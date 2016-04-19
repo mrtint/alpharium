@@ -6,5 +6,6 @@
 angular.module('alphariumApp.configuration', [])
   .constant('configuration', {
     test: 'Development',
+    sourceUrl: 'http://localhost:8080',
     logEnabled: 'true'
   });

@@ -1,4 +1,5 @@
 {
   "test": "QA",
+  "sourceUrl": "http://localhost:8080",
   "logEnabled": "true"
 }

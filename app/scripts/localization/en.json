@@ -3,6 +3,7 @@
   "app_name": "Alpharium",
   "menu": {
     "main": "Main",
+    "video" : "Video",
     "about": "About",
     "language": "Language"
   }

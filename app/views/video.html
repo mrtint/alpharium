@@ -1,0 +1,32 @@
+<div class="jumbotron">
+  <h3>영상 등록</h3>
+  <div class="input-group">
+    <span class="input-group-addon">
+      <span class="glyphicon glyphicon-facetime-video" aria-hidden="true"></span>
+    </span>
+    <input type="text" class="form-control" placeholder="Youtube URL" aria-describedby="sizing-addon1"
+           ng-model="video.url">
+    <span class="input-group-btn">
+      <button class="btn btn-default" type="button" ng-click="confirmUrl()">Submit</button>
+    </span>
+  </div>
+</div>
+<div id="video-area">
+
+</div>
+<div class="input-group">
+    <span class="input-group-addon">
+      <span class="glyphicon glyphicon-align-justify" aria-hidden="true"></span>
+    </span>
+  <input type="text" class="form-control" placeholder="Title" aria-describedby="sizing-addon1" ng-model="video.title">
+</div>
+<textarea class="form-control" ng-model="video.description" placeholder="Description" rows="3"></textarea>
+<br>
+<div class="btn-group btn-group-justified" role="group" aria-label="...">
+  <div class="btn-group" role="group">
+    <button type="button" class="btn btn-default" ng-click="add()">Add</button>
+  </div>
+  <div class="btn-group" role="group">
+    <button type="button" class="btn btn-default" ng-click="cancel()">Cancel</button>
+  </div>
+</div>

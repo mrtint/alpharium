@@ -3,6 +3,7 @@
   "app_name": "알파리움",
   "menu": {
     "main": "메인",
+    "video": "영상",
     "about": "소개",
     "language": "언어"
   }

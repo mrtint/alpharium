@@ -40,7 +40,8 @@ app.config(['configuration', '$translateProvider', '$stateProvider', '$urlRouter
     // URL 리소스 사용을 위한 신뢰 출처, 비신뢰 출처 등록
     $sceDelegateProvider.resourceUrlWhitelist([
       'self',
-      'https://www.youtube.com/**'
+      'https://www.youtube.com/**',
+      'https://youtu.be/**'
     ]);
     $sceDelegateProvider.resourceUrlBlacklist([
       'http://myapp.example.com/clickThru**'
@@ -51,8 +52,7 @@ app.config(['configuration', '$translateProvider', '$stateProvider', '$urlRouter
     $stateProvider
       .state('main', {
         url: "/",
-        templateUrl: '/views/main.html',
-        controller: 'MainController'
+        templateUrl: '/views/main.html'
       })
       .state('video', {
         url: "/video",
