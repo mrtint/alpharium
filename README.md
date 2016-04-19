@@ -1,4 +1,4 @@
-# hansan-angular-template
+# Alpharium project
 
 ## Overview
 
