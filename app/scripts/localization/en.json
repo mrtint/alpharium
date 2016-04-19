@@ -1,0 +1,9 @@
+{
+  "title": "Hansan's AngularJS sample page",
+  "app_name": "Alpharium",
+  "menu": {
+    "main": "Main",
+    "about": "About",
+    "language": "Language"
+  }
+}

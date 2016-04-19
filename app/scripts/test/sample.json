@@ -1,0 +1,769 @@
+{
+  "result": [
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/V5XVrrRlT-Ps5d5Q4GjAb-0Btzo\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK7R7S27fCJlo_s4-0ASjGP4",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:54:23.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "하스스톤: 낙스라마스의 저주 시네마틱 영상",
+        "description": "혼자서도 누구나 즐길 수 있는 하스스톤 최초의 모험 모드, 낙스라마스의 문이 열렸습니다!\n\n무시무시한 낙스라마스의 다섯 지구에서 기다리는 상징적인 우두머리들과 대결하고, 여러분의 하스스톤 덱에 추가할 수 있는 멋진 전리품(이라고 쓰고 \"신규 카드\"라고 읽습니다)을 얻어 보세요! 하스스톤은 이곳에서 시작하실 수 있습니다: http://kr.battle.net/hearthstone/ko/\n\n또한, 하스스톤 페이스북에서 새로운 소식들을 빠르게 확인하실 수 있으니 참고하세요!\nhttps://www.facebook.com/HearthstonekoKR",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/FYS_97jJplo/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/FYS_97jJplo/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/FYS_97jJplo/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/FYS_97jJplo/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/FYS_97jJplo/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 0,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "FYS_97jJplo"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/CrKllS_gaAypc0-SD1d7LwaN1Js\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupKwtHCYBbhiRPJ8jBnpNjcJo",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "워크래프트 III: 프로즌 쓰론 - 오프닝 시네마틱 영상",
+        "description": "전쟁의 상흔이 새겨진 아제로스로부터 악마의 위협은 사라졌지만, 평화는 여전히 먼 꿈만 같습니다. 이제 더 많은 유닛과 임무, 더 격정적인 전략적 전투가 함께하는 전쟁의 불길이 번집니다.\n\n2003년에 출시된 워크래프트 III: 프로즌 쓰론은 여러 상을 휩쓴 실시간 전략 시뮬레이션 게임 워크래프트 III의 확장팩입니다. 유닛들에게 명령을 내리고 전설의 영웅들을 움직여 월드 오브 워크래프트로 이어지는 역사의 장면들을 함께하세요!\nhttp://blizzard.com/games/war3/\n\n블리자드의 영상을 구독해보세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/_d3_-Mp2pK0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/_d3_-Mp2pK0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/_d3_-Mp2pK0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/_d3_-Mp2pK0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/_d3_-Mp2pK0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 1,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "_d3_-Mp2pK0"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/vIdn00A0uYhZFepntp-bidaaSaQ\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK8-GayGkuUS4kOWN9s-VxhU",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "워크래프트 III: 레인 오브 카오스 - 오프닝 시네마틱 영상",
+        "description": "교활하고 사악하며 막을 수 없을 듯한 악마의 무리 불타는 군단이 오랜 준비를 마치고 드디어 인간 세상을 공습하려 합니다. 혼돈의 시대가 열리면, 전략이 생존을 가늠합니다.\n\n2002년 출시된 워크래프트 III는 워크래프트 세계를 배경으로한 실시간 전략 시뮬레이션 게임입니다. 신비로운 나이트 엘프, 사악한 언데드, 야만적인 오크, 숭고한 인간을 지휘하세요. 또한 전설의 영웅들을 움직여 월드 오브 워크래프트로 이어지는 역사의 장면들을 함께하세요!\n\nhttp://blizzard.com/games/war3/\n\n블리자드의 영상을 구독해보세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/jxuPr-sfOZw/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/jxuPr-sfOZw/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/jxuPr-sfOZw/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/jxuPr-sfOZw/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/jxuPr-sfOZw/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 2,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "jxuPr-sfOZw"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/kkUZLlMmu8mqtqQJrORCLH5SGdY\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK60pT4DUWLjfM5qc9gd2L-c",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "스타크래프트 II: 자유의 날개 - 과거의 망령 영상",
+        "description": "이 영상은 자유의 날개 출시를 앞두고 진행된 자치령 캠페인에서 최후에 개방되는 보상으로 공개되었습니다. \nhttp://StarCraft.com\n\n자막 버튼을 누르시면 한글 자막으로 보실 수 있습니다.\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/vYQFjDIM8eI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/vYQFjDIM8eI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/vYQFjDIM8eI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/vYQFjDIM8eI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/vYQFjDIM8eI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 3,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "vYQFjDIM8eI"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/n5z-jnNjfsdNY85BZcw1YN2DFNk\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK5056cRjaoDuX0QJ7cHuT9Y",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "스타크래프트: 브루드워 - 오프닝 시네마틱 영상",
+        "description": "스타크래프트 확장팩 브루드워의 이 오프닝 시네마틱 영상에서 알렉산더는 지상의 테란 부대의 절실한 요구를 무시하는 모습을 보입니다. 배틀크루저 내부에서는 제라드 듀갈 제독이 알렉세이 스투코프 부제독이 저그의 위협에 고마워하며 저그의 존재를 구경만 하고 있다고 주장합니다. \n\nhttp://blizzard.com/games/sc/\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/rcaLODLMilM/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/rcaLODLMilM/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/rcaLODLMilM/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/rcaLODLMilM/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/rcaLODLMilM/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 4,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "rcaLODLMilM"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/_aEQNN5qzWhyvNwBkQtfinBqYqo\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupKxW5ZxG7gQvMt_EBhAkDXY0",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "스타크래프트 - 오리지널 오프닝 시네마틱 영상",
+        "description": "스타크래프트 오리지널의 오프닝 시네마틱 영상입니다. 모든 것이 어긋나기 시작할 때, Jem과 Joeyray는 차우 사라 행성 궤도에 있던 부서진 테란 우주선 잔해를 뒤지고 있었을 뿐입니다.\n\nhttp://blizzard.com/games/sc/\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/TdFRdriyxOA/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/TdFRdriyxOA/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/TdFRdriyxOA/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/TdFRdriyxOA/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/TdFRdriyxOA/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 5,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "TdFRdriyxOA"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/8e8aV7ocXkm-DnNawsTeJg7w23w\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupKxwKjLADVZean5M435Qivw8",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "디아블로 II - 오프닝 시네마틱 영상",
+        "description": "Stay a while and listen! http://blizzard.com/games/d2/\n\n트리스트람의 교회 아래에서 공포의 군주 디아블로가 용감한 용사에게 무릎을 꿇었습니다. 이제 그 용사는 사라졌고, 그 자리를 대신한 어둠의 방랑자는 성역의 세계를 배회하며 지나가는 자리마다 죽음과 파괴를 남깁니다. 인류의 영웅으로서, 여러분은 디아블로의 악마 형제를 추종하는 자들과 맞서 싸우며, 어둠의 방랑자가 끔찍한 운명을 현실로 옮기기 전에 막아내야 합니다.\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/EsP93Oyfo2s/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/EsP93Oyfo2s/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/EsP93Oyfo2s/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/EsP93Oyfo2s/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/EsP93Oyfo2s/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 6,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "EsP93Oyfo2s"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/9jEwb5LendgEx6YB5Bm28-AQUWg\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupKxCBLCRvY_mpQxnLrg8XquU",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "월드 오브 워크래프트: 리치 왕의 분노 - 시네마틱 영상",
+        "description": "이 영상은 월드 오브 워크래프트의 두 번째 확장팩 \"리치 왕의 분노\"의 공식 시네마틱 영상입니다. 리치 왕의 분노의 주요 내용은 아래를 참고하시기 바라며, 모든 세부 사항은 여기에서 확인하실 수 있습니다: http://battle.net/wow/game/patch-notes/3-0\n\n아웃랜드의 도전에 종지부를 찍은 당신은 다가올 위험에 맞설 준비가 되었는가? 얼어붙은 북쪽 땅에서 아제로스 시민의 마음을 공포와 불안으로 채울 악의 세력이 잠에서 깨어나고 있다. 이 땅의 영웅들은 기대와 결의를 갖고 모험에 나설 준비를 하고 있다.\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/4qLTUILKleU/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/4qLTUILKleU/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/4qLTUILKleU/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/4qLTUILKleU/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/4qLTUILKleU/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 7,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "4qLTUILKleU"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/REqVaGmZloW9UGohmabPeB2ip24\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK3ebwO_G4-1lT6Ykrl_xg5U",
+      "snippet": {
+        "publishedAt": "2014-02-18T07:38:11.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "월드 오브 워크래프트: 불타는 성전 - 시네마틱 영상",
+        "description": "이 영상은 월드 오브 워크래프트의 첫 번째 확장팩 \"불타는 성전\"의 공식 시네마틱 영상입니다. 불타는 성전의 주요 내용은 아래를 참고하시기 바라며, 모든 세부 내용은 여기에서 확인하실 수 있습니다: http://battle.net/wow/game/patch-notes/2-0\n\n거대한 폭풍이 불기 전에는 종종 고요한 정적이 먼저 엄습합니다. 전 세계가 일 순간 고요에 휩싸이고 폭풍이 그 힘을 모두 모으는 것처럼 말입니다. 이번 패치는 월드 오브 워크래프트: 불타는 성전의 출시에 앞서 공개된 패치로 PvP 명예 시스템 및 투기장을 포함해서 여러 중요한 변경 및 개선 사항이 포함되어 있습니다. 전장에서 자신의 가치를 입증하고 새롭고 강력한 PvP 명예 보상을 얻으십시오. 또는 자신의 팀 PvP 실력을 새로운 투기장 시스템에서 시험해 보십시오. 아웃랜드와 또 다른 미지의 영역에서 기다리고 있는 수많은 도전에 맞서기 위해 자신의 직업 특성을 새롭게 바꿔 보십시오. 이외에도 이번 패치에 새로운 기능들이 많이 추가됩니다. 하지만 이것은 단지 폭풍 전야의 고요일 뿐입니다.\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/XMZ_H8UkTDs/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/XMZ_H8UkTDs/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/XMZ_H8UkTDs/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/XMZ_H8UkTDs/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/XMZ_H8UkTDs/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 8,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "XMZ_H8UkTDs"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/41EUhU37diKrm3PLIFgSliWYqEo\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK09H8FFhFJwJfvQCjwwsRSw",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:48:39.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "디아블로 III: 영혼을 거두는 자 - 오프닝 시네마틱 영상",
+        "description": "종말이 시작되었다: diablo3.com/ReaperOfSouls\n\n성역을 중심으로 펼쳐지는 방대한 서사시의 다음 장이 공개되었습니다. 본 영상은 디아블로 III의 첫 번째 확장팩 \"영혼을 거두는 자\"의 오프닝 시네마틱으로, 2013년 8월 21일 독일 쾰른에서 개최된 gamescom 2013에서 최초로 공개되었습니다. 평론가들의 극찬을 받은 디아블로 시리즈의 대규모 업데이트에 대한 최신 소식과 정보는 http://www.diablo3.com을 참고해 주십시오.",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/JE_4hiF4000/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/JE_4hiF4000/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/JE_4hiF4000/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/JE_4hiF4000/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/JE_4hiF4000/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 9,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "JE_4hiF4000"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/4Cxo4Adj0eo_w6IKNqydao7-WBM\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK1zuevOX8w1LF68Tvb_gZqs",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:56:15.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "월드 오브 워크래프트 시네마틱 영상",
+        "description": "이 영상은 출시와 함께 세계에 폭풍을 몰고온 월드 오브 워크래프트의 공식 시네마틱 영상입니다.\n\n월드 오브 워크래프트 스토리에 대한 더 자세한 사항은 여기에서 확인하실 수 있습니다.\nhttp://battle.net/wow/game/the-story-of-warcraft/chapter6\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/zyDUmYQppLQ/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/zyDUmYQppLQ/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/zyDUmYQppLQ/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/zyDUmYQppLQ/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/zyDUmYQppLQ/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 10,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "zyDUmYQppLQ"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/_CK2VnneXCd1LtA6y1HfhPlgobM\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK0sN6pwHKCWuZhvdyJTXRoA",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:50:53.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "하스스톤: 워크래프트의 영웅들 시네마틱 영상",
+        "description": "하스스톤은 블리자드 엔터테인먼트에서 선보인 무료로 즐길 수 있는 전략 카드 게임입니다. 자세한 정보는 여기서 확인하실 수 있습니다. http://PlayHearthstone.com\n\n블리자드 엔터테인먼트의 하스스톤: 워크래프트의 영웅들은 윈도우, Mac, 그리고 iPad에서 즐길 수 있는 전략 카드 게임입니다. 하스스톤은 무료로 플레이할 수 있으며, 놀랍도록 단순하지만, 손을 뗄 수 없도록 만들어졌습니다.하스스톤은 선술집의 따스한 모닥불 주위에 모여 활기차게 대결을 벌이는 느낌으로 빠르게 실력을 겨룰 수 있는 게임입니다.\n\n플레이어의 카드 덱은 워크래프트를 대표하는 아홉 개의 직업에 해당하는 영웅들을 중심으로 만들어집니다. 하수인과 주문, 그리고 무기 카드를 사용하여 자신만의 차별화된 전략을 선보이세요. 여러분은 컴퓨터와 연습 경기를 치러 실력을 향상시킨 후, 준비가 되면 Battle.net 친구들이나 다른 플레이어들과 친선 경기를 할 수 있습니다. 또한 제작 기능을 사용하거나, 경기에서 승리하거나, 카드 팩을 구매하면 더욱 많은 카드를 얻을 수 있고, 이로써 당신의 덱은 더욱 강력해질 것입니다. 수백 가지의 고유한 카드들로 구상할 수 있는 조합과 전술은 그야말로 무한합니다!\n\n페이스북과 트위터를 통해 새로운 소식을 확인하실 수 있습니다!\nhttp://Facebook.com/PlayHearthstone\nhttp://Twitter.com/PlayHearthstone\n\n지금 블리자드의 영상을 구독해보세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/m6kPKwfuzPI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/m6kPKwfuzPI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/m6kPKwfuzPI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/m6kPKwfuzPI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/m6kPKwfuzPI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 11,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "m6kPKwfuzPI"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/oNXlhi1EqNnUlNqhZoFUQ_xO8JU\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK2m5F8NG4ib-A1Ivl0vz4x4",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:51:27.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "복수 - 스타크래프트 II: 군단의 심장",
+        "description": "사라 캐리건은 크나 큰 분노와 거대한 복수의 길을 걷고 있습니다. 그녀가 복수의 길을 쫓는 동안 칼날 여왕은 자신의 제국을 되찾으려 합니다. \n\n스타크래프트 II: 군단의 심장을 지금 구매하세요:\nhttp://kr.blizzard.com/ko-kr/games/hots/\n\n블리자드의 영상을 구독해보세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/qlLBc1QKdU8/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/qlLBc1QKdU8/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/qlLBc1QKdU8/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/qlLBc1QKdU8/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/qlLBc1QKdU8/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 12,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "qlLBc1QKdU8"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/dOwke_Y3cyaSFc4uK3qP_ac-pY4\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK5UllzhMV-qSm0d2N6ynRIM",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:51:51.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "스타크래프트 II: 군단의 심장 - 오프닝 시네마틱 영상",
+        "description": "스타크래프트 II: 군단의 심장 오프닝 시네마틱 영상이 공개되었습니다! 3월 12일 출시하는 군단의 심장을 오프닝 시네마틱 영상으로 미리 만나보세요! 아래 링크를 통해 군단의 심장에 대한 더 자세한 정보를 확인하실 수 있습니다.\nhttp://kr.blizzard.com/ko-kr/games/hots/index.html\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/qStRYrJUMrI/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/qStRYrJUMrI/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/qStRYrJUMrI/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/qStRYrJUMrI/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/qStRYrJUMrI/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 13,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "qStRYrJUMrI"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/pSOZ0KNAxpuY_QIxxD2Xi-7kv10\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK5u6AgA9BmZnDGyejGhu36s",
+      "snippet": {
+        "publishedAt": "2014-08-01T06:52:28.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "월드 오브 워크래프트: 판다리아의 안개 - 시네마틱 영상",
+        "description": "이 영상은 2012년 8월 16일 독일 쾰른에서 처음 공개된 월드 오브 워크래프트의 네 번째 확장팩 \"판다리아의 안개\"의 공식 시네마틱 영상입니다. 평단의 극찬을 받은 월드 오브 워크래프트 프랜차이즈의 주요 내용은 여기에서 확인하실 수 있습니다: http://blizzard.com/games/mists/?int=wow\n\n판다리아의 신비한 비밀이 드러납니다. \n\n여러분은 아제로스를 파괴하려던 데스윙을 막아냈고, 용군단을 멸망의 위기로부터 구해냈습니다. 이제 새로운 모험의 문이 열립니다. 사라진 대륙의 신비를 마주하고 판다리아의 과거에 숨은 검은 비밀을 밝혀내야 합니다. 세계의 분리 이후로 줄곧 숨겨져 있던 고대 왕국을 탐험하고, 잊혀진 금고 깊은 곳에 감춰진 보물을 발굴하고, 또 너무 늦기 전에 악의 그림자로부터 판다리아를 지켜내야 합니다.\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/lthknGu6GX0/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/lthknGu6GX0/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/lthknGu6GX0/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/lthknGu6GX0/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/lthknGu6GX0/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 14,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "lthknGu6GX0"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/nhjefH2fSQjK2EP-sDtUR5OSf-0\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK9PPdZg5ERkknHrSlwuWS4k",
+      "snippet": {
+        "publishedAt": "2014-08-01T09:29:13.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "디아블로 III 오프닝 시네마틱 영상",
+        "description": "지옥의 문이 열리고, 여러분이 불타는 지옥의 악마들에 맞서 성역을 지키는 최후의 싸움을 하게 될 바로 그 순간, 여러분의 두 눈을 의심하게 할 만큼 장엄한 영상이 펼쳐질 것 입니다. 바로 디아블로 III의 도입부 영상입니다. 빛과 어둠의 충돌, 그 끝나지 않은 전투의 현장을 생생히 보여주는 디아블로 III의 새 도입부 영상을 미리 감상해보세요.\nhttp://blizzard.com/games/d3/\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/tYjvJq0qfqg/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/tYjvJq0qfqg/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/tYjvJq0qfqg/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/tYjvJq0qfqg/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/tYjvJq0qfqg/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 15,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "tYjvJq0qfqg"
+        }
+      }
+    },
+    {
+      "kind": "youtube#playlistItem",
+      "etag": "\"0KG1mRN7bm3nResDPKHQZpg5-do/5ZuL2gnV54UAKGy7JrNjjui4wAE\"",
+      "id": "PLDsjUG0XVvjndPVJCYjupK_9yDB4JBAJBZjtTwO2S0D0",
+      "snippet": {
+        "publishedAt": "2014-08-01T09:26:46.000Z",
+        "channelId": "UCEOoYEH7uLJ0Ux566Hy3XmQ",
+        "title": "디아블로 III - 검은 영혼석 시네마틱 영상",
+        "description": "레아는 자신의 아저씨 데커드 케인이 남긴 비밀스럽고 골치 아픈 기호의 의미들을 알아내기 위해 고심하고 있을 때 어두운 환영을 목격합니다.\n죄악의 군주 아즈모단은 불타는 지옥으로부터 자신의 군대가 성역을 향해 밀려들어 이 세상은 물론 저항할 의지마저 짓밟을 것이라며 연약하고 어린 그녀를 겁박합니다.\n\n이 게임 영상에서 디아블로 III에서 진행되는 어두운 줄거리의 한 부분이 살짝 드러납니다. \nhttp://battle.net/d3/\n\n지금 블리자드의 영상을 구독하세요!\nhttp://www.youtube.com/subscription_center?add_user=BlizzardKorea",
+        "thumbnails": {
+          "default": {
+            "url": "https://i.ytimg.com/vi/z1ioZ1V3_us/default.jpg",
+            "width": 120,
+            "height": 90
+          },
+          "medium": {
+            "url": "https://i.ytimg.com/vi/z1ioZ1V3_us/mqdefault.jpg",
+            "width": 320,
+            "height": 180
+          },
+          "high": {
+            "url": "https://i.ytimg.com/vi/z1ioZ1V3_us/hqdefault.jpg",
+            "width": 480,
+            "height": 360
+          },
+          "standard": {
+            "url": "https://i.ytimg.com/vi/z1ioZ1V3_us/sddefault.jpg",
+            "width": 640,
+            "height": 480
+          },
+          "maxres": {
+            "url": "https://i.ytimg.com/vi/z1ioZ1V3_us/maxresdefault.jpg",
+            "width": 1280,
+            "height": 720
+          }
+        },
+        "channelTitle": "BLIZZARDKOREA",
+        "playlistId": "PLGUh4aFN2oKWBSkdJt-9VKu2ihRQsApyB",
+        "position": 16,
+        "resourceId": {
+          "kind": "youtube#video",
+          "videoId": "z1ioZ1V3_us"
+        }
+      }
+    }
+  ]
+}
