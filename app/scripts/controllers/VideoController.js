@@ -15,30 +15,39 @@ mainApp.controller('VideoController',
       $scope.videoCount = 0;
       $scope.video = null;
 
+      /**
+       * Confirm Video URL and set video data.
+       */
       $scope.confirmUrl = function () {
         var videoArea = angular.element('#video-area');
         if ($scope.video !== null) {
           $scope.parser = document.createElement('a');
           $scope.parser.href = $scope.video.url;
-          $scope.video.resource_id = $scope.parser.pathname.replace("/", "");
-          $scope.video.embed = "https://www.youtube.com/embed/" + $scope.video.resource_id;
+          $scope.video.resourceId = $scope.parser.pathname.replace("/", "");
+          $scope.video.thumnailUrl = "https://i.ytimg.com/vi/" + $scope.video.resourceId + "/sddefault.jpg";
           $log.debug($scope.video);
           videoArea.empty();
           videoArea.append($compile('<youtube-video></youtube-video>')($scope));
         }
       };
-
+      /**
+       * Add video data.
+       */
       $scope.add = function () {
+        $log.debug($scope.video);
         $http({
           method: 'PUT',
           url: configuration.sourceUrl + '/video',
           data: $scope.video
         }).then(function successCallback(response) {
           $log.debug(response);
-          // $scope.cancel();
+          $scope.cancel();
         });
       };
 
+      /**
+       * Reset a creating video data.
+       */
       $scope.cancel = function () {
         $scope.video = null;
       };
