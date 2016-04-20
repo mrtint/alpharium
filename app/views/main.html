@@ -1,0 +1,13 @@
+<div id="video-list" ng-controller="VideoListController">
+  <div class="row">
+    <div class="col-sm-6 col-md-4" ng-repeat="v in videos">
+      <div class="thumbnail">
+        <img ng-src="{{ v.thumnailUrl }}" alt="{{ v.resourceId }}">
+        <div class="caption">
+          <h3>{{ v.title }}</h3>
+          <p>{{ v.description }}</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
