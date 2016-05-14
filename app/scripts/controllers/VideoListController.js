@@ -20,11 +20,12 @@ mainApp.controller('VideoListController',
       $scope.getList = function () {
         $http({
           method: 'GET',
-          url: configuration.sourceUrl + '/video/list',
+          url: configuration.sourceUrl + '/api/videos',
           data: $scope.video
         }).then(function successCallback(response) {
           $log.debug(response);
           $scope.videos = response.data;
+          
         });
       }
 

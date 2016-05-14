@@ -52,7 +52,8 @@ app.config(['configuration', '$translateProvider', '$stateProvider', '$urlRouter
     $stateProvider
       .state('main', {
         url: "/",
-        templateUrl: '/views/main.html'
+        templateUrl: '/views/main.html',
+        controller: 'VideoListController'
       })
       .state('video', {
         url: "/video",
