@@ -25,7 +25,6 @@ mainApp.controller('VideoListController',
         }).then(function successCallback(response) {
           $log.debug(response);
           $scope.videos = response.data;
-          
         });
       }
 
