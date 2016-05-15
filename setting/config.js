@@ -7,5 +7,6 @@ angular.module('alphariumApp.configuration', [])
   .constant('configuration', {
     test: '@@test',
     sourceUrl: '@@sourceUrl',
+    oembedUrl: '@@oembedUrl',
     logEnabled: '@@logEnabled'
   });

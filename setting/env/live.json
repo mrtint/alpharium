@@ -1,5 +1,6 @@
 {
   "test": "Live",
   "sourceUrl" : "http://localhost:8080",
+  "oembedUrl" : "https://noembed.com/embed",
   "logEnabled": "false"
 }
