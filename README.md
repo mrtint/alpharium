@@ -8,7 +8,8 @@
 
 ## 🛠️ 기술 스택 (Tech Stack)
 
-* **Core:** Expo SDK 57 (`~57.0.9`), React Native (`0.86.2`), TypeScript (`~5.8.2`)
+* **Core:** Expo SDK 54 (`~54.0.36`), React Native (`0.81.5`), React (`19.1.0`), TypeScript (`~5.9.2`)
+* **Runtime:** Node.js `20.19.x` 이상 (SDK 54 요구사항)
 * **AI Model:** LG EXAONE 4.0 1.2B Instruct (Pure On-Device) / Moondream 1.6B (Vision)
 * **Testing:** Jest (`jest-expo`), React Native Testing Library (`@testing-library/react-native`), Maestro E2E
 * **Code Quality:** Prettier, TypeScript Strict Lint
