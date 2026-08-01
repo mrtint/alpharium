@@ -1,3 +1,12 @@
+# Read the concept first
+
+이 앱의 일기를 쓰는 주체는 사용자가 아니라 **휴대폰**이다. 목적은 정확한 기록이
+아니라 유희다. 코드만 보면 평범한 일기 앱으로 오해하기 쉬우니, 작업 전에
+[docs/concept.md](docs/concept.md)를 읽어라. 규범은
+[.specify/memory/constitution.md](.specify/memory/constitution.md)에 있다.
+
+기존 `src/`와 `App.tsx`는 컨셉 검증용 실험체이며 설계 근거가 아니다.
+
 # Expo HAS CHANGED
 
 This project targets **Expo SDK 54**. Read the exact versioned docs at
