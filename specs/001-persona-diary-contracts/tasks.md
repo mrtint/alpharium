@@ -1,0 +1,235 @@
+---
+
+description: "Task list for US1 코어 루프 implementation"
+---
+
+# Tasks: US1 코어 루프 — 오늘의 신호로 일기 한 편 받기
+
+**Input**: Design documents from `/specs/001-persona-diary-contracts/`
+
+**Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/axis-boundaries.md](contracts/axis-boundaries.md), [quickstart.md](quickstart.md)
+
+## 범위 *(먼저 읽을 것)*
+
+[plan.md](plan.md)가 정한 대로 **001 User Story 1 하나만** 다룬다. US2~US5는 이 목록에 없다.
+
+**예외 하나** — US2(실패 경로)의 구현은 US1 안에 포함된다. 001 US2가 그 이유를 적었고
+헌법 원칙 II가 NON-NEGOTIABLE이다: 성공 경로만 만들고 실패를 나중에 붙이면 그 사이에
+빈칸을 메우는 코드가 반드시 생긴다. 따라서 실패 처리 과제에 `[US1]` 라벨을 붙인다 —
+US1의 완료 조건이지 별도 스토리가 아니다.
+
+## Tests: 헌법이 요구한다 (선택 아님)
+
+헌법 원칙 IV가 **구현 전 테스트를 먼저 쓸 대상**을 명시했다: `AIEngine` 구현체(정상·실패·
+형식 불량 응답), 신호/일기 스키마 검증, 신호 정제 계약, 퍼소나 지속성, 로컬 저장·조회·삭제,
+권한 거부 분기. 순수 스타일링·레이아웃은 면제. Maestro E2E는 주 경로 1개 이상 유지(MUST).
+
+해당 과제에 **⚖️ 원칙 IV** 표시를 붙였다. 이것은 선택 항목이 아니다.
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: 병렬 가능 (다른 파일, 미완 과제에 의존하지 않음)
+- **[Story]**: `[US1]` — 사용자 스토리 단계에만 붙는다
+- 파일 경로를 반드시 포함한다
+
+---
+
+## Phase 1: Setup (Shared Infrastructure)
+
+**Purpose**: 프로젝트 구조와 의존성
+
+- [ ] T001 [plan.md](plan.md)의 구조에 따라 축별 디렉터리 생성: `src/persona/`, `src/signals/`, `src/inference/engines/`, `src/speaker/`, `src/storage/`, `src/ui/`
+- [ ] T002 신호 소스 패키지(활동·위치·사진·일정)를 `npx expo install`로 설치하고 `package.json`에 반영 — **버전을 손으로 적지 않는다**(헌법 「패키지 버전 추측 금지」). `npx expo install --check`로 검증
+- [ ] T003 [P] 테스트 디렉터리 생성: `__tests__/contract/`, `__tests__/integration/`, `__tests__/unit/`
+- [ ] T004 [P] 어댑터 선택 지점과 `.env.development` 구성 — 프로덕션 번들에 클라우드 어댑터가 포함되지 않도록 빌드 시점에 갈린다 (헌법 원칙 I)
+
+---
+
+## Phase 2: Foundational (Blocking Prerequisites)
+
+**Purpose**: 모든 축이 딛는 기반. 이 단계가 끝나기 전에는 US1 작업을 시작할 수 없다
+
+**⚠️ CRITICAL**: T005는 나머지 전부의 전제다 — 관측 여부 표현이 없으면 001 FR-010이
+구조적으로 깨진다
+
+- [ ] T005 **관측 여부 표현** 타입을 `src/signals/observation.ts`에 구현 — 「관측되지 않았음」이 「값이 없음」과 구별되는 형태. 값 자리를 비우는 것으로 대신하지 않는다 (001 FR-010, 003 FR-242)
+- [ ] T006 ⚖️ 원칙 IV 스키마 검증 테스트를 `__tests__/contract/observation.test.ts`에 작성 — 미관측과 값-없음이 구별되고, 「걸음 수 0」과 「걸음 수 미관측」이 다른 상태임을 검사
+- [ ] T007 [P] 성격 카탈로그(식별자·표시명·서술)를 `src/persona/catalog.ts`에 구현 (002 FR-140·FR-141)
+- [ ] T008 [P] 퍼소나 엔티티를 `src/persona/persona.ts`에 구현 — 이름(1~20자)과 **성격 식별자**만 보유. 기기 식별자·관측 환경·이름 변경 이력을 포함하지 않는다 (001 FR-005·FR-006, 005 FR-404)
+- [ ] T009 ⚖️ 원칙 IV 퍼소나 지속성 테스트를 `__tests__/contract/persona-persistence.test.ts`에 작성 — 기기 식별자가 달라져도 이름·성격이 동일 (001 SC-005)
+- [ ] T010 [P] 일별 집계 엔티티를 `src/signals/digest.ts`에 구현 — [data-model.md](data-model.md) 엔티티 2의 열 항목. **목록 밖의 항목을 추가하지 않는다** (003 FR-244)
+- [ ] T011 [P] 일기 엔티티를 `src/inference/diary.ts`에 구현 — 날짜·퍼소나 귀속·본문 셋뿐. 제목·태그·기분·재료 요약을 두지 않는다 (004 FR-300·FR-301)
+- [ ] T012 **기록 묶음** 구조를 `src/storage/bundle.ts`에 구현 — 일기와 집계를 하나의 조작 단위로 다룬다. **원본 로그를 담을 자리가 존재하지 않아야 한다** (005 FR-402·FR-410)
+- [ ] T013 ⚖️ 원칙 IV 기록 묶음 구조 테스트를 `__tests__/contract/bundle-structure.test.ts`에 작성 — 원본 로그를 담을 자리가 타입 수준에서 없음을 검사. 저장 시점 걸러내기로 대신하지 않았음을 확인 (005 FR-402)
+- [ ] T014 [P] `AIEngine` 인터페이스를 `src/inference/engine.ts`에 정의 — 모든 추론 접근이 이 경계를 통과한다 (헌법 원칙 III)
+- [ ] T015 **화자 판정기**를 `src/speaker/verify.ts`에 순수 함수로 구현 — [research.md](research.md) 결정 1의 어휘적 판정. **표지 목록은 비운 채 매개변수로 둔다**(T057에서 실측으로 채운다). `AIEngine` 구현체 안에 두지 않는다 (헌법 원칙 III, 004 FR-346~FR-348)
+- [ ] T016 ⚖️ 원칙 IV 화자 판정 성질 테스트를 `__tests__/contract/speaker-verify.test.ts`에 작성 — [quickstart.md](quickstart.md) 시나리오 8a의 셋: 결정성(같은 본문에 항상 같은 결과), 내용 비평가(같은 화자의 좋은 글과 나쁜 글이 같은 판정), 교정 없음(참·거짓만 내놓는다) (004 FR-346·FR-347·FR-349, SC-309)
+- [ ] T017 [P] 로그 위생을 `src/logging.ts`에 구현 — 일기 본문·집계 내용·원시 신호가 로그·크래시 리포트에 남지 않는다 (001 FR-037, 005 FR-405, 헌법 원칙 I)
+- [ ] T018 [P] 저장소 형식 버전 식별을 `src/storage/version.ts`에 구현 (005 FR-403)
+
+**Checkpoint**: 기반 완료 — US1 구현을 시작할 수 있다
+
+---
+
+## Phase 3: User Story 1 - 오늘의 신호로 일기 한 편 받기 (Priority: P1) 🎯 MVP
+
+**Goal**: 사용자가 생성을 요청하면 그 시점에 집계를 만들고, 퍼소나로 해석해 일기를 쓰고,
+기록 묶음으로 저장하고, 사용자가 본문과 근거 집계를 **대조**한다.
+
+**Independent Test**: 퍼소나가 존재하는 상태에서 생성을 한 번 요청해, 일기 한 편이
+산출되고 그날의 집계와 함께 저장·조회되는지로 검증한다. **일기의 내용이 실제 하루와
+맞는지는 검증하지 않는다** (001 US1 Independent Test, SC-009).
+
+### 3a. 수집·정제 축 (003)
+
+- [ ] T019 [P] [US1] 활동 소스 어댑터를 `src/signals/sources/activity.ts`에 구현 — 걸음 수(0시~관측 시점 누적)와 활동 시간대. 분 단위 로그를 담지 않는다 (003 FR-247·FR-248)
+- [ ] T020 [P] [US1] 위치 소스 어댑터를 `src/signals/sources/location.ts`에 구현 — 장소 표현+시간대의 쌍, 이동 여부. **원시 좌표·이동 경로·속도를 담지 않는다** (003 FR-249·FR-251)
+- [ ] T021 [P] [US1] 사진 소스 어댑터를 `src/signals/sources/photo.ts`에 구현 — **시각대·장소·캡션 셋만**. 원본·경로·기기 정보·좌표를 전부 버린다. 캡션 생성 실패 시 지어내지 않고 미관측으로 남긴다 (003 FR-220·FR-235·FR-252)
+- [ ] T022 [P] [US1] 일정 소스 어댑터를 `src/signals/sources/calendar.ts`에 구현 — **제목·시간대만**. 참석자·설명 본문·첨부·회의 링크·일정 식별자를 담지 않는다 (003 FR-253)
+- [ ] T023 [US1] 권한 거부 분기를 `src/signals/permissions.ts`에 구현 — 크래시가 아닌 기능 축소. **모든 소스가 거부되어도 집계 한 덩어리를 산출한다**(비어 있음으로 판정) (003 FR-217, 헌법 원칙 V)
+- [ ] T024 [US1] ⚖️ 원칙 IV 권한 거부 테스트를 `__tests__/contract/permissions.test.ts`에 작성 — 소스별 거부와 전체 거부에서 집계가 산출되고 크래시하지 않음
+- [ ] T025 [US1] 집계 산출기를 `src/signals/digest-builder.ts`에 구현 — **생성 요청 시점에** 만든다(상시 수집 금지). 항목별 상한과 시간대 세분도는 **매개변수로 두고 값을 비운다**(T059에서 실측) (003 FR-257·FR-260·FR-261)
+- [ ] T026 [US1] 규모 판정을 `src/signals/scale.ts`에 구현 — **여섯 항목**(걸음 수·활동 시간대·머문 장소·이동 여부·사진 목록·일정 목록)만 센다. 항상 존재하는 셋과 파생 항목(사진 총 개수)은 세지 않는다. 임계값은 **매개변수로 두고 값을 비운다**(T058에서 실측, 범위 2~6) (003 FR-271~FR-275)
+- [ ] T027 [US1] ⚖️ 원칙 IV 규모 판정 테스트를 `__tests__/contract/scale.test.ts`에 작성 — 전 조합에서 판정이 정확히 하나, 같은 입력에 항상 같은 결과, 내용·값의 크기가 판정에 관여하지 않음 (003 FR-271·FR-275)
+- [ ] T028 [US1] ⚖️ 원칙 IV 신호 정제 계약 테스트를 `__tests__/contract/digest-contract.test.ts`에 작성 — 원시 로그가 집계에 남지 않고, 산출 후 중간 결과물도 남지 않음 (003 FR-255, 001 SC-004)
+- [ ] T029 [US1] 집계 생성 실패 처리를 `src/signals/digest-builder.ts`에 추가 — 실패 시 **추론을 시도하지 않고** 부분 집계를 쓰지 않는다. 사용자에게 알린다 (003 FR-265)
+
+### 3b. 추론 축 (004)
+
+- [ ] T030 [US1] 프롬프트 구성을 `src/inference/prompt.ts`에 구현 — **미관측 항목은 아예 뺀다**(미관측이라고 알리지도 않는다). 회상 슬롯 자리를 두되 항상 비운다. 입력 구성 규칙과 추측의 강도는 **매개변수로 두고 값을 비운다**(T060에서 실측) (004 FR-318·FR-331, 001 FR-015)
+- [ ] T031 [US1] 회상 슬롯 테스트를 `__tests__/contract/recall-slot.test.ts`에 작성 — **모든** 추론 요청에서 슬롯이 비어 있음. 예외 없음 (001 SC-006, [quickstart.md](quickstart.md) 시나리오 7)
+- [ ] T032 [US1] 클라우드 어댑터를 `src/inference/engines/cloud.ts`에 구현 — 온디바이스와 **동일한 스키마**를 쓰고 사진 원본을 전송하지 않는다 (헌법 원칙 I 개발 예외)
+- [ ] T033 [US1] ⚖️ 원칙 IV `AIEngine` 테스트를 `__tests__/contract/engine.test.ts`에 작성 — **정상·실패·형식 불량 응답** 셋 모두 (헌법 원칙 IV 명시 대상)
+- [ ] T034 [US1] 출력 해석을 `src/inference/parse.ts`에 구현 — 본문을 식별할 수 없거나 비어 있으면 형식 실패. **본문 외의 내용이 덧붙어 있어도 본문을 식별할 수 있으면 성공**이며 나머지는 버린다 (004 FR-340·FR-341)
+- [ ] T035 [US1] 실패 네 가지 구별을 `src/inference/failure.ts`에 구현 — 입력 구성·모델 응답·형식·화자 위반. **입력 구성 실패 시 모델을 호출하지 않는다** (004 FR-350·FR-352)
+- [ ] T036 [US1] 생성 파이프라인을 `src/inference/generate.ts`에 구현 — 집계+퍼소나 → 프롬프트 → 어댑터 → 형식 검사 → **화자 판정**(T015) 순. 판정을 통과하지 못한 본문은 저장 축에 도달하지 않는다 (004 FR-345·FR-349)
+- [ ] T037 [US1] 실패 네 가지 테스트를 `__tests__/contract/inference-failure.test.ts`에 작성 — 네 경우 모두 **일기가 저장되지 않고**, 대체 텍스트가 그 자리를 채우지 않으며, 재시도가 가능함 (001 SC-003, 004 FR-351·FR-353·FR-354)
+
+### 3c. 저장 축 (005)
+
+- [ ] T038 [US1] 기록 묶음 저장을 `src/storage/repository.ts`에 구현 — **전부 성공하거나 전부 실패**한다. 일기만 있고 근거가 없는 상태를 만들지 않는다 (001 FR-032, 005 FR-411)
+- [ ] T039 [US1] ⚖️ 원칙 IV 저장 원자성 테스트를 `__tests__/contract/storage-atomicity.test.ts`에 작성 — 저장 도중 중단 시 일기와 집계가 함께 남거나 함께 남지 않음
+- [ ] T040 [US1] 조회를 `src/storage/repository.ts`에 구현 — 보이는 기록의 목록, 특정 날짜의 기록 묶음 (005 FR-470)
+- [ ] T041 [US1] ⚖️ 원칙 IV 로컬 저장·조회 테스트를 `__tests__/contract/storage.test.ts`에 작성 — 저장 후 조회 가능, 기기 식별자 미포함, 날짜당 보이는 일기가 최대 한 편 (001 SC-002·SC-008, 005 FR-404)
+- [ ] T042 [US1] 저장 실패 처리를 `src/storage/repository.ts`에 추가 — 실패를 알리고 **부분적으로 저장된 것을 남기지 않는다** (005 FR-412)
+
+### 3d. 화면 축 (006)
+
+- [ ] T043 [US1] 생성 흐름 오케스트레이션을 `src/ui/generate-flow.ts`에 구현 — [data-model.md](data-model.md)의 상태 전이도 그대로. 요청은 **완료 또는 실패 중 하나의 결말에 도달한다** (006 FR-521)
+- [ ] T044 [US1] **오늘 자리**를 `src/ui/screens/Today.tsx`에 구현 — 앱을 열었을 때 도달하는 자리, 생성 진입 (006 FR-501)
+- [ ] T045 [US1] 생성 진행 표시를 `src/ui/screens/Today.tsx`에 추가 (006 FR-520, 001 FR-041)
+- [ ] T046 [US1] 실패 표시를 `src/ui/components/FailureNotice.tsx`에 구현 — 명시적 표시(조용히 이전 화면으로 돌아가지 않음), **재시도 / 환경 확인** 두 갈래 안내, 어느 경우에도 재시도 경로 제공 (006 FR-522~FR-524)
+- [ ] T047 [US1] **추론 외의 실패 표시**를 `src/ui/components/FailureNotice.tsx`에 추가 — 집계 생성 실패·저장 실패까지. _이것을 삼키는 것이 헌법 원칙 II의 흔한 빠져나감이다_ (006 FR-528)
+- [ ] T048 [US1] 빈 집계 알림을 `src/ui/screens/Today.tsx`에 구현 — **쓸 재료가 없어 쓸 수 없음**을 알리고 추론을 시도하지 않는다 (006 FR-526, 001 FR-013)
+- [ ] T049 [US1] **「적음」 확인**을 `src/ui/components/ScaleNotice.tsx`에 구현 — 「적음」일 때만 표시, **진행이 기본 선택**, 부족·빈약·미흡·불충분 등 평가어와 경고 기호 금지, 전달하는 것은 지금 반영되는 관측의 셈 (006 FR-540~FR-544)
+- [ ] T050 [US1] 「적음」 확인의 구조 조건 테스트를 `__tests__/integration/scale-notice.test.tsx`에 작성 — 진행이 기본 선택인가, 평가어·경고 기호가 없는가, 「보통」에서는 뜨지 않는가 (006 SC-511·SC-512·SC-514)
+- [ ] T051 [US1] 덮어쓰기 확인을 `src/ui/components/OverwriteNotice.tsx`에 구현 — 확인 없이 덮어쓰지 않는다. 재생성 시 **집계를 새로 만든다** (001 FR-040·FR-040a, 003 FR-263)
+- [ ] T052 [US1] **기록 목록**을 `src/ui/screens/RecordList.tsx`에 구현 — 보이는 기록만 나열, 각 항목에서 상세로 이동. 기록이 없는 상태는 **정상 상태**로 표현한다(오류로 표시하지 않는다) (006 FR-502·FR-503·FR-506)
+- [ ] T053 [US1] **일기 상세**를 `src/ui/screens/DiaryDetail.tsx`에 구현 — 본문·재료 요약·근거 집계·퍼소나 이름에 도달. **대조는 부가 기능이 아니라 필수 구성**이며 집계를 별도 영역으로 벗어나게 하지 않는다 (006 FR-504·FR-510, 001 FR-031)
+- [ ] T054 [US1] 재료 요약 파생을 `src/ui/material-summary.ts`에 구현 — **저장하지 않고** 짝이 되는 집계에서 계산. 관측된 항목만 세고, 셀 대상이 없으면 0을 나열하지 않는다. 세는 항목의 선택은 열려 있다 (004 FR-303·FR-304, 006 FR-511~FR-513·FR-516)
+- [ ] T055 [US1] 집계 표시를 `src/ui/components/DigestView.tsx`에 구현 — **미관측을 값-없음과 구별**해 보이고, 결함·미완으로 표시하지 않는다 (006 FR-514·FR-515)
+- [ ] T056 [US1] 클라우드 모드 표시를 `src/ui/components/CloudBadge.tsx`에 구현 — 개발 모드에서 **지나칠 수 없는 자리**에. 프로덕션에서는 표시하지 않는다 (006 FR-590~FR-593, 헌법 원칙 I)
+- [ ] T057 [US1] 통합 테스트를 `__tests__/integration/core-loop.test.tsx`에 작성 — [quickstart.md](quickstart.md) 시나리오 1(정상)·2(빈 집계)·4(덮어쓰기와 재생성). 시나리오 4는 **두 번째 일기가 두 번째 집계와 짝지어져 있음**을 검사 (001 SC-011)
+
+**Checkpoint**: US1이 독립적으로 동작하고 검증 가능하다
+
+---
+
+## Phase 4: 실측과 정리 (Cross-Cutting)
+
+**Purpose**: 스펙이 **의도적으로 비운 값**을 관측으로 채우고, 계승하지 않는 것을 정리한다
+
+**⚠️ T058은 필수다** — 나머지 실측은 값이 비어도 루프가 돌지만, 화자 표지 목록이 없으면
+001 FR-019의 검증이 성립하지 않는다 (004 Assumptions)
+
+- [ ] T058 **화자 판정 표지 목록의 실측** — [quickstart.md](quickstart.md) 시나리오 8b에 따라 실제 모델 출력을 모아 `src/speaker/verify.ts`의 표지 목록을 채운다. **위음성**(사용자 화자인데 통과)을 우선 없앤다 — 통과하면 001 FR-019가 깨진 채 지나간다 (004 FR-348)
+- [ ] T059 [P] 규모 판정 임계값의 실측 — 「적음」 확인의 발생 빈도를 관측해 `src/signals/scale.ts`의 임계값을 2~6 범위에서 정한다. **관측 결과를 근거로 남긴다** (003 FR-274, SC-216)
+- [ ] T060 [P] 항목별 상한·시간대 세분도의 실측 — 집계를 키우며 추론 품질 변화를 관측해 `src/signals/digest-builder.ts`의 매개변수를 정한다. **실측 없이 정한 값을 최종값으로 남기지 않는다** (003 FR-257)
+- [ ] T061 [P] 입력 구성 규칙·추측의 강도의 실측 — `src/inference/prompt.ts`의 매개변수를 정한다 (004 FR-318·FR-331)
+- [ ] T062 「적음」 확인 중립성의 관찰 — 사용자가 실제로 말리는 것으로 느끼는지 확인하고 결과를 [quickstart.md](quickstart.md)에 기록한다. 구조적 조건(T050)으로 닫히지 않는 잔여다 (006 Assumptions)
+- [ ] T063 실험 코드 정리 — `src/types/signals.ts`, `src/services/aiService.ts`, `App.tsx`. 특히 `aiService.ts`의 **고정 fallback 문구는 헌법 원칙 II에 따라 폐기 대상**이다 (001 Assumptions, 헌법 원칙 II 근거 절)
+- [ ] T064 [P] `README.md`와 `AGENTS.md`의 「따뜻한 1인칭 한국어 일기」 서술을 퍼소나 컨셉에 맞게 정정 — 사람 일기로 읽히는 상태를 고친다 (헌법 Sync Impact Report의 Deferred items)
+- [ ] T065 ⚖️ 원칙 IV Maestro E2E 주 경로 1개를 `.maestro/core-loop.yaml`에 작성 — 생성 요청부터 일기 상세 도달까지 (헌법 원칙 IV MUST)
+- [ ] T066 [quickstart.md](quickstart.md)의 시나리오 여덟을 전부 실행하고 결과를 기록 — 특히 시나리오 5(원본 로그 미보관 전수 조사)와 6(실패 경로 여섯 가지)
+- [ ] T067 헌법 게이트 확인 — `package.json`의 `npm run lint`(tsc 포함)와 `npm test`가 통과하고, `src/inference/engines/`의 클라우드 어댑터가 프로덕션 번들에 포함되지 않으며, 원칙 0·I·II 위반이 없음을 확인한다. **위반 시 병합 불가, 예외 없음**
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: 의존 없음 — 즉시 시작
+- **Foundational (Phase 2)**: Setup 이후. **US1 전체를 막는다**
+- **US1 (Phase 3)**: Foundational 완료 후
+- **실측·정리 (Phase 4)**: US1이 돌아간 뒤 — 관측할 대상이 있어야 실측이 성립한다
+
+### Phase 2 내부
+
+- **T005가 최우선** — 관측 여부 표현은 T010(집계)·T012(기록 묶음)의 전제다
+- T015(화자 판정기)는 T014(`AIEngine`)와 **독립적으로** 만들 수 있다 — 어댑터 밖에 두는
+  것이 결정이므로(헌법 원칙 III), 모델 없이 T016으로 검증한다
+
+### Phase 3 내부
+
+- **3a → 3b → 3c → 3d** 순서 (헌법 「개발 워크플로」의 Spec-First 순서)
+- 3a 안에서 T019~T022(소스 어댑터 넷)는 병렬 가능, T023(권한 거부)이 그 뒤
+- 3b는 3a의 집계가 있어야 실재하는 입력으로 만들 수 있다 — **상상하면 그것이 반복 실패의 형태다**
+- 3d의 T043(오케스트레이션)이 3a·3b·3c를 엮으므로 마지막
+
+### Phase 4 내부
+
+- **T058이 먼저** — 화자 판정이 닫히지 않으면 나머지 실측의 의미가 약하다
+- T059~T061은 서로 독립이라 병렬 가능
+
+### Parallel Opportunities
+
+- Phase 1: T003·T004
+- Phase 2: T007·T008 / T010·T011 / T014 / T017·T018
+- Phase 3a: T019·T020·T021·T022 (소스 어댑터 넷 — 서로 다른 파일)
+- Phase 4: T059·T060·T061 / T064
+
+---
+
+## Parallel Example: 소스 어댑터 넷 (Phase 3a)
+
+```bash
+Task: "활동 소스 어댑터를 src/signals/sources/activity.ts에 구현"
+Task: "위치 소스 어댑터를 src/signals/sources/location.ts에 구현"
+Task: "사진 소스 어댑터를 src/signals/sources/photo.ts에 구현"
+Task: "일정 소스 어댑터를 src/signals/sources/calendar.ts에 구현"
+```
+
+넷은 서로 다른 파일이고 의존이 없다. 다만 **T005(관측 여부 표현)가 끝난 뒤**여야 한다 —
+각 어댑터가 항목별 미관측을 표현해야 하기 때문이다.
+
+---
+
+## Implementation Strategy
+
+### MVP = US1 (이 문서 전체)
+
+1. Phase 1: Setup
+2. Phase 2: Foundational — **T005와 T015가 이 단계의 핵심**
+3. Phase 3: US1 — 3a → 3b → 3c → 3d
+4. **멈추고 검증**: [quickstart.md](quickstart.md) 시나리오 1~7
+5. Phase 4: 실측으로 비운 값을 채우고 정리
+
+### 이 목록 다음
+
+US2~US5는 이 목록에 없다. US1이 관통한 뒤 **축 사이 계약이 실제로 맞물렸는지 확인하고**
+다음 범위를 정한다. 저장 구조는 US4(기기 비종속)·US5(소프트 삭제)를 미리 만족하도록
+T008·T012에서 만들었으므로, 나중에 고칠 수 없는 자리는 남기지 않았다.
+
+---
+
+## Notes
+
+- **[P] = 다른 파일, 의존 없음**
+- **⚖️ 원칙 IV = 헌법이 요구하는 테스트.** 선택이 아니다. 구현 전에 쓰고 실패를 확인한다
+- 커밋은 헌법 「커밋 컨벤션」을 따른다 — `type(scope): 제목`, 한글, 본문 필수
+  (`docs`·`style`·`chore`는 제목만으로 충분)
+- **파기 시작했다는 신호**: 인덱스 설계·쿼리 최적화(005), 프롬프트 문구 다듬기(004),
+  특정 라이브러리 API 사용법(003), 레이아웃·색·서체(006). 이런 작업을 하고 있다면
+  범위를 벗어난 것이다
+- **한 축을 깊게 파고 싶어지면 그것이 실패 신호다** (ROADMAP)
