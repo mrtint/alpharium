@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  SafeAreaView,
   StatusBar,
 } from "react-native";
 import { DeviceSignalPackage, DiaryOutput } from "./src/types/signals";
