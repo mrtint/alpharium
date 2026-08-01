@@ -1,0 +1,16 @@
+# 저장소에는 항상 LF로 저장한다. 체크아웃 시 줄바꿈은 각자의 OS에 맞춰진다.
+# core.autocrlf 설정에 의존하지 않고 저장소 차원에서 보장하기 위한 것이다.
+* text=auto eol=lf
+
+# 바이너리 — 줄바꿈 변환 대상에서 제외한다.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.keystore binary
+*.jks binary
