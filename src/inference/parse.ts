@@ -26,6 +26,37 @@ const PREAMBLE = /^\s*(?:제목|title)\s*[:：].*$/gim;
 const FENCE = /^\s*```[a-z]*\s*\n([\s\S]*?)\n?\s*```\s*$/i;
 
 /**
+ * 추론 태그의 **닫는** 쪽. 이 뒤가 본문이다.
+ *
+ * 여는 태그를 함께 찾지 않는 이유가 있다 — 실측(2026-08-02, exaone4:1.2b)에서 모델이
+ * 여는 태그를 빼먹고 닫기만 하거나(`생각...</think>`) 닫는 태그를 연달아 뱉는
+ * (`</think></think></think>`) 경우가 나왔다. **마지막 닫는 태그 뒤**를 본문으로 보면
+ * 셋 다 같은 규칙으로 걸린다.
+ */
+const REASONING_CLOSE = /<\/(?:think|thinking|reasoning)>/gi;
+
+/** 여는 태그. 끝내 닫히지 않았다면 본문이 시작되지 않은 것이다. */
+const REASONING_OPEN = /<(?:think|thinking|reasoning)>/i;
+
+/**
+ * 생각 과정을 걷어낸다 (004 FR-341 — 「본문 외의 내용은 버린다」).
+ *
+ * 이것이 본문에 남으면 사용자가 읽는 일기에 모델의 혼잣말이 섞인다.
+ */
+function stripReasoning(text: string): string | null {
+  const matches = [...text.matchAll(REASONING_CLOSE)];
+
+  if (matches.length > 0) {
+    // 마지막 닫는 태그 뒤가 본문이다.
+    const last = matches[matches.length - 1];
+    return text.slice(last.index + last[0].length);
+  }
+
+  // 열기만 하고 닫히지 않았다면 아직 본문에 닿지 못한 출력이다 (004 FR-340).
+  return REASONING_OPEN.test(text) ? null : text;
+}
+
+/**
  * 원시 출력에서 본문을 골라낸다.
  *
  * 본문을 식별할 수 없거나 비어 있으면 형식 실패다. 성공하면 **본문만** 돌려주며,
@@ -34,7 +65,11 @@ const FENCE = /^\s*```[a-z]*\s*\n([\s\S]*?)\n?\s*```\s*$/i;
 export function parseDiaryBody(rawText: string): ParseResult {
   if (typeof rawText !== "string") return { ok: false };
 
-  const unfenced = rawText.match(FENCE)?.[1] ?? rawText;
+  // 생각 과정을 먼저 걷어낸다 — 그 안의 내용이 본문 후보로 오해되지 않도록.
+  const reasoned = stripReasoning(rawText);
+  if (reasoned === null) return { ok: false };
+
+  const unfenced = reasoned.match(FENCE)?.[1] ?? reasoned;
 
   // JSON으로 감싸 온 경우 본문 자리를 찾는다. 실패하면 원문을 그대로 본다.
   const fromJson = bodyFromJson(unfenced);
