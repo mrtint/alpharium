@@ -239,3 +239,46 @@ npm test
 - **원칙 0** — 시나리오 2·3·5·8이 통과한다
 
 **원칙 0·I·II를 위반하는 변경은 병합할 수 없다. 예외 없음** (헌법 Governance).
+
+---
+
+## 실행 결과 (2026-08-02, US1 구현 직후)
+
+### 자동 검사로 닫힌 것
+
+| 항목 | 결과 |
+| --- | --- |
+| `npm run lint` (eslint + `tsc --noEmit`) | 통과, 경고 0 |
+| `npm test` | 16 스위트 · 206 테스트 전부 통과 |
+| `npx expo install --check` | Dependencies are up to date |
+| **원칙 I** — 프로덕션 번들에 클라우드 어댑터 미포함 | **실측 확인.** `NODE_ENV=production npx expo export --platform android`로 뽑은 Hermes 번들에서 `chat/completions`·`exaone3.5`·`macbook.yattle-mora`·클라우드 배지 문구가 **전부 발견되지 않았다.** 어댑터 선택 지점(`src/inference/engines/index.ts`)이 `require`를 빌드 시점 분기 안에 두어 죽은 코드가 된다 |
+
+시나리오별로는 **1·2·3·3b·4**가 [`__tests__/integration/core-loop.test.tsx`](../../__tests__/integration/core-loop.test.tsx)와
+[`scale-notice.test.tsx`](../../__tests__/integration/scale-notice.test.tsx)로, **6(종료 사유 다섯)**이
+[`inference-failure.test.ts`](../../__tests__/contract/inference-failure.test.ts)로, **7(회상 슬롯)**이
+[`recall-slot.test.ts`](../../__tests__/contract/recall-slot.test.ts)로, **8a(화자 판정 성질)**가
+[`speaker-verify.test.ts`](../../__tests__/contract/speaker-verify.test.ts)로 닫혔다.
+
+시나리오 **5(원본 로그 미보관)**는 저장 경로에 한해 자동 검사로 닫혔다 —
+[`storage.test.ts`](../../__tests__/contract/storage.test.ts)와
+[`digest-contract.test.ts`](../../__tests__/contract/digest-contract.test.ts)가 저장된 원문과 집계를
+전수 조사해 좌표·사진 경로·기기 식별자·참석자가 없음을 확인한다. **다만 실기기의
+크래시 리포트 확인은 아래에 남아 있다.**
+
+### 실기기·실모델이 있어야 닫히는 것 (남은 일)
+
+아래는 코드가 아니라 **관측**을 요구하므로 이번 구현으로 닫지 못했다. 값이 비어도
+루프가 도는 다섯과 달리, **T058은 비면 001 FR-019의 검증이 성립하지 않는다.**
+
+| 항목 | 과제 | 현재 상태 |
+| --- | --- | --- |
+| **화자 판정의 표지 목록** | **T058** | `EMPTY_MARKERS`로 비어 있다. **위음성(사용자 화자인데 통과)이 그대로 지나간다** — 실제 모델 출력을 모아 채워야 한다 (시나리오 8b) |
+| 규모 판정 임계값 | T059 | `DEFAULT_SCALE_PARAMS.threshold = 3` — **관측 근거 없는 잠정값** |
+| 항목별 상한·시간대 세분도 | T060 | `DEFAULT_DIGEST_PARAMS` 전부 `null`(상한 없음) |
+| 입력 구성 규칙·추측의 강도 | T061 | `DEFAULT_PROMPT_PARAMS` 둘 다 `unset` |
+| 「적음」 확인의 중립성 | T062 | 구조 조건(T050)은 닫혔고, 사용자가 말리는 것으로 느끼는지는 미관측 |
+| 시나리오 5의 크래시 리포트 확인 | T066 | 저장 경로는 닫혔고, 실기기 로그·크래시 리포트 전수 조사가 남았다 |
+| Maestro E2E 실행 | T065 | [`.maestro/core-loop.yaml`](../../.maestro/core-loop.yaml)을 **작성했고 실행은 하지 않았다** — Expo Go가 붙은 기기가 필요하다 |
+
+003 FR-257이 **실측 없이 정한 값을 최종값으로 남기지 말 것**을 요구하므로, 위 잠정값들은
+관측으로 대체되기 전까지 최종값이 아니다.
