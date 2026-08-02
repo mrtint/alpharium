@@ -61,3 +61,6 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+
+# 실측 산출물 — 관측 기록이며 소스가 아니다
+measurements/
