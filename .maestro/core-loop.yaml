@@ -1,0 +1,51 @@
+# T065 ⚖️ 원칙 IV — Maestro E2E 주 경로 1개 (헌법 원칙 IV MUST)
+#
+# **구현된** 주 경로를 유지한다: 생성 요청부터 일기 상세 도달까지.
+#
+# 검증하지 않는 것: 일기의 내용이 실제 하루와 맞는지 (001 SC-009, 헌법 원칙 0).
+# 이 흐름이 확인하는 것은 축 사이 계약이 실제로 맞물려 끝까지 관통하는가뿐이다.
+#
+# 실행 (AGENTS.md — Metro가 IPv6에 바인딩되므로 Tailscale 주소를 쓴다):
+#   $env:REACT_NATIVE_PACKAGER_HOSTNAME = "100.98.26.61"; npx expo start --host lan
+#   maestro test .maestro/core-loop.yaml
+
+appId: host.exp.Exponent
+---
+- launchApp
+
+# 1. 앱을 열면 오늘 자리에 도달한다 (006 FR-501)
+- assertVisible: "오늘"
+
+# 2. 생성을 요청한다
+- tapOn:
+    id: "today-generate"
+
+# 3. 진행 중임이 나타난다 (006 FR-520, 001 FR-041)
+- assertVisible:
+    id: "today-progress"
+    optional: true
+
+# 4. 요청은 완료 또는 실패 중 하나의 결말에 도달한다 (006 FR-521).
+#    조용히 사라지는 경로가 없으므로 셋 중 하나가 반드시 보인다.
+- extendedWaitUntil:
+    visible:
+      id: "today-completed"
+    timeout: 120000
+
+# 5. 기록 목록으로 이동해 항목을 연다 (006 FR-502·FR-503)
+- tapOn: "기록"
+- assertVisible:
+    id: "record-list"
+- tapOn:
+    id: "record-list"
+    index: 0
+
+# 6. 일기 상세에서 본문·근거 집계에 도달한다 — 대조가 필수 구성이다 (006 FR-504·FR-510)
+- assertVisible:
+    id: "diary-detail"
+- assertVisible:
+    id: "diary-detail-body"
+- assertVisible:
+    id: "diary-detail-evidence"
+- assertVisible:
+    id: "digest-view"
