@@ -251,7 +251,7 @@ npm test
 | `npm run lint` (eslint + `tsc --noEmit`) | 통과, 경고 0 |
 | `npm test` | 16 스위트 · 206 테스트 전부 통과 |
 | `npx expo install --check` | Dependencies are up to date |
-| **원칙 I** — 프로덕션 번들에 클라우드 어댑터 미포함 | **실측 확인.** `NODE_ENV=production npx expo export --platform android`로 뽑은 Hermes 번들에서 `chat/completions`·`exaone3.5`·`macbook.yattle-mora`·클라우드 배지 문구가 **전부 발견되지 않았다.** 어댑터 선택 지점(`src/inference/engines/index.ts`)이 `require`를 빌드 시점 분기 안에 두어 죽은 코드가 된다 |
+| **원칙 I** — 프로덕션 번들에 클라우드 어댑터 미포함 | **실측 확인.** `NODE_ENV=production npx expo export --platform android`로 뽑은 Hermes 번들에서 `chat/completions`·모델 이름·`macbook.yattle-mora`·클라우드 배지 문구가 **전부 발견되지 않았다.** 어댑터 선택 지점(`src/inference/engines/index.ts`)이 `require`를 빌드 시점 분기 안에 두어 죽은 코드가 된다 |
 
 시나리오별로는 **1·2·3·3b·4**가 [`__tests__/integration/core-loop.test.tsx`](../../__tests__/integration/core-loop.test.tsx)와
 [`scale-notice.test.tsx`](../../__tests__/integration/scale-notice.test.tsx)로, **6(종료 사유 다섯)**이

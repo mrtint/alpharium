@@ -17,7 +17,23 @@
  */
 import { EngineCallError, type AIEngine, type EngineRequest, type EngineResponse } from "../engine";
 
-const DEFAULT_MODEL = "exaone3.5:7.8b";
+/**
+ * 실측으로 고른 모델 (2026-08-03, quickstart 「추론 품질 실측」).
+ *
+ * exaone4:1.2b는 한국어 문장 자체가 깨져(`비트들아진`, `묻칭구먼`) 부적합했다.
+ */
+const DEFAULT_MODEL = "qwen3:1.7b";
+
+/**
+ * 사고(Thinking)를 끈다 (2026-08-03 실측).
+ *
+ * 사고하는 모델은 1B급에서 사고에 출력을 다 쓰고 본문에 한 줄만 남기는 일이 잦다 —
+ * 끄자 본문 확보가 20/21에서 21/21로, 한 줄짜리 붕괴가 6편에서 2편으로 줄었다.
+ *
+ * `think: false`와 `chat_template_kwargs.enable_thinking`은 이 서버가 **조용히
+ * 무시한다.** 실제로 먹히는 것은 이 필드뿐이다.
+ */
+const REASONING_EFFORT = "none";
 
 export class CloudEngine implements AIEngine {
   readonly kind = "cloud" as const;
@@ -40,6 +56,7 @@ export class CloudEngine implements AIEngine {
         signal: request.signal,
         body: JSON.stringify({
           model: DEFAULT_MODEL,
+          reasoning_effort: REASONING_EFFORT,
           // 완성된 프롬프트를 그대로 싣는다. 여기서 조립하지 않는다.
           messages: [{ role: "user", content: request.prompt }],
         }),
