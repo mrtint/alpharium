@@ -101,7 +101,15 @@ async function callModel(prompt: string): Promise<string> {
   const response = await fetch(`${BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: MODEL, messages: [{ role: "user", content: prompt }] }),
+    body: JSON.stringify({
+      model: MODEL,
+      // 사고(Thinking)를 끈다. exaone4처럼 사고하는 모델은 1B급에서 사고에 출력을
+      // 다 써 버리고 본문에 한 줄만 남기는 일이 잦았다 (실측 2026-08-02).
+      // `think: false`와 `chat_template_kwargs`는 이 서버가 조용히 무시한다 —
+      // 실제로 먹히는 것은 `reasoning_effort`뿐이다.
+      reasoning_effort: "none",
+      messages: [{ role: "user", content: prompt }],
+    }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
