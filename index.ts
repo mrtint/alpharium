@@ -1,3 +1,7 @@
-// 진입점은 앱이 생기면 다시 연결한다.
-// 백지 상태이므로 등록할 루트 컴포넌트가 없다.
-export {};
+import { registerRootComponent } from "expo";
+
+import App from "./App";
+
+// registerRootComponent는 AppRegistry.registerComponent를 부르고,
+// Expo Go와 네이티브 빌드 양쪽에서 알맞은 환경을 준비한다.
+registerRootComponent(App);

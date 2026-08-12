@@ -25,15 +25,20 @@
   },
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "test": "jest",
-    "lint": "eslint . && tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"App.tsx\""
+    "test:device": "node scripts/run-device-tests.mjs",
+    "lint": "eslint . && tsc --noEmit && npm run check:constitution",
+    "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
+    "check:constitution": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/check-constitution.mts"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/.maestro/"
+    ]
   },
   "engines": {
     "node": ">=20.19.0"

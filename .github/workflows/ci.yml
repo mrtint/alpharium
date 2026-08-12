@@ -1,13 +1,16 @@
-name: Alpharium Mobile CI/CD Pipeline
+name: Alpharium CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
-  # 1. Stage: Test (Push 및 PR/MR 발생 시 즉시 실행, 실패 시 이후 모든 단계 취소)
+  # 1단계: 검사와 기기 불필요 테스트
+  #
+  # 실기기 테스트는 CI에서 돌지 않는다. 기기가 없으므로 건너뛴 것으로 보고되며,
+  # 통과로 집계되지 않는다(FR-021e, 헌법 원칙 V).
   test:
     runs-on: ubuntu-latest
     steps:
@@ -15,14 +18,29 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: 'npm'
+          cache: "npm"
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
-      - run: npx prettier --check "src/**/*.{ts,tsx}" "App.tsx"
 
-  # 2. Stage: Build (Test 단계 100% 통과 시에만 실행, 실패 시 중단)
-  build:
+      # eslint + tsc + 헌법 위반 검사(FR-026)
+      - run: npm run lint
+
+      # 기기 불필요 갈래. 기기 없이 항상 돈다(FR-021c)
+      - run: npm test
+
+      - run: npx prettier --check "src/**/*.{ts,tsx}" "__tests__/**/*.{ts,tsx}" "*.{ts,tsx}"
+
+      # 의존성 선언과 SDK 기대값이 어긋나는지 확인(FR-022)
+      - run: npx expo install --check
+
+      # 실기기 테스트가 건너뛰어졌음을 결과에 남긴다.
+      # 이 실행은 온디바이스를 검증하지 않았다.
+      - run: npm run test:device
+
+  # 2단계: 안드로이드 번들이 만들어지는지 확인
+  #
+  # 웹 빌드는 하지 않는다 — 이 제품은 안드로이드 앱이고, 웹에서는 온디바이스 추론이
+  # 불가능하다(헌법 원칙 I).
+  bundle:
     needs: test
     runs-on: ubuntu-latest
     steps:
@@ -30,36 +48,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
-          cache: 'npm'
+          cache: "npm"
       - run: npm ci
-      - run: npx expo export --platform web
+      - run: npx expo export --platform android --output-dir dist
       - uses: actions/upload-artifact@v6
         with:
-          name: build-dist
+          name: android-bundle
           path: dist/
-
-  # 3. Stage: Release (Build 통과 및 main 브랜치인 경우에만 실행)
-  release:
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-      - run: echo "Verifying Release Version..."
-      - run: node -e "console.log('Release Version:', require('./package.json').version)"
-
-  # 4. Stage: Deploy (Release 성공 시에만 최종 배포)
-  deploy:
-    needs: release
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v7
-        with:
-          name: build-dist
-          path: dist/
-      - run: echo "Deploying build artifacts..."
-      - run: ls -la dist/
