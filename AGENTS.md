@@ -1,29 +1,39 @@
-# Expo HAS CHANGED
+# 이 저장소는 백지 상태다
 
-This project targets **Expo SDK 54**. Read the exact versioned docs at
-https://docs.expo.dev/versions/v54.0.0/ before writing any code.
+2026-08-12에 이전 작업 전체를 되돌렸다. 남아 있는 것은 Expo 프로젝트 뼈대와
+빌드 설정뿐이며, **앱 코드도 스펙도 컨셉 문서도 없다.**
 
-Do not guess package versions. `expo install` resolves them from Expo's API
-(`sdks/:sdkVersion/native-modules`), not from the npm registry — so `npm view`
-gives wrong answers. Look versions up in the versioned docs or via context7
-(`/expo/expo` branch `sdk-54`), then verify with `npx expo install --check`.
+되돌린 이유는 실패해서가 아니라 **측정 장치와 제품이 뒤섞였기 때문**이다.
+이전 저장소에는 모델 출력을 재고 판정하는 코드·문서가 제품 코드와 같은 자리에
+쌓여 있었고, 그 결과 새 세션마다 이 저장소를 「측정하는 제품」으로 잘못 읽었다.
+읽는 쪽의 실수가 아니라 저장소가 그렇게 보이게 되어 있었다.
 
-Note: `expo-status-bar` and `@expo/metro-runtime` do not follow SDK numbering
-(SDK 54 uses `3.0.9` and `6.1.2`).
+## 그러므로 지킬 것
 
-## Why SDK 54, not 57
+**여기는 제품을 만드는 곳이다.** 모델의 출력을 재거나, 품질을 점수로 매기거나,
+여러 모델을 비교하는 장치를 제품 코드에 들이지 않는다. 그런 것이 필요하면 별도
+저장소에서 한다.
 
-Play Store only ships Expo Go 54 for the target test device, and Expo Go
-supports exactly one SDK. Staying on 54 keeps the app runnable in Expo Go
-without sideloading an APK.
+**아직 아무것도 정해지지 않았다.** 헌법, 컨셉, 스펙을 저장소 소유자와 함께 새로
+쓴다. 이전 작업의 결론을 기억에서 꺼내 복원하지 않는다 — 되돌린 의미가 없어진다.
 
-## Running on a phone
+## 이전 작업에서 실측으로 확인된 것
 
-Metro binds to IPv6 (`::`) on this machine, so the Wi-Fi LAN IP is unreachable
-even locally. Use the Tailscale address instead:
+값을 다시 확인하는 데 시간을 쓰지 않도록 사실만 남긴다. **이것은 규범이 아니며,
+새 헌법이 무엇을 정하든 그쪽이 우선한다.**
 
-```powershell
-$env:REACT_NATIVE_PACKAGER_HOSTNAME = "100.98.26.61"; npx expo start --host lan
-```
+- 온디바이스 추론은 실기기(Galaxy S20+, Android 13, arm64-v8a)에서 실제로 돌았다.
+- 그 구성은 Expo 57 + React Native 0.86 + `llama.rn`이었고, **Expo Go로는 실행할 수
+  없다** — 네이티브 추론 모듈이 Expo Go에 없기 때문이다. development build가 필요하다.
+- **Android에는 기간 걸음 수를 되짚는 통로가 없다.** `expo-sensors`의
+  `getStepCountAsync`는 iOS 전용이다. 앱 실행 이후의 증분 구독은 「0시부터 누적」이
+  아니므로 같은 것으로 쓸 수 없다.
 
-Then open `exp://100.98.26.61:8081` in Expo Go (phone needs Tailscale connected).
+현재 `package.json`은 **SDK 54**다. 위 사실은 이전 작업의 관측일 뿐이며, 어느 SDK로
+갈지는 새로 판단한다.
+
+## Expo 작업 시
+
+패키지 버전을 추측하지 않는다. `expo install`은 npm이 아니라 Expo API에서 버전을
+해석하므로 `npm view`는 틀린 답을 준다. 대상 SDK의 버전별 공식 문서나
+context7(`/expo/expo`)로 확인하고 `npx expo install --check`로 검증한다.
