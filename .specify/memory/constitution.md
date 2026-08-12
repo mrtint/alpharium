@@ -20,6 +20,11 @@ Amendment 1.0.1 (2026-08-12)
 - Expo Go 지원 SDK가 제약이 아님을 명시 (development build 확정의 귀결).
 - package.json 선언과 node_modules 설치본의 어긋남을 실측값으로 기록하고,
   해소를 스펙 단계로 넘김. 실증된 조합(expo 57 + RN 0.86 + llama.rn)을 근거로 남김.
+
+Amendment 1.0.2 (2026-08-12)
+- 원칙 I의 「기술적 귀결」 문단만 수정. 규범 조항은 바뀌지 않았으므로 PATCH.
+- 1.0.1이 스펙 단계로 넘겼던 SDK 선택을 Expo 57로 확정하고, 선언과 설치본의
+  어긋남을 해소했음을 기록. 기준선 버전을 함께 적음.
 -->
 
 # Alpharium Constitution
@@ -52,10 +57,10 @@ GPS 궤적, 걸음 수, 배터리와 연결 상태뿐이다. 그 조각으로 �
 기술적 귀결: 네이티브 추론 모듈이 필요하므로 Expo Go로는 실행할 수 없다. development
 build로 간다. Expo Go가 어느 SDK를 지원하는지는 더 이상 제약이 아니다.
 
-주의: 현재 `package.json`은 `expo ~54.0.36`, `react-native 0.81.5`를 선언하지만
-`node_modules`에는 `expo 57.0.12`, `react-native 0.86.2`가 설치돼 있다(2026-08-12 실측).
-둘이 어긋나 있으므로 스펙 단계에서 어느 쪽으로 맞출지 정해야 한다. 온디바이스 추론이
-실증된 조합은 expo 57 + React Native 0.86 + llama.rn이다.
+SDK는 **Expo 57**로 확정한다. 온디바이스 추론이 실증된 조합이 expo 57 + React Native
+0.86 + `llama.rn`이기 때문이다. 2026-08-12에 `package.json` 선언(SDK 54)과 설치본(57)의
+어긋남을 선언 쪽을 올려 해소했다. 기준선은 `expo ~57.0.9` / `react-native 0.86.2` /
+`llama.rn ^0.12.8`이다.
 
 ### II. 화자는 휴대폰이고, 시야는 좁다
 
@@ -152,4 +157,4 @@ qwen과 gemma를 한국어에서 제외하는 근거: 한국어 출력에서 qwe
 - 원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드에 몰래 두지 않는다(MUST NOT).
 - 개정할 때는 무엇이 왜 바뀌었는지 기록한다(MUST).
 
-**Version**: 1.0.1 | **Ratified**: 2026-08-12 | **Last Amended**: 2026-08-12
+**Version**: 1.0.2 | **Ratified**: 2026-08-12 | **Last Amended**: 2026-08-12
