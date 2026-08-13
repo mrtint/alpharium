@@ -1,0 +1,357 @@
+/**
+ * 파이프라인 계약 테스트.
+ *
+ * 계약: specs/002-diary-pipeline-contracts/contracts/pipeline.md 「검증 표」
+ *
+ * **이 기능에서는 항상 `generation`에서 멈춘다.** 추론이 `not-implemented`를 반환하기
+ * 때문이며, 그것이 정상이다. 파이프라인이 거기까지 도달하는 것 자체가 검증 대상이다.
+ *
+ * `now`를 인자로 받으므로 03:59와 04:00 경계를 자유롭게 만들 수 있다. 테스트가 시간에
+ * 의존하지 않는다(FR-018a).
+ */
+
+import { createPipeline } from "../../src/diary/pipeline";
+import { memoryStore } from "../../src/diary/store";
+import type { Character, DiaryEntry, VisionSetting } from "../../src/diary/types";
+import type { GenerationResult, InferenceBackend } from "../../src/inference/types";
+import { partiallyUnknownDay, richDay } from "../../src/signals/fake";
+import type { DaySignals } from "../../src/signals/types";
+import type { DayDate } from "../../src/config/day-boundary";
+
+/** 하루가 닫힌 뒤의 시각. 2026-08-12는 2026-08-13 04:00에 닫힌다. */
+const AFTER_CLOSE = new Date("2026-08-13T06:00:00");
+const DAY: DayDate = "2026-08-12";
+
+/** 추론 대역. 이 기능의 실제 어댑터와 같이 not-implemented를 돌려준다. */
+function backendReturning(result: GenerationResult): InferenceBackend {
+  return {
+    location: "on-device",
+    async isAvailable() {
+      return { kind: "loaded" };
+    },
+    async generate() {
+      return result;
+    },
+  };
+}
+
+const notImplemented = () => backendReturning({ kind: "not-implemented" });
+const generating = (text: string) => backendReturning({ text });
+
+/** 파이프라인 하나를 대역과 함께 만든다. */
+function makePipeline(
+  overrides: {
+    backend?: InferenceBackend;
+    store?: ReturnType<typeof memoryStore>;
+    signals?: (day: DayDate) => Promise<DaySignals | null>;
+  } = {},
+) {
+  const store = overrides.store ?? memoryStore();
+  const pipeline = createPipeline({
+    backend: overrides.backend ?? notImplemented(),
+    store,
+    loadSignals: overrides.signals ?? (async (day) => partiallyUnknownDay(day)),
+  });
+  return { pipeline, store };
+}
+
+function inputFor(
+  overrides: { day?: DayDate; now?: Date; character?: Character; vision?: VisionSetting } = {},
+) {
+  return {
+    day: overrides.day ?? DAY,
+    now: overrides.now ?? AFTER_CLOSE,
+    character: "character" in overrides ? overrides.character : ("quiet" as Character),
+    vision: overrides.vision ?? ("quick" as VisionSetting),
+  };
+}
+
+describe("단계별 실패가 해당 stage로 보고된다 (FR-019, SC-006)", () => {
+  // contracts/pipeline.md 「검증 표」 6행
+  it("하루가 아직 안 닫힘 → day-not-closed (FR-018c, SC-010)", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-13T03:59:00") }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("day-not-closed");
+  });
+
+  it("신호를 가져오지 못함 → signals", async () => {
+    const { pipeline } = makePipeline({ signals: async () => null });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("signals");
+  });
+
+  it("캐릭터 없음 → request-build (FR-007)", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor({ character: undefined }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("request-build");
+  });
+
+  it("생성이 not-implemented → generation (FR-015)", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("generation");
+  });
+
+  it("저장 실패 → storage (FR-024)", async () => {
+    const store = memoryStore({ failWith: "저장 공간이 없다" });
+    const { pipeline } = makePipeline({ backend: generating("일기 본문"), store });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("storage");
+  });
+
+  it("전부 성공 → ok: true, entry", async () => {
+    // 이 기능에서는 실제로 도달하지 않는 경로다. 길이 이어져 있는지만 확인한다.
+    const { pipeline, store } = makePipeline({ backend: generating("오늘 주인은 조용했다") });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.text).toBe("오늘 주인은 조용했다");
+      expect(result.entry.date).toBe(DAY);
+      expect(result.entry.character).toBe("quiet");
+    }
+    expect(await store.has(DAY)).toBe(true);
+  });
+
+  it("실패에는 stage와 reason이 반드시 있다 — stage 없이 실패하는 경로가 없다", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.stage).toBeDefined();
+      expect(typeof result.reason).toBe("string");
+      expect(result.reason.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("하루 경계 — 닫히지 않은 하루는 거부된다 (FR-018c, SC-010)", () => {
+  it("2026-08-13 03:59는 아직 안 닫혔다", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-13T03:59:59") }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("day-not-closed");
+  });
+
+  it("2026-08-13 04:00이면 닫혔으므로 다음 단계로 넘어간다", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-13T04:00:00") }));
+
+    // day-not-closed를 지나 generation까지 갔다는 것이 확인 대상이다.
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("generation");
+  });
+
+  it("진행 중인 하루는 거부된다", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-12T12:00:00") }));
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("day-not-closed");
+  });
+
+  it("닫히지 않은 하루는 신호도 가져오지 않는다 — 앞에서 멈춘다", async () => {
+    let called = false;
+    const { pipeline } = makePipeline({
+      signals: async (day) => {
+        called = true;
+        return partiallyUnknownDay(day);
+      },
+    });
+
+    await pipeline.run(inputFor({ now: new Date("2026-08-12T12:00:00") }));
+    expect(called).toBe(false);
+  });
+});
+
+describe("중복 실행을 막는다 (FR-018d)", () => {
+  /**
+   * 온디바이스 추론은 오래 걸린다. 사용자가 여러 번 눌러도 한 번만 돌아야 한다.
+   */
+  it("같은 하루가 진행 중이면 already-running", async () => {
+    let release: () => void = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const slowBackend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        await blocked;
+        return { kind: "not-implemented" };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend: slowBackend });
+
+    const first = pipeline.run(inputFor());
+    const second = await pipeline.run(inputFor());
+
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.stage).toBe("already-running");
+
+    release();
+    await first;
+  });
+
+  it("다른 하루는 동시에 돌 수 있다", async () => {
+    let release: () => void = () => {};
+    const blocked = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    const slowBackend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        await blocked;
+        return { kind: "not-implemented" };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend: slowBackend });
+
+    const first = pipeline.run(inputFor({ day: "2026-08-12" }));
+    release();
+    const second = await pipeline.run(inputFor({ day: "2026-08-11" }));
+
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.stage).not.toBe("already-running");
+    await first;
+  });
+
+  it("실패로 끝나도 진행 중에서 빠진다 — 다시 시도할 수 있다", async () => {
+    // 빠지지 않으면 실패한 하루를 영영 다시 시도할 수 없다(contracts/pipeline.md).
+    const { pipeline } = makePipeline();
+
+    const first = await pipeline.run(inputFor());
+    expect(first.ok).toBe(false);
+    if (!first.ok) expect(first.stage).toBe("generation");
+
+    const second = await pipeline.run(inputFor());
+    expect(second.ok).toBe(false);
+    if (!second.ok) expect(second.stage).toBe("generation");
+  });
+
+  it("성공으로 끝나도 진행 중에서 빠진다", async () => {
+    const { pipeline } = makePipeline({ backend: generating("일기") });
+
+    expect((await pipeline.run(inputFor())).ok).toBe(true);
+    expect((await pipeline.run(inputFor())).ok).toBe(true);
+  });
+
+  it("진행 중 상태를 저장소에 남기지 않는다", async () => {
+    // 남기면 앱이 죽었을 때 "영원히 생성 중"인 하루가 생긴다.
+    const { pipeline, store } = makePipeline();
+    await pipeline.run(inputFor());
+
+    // 실패했으므로 저장소에 아무것도 남지 않아야 한다.
+    expect(await store.listDays()).toEqual([]);
+  });
+});
+
+describe("불변식 — 실패 시 일기를 만들지 않는다 (FR-012)", () => {
+  it("생성이 실패하면 저장을 부르지 않는다 (FR-023b)", async () => {
+    const store = memoryStore();
+    await store.save({
+      date: DAY,
+      text: "지켜져야 할 기존 일기",
+      character: "quiet",
+      signalsUsed: richDay(DAY),
+      createdAt: new Date("2026-08-13T05:00:00"),
+    });
+
+    const { pipeline } = makePipeline({ store });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    // 생성이 실패했으므로 기존 일기가 그대로 남아야 한다.
+    expect((await store.load(DAY))?.text).toBe("지켜져야 할 기존 일기");
+  });
+
+  it("실패 결과에 entry가 없다 — 빈 본문의 일기를 만들지 않는다", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    expect("entry" in result).toBe(false);
+  });
+
+  it("실패 결과에 text가 없다 — 플레이스홀더가 일기 자리에 들어가지 않는다", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(inputFor());
+
+    expect("text" in result).toBe(false);
+    expect(JSON.stringify(result)).not.toContain("생성할 수 없");
+  });
+});
+
+describe("파이프라인은 실행 시점을 판단하지 않는다 (FR-018a)", () => {
+  /**
+   * "지금이 만들 때인가"는 부르는 쪽의 몫이다. 파이프라인은 주어진 하루가 닫혔는지만 본다.
+   * 그래야 앱을 열 때 부르든 나중에 백그라운드가 부르든 계약이 같다.
+   */
+  it("now를 인자로 받는다 — 스스로 현재 시각을 읽지 않는다", async () => {
+    const { pipeline } = makePipeline();
+
+    // 실제 현재 시각이 무엇이든 인자로 준 now만 본다.
+    const closed = await pipeline.run(inputFor({ now: new Date("2030-01-01T00:00:00") }));
+    const notClosed = await pipeline.run(inputFor({ now: new Date("2026-08-12T05:00:00") }));
+
+    expect(closed.ok).toBe(false);
+    if (!closed.ok) expect(closed.stage).toBe("generation");
+    if (!notClosed.ok) expect(notClosed.stage).toBe("day-not-closed");
+  });
+
+  it("추론 어댑터를 스스로 고르지 않는다 — 주입받는다 (FR-017)", async () => {
+    // 001의 select.ts가 고른 결과를 받는다. 파이프라인이 스스로 고르면
+    // 헌법 원칙 I의 방어선이 둘로 갈라진다.
+    let generateCalled = false;
+    const spy: InferenceBackend = {
+      location: "desktop-server",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        generateCalled = true;
+        return { kind: "not-implemented" };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend: spy });
+    await pipeline.run(inputFor());
+
+    expect(generateCalled).toBe(true);
+  });
+});
+
+describe("생성된 일기는 근거를 담는다 (FR-011)", () => {
+  it("signalsUsed에 생성에 쓰인 신호가 담긴다", async () => {
+    const { pipeline } = makePipeline({ backend: generating("일기 본문") });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const entry: DiaryEntry = result.entry;
+      expect(entry.signalsUsed.date).toBe(DAY);
+      expect(entry.signalsUsed.steps.kind).toBe("unknown");
+    }
+  });
+});

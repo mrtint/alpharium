@@ -11,6 +11,7 @@
 import { currentEnvironment, desktopInferenceUrl } from "../config/environment";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation } from "../inference/types";
+import { checkStorage } from "./storage-check";
 import type { DiagnosticReport, Failure } from "./types";
 
 export type ReportOptions = {
@@ -54,6 +55,13 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
     options.serverBaseUrl ?? desktopInferenceUrl(),
   );
 
+  // 저장 점검은 추론 위치와 무관하게 돈다 — 파일 시스템은 어느 환경에서든 있어야 한다.
+  const storage = await checkStorage();
+
+  if (storage.kind === "failed") {
+    failures.push({ what: "일기 저장", reason: storage.reason });
+  }
+
   if (!selection.ok) {
     return {
       environment,
@@ -61,6 +69,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
         ? { ok: true, location: location.location }
         : { ok: false, reason: location.reason, requested: location.requested },
       moduleStatus: { kind: "unavailable", reason: "추론 위치를 고르지 못했다" },
+      storage,
       failures,
     };
   }
@@ -77,6 +86,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
       ? { ok: true, location: location.location }
       : { ok: false, reason: location.reason, requested: location.requested },
     moduleStatus,
+    storage,
     failures,
   };
 }

@@ -16,7 +16,7 @@
  * 결과다. 조용히 그럴듯한 답을 만들어 주는 순간 헌법 원칙 I이 깨진다.
  */
 
-import type { InferenceBackend, ModuleStatus } from "./types";
+import type { GenerationResult, InferenceBackend, ModuleStatus } from "./types";
 
 /** 서버가 살아 있는지 확인하는 함수. 테스트에서 주입한다. */
 export type ServerProbe = (baseUrl: string) => Promise<boolean>;
@@ -47,6 +47,20 @@ export function createDesktopServerBackend(
         const reason = error instanceof Error ? error.message : String(error);
         return { kind: "failed", reason };
       }
+    },
+
+    /**
+     * 아직 구현되지 않았다(FR-015).
+     *
+     * **서버에 요청을 보내지 않는다.** 이 어댑터에 생성이 붙는 시점에는 헌법 원칙 I의
+     * 제약(동일 GGUF·동일 프롬프트·동일 샘플링)을 강제할 수단이 함께 있어야 한다.
+     * 강제 수단 없이 서버 생성을 먼저 붙이면 데스크톱이 온디바이스보다 좋은 답을 내는
+     * 경로가 생기고, 그것이 원칙 I이 막으려는 상태다.
+     *
+     * 대체 응답도 만들지 않는다(FR-016). 닿지 못하면 닿지 못했다는 사실이 결과다.
+     */
+    async generate(): Promise<GenerationResult> {
+      return { kind: "not-implemented" };
     },
   };
 }

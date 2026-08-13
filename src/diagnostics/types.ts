@@ -12,6 +12,7 @@
 
 import type { EnvironmentResolution } from "../config/types";
 import type { InferenceLocation, ModuleStatus, SelectionFailure } from "../inference/types";
+import type { StorageCheck } from "./storage-check";
 
 /** 진단 정보가 나가는 곳. */
 export type Sink = "screen" | "log";
@@ -36,5 +37,11 @@ export type DiagnosticReport = {
   environment: EnvironmentResolution;
   inferenceLocation: LocationSelection;
   moduleStatus: ModuleStatus;
+  /**
+   * 파일 저장이 실기기에서 실제로 도는가(002).
+   *
+   * 이 자리는 상태를 담을 뿐 성능을 담지 않는다 — 소요 시간·크기를 넣지 않는다(원칙 IV).
+   */
+  storage: StorageCheck;
   failures: Failure[];
 };

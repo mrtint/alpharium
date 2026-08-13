@@ -52,6 +52,7 @@ export function DiagnosticsScreen() {
       <Row label="환경" value={environmentText} />
       <Row label="추론 위치" value={locationText} />
       <Row label="모듈 상태" value={formatModuleStatus(report)} />
+      <Row label="저장 점검" value={formatStorage(report)} />
 
       {report.failures.length > 0 && (
         <View style={styles.failures}>
@@ -70,6 +71,17 @@ export function DiagnosticsScreen() {
 function formatModuleStatus(report: DiagnosticReport): string {
   const status = report.moduleStatus;
   return status.kind === "loaded" ? "loaded" : `${status.kind} — ${status.reason}`;
+}
+
+/**
+ * 저장 점검 결과.
+ *
+ * `unavailable`을 `ok`로 적지 않는다 — 돌지 못한 것은 통과가 아니다(헌법 원칙 V).
+ * 시뮬레이터에서는 unavailable이 정상이고, 실기기에서 unavailable이면 문제다.
+ */
+function formatStorage(report: DiagnosticReport): string {
+  const check = report.storage;
+  return check.kind === "ok" ? `ok — ${check.detail}` : `${check.kind} — ${check.reason}`;
 }
 
 function Row({ label, value }: { label: string; value: string }) {

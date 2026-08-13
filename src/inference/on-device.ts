@@ -8,7 +8,7 @@
  * "네이티브 모듈이 붙어 호출 가능한가"만 확인할 수 있다 — FR-006이 요구하는 전부다.
  */
 
-import type { InferenceBackend, ModuleStatus } from "./types";
+import type { GenerationResult, InferenceBackend, ModuleStatus } from "./types";
 
 /** 네이티브 백엔드 장치 정보를 조회하는 함수. 테스트에서 주입한다. */
 export type BackendProbe = () => Promise<unknown>;
@@ -50,6 +50,19 @@ export function createOnDeviceBackend(probe: BackendProbe): InferenceBackend {
           ? { kind: "unavailable", reason }
           : { kind: "failed", reason };
       }
+    },
+
+    /**
+     * 아직 구현되지 않았다(FR-015).
+     *
+     * **요청을 보고 그럴듯한 텍스트를 만들지 않는다.** 모델 파일 적재도 프롬프트도 없는
+     * 상태에서 무언가 문자열을 돌려주면 그것이 가짜 일기다(헌법 원칙 I). 없는 것을
+     * 없다고 말하는 편이 정직하며, 계약이 그것을 요구한다.
+     *
+     * 실제 생성은 다음 기능이다. 그때 이 자리에 initLlama()와 프롬프트가 들어온다.
+     */
+    async generate(): Promise<GenerationResult> {
+      return { kind: "not-implemented" };
     },
   };
 }
