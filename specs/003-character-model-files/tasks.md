@@ -36,9 +36,9 @@
 
 **Purpose**: 새 자리를 열고, 002가 이미 쓰고 있는데 선언되지 않은 의존을 바로잡는다.
 
-- [ ] T001 `src/models/`, `__tests__/models/` 디렉터리 생성 (plan.md 「Source Code」 구조대로)
-- [ ] T002 `package.json`의 `dependencies`에 `expo-file-system` 추가 — **설치본(57.0.2)에 선언을 맞춘다**(research.md §7). 002가 `src/diary/store.ts:246`에서 이미 쓰는데 선언이 없어 다음 설치에서 사라질 수 있다. 버전을 추측하지 않고 설치본을 그대로 적는다
-- [ ] T003 `package.json`/`package-lock.json` 검증 — `npx expo install --check`와 `npm run lint` 통과 확인. T002가 기준선을 깨지 않았는지
+- [X] T001 `src/models/`, `__tests__/models/` 디렉터리 생성 (plan.md 「Source Code」 구조대로)
+- [X] T002 `package.json`의 `dependencies`에 `expo-file-system` 추가 — **설치본(57.0.2)에 선언을 맞춘다**(research.md §7). 002가 `src/diary/store.ts:246`에서 이미 쓰는데 선언이 없어 다음 설치에서 사라질 수 있다. 버전을 추측하지 않고 설치본을 그대로 적는다
+- [X] T003 `package.json`/`package-lock.json` 검증 — `npx expo install --check`와 `npm run lint` 통과 확인. T002가 기준선을 깨지 않았는지
 
 **Checkpoint**: 새 자리가 열렸고 의존 선언이 설치본과 맞는다
 
