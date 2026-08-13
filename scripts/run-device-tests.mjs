@@ -83,7 +83,21 @@ function main() {
   console.log("  실기기 검증은 dev 환경에서 한다: EXPO_PUBLIC_APP_ENV=dev");
   console.log("");
 
-  const run = spawnSync("maestro", ["test", FLOW], { stdio: "inherit", shell: true });
+  // Maestro는 JVM이고, 흐름 파일을 **플랫폼 기본 문자셋**으로 읽는다. 한국어 Windows에서는
+  // 그것이 CP949라서 UTF-8로 저장된 `assertVisible: "환경"`이 `ȯ��`로 뭉개진 채 기기에
+  // 전달된다 — 화면에 "환경"이 멀쩡히 있어도 실패한다.
+  //
+  // 실측 (2026-08-14): maestro 출력 바이트가 `c8 af b0 e6`이었고, 이것은 "환경"의 CP949
+  // 인코딩과 정확히 일치했다. `-Dfile.encoding=UTF-8`을 주면 "환경"으로 바르게 읽힌다.
+  //
+  // 이 줄이 없으면 **흐름 파일에 한글을 쓸 수 없다.** 검증 문구를 영어로 바꿔 우회하지
+  // 않는다 — 화면이 한국어이므로 검증도 한국어여야 하고, 우회하면 같은 함정이 다음 흐름에서
+  // 되풀이된다.
+  const run = spawnSync("maestro", ["test", FLOW], {
+    stdio: "inherit",
+    shell: true,
+    env: { ...process.env, JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8" },
+  });
 
   if (run.status === 0) {
     report(PASSED);
