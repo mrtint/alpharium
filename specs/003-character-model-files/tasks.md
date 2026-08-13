@@ -51,11 +51,11 @@
 
 **⚠️ CRITICAL**: US1~US5 전부가 이 단계를 기다린다
 
-- [ ] T004 `src/models/types.ts`에 **바깥쪽 타입** 정의 — `ModelReadiness`(넷), `DownloadProgress`, `DownloadFailure`, `StorageUsage` (data-model.md). **`DownloadProgress`에 바이트·시간 필드를 넣지 않는다**(FR-013a, FR-034) — `totalBytes`가 곧 모델 크기다
-- [ ] T005 [P] `src/models/types.ts`에 **안쪽 타입** 정의 — `ModelAsset`(key·url·expectedBytes·md5), `AssetKey`, `VerificationVerdict`(assetKey 포함), `PausedDownload`. **`VerificationVerdict`에 시각을 담지 않는다**(원칙 IV)
-- [ ] T006 [P] `src/models/port.ts`에 통로 정의 — 파일(존재·크기·삭제·md5), 네트워크(내려받기 작업), 공간(남은 바이트). **`expo-file-system`을 직접 부르지 않고 주입받는다** — 002의 `FileSystemPort`와 같은 방식이라 기기 없이 대역으로 갈아끼운다
-- [ ] T007 `__tests__/models/roster.test.ts` 작성 — contracts/roster.md 「검증 표」 R1~R8. **R6(역방향 함수 없음)·R7(process.env 없음)이 원칙 III의 방어선이다**
-- [ ] T008 `src/models/roster.ts` 구현 — `assetFor(character)`와 `CHARACTERS` 재수출만. **`allAssets()`도 `characterFor()`도 만들지 않는다**(FR-003, FR-010). 실제 url·크기·md5는 자리만 두고 저장소 소유자가 채운다(research.md 「미해결」)
+- [X] T004 `src/models/types.ts`에 **바깥쪽 타입** 정의 — `ModelReadiness`(넷), `DownloadProgress`, `DownloadFailure`, `StorageUsage` (data-model.md). **`DownloadProgress`에 바이트·시간 필드를 넣지 않는다**(FR-013a, FR-034) — `totalBytes`가 곧 모델 크기다
+- [X] T005 [P] `src/models/types.ts`에 **안쪽 타입** 정의 — `ModelAsset`(key·url·expectedBytes·md5), `AssetKey`, `VerificationVerdict`(assetKey 포함), `PausedDownload`. **`VerificationVerdict`에 시각을 담지 않는다**(원칙 IV)
+- [X] T006 [P] `src/models/port.ts`에 통로 정의 — 파일(존재·크기·삭제·md5), 네트워크(내려받기 작업), 공간(남은 바이트). **`expo-file-system`을 직접 부르지 않고 주입받는다** — 002의 `FileSystemPort`와 같은 방식이라 기기 없이 대역으로 갈아끼운다
+- [X] T007 `__tests__/models/roster.test.ts` 작성 — contracts/roster.md 「검증 표」 R1~R8. **R6(역방향 함수 없음)·R7(process.env 없음)이 원칙 III의 방어선이다**
+- [~] T008 `src/models/roster.ts` 구현 — `assetFor(character)`와 `CHARACTERS` 재수출만. **`allAssets()`도 `characterFor()`도 만들지 않는다**(FR-003, FR-010). 실제 url·크기·md5는 자리만 두고 저장소 소유자가 채운다(research.md 「미해결」)
 
 **Checkpoint**: 타입과 매핑 경계가 정해졌다 — 스토리 작업 시작 가능
 
@@ -74,13 +74,13 @@
 
 ### Tests for User Story 1 ⚠️ 먼저 쓰고, 실패를 확인한 뒤 구현한다
 
-- [ ] T009 [P] [US1] `__tests__/models/readiness.test.ts` — contracts/readiness.md 검증 표 D1~D6. **D5(넷이 서로 구분된다)가 원칙 V의 방어선이다**(SC-003)
-- [ ] T010 [US1] `__tests__/models/readiness.test.ts`에 D7~D10 추가 — 검증 결과 없음/파일 사라짐/크기 다름/다른 자산의 결과. **D8이 명확화 세션의 결론이다**(FR-021e, SC-019)
-- [ ] T011 [P] [US1] `__tests__/models/readiness.test.ts`에 D15 추가 — `reason`에 모델 정보가 없다(FR-004)
+- [X] T009 [P] [US1] `__tests__/models/readiness.test.ts` — contracts/readiness.md 검증 표 D1~D6. **D5(넷이 서로 구분된다)가 원칙 V의 방어선이다**(SC-003)
+- [X] T010 [US1] `__tests__/models/readiness.test.ts`에 D7~D10 추가 — 검증 결과 없음/파일 사라짐/크기 다름/다른 자산의 결과. **D8이 명확화 세션의 결론이다**(FR-021e, SC-019)
+- [X] T011 [P] [US1] `__tests__/models/readiness.test.ts`에 D15 추가 — `reason`에 모델 정보가 없다(FR-004)
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] `src/models/readiness.ts` 구현 — `readinessOf(input)` 순수 함수. contracts/readiness.md 「넷을 가르는 규칙」 7행 순서대로. **안에서 파일 시스템을 부르지 않는다** — 002의 `day-boundary.ts`가 `now`를 인자로 받은 것과 같은 이유
+- [X] T012 [US1] `src/models/readiness.ts` 구현 — `readinessOf(input)` 순수 함수. contracts/readiness.md 「넷을 가르는 규칙」 7행 순서대로. **안에서 파일 시스템을 부르지 않는다** — 002의 `day-boundary.ts`가 `now`를 인자로 받은 것과 같은 이유
 - [ ] T013 [US1] `src/models/storage.ts`에 상태 조회 구현 — `state.json`을 읽어 검증 결과·중단 상태를 준다(contracts/storage.md 「메타데이터를 한 파일에 모으는 이유」). **파일 내용을 읽지 않는다**(SC-016)
 - [ ] T014 [US1] `src/models/port.ts`의 `expo-file-system` 구현 — 존재·크기 확인. 지연 import(001·002와 같은 이유). `Paths.document/models/` 아래
 
