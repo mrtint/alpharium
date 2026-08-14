@@ -22,7 +22,7 @@ import type {
   TransferOutcome,
   TransferProgress,
 } from "../../src/models/port";
-import { assetFor } from "../../src/models/roster";
+import { assetFor, CHARACTERS } from "../../src/models/roster";
 import { readState } from "../../src/models/storage";
 import type { DownloadProgress } from "../../src/models/types";
 
@@ -49,15 +49,23 @@ function harness(options: {
   // 기본값은 **다 받아 온전한 파일**이다. 받기가 끝나면 곧바로 검증이 돌기 때문에
   // (FR-021a), 파일이 없는 것을 기본으로 두면 모든 성공 경로가 verification-failed로
   // 끝나 무엇을 시험하는지 흐려진다. 검증 실패를 보고 싶은 테스트만 값을 바꾼다.
+  //
+  // **지문은 로스터의 기준값과 같아야 한다.** 로스터에 실측 md5가 들어오면 검증이
+  // 채록에서 진짜 비교로 바뀌므로, 아무 문자열이나 돌려주면 성공 경로가 전부
+  // verification-failed가 된다. 이 대역은 "온전한 파일"을 흉내 내는 것이 목적이므로
+  // 기준값을 그대로 되돌려준다 — 기준이 아직 없으면(빈 문자열) 채록 경로를 탄다.
   const bytes = options.bytes === undefined ? 1000 : options.bytes;
-  const hash = options.hash === undefined ? "hash" : options.hash;
+  const matchingHash = (key: string) => {
+    const asset = CHARACTERS.map(assetFor).find((a) => a.key === key);
+    return asset && asset.md5 !== "" ? asset.md5 : "hash";
+  };
 
   const files: ModelFilePort = {
     async facts() {
       return { exists: bytes != null, bytes: bytes ?? null };
     },
-    async contentHash() {
-      return hash;
+    async contentHash(key) {
+      return options.hash === undefined ? matchingHash(key) : options.hash;
     },
     async remove() {},
     async bytesUsed() {

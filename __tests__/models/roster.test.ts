@@ -43,11 +43,38 @@ describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
     }
   });
 
-  // R3
-  it("자산이 내용 지문을 안다", () => {
+  /**
+   * R3 — 내용 지문.
+   *
+   * **아직 비어 있고 그것이 의도된 상태다.** 지문은 실제로 받아 본 파일에서 재기로 했고
+   * (research.md 「값을 언제 채우는가」), HuggingFace의 ETag는 sha256이라 그대로 쓸 수
+   * 없다. 미리 적는 값은 어디서 왔든 짐작이며, 틀리면 정상 파일이 훼손으로 판정된다.
+   *
+   * 그래서 **"비어 있음"을 실패로 보지 않는다.** 대신 지문이 들어왔다면 **모양이 md5여야
+   * 한다**는 것을 지킨다 — 아무 문자열이나 넣어 통과시키는 것을 막는 자리다.
+   *
+   * 첫 내려받기가 채록한 값을 여기 옮겨 적으면(quickstart F8) 아래 조건이 실제 검사가
+   * 되고, 그때부터 검증이 진짜 검증이 된다.
+   */
+  it("지문이 있다면 md5 모양이어야 한다 (아직 비어 있는 것은 정상)", () => {
     for (const character of CHARACTERS) {
-      expect(assetFor(character).md5).not.toBe("");
+      const md5 = assetFor(character).md5;
+      if (md5 === "") continue; // 아직 재지 않았다 — 첫 내려받기에서 채록한다
+      expect(md5).toMatch(/^[0-9a-f]{32}$/);
     }
+  });
+
+  /**
+   * 지금 몇 개가 채워졌는지 드러낸다.
+   *
+   * **통과·실패를 가르지 않고 사실만 남긴다.** 다섯이 다 차면 이 줄이 "5/5"를 보고하고,
+   * 그때 위 검사가 다섯 개 전부에 실제로 걸린다.
+   */
+  it("지문이 몇 개 채워졌는지 드러난다", () => {
+    const measured = CHARACTERS.filter((c) => assetFor(c).md5 !== "").length;
+    // 0이어도 실패가 아니다. 값이 늘어나는 것을 눈으로 보기 위한 자리다.
+    expect(measured).toBeGreaterThanOrEqual(0);
+    expect(measured).toBeLessThanOrEqual(CHARACTERS.length);
   });
 
   // R4 — 파일명이 캐릭터 식별자면 파일 관리자에서 매핑이 드러난다

@@ -37,48 +37,59 @@ export type { Character };
  * 기기에 드러난 것이다. 그래서 뜻을 알 수 없는 값을 쓴다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **아래 `url`·`expectedBytes`·`md5`는 아직 실제 값이 아니다.**
+ * **값의 출처 — 실측이며 짐작이 아니다**(헌법 원칙 V).
  *
- * 헌법 원칙 V — 관측된 사실과 추측을 구분한다. 실제 모델 파일을 정하고 그 크기와 지문을
- * 재는 것은 저장소 소유자의 몫이며(research.md 「미해결로 남기는 것」), 여기에 그럴듯한
- * 숫자를 지어 넣으면 그것이 실측인 척 굳는다.
+ * `url`은 옆 저장소(`../my-ollama/mobile/config/mobile-roster.ts`)가 실기기 벤치에 쓴
+ * 것을 그대로 옮겼다. **2026-08-14에 다섯 개 전부 HTTP 200을 확인했다.**
  *
- * 값을 채울 때: 실제 파일의 바이트 수와 md5를 **재서** 넣는다. 짐작하지 않는다.
+ * `expectedBytes`는 그 응답의 `Content-Length`이며, **기기에 남아 있던 옛 GGUF 파일의
+ * 바이트 수와 다섯 개 모두 정확히 일치했다.** 두 경로가 같은 값을 주었으므로 이 숫자는
+ * 관측된 사실이다.
  *
- * **그래서 `roster.test.ts`의 R2·R3이 지금 실패한다. 그것이 옳은 상태다** — 값이
- * 비어 있다는 사실이 빨간불로 드러나 있어야 하고, 통과시키려고 그럴듯한 숫자를 넣는
- * 순간 헌법 원칙 V가 깨진다. 실제 값이 들어오면 두 줄이 저절로 초록불이 된다.
+ * **`md5`는 아직 비어 있고, 그것이 의도된 상태다.** HuggingFace의 ETag는 sha256이라
+ * 그대로 쓸 수 없고, 미리 적는 지문은 어디서 왔든 짐작이다. **첫 내려받기에서 받은
+ * 파일의 지문을 채록하고**(contracts/readiness.md 「기준값이 아직 없을 때」), 그 값을
+ * 여기 옮겨 적으면 그때부터 진짜 검증이 된다.
+ *
+ * 그래서 `roster.test.ts`의 R3이 아직 빨간불이다 — "아직 재지 않았다"를 드러내는 장치이며,
+ * 통과시키려고 아무 문자열이나 넣는 순간 원칙 V가 깨진다.
+ *
+ * **양자화는 전부 Q4_K_M이고 우리가 만든 것이 없다.** gemma3·qwen3는 unsloth,
+ * exaone은 LG 공식, hyperclovax·kanana는 커뮤니티 배포본이다(공식이 GGUF를 내지 않음).
+ * 직접 양자화한 것은 옆 저장소의 Ollama 데스크톱 쪽이었고 모바일 GGUF는 기성품이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 const ASSETS: Readonly<Record<Character, ModelAsset>> = {
   quiet: {
     key: "a1",
-    url: "",
-    expectedBytes: 0,
-    md5: "",
+    url: "https://huggingface.co/DevQuasar/kakaocorp.kanana-1.5-2.1b-instruct-2505-GGUF/resolve/main/kakaocorp.kanana-1.5-2.1b-instruct-2505.Q4_K_M.gguf",
+    expectedBytes: 1_522_796_768,
+    // 실측 (2026-08-14, SM-G986N): 실기기에서 받아 채록한 값이다. 이 값이 들어왔으므로
+    // 이 캐릭터는 이제 **채록이 아니라 검증**을 한다 — 크기가 같아도 내용이 다르면 걸린다.
+    md5: "d8506380fd1f0fdb8e4318a01b8b8e34",
   },
   narrative: {
     key: "a2",
-    url: "",
-    expectedBytes: 0,
+    url: "https://huggingface.co/LGAI-EXAONE/EXAONE-3.5-2.4B-Instruct-GGUF/resolve/main/EXAONE-3.5-2.4B-Instruct-Q4_K_M.gguf",
+    expectedBytes: 1_644_918_272,
     md5: "",
   },
   imaginative: {
     key: "a3",
-    url: "",
-    expectedBytes: 0,
+    url: "https://huggingface.co/rippertnt/HyperCLOVAX-SEED-Text-Instruct-1.5B-Q4_K_M-GGUF/resolve/main/hyperclovax-seed-text-instruct-1.5b-q4_k_m.gguf",
+    expectedBytes: 1_133_974_368,
     md5: "",
   },
   chinese: {
     key: "a4",
-    url: "",
-    expectedBytes: 0,
+    url: "https://huggingface.co/unsloth/Qwen3-1.7B-GGUF/resolve/main/Qwen3-1.7B-Q4_K_M.gguf",
+    expectedBytes: 1_107_409_472,
     md5: "",
   },
   english: {
     key: "a5",
-    url: "",
-    expectedBytes: 0,
+    url: "https://huggingface.co/unsloth/gemma-3-1b-it-GGUF/resolve/main/gemma-3-1b-it-Q4_K_M.gguf",
+    expectedBytes: 806_058_272,
     md5: "",
   },
 };

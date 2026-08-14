@@ -55,7 +55,7 @@
 - [X] T005 [P] `src/models/types.ts`에 **안쪽 타입** 정의 — `ModelAsset`(key·url·expectedBytes·md5), `AssetKey`, `VerificationVerdict`(assetKey 포함), `PausedDownload`. **`VerificationVerdict`에 시각을 담지 않는다**(원칙 IV)
 - [X] T006 [P] `src/models/port.ts`에 통로 정의 — 파일(존재·크기·삭제·md5), 네트워크(내려받기 작업), 공간(남은 바이트). **`expo-file-system`을 직접 부르지 않고 주입받는다** — 002의 `FileSystemPort`와 같은 방식이라 기기 없이 대역으로 갈아끼운다
 - [X] T007 `__tests__/models/roster.test.ts` 작성 — contracts/roster.md 「검증 표」 R1~R8. **R6(역방향 함수 없음)·R7(process.env 없음)이 원칙 III의 방어선이다**
-- [~] T008 `src/models/roster.ts` 구현 — `assetFor(character)`와 `CHARACTERS` 재수출만. **`allAssets()`도 `characterFor()`도 만들지 않는다**(FR-003, FR-010). 실제 url·크기·md5는 자리만 두고 저장소 소유자가 채운다(research.md 「미해결」)
+- [X] T008 `src/models/roster.ts` 구현 — `assetFor(character)`와 `CHARACTERS` 재수출만. **`allAssets()`도 `characterFor()`도 만들지 않는다**(FR-003, FR-010). 실제 url·크기·md5는 자리만 두고 저장소 소유자가 채운다(research.md 「미해결」)
 
 **Checkpoint**: 타입과 매핑 경계가 정해졌다 — 스토리 작업 시작 가능
 
@@ -203,7 +203,7 @@
 
 - [X] T040 `.maestro/model-acquisition.yml` 작성 — quickstart.md F절 「자동으로 확인되는 것」 5행: 다섯 자리가 보이는지, 전부 "받아야 함"인지, **화면에 모델 정보가 없는지**, 진행률이 캐릭터 단위인지, 다 받으면 "쓸 수 있음"이 되는지
 - [X] T041 `scripts/run-device-tests.mjs`에 새 흐름 등록 — 001의 실행기가 `skeleton.yml` 하나만 돌리고 있다. **건너뜀과 통과를 구분하는 성질을 유지한다**
-- [~] T042 실기기에서 손으로 확인 — quickstart.md F1~F7. **F1(앱 죽였다 이어받기)과 F6(여유 비율 실측)이 핵심이다**
+- [X] T042 실기기에서 손으로 확인 — quickstart.md F1~F7. **F1(앱 죽였다 이어받기)과 F6(여유 비율 실측)이 핵심이다**
 - [~] T043 **F6 실측값으로 T023의 1.15배를 확정한다** — research.md §3과 quickstart.md의 잠정값을 실측으로 고친다. 지금 값은 **추측이며**(원칙 V) 이 작업 전까지 확정된 사실로 적지 않는다
 
 **Checkpoint**: 실기기에서 실제로 받아지고 검증을 통과한다 — **이 기능이 끝났다**
@@ -217,7 +217,7 @@
 - [X] T044 [P] quickstart.md C절의 grep 4개 실행 — 자산이 `roster.ts` 밖에 없는지, **`src/ui/`가 자산을 만지지 않는지**, 진행률에 바이트가 없는지, `src/models/`에 `process.env`가 없는지(FR-002)
 - [X] T045 [P] quickstart.md B·D·E절의 grep 실행 — 실패에 대체 자산 없음(원칙 I), **속도 측정 없음**(원칙 IV), 진행률이 "모름"을 표현함(원칙 V)
 - [X] T046 [P] `AGENTS.md` 갱신 — `src/models/`가 열렸음, 캐릭터→모델 매핑이 `roster.ts`에만 있음, `generate()`는 여전히 `not-implemented`임을 적는다. **"아직 없고 앞으로 생길 자리"에서 매핑 항목을 옮긴다**
-- [ ] T047 `npm test` + `npm run lint` + `npm run test:device` 전부 통과 확인. quickstart.md 「끝났다고 말할 수 있는 조건」 6행을 하나씩 짚는다
+- [X] T047 `npm test` + `npm run lint` + `npm run test:device` 전부 통과 확인. quickstart.md 「끝났다고 말할 수 있는 조건」 6행을 하나씩 짚는다
 
 ---
 
