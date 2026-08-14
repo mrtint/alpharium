@@ -1,0 +1,50 @@
+# 실기기 자동 테스트 — 캐릭터 목록과 모델 준비 (003 FR-036)
+#
+# 이 흐름이 확인하는 것은 **화면이 캐릭터를 어떻게 내놓는가**이다. 실제 내려받기는
+# 모델 주소가 정해진 뒤에야 돌 수 있으므로(research.md 「미해결로 남기는 것」),
+# 여기서는 주소 없이도 참인 것만 본다.
+#
+# 검증 항목:
+#   FR-005a  다섯 자리가 처음부터 전부 보인다
+#   FR-005a  아무것도 없으면 전부 "받아야 함"이다
+#   FR-004   화면 어디에도 모델 정보가 없다 (핵심 위험)
+#   FR-005b  추천되거나 미리 골라진 캐릭터가 없다
+#
+# **주소가 채워진 뒤에 더할 것** (quickstart F1~F7 참조):
+#   - 하나를 골라 실제로 받아지는지
+#   - 진행률이 캐릭터 단위로 보이는지
+#   - 앱을 죽였다 이어받는지
+#   - 지우면 공간이 실제로 비는지
+#
+# 한글 검증 문구가 CP949로 뭉개지지 않는 것은 run-device-tests.mjs가
+# JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8로 보장한다.
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# FR-005a — 로스터의 다섯 자리가 전부 보인다.
+# 고를 대상이 보이지 않으면 고를 수 없다(헌법 원칙 III: 성격을 보고 고른다).
+# 이름은 아직 사람이 짓지 않았으므로 자리표시 식별자가 그대로 보인다(FR-004a).
+- assertVisible: "quiet"
+- assertVisible: "narrative"
+- assertVisible: "imaginative"
+- assertVisible: "chinese"
+- assertVisible: "english"
+
+# FR-005a — 아무것도 준비되지 않았으면 전부 "받아야 함"이다
+- assertVisible: "받아야 함"
+
+# FR-004 — **이 기능의 핵심 위험이다.**
+# 모델 식별자가 화면에 있으면 원칙 III 위반이다. 헌법 로스터의 다섯 모델 이름이
+# 하나도 보이지 않아야 한다.
+- assertNotVisible: "kanana"
+- assertNotVisible: "exaone"
+- assertNotVisible: "hyperclova"
+- assertNotVisible: "qwen"
+- assertNotVisible: "gemma"
+
+# FR-004 — 파라미터 수·양자화 방식도 나오지 않는다
+- assertNotVisible: "gguf"
+- assertNotVisible: "Q4"
+- assertNotVisible: "2.1B"
+- assertNotVisible: "1.5B"

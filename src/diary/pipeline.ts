@@ -21,6 +21,7 @@ export type PipelineStage =
   | "already-running" // 같은 하루가 이미 생성 중 (FR-018d)
   | "signals" // 신호를 가져오지 못함
   | "request-build" // 캐릭터가 없어 요청 실패 (FR-007)
+  | "model-not-ready" // 고른 캐릭터의 모델이 기기에 없다 (003 FR-008)
   | "generation" // 추론 실패 또는 not-implemented
   | "storage"; // 저장 실패 (FR-024)
 
@@ -53,6 +54,17 @@ export type PipelineInput = {
 export type PipelineDeps = {
   /** 이 기능에서는 가짜 신호. 다음 기능에서 실제 수집으로 갈아끼운다 */
   loadSignals: (day: DayDate) => Promise<DaySignals | null>;
+  /**
+   * 이 캐릭터의 모델이 지금 기기에 있는가 (003 FR-008).
+   *
+   * 003이 붙기 전에는 없었으므로 **선택적이다** — 주지 않으면 이 단계를 건너뛴다.
+   * 002의 기존 테스트가 그대로 통과해야 하기 때문이며, 계약을 넓히는 것이지 바꾸는 것이
+   * 아니다.
+   *
+   * **준비되지 않았으면 생성을 시도하지 않는다.** 다른 캐릭터의 모델로 대신하지도 않는다
+   * (FR-008a, 헌법 원칙 I) — 조용한 대체는 사용자가 고른 캐릭터를 배신하는 것이다.
+   */
+  isModelReady?: (character: Character) => Promise<boolean>;
   /** 001의 select.ts가 고른 것 */
   backend: InferenceBackend;
   /** 파일 구현 또는 메모리 대역 */
@@ -120,6 +132,17 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
   const request = buildRequest(signals, input.character, input.vision);
   if (!request.ok) {
     return stop("request-build", "캐릭터가 정해지지 않아 요청을 만들지 못했다");
+  }
+
+  // 4b. 모델이 기기에 있는가 (003 FR-008).
+  //
+  // **생성을 시도하기 전에 막는다.** 요청이 만들어져야 어느 캐릭터인지 알 수 있으므로
+  // request-build 다음이고, 없는 모델로 추론을 시도하면 무너지므로 generation 앞이다.
+  if (deps.isModelReady !== undefined) {
+    const ready = await deps.isModelReady(request.request.character);
+    if (!ready) {
+      return stop("model-not-ready", "고른 캐릭터의 모델이 아직 기기에 없다");
+    }
   }
 
   // 5. 생성한다. 이 기능에서는 항상 여기서 멈춘다.

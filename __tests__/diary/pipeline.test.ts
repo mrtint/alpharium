@@ -44,6 +44,8 @@ function makePipeline(
     backend?: InferenceBackend;
     store?: ReturnType<typeof memoryStore>;
     signals?: (day: DayDate) => Promise<DaySignals | null>;
+    /** 003이 더한 단계. 주지 않으면 건너뛴다 — 002의 기존 테스트가 그대로 돈다 */
+    isModelReady?: (character: Character) => Promise<boolean>;
   } = {},
 ) {
   const store = overrides.store ?? memoryStore();
@@ -51,6 +53,7 @@ function makePipeline(
     backend: overrides.backend ?? notImplemented(),
     store,
     loadSignals: overrides.signals ?? (async (day) => partiallyUnknownDay(day)),
+    isModelReady: overrides.isModelReady,
   });
   return { pipeline, store };
 }
@@ -353,5 +356,77 @@ describe("생성된 일기는 근거를 담는다 (FR-011)", () => {
       expect(entry.signalsUsed.date).toBe(DAY);
       expect(entry.signalsUsed.steps.kind).toBe("unknown");
     }
+  });
+});
+
+/**
+ * 003이 더한 단계 — 모델이 기기에 없으면 생성 앞에서 멈춘다 (D13, D14).
+ *
+ * 계약: specs/003-character-model-files/contracts/readiness.md
+ */
+describe("모델이 준비되지 않으면 생성을 시도하지 않는다 (003 FR-008)", () => {
+  // D13
+  it("준비되지 않은 캐릭터면 model-not-ready에서 멈춘다", async () => {
+    const { pipeline } = makePipeline({ isModelReady: async () => false });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("model-not-ready");
+  });
+
+  it("준비되지 않았으면 추론을 부르지 않는다", async () => {
+    let generateCalled = false;
+    const spy: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        generateCalled = true;
+        return { kind: "not-implemented" };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend: spy, isModelReady: async () => false });
+    await pipeline.run(inputFor());
+
+    // 없는 모델로 추론을 시도하면 무너진다. 그 앞에서 막는 것이 이 단계의 존재 이유다.
+    expect(generateCalled).toBe(false);
+  });
+
+  // D14 — 조용한 대체는 사용자가 고른 캐릭터를 배신하는 것이다 (FR-008a, SC-005)
+  it("준비된 다른 캐릭터가 있어도 대신 쓰지 않는다", async () => {
+    const asked: Character[] = [];
+    const { pipeline } = makePipeline({
+      isModelReady: async (character) => {
+        asked.push(character);
+        return false; // 고른 캐릭터만 없다
+      },
+    });
+
+    const result = await pipeline.run(inputFor({ character: "quiet" }));
+
+    expect(result.ok).toBe(false);
+    // 고른 캐릭터 하나만 묻는다 — 다른 캐릭터를 훑어 대체재를 찾지 않는다
+    expect(asked).toEqual(["quiet"]);
+  });
+
+  it("준비됐으면 생성까지 간다", async () => {
+    const { pipeline } = makePipeline({ isModelReady: async () => true });
+
+    const result = await pipeline.run(inputFor());
+
+    // 003이 끝나도 generate()는 not-implemented다 (FR-009)
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("generation");
+  });
+
+  it("판정을 주지 않으면 이 단계를 건너뛴다 (002 그대로)", async () => {
+    const { pipeline } = makePipeline();
+
+    const result = await pipeline.run(inputFor());
+
+    if (!result.ok) expect(result.stage).toBe("generation");
   });
 });

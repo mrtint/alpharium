@@ -81,8 +81,8 @@
 ### Implementation for User Story 1
 
 - [X] T012 [US1] `src/models/readiness.ts` 구현 — `readinessOf(input)` 순수 함수. contracts/readiness.md 「넷을 가르는 규칙」 7행 순서대로. **안에서 파일 시스템을 부르지 않는다** — 002의 `day-boundary.ts`가 `now`를 인자로 받은 것과 같은 이유
-- [ ] T013 [US1] `src/models/storage.ts`에 상태 조회 구현 — `state.json`을 읽어 검증 결과·중단 상태를 준다(contracts/storage.md 「메타데이터를 한 파일에 모으는 이유」). **파일 내용을 읽지 않는다**(SC-016)
-- [ ] T014 [US1] `src/models/port.ts`의 `expo-file-system` 구현 — 존재·크기 확인. 지연 import(001·002와 같은 이유). `Paths.document/models/` 아래
+- [X] T013 [US1] `src/models/storage.ts`에 상태 조회 구현 — `state.json`을 읽어 검증 결과·중단 상태를 준다(contracts/storage.md 「메타데이터를 한 파일에 모으는 이유」). **파일 내용을 읽지 않는다**(SC-016)
+- [X] T014 [US1] `src/models/port.ts`의 `expo-file-system` 구현 — 존재·크기 확인. 지연 import(001·002와 같은 이유). `Paths.document/models/` 아래
 
 **Checkpoint**: 준비 상태 넷이 갈리고 기기 없이 검증된다. **여기까지가 MVP다**
 
@@ -100,14 +100,14 @@
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T015 [P] [US4] `__tests__/models/verification.test.ts` — contracts/readiness.md D11. **크기는 같고 md5가 다른 파일이 걸리는지**(SC-015). 이것이 이 스토리의 존재 이유다
-- [ ] T016 [US4] `__tests__/models/verification.test.ts`에 검증 결과 보관·복원 검증 추가 — `assetKey`가 함께 남는지(설계 발견), 결과가 사라지면 `ready`가 아닌지(FR-021c)
+- [X] T015 [P] [US4] `__tests__/models/verification.test.ts` — contracts/readiness.md D11. **크기는 같고 md5가 다른 파일이 걸리는지**(SC-015). 이것이 이 스토리의 존재 이유다
+- [X] T016 [US4] `__tests__/models/verification.test.ts`에 검증 결과 보관·복원 검증 추가 — `assetKey`가 함께 남는지(설계 발견), 결과가 사라지면 `ready`가 아닌지(FR-021c)
 
 ### Implementation for User Story 4
 
-- [ ] T017 [US4] `src/models/verification.ts` 구현 — 파일의 md5를 자산의 지문과 견준다. `File.info({ md5: true })`를 쓴다(research.md §2). **내려받기 직후 한 번만 부른다**(FR-021a)
-- [ ] T018 [US4] `src/models/storage.ts`에 검증 결과 쓰기 구현 — 임시 파일에 쓰고 옮긴다(원자적, 002와 동형). 쓰다 죽으면 결과 전체를 잃으므로
-- [ ] T019 [US4] `src/models/verification.ts`에 어긋난 결과 정리 추가 — 파일이 없거나 크기가 다르면 남은 결과를 지운다(FR-021e). **어긋난 채 방치하지 않는다**(SC-019)
+- [X] T017 [US4] `src/models/verification.ts` 구현 — 파일의 md5를 자산의 지문과 견준다. `File.info({ md5: true })`를 쓴다(research.md §2). **내려받기 직후 한 번만 부른다**(FR-021a)
+- [X] T018 [US4] `src/models/storage.ts`에 검증 결과 쓰기 구현 — 임시 파일에 쓰고 옮긴다(원자적, 002와 동형). 쓰다 죽으면 결과 전체를 잃으므로
+- [X] T019 [US4] `src/models/verification.ts`에 어긋난 결과 정리 추가 — 파일이 없거나 크기가 다르면 남은 결과를 지운다(FR-021e). **어긋난 채 방치하지 않는다**(SC-019)
 
 **Checkpoint**: 훼손된 파일이 "쓸 수 있음"으로 통과하지 않는다
 
@@ -122,15 +122,15 @@
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T020 [P] [US2] `__tests__/models/acquisition.test.ts` — contracts/acquisition.md A1~A3. **A1(고른 것만)·A2(다른 것 안 생김)가 헌법 로스터의 방어선이다**(SC-002)
-- [ ] T021 [US2] `__tests__/models/acquisition.test.ts`에 A15~A17 추가 — 둘째 요청 거부, 앞의 것 유지, 멈추면 통함. **A17이 없으면 사용자가 갇힌다**(FR-020a)
-- [ ] T022 [US2] `__tests__/models/acquisition.test.ts`에 A12~A14, A18 추가 — 공간 부족이 시작 전에 걸리는지, **딱 맞으면 시작 안 하는지**(FR-019b), 안내에 크기가 없는지, 덜 받은 것이 완료가 아닌지
+- [X] T020 [P] [US2] `__tests__/models/acquisition.test.ts` — contracts/acquisition.md A1~A3. **A1(고른 것만)·A2(다른 것 안 생김)가 헌법 로스터의 방어선이다**(SC-002)
+- [X] T021 [US2] `__tests__/models/acquisition.test.ts`에 A15~A17 추가 — 둘째 요청 거부, 앞의 것 유지, 멈추면 통함. **A17이 없으면 사용자가 갇힌다**(FR-020a)
+- [X] T022 [US2] `__tests__/models/acquisition.test.ts`에 A12~A14, A18 추가 — 공간 부족이 시작 전에 걸리는지, **딱 맞으면 시작 안 하는지**(FR-019b), 안내에 크기가 없는지, 덜 받은 것이 완료가 아닌지
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] `src/models/acquisition.ts`에 시작 전 확인 구현 — contracts/acquisition.md 「시작하기 전에 보는 것」 4행 순서대로. **공간은 예상 크기의 1.15배를 요구한다**(research.md §3, **잠정값 — T042에서 실측 확정**)
-- [ ] T024 [US2] `src/models/acquisition.ts`에 한 번에 하나 강제 구현 — 진행 중인 작업을 **메모리에 하나** 들고 뒤의 요청은 `busy`로 거부. **저장소에 남기지 않는다** — 남기면 앱이 죽었을 때 영원히 진행 중인 캐릭터가 생긴다(002의 `running` Set과 같은 판단)
-- [ ] T025 [US2] `src/models/port.ts`에 공간 조회 구현 — `Paths.availableDiskSpace`(research.md §1). 지연 import
+- [X] T023 [US2] `src/models/acquisition.ts`에 시작 전 확인 구현 — contracts/acquisition.md 「시작하기 전에 보는 것」 4행 순서대로. **공간은 예상 크기의 1.15배를 요구한다**(research.md §3, **잠정값 — T042에서 실측 확정**)
+- [X] T024 [US2] `src/models/acquisition.ts`에 한 번에 하나 강제 구현 — 진행 중인 작업을 **메모리에 하나** 들고 뒤의 요청은 `busy`로 거부. **저장소에 남기지 않는다** — 남기면 앱이 죽었을 때 영원히 진행 중인 캐릭터가 생긴다(002의 `running` Set과 같은 판단)
+- [X] T025 [US2] `src/models/port.ts`에 공간 조회 구현 — `Paths.availableDiskSpace`(research.md §1). 지연 import
 
 **Checkpoint**: 고른 하나만 받아지고, 둘째 요청이 거부되며, 공간이 먼저 걸린다
 
@@ -145,16 +145,16 @@
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T026 [P] [US3] `__tests__/models/acquisition.test.ts`에 A4~A6 추가 — 진행률이 캐릭터 단위인지, **시간 정보가 없는지**(원칙 IV), `totalBytes: -1`이면 "모름"인지(원칙 V)
-- [ ] T027 [US3] `__tests__/models/acquisition.test.ts`에 A7~A11 추가 — 중단·이어받기·앱 종료 후 재개·끊김 표현. **A11(실패가 "받았음"이 아니다)이 원칙 V다**
-- [ ] T028 [US3] `__tests__/models/acquisition.test.ts`에 A19~A20 추가 — 완료 후 검증이 도는지, 실패에 "대신 쓸 자산"이 없는지(FR-035, 원칙 I)
+- [X] T026 [P] [US3] `__tests__/models/acquisition.test.ts`에 A4~A6 추가 — 진행률이 캐릭터 단위인지, **시간 정보가 없는지**(원칙 IV), `totalBytes: -1`이면 "모름"인지(원칙 V)
+- [X] T027 [US3] `__tests__/models/acquisition.test.ts`에 A7~A11 추가 — 중단·이어받기·앱 종료 후 재개·끊김 표현. **A11(실패가 "받았음"이 아니다)이 원칙 V다**
+- [X] T028 [US3] `__tests__/models/acquisition.test.ts`에 A19~A20 추가 — 완료 후 검증이 도는지, 실패에 "대신 쓸 자산"이 없는지(FR-035, 원칙 I)
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] `src/models/port.ts`에 내려받기 작업 구현 — `File.createDownloadTask`의 `pause`/`resumeAsync`/`savable`/`fromSavable`를 감싼다(research.md §1). **재개를 우리가 만들지 않고 보관한다**
-- [ ] T030 [US3] `src/models/acquisition.ts`에 진행률 구현 — `bytesWritten`/`totalBytes`를 **`0~1` 또는 "모름"으로만** 밖에 내준다(FR-013a). `totalBytes`가 `-1`이면 자산의 예상 크기로 갈음하되 그것과도 어긋나면 "모름"
-- [ ] T031 [US3] `src/models/acquisition.ts`에 중단·재개 구현 — 중단 시 `savable()`을 `state.json`에 저장, 재개 시 `fromSavable()`로 복원(FR-015, FR-016). **`paused` 상태에서만 `savable()`을 부를 수 있으므로**, 앱이 갑자기 죽어 저장하지 못한 경우도 `partial`로 다뤄야 한다
-- [ ] T032 [US3] `src/models/acquisition.ts`에 완료 판정 구현 — 받은 양이 예상 크기에 이르러야 완료(FR-001b, SC-014). 완료 직후 검증(T017)을 부른다
+- [X] T029 [US3] `src/models/port.ts`에 내려받기 작업 구현 — `File.createDownloadTask`의 `pause`/`resumeAsync`/`savable`/`fromSavable`를 감싼다(research.md §1). **재개를 우리가 만들지 않고 보관한다**
+- [X] T030 [US3] `src/models/acquisition.ts`에 진행률 구현 — `bytesWritten`/`totalBytes`를 **`0~1` 또는 "모름"으로만** 밖에 내준다(FR-013a). `totalBytes`가 `-1`이면 자산의 예상 크기로 갈음하되 그것과도 어긋나면 "모름"
+- [X] T031 [US3] `src/models/acquisition.ts`에 중단·재개 구현 — 중단 시 `savable()`을 `state.json`에 저장, 재개 시 `fromSavable()`로 복원(FR-015, FR-016). **`paused` 상태에서만 `savable()`을 부를 수 있으므로**, 앱이 갑자기 죽어 저장하지 못한 경우도 `partial`로 다뤄야 한다
+- [X] T032 [US3] `src/models/acquisition.ts`에 완료 판정 구현 — 받은 양이 예상 크기에 이르러야 완료(FR-001b, SC-014). 완료 직후 검증(T017)을 부른다
 
 **Checkpoint**: 진행률이 보이고, 멈췄다 이어받을 수 있다
 
@@ -169,13 +169,13 @@
 
 ### Tests for User Story 5 ⚠️
 
-- [ ] T033 [P] [US5] `__tests__/models/storage.test.ts` — contracts/storage.md S1~S7. **S4(부분 파일도 지워짐)·S6(일기는 남음)이 빠뜨리기 쉬운 둘이다**
-- [ ] T034 [US5] `__tests__/models/storage.test.ts`에 S8~S14 추가 — 공간 표시가 캐릭터 단위인지, 파일명이 모델명·캐릭터 식별자가 아닌지, 메타 쓰기가 원자적인지
+- [X] T033 [P] [US5] `__tests__/models/storage.test.ts` — contracts/storage.md S1~S7. **S4(부분 파일도 지워짐)·S6(일기는 남음)이 빠뜨리기 쉬운 둘이다**
+- [X] T034 [US5] `__tests__/models/storage.test.ts`에 S8~S14 추가 — 공간 표시가 캐릭터 단위인지, 파일명이 모델명·캐릭터 식별자가 아닌지, 메타 쓰기가 원자적인지
 
 ### Implementation for User Story 5
 
-- [ ] T035 [US5] `src/models/storage.ts`에 삭제 구현 — 모델 파일·검증 결과·중단 상태·**부분 파일**을 함께 지운다(FR-029). `src/diary/`는 건드리지 않는다(FR-030)
-- [ ] T036 [US5] `src/models/storage.ts`에 공간 사용 조회 구현 — **캐릭터 단위로 합산**한다(FR-028a). 부분 파일도 합산 — 사용자가 보는 것은 "지금 차지하는 자리"다
+- [X] T035 [US5] `src/models/storage.ts`에 삭제 구현 — 모델 파일·검증 결과·중단 상태·**부분 파일**을 함께 지운다(FR-029). `src/diary/`는 건드리지 않는다(FR-030)
+- [X] T036 [US5] `src/models/storage.ts`에 공간 사용 조회 구현 — **캐릭터 단위로 합산**한다(FR-028a). 부분 파일도 합산 — 사용자가 보는 것은 "지금 차지하는 자리"다
 
 **Checkpoint**: 지우면 공간이 실제로 비고, 일기는 남는다
 
@@ -187,9 +187,9 @@
 
 **⚠️ 원칙 III이 실제로 시험받는 자리다.**
 
-- [ ] T037 `src/ui/CharacterListScreen.tsx` 구현 — 다섯 자리를 전부 "받아야 함"으로 보이고 각각 준비를 시작할 수 있다(FR-005a). **추천·기본 선택 없이 다섯이 같은 자격**(FR-005b), **설명 문안을 짓지 않는다**(FR-005c). 화면은 `Character`와 `ModelReadiness`만 받는다 — `ModelAsset`을 import 하지 않는다
-- [ ] T038 `src/diary/pipeline.ts`에 준비 확인 단계 추가 — `PipelineStage`에 갈래 하나, `PipelineDeps`에 준비 상태를 묻는 함수 하나(research.md §6). **`request-build` 다음, `generation` 앞**. 002의 `store.ts`·`types.ts`·`request.ts`는 손대지 않는다
-- [ ] T039 [P] `__tests__/diary/pipeline.test.ts`에 D13~D14 추가 — 준비 안 된 캐릭터면 생성 전에 멈추는지(FR-008), **대체 모델로 생성되지 않는지**(FR-008a, SC-005). 002의 기존 테스트는 그대로 통과해야 한다
+- [X] T037 `src/ui/CharacterListScreen.tsx` 구현 — 다섯 자리를 전부 "받아야 함"으로 보이고 각각 준비를 시작할 수 있다(FR-005a). **추천·기본 선택 없이 다섯이 같은 자격**(FR-005b), **설명 문안을 짓지 않는다**(FR-005c). 화면은 `Character`와 `ModelReadiness`만 받는다 — `ModelAsset`을 import 하지 않는다
+- [X] T038 `src/diary/pipeline.ts`에 준비 확인 단계 추가 — `PipelineStage`에 갈래 하나, `PipelineDeps`에 준비 상태를 묻는 함수 하나(research.md §6). **`request-build` 다음, `generation` 앞**. 002의 `store.ts`·`types.ts`·`request.ts`는 손대지 않는다
+- [X] T039 [P] `__tests__/diary/pipeline.test.ts`에 D13~D14 추가 — 준비 안 된 캐릭터면 생성 전에 멈추는지(FR-008), **대체 모델로 생성되지 않는지**(FR-008a, SC-005). 002의 기존 테스트는 그대로 통과해야 한다
 
 **Checkpoint**: 첫 화면이 뜨고, 파이프라인이 준비되지 않은 캐릭터를 막는다
 
@@ -201,10 +201,10 @@
 
 **건너뛴 실기기 테스트는 통과가 아니다**(헌법 원칙 V).
 
-- [ ] T040 `.maestro/model-acquisition.yml` 작성 — quickstart.md F절 「자동으로 확인되는 것」 5행: 다섯 자리가 보이는지, 전부 "받아야 함"인지, **화면에 모델 정보가 없는지**, 진행률이 캐릭터 단위인지, 다 받으면 "쓸 수 있음"이 되는지
-- [ ] T041 `scripts/run-device-tests.mjs`에 새 흐름 등록 — 001의 실행기가 `skeleton.yml` 하나만 돌리고 있다. **건너뜀과 통과를 구분하는 성질을 유지한다**
-- [ ] T042 실기기에서 손으로 확인 — quickstart.md F1~F7. **F1(앱 죽였다 이어받기)과 F6(여유 비율 실측)이 핵심이다**
-- [ ] T043 **F6 실측값으로 T023의 1.15배를 확정한다** — research.md §3과 quickstart.md의 잠정값을 실측으로 고친다. 지금 값은 **추측이며**(원칙 V) 이 작업 전까지 확정된 사실로 적지 않는다
+- [X] T040 `.maestro/model-acquisition.yml` 작성 — quickstart.md F절 「자동으로 확인되는 것」 5행: 다섯 자리가 보이는지, 전부 "받아야 함"인지, **화면에 모델 정보가 없는지**, 진행률이 캐릭터 단위인지, 다 받으면 "쓸 수 있음"이 되는지
+- [X] T041 `scripts/run-device-tests.mjs`에 새 흐름 등록 — 001의 실행기가 `skeleton.yml` 하나만 돌리고 있다. **건너뜀과 통과를 구분하는 성질을 유지한다**
+- [~] T042 실기기에서 손으로 확인 — quickstart.md F1~F7. **F1(앱 죽였다 이어받기)과 F6(여유 비율 실측)이 핵심이다**
+- [~] T043 **F6 실측값으로 T023의 1.15배를 확정한다** — research.md §3과 quickstart.md의 잠정값을 실측으로 고친다. 지금 값은 **추측이며**(원칙 V) 이 작업 전까지 확정된 사실로 적지 않는다
 
 **Checkpoint**: 실기기에서 실제로 받아지고 검증을 통과한다 — **이 기능이 끝났다**
 
@@ -214,9 +214,9 @@
 
 **Purpose**: 원칙 III·IV가 코드에 실제로 지켜지는지 기계로 확인한다.
 
-- [ ] T044 [P] quickstart.md C절의 grep 4개 실행 — 자산이 `roster.ts` 밖에 없는지, **`src/ui/`가 자산을 만지지 않는지**, 진행률에 바이트가 없는지, `src/models/`에 `process.env`가 없는지(FR-002)
-- [ ] T045 [P] quickstart.md B·D·E절의 grep 실행 — 실패에 대체 자산 없음(원칙 I), **속도 측정 없음**(원칙 IV), 진행률이 "모름"을 표현함(원칙 V)
-- [ ] T046 [P] `AGENTS.md` 갱신 — `src/models/`가 열렸음, 캐릭터→모델 매핑이 `roster.ts`에만 있음, `generate()`는 여전히 `not-implemented`임을 적는다. **"아직 없고 앞으로 생길 자리"에서 매핑 항목을 옮긴다**
+- [X] T044 [P] quickstart.md C절의 grep 4개 실행 — 자산이 `roster.ts` 밖에 없는지, **`src/ui/`가 자산을 만지지 않는지**, 진행률에 바이트가 없는지, `src/models/`에 `process.env`가 없는지(FR-002)
+- [X] T045 [P] quickstart.md B·D·E절의 grep 실행 — 실패에 대체 자산 없음(원칙 I), **속도 측정 없음**(원칙 IV), 진행률이 "모름"을 표현함(원칙 V)
+- [X] T046 [P] `AGENTS.md` 갱신 — `src/models/`가 열렸음, 캐릭터→모델 매핑이 `roster.ts`에만 있음, `generate()`는 여전히 `not-implemented`임을 적는다. **"아직 없고 앞으로 생길 자리"에서 매핑 항목을 옮긴다**
 - [ ] T047 `npm test` + `npm run lint` + `npm run test:device` 전부 통과 확인. quickstart.md 「끝났다고 말할 수 있는 조건」 6행을 하나씩 짚는다
 
 ---

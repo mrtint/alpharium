@@ -15,7 +15,13 @@
 
 import { spawnSync } from "node:child_process";
 
-const FLOW = ".maestro/skeleton.yml";
+/**
+ * 돌릴 흐름들.
+ *
+ * **하나라도 실패하면 전체가 실패다.** 일부만 통과한 것을 통과로 보고하면, 기기 없이
+ * 초록불인 것과 구분되지 않는다(헌법 원칙 V).
+ */
+const FLOWS = [".maestro/skeleton.yml", ".maestro/model-acquisition.yml"];
 
 /** 결과 상태. skipped는 passed가 아니다. */
 const PASSED = "passed";
@@ -93,18 +99,23 @@ function main() {
   // 이 줄이 없으면 **흐름 파일에 한글을 쓸 수 없다.** 검증 문구를 영어로 바꿔 우회하지
   // 않는다 — 화면이 한국어이므로 검증도 한국어여야 하고, 우회하면 같은 함정이 다음 흐름에서
   // 되풀이된다.
-  const run = spawnSync("maestro", ["test", FLOW], {
-    stdio: "inherit",
-    shell: true,
-    env: { ...process.env, JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8" },
-  });
+  const failed = [];
+  for (const flow of FLOWS) {
+    console.log(`▶ ${flow}`);
+    const run = spawnSync("maestro", ["test", flow], {
+      stdio: "inherit",
+      shell: true,
+      env: { ...process.env, JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8" },
+    });
+    if (run.status !== 0) failed.push(`${flow} (종료 코드 ${run.status})`);
+  }
 
-  if (run.status === 0) {
+  if (failed.length === 0) {
     report(PASSED);
     process.exit(0);
   }
 
-  report(FAILED, `maestro가 종료 코드 ${run.status}로 끝났다`);
+  report(FAILED, `실패한 흐름: ${failed.join(", ")}`);
   process.exit(1);
 }
 
