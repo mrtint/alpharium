@@ -10,7 +10,12 @@
  */
 
 import { collectDaySignals } from "../../src/signals/collect";
-import type { LocationOutcome, PermissionState, PhotoFacts, PhotoPort } from "../../src/signals/port";
+import type {
+  LocationOutcome,
+  PermissionState,
+  PhotoFacts,
+  PhotoPort,
+} from "../../src/signals/port";
 
 /** 하루의 시작은 04:00이다. 이 날의 사진은 08-12 04:00 ~ 08-13 04:00에 속한다 */
 const DAY = "2026-08-12";

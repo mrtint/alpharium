@@ -32,8 +32,7 @@ export type PipelineStage =
  * 만들지 않는다 — 만드는 순간 가짜 일기와 구분이 사라진다(헌법 원칙 I).
  */
 export type PipelineResult =
-  | { ok: true; entry: DiaryEntry }
-  | { ok: false; stage: PipelineStage; reason: string };
+  { ok: true; entry: DiaryEntry } | { ok: false; stage: PipelineStage; reason: string };
 
 export type PipelineInput = {
   day: DayDate;

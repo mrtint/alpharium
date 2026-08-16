@@ -146,7 +146,13 @@ export function expoDiskSpacePort(): DiskSpacePort {
 export function expoDownloadPort(): DownloadPort {
   const wrap = (
     createTask: () => Promise<{
-      task: { downloadAsync?: () => Promise<unknown>; resumeAsync?: () => Promise<unknown>; pauseAsync: () => Promise<void>; savable: () => unknown; state: string };
+      task: {
+        downloadAsync?: () => Promise<unknown>;
+        resumeAsync?: () => Promise<unknown>;
+        pauseAsync: () => Promise<void>;
+        savable: () => unknown;
+        state: string;
+      };
       run: () => Promise<unknown>;
     }>,
   ): TransferHandle => {

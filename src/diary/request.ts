@@ -16,8 +16,7 @@ import type { Character, DiaryRequest, VisionSetting } from "./types";
  * 예외는 삼켜지기 쉽고, 삼켜지면 파이프라인이 어느 단계에서 멈췄는지 말할 수 없다(FR-019).
  */
 export type RequestResult =
-  | { ok: true; request: DiaryRequest }
-  | { ok: false; reason: "no-character" };
+  { ok: true; request: DiaryRequest } | { ok: false; reason: "no-character" };
 
 /**
  * 요청을 만든다.

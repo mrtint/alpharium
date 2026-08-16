@@ -13,14 +13,7 @@
 import type { Character } from "../diary/types";
 import type { DownloadPort, DiskSpacePort, MetadataPort, ModelFilePort } from "./port";
 import { assetFor } from "./roster";
-import {
-  pausedFor,
-  readState,
-  withPaused,
-  withVerdict,
-  withoutAsset,
-  writeState,
-} from "./storage";
+import { pausedFor, readState, withPaused, withVerdict, withoutAsset, writeState } from "./storage";
 import type { DownloadFailure, DownloadProgress } from "./types";
 import { verifyDownloaded } from "./verification";
 
@@ -48,8 +41,7 @@ export type AcquisitionPorts = {
 };
 
 export type AcquisitionResult =
-  | { ok: true; verified: boolean }
-  | { ok: false; failure: DownloadFailure };
+  { ok: true; verified: boolean } | { ok: false; failure: DownloadFailure };
 
 /**
  * 내려받기를 다루는 것.
@@ -62,7 +54,10 @@ export type AcquisitionResult =
  * 받았다"는 사실이라 기기에 남는다.
  */
 export interface Acquisition {
-  prepare(character: Character, onProgress?: (p: DownloadProgress) => void): Promise<AcquisitionResult>;
+  prepare(
+    character: Character,
+    onProgress?: (p: DownloadProgress) => void,
+  ): Promise<AcquisitionResult>;
   pause(): Promise<void>;
   /** 지금 받는 중인 캐릭터. 없으면 null */
   busyWith(): Character | null;
@@ -114,14 +109,21 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         }
 
         const report = (bytesWritten: number, totalBytes: number) => {
-          onProgress?.({ character, fraction: fractionOf(bytesWritten, totalBytes, asset.expectedBytes) });
+          onProgress?.({
+            character,
+            fraction: fractionOf(bytesWritten, totalBytes, asset.expectedBytes),
+          });
         };
 
         // 3. 이어받거나 처음부터 받는다 (FR-015, FR-016).
         const task =
           paused !== null
-            ? ports.download.resume(asset.key, paused.state, (p) => report(p.bytesWritten, p.totalBytes))
-            : ports.download.start(asset.key, asset.url, (p) => report(p.bytesWritten, p.totalBytes));
+            ? ports.download.resume(asset.key, paused.state, (p) =>
+                report(p.bytesWritten, p.totalBytes),
+              )
+            : ports.download.start(asset.key, asset.url, (p) =>
+                report(p.bytesWritten, p.totalBytes),
+              );
 
         handle = task;
         const outcome = await task.wait();
@@ -130,7 +132,10 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         if (outcome.kind === "paused") {
           await writeState(
             ports.metadata,
-            withPaused(await readState(ports.metadata), { assetKey: asset.key, state: outcome.state }),
+            withPaused(await readState(ports.metadata), {
+              assetKey: asset.key,
+              state: outcome.state,
+            }),
           );
           return { ok: false, failure: { kind: "network", reason: "받다가 멈췄다" } };
         }

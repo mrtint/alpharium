@@ -10,7 +10,12 @@
  */
 
 import { collectDaySignals } from "../../src/signals/collect";
-import type { LocationOutcome, PermissionState, PhotoFacts, PhotoPort } from "../../src/signals/port";
+import type {
+  LocationOutcome,
+  PermissionState,
+  PhotoFacts,
+  PhotoPort,
+} from "../../src/signals/port";
 
 const DAY = "2026-08-12";
 const at = (iso: string) => new Date(iso).getTime();

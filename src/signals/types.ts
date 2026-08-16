@@ -36,9 +36,7 @@ import type { DayDate } from "../config/day-boundary";
  * 헌법 원칙 V가 깨진다.
  */
 export type SignalValue<T> =
-  | { kind: "known"; value: T }
-  | { kind: "none" }
-  | { kind: "unknown"; reason: string };
+  { kind: "known"; value: T } | { kind: "none" } | { kind: "unknown"; reason: string };
 
 /** 기기에 남은 사진 하나. 내용 이해는 시각 처리 기능의 몫이며 여기서 다루지 않는다. */
 export type Photo = {

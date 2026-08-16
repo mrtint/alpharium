@@ -88,9 +88,7 @@ export type TransferProgress = {
  * 실패가 아니고, 이어받을 수 있는 상태다(FR-014, FR-015).
  */
 export type TransferOutcome =
-  | { kind: "completed" }
-  | { kind: "paused"; state: unknown }
-  | { kind: "failed"; reason: string };
+  { kind: "completed" } | { kind: "paused"; state: unknown } | { kind: "failed"; reason: string };
 
 /**
  * 하나의 내려받기 작업.

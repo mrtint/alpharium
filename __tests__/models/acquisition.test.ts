@@ -33,14 +33,16 @@ const ACQUISITION_CODE = readFileSync(join(__dirname, "../../src/models/acquisit
 type Requested = { key: string; url: string; resumed: boolean };
 
 /** 대역 묶음. 어떤 자산을 요청했는지 추적해 A1·A2를 검증한다. */
-function harness(options: {
-  outcome?: TransferOutcome;
-  available?: number;
-  hash?: string | null;
-  bytes?: number | null;
-  progress?: TransferProgress[];
-  metadata?: string | null;
-} = {}) {
+function harness(
+  options: {
+    outcome?: TransferOutcome;
+    available?: number;
+    hash?: string | null;
+    bytes?: number | null;
+    progress?: TransferProgress[];
+    metadata?: string | null;
+  } = {},
+) {
   const requested: Requested[] = [];
   const created: string[] = [];
   let stored = options.metadata ?? null;
