@@ -68,7 +68,16 @@ function reviveDates(entry: DiaryEntry): DiaryEntry {
         photos.kind === "known"
           ? {
               kind: "known",
-              value: photos.value.map((photo) => ({ ...photo, takenAt: new Date(photo.takenAt) })),
+              // 004에서 값이 `Photo[]`에서 `PhotoObservation`으로 한 겹 깊어졌다.
+              // **`complete`를 함께 옮긴다** — 여기서 떨어뜨리면 잘린 하루가 온전한 것으로
+              // 되살아나고, 그것이 FR-014d가 막으려는 거짓이다.
+              value: {
+                ...photos.value,
+                photos: photos.value.photos.map((photo) => ({
+                  ...photo,
+                  takenAt: new Date(photo.takenAt),
+                })),
+              },
             }
           : photos,
     },

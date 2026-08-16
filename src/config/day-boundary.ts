@@ -50,6 +50,25 @@ export function dayOf(instant: Date): DayDate {
 }
 
 /**
+ * 하루가 걸치는 시각의 구간을 구한다. `[start, end)` — 끝은 포함하지 않는다.
+ *
+ * 004에서 더했다. 사진을 「이 하루의 것」으로 고르려면 미디어 라이브러리에 시각 구간을
+ * 넘겨야 하는데, **그 구간을 부르는 쪽에서 계산하면 04:00이 이 파일 밖으로 새어 나간다**
+ * (FR-021a, 004 FR-002). 경계를 아는 자리는 여기 하나여야 한다.
+ *
+ * `dayOf(start)`와 `dayOf(end)`가 각각 그 하루와 다음 하루가 되는 것이 이 함수의 계약이다.
+ */
+export function dayBounds(day: DayDate): { startMs: number; endMs: number } {
+  const [year, month, date] = day.split("-").map(Number);
+
+  // 기기 시간대 기준으로 만든다. UTC로 바꾸면 하루가 어긋난다.
+  const start = new Date(year, month - 1, date, DAY_STARTS_AT_HOUR, 0, 0, 0);
+  const end = new Date(year, month - 1, date + 1, DAY_STARTS_AT_HOUR, 0, 0, 0);
+
+  return { startMs: start.getTime(), endMs: end.getTime() };
+}
+
+/**
  * 어떤 하루가 닫혔는지 판정한다.
  *
  * 하루는 다음 날 04:00에 닫힌다. 아직 닫히지 않은 하루는 일기를 만들 수 없다(FR-018c) —

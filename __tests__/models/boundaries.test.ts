@@ -22,7 +22,9 @@ function codeOf(...segments: string[]): string {
 }
 
 function filesIn(dir: string): string[] {
-  return readdirSync(join(SRC, dir)).filter((name) => name.endsWith(".ts") || name.endsWith(".tsx"));
+  return readdirSync(join(SRC, dir)).filter(
+    (name) => name.endsWith(".ts") || name.endsWith(".tsx"),
+  );
 }
 
 describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
@@ -47,7 +49,10 @@ describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
    */
   it("목록 화면이 받는 값에 자산이 없다", () => {
     const code = codeOf("ui", "CharacterListScreen.tsx");
-    const props = code.slice(code.indexOf("CharacterListProps"), code.indexOf("function statusText"));
+    const props = code.slice(
+      code.indexOf("CharacterListProps"),
+      code.indexOf("function statusText"),
+    );
     expect(props).not.toMatch(/asset|url|md5|expectedBytes/i);
   });
 
@@ -72,10 +77,7 @@ describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
   // 설계 중 찾은 누출 경로 — totalBytes가 곧 모델 크기다
   it("진행률 타입에 바이트가 없다", () => {
     const code = codeOf("models", "types.ts");
-    const progress = code.slice(
-      code.indexOf("DownloadProgress"),
-      code.indexOf("DownloadFailure"),
-    );
+    const progress = code.slice(code.indexOf("DownloadProgress"), code.indexOf("DownloadFailure"));
     expect(progress).not.toMatch(/bytes/i);
   });
 });
@@ -91,10 +93,7 @@ describe("원칙 IV — 측정 장치를 들이지 않는다", () => {
 
   it("검증 결과에 시각이 없다", () => {
     const code = codeOf("models", "types.ts");
-    const verdict = code.slice(
-      code.indexOf("VerificationVerdict"),
-      code.indexOf("PausedDownload"),
-    );
+    const verdict = code.slice(code.indexOf("VerificationVerdict"), code.indexOf("PausedDownload"));
     expect(verdict).not.toMatch(/verifiedAt|timestamp|duration/);
   });
 });

@@ -3,6 +3,9 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { collectReport } from "../diagnostics/report";
 import type { DiagnosticReport } from "../diagnostics/types";
+import { expoPhotoPort } from "../signals/expo-port";
+import { PermissionPanel } from "./PermissionPanel";
+import { SignalProbe } from "./SignalProbe";
 
 /**
  * 진단 화면 — 개발자가 실기기에서 상태를 눈으로 확인한다(FR-006, SC-002).
@@ -18,6 +21,13 @@ import type { DiagnosticReport } from "../diagnostics/types";
  *
  * 화면 디자인은 이 기능의 범위 밖이다 — 상태가 읽히면 충분하다.
  */
+/**
+ * 기기에 닿는 통로. 화면이 다시 그려질 때마다 새로 만들지 않도록 밖에 둔다.
+ *
+ * 지연 import 하는 통로이므로 여기서 만들어도 모듈이 즉시 해석되지 않는다.
+ */
+const photoPort = expoPhotoPort();
+
 export function DiagnosticsScreen() {
   const [report, setReport] = useState<DiagnosticReport | null>(null);
 
@@ -53,6 +63,10 @@ export function DiagnosticsScreen() {
       <Row label="추론 위치" value={locationText} />
       <Row label="모듈 상태" value={formatModuleStatus(report)} />
       <Row label="저장 점검" value={formatStorage(report)} />
+
+      {/* 004 — 권한 상태와 요청. 이것이 없으면 실기기에서 영원히 unknown이다 */}
+      <PermissionPanel port={photoPort} />
+      <SignalProbe port={photoPort} />
 
       {report.failures.length > 0 && (
         <View style={styles.failures}>

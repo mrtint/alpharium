@@ -42,7 +42,10 @@ const PROBE_DAY = "1970-01-02";
 function probeSignals(): DaySignals {
   return {
     date: PROBE_DAY,
-    photos: { kind: "known", value: [{ id: "probe", takenAt: new Date(0) }] },
+    photos: {
+      kind: "known",
+      value: { photos: [{ id: "probe", takenAt: new Date(0) }], complete: true },
+    },
     places: { kind: "none" },
     steps: { kind: "unknown", reason: "점검용 값" },
     battery: { kind: "none" },

@@ -25,11 +25,24 @@ appId: com.anonymous.alpharium
 # FR-005a — 로스터의 다섯 자리가 전부 보인다.
 # 고를 대상이 보이지 않으면 고를 수 없다(헌법 원칙 III: 성격을 보고 고른다).
 # 이름은 아직 사람이 짓지 않았으므로 자리표시 식별자가 그대로 보인다(FR-004a).
-- assertVisible: "quiet"
+#
+# **스크롤해서 찾는다** — 004가 진단 화면 위쪽에 권한·신호 자리를 더해서 캐릭터
+# 목록이 첫 화면 밖으로 밀렸다. assertVisible은 스크롤하지 않으므로 그대로 두면
+# chinese·english를 못 찾는다. 「보인다」의 뜻은 「화면에 도달할 수 있다」이지
+# 「첫 화면에 있다」가 아니다.
+- scrollUntilVisible:
+    element: "quiet"
+    direction: DOWN
 - assertVisible: "narrative"
-- assertVisible: "imaginative"
-- assertVisible: "chinese"
-- assertVisible: "english"
+- scrollUntilVisible:
+    element: "imaginative"
+    direction: DOWN
+- scrollUntilVisible:
+    element: "chinese"
+    direction: DOWN
+- scrollUntilVisible:
+    element: "english"
+    direction: DOWN
 
 # FR-005a — 아무것도 준비되지 않았으면 전부 "받아야 함"이다
 - assertVisible: "받아야 함"
