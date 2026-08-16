@@ -23,7 +23,16 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "llama.rn"
+      "llama.rn",
+      [
+        "expo-media-library",
+        {
+          "granularPermissions": [
+            "photo"
+          ],
+          "isAccessMediaLocationEnabled": true
+        }
+      ]
     ]
   }
 }

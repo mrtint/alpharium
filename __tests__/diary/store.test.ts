@@ -182,7 +182,30 @@ describe("직렬화 왕복 — unknown이 살아남는다 (SC-007, 원칙 V)", (
     const photos = restored.signalsUsed.photos;
     expect(photos.kind).toBe("known");
     if (photos.kind === "known") {
-      expect(photos.value[0].takenAt).toBeInstanceOf(Date);
+      expect(photos.value.photos[0].takenAt).toBeInstanceOf(Date);
+      // 004: `complete`도 왕복에서 살아남아야 한다. 여기서 떨어지면 잘린 하루가
+      // 온전한 것으로 되살아나고, 그것이 FR-014d가 막으려는 거짓이다.
+      expect(photos.value.complete).toBe(true);
+    }
+  });
+
+  it("잘린 사진 목록의 complete가 왕복에서 살아남는다", () => {
+    // 004 FR-014d — 상한에 걸린 하루가 저장을 거쳐 「전부 봤다」로 되살아나면 안 된다.
+    const day = richDay("2026-08-12");
+    const truncated = {
+      ...entryFor("2026-08-12"),
+      signalsUsed: {
+        ...day,
+        photos: { kind: "known" as const, value: { photos: [], complete: false } },
+      },
+    };
+
+    const restored = deserializeEntry(serializeEntry(truncated));
+    const photos = restored.signalsUsed.photos;
+
+    expect(photos.kind).toBe("known");
+    if (photos.kind === "known") {
+      expect(photos.value.complete).toBe(false);
     }
   });
 

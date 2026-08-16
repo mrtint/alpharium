@@ -56,6 +56,62 @@ export type PlaceTrace = {
   approximateDistanceMeters: number;
 };
 
+/**
+ * 하루의 사진들 — **목록과 「이것이 전부인가」가 함께 다닌다**(FR-024).
+ *
+ * 계약: specs/004-photo-signal-collection/contracts/collection.md
+ *
+ * **왜 `Photo[]`를 그냥 담지 않는가**: 목록만 받는 쪽이 `photos.length`를 그날 찍은 수로
+ * 읽게 된다. 상한에 걸려 잘린 하루에서 그것은 거짓이다(FR-014d). 묶어 두면 한계를 못 보고
+ * 지나칠 수 없다.
+ *
+ * **금지**(FR-027): 여기서 목록만 꺼내는 편의 함수를 만들지 않는다. `photosOf(observation)`
+ * 같은 것이 생기는 순간 `complete`가 사라진다 — `SignalValue`에 `valueOr()`를 금지한 것과
+ * 같은 이유이며, 같은 실수가 한 겹 아래에서 반복되는 자리다.
+ */
+export type PhotoObservation = {
+  /** 그 하루의 사진들. 찍힌 시각 순(FR-004) */
+  photos: Photo[];
+  /**
+   * 이것이 그날의 전부인가.
+   *
+   * `false`면 상한에 걸려 잘린 것이며, `photos`에는 **이른 시각부터** 상한만큼
+   * 들어 있다(FR-014b). 이 하루의 일기는 사진의 수를 단언해서는 안 된다(FR-014d).
+   */
+  complete: boolean;
+};
+
+/**
+ * 사진에서 얻은 자리 — **자리와 「어디서 왔는가」가 함께 다닌다**(FR-025).
+ *
+ * 계약: specs/004-photo-signal-collection/contracts/collection.md
+ *
+ * **이것은 하루의 궤적이 아니라 사진이 찍힌 지점들이다**(FR-013e). 집→회사→집이어도
+ * 회사에서만 찍었으면 이동 거리는 0이다.
+ */
+export type PhotoPlaces = {
+  /** 자리의 수와 이은 거리. 위 한계가 적용된 값이다 */
+  trace: PlaceTrace;
+  /**
+   * 이 자리 정보가 어디서 왔는가.
+   *
+   * **지금은 값이 하나뿐이지만 자리를 둔다.** 005에서 실제 GPS 수집이 붙으면 같은
+   * `places` 자리에 다른 출처가 들어오고, 그때 "이 값이 어디서 왔나"를 묻는 코드가 이미
+   * 있어야 한다. 질문을 미리 세워 두는 것이다.
+   */
+  source: "photo-exif";
+  /** 좌표를 얻은 사진의 수 */
+  photosWithLocation: number;
+  /**
+   * 좌표를 물어본 사진의 수.
+   *
+   * **`photosWithLocation`과 함께 있어야 뜻이 산다**: 열 장 중 두 장에만 좌표가 있었다면
+   * `visitCount`가 1이어도 "하루 종일 한 곳에 있었다"가 아니라 "좌표를 본 두 장이 같은
+   * 곳이었다"이다. 이 차이가 일기에서 단언과 짐작을 가른다(헌법 원칙 II).
+   */
+  photosConsidered: number;
+};
+
 /** 배터리의 하루 흐름. 얼마나 썼는지가 활동의 간접 신호가 된다. */
 export type BatteryTrace = {
   /** 0~1 */
@@ -86,12 +142,17 @@ export type ConnectivityTrace = {
  *
  * `steps`는 안드로이드에서 대개 `unknown`이다 — 기간 걸음 수를 되짚는 통로가 없다
  * (AGENTS.md 실측). 예외가 아니라 정상 상태다.
+ *
+ * **004에서 자리 수는 그대로이고 담기는 값의 타입만 넓어졌다**(FR-026). `SignalValue`의
+ * 세 갈래도 그대로다 — 넓혔다면 002·003의 모든 판정이 영향받았을 것이다.
  */
 export type DaySignals = {
   /** 어느 날의 신호인가. 04:00 경계로 정해진다(FR-021). 없으면 만들 수 없다(FR-004) */
   date: DayDate;
-  photos: SignalValue<Photo[]>;
-  places: SignalValue<PlaceTrace>;
+  /** 004에서 `Photo[]`가 아니라 `PhotoObservation`이 됐다 — 한계가 값에 붙어 있다(FR-024) */
+  photos: SignalValue<PhotoObservation>;
+  /** 004에서 `PlaceTrace`가 아니라 `PhotoPlaces`가 됐다 — 출처가 값에 붙어 있다(FR-025) */
+  places: SignalValue<PhotoPlaces>;
   steps: SignalValue<number>;
   battery: SignalValue<BatteryTrace>;
   connectivity: SignalValue<ConnectivityTrace>;

@@ -41,13 +41,24 @@ export function richDay(date: DayDate): DaySignals {
     date,
     photos: {
       kind: "known",
-      value: [
-        { id: "fake-photo-1", takenAt: new Date(`${date}T09:12:00`) },
-        { id: "fake-photo-2", takenAt: new Date(`${date}T13:40:00`) },
-        { id: "fake-photo-3", takenAt: new Date(`${date}T19:05:00`) },
-      ],
+      value: {
+        photos: [
+          { id: "fake-photo-1", takenAt: new Date(`${date}T09:12:00`) },
+          { id: "fake-photo-2", takenAt: new Date(`${date}T13:40:00`) },
+          { id: "fake-photo-3", takenAt: new Date(`${date}T19:05:00`) },
+        ],
+        complete: true,
+      },
     },
-    places: { kind: "known", value: { visitCount: 4, approximateDistanceMeters: 8300 } },
+    places: {
+      kind: "known",
+      value: {
+        trace: { visitCount: 4, approximateDistanceMeters: 8300 },
+        source: "photo-exif",
+        photosWithLocation: 3,
+        photosConsidered: 3,
+      },
+    },
     steps: { kind: "unknown", reason: STEPS_UNAVAILABLE },
     battery: { kind: "known", value: { startLevel: 0.98, endLevel: 0.21, charged: true } },
     connectivity: {
@@ -98,7 +109,13 @@ export function unknownDay(date: DayDate): DaySignals {
 export function partiallyUnknownDay(date: DayDate): DaySignals {
   return {
     date,
-    photos: { kind: "known", value: [{ id: "fake-photo-1", takenAt: new Date(`${date}T18:20:00`) }] },
+    photos: {
+      kind: "known",
+      value: {
+        photos: [{ id: "fake-photo-1", takenAt: new Date(`${date}T18:20:00`) }],
+        complete: true,
+      },
+    },
     places: { kind: "unknown", reason: "위치 권한이 없다" },
     steps: { kind: "unknown", reason: STEPS_UNAVAILABLE },
     battery: { kind: "known", value: { startLevel: 0.74, endLevel: 0.33, charged: false } },
