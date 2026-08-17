@@ -44,12 +44,8 @@ function backendReturning(
 
 const loadSignals = async () => richDay("2026-08-16");
 
-async function renderProbe(
-  backend: InferenceBackend & { stop?: () => Promise<void> },
-) {
-  await render(
-    <GenerationProbe backend={backend} loadSignals={loadSignals} character="quiet" />,
-  );
+async function renderProbe(backend: InferenceBackend & { stop?: () => Promise<void> }) {
+  await render(<GenerationProbe backend={backend} loadSignals={loadSignals} character="quiet" />);
 }
 
 describe("일기가 나오면 보여준다", () => {
@@ -82,9 +78,7 @@ describe("「쓰고 있다」 표시 (FR-028) ★", () => {
   });
 
   it("실패로 끝나도 표시가 사라진다", async () => {
-    await renderProbe(
-      backendReturning({ kind: "rejected", why: "echo" }, { delayMs: 20 }),
-    );
+    await renderProbe(backendReturning({ kind: "rejected", why: "echo" }, { delayMs: 20 }));
 
     await userEvent.press(screen.getByText("일기 쓰기"));
     await waitFor(() => expect(screen.queryByText("쓰고 있다")).toBeNull());
@@ -111,9 +105,7 @@ describe("★ 판정을 통과하지 않은 글이 화면에 오르지 않는다
 
     await userEvent.press(screen.getByText("일기 쓰기"));
 
-    await waitFor(() =>
-      expect(screen.getByText(/다시 시도해 볼 만하다/)).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByText(/다시 시도해 볼 만하다/)).toBeTruthy());
     expect(screen.queryByText(DIARY)).toBeNull();
   });
 

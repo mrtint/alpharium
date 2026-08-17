@@ -25,10 +25,7 @@ import type { DiaryRequest, VisionSetting } from "../../src/diary/types";
 import { createDesktopServerBackend } from "../../src/inference/desktop-server";
 import { createOnDeviceBackend } from "../../src/inference/on-device";
 import type { GenerationEngine } from "../../src/inference/engine-port";
-import type {
-  GenerationFailure,
-  InferenceBackend,
-} from "../../src/inference/types";
+import type { GenerationFailure, InferenceBackend } from "../../src/inference/types";
 import { emptyDay, richDay, unknownDay } from "../../src/signals/fake";
 import type { DaySignals } from "../../src/signals/types";
 
@@ -203,7 +200,10 @@ describe("실패 결과에 텍스트가 없다 (002 FR-016, SC-004) — 원칙 I
 
 describe("어느 어댑터도 예외를 던지지 않는다 (002 FR-019)", () => {
   const backends: readonly { name: string; make: () => InferenceBackend }[] = [
-    { name: "온디바이스(엔진 있음)", make: () => createOnDeviceBackend(async () => ({}), goodEngine()) },
+    {
+      name: "온디바이스(엔진 있음)",
+      make: () => createOnDeviceBackend(async () => ({}), goodEngine()),
+    },
     { name: "온디바이스(엔진 없음)", make: () => createOnDeviceBackend(async () => ({})) },
     {
       name: "데스크톱 서버",

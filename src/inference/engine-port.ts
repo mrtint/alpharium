@@ -73,9 +73,7 @@ export type RunResult = {
  * **`reason`이 둘인 이유**: 파일이 없는 것과 있는데 못 여는 것은 사용자가 할 일이
  * 다르다(FR-017d). 003이 `ModelReadiness`를 넷으로 가른 것과 같은 판단이다.
  */
-export type LoadResult =
-  | { ok: true }
-  | { ok: false; reason: "not-found" | "load-failed" };
+export type LoadResult = { ok: true } | { ok: false; reason: "not-found" | "load-failed" };
 
 /** 생성에 걸리는 한도. **둘 다 짐작이며 실측이 아니다**(sampling.ts 참고) */
 export type RunLimits = {

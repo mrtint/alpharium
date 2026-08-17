@@ -15,10 +15,7 @@
 import { buildPrompt } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character } from "../../src/diary/types";
-import {
-  judgeServerOutput,
-  serverRequestFor,
-} from "../../src/inference/desktop-server";
+import { judgeServerOutput, serverRequestFor } from "../../src/inference/desktop-server";
 import { SAMPLING } from "../../src/inference/sampling";
 import { richDay } from "../../src/signals/fake";
 import { createLlamaEngine, endingOf } from "../../src/inference/llama-port";
@@ -477,9 +474,9 @@ describe("FR-005 — 두 경로가 같은 프롬프트·샘플링을 쓴다 ★"
     const request = requestFor();
 
     // 통과하는 글
-    expect(
-      judgeServerOutput(request, "오늘 주인은 어딘가로 나섰다.", { kind: "eos" }),
-    ).toEqual({ text: "오늘 주인은 어딘가로 나섰다." });
+    expect(judgeServerOutput(request, "오늘 주인은 어딘가로 나섰다.", { kind: "eos" })).toEqual({
+      text: "오늘 주인은 어딘가로 나섰다.",
+    });
 
     // 끝나지 않은 글 — 데스크톱이라고 느슨하게 보지 않는다
     const truncated = judgeServerOutput(request, "오늘 주인은", { kind: "length" });

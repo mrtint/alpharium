@@ -24,13 +24,7 @@
 import type { Character } from "../diary/types";
 import { assetFor } from "../models/roster";
 import { modelFilePath } from "../models/expo-port";
-import type {
-  Ending,
-  GenerationEngine,
-  LoadResult,
-  RunLimits,
-  RunResult,
-} from "./engine-port";
+import type { Ending, GenerationEngine, LoadResult, RunLimits, RunResult } from "./engine-port";
 import { SAMPLING } from "./sampling";
 
 /**
@@ -91,7 +85,10 @@ export function endingOf(result: NativeResult): Ending {
   if (result.interrupted === true) return { kind: "interrupted" };
   if (result.context_full === true) return { kind: "context" };
   if (result.truncated === true) return { kind: "context" };
-  if (result.stopped_limit === true || (typeof result.stopped_limit === "number" && result.stopped_limit > 0)) {
+  if (
+    result.stopped_limit === true ||
+    (typeof result.stopped_limit === "number" && result.stopped_limit > 0)
+  ) {
     return { kind: "length" };
   }
   if (result.stopped_eos === true) return { kind: "eos" };

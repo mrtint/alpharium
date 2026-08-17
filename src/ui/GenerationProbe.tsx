@@ -147,9 +147,7 @@ export function GenerationProbe({
         // **진단 경로에는 갈래가 남는다**(FR-017e·FR-027). 사용자에게 가는 말은 「할 수
         // 있는 것」으로 옮기지만, 개발자가 실기기에서 **왜 거부됐는지** 모르면 고칠 수
         // 없다. 이 줄은 화면이 아니라 로그로만 가므로 원칙 III을 어기지 않는다.
-        setDiagnosis(
-          result.kind === "rejected" ? `rejected: ${result.why}` : result.kind,
-        );
+        setDiagnosis(result.kind === "rejected" ? `rejected: ${result.why}` : result.kind);
         return;
       }
 

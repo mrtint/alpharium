@@ -32,11 +32,7 @@ const INSTRUCTIONS = [
 const GOOD_KO =
   "오늘 주인은 아침부터 어딘가로 나섰다. 사진 세 장이 남았고, 나는 그것 말고는 아무것도 보지 못했다. 아마 즐거웠을 것이다.";
 
-function ask(
-  text: string,
-  ending: Ending = EOS,
-  character: Character = "quiet",
-): Verdict {
+function ask(text: string, ending: Ending = EOS, character: Character = "quiet"): Verdict {
   return judge(text, ending, character, INSTRUCTIONS);
 }
 
@@ -63,9 +59,9 @@ describe("A-6 정상 일기는 통과한다", () => {
   });
 
   it("영어 캐릭터 + 영어 글 → ok", () => {
-    expect(
-      ask("My owner went out today. I only saw three photographs.", EOS, "english").ok,
-    ).toBe(true);
+    expect(ask("My owner went out today. I only saw three photographs.", EOS, "english").ok).toBe(
+      true,
+    );
   });
 });
 
@@ -191,9 +187,7 @@ describe("A-4 끝나지 않은 글은 거부된다 (FR-016d, FR-021c)", () => {
   });
 
   it("문자열을 보지 않는다 — 완결돼 보여도 eos가 아니면 거부", () => {
-    expect(ask("오늘은 조용한 하루였다. 잘 자라, 주인아.", { kind: "length" }).ok).toBe(
-      false,
-    );
+    expect(ask("오늘은 조용한 하루였다. 잘 자라, 주인아.", { kind: "length" }).ok).toBe(false);
   });
 });
 
@@ -235,12 +229,7 @@ describe("A-7 갈래가 넷을 넘지 않는다 (FR-018b) ★ 원칙 IV의 자�
     // **다섯 번째를 넣으면 이 테스트가 깨진다.** 깨지면 contracts/acceptance.md를
     // 먼저 읽고 원칙 IV를 어기지 않는지 따져야 한다.
     expect(REJECT_REASONS).toHaveLength(4);
-    expect([...REJECT_REASONS].sort()).toEqual([
-      "echo",
-      "empty",
-      "language",
-      "unfinished",
-    ]);
+    expect([...REJECT_REASONS].sort()).toEqual(["echo", "empty", "language", "unfinished"]);
   });
 
   it("판정이 넷 밖의 값을 내지 않는다", () => {

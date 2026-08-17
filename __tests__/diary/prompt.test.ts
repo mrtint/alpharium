@@ -16,12 +16,7 @@ import { buildPrompt, instructionLines } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character, type DiaryRequest } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
-import {
-  emptyDay,
-  partiallyUnknownDay,
-  richDay,
-  unknownDay,
-} from "../../src/signals/fake";
+import { emptyDay, partiallyUnknownDay, richDay, unknownDay } from "../../src/signals/fake";
 
 const DAY = "2026-08-16";
 

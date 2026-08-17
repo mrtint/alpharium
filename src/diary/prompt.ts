@@ -119,11 +119,7 @@ export function instructionLines(request: DiaryRequest): string[] {
  *
  * **`unknown`에 기본값을 넣지 않는다.** 0으로 적으면 일기가 "걷지 않았다"고 쓴다.
  */
-function describe<T>(
-  label: string,
-  signal: SignalValue<T>,
-  known: (value: T) => string,
-): string[] {
+function describe<T>(label: string, signal: SignalValue<T>, known: (value: T) => string): string[] {
   switch (signal.kind) {
     case "known":
       return [`${label}: ${known(signal.value)}`];
@@ -145,9 +141,7 @@ function signalLines(signals: DaySignals): string[] {
   // **`photos`만 꺼내면 한계가 사라진다**(004 FR-027이 편의 함수를 금지한 이유).
   lines.push(
     ...describe("사진", signals.photos, (observation) => {
-      const times = observation.photos
-        .map((photo) => `${photo.takenAt.getHours()}시`)
-        .join(", ");
+      const times = observation.photos.map((photo) => `${photo.takenAt.getHours()}시`).join(", ");
       const count = `${observation.photos.length}장`;
       return observation.photos.length === 0 ? count : `${count} (${times})`;
     }),
