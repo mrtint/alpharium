@@ -108,6 +108,11 @@ adb shell dumpsys trust        # deviceLocked=0 확인 — 잠금 화면 위에�
 - **죽인 빌드가 Gradle 락을 남긴다.** 다음 빌드가 `checkDebugAarMetadata`에서
   `Timeout waiting to lock file hash cache`로 실패한다. **코드 문제가 아니다** —
   `./gradlew --stop`으로 데몬을 정리하고 다시 돌린다.
+- **`./gradlew clean`이 실패할 수 있다.** `:app:externalNativeBuildCleanDebug`가
+  armeabi-v7a의 CMake를 다시 돌리려다 `Configuring incomplete`로 죽는다. **이것도 코드
+  문제가 아니다** — 청소 작업이 CMake 캐시를 건드리는 것이며, 빌드 자체는 정상이다.
+  깨끗한 빌드가 필요하면 `clean` 대신 **디렉터리를 지운다**:
+  `rm -rf android/app/.cxx android/app/build`
 - **무선 adb는 화면이 잠기면 끊긴다.** `adb devices`가 `offline`이 되고 `adb mdns
   services`도 아무것도 못 찾는다. **폰 화면을 켜 두어야 한다.** 다시 붙일 때는
   포트가 바뀌었을 수 있으므로 `adb mdns services`로 다시 찾는다.
