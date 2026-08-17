@@ -50,7 +50,36 @@ export type DiaryDraft = { text: string };
 export type GenerationFailure =
   | { kind: "not-implemented" }
   | { kind: "backend-unavailable"; reason: string }
-  | { kind: "generation-failed"; reason: string };
+  | { kind: "generation-failed"; reason: string }
+  // ─── 005가 더한 갈래 ───────────────────────────────────────────────────────
+  //
+  // **계약을 바꾼 것이 아니라 넓힌 것이다**(005 FR-025). 002가 이것을 유니온으로 둔 것은
+  // 갈래가 늘 것을 전제한 구조이며, 늘어난 갈래가 위 불변식(「`text` 없음」)을 지키는 한
+  // 「자리 수와 갈래를 넓히지 않는다」에 걸리지 않는다 — 그 조항이 막은 것은
+  // `DiaryEntry`·`DiaryRequest`의 모양이 바뀌는 것이다.
+  //
+  // **갈래를 넷으로 가른 이유는 사용자가 할 일이 다르기 때문이다**(005 FR-017d).
+  // 뭉개면 「다시 시도하면 되는가」와 「이 캐릭터로는 계속 이럴 수 있는가」를 구분할 수
+  // 없다. 003이 `ModelReadiness`를 넷으로 가른 것과 같은 판단이다.
+  //
+  // **`not-implemented`는 남는다** — 시각 처리(`quick`/`detailed`)가 아직 없다는 것을
+  // 말하는 데 쓰인다(005 FR-022). 이름이 맞고, 없앨 이유가 없다.
+  | { kind: "model-load-failed"; reason: "not-found" | "load-failed" }
+  /**
+   * 생성은 됐으나 판정에서 거부됐다 (005 FR-016).
+   *
+   * **`why`는 진단용이며 사용자에게 그대로 보이지 않는다**(005 FR-017e). 「되뱉었다」·
+   * 「언어가 다르다」는 캐릭터 뒤의 모델을 드러내는 말이므로, 화면에서는 「할 수 있는
+   * 것」으로 옮긴다.
+   *
+   * **거부된 글 자체는 담지 않는다**(005 FR-017c). 담으면 그것이 `text`가 새는 경로가
+   * 된다 — 이름을 `text`와 달리 둔 `reason`조차 두지 않고 갈래만 남기는 이유다.
+   */
+  | { kind: "rejected"; why: "empty" | "echo" | "language" | "unfinished" }
+  /** 시간 한도를 넘었다 (005 FR-021). 기기가 버거운 것이다 */
+  | { kind: "timed-out" }
+  /** 앱이 앞을 벗어나 끊겼다 (005 FR-021b·c). 사용자가 떠나서 그런 것이다 */
+  | { kind: "interrupted" };
 
 /** 생성 결과. 실패도 값이다 — 예외로 던지지 않는다. */
 export type GenerationResult = DiaryDraft | GenerationFailure;

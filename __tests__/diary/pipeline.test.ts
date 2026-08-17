@@ -430,3 +430,125 @@ describe("모델이 준비되지 않으면 생성을 시도하지 않는다 (003
     if (!result.ok) expect(result.stage).toBe("generation");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * 005 — 실제 생성이 붙은 뒤의 파이프라인
+ *
+ * **위 테스트들은 대역이 `not-implemented`를 돌려주는 경우이며 그대로 유효하다.**
+ * 여기서는 대역이 실제 글을 돌려줄 때 파이프라인이 끝까지 가는지 본다.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+describe("005 — 파이프라인이 처음으로 끝까지 간다 (FR-004) ★", () => {
+  it("생성이 성공하면 ok: true로 끝난다", async () => {
+    // **002 이후 처음이다.** 이 한 줄이 이 기능의 존재 증명이며, 지금까지 파이프라인은
+    // 늘 generation에서 멈췄다.
+    const { pipeline } = makePipeline({ backend: generating("조용한 하루였다.") });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.entry.text).toBe("조용한 하루였다.");
+  });
+
+  it("생성된 일기가 저장된다", async () => {
+    const { pipeline, store } = makePipeline({ backend: generating("조용한 하루였다.") });
+
+    await pipeline.run(inputFor());
+
+    const saved = await store.load(DAY);
+    expect(saved).not.toBeNull();
+    expect(saved?.text).toBe("조용한 하루였다.");
+  });
+
+  it("일기가 어느 신호를 보고 쓰였는지 함께 남는다 (002 FR-011)", async () => {
+    const { pipeline } = makePipeline({ backend: generating("조용한 하루였다.") });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.entry.signalsUsed.date).toBe(DAY);
+  });
+});
+
+describe("005 — 실패하면 저장이 일어나지 않는다 (FR-020, SC-004b)", () => {
+  /** 실패를 돌려주는 대역들 — 판정이 거부한 갈래를 어댑터가 이미 옮긴 모양이다 */
+  const failures: GenerationResult[] = [
+    { kind: "rejected", why: "empty" },
+    { kind: "rejected", why: "echo" },
+    { kind: "rejected", why: "language" },
+    { kind: "rejected", why: "unfinished" },
+    { kind: "interrupted" },
+    { kind: "timed-out" },
+    { kind: "model-load-failed", reason: "not-found" },
+  ];
+
+  it.each(failures)("$kind — 저장되지 않는다", async (failure) => {
+    const { pipeline, store } = makePipeline({ backend: backendReturning(failure) });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("generation");
+    expect(await store.load(DAY)).toBeNull();
+  });
+
+  it.each(failures)("$kind — 결과에 text가 없다 (002 FR-016)", async (failure) => {
+    const { pipeline } = makePipeline({ backend: backendReturning(failure) });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(JSON.stringify(result)).not.toContain('"text"');
+  });
+
+  it("실패해도 기존 일기가 그대로 있다 (002 FR-023b)", async () => {
+    const store = memoryStore();
+    const first = makePipeline({ backend: generating("먼저 쓴 일기"), store });
+    await first.pipeline.run(inputFor());
+
+    // 같은 하루를 다시 요청했는데 이번에는 거부됐다.
+    const second = makePipeline({
+      backend: backendReturning({ kind: "rejected", why: "echo" }),
+      store,
+    });
+    const result = await second.pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    // **먼저 쓴 일기가 사라지지 않았다.** 생성을 시작하며 먼저 지웠다면 잃었을 것이다.
+    expect((await store.load(DAY))?.text).toBe("먼저 쓴 일기");
+  });
+});
+
+describe("005 — 하루에 일기는 하나다 (FR-020a, SC-004c)", () => {
+  it("성공하면 기존 일기를 덮어쓴다", async () => {
+    const store = memoryStore();
+
+    await makePipeline({ backend: generating("첫 번째"), store }).pipeline.run(inputFor());
+    await makePipeline({ backend: generating("두 번째"), store }).pipeline.run(inputFor());
+
+    expect((await store.load(DAY))?.text).toBe("두 번째");
+  });
+
+  it("저장된 것을 생성 대신 다시 보여주지 않는다 (원칙 I)", async () => {
+    // 두 번째 요청도 실제로 생성을 시도해야 한다 — 첫 결과를 재사용하면 원칙 I 위반이다.
+    const store = memoryStore();
+    let generateCalls = 0;
+
+    const counting: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        generateCalls += 1;
+        return { text: `생성 ${generateCalls}회차` };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend: counting, store });
+    await pipeline.run(inputFor());
+    await pipeline.run(inputFor());
+
+    expect(generateCalls).toBe(2);
+    expect((await store.load(DAY))?.text).toBe("생성 2회차");
+  });
+});

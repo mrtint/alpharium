@@ -78,7 +78,10 @@ const ASSETS: Readonly<Record<Character, ModelAsset>> = {
     key: "a3",
     url: "https://huggingface.co/rippertnt/HyperCLOVAX-SEED-Text-Instruct-1.5B-Q4_K_M-GGUF/resolve/main/hyperclovax-seed-text-instruct-1.5b-q4_k_m.gguf",
     expectedBytes: 1_133_974_368,
-    md5: "",
+    // 실측 (2026-08-17, SM-G986N): 기기에 받아 둔 파일에서 채록했다. 003의
+    // `state.json`에 `passed: true`로 남아 있던 검증 결과의 지문이며, 크기도
+    // `expectedBytes`와 정확히 일치했다. 이제 이 캐릭터는 **채록이 아니라 검증**을 한다.
+    md5: "4a3b9821b970df32e3d201a208f8ee14",
   },
   chinese: {
     key: "a4",

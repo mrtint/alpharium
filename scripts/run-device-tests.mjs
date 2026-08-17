@@ -21,7 +21,13 @@ import { spawnSync } from "node:child_process";
  * **하나라도 실패하면 전체가 실패다.** 일부만 통과한 것을 통과로 보고하면, 기기 없이
  * 초록불인 것과 구분되지 않는다(헌법 원칙 V).
  */
-const FLOWS = [".maestro/skeleton.yml", ".maestro/model-acquisition.yml"];
+const FLOWS = [
+  ".maestro/skeleton.yml",
+  ".maestro/model-acquisition.yml",
+  // 005 — 생성 패널. **여기 등록하지 않으면 흐름이 있어도 돌지 않고**, 그러면 초록불인데
+  // 아무것도 검증되지 않은 상태가 된다(헌법 원칙 V).
+  ".maestro/generate-diary.yml",
+];
 
 /** 결과 상태. skipped는 passed가 아니다. */
 const PASSED = "passed";
