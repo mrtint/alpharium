@@ -1,0 +1,75 @@
+# 실기기 자동 테스트 — 일기 생성 (005 FR-027, FR-028)
+#
+# 이 흐름이 확인하는 것은 **화면이 생성을 어떻게 내놓는가**이다. 일기가 실제로 나오는지는
+# 모델 파일이 기기에 있어야 하므로(003), 여기서는 **파일 유무와 무관하게 참인 것**만 본다.
+#
+# 검증 항목:
+#   FR-027   생성을 요청할 수 있는 자리가 있다
+#   FR-028a  진행률·남은 시간·토큰 수가 보이지 않는다  (핵심 위험 — 원칙 IV)
+#   FR-028b  생성 중인 글이 흘러나오지 않는다          (핵심 위험 — 원칙 I)
+#   FR-027a  화면 어디에도 모델 정보가 없다             (원칙 III, 003의 경계)
+#
+# **quickstart의 D2·D5·D6은 여기서 자동화하지 않는다.**
+#   D2(일기가 실제로 나온다) — 모델 파일과 수십 초~수 분이 필요하다
+#   D5(얼마나 걸리는가)      — 시계로 재고 사람이 판단한다. 코드에 담지 않는다(FR-011)
+#   D6(화자가 휴대폰인가)    — 의미를 읽어야 하며 기계로 채점하지 않는다(원칙 IV)
+#
+# 셋 다 **사람이 손으로 확인한다**. 자동화되지 않았다고 통과한 것이 아니다(원칙 V).
+#
+# 한글 검증 문구가 CP949로 뭉개지지 않는 것은 run-device-tests.mjs가
+# JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8로 보장한다.
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# FR-027 — 생성을 요청할 자리가 있다.
+# 이것이 없으면 실기기에서 생성을 눌러 볼 방법이 없고, D2를 확인할 수 없다.
+#
+# **스크롤해서 찾는다** — 진단 화면에 환경·모듈·저장·권한·신호가 먼저 있고 생성 패널이
+# 그 아래다. assertVisible은 스크롤하지 않는다(003 흐름에서 얻은 교훈).
+- scrollUntilVisible:
+    element: "일기 생성"
+    direction: DOWN
+- assertVisible: "일기 쓰기"
+
+# ★ FR-028a — **원칙 IV의 핵심 위험이다.**
+# 오래 기다리는 화면이므로 「얼마나 남았나」를 넣고 싶어지는 압력이 실제로 있다.
+# 그 순간 그것이 모델 비교의 시작점이 된다.
+#
+# 누르기 전에 본다 — 모델이 없으면 즉시 실패로 끝나므로 누른 뒤에는 표시가 사라진다.
+- assertNotVisible: "%"
+- assertNotVisible: "남음"
+- assertNotVisible: "토큰"
+- assertNotVisible: "초 남"
+
+# FR-027a — 모델 정보가 없다 (003의 경계를 그대로 지킨다)
+- assertNotVisible: "kanana"
+- assertNotVisible: "exaone"
+- assertNotVisible: "hyperclova"
+- assertNotVisible: "qwen"
+- assertNotVisible: "gemma"
+- assertNotVisible: "gguf"
+- assertNotVisible: "Q4"
+
+# 생성을 눌러 본다.
+#
+# **모델이 없으면 실패로 끝나고 그것이 정상이다** — 이 흐름은 「일기가 나온다」를 보지
+# 않는다. 보는 것은 **눌렀을 때 무너지지 않고, 무엇을 할 수 있는지 말해 주는가**이다.
+- tapOn: "일기 쓰기"
+
+# FR-028c — 어떻게 끝나든 「쓰고 있다」가 남아 있지 않다.
+#
+# 모델이 없으면 즉시 끝나고, 있으면 오래 걸린다. 어느 쪽이든 **끝난 뒤에는** 사라져야
+# 하므로 넉넉히 기다린 뒤 본다.
+- extendedWaitUntil:
+    notVisible: "쓰고 있다"
+    timeout: 240000
+
+# ★ FR-017e — 실패가 「할 수 있는 것」으로 옮겨진다 (원칙 III).
+# 모델의 실패 양상을 그대로 보이지 않는다. 사용자는 모델을 모른다.
+- assertNotVisible: "되뱉"
+- assertNotVisible: "echo"
+- assertNotVisible: "language"
+- assertNotVisible: "unfinished"
+- assertNotVisible: "not-implemented"
+- assertNotVisible: "rejected"

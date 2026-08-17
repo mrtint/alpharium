@@ -212,6 +212,26 @@ export function expoDownloadPort(): DownloadPort {
 }
 
 /** 실기기에서 쓰는 통로 묶음. 테스트는 이것을 쓰지 않고 대역을 넣는다. */
+/**
+ * 모델 파일의 실제 경로.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **005가 더한 자리다.** `ModelFilePort`는 일부러 경로를 내주지 않는다 — 자산키로만
+ * 다루면 부르는 쪽이 파일을 직접 열 수 없기 때문이다.
+ *
+ * 그런데 `llama.rn`의 `initLlama`는 **경로 문자열을 요구한다.** 005가 자기 쪽에서
+ * 디렉터리 규칙을 다시 만들면 경로 지식이 두 곳에 생기고, 한쪽을 고칠 때 다른 쪽이
+ * 어긋난다. **그래서 이미 아는 이 자리가 내준다.**
+ *
+ * **돌려주는 값은 안쪽 값이다**(003 types.ts의 경계). 화면으로 나가지 않는다 —
+ * 파일 이름이 자산키이므로 그것이 새면 캐릭터→모델 매핑을 역추적할 실마리가 된다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export async function modelFilePath(key: AssetKey): Promise<string> {
+  const { dir, File } = await openDirectory();
+  return new File(dir, fileNameFor(key)).uri;
+}
+
 export function expoModelPorts(): ModelPorts {
   return {
     files: expoModelFilePort(),

@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
+import type { DayDate } from "../config/day-boundary";
+import type { Character } from "../diary/types";
 import { collectReport } from "../diagnostics/report";
 import type { DiagnosticReport } from "../diagnostics/types";
+import { onDeviceBackend } from "../inference/on-device";
+import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
+import { GenerationProbe } from "./GenerationProbe";
 import { PermissionPanel } from "./PermissionPanel";
 import { SignalProbe } from "./SignalProbe";
 
@@ -27,6 +32,30 @@ import { SignalProbe } from "./SignalProbe";
  * 지연 import 하는 통로이므로 여기서 만들어도 모듈이 즉시 해석되지 않는다.
  */
 const photoPort = expoPhotoPort();
+
+/**
+ * 005 — 생성 어댑터. 화면이 다시 그려질 때마다 새로 만들지 않는다.
+ *
+ * **`select.ts`를 거치지 않고 온디바이스를 직접 쓰는 것이 아니다** — 진단 화면은 dev
+ * 환경에서만 열리고(App.tsx의 `showsOnScreen`), dev에서 허용된 위치는 온디바이스뿐이다
+ * (001의 `policy.ts`). 다만 이 화면이 자라 사용자 경로가 되면 그때는 반드시
+ * `selectBackend()`를 거쳐야 한다(FR-024).
+ */
+const generationBackend = onDeviceBackend();
+
+/** 005 — 그 하루의 진짜 신호. 004의 수집을 그대로 쓴다 */
+const loadSignals = (day: DayDate) => collectDaySignals(photoPort, day);
+
+/**
+ * 진단에서 생성을 시험할 캐릭터.
+ *
+ * **어느 캐릭터의 모델이 기기에 있느냐에 달렸다** — 없으면 `model-load-failed`가 나오고
+ * 그것이 정상이다. 캐릭터 목록에서 준비 상태를 보고 고르는 것은 사용자 화면의 몫이며,
+ * 진단은 하나를 골라 두고 눌러 보기만 한다.
+ *
+ * 2026-08-17 실기기에 받아 둔 것이 `imaginative`이므로 그것으로 둔다.
+ */
+const PROBE_CHARACTER: Character = "imaginative";
 
 export function DiagnosticsScreen() {
   const [report, setReport] = useState<DiagnosticReport | null>(null);
@@ -67,6 +96,14 @@ export function DiagnosticsScreen() {
       {/* 004 — 권한 상태와 요청. 이것이 없으면 실기기에서 영원히 unknown이다 */}
       <PermissionPanel port={photoPort} />
       <SignalProbe port={photoPort} />
+
+      {/* 005 — 일기가 실제로 나오는지 확인한다(quickstart D2). 이것이 없으면
+          실기기에서 생성을 눌러 볼 방법이 없다 */}
+      <GenerationProbe
+        backend={generationBackend}
+        loadSignals={loadSignals}
+        character={PROBE_CHARACTER}
+      />
 
       {report.failures.length > 0 && (
         <View style={styles.failures}>
