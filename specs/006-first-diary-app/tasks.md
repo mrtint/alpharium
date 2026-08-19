@@ -73,21 +73,21 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### Tests (구현 전)
 
-- [ ] T010 [P] [US2] `__tests__/ui/generation-probe.test.tsx`를 고친다: `pipeline` prop을 받고 `backend.generate()`를 직접 부르지 않는다 (P1·P2)
-- [ ] T011 [P] [US2] `__tests__/diary/store.test.ts`에 여러 날짜 저장 후 `listDays()`가 **전부** 주는지 검사를 더한다 (P8, SC-008a)
-- [ ] T012 [US2] `__tests__/diary/store.test.ts`에 `memoryStore({serialized: true})` 왕복에서 `unknown`이 `unknown`으로 남는 검사가 있는지 확인하고 없으면 더한다 (P6, SC-008d)
+- [X] T010 [P] [US2] `__tests__/ui/generation-probe.test.tsx`를 고친다: `pipeline` prop을 받고 `backend.generate()`를 직접 부르지 않는다 (P1·P2)
+- [X] T011 [P] [US2] `__tests__/diary/store.test.ts`에 여러 날짜 저장 후 `listDays()`가 **전부** 주는지 검사를 더한다 (P8, SC-008a)
+- [X] T012 [US2] `__tests__/diary/store.test.ts`에 `memoryStore({serialized: true})` 왕복에서 `unknown`이 `unknown`으로 남는 검사가 있는지 확인하고 없으면 더한다 (P6, SC-008d)
 
 ### Implementation
 
-- [ ] T013 [US2] `src/ui/GenerationProbe.tsx`의 props를 `backend`·`loadSignals`에서 `pipeline`·`now`로 바꾸고 `pipeline.run()`을 부른다. **005의 방어를 유지한다** — `busy` 불리언 하나, 토큰 콜백 없음, `describeFailure()` (contracts/persistence.md §5)
-- [ ] T014 [US2] `src/ui/GenerationProbe.tsx`가 `PipelineResult`를 다루도록 고친다 — `storage` 실패는 글과 함께 「저장하지 못했다」를 보인다 (FR-012a·b)
-- [ ] T015 [US2] `src/ui/DiagnosticsScreen.tsx`가 `createAppPipeline()`으로 만든 파이프라인을 `GenerationProbe`에 넘기도록 고친다. `onDeviceBackend()` 직접 생성을 없앤다 (FR-010a)
+- [X] T013 [US2] `src/ui/GenerationProbe.tsx`의 props를 `backend`·`loadSignals`에서 `pipeline`·`now`로 바꾸고 `pipeline.run()`을 부른다. **005의 방어를 유지한다** — `busy` 불리언 하나, 토큰 콜백 없음, `describeFailure()` (contracts/persistence.md §5)
+- [X] T014 [US2] `src/ui/GenerationProbe.tsx`가 `PipelineResult`를 다루도록 고친다 — `storage` 실패는 글과 함께 「저장하지 못했다」를 보인다 (FR-012a·b)
+- [X] T015 [US2] `src/ui/DiagnosticsScreen.tsx`가 `createAppPipeline()`으로 만든 파이프라인을 `GenerationProbe`에 넘기도록 고친다. `onDeviceBackend()` 직접 생성을 없앤다 (FR-010a)
 
 ### 정적 방어 (P1 — 런타임 테스트로는 못 잡는다)
 
-- [ ] T016 [US2] `scripts/constitution-rules.ts`에 소스 검사 규칙을 더한다: `src/ui/`와 `src/app/`에서 `backend.generate(` 직접 호출이 0건. **원칙 IV 경계 주석을 함께 갱신한다** — 이것은 설정·구조 검사이지 모델 출력 측정이 아니다
-- [ ] T017 [US2] `scripts/check-constitution.mts`가 `src/` 소스도 훑도록 넓힌다 (지금은 `.env*`만 본다)
-- [ ] T018 [P] [US2] `__tests__/scripts/check-constitution.test.ts`에 새 규칙의 검사를 더한다 — 위반을 일부러 넣으면 잡히는지 확인한다
+- [X] T016 [US2] `scripts/constitution-rules.ts`에 소스 검사 규칙을 더한다: `src/ui/`와 `src/app/`에서 `backend.generate(` 직접 호출이 0건. **원칙 IV 경계 주석을 함께 갱신한다** — 이것은 설정·구조 검사이지 모델 출력 측정이 아니다
+- [X] T017 [US2] `scripts/check-constitution.mts`가 `src/` 소스도 훑도록 넓힌다 (지금은 `.env*`만 본다)
+- [X] T018 [P] [US2] `__tests__/scripts/check-constitution.test.ts`에 새 규칙의 검사를 더한다 — 위반을 일부러 넣으면 잡히는지 확인한다
 
 **Checkpoint**: 일기가 실제로 저장된다. **아직 읽는 화면은 없다** — US3의 몫
 

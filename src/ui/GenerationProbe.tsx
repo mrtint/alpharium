@@ -22,12 +22,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { dayOf, type DayDate } from "../config/day-boundary";
+import { latestClosedDay } from "../config/day-boundary";
+import type { Pipeline, PipelineStage } from "../diary/pipeline";
 import type { Character, VisionSetting } from "../diary/types";
-import { buildRequest } from "../diary/request";
-import type { GenerationResult, InferenceBackend } from "../inference/types";
+import type { GenerationResult } from "../inference/types";
 import { isGenerationFailure } from "../inference/types";
-import type { DaySignals } from "../signals/types";
 
 /**
  * 실패를 **사용자가 할 수 있는 것**으로 옮긴다 (FR-017d·e).
@@ -65,19 +64,73 @@ export function describeFailure(result: GenerationResult): string {
   }
 }
 
+/**
+ * 파이프라인 단계를 사용자가 할 수 있는 말로 옮긴다 (006 FR-029).
+ *
+ * **`generation`은 `describeFailure()`에 맡긴다** — 005가 이미 원칙 III을 지키도록
+ * 갈래를 옮겨 두었고, 여기서 다시 쓰면 그 방어가 둘로 갈라진다.
+ */
+function describeStage(stage: PipelineStage, reason: string): string {
+  switch (stage) {
+    case "day-not-closed":
+      return "아직 이르다. 하루가 끝나야 그날의 일기를 쓸 수 있다";
+    case "already-running":
+      return "이미 쓰고 있다";
+    case "signals":
+      return "그 하루의 신호를 가져오지 못했다";
+    case "request-build":
+      return "캐릭터를 먼저 골라야 한다";
+    case "model-not-ready":
+      return "고른 캐릭터를 먼저 준비해야 한다";
+    case "storage":
+      // **entry가 있으면 여기 오지 않는다** — 위에서 `unsaved` 표시로 갈린다.
+      // 이 문구는 글 없이 저장만 실패한 경우의 대비책이다.
+      return "일기를 저장하지 못했다. 다시 시도해 볼 만하다";
+    case "generation":
+      // 파이프라인이 `kind: detail` 꼴로 담아 온다. 005의 문구로 옮긴다.
+      return describeGenerationReason(reason);
+  }
+}
+
+/** `generation` 단계의 reason 문자열을 005의 사용자 문구로 옮긴다 */
+function describeGenerationReason(reason: string): string {
+  const kind = reason.split(":")[0]?.trim();
+  const failures: Record<string, GenerationResult> = {
+    "not-implemented": { kind: "not-implemented" },
+    "backend-unavailable": { kind: "backend-unavailable", reason },
+    "model-load-failed": { kind: "model-load-failed", reason: "load-failed" },
+    rejected: { kind: "rejected", why: "empty" },
+    "timed-out": { kind: "timed-out" },
+    interrupted: { kind: "interrupted" },
+    "generation-failed": { kind: "generation-failed", reason },
+  };
+  const failure = failures[kind ?? ""];
+  return failure === undefined
+    ? "일기를 쓰는 중에 문제가 생겼다. 다시 시도해 볼 만하다"
+    : describeFailure(failure);
+}
+
 export type GenerationProbeProps = {
-  /** 끊을 수 있으면 `stop()`을 쓴다(FR-021b). 없어도 시간 한도가 결국 끊는다 */
-  backend: InferenceBackend & { stop?: () => Promise<void> };
-  loadSignals: (day: DayDate) => Promise<DaySignals | null>;
+  /**
+   * **006이 `backend`를 이것으로 바꿨다**(FR-010a).
+   *
+   * 어댑터를 직접 부르면 저장을 건너뛴다 — 그것이 일기가 하나도 남지 않은 원인이었다.
+   */
+  pipeline: Pipeline;
+  /** 끊을 수 있으면 쓴다(005 FR-021b). 없어도 시간 한도가 결국 끊는다 */
+  stop?: () => Promise<void>;
   character: Character;
   vision?: VisionSetting;
+  /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
+  now?: () => Date;
 };
 
 export function GenerationProbe({
-  backend,
-  loadSignals,
+  pipeline,
+  stop,
   character,
   vision = "none",
+  now = () => new Date(),
 }: GenerationProbeProps) {
   /**
    * **「쓰고 있다」는 불리언 하나다**(FR-028a·b).
@@ -88,6 +141,13 @@ export function GenerationProbe({
   const [busy, setBusy] = useState(false);
   const [text, setText] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * **저장에 실패했는가**(006 FR-012b).
+   *
+   * `text`가 있는데 이것이 참이면 「보이지만 남지 않는다」는 상태다. 불리언 하나인
+   * 이유는 `busy`와 같다 — 담을 자리가 없어야 다른 것이 끼어들지 않는다.
+   */
+  const [unsaved, setUnsaved] = useState(false);
   /**
    * 개발자용 갈래 표시 (FR-027).
    *
@@ -110,54 +170,66 @@ export function GenerationProbe({
       if (state !== "active" && running.current) {
         // 실제 중단은 llama-port의 stop()이 한다. 멈추지 못해도 시간 한도가
         // 결국 끊으므로(FR-021) 실패를 알릴 것이 없다.
-        void backend.stop?.().catch(() => {});
+        void stop?.().catch(() => {});
       }
     });
     return () => subscription.remove();
-  }, [backend]);
+  }, [stop]);
 
   const generate = useCallback(async () => {
     setBusy(true);
     setText(null);
     setFailure(null);
     setDiagnosis(null);
+    setUnsaved(false);
     running.current = true;
 
     try {
       // "지금"을 여기서 읽는다 — 아래 계층은 하루를 인자로 받는다(FR-018a).
-      const day = dayOf(new Date());
-      const signals = await loadSignals(day);
-      if (signals === null) {
-        setFailure("그 하루의 신호를 가져오지 못했다");
+      const at = now();
+
+      // **파이프라인이 신호 수집·요청 구성·생성·저장을 다 한다**(006 FR-010).
+      // 어댑터를 직접 부르지 않는다 — 그것이 저장을 건너뛴 원인이었다.
+      const result = await pipeline.run({
+        // **오늘이 아니라 마지막으로 닫힌 하루다**(006 FR-030). `dayOf(at)`은 오늘이고
+        // 오늘은 정의상 닫히지 않아 언제나 `day-not-closed`로 멈춘다.
+        day: latestClosedDay(at),
+        now: at,
+        character,
+        vision,
+      });
+
+      if (result.ok) {
+        setText(result.entry.text);
         return;
       }
 
-      const request = buildRequest(signals, character, vision);
-      if (!request.ok) {
-        setFailure("캐릭터를 먼저 골라야 한다");
+      // **저장 실패는 글이 있다**(006 FR-012a). 30초를 들인 글이고 다시 생성해도 같은
+      // 글이 나오지 않으므로 읽을 기회를 빼앗지 않는다. 다만 남지 않는다는 것을
+      // 함께 말한다(FR-012b) — 성공처럼 보이면 사용자는 일기가 남은 줄 안다.
+      if (result.entry !== undefined) {
+        setText(result.entry.text);
+        setUnsaved(true);
+        // **저장 실패 문구를 두 번 말하지 않는다.** 아래 `unsaved` 표시가 「저장하지
+        // 못했다」와 「나가면 사라진다」를 함께 말하므로, 여기서 또 적으면 같은 말이
+        // 화면에 둘이 된다.
+        setDiagnosis(`${result.stage}: ${result.reason}`);
         return;
       }
 
-      const result = await backend.generate(request.request);
+      // **거부된 글은 어디에도 남지 않는다**(FR-017c) — 애초에 결과에 없다.
+      setFailure(describeStage(result.stage, result.reason));
 
-      if (isGenerationFailure(result)) {
-        // **거부된 글은 어디에도 남지 않는다**(FR-017c) — 애초에 결과에 없다.
-        setFailure(describeFailure(result));
-
-        // **진단 경로에는 갈래가 남는다**(FR-017e·FR-027). 사용자에게 가는 말은 「할 수
-        // 있는 것」으로 옮기지만, 개발자가 실기기에서 **왜 거부됐는지** 모르면 고칠 수
-        // 없다. 이 줄은 화면이 아니라 로그로만 가므로 원칙 III을 어기지 않는다.
-        setDiagnosis(result.kind === "rejected" ? `rejected: ${result.why}` : result.kind);
-        return;
-      }
-
-      setText(result.text);
+      // **진단 경로에는 갈래가 남는다**(FR-017e·FR-027). 사용자에게 가는 말은 「할 수
+      // 있는 것」으로 옮기지만, 개발자가 실기기에서 **왜 멈췄는지** 모르면 고칠 수
+      // 없다. 진단 화면에만 나오며 사용자 경로가 아니다.
+      setDiagnosis(`${result.stage}: ${result.reason}`);
     } finally {
       running.current = false;
       // **성공·실패 어느 쪽으로 끝나도 표시가 사라진다**(FR-028c).
       setBusy(false);
     }
-  }, [backend, loadSignals, character, vision]);
+  }, [pipeline, character, vision, now]);
 
   return (
     <View style={styles.panel}>
@@ -176,6 +248,11 @@ export function GenerationProbe({
       {busy && <Text style={styles.status}>쓰고 있다</Text>}
 
       {failure !== null && <Text style={styles.failure}>{failure}</Text>}
+
+      {/* **저장하지 못했다는 것과 사라진다는 것을 함께 말한다**(006 FR-012b) */}
+      {unsaved && (
+        <Text style={styles.failure}>저장하지 못했다. 앱을 나가면 이 일기는 사라진다</Text>
+      )}
 
       {/* 개발자용. 사용자 경로가 아니다(FR-027) */}
       {diagnosis !== null && <Text style={styles.diagnosis}>진단: {diagnosis}</Text>}

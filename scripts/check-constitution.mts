@@ -14,10 +14,15 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { checkEnvFile, formatViolations, type Violation } from "./constitution-rules.ts";
+import {
+  checkEnvFile,
+  checkSourceFile,
+  formatViolations,
+  type Violation,
+} from "./constitution-rules.ts";
 
-/** 저장소 루트의 .env* 파일을 모두 검사한다. */
-function checkRepository(root: string): Violation[] {
+/** 설정 파일 검사가 보는 자리 — 저장소 루트의 `.env*` */
+function checkEnvFiles(root: string): Violation[] {
   const violations: Violation[] = [];
 
   for (const name of readdirSync(root)) {
@@ -27,6 +32,33 @@ function checkRepository(root: string): Violation[] {
   }
 
   return violations;
+}
+
+/**
+ * 소스 검사가 보는 자리 (006 FR-010).
+ *
+ * **`src/` 아래를 훑는다.** 어느 파일을 실제로 볼지는 `checkSourceFile`이 경로로
+ * 정한다 — 여기서 다시 고르면 규칙이 두 곳에 생긴다.
+ */
+function checkSourceFiles(root: string, relative = "src"): Violation[] {
+  const violations: Violation[] = [];
+  const absolute = join(root, relative);
+
+  for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+    const child = `${relative}/${entry.name}`;
+    if (entry.isDirectory()) {
+      violations.push(...checkSourceFiles(root, child));
+    } else if (/\.tsx?$/.test(entry.name)) {
+      violations.push(...checkSourceFile(child, readFileSync(join(root, child), "utf8")));
+    }
+  }
+
+  return violations;
+}
+
+/** 저장소를 훑는다. 설정과 소스 둘 다 본다. */
+function checkRepository(root: string): Violation[] {
+  return [...checkEnvFiles(root), ...checkSourceFiles(root)];
 }
 
 const violations = checkRepository(process.cwd());

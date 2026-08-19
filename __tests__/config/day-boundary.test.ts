@@ -8,7 +8,7 @@
  * 자정 기준과 다른 지점이며, 여기가 무너지면 신호 수집과 일기 생성이 서로 다른 하루를 본다.
  */
 
-import { dayOf, isDayClosed } from "../../src/config/day-boundary";
+import { dayOf, isDayClosed, latestClosedDay } from "../../src/config/day-boundary";
 
 describe("dayOf — 시각이 속한 하루", () => {
   // contracts/signals.md 「dayOf 검증 표」 6행
@@ -79,5 +79,48 @@ describe("현재 시각을 스스로 읽지 않는다", () => {
     const now = new Date("2026-08-13T04:00:00");
     expect(isDayClosed("2026-08-12", now)).toBe(true);
     expect(isDayClosed("2026-08-13", now)).toBe(false);
+  });
+});
+
+/**
+ * 006 FR-030 — **일기를 쓸 수 있는 가장 최근의 하루.**
+ *
+ * `dayOf(now)`는 오늘이고 오늘은 정의상 닫히지 않았으므로, 그것을 파이프라인에 넘기면
+ * 언제나 `day-not-closed`로 멈춘다. 이 계산이 `dayOf`와 같은 파일에 있어야 04:00
+ * 경계가 새어 나가지 않는다(FR-021a).
+ */
+describe("latestClosedDay (006 FR-030)", () => {
+  it("낮에 부르면 어제가 나온다", () => {
+    expect(latestClosedDay(new Date("2026-08-17T14:00:00"))).toBe("2026-08-16");
+  });
+
+  it("04:00 직후에 부르면 어제가 나온다 — 그때 어제가 막 닫혔다", () => {
+    expect(latestClosedDay(new Date("2026-08-17T04:00:00"))).toBe("2026-08-16");
+  });
+
+  it("03:59에 부르면 그저께가 나온다 — 아직 어제가 닫히지 않았다", () => {
+    // 03:59는 아직 8/16이므로 마지막으로 닫힌 하루는 8/15다.
+    expect(latestClosedDay(new Date("2026-08-17T03:59:00"))).toBe("2026-08-15");
+  });
+
+  it("결과는 언제나 닫힌 하루다", () => {
+    const instants = [
+      "2026-08-17T00:30:00",
+      "2026-08-17T04:00:00",
+      "2026-08-17T12:00:00",
+      "2026-08-17T23:59:00",
+      "2026-03-01T05:00:00",
+      "2026-01-01T02:00:00",
+    ];
+
+    for (const iso of instants) {
+      const now = new Date(iso);
+      expect(isDayClosed(latestClosedDay(now), now)).toBe(true);
+    }
+  });
+
+  it("월·연 경계를 넘는다", () => {
+    expect(latestClosedDay(new Date("2026-03-01T12:00:00"))).toBe("2026-02-28");
+    expect(latestClosedDay(new Date("2026-01-01T12:00:00"))).toBe("2025-12-31");
   });
 });
