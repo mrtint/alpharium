@@ -357,6 +357,58 @@ I이 금지한 캐싱이고, 전자는 매번 실제로 생성하되 결과가 �
 때문이다. 헌법 원칙 I이 온디바이스 추론을 타협 불가로 못 박았고, 그 귀결로 development
 build가 필요하다. `npx expo run:android`를 쓴다.
 
+## release 빌드와 서명
+
+**손으로 설치할 수 있는 배포물을 만드는 절차다**(006). 스토어 등록은 범위 밖이다.
+
+### 서명 키 (최초 1회)
+
+**⚠️ 이 키를 잃으면 이미 설치된 앱을 덮어쓸 수 없다.** 지우고 다시 깔아야 하고 그때
+사용자의 일기가 함께 사라진다. **저장소 밖에 백업한다.**
+
+```
+keytool -genkeypair -v -keystore <경로>/alpharium.jks   -alias alpharium -keyalg RSA -keysize 2048 -validity 10000
+```
+
+만든 파일을 `android/app/alpharium.jks`에 둔다(`.gitignore`의 `*.jks`가 막는다).
+비밀번호는 `~/.gradle/gradle.properties`에 적는다 — **저장소가 아니다**:
+
+```
+ALPHARIUM_STORE_PASSWORD=<비밀번호>
+ALPHARIUM_KEY_PASSWORD=<비밀번호>
+```
+
+**서명 설정은 `plugins/with-release-signing.js`가 선언으로 넣는다.**
+`android/app/build.gradle`을 직접 고치지 않는다 — `android/`는 gitignore된 생성물이라
+저장소에 남지 않고 `prebuild --clean`에 지워진다.
+
+### 빌드
+
+```
+npx expo prebuild --platform android --clean
+cd android && NODE_ENV=production ./gradlew assembleRelease
+```
+
+**`--clean`을 건너뛰지 않는다** — 004에서 이것 때문에 권한이 빠진 APK가 설치됐다.
+**`NODE_ENV=production`이 필요하다** — Expo는 `NODE_ENV`로 env 파일을 고르므로
+그것이 없으면 `.env.production`이 로드되지 않고 `EXPO_PUBLIC_APP_ENV`가 비어
+앱이 「이 빌드는 잘못 만들어졌다」로 뜬다.
+
+산출물: `android/app/build/outputs/apk/release/app-release.apk`
+
+### 확인 — 빌드 성공을 믿지 않는다
+
+| 무엇 | 어떻게 | 통과 |
+| --- | --- | --- |
+| 서명 | `apksigner verify --print-certs <apk>` | `CN=Android Debug`가 **아니다** |
+| 키 비커밋 | `git status`, `git ls-files \| grep -i jks` | 아무것도 안 나온다 |
+| Metro 없이 도는가 | **Metro를 끄고 USB를 뽑고** 앱을 연다 | `Unable to load script`가 없다 |
+| 환경 | 앱 화면 | 「이 빌드는 잘못 만들어졌다」가 **아니다** |
+
+**⚠️ release는 minify·R8·ProGuard가 켜진다.** 동적 `import`(`expoFileSystemPort`·
+`onDeviceBackend`·`expoPhotoPort`)와 `llama.rn`의 JNI 심볼이 여기서 깨질 수 있으며,
+**debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V).
+
 ## 테스트
 
 | 명령 | 무엇 | 기기 |

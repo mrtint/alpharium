@@ -25,6 +25,13 @@
     "plugins": [
       "llama.rn",
       [
+        "./plugins/with-release-signing",
+        {
+          "keystorePath": "alpharium.jks",
+          "keyAlias": "alpharium"
+        }
+      ],
+      [
         "expo-media-library",
         {
           "granularPermissions": [
