@@ -31,9 +31,9 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 **Purpose**: 새로 여는 자리를 만들고 죽은 설정을 정리한다
 
-- [ ] T001 [P] `src/app/` 디렉터리를 만들고 `src/app/README.md`에 "사용자 경로 조립의 유일한 자리"를 적는다 (plan.md Structure Decision)
-- [ ] T002 [P] `plugins/` 디렉터리를 만들고 `plugins/README.md`에 "android/가 gitignore이므로 네이티브 설정은 여기에 선언으로 남긴다"를 적는다 (research.md §1)
-- [ ] T003 `.env.dev`가 자동 로드되지 않는다는 사실을 `AGENTS.md`의 실기기 절차 항목에 적는다 — `EXPO_PUBLIC_APP_ENV=dev`를 직접 주는 것이 파일 때문이 아님을 밝힌다 (research.md §4)
+- [X] T001 [P] `src/app/` 디렉터리를 만들고 `src/app/README.md`에 "사용자 경로 조립의 유일한 자리"를 적는다 (plan.md Structure Decision)
+- [X] T002 [P] `plugins/` 디렉터리를 만들고 `plugins/README.md`에 "android/가 gitignore이므로 네이티브 설정은 여기에 선언으로 남긴다"를 적는다 (research.md §1)
+- [X] T003 `.env.dev`가 자동 로드되지 않는다는 사실을 `AGENTS.md`의 실기기 절차 항목에 적는다 — `EXPO_PUBLIC_APP_ENV=dev`를 직접 주는 것이 파일 때문이 아님을 밝힌다 (research.md §4)
 
 **Checkpoint**: 새 자리가 열렸고 env 통로의 오해가 문서에서 제거됐다
 
@@ -47,15 +47,15 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### 파이프라인 계약 확장 (contracts/persistence.md §4)
 
-- [ ] T004 `__tests__/diary/pipeline.test.ts`에 실패 테스트를 더한다: 저장이 실패하면 결과가 `stage: 'storage'`이면서 **`entry`를 담고 있다**. 다른 실패 갈래(`generation`·`signals`·`model-not-ready`)에는 `entry`가 **없다**
-- [ ] T005 `src/diary/pipeline.ts`의 `PipelineResult`에 `{ ok: false; stage: 'storage'; reason: string; entry: DiaryEntry }` 갈래를 더한다. 002의 기존 갈래는 그대로 둔다
-- [ ] T006 `src/diary/pipeline.ts` `runStages()`의 저장 실패 지점에서 만들어 둔 `entry`를 버리지 않고 실어 보낸다 (지금 `stop("storage", saved.reason)`이 버린다)
-- [ ] T007 `__tests__/diary/pipeline.test.ts`의 기존 테스트가 전부 그대로 통과하는지 확인한다 — 계약을 **넓히는 것이지 바꾸는 것이 아니다**
+- [X] T004 `__tests__/diary/pipeline.test.ts`에 실패 테스트를 더한다: 저장이 실패하면 결과가 `stage: 'storage'`이면서 **`entry`를 담고 있다**. 다른 실패 갈래(`generation`·`signals`·`model-not-ready`)에는 `entry`가 **없다**
+- [X] T005 `src/diary/pipeline.ts`의 `PipelineResult`에 `{ ok: false; stage: 'storage'; reason: string; entry: DiaryEntry }` 갈래를 더한다. 002의 기존 갈래는 그대로 둔다
+- [X] T006 `src/diary/pipeline.ts` `runStages()`의 저장 실패 지점에서 만들어 둔 `entry`를 버리지 않고 실어 보낸다 (지금 `stop("storage", saved.reason)`이 버린다)
+- [X] T007 `__tests__/diary/pipeline.test.ts`의 기존 테스트가 전부 그대로 통과하는지 확인한다 — 계약을 **넓히는 것이지 바꾸는 것이 아니다**
 
 ### 조립 지점 (contracts/persistence.md §3)
 
-- [ ] T008 [P] `__tests__/app/wiring.test.ts`를 쓴다: `createAppPipeline()`이 `selectBackend()`를 거친다, 환경 판정 실패 시 파이프라인을 만들지 않고 실패를 값으로 돌려준다 (P3)
-- [ ] T009 `src/app/wiring.ts`에 `createAppPipeline(resolution)`을 만든다 — `selectBackend` + `fileStore(expoFileSystemPort('diary'))` + `collectDaySignals` + `isModelReady`를 조립하고 실패를 값으로 반환한다
+- [X] T008 [P] `__tests__/app/wiring.test.ts`를 쓴다: `createAppPipeline()`이 `selectBackend()`를 거친다, 환경 판정 실패 시 파이프라인을 만들지 않고 실패를 값으로 돌려준다 (P3)
+- [X] T009 `src/app/wiring.ts`에 `createAppPipeline(resolution)`을 만든다 — `selectBackend` + `fileStore(expoFileSystemPort('diary'))` + `collectDaySignals` + `isModelReady`를 조립하고 실패를 값으로 반환한다
 
 **Checkpoint**: 파이프라인이 저장 실패에도 글을 돌려주고, 조립 지점이 하나로 섰다
 

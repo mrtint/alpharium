@@ -322,6 +322,21 @@ build가 필요하다. `npx expo run:android`를 쓴다.
    --dev-client`. debug APK에는 JS 번들이 없어 Metro에서 받는다. 없으면 앱이
    `Unable to load script`로 죽고, Maestro는 `launchApp... COMPLETED`를 찍은 뒤 아무것도
    보지 못한다.
+
+   **⚠️ 환경 변수를 앞에 붙이는 것이 핵심이며 `.env.dev` 때문이 아니다**(2026-08-18,
+   `node_modules/@expo/env/build/index.js` 직접 확인). Expo는 **`NODE_ENV`로 env 파일을
+   고른다** — `.env.${NODE_ENV}` 꼴이다. `EXPO_PUBLIC_APP_ENV`는 파일 *안의 값*이지
+   파일을 고르는 열쇠가 아니다. 그래서:
+
+   | `NODE_ENV` | 로드되는 파일 |
+   | --- | --- |
+   | `production` | `.env.production` ✅ |
+   | `development` | `.env.development` ✅ |
+   | `dev` | **없음** — 비표준 모드라 경고까지 난다 |
+
+   **`.env.dev`는 어떤 모드에도 매칭되지 않아 자동 로드되지 않는다.** 파일은 있지만
+   아무도 읽지 않으며, 위 명령이 도는 것은 변수를 직접 주기 때문이다. 「파일이 있으니
+   dev 빌드는 알아서 되겠지」로 읽지 않는다(원칙 V).
 2. **기기 잠금이 풀려 있고 화면이 켜져 있어야 한다** — 잠금 화면 위에서는 앱이 뜨지 않는다.
    `adb shell dumpsys trust`의 `deviceLocked=0`으로 확인한다. PIN은 사람이 넣어야 한다.
 3. **한글 검증 문구는 `-Dfile.encoding=UTF-8`이 있어야 읽힌다** — Maestro는 JVM이고 흐름

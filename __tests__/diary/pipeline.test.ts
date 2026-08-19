@@ -112,6 +112,58 @@ describe("단계별 실패가 해당 stage로 보고된다 (FR-019, SC-006)", ()
     if (!result.ok) expect(result.stage).toBe("storage");
   });
 
+  /**
+   * 006 FR-012a — **저장 실패인데 글은 있다.**
+   *
+   * 002가 「실패 갈래에 entry도 text도 없다」로 정한 것을 넓힌다. 금지된 것은
+   * **지어낸 텍스트가 일기 자리에 들어가는 것**이었고, 여기 실린 글은 모델이 실제로
+   * 생성하고 판정을 통과한 것이다.
+   *
+   * **`storage` 갈래에만 붙는다** — 6단계에 도달했다는 것 자체가 생성 성공을 뜻하기
+   * 때문이다(5단계가 실패하면 6단계에 오지 않는다).
+   */
+  it("저장 실패 → storage에 생성된 entry가 실려 온다 (006 FR-012a)", async () => {
+    const store = memoryStore({ failWith: "저장 공간이 없다" });
+    const { pipeline } = makePipeline({ backend: generating("오늘 주인은 조용했다"), store });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.stage).toBe("storage");
+      // 30초를 들여 만든 글이다. 다시 생성해도 같은 글이 나오지 않는다.
+      expect(result.entry).toBeDefined();
+      expect(result.entry?.text).toBe("오늘 주인은 조용했다");
+      expect(result.entry?.date).toBe(DAY);
+    }
+  });
+
+  /**
+   * 006 SC-008c의 뒷면 — **다른 실패 갈래에는 entry가 없다.**
+   *
+   * 이것이 002의 불변식이 살아 있다는 증거다. `storage`에만 붙는 이유가 「거기 도달했다는
+   * 것이 생성 성공을 뜻하기 때문」이므로, 생성 전에 멈춘 갈래에 entry가 생기면 그 근거가
+   * 무너진다.
+   */
+  it("생성 전에 멈춘 실패에는 entry가 없다 (002 FR-012 유지)", async () => {
+    const cases = [
+      // 신호 없음
+      makePipeline({ signals: async () => null }),
+      // 모델 미준비
+      makePipeline({ isModelReady: async () => false }),
+      // 생성 실패
+      makePipeline({ backend: notImplemented() }),
+    ];
+
+    for (const { pipeline } of cases) {
+      const result = await pipeline.run(inputFor());
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.stage).not.toBe("storage");
+        expect(result.entry).toBeUndefined();
+      }
+    }
+  });
+
   it("전부 성공 → ok: true, entry", async () => {
     // 이 기능에서는 실제로 도달하지 않는 경로다. 길이 이어져 있는지만 확인한다.
     const { pipeline, store } = makePipeline({ backend: generating("오늘 주인은 조용했다") });
