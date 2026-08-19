@@ -102,24 +102,24 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### Tests (구현 전)
 
-- [ ] T019 [P] [US3] `__tests__/app/state.test.ts`를 쓴다: `AppScreen` 전이 전 갈래 — `list`→`detail`, `list`→`unreadable`, `list`→`writing`→`written`/`failed`, 각각 뒤로 (data-model.md §3)
-- [ ] T020 [US3] `__tests__/app/state.test.ts`에 S1 검사를 더한다: **저장된 일기가 있어도 「쓰기」가 `detail`로 새지 않는다** (원칙 I, contracts/screens.md S1)
-- [ ] T021 [P] [US3] `__tests__/ui/diary-list.test.tsx`를 쓴다: 빈 목록에 안내가 보인다(S7), `readable: false` 항목이 「없음」과 다르게 보인다(S3), 날짜순 정렬
-- [ ] T022 [P] [US3] `__tests__/ui/diary-detail.test.tsx`를 쓴다: 전문과 날짜가 보인다, 모델 정보·생성 시간이 없다 (S4·S5)
+- [X] T019 [P] [US3] `__tests__/app/state.test.ts`를 쓴다: `AppScreen` 전이 전 갈래 — `list`→`detail`, `list`→`unreadable`, `list`→`writing`→`written`/`failed`, 각각 뒤로 (data-model.md §3)
+- [X] T020 [US3] `__tests__/app/state.test.ts`에 S1 검사를 더한다: **저장된 일기가 있어도 「쓰기」가 `detail`로 새지 않는다** (원칙 I, contracts/screens.md S1)
+- [X] T021 [P] [US3] `__tests__/ui/diary-list.test.tsx`를 쓴다: 빈 목록에 안내가 보인다(S7), `readable: false` 항목이 「없음」과 다르게 보인다(S3), 날짜순 정렬
+- [X] T022 [P] [US3] `__tests__/ui/diary-detail.test.tsx`를 쓴다: 전문과 날짜가 보인다, 모델 정보·생성 시간이 없다 (S4·S5)
 
 **⚠️ `@testing-library/react-native` 14의 `render`는 Promise를 반환한다 — `await`
 없이 쓰면 `screen`이 비고 오류 문구가 원인을 가리지 않는다** (AGENTS.md)
 
 ### Implementation
 
-- [ ] T023 [US3] `src/app/state.ts`에 `AppScreen` 타입과 전이 함수를 **순수 함수로** 만든다 (data-model.md §2·§3). 기기 없이 전 갈래가 검증되어야 한다 (SC-023)
-- [ ] T024 [US3] `src/app/state.ts`에 `PipelineStage` → `AppScreen` 옮기기를 만든다. **`storage`는 `failed`가 아니라 `written{saved:false}`로 간다** (data-model.md §5)
-- [ ] T025 [P] [US3] `src/ui/DiaryListScreen.tsx`를 만든다 — 날짜순 목록, `readable` 두 갈래, 빈 상태 안내, 「일기 쓰기」 동작 (contracts/screens.md §2)
-- [ ] T026 [P] [US3] `src/ui/DiaryDetailScreen.tsx`를 만든다 — 전문(스크롤)과 날짜
-- [ ] T027 [US3] `src/diary/store.ts`에 목록 항목을 읽는 경로를 더한다: `listDays()` + 각 날짜의 `load()` 성공 여부로 `DiaryListItem`을 만든다. **읽기 실패가 목록에서 날짜를 지우지 않는다** (FR-017a)
-- [ ] T028 [US3] `src/ui/DiaryHomeScreen.tsx`를 만든다 — 목록·상세·쓰는 중을 `AppScreen` 상태로 가른다. **네비게이션 라이브러리를 들이지 않는다** (research.md §5)
-- [ ] T029 [US3] `App.tsx`가 진단 화면 대신 `DiaryHomeScreen`을 사용자 경로로 띄우도록 고친다. 캐릭터 목록(003)은 그대로 잇는다
-- [ ] T030 [US3] `App.tsx`에서 진단 화면이 `local`·`dev`에서만 열리는 것을 유지한다 (S9, SC-010) — 이 기능이 그 경계를 느슨하게 하지 않는다
+- [X] T023 [US3] `src/app/state.ts`에 `AppScreen` 타입과 전이 함수를 **순수 함수로** 만든다 (data-model.md §2·§3). 기기 없이 전 갈래가 검증되어야 한다 (SC-023)
+- [X] T024 [US3] `src/app/state.ts`에 `PipelineStage` → `AppScreen` 옮기기를 만든다. **`storage`는 `failed`가 아니라 `written{saved:false}`로 간다** (data-model.md §5)
+- [X] T025 [P] [US3] `src/ui/DiaryListScreen.tsx`를 만든다 — 날짜순 목록, `readable` 두 갈래, 빈 상태 안내, 「일기 쓰기」 동작 (contracts/screens.md §2)
+- [X] T026 [P] [US3] `src/ui/DiaryDetailScreen.tsx`를 만든다 — 전문(스크롤)과 날짜
+- [X] T027 [US3] `src/diary/store.ts`에 목록 항목을 읽는 경로를 더한다: `listDays()` + 각 날짜의 `load()` 성공 여부로 `DiaryListItem`을 만든다. **읽기 실패가 목록에서 날짜를 지우지 않는다** (FR-017a)
+- [X] T028 [US3] `src/ui/DiaryHomeScreen.tsx`를 만든다 — 목록·상세·쓰는 중을 `AppScreen` 상태로 가른다. **네비게이션 라이브러리를 들이지 않는다** (research.md §5)
+- [X] T029 [US3] `App.tsx`가 진단 화면 대신 `DiaryHomeScreen`을 사용자 경로로 띄우도록 고친다. 캐릭터 목록(003)은 그대로 잇는다
+- [X] T030 [US3] `App.tsx`에서 진단 화면이 `local`·`dev`에서만 열리는 것을 유지한다 (S9, SC-010) — 이 기능이 그 경계를 느슨하게 하지 않는다
 
 **Checkpoint**: 진단 없이 일기를 만들고 읽는다. **US2 + US3 = 제품이 하는 일 전부**
 
@@ -148,8 +148,8 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### 빌드 오류 화면 (FR-035)
 
-- [ ] T035 [P] [US1] `__tests__/ui/build-error.test.tsx`를 쓴다: 「다시 시도」가 **없고**(S10), 환경 변수 이름·값이 **없다**(원칙 III)
-- [ ] T036 [US1] `src/ui/BuildErrorScreen.tsx`를 만든다 — 「이 빌드가 잘못 만들어졌다」만 말한다
+- [X] T035 [P] [US1] `__tests__/ui/build-error.test.tsx`를 쓴다: 「다시 시도」가 **없고**(S10), 환경 변수 이름·값이 **없다**(원칙 III)
+- [X] T036 [US1] `src/ui/BuildErrorScreen.tsx`를 만든다 — 「이 빌드가 잘못 만들어졌다」만 말한다
 - [ ] T037 [US1] `App.tsx`가 환경 판정 실패 시 `BuildErrorScreen`을 띄우고 **일기 기능을 막되 앱은 뜨게** 한다 (FR-035a·c)
 
 **Checkpoint**: release에서 앱이 뜨고 환경이 옳게 판정된다

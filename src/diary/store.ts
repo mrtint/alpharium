@@ -94,6 +94,46 @@ export function deserializeEntry(serialized: string): DiaryEntry {
   return reviveDates(JSON.parse(serialized) as DiaryEntry);
 }
 
+/* ─────────────────────────── 목록 읽기 (006) ─────────────────────────── */
+
+/**
+ * 목록 한 줄 (006 data-model.md §1).
+ *
+ * **전문을 담지 않는다.** 목록에서 전부 읽으면 일기가 늘수록 느려진다.
+ */
+export type DiaryListItem = { day: DayDate; readable: boolean };
+
+/**
+ * 저장된 일기의 목록을 읽는다 (006 FR-017·017a).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **읽기 실패가 목록에서 날짜를 지우지 않는다**(원칙 V).
+ *
+ * `load()`가 `null`을 주는 날짜를 조용히 빼면 「그날 일기가 없다」와 구분이 사라지고,
+ * 사용자는 일기를 쓴 기억과 화면이 어긋나는 것을 설명할 방법이 없다.
+ *
+ * **날짜는 파일 이름에서 온다** — `listDays()`가 파일명을 파싱하므로 내용이 깨져도
+ * 어느 날인지는 안다. 그것이 `readable: false`를 만들 수 있는 이유다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export async function listDiaries(store: DiaryStore): Promise<DiaryListItem[]> {
+  const days = await store.listDays();
+
+  const items = await Promise.all(
+    days.map(async (day): Promise<DiaryListItem> => {
+      try {
+        return { day, readable: (await store.load(day)) !== null };
+      } catch {
+        // 읽다가 무너져도 그 날짜를 잃지 않는다. 「읽을 수 없다」가 결론이다.
+        return { day, readable: false };
+      }
+    }),
+  );
+
+  // 최근 것이 먼저 보인다. 날짜 문자열은 사전순이 곧 시간순이다(YYYY-MM-DD).
+  return items.sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : 0));
+}
+
 /* ─────────────────────────── 메모리 구현 ─────────────────────────── */
 
 /** 테스트와 파이프라인 검증용 저장소. 실패를 흉내 낼 수 있다. */
