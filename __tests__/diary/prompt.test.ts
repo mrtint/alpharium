@@ -58,6 +58,58 @@ describe("P-1 화자 규칙이 항상 있다 (FR-013·013a)", () => {
   });
 });
 
+/**
+ * ★★ P-1a — 006 실기기 확인에서 드러난 것 (2026-08-20, SM-G986N).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **신호가 거의 없는 하루인데 모델이 하루 전체를 지어냈다.**
+ *
+ * 그날 신호는 `photos: none`, 나머지 전부 `unknown`이었다. 그런데 생성된 일기에는
+ * 날씨·비·세탁기·청소기·인터넷·요리·TV·가족·저녁 식사·음악이 **전부 단언으로** 나왔다.
+ * 헌법 원칙 II 위반이며 005의 SC-002a 실패가 되풀이된 것이다.
+ *
+ * **왜 기존 지시로 부족했는가**: 규칙이 「단언하지 마라」라고만 말하고 **무엇을 쓸지는
+ * 말하지 않았다.** 모델은 쓸 것이 없으면 채운다 — 빈 종이를 주고 「거짓말하지 마라」만
+ * 말하면 거짓말이 나온다.
+ *
+ * 그래서 **「기록이 적으면 적게 써라」와 「모르는 것에 대해 써도 된다」를 더한다.**
+ * 판정 갈래를 늘리지 않는다(FR-039) — 고치는 자리는 프롬프트뿐이다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-036)", () => {
+  it("본 것만 쓰라는 지시가 담긴다", () => {
+    const prompt = buildPrompt(requestFor(unknownDay(DAY)));
+    expect(prompt).toMatch(/본 것만|기록에 있는 것만/);
+  });
+
+  it("기록이 적으면 짧게 쓰라는 지시가 담긴다", () => {
+    // **길이를 채우려는 압력이 지어내기의 원인이다.** 짧아도 된다고 말해 준다.
+    const prompt = buildPrompt(requestFor(unknownDay(DAY)));
+    expect(prompt).toMatch(/짧(게|아도)/);
+  });
+
+  it("모르는 것을 모른다고 쓰는 것이 허용된다는 것이 담긴다", () => {
+    // 헌법 원칙 II가 **권장한** 것이다. 쓸 것이 없을 때 이것이 대안이 된다.
+    const prompt = buildPrompt(requestFor(unknownDay(DAY)));
+    expect(prompt).toMatch(/모른다고|모르는 것을/);
+  });
+
+  it("★ 지어내면 안 되는 예가 구체적으로 담긴다", () => {
+    // 추상적 금지("단언하지 마라")만으로는 부족했다. 무엇이 위반인지 보여준다.
+    const prompt = buildPrompt(requestFor(unknownDay(DAY)));
+    expect(prompt).toMatch(/날씨|먹|만난/);
+  });
+
+  it("★ 캐릭터가 달라도 같은 규칙이다 (FR-040)", () => {
+    // 성격은 모델에서 오지 프롬프트가 만드는 것이 아니다(원칙 III).
+    const prompts = CHARACTERS.map((c) => buildPrompt(requestFor(unknownDay(DAY), c)));
+    for (const prompt of prompts) {
+      expect(prompt).toMatch(/본 것만|기록에 있는 것만/);
+      expect(prompt).toMatch(/짧(게|아도)/);
+    }
+  });
+});
+
 describe("P-2 캐릭터에서 오는 것은 언어뿐이다 (FR-014·014a·014b)", () => {
   it("한국어 캐릭터 셋은 한국어로 쓰도록 지시받는다", () => {
     for (const character of ["quiet", "narrative", "imaginative"] as const) {
