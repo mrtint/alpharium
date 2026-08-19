@@ -61,7 +61,7 @@ export default function App() {
       </View>
 
       {tab === "diary" ? (
-        <DiarySection />
+        <DiarySection onGoToCharacters={() => setTab("characters")} />
       ) : (
         // 003의 목록은 스스로 스크롤하지 않는다 — 다섯 자리가 화면을 넘길 수 있으므로
         // 여기서 감싼다.
@@ -81,7 +81,7 @@ export default function App() {
  * 거쳐 고른다. 조립이 실패하면 파이프라인을 넘기지 않고, 그러면 화면이 `build-error`로
  * 간다(FR-035a).
  */
-function DiarySection() {
+function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
   const environment = currentEnvironment();
 
   // 화면이 다시 그려질 때마다 새로 만들지 않는다. 지연 import 하는 통로이므로
@@ -111,6 +111,8 @@ function DiarySection() {
       // 준비된 캐릭터가 없으면 파이프라인이 `model-not-ready`로 멈추고, 화면이
       // 「캐릭터를 먼저 준비해야 한다」로 옮긴다(FR-028).
       character={character ?? "quiet"}
+      // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
+      onGoToCharacters={onGoToCharacters}
     />
   );
 }

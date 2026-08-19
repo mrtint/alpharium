@@ -47,7 +47,12 @@ export type PipelineStage =
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export type PipelineResult =
-  | { ok: true; entry: DiaryEntry }
+  /**
+   * `overwrote` — **덮어썼다는 사실이 드러나야 한다**(002 FR-023a, 006 FR-034).
+   * 조용히 덮어쓰면 사용자는 이전 일기가 사라진 줄도 모르고, 온디바이스 생성은
+   * 비용이 커서 사라진 일기를 되돌릴 수 없다.
+   */
+  | { ok: true; entry: DiaryEntry; overwrote: boolean }
   | { ok: false; stage: PipelineStage; reason: string; entry?: undefined }
   | { ok: false; stage: "storage"; reason: string; entry: DiaryEntry };
 
@@ -184,5 +189,5 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
     return { ok: false, stage: "storage", reason: saved.reason, entry };
   }
 
-  return { ok: true, entry };
+  return { ok: true, entry, overwrote: saved.overwrote };
 }

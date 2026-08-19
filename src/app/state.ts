@@ -22,8 +22,9 @@
 
 import type { DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
-import type { PipelineResult, PipelineStage } from "../diary/pipeline";
+import type { PipelineResult } from "../diary/pipeline";
 import type { DiaryEntry } from "../diary/types";
+import { describeStage } from "./failure-text";
 
 /**
  * 목록의 한 줄 (data-model.md §1).
@@ -49,7 +50,7 @@ export type AppScreen =
   | { kind: "detail"; day: DayDate; entry: DiaryEntry }
   | { kind: "unreadable"; day: DayDate }
   | { kind: "writing" }
-  | { kind: "written"; entry: DiaryEntry; saved: boolean }
+  | { kind: "written"; entry: DiaryEntry; saved: boolean; overwrote: boolean }
   | { kind: "failed"; message: string };
 
 /**
@@ -103,36 +104,6 @@ export function toWriting(): AppScreen {
 }
 
 /**
- * 파이프라인 단계를 **사용자가 할 수 있는 말**로 옮긴다 (FR-029, S8).
- *
- * **모델의 실패 양상을 드러내지 않는다**(원칙 III). 「되뱉었다」·「언어가 다르다」는
- * 캐릭터 뒤의 모델을 드러내는 말이며, 사용자는 모델을 모른다.
- *
- * **네 거부 갈래가 하나의 말로 합쳐진다** — 사용자에게 필요한 것은 「무엇이 잘못됐나」가
- * 아니라 「무엇을 할 수 있나」다(005가 `describeFailure`에서 내린 것과 같은 판단).
- */
-function messageFor(stage: PipelineStage): string {
-  switch (stage) {
-    case "day-not-closed":
-      return "아직 이르다. 하루가 끝나야 그날의 일기를 쓸 수 있다";
-    case "already-running":
-      return "이미 쓰고 있다";
-    case "signals":
-      return "그 하루의 기록을 가져오지 못했다. 다시 시도해 볼 만하다";
-    case "request-build":
-      return "캐릭터를 먼저 골라야 한다";
-    case "model-not-ready":
-      return "고른 캐릭터를 먼저 준비해야 한다";
-    case "storage":
-      return "일기를 저장하지 못했다. 다시 시도해 볼 만하다";
-    case "generation":
-      // **네 거부 갈래·시간 초과·끊김이 모두 여기로 온다.** 갈래를 화면에서 다시
-      // 가르지 않는다 — 가르는 순간 모델의 실패 양상이 사용자에게 드러난다.
-      return "일기가 제대로 나오지 않았다. 다시 시도해 볼 만하다";
-  }
-}
-
-/**
  * 생성 결과를 화면으로 옮긴다 (data-model.md §5).
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -146,13 +117,16 @@ function messageFor(stage: PipelineStage): string {
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function afterGeneration(result: PipelineResult): AppScreen {
-  if (result.ok) return { kind: "written", entry: result.entry, saved: true };
+  if (result.ok) {
+    return { kind: "written", entry: result.entry, saved: true, overwrote: result.overwrote };
+  }
 
   // 저장 실패인데 글이 있다 — 보여주되 남지 않는다고 말한다.
   if (result.entry !== undefined) {
-    return { kind: "written", entry: result.entry, saved: false };
+    // 쓰기가 실패했으므로 기존 일기는 그대로 남아 있다(002 FR-023b) — 덮어쓴 것이 아니다.
+    return { kind: "written", entry: result.entry, saved: false, overwrote: false };
   }
 
   // **거부된 글은 여기 오지 않는다** — 애초에 결과에 없다(002 FR-012).
-  return { kind: "failed", message: messageFor(result.stage) };
+  return { kind: "failed", message: describeStage(result.stage, result.reason) };
 }

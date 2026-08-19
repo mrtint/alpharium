@@ -49,6 +49,8 @@ export type DiaryHomeScreenProps = {
   stop?: () => Promise<void>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
   now?: () => Date;
+  /** 캐릭터 준비 화면으로 가는 길 (FR-028). 없으면 안내만 하고 길은 주지 않는다 */
+  onGoToCharacters?: () => void;
 };
 
 export function DiaryHomeScreen({
@@ -59,6 +61,7 @@ export function DiaryHomeScreen({
   vision = "none",
   stop,
   now = () => new Date(),
+  onGoToCharacters,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -185,7 +188,11 @@ export function DiaryHomeScreen({
     case "written":
       return (
         <Frame onBack={() => void backToList()}>
-          <DiaryDetailScreen entry={screen.entry} saved={screen.saved} />
+          <DiaryDetailScreen
+            entry={screen.entry}
+            saved={screen.saved}
+            overwrote={screen.overwrote}
+          />
         </Frame>
       );
 
@@ -195,6 +202,17 @@ export function DiaryHomeScreen({
           <View style={styles.notice}>
             {/* **거부된 글은 여기 없다**(S2) — 애초에 화면 상태에 담기지 않는다 */}
             <Text style={styles.noticeText}>{screen.message}</Text>
+
+            {/*
+              **캐릭터를 준비해야 하는 실패면 그리로 가는 길을 준다**(FR-028).
+              「준비해야 한다」고만 말하고 갈 곳을 주지 않으면 사용자가 헤맨다 —
+              003의 목록이 이미 있으므로 그것을 가리킨다.
+            */}
+            {onGoToCharacters !== undefined && /준비/.test(screen.message) && (
+              <Pressable accessibilityRole="button" onPress={onGoToCharacters} style={styles.link}>
+                <Text>캐릭터 준비하러 가기</Text>
+              </Pressable>
+            )}
           </View>
         </Frame>
       );
@@ -218,7 +236,14 @@ const styles = StyleSheet.create({
   back: { paddingHorizontal: 20, paddingVertical: 8, alignSelf: "flex-start" },
   center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
   writing: { fontSize: 16 },
-  notice: { padding: 20, gap: 8 },
+  notice: { padding: 20, gap: 12 },
+  link: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderRadius: 6,
+    alignSelf: "flex-start",
+  },
   day: { fontSize: 14, opacity: 0.6 },
   noticeText: { fontSize: 16, lineHeight: 24 },
   hint: { fontSize: 14, opacity: 0.7 },

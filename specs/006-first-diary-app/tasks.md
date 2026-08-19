@@ -193,17 +193,17 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### Tests (구현 전)
 
-- [ ] T046 [P] [US5] `__tests__/app/state.test.ts`에 실패 갈래별 문구 검사를 더한다: 각 `PipelineStage`가 「할 수 있는 것」으로 옮겨진다 (S8, SC-015)
-- [ ] T047 [US5] `__tests__/app/state.test.ts`에 S2 검사를 더한다: **거부된 글이 어떤 화면 상태에도 담기지 않는다** (SC-014)
-- [ ] T048 [P] [US5] `__tests__/ui/diary-list.test.tsx`에 검사를 더한다: 사진을 **보지 못한** 하루와 사진이 **없었던** 하루가 다르게 보인다 (FR-032, SC-016)
+- [X] T046 [P] [US5] `__tests__/app/state.test.ts`에 실패 갈래별 문구 검사를 더한다: 각 `PipelineStage`가 「할 수 있는 것」으로 옮겨진다 (S8, SC-015)
+- [X] T047 [US5] `__tests__/app/state.test.ts`에 S2 검사를 더한다: **거부된 글이 어떤 화면 상태에도 담기지 않는다** (SC-014)
+- [X] T048 [P] [US5] `__tests__/ui/diary-list.test.tsx`에 검사를 더한다: 사진을 **보지 못한** 하루와 사진이 **없었던** 하루가 다르게 보인다 (FR-032, SC-016)
 
 ### Implementation
 
-- [ ] T049 [US5] `src/app/state.ts`의 실패 옮기기에 005의 `describeFailure()`를 재사용한다 — 새로 쓰지 않는다 (원칙 III 방어를 잃지 않기 위해)
-- [ ] T050 [US5] `src/ui/DiaryHomeScreen.tsx`에 모델 미준비 안내와 캐릭터 목록으로 가는 길을 잇는다 (FR-028)
-- [ ] T051 [US5] `src/ui/DiaryDetailScreen.tsx`에 `unknown`/`none` 구분 표시를 더한다 — 「사진을 보지 못했다」와 「사진이 없었다」가 다른 문장이다 (FR-032)
-- [ ] T052 [US5] 하루가 닫히지 않았을 때의 안내를 잇는다 (FR-033)
-- [ ] T053 [US5] 같은 하루에 다시 쓸 때 **덮어썼다는 사실**을 보인다 (FR-034)
+- [X] T049 [US5] `src/app/state.ts`의 실패 옮기기에 005의 `describeFailure()`를 재사용한다 — 새로 쓰지 않는다 (원칙 III 방어를 잃지 않기 위해)
+- [X] T050 [US5] `src/ui/DiaryHomeScreen.tsx`에 모델 미준비 안내와 캐릭터 목록으로 가는 길을 잇는다 (FR-028)
+- [X] T051 [US5] `src/ui/DiaryDetailScreen.tsx`에 `unknown`/`none` 구분 표시를 더한다 — 「사진을 보지 못했다」와 「사진이 없었다」가 다른 문장이다 (FR-032)
+- [X] T052 [US5] 하루가 닫히지 않았을 때의 안내를 잇는다 (FR-033)
+- [X] T053 [US5] 같은 하루에 다시 쓸 때 **덮어썼다는 사실**을 보인다 (FR-034)
 
 **Checkpoint**: 벗어난 경로에서도 사용자가 길을 안다
 

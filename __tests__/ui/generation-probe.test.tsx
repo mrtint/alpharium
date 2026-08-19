@@ -24,7 +24,8 @@ import { render, screen, userEvent, waitFor } from "@testing-library/react-nativ
 
 import { createPipeline } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
-import { describeFailure, GenerationProbe } from "../../src/ui/GenerationProbe";
+import { describeFailure } from "../../src/app/failure-text";
+import { GenerationProbe } from "../../src/ui/GenerationProbe";
 import type { GenerationResult, InferenceBackend } from "../../src/inference/types";
 import { richDay } from "../../src/signals/fake";
 

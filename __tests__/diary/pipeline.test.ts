@@ -113,6 +113,32 @@ describe("단계별 실패가 해당 stage로 보고된다 (FR-019, SC-006)", ()
   });
 
   /**
+   * 006 FR-034 — **덮어썼다는 사실이 결과에 드러난다** (002 FR-023a).
+   *
+   * `store.save()`는 `overwrote`를 돌려주는데 파이프라인이 그것을 버리면 화면이 알 수
+   * 없다. **조용히 덮어쓰면 사용자는 이전 일기가 사라진 줄도 모른다** — 온디바이스
+   * 생성은 비용이 크고 사라진 일기는 되돌릴 수 없다.
+   */
+  it("처음 저장하면 overwrote가 false다 (006 FR-034)", async () => {
+    const { pipeline } = makePipeline({ backend: generating("첫 일기") });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.overwrote).toBe(false);
+  });
+
+  it("같은 하루에 다시 쓰면 overwrote가 true다 (006 FR-034)", async () => {
+    const store = memoryStore();
+    const { pipeline } = makePipeline({ backend: generating("첫 일기"), store });
+
+    await pipeline.run(inputFor());
+    const second = await pipeline.run(inputFor());
+
+    expect(second.ok).toBe(true);
+    if (second.ok) expect(second.overwrote).toBe(true);
+  });
+
+  /**
    * 006 FR-012a — **저장 실패인데 글은 있다.**
    *
    * 002가 「실패 갈래에 entry도 text도 없다」로 정한 것을 넓힌다. 금지된 것은

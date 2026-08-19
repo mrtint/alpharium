@@ -126,7 +126,7 @@ describe("쓰는 중 (FR-021, S6)", () => {
 
 describe("생성 결과 → 화면 (data-model.md §5)", () => {
   it("성공하면 written이고 저장됐다", () => {
-    const result: PipelineResult = { ok: true, entry: entryFor() };
+    const result: PipelineResult = { ok: true, entry: entryFor(), overwrote: false };
     const screen = afterGeneration(result);
 
     expect(screen.kind).toBe("written");
@@ -160,6 +160,34 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
     }
   });
 
+  /**
+   * ★ 006 FR-034 — **덮어썼다는 사실이 화면까지 간다** (002 FR-023a).
+   */
+  it("★ 덮어쓴 일기는 그 사실이 화면 상태에 남는다", () => {
+    const screen = afterGeneration({ ok: true, entry: entryFor(), overwrote: true });
+
+    expect(screen.kind).toBe("written");
+    if (screen.kind === "written") expect(screen.overwrote).toBe(true);
+  });
+
+  it("처음 쓴 일기는 덮어쓴 것이 아니다", () => {
+    const screen = afterGeneration({ ok: true, entry: entryFor(), overwrote: false });
+
+    if (screen.kind === "written") expect(screen.overwrote).toBe(false);
+  });
+
+  it("저장에 실패했으면 덮어쓴 것도 아니다", () => {
+    // 쓰기가 실패했으므로 기존 일기가 그대로 남아 있다(002 FR-023b).
+    const screen = afterGeneration({
+      ok: false,
+      stage: "storage",
+      reason: "저장 공간이 없다",
+      entry: entryFor(),
+    });
+
+    if (screen.kind === "written") expect(screen.overwrote).toBe(false);
+  });
+
   it.each([
     ["day-not-closed", /이르다/],
     ["signals", /가져오지 못했다/],
@@ -172,6 +200,71 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
 
     expect(screen.kind).toBe("failed");
     if (screen.kind === "failed") expect(screen.message).toMatch(expected);
+  });
+
+  /**
+   * ★ 006 FR-028 — **생성 실패 안에서도 「할 수 있는 것」이 갈린다.**
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * 파이프라인은 `generation` 단계의 `reason`에 `kind: detail` 꼴로 무엇이 일어났는지
+   * 담아 온다. 그것을 통째로 버리고 한 문장으로 뭉개면 **「캐릭터를 받아야 하는가」와
+   * 「다시 눌러 보면 되는가」를 구분할 수 없다** — 003이 `ModelReadiness`를 넷으로 가른
+   * 이유가 「사용자에게 무엇을 하라고 말할 수 있어야 한다」였고 같은 판단이다.
+   *
+   * **모델의 실패 양상은 여전히 새지 않는다**(원칙 III). 005의 `describeFailure()`가
+   * 이미 그 방어를 하고 있으므로 **그것을 재사용한다** — 새로 쓰면 방어가 둘로 갈라진다.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  it("★ 모델이 없으면 「준비해야 한다」로, 거부되면 「다시 시도」로 갈린다", () => {
+    const notFound = afterGeneration({
+      ok: false,
+      stage: "generation",
+      reason: "model-load-failed: not-found",
+    });
+    const rejected = afterGeneration({
+      ok: false,
+      stage: "generation",
+      reason: "rejected: echo",
+    });
+
+    expect(notFound.kind).toBe("failed");
+    expect(rejected.kind).toBe("failed");
+    if (notFound.kind === "failed" && rejected.kind === "failed") {
+      // 뭉개면 사용자가 무엇을 해야 할지 모른다.
+      expect(notFound.message).not.toBe(rejected.message);
+      expect(notFound.message).toMatch(/준비/);
+      expect(rejected.message).toMatch(/다시 시도/);
+    }
+  });
+
+  it("★ 시간 초과와 끊김이 각자의 말을 가진다", () => {
+    const timedOut = afterGeneration({
+      ok: false,
+      stage: "generation",
+      reason: "timed-out",
+    });
+    const interrupted = afterGeneration({
+      ok: false,
+      stage: "generation",
+      reason: "interrupted",
+    });
+
+    if (timedOut.kind === "failed" && interrupted.kind === "failed") {
+      expect(timedOut.message).not.toBe(interrupted.message);
+      // 앱을 떠나서 멈춘 것은 사용자가 아는 편이 낫다.
+      expect(interrupted.message).toMatch(/떠나|벗어/);
+    }
+  });
+
+  it("★ 갈래를 알 수 없는 reason도 무너지지 않는다", () => {
+    const unknown = afterGeneration({
+      ok: false,
+      stage: "generation",
+      reason: "무언가 새로운 것",
+    });
+
+    expect(unknown.kind).toBe("failed");
+    if (unknown.kind === "failed") expect(unknown.message.length).toBeGreaterThan(0);
   });
 
   /**
@@ -216,7 +309,7 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
   });
 
   it("생성 시간·속도·토큰 수를 담는 자리가 없다 (SC-020)", () => {
-    const screen = afterGeneration({ ok: true, entry: entryFor() });
+    const screen = afterGeneration({ ok: true, entry: entryFor(), overwrote: false });
     const rendered = JSON.stringify(screen);
 
     for (const metric of ["elapsed", "ms", "tokens", "perSecond", "speed"]) {

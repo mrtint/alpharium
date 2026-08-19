@@ -28,6 +28,13 @@ export type DiaryDetailScreenProps = {
    * 실패한 경우에만 `false`가 온다.
    */
   saved?: boolean;
+  /**
+   * 이전 일기를 덮어썼는가 (006 FR-034, 002 FR-023a).
+   *
+   * **조용히 덮어쓰면 사용자는 이전 일기가 사라진 줄도 모른다.** 목록에서 연 일기는
+   * 방금 쓴 것이 아니므로 기본값이 `false`다.
+   */
+  overwrote?: boolean;
 };
 
 /**
@@ -66,7 +73,11 @@ function signalLines(signals: DaySignals): { label: string; value: string }[] {
   ];
 }
 
-export function DiaryDetailScreen({ entry, saved = true }: DiaryDetailScreenProps) {
+export function DiaryDetailScreen({
+  entry,
+  saved = true,
+  overwrote = false,
+}: DiaryDetailScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.day}>{entry.date}</Text>
@@ -75,6 +86,9 @@ export function DiaryDetailScreen({ entry, saved = true }: DiaryDetailScreenProp
       {!saved && (
         <Text style={styles.unsaved}>저장하지 못했다. 앱을 나가면 이 일기는 사라진다</Text>
       )}
+
+      {/* **덮어썼다는 사실을 알린다**(FR-034) — 사라진 일기는 되돌릴 수 없다 */}
+      {overwrote && <Text style={styles.overwrote}>이전 일기를 덮어썼다</Text>}
 
       {/* 일기가 길면 스크롤된다 */}
       <Text style={styles.text}>{entry.text}</Text>
@@ -98,6 +112,7 @@ const styles = StyleSheet.create({
   page: { padding: 20, gap: 16 },
   day: { fontSize: 14, opacity: 0.6 },
   unsaved: { fontSize: 14 },
+  overwrote: { fontSize: 13, opacity: 0.7 },
   text: { fontSize: 16, lineHeight: 26 },
   signals: {
     marginTop: 8,

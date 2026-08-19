@@ -71,6 +71,33 @@ describe("★ 저장되지 않은 일기 (FR-012b)", () => {
 });
 
 /**
+ * ★ 006 FR-034 — **덮어썼다는 사실을 사용자에게 옮긴다** (002 FR-023a).
+ *
+ * 조용히 덮어쓰면 사용자는 이전 일기가 사라진 줄도 모른다. 온디바이스 생성은 비용이
+ * 크고 사라진 일기는 되돌릴 수 없다.
+ */
+describe("★ 덮어쓴 일기 (FR-034)", () => {
+  it("덮어썼다는 것이 보인다", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} overwrote={true} />);
+
+    expect(screen.getByText(/이전 일기.*덮어/)).toBeTruthy();
+  });
+
+  it("처음 쓴 일기에는 그 말이 없다", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} overwrote={false} />);
+
+    expect(screen.queryByText(/덮어/)).toBeNull();
+  });
+
+  it("목록에서 연 일기에는 그 말이 없다", async () => {
+    // overwrote를 주지 않으면 방금 쓴 것이 아니다.
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.queryByText(/덮어/)).toBeNull();
+  });
+});
+
+/**
  * ★ 원칙 V — **사진을 보지 못한 하루와 사진이 없었던 하루가 다르게 보인다**
  * (FR-032, SC-016).
  *

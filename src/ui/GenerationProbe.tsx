@@ -23,92 +23,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { latestClosedDay } from "../config/day-boundary";
-import type { Pipeline, PipelineStage } from "../diary/pipeline";
+import type { Pipeline } from "../diary/pipeline";
 import type { Character, VisionSetting } from "../diary/types";
-import type { GenerationResult } from "../inference/types";
-import { isGenerationFailure } from "../inference/types";
-
-/**
- * 실패를 **사용자가 할 수 있는 것**으로 옮긴다 (FR-017d·e).
- *
- * ─────────────────────────────────────────────────────────────────────────────
- * **「되뱉었다」·「언어가 다르다」를 그대로 보이지 않는다**(원칙 III). 그것은 캐릭터 뒤의
- * 모델이 어떻게 실패했는지를 드러내는 말이며, 사용자는 모델을 모른다.
- *
- * 대신 **다시 시도할 만한가**를 말한다 — 003이 `ModelReadiness`를 넷으로 가른 이유가
- * "사용자에게 무엇을 하라고 말할 수 있어야 한다"였고 같은 판단이다.
- * ─────────────────────────────────────────────────────────────────────────────
- */
-export function describeFailure(result: GenerationResult): string {
-  if (!isGenerationFailure(result)) return "";
-
-  switch (result.kind) {
-    case "not-implemented":
-      // 시각 설정이 none이 아닐 때다(FR-022).
-      return "이 설정으로는 아직 일기를 쓸 수 없다";
-    case "backend-unavailable":
-      return "이 기기에서 일기를 쓸 수 없다";
-    case "model-load-failed":
-      return result.reason === "not-found"
-        ? "고른 캐릭터를 먼저 준비해야 한다"
-        : "고른 캐릭터를 준비하는 데 문제가 있다. 다시 받아야 할 수 있다";
-    case "rejected":
-      // **네 갈래를 하나로 옮긴다.** 무엇이 잘못됐는지가 아니라 무엇을 할 수 있는지다.
-      return "일기가 제대로 나오지 않았다. 다시 시도해 볼 만하다";
-    case "timed-out":
-      return "시간이 너무 오래 걸려 멈췄다. 다시 시도해 볼 만하다";
-    case "interrupted":
-      return "앱을 떠나 있는 동안 멈췄다. 다시 시도할 수 있다";
-    case "generation-failed":
-      return "일기를 쓰는 중에 문제가 생겼다. 다시 시도해 볼 만하다";
-  }
-}
-
-/**
- * 파이프라인 단계를 사용자가 할 수 있는 말로 옮긴다 (006 FR-029).
- *
- * **`generation`은 `describeFailure()`에 맡긴다** — 005가 이미 원칙 III을 지키도록
- * 갈래를 옮겨 두었고, 여기서 다시 쓰면 그 방어가 둘로 갈라진다.
- */
-function describeStage(stage: PipelineStage, reason: string): string {
-  switch (stage) {
-    case "day-not-closed":
-      return "아직 이르다. 하루가 끝나야 그날의 일기를 쓸 수 있다";
-    case "already-running":
-      return "이미 쓰고 있다";
-    case "signals":
-      return "그 하루의 신호를 가져오지 못했다";
-    case "request-build":
-      return "캐릭터를 먼저 골라야 한다";
-    case "model-not-ready":
-      return "고른 캐릭터를 먼저 준비해야 한다";
-    case "storage":
-      // **entry가 있으면 여기 오지 않는다** — 위에서 `unsaved` 표시로 갈린다.
-      // 이 문구는 글 없이 저장만 실패한 경우의 대비책이다.
-      return "일기를 저장하지 못했다. 다시 시도해 볼 만하다";
-    case "generation":
-      // 파이프라인이 `kind: detail` 꼴로 담아 온다. 005의 문구로 옮긴다.
-      return describeGenerationReason(reason);
-  }
-}
-
-/** `generation` 단계의 reason 문자열을 005의 사용자 문구로 옮긴다 */
-function describeGenerationReason(reason: string): string {
-  const kind = reason.split(":")[0]?.trim();
-  const failures: Record<string, GenerationResult> = {
-    "not-implemented": { kind: "not-implemented" },
-    "backend-unavailable": { kind: "backend-unavailable", reason },
-    "model-load-failed": { kind: "model-load-failed", reason: "load-failed" },
-    rejected: { kind: "rejected", why: "empty" },
-    "timed-out": { kind: "timed-out" },
-    interrupted: { kind: "interrupted" },
-    "generation-failed": { kind: "generation-failed", reason },
-  };
-  const failure = failures[kind ?? ""];
-  return failure === undefined
-    ? "일기를 쓰는 중에 문제가 생겼다. 다시 시도해 볼 만하다"
-    : describeFailure(failure);
-}
+import { describeStage } from "../app/failure-text";
 
 export type GenerationProbeProps = {
   /**
