@@ -240,8 +240,8 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### Maestro 흐름
 
-- [ ] T058 [P] `.maestro/diary-user-path.yml`을 만든다 — 진단 없이 목록 → 쓰기 → 읽기
-- [ ] T059 **`scripts/run-device-tests.mjs`의 `FLOWS`에 `.maestro/diary-user-path.yml`을 등록한다.** ⚠️ 등록하지 않으면 파일이 있어도 안 돌고 **초록불인데 아무것도 검증되지 않는다** (AGENTS.md)
+- [X] T058 [P] `.maestro/diary-user-path.yml`을 만든다 — 진단 없이 목록 → 쓰기 → 읽기
+- [X] T059 **`scripts/run-device-tests.mjs`의 `FLOWS`에 `.maestro/diary-user-path.yml`을 등록한다.** ⚠️ 등록하지 않으면 파일이 있어도 안 돌고 **초록불인데 아무것도 검증되지 않는다** (AGENTS.md)
 
 ### release APK 검증 (quickstart.md D)
 
