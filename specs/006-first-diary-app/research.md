@@ -58,9 +58,19 @@
 값을 하드코딩하지 않게 하는 것」이며, plugin은 **경로와 별칭만 알고 실제 비밀번호는
 gradle 실행 시점에 읽도록** 한다.
 
-**미확인 — 계획 단계에서 정할 것이 아니라 구현에서 확인할 것**: gradle이 어느 파일에서
-비밀번호를 읽게 할지(`~/.gradle/gradle.properties` vs 프로젝트 루트의 gitignore된
-파일). 둘 다 성립하며, **문서화(FR-006)가 더 중요하다.**
+**~~미확인~~ → 확정 (2026-08-20 구현에서 결정)**: `~/.gradle/gradle.properties`를
+골랐다. 저장소 트리 밖이라 **실수로 커밋될 경로가 아예 없고**, gradle이 별도 설정 없이
+읽으므로 `project.findProperty()` 한 줄로 닿는다. 프로젝트 루트의 gitignore된 파일은
+「무시 규칙이 맞게 걸려 있는가」에 계속 의존해야 한다.
+
+**★ 실측으로 드러난 것 — 키를 `android/app/`에만 두면 잃는다** (2026-08-20).
+`npx expo prebuild --platform android --clean`이 `android/`를 **통째로 지우므로 거기
+있던 키스토어가 함께 사라진다.** 이 문서 §1이 「`android/`는 prebuild에 지워지는
+생성물」이라고 이미 적어 두었는데도, 키를 어디에 둘지는 그와 따로 생각해 버렸다 —
+**`.gitignore`가 막아 준다는 것과 그 자리가 안전하다는 것은 다른 말이다.**
+
+그래서 **원본은 `~/.alpharium-signing/`에 두고 `android/app/`에는 사본을 놓는다.**
+빌드 절차의 prebuild 다음 줄에 복사가 들어간다(AGENTS.md).
 
 **Alternatives considered**:
 

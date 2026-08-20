@@ -386,7 +386,17 @@ build가 필요하다. `npx expo run:android`를 쓴다.
 keytool -genkeypair -v -keystore <경로>/alpharium.jks   -alias alpharium -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-만든 파일을 `android/app/alpharium.jks`에 둔다(`.gitignore`의 `*.jks`가 막는다).
+**⚠️ 원본은 저장소 밖에 두고, `android/app/alpharium.jks`에는 사본을 놓는다**
+(2026-08-20 실측). `android/`는 `prebuild --clean`이 **통째로 지우므로 거기 둔 키가
+함께 사라진다** — `.gitignore`가 막아 주므로 커밋되지 않는다는 것과, 그 자리가
+안전하다는 것은 다른 말이다. 지금 원본은 `~/.alpharium-signing/`에 있다.
+
+```
+mkdir -p ~/.alpharium-signing
+cp android/app/alpharium.jks ~/.alpharium-signing/     # 원본 보관
+cp ~/.alpharium-signing/alpharium.jks android/app/     # prebuild 뒤 되돌리기
+```
+
 비밀번호는 `~/.gradle/gradle.properties`에 적는다 — **저장소가 아니다**:
 
 ```
@@ -402,10 +412,14 @@ ALPHARIUM_KEY_PASSWORD=<비밀번호>
 
 ```
 npx expo prebuild --platform android --clean
+cp ~/.alpharium-signing/alpharium.jks android/app/     # ★ prebuild가 지웠다
 cd android && NODE_ENV=production ./gradlew assembleRelease
 ```
 
 **`--clean`을 건너뛰지 않는다** — 004에서 이것 때문에 권한이 빠진 APK가 설치됐다.
+**가운데 줄을 건너뛰지 않는다** — `prebuild --clean`이 키를 지웠기 때문이다.
+**키가 없을 때 gradle이 어떻게 되는지는 아직 관측하지 않았다**(원칙 V) — 실패한다고
+짐작하지 말고, 서명은 언제나 `apksigner`로 확인한다(아래 표).
 **`NODE_ENV=production`이 필요하다** — Expo는 `NODE_ENV`로 env 파일을 고르므로
 그것이 없으면 `.env.production`이 로드되지 않고 `EXPO_PUBLIC_APP_ENV`가 비어
 앱이 「이 빌드는 잘못 만들어졌다」로 뜬다.
