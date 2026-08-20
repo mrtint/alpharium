@@ -138,19 +138,19 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### 조기 확인 (앞당겨도 된다)
 
-- [ ] T031 [US1] release 빌드를 한 번 뽑아 앱이 뜨는지만 확인한다 (서명 전, 최적화 켠 상태). **깨지면 research.md §7의 위험 표를 본다** — 동적 `import`와 `llama.rn` JNI 심볼이 후보이며 **둘 다 아직 관측되지 않은 짐작이다**
-- [ ] T032 [US1] T031에서 관측한 것을 `research.md` §7의 「미확인」 표에 **사실로** 옮겨 적는다 — 도는 것도 안 도는 것도 관측이다 (원칙 V)
+- [X] T031 [US1] release 빌드를 한 번 뽑아 앱이 뜨는지만 확인한다 (서명 전, 최적화 켠 상태). **깨지면 research.md §7의 위험 표를 본다** — 동적 `import`와 `llama.rn` JNI 심볼이 후보이며 **둘 다 아직 관측되지 않은 짐작이다**
+- [X] T032 [US1] T031에서 관측한 것을 `research.md` §7의 「미확인」 표에 **사실로** 옮겨 적는다 — 도는 것도 안 도는 것도 관측이다 (원칙 V)
 
 ### 환경 주입 (contracts/release-build.md §3)
 
-- [ ] T033 [P] [US1] release 빌드에서 `EXPO_PUBLIC_APP_ENV`가 `prod`로 박히는지 확인한다 — `NODE_ENV=production`일 때 `.env.production`이 로드되는 규칙이 실제로 도는지 (R5, FR-002)
-- [ ] T034 [P] [US1] `__tests__/config/environment.test.ts`에 판정 실패가 기본값으로 떨어지지 않는 검사가 있는지 확인한다 (R6, SC-002a). 이미 001에서 다뤘다면 그대로 둔다
+- [X] T033 [P] [US1] release 빌드에서 `EXPO_PUBLIC_APP_ENV`가 `prod`로 박히는지 확인한다 — `NODE_ENV=production`일 때 `.env.production`이 로드되는 규칙이 실제로 도는지 (R5, FR-002)
+- [X] T034 [P] [US1] `__tests__/config/environment.test.ts`에 판정 실패가 기본값으로 떨어지지 않는 검사가 있는지 확인한다 (R6, SC-002a). 이미 001에서 다뤘다면 그대로 둔다
 
 ### 빌드 오류 화면 (FR-035)
 
 - [X] T035 [P] [US1] `__tests__/ui/build-error.test.tsx`를 쓴다: 「다시 시도」가 **없고**(S10), 환경 변수 이름·값이 **없다**(원칙 III)
 - [X] T036 [US1] `src/ui/BuildErrorScreen.tsx`를 만든다 — 「이 빌드가 잘못 만들어졌다」만 말한다
-- [ ] T037 [US1] `App.tsx`가 환경 판정 실패 시 `BuildErrorScreen`을 띄우고 **일기 기능을 막되 앱은 뜨게** 한다 (FR-035a·c)
+- [X] T037 [US1] `App.tsx`가 환경 판정 실패 시 `BuildErrorScreen`을 띄우고 **일기 기능을 막되 앱은 뜨게** 한다 (FR-035a·c)
 
 **Checkpoint**: release에서 앱이 뜨고 환경이 옳게 판정된다
 
@@ -176,8 +176,8 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### 확인 (빌드 성공을 믿지 않는다)
 
-- [ ] T043 [US4] `apksigner verify --print-certs`로 debug 인증서(`CN=Android Debug`)가 **아닌지** 확인한다 (R1, SC-004)
-- [ ] T044 [US4] `git status`와 `git ls-files | grep -i jks`로 키가 저장소에 없는지 확인한다 (R2, SC-005)
+- [X] T043 [US4] `apksigner verify --print-certs`로 debug 인증서(`CN=Android Debug`)가 **아닌지** 확인한다 (R1, SC-004)
+- [X] T044 [US4] `git status`와 `git ls-files | grep -i jks`로 키가 저장소에 없는지 확인한다 (R2, SC-005)
 - [ ] T045 [US4] 빌드 절차와 키 두는 자리를 `AGENTS.md`에 적는다 — 다음 사람이 재현할 수 있어야 한다 (FR-006, SC-007)
 
 **Checkpoint**: 제 키로 서명된 APK가 나온다. 덮어 설치 확인은 Phase 9에서

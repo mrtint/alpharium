@@ -172,6 +172,22 @@
     함께 뭉갠다**(원칙 III: 성격은 모델의 성질이지 프롬프트가 만드는 것이 아니다).
     `imaginative`가 「상상을 섞는다」는 것을 사용자에게 알리는 것은 헌법이 이미
     요구하고 있다(로스터, MUST).
+- **★ release 빌드가 실기기에서 돈다** (2026-08-20, SM-G986N, Android 13).
+  **005까지의 모든 실기기 확인이 debug였고 release는 이번이 처음이다.**
+  - **빌드 31분 14초** (첫 빌드, 316개 태스크). `NODE_ENV=production ./gradlew assembleRelease`.
+    **APK 172MB**, ABI 3개(arm64-v8a·armeabi-v7a·x86). `librnllama.so`만 9.8MB.
+  - **Metro를 끄고 `adb reverse`를 지운 상태에서 앱이 뜬다** — `assets/index.android.bundle`이
+    APK 안에 있다. `Unable to load script`가 나지 않는다.
+  - **⚠️ 짐작이었던 것 둘이 전부 통과했다**: minify·R8·ProGuard를 켠 채로 **동적
+    `import`가 살아남았고**(저장·조회·생성 전부 동작) **`llama.rn`의 JNI 심볼도
+    살아남았다**(모델 적재·생성 성공). 지금까지 「깨질 수 있다」로 적어 둔 위험이었고
+    실제로는 깨지지 않았다.
+  - **prod로 판정된다** — 진단 화면이 보이지 않고(001 SC-013) 「이 빌드는 잘못
+    만들어졌다」도 아니다.
+  - **debug APK 위에 release를 덮어 설치해도 일기가 남았다** — 둘 다 debug 키로 서명돼
+    있어 가능했다. **제 키로 바꾸는 순간 이 경로가 끊긴다**(그래서 서명 키가 먼저다).
+  - **⚠️ release는 `run-as`가 안 된다** — `package not debuggable`. 기기 안 파일을
+    직접 볼 수 없으므로 **앱 화면으로 확인해야 한다.**
 - **파일 저장이 실기기에서 돈다** (2026-08-13, SM-G986N). `expo-file-system` 57의
   `File`/`Paths`로 저장·조회·덮어쓰기·목록이 동작했고, **`unknown`이 파일 왕복에서
   살아남는 것**까지 확인했다. `write`/`delete`/`create`/`moveSync`는 동기이고 `text()`만
