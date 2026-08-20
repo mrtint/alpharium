@@ -261,8 +261,8 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 
 ### 덮어 설치 (quickstart.md E)
 
-- [ ] T069 `app.json`의 `versionCode`를 올리고 같은 키로 재빌드한다
-- [ ] T070 `adb install -r`로 덮어 설치한다 — `INSTALL_FAILED_UPDATE_INCOMPATIBLE`이 아니고 **일기가 그대로 있다** (SC-006)
+- [X] T069 `app.json`의 `versionCode`를 올리고 같은 키로 재빌드한다
+- [X] T070 `adb install -r`로 덮어 설치한다 — `INSTALL_FAILED_UPDATE_INCOMPATIBLE`이 아니고 **일기가 그대로 있다** (SC-006)
 
 ### 기록
 
