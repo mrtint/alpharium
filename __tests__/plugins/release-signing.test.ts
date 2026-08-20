@@ -32,6 +32,7 @@ android {
         }
         release {
             // Caution! In production, you need to generate your own keystore file.
+            // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
             minifyEnabled enableMinifyInReleaseBuilds
         }
@@ -56,6 +57,15 @@ describe("addReleaseSigning (R1)", () => {
 
     // 개발 빌드까지 제 키를 요구하면 키 없는 사람이 개발을 못 한다.
     expect(out).toMatch(/debug\s*\{\s*signingConfig signingConfigs\.debug/);
+  });
+
+  it("★ 더 이상 맞지 않는 「제 키를 만들라」 주석을 지운다", () => {
+    const out = addReleaseSigning(TEMPLATE, OPTIONS);
+
+    // **사실이 아닌 주석은 없느니만 못하다.** 바로 아래 줄이 제 키를 가리키는데
+    // 「keystore를 만들어야 한다」가 남아 있으면 다음 사람이 아직 debug 키인 줄 안다.
+    expect(out).not.toContain("Caution! In production");
+    expect(out).not.toContain("signed-apk-android");
   });
 
   it("signingConfigs 안에 설정이 생긴다", () => {

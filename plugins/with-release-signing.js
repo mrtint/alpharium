@@ -56,11 +56,18 @@ function addReleaseSigning(contents, { keystorePath, keyAlias }) {
   let next = contents.replace(/(signingConfigs\s*\{)/, `$1${signingConfig}`);
 
   // release가 debug 키를 쓰던 것을 우리 것으로 바꾼다.
-  // **주석의 "Caution!"도 함께 지운다** — 더 이상 해당하지 않는 경고가 남으면
-  // 다음 사람이 아직 debug 키인 줄 안다.
   next = next.replace(
     /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/,
     "$1signingConfig signingConfigs.alphariumRelease",
+  );
+
+  // **템플릿의 "Caution! ... generate your own keystore" 주석을 지운다.**
+  // 그것은 debug 키를 쓰고 있을 때의 경고이며, 바로 아래 줄이 제 키를 가리키는데도
+  // 남아 있으면 다음 사람이 아직 debug 키인 줄 안다 — 사실이 아닌 주석은 없느니만 못하다.
+  // 둘째 줄(문서 링크)은 템플릿 판마다 있기도 없기도 하므로 선택으로 둔다.
+  next = next.replace(
+    /^[ \t]*\/\/ Caution! In production, you need to generate your own keystore file\.\r?\n(?:[ \t]*\/\/ see https:\/\/reactnative\.dev\/docs\/signed-apk-android\.\r?\n)?/m,
+    "",
   );
 
   return next;
