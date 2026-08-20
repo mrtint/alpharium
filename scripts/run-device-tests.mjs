@@ -27,6 +27,8 @@ const FLOWS = [
   // 005 — 생성 패널. **여기 등록하지 않으면 흐름이 있어도 돌지 않고**, 그러면 초록불인데
   // 아무것도 검증되지 않은 상태가 된다(헌법 원칙 V).
   ".maestro/generate-diary.yml",
+  // 006 — 사용자 경로. **진단 화면을 거치지 않고 일기에 닿는가**를 본다.
+  ".maestro/diary-user-path.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

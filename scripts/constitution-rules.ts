@@ -21,6 +21,10 @@
  * **여기에 넣지 않을 것**: 추론 속도 측정, 출력 품질 점수, 모델 간 비교, 프롬프트 평가.
  * "이미 검사가 있으니 여기에 출력 검사도 넣자"가 정확히 원칙 IV 위반이다.
  * 그런 것이 필요하면 별도 저장소에서 한다.
+ *
+ * **006이 소스 검사를 더했다**(FR-010, SC-008b). 같은 경계가 그대로 적용된다 —
+ * 소스에 **어떤 호출이 있는지**만 보며, 코드를 돌리지도 출력을 만들지도 재지도 않는다.
+ * 「어느 화면이 더 빠른가」·「어느 프롬프트가 나은가」는 여기 들어올 수 없다.
  * ─────────────────────────────────────────────────────────────────────────
  */
 
@@ -79,6 +83,63 @@ export function checkEnvFile(fileName: string, contents: string): Violation[] {
         file: fileName,
         key,
         rule: "local이 아닌 환경에 데스크톱 서버 주소 키 (FR-014, 원칙 I)",
+      });
+    }
+  }
+
+  return violations;
+}
+
+/* ─────────────────────────── 소스 검사 (006) ─────────────────────────── */
+
+/**
+ * 추론 어댑터를 직접 부르는 것을 잡는다 (006 FR-010, SC-008b).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **왜 런타임 테스트로 부족한가**: 테스트는 「이 경로가 저장까지 간다」를 확인할 뿐,
+ * **저장소 어딘가에 남아 있는 다른 직접 호출**을 잡지 못한다. 005에서 정확히 그 일이
+ * 있었다 — 파이프라인 테스트는 전부 초록불이었는데 화면이 어댑터를 직접 불러
+ * `store.save()`가 기기에서 한 번도 돌지 않았다.
+ *
+ * **왜 `src/inference/`는 검사하지 않는가**: 어댑터를 구현하고 고르는 자리이므로
+ * `generate`가 당연히 나온다. 금지 대상은 **그것을 건너뛰고 쓰는 쪽**이다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const DIRECT_GENERATE = /\b(?:backend|adapter|engine)\s*\.\s*generate\s*\(/;
+
+/** 어댑터를 직접 만드는 것. `wiring.ts`가 `select.ts`를 거치도록 강제한다(FR-026) */
+const DIRECT_BACKEND_FACTORY = /\b(?:onDeviceBackend|createDesktopServerBackend)\s*\(/;
+
+/**
+ * 소스 파일 하나를 검사한다.
+ *
+ * **경로로 판단한다.** `src/ui/`와 `src/app/`은 화면과 조립이며, 추론 어댑터를 직접
+ * 다룰 이유가 없다. `wiring.ts`만 예외로 `select.ts`의 결과를 받는다.
+ */
+export function checkSourceFile(fileName: string, contents: string): Violation[] {
+  // 윈도우 경로 구분자를 맞춘다. 정규식 대신 split/join을 쓰는 편이 읽기 쉽다.
+  const normalized = fileName.split("\\").join("/");
+  const watched = normalized.startsWith("src/ui/") || normalized.startsWith("src/app/");
+  if (!watched) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (DIRECT_GENERATE.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "추론 어댑터 직접 호출 — 파이프라인을 거쳐야 저장이 일어난다 (006 FR-010)",
+      });
+    }
+    if (DIRECT_BACKEND_FACTORY.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "추론 어댑터 직접 생성 — select.ts를 거쳐야 한다 (006 FR-026, 원칙 I)",
       });
     }
   }

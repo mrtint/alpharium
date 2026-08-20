@@ -30,9 +30,31 @@ export type PipelineStage =
  *
  * **실패 갈래에 `entry`도 `text`도 없다(FR-012).** 빈 본문이나 플레이스홀더로 일기를
  * 만들지 않는다 — 만드는 순간 가짜 일기와 구분이 사라진다(헌법 원칙 I).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **006이 예외를 하나 열었다: `storage` 실패에는 `entry`가 실린다**(006 FR-012a).
+ *
+ * 002의 불변식을 깨는 것처럼 보이지만 아니다. 금지된 것은 **지어낸 텍스트가 일기
+ * 자리에 들어가는 것**이었고("일기를 생성할 수 없습니다" 같은 플레이스홀더), 여기
+ * 실리는 글은 **모델이 실제로 생성하고 판정을 통과한 것**이다. 가짜가 아니다.
+ *
+ * **왜 `storage`에만 붙는가**: 6단계(저장)에 도달했다는 것 자체가 5단계(생성) 성공을
+ * 뜻한다. 생성 전에 멈춘 갈래에는 보여줄 글이 애초에 없으므로 `entry`가 없다 —
+ * `pipeline.test.ts`가 그것을 직접 검사한다.
+ *
+ * **왜 성공으로 돌리지 않는가**: 저장 실패가 성공으로 읽히면 사용자는 일기가 남은 줄
+ * 안다(006 SC-008c). 실패는 실패로 두고 글만 함께 보낸다.
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 export type PipelineResult =
-  { ok: true; entry: DiaryEntry } | { ok: false; stage: PipelineStage; reason: string };
+  /**
+   * `overwrote` — **덮어썼다는 사실이 드러나야 한다**(002 FR-023a, 006 FR-034).
+   * 조용히 덮어쓰면 사용자는 이전 일기가 사라진 줄도 모르고, 온디바이스 생성은
+   * 비용이 커서 사라진 일기를 되돌릴 수 없다.
+   */
+  | { ok: true; entry: DiaryEntry; overwrote: boolean }
+  | { ok: false; stage: PipelineStage; reason: string; entry?: undefined }
+  | { ok: false; stage: "storage"; reason: string; entry: DiaryEntry };
 
 export type PipelineInput = {
   day: DayDate;
@@ -162,8 +184,10 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
 
   const saved = await deps.store.save(entry);
   if (!saved.ok) {
-    return stop("storage", saved.reason);
+    // **만든 글을 버리지 않는다**(006 FR-012a). 30초를 들인 글이고 다시 생성해도
+    // 같은 글이 나오지 않는다. 실패는 실패로 두되 읽을 기회를 빼앗지 않는다.
+    return { ok: false, stage: "storage", reason: saved.reason, entry };
   }
 
-  return { ok: true, entry };
+  return { ok: true, entry, overwrote: saved.overwrote };
 }

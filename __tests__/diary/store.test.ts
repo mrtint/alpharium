@@ -11,7 +11,13 @@
  * 조용히 깨진다(SC-007).
  */
 
-import { deserializeEntry, memoryStore, serializeEntry } from "../../src/diary/store";
+import {
+  deserializeEntry,
+  listDiaries,
+  memoryStore,
+  serializeEntry,
+  type DiaryStore,
+} from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
 import { emptyDay, partiallyUnknownDay, richDay, unknownDay } from "../../src/signals/fake";
 import type { DayDate } from "../../src/config/day-boundary";
@@ -236,5 +242,77 @@ describe("저장된 일기에 모델 식별자·측정 지표가 없다 (원칙 
     for (const forbidden of ["elapsed", "tokenspersec", "score", "benchmark"]) {
       expect(serialized).not.toContain(forbidden);
     }
+  });
+});
+
+/**
+ * 006 FR-017a — **목록은 읽을 수 없는 날짜도 잃지 않는다.**
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 조용히 빼면 「그날 일기가 없다」와 구분이 사라진다(원칙 V). 사용자는 일기를 쓴
+ * 기억과 화면이 어긋나는 것을 설명할 방법이 없다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("listDiaries (006 FR-017·017a)", () => {
+  it("저장된 날짜가 전부 나온다", async () => {
+    const store = memoryStore();
+    for (const day of ["2026-08-10", "2026-08-11", "2026-08-12"]) {
+      await store.save(entryFor(day));
+    }
+
+    const items = await listDiaries(store);
+
+    expect(items).toHaveLength(3);
+    expect(items.every((item) => item.readable)).toBe(true);
+  });
+
+  it("최근 것이 먼저 나온다", async () => {
+    const store = memoryStore();
+    for (const day of ["2026-08-10", "2026-08-12", "2026-08-11"]) {
+      await store.save(entryFor(day));
+    }
+
+    const items = await listDiaries(store);
+
+    expect(items.map((item) => item.day)).toEqual(["2026-08-12", "2026-08-11", "2026-08-10"]);
+  });
+
+  it("일기가 없으면 빈 목록이다", async () => {
+    expect(await listDiaries(memoryStore())).toEqual([]);
+  });
+
+  it("★ 읽을 수 없는 날짜가 목록에서 사라지지 않는다", async () => {
+    const store = memoryStore();
+    await store.save(entryFor("2026-08-11"));
+    await store.save(entryFor("2026-08-12"));
+
+    // 한 날짜만 읽히지 않게 만든다 — 파일이 깨진 상황과 같다.
+    const broken: DiaryStore = {
+      ...store,
+      load: async (day) => (day === "2026-08-11" ? null : store.load(day)),
+    };
+
+    const items = await listDiaries(broken);
+
+    // **날짜는 남고 「읽을 수 없다」로 표시된다.** 빠지지 않는다.
+    expect(items).toHaveLength(2);
+    expect(items.find((item) => item.day === "2026-08-11")?.readable).toBe(false);
+    expect(items.find((item) => item.day === "2026-08-12")?.readable).toBe(true);
+  });
+
+  it("읽다가 예외가 나도 날짜를 잃지 않는다", async () => {
+    const store = memoryStore();
+    await store.save(entryFor("2026-08-12"));
+
+    const throwing: DiaryStore = {
+      ...store,
+      load: async () => {
+        throw new Error("읽을 수 없다");
+      },
+    };
+
+    const items = await listDiaries(throwing);
+
+    expect(items).toEqual([{ day: "2026-08-12", readable: false }]);
   });
 });

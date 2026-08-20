@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 
-import type { DayDate } from "../config/day-boundary";
+import { createAppPipeline } from "../app/wiring";
+import { currentEnvironment } from "../config/environment";
 import type { Character } from "../diary/types";
 import { collectReport } from "../diagnostics/report";
 import type { DiagnosticReport } from "../diagnostics/types";
-import { onDeviceBackend } from "../inference/on-device";
-import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
 import { GenerationProbe } from "./GenerationProbe";
 import { PermissionPanel } from "./PermissionPanel";
@@ -34,17 +33,18 @@ import { SignalProbe } from "./SignalProbe";
 const photoPort = expoPhotoPort();
 
 /**
- * 005 — 생성 어댑터. 화면이 다시 그려질 때마다 새로 만들지 않는다.
+ * 006 — 생성 파이프라인. 화면이 다시 그려질 때마다 새로 만들지 않는다.
  *
- * **`select.ts`를 거치지 않고 온디바이스를 직접 쓰는 것이 아니다** — 진단 화면은 dev
- * 환경에서만 열리고(App.tsx의 `showsOnScreen`), dev에서 허용된 위치는 온디바이스뿐이다
- * (001의 `policy.ts`). 다만 이 화면이 자라 사용자 경로가 되면 그때는 반드시
- * `selectBackend()`를 거쳐야 한다(FR-024).
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **005는 여기서 `onDeviceBackend()`를 직접 만들었고, 그것이 저장이 끊긴 원인이었다.**
+ * 어댑터를 손에 쥐면 파이프라인을 건너뛰게 되고, 그러면 `store.save()`가 돌지 않는다.
+ *
+ * 지금은 **사용자 경로와 같은 `createAppPipeline()`을 쓴다**(006 FR-010a). 진단이라는
+ * 이유로 저장을 건너뛰지 않으므로, 실기기에서 저장이 실제로 도는 것을 눈으로 확인할
+ * 수 있다. 추론 위치도 `select.ts`가 고른다(FR-026).
+ * ─────────────────────────────────────────────────────────────────────────────
  */
-const generationBackend = onDeviceBackend();
-
-/** 005 — 그 하루의 진짜 신호. 004의 수집을 그대로 쓴다 */
-const loadSignals = (day: DayDate) => collectDaySignals(photoPort, day);
+const generation = createAppPipeline(currentEnvironment());
 
 /**
  * 진단에서 생성을 시험할 캐릭터.
@@ -99,11 +99,15 @@ export function DiagnosticsScreen() {
 
       {/* 005 — 일기가 실제로 나오는지 확인한다(quickstart D2). 이것이 없으면
           실기기에서 생성을 눌러 볼 방법이 없다 */}
-      <GenerationProbe
-        backend={generationBackend}
-        loadSignals={loadSignals}
-        character={PROBE_CHARACTER}
-      />
+      {/*
+        조립이 실패하면 생성 패널을 띄우지 않는다 — 환경을 모르는 채로 추론 위치를
+        고를 수 없다(FR-035). 진단 화면이므로 까닭을 그대로 보인다.
+      */}
+      {generation.ok ? (
+        <GenerationProbe pipeline={generation.pipeline} character={PROBE_CHARACTER} />
+      ) : (
+        <Text style={styles.failure}>생성 준비 실패: {generation.detail}</Text>
+      )}
 
       {report.failures.length > 0 && (
         <View style={styles.failures}>

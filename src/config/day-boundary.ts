@@ -77,3 +77,25 @@ export function dayBounds(day: DayDate): { startMs: number; endMs: number } {
 export function isDayClosed(day: DayDate, now: Date): boolean {
   return dayOf(now) > day;
 }
+
+/**
+ * 지금 시점에서 **일기를 쓸 수 있는 가장 최근의 하루**를 구한다 (006 FR-030).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **`dayOf(now)`는 오늘이며 오늘은 정의상 닫히지 않았다.** 그래서 그것을 그대로
+ * 파이프라인에 넘기면 언제나 `day-not-closed`로 멈춘다.
+ *
+ * **이 계산이 여기 있어야 하는 이유**: 「하루 전」을 부르는 쪽에서 빼면 04:00 경계가
+ * 이 파일 밖으로 새어 나간다(FR-021a). 004가 `dayBounds`를 여기 둔 것과 같은 판단이며,
+ * 새는 순간 신호 수집과 일기 생성이 서로 다른 하루를 보게 된다.
+ *
+ * 새벽 02:00에 부르면 그저께가 아니라 **어제**가 나온다 — 02:00은 아직 어제이므로
+ * 그 앞의 하루가 마지막으로 닫힌 하루다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export function latestClosedDay(now: Date): DayDate {
+  const shifted = new Date(now.getTime());
+  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
+  shifted.setDate(shifted.getDate() - 1);
+  return formatDay(shifted);
+}
