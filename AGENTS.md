@@ -104,6 +104,10 @@
   - **조용히 실패하는 것이 이 버그의 성질이다**: 이름도 쓰임새도 맞아 보이고, iOS에서는
     실제로 동작하며, 빌드도 테스트도 통과한다. **안드로이드 화면을 눈으로 봐야 드러난다** —
     006의 실기기 확인이 전부 초록불이었는데도 이것을 놓쳤다.
+  - **고친 뒤 release 빌드로 확인했다** (SM-G986N). 시계·배터리·블루투스가 제 띠에
+    있고 탭은 그 아래에 있다. 목록·상세 둘 다 겹치지 않으며 **아래쪽 제스처 막대도
+    자리를 가진다.** `react-native-safe-area-context`의 네이티브 모듈이 **R8·ProGuard를
+    켠 release에서 동작한다.**
 - **`llama.rn` 0.12.9의 API를 설치본 타입으로 직접 확인했다** (2026-08-17). 쓰는 것은
   `initLlama`·`completion`·`stopCompletion`·`release` 넷이다. **`completion()`의 결과에
   `timings`·`tokens_predicted`·`predicted_per_second`가 들어 있다** — 요청하지 않아도
