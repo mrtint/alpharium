@@ -1,6 +1,7 @@
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { createAppPipeline } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
@@ -32,14 +33,36 @@ import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
  *
  * **캐릭터 준비는 여전히 003의 화면이 한다.** 일기와 캐릭터를 오가는 자리를 여기 둔다 —
  * 화면이 둘뿐이므로 상태 하나로 가른다(research.md §5).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **⚠️ `SafeAreaView`는 `react-native`가 아니라 `react-native-safe-area-context`에서
+ * 온다.**
+ *
+ * 전자는 **iOS 전용이며 안드로이드에서는 아무 일도 하지 않는다.** 그런데 이 앱은
+ * `edgeToEdgeEnabled=true`(gradle.properties)에 상태 표시줄이 투명이라 **화면이 시스템
+ * 막대 아래까지 그려진다** — 그래서 시계·배터리·블루투스 표시와 탭이 겹쳐 보였다.
+ *
+ * **조용히 실패하는 것이 이 버그의 성질이다**: 이름도 쓰임새도 맞아 보이고, iOS에서는
+ * 실제로 동작하며, 빌드도 테스트도 통과한다. 안드로이드에서 눈으로 봐야 드러난다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export default function App() {
+  return (
+    // 인셋을 재는 자리. 이것이 없으면 아래 `SafeAreaView`가 잴 값을 얻지 못한다.
+    <SafeAreaProvider>
+      <AppFrame />
+    </SafeAreaProvider>
+  );
+}
+
+function AppFrame() {
   const environment = currentEnvironment();
   const [tab, setTab] = useState<"diary" | "characters">("diary");
 
   return (
-    <SafeAreaView style={styles.container}>
+    // `edges`를 적어 둔다 — 기본값은 네 변 전부이며, 무엇을 피하는지가 코드에 보이는
+    // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
+    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       {/* 진단은 local·dev에서만. **사용자 경로는 세 환경 전부에서 돈다**(FR-024) */}
       {showsOnScreen(environment) && (
         <ScrollView style={styles.diagnostics}>
