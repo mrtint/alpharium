@@ -172,11 +172,11 @@ Expo 모바일 앱. 저장소 루트에 `src/`·`__tests__/`·`plugins/`·`.maes
 - [X] T039 [US4] 비밀번호를 gitignore된 자리에 둔다. `.gitignore`의 `*.jks`(24행)·`*.env.secret`(36행)가 이미 막는 것을 확인한다 (R2)
 - [X] T040 [US4] `plugins/with-release-signing.js`를 만든다 — `withAppBuildGradle`로 release `signingConfig`를 넣는다. **비밀번호를 plugin에 박지 않는다** (R2, SC-005)
 - [X] T041 [US4] `app.json`의 `expo.plugins`에 `./plugins/with-release-signing`을 등록한다
-- [ ] T042 [US4] `npx expo prebuild --platform android --clean`으로 반영한다. **`--clean`을 건너뛰지 않는다** — 004에서 이것 때문에 권한이 빠진 APK가 설치됐다
+- [X] T042 [US4] `npx expo prebuild --platform android --clean`으로 반영한다. **`--clean`을 건너뛰지 않는다** — 004에서 이것 때문에 권한이 빠진 APK가 설치됐다
 
 ### 확인 (빌드 성공을 믿지 않는다)
 
-- [ ] T043 [US4] `apksigner verify --print-certs`로 debug 인증서(`CN=Android Debug`)가 **아닌지** 확인한다 (R1, SC-004)
+- [X] T043 [US4] `apksigner verify --print-certs`로 debug 인증서(`CN=Android Debug`)가 **아닌지** 확인한다 (R1, SC-004)
 - [X] T044 [US4] `git status`와 `git ls-files | grep -i jks`로 키가 저장소에 없는지 확인한다 (R2, SC-005)
 - [X] T045 [US4] 빌드 절차와 키 두는 자리를 `AGENTS.md`에 적는다 — 다음 사람이 재현할 수 있어야 한다 (FR-006, SC-007)
 

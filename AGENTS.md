@@ -188,6 +188,16 @@
     있어 가능했다. **제 키로 바꾸는 순간 이 경로가 끊긴다**(그래서 서명 키가 먼저다).
   - **⚠️ release는 `run-as`가 안 된다** — `package not debuggable`. 기기 안 파일을
     직접 볼 수 없으므로 **앱 화면으로 확인해야 한다.**
+- **★ 제 서명 키로 빌드했다** (2026-08-20, SM-G986N). `CN=alpharium`이며
+  **`CN=Android Debug`가 아니다**(`apksigner verify --print-certs`). APK의 SHA-256이
+  키스토어 지문과 같다.
+  - **⚠️ 서명이 바뀌면 덮어 설치가 실제로 끊긴다 — 짐작이 아니라 관측이다.**
+    debug 키로 설치돼 있던 앱 위에 제 키 APK를 `adb install -r`로 넣으니
+    **`INSTALL_FAILED_UPDATE_INCOMPATIBLE: signatures do not match`**로 거부됐다.
+    지우고 다시 깔아야 했고 **그때 기기의 일기가 함께 사라졌다.** 006이 서명을
+    먼저 세운 이유가 이것이며, **일기가 하나뿐일 때 치렀으므로 비용이 가장 쌌다.**
+  - **키는 `~/.alpharium-signing/`에 있고 `android/app/`의 것은 사본이다** —
+    `prebuild --clean`이 후자를 지운다(위 「release 빌드와 서명」).
 - **파일 저장이 실기기에서 돈다** (2026-08-13, SM-G986N). `expo-file-system` 57의
   `File`/`Paths`로 저장·조회·덮어쓰기·목록이 동작했고, **`unknown`이 파일 왕복에서
   살아남는 것**까지 확인했다. `write`/`delete`/`create`/`moveSync`는 동기이고 `text()`만
