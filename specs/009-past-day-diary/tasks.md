@@ -255,11 +255,12 @@ T027~T030이 그것을 못 박았다** — 나누지 않은 설계의 값어치�
 > **★ T051(SC-013) 통과 — 어제가 아닌 2026-08-18의 일기가 실제로 만들어져 그 날짜로
 > 저장됐다.** 목록에 뜨고 눌러서 전문까지 읽힌다.
 >
-> **T050(Maestro 자동 흐름)은 돌리지 않았다** — 손으로 D1~D11을 확인했고, 자동 흐름은
-> debug 빌드와 Metro가 필요하다(release에는 진단 화면이 없어 일부 흐름이 실패한다).
-> **건너뛴 것은 통과가 아니므로 미완으로 남긴다.**
+> **★ T050(Maestro 자동 흐름)도 통과했다** (2026-08-21, debug 빌드 + Metro).
+> `.maestro/past-day-diary.yml`이 **전 단계 COMPLETED, 종료 코드 0**이다.
+>
+> **58/58 완료.**
 
-- [ ] T050 debug 빌드로 [quickstart.md](quickstart.md) **B0**(Metro·`adb reverse`·잠금 해제)를 갖추고 `npm run test:device`를 돌린다
+- [X] T050 debug 빌드로 [quickstart.md](quickstart.md) **B0**(Metro·`adb reverse`·잠금 해제)를 갖추고 `npm run test:device`를 돌린다
 - [X] T051 ★ [quickstart.md](quickstart.md) **D3**을 손으로 확인한다 — **어제가 아닌 하루의 일기가 실제로 만들어져 그 날짜로 저장된다**(SC-013). **이것이 완료 조건이다**
 - [X] T052 [P] [quickstart.md](quickstart.md) **D4**(일기가 하나만 는다, SC-002a)와 **D5**(그 하루의 신호다)를 확인한다
 - [X] T053 [P] [quickstart.md](quickstart.md) **D6·D7**을 확인한다 — 덮어쓰기 예고가 뜨고 **그래도 생성이 돈다**(SC-007, 원칙 I)
