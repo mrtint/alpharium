@@ -29,6 +29,9 @@ const FLOWS = [
   ".maestro/generate-diary.yml",
   // 006 — 사용자 경로. **진단 화면을 거치지 않고 일기에 닿는가**를 본다.
   ".maestro/diary-user-path.yml",
+  // 007 — 캐릭터 선택과 그만두기. **누가 쓰는지 고를 수 있는가**와
+  // **30초를 견디고 끊을 수 있는가**를 본다.
+  ".maestro/diary-character-select.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

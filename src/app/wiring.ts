@@ -47,8 +47,34 @@ import type { DaySignals } from "../signals/types";
  * 화면에 표시하지 않는다(원칙 III — 사용자는 추론 위치를 알 필요가 없다).
  */
 export type AppPipelineResult =
-  | { ok: true; pipeline: Pipeline; location: InferenceLocation }
-  | { ok: false; reason: SelectionFailure; detail: string; pipeline?: undefined };
+  | {
+      ok: true;
+      pipeline: Pipeline;
+      location: InferenceLocation;
+      /**
+       * 생성을 끊는 통로 (005 FR-014b, 007 FR-013).
+       *
+       * ─────────────────────────────────────────────────────────────────────
+       * **★ 007이 잇는 끊긴 배선이다.**
+       *
+       * 006까지 이 자리가 없어 `App.tsx`가 화면에 넘길 것이 없었고, 그래서
+       * **005의 끊김 기능이 실기기에서 한 번도 돈 적이 없다.** 「30초라 확인하지
+       * 못했다」가 아니라 배선이 없어 확인할 수 없었던 것이다.
+       *
+       * **옵셔널인 것은 의도다** — 데스크톱 경로에는 끊을 것이 없다(005 FR-025).
+       * 다만 옵셔널이 이 결함을 숨긴 원인이기도 하므로, **온디바이스면 반드시
+       * 있다는 것을 테스트가 검사한다**(007 contracts/selection.md §3).
+       * ─────────────────────────────────────────────────────────────────────
+       */
+      stop?: () => Promise<void>;
+    }
+  | {
+      ok: false;
+      reason: SelectionFailure;
+      detail: string;
+      pipeline?: undefined;
+      stop?: undefined;
+    };
 
 /** 조립에 필요한 통로. 테스트가 기기 없이 갈아끼운다 */
 export type WiringDeps = {
@@ -104,5 +130,9 @@ export function createAppPipeline(
     isModelReady: deps.isModelReady,
   });
 
-  return { ok: true, pipeline, location: located.location };
+  // **backend를 버리지 않는다**(007 §3). 006까지 여기서 버려서 화면이 끊을 길이 없었다.
+  // 데스크톱에는 `stop`이 없으므로 그대로 undefined가 실린다 — 넓히지 않는다(005 FR-025).
+  const stop = selection.backend.stop?.bind(selection.backend);
+
+  return { ok: true, pipeline, location: located.location, stop };
 }

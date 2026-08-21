@@ -111,6 +111,33 @@ const DIRECT_GENERATE = /\b(?:backend|adapter|engine)\s*\.\s*generate\s*\(/;
 const DIRECT_BACKEND_FACTORY = /\b(?:onDeviceBackend|createDesktopServerBackend)\s*\(/;
 
 /**
+ * 화면이 모델 내부에 닿는 것 (007 FR-007·026, 원칙 III).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **화면은 캐릭터만 알아야 하고 모델은 몰라야 한다.**
+ *
+ * 003의 `CharacterListScreen`과 007의 `CharacterPicker`가 `roster.ts`·`ModelAsset`을
+ * import 하지 않는 것으로 이 방어를 세웠다 — **조심해서 안 쓰는 것이 아니라 쓸 수
+ * 없는 것**이 방어이며, 그 성질을 사람의 주의력이 아니라 검사로 지킨다.
+ *
+ * 닿는 순간 자산키·주소·크기·지문에 접근할 수 있고, 그것이 화면에 새면 사용자가
+ * 모델을 역추적할 수 있다.
+ *
+ * **`App.tsx`는 이 검사의 대상이 아니다** — 준비 상태를 읽으려면 `roster.ts`가
+ * 필요하고, 그것은 화면이 아니라 조립이다. 검사 대상은 `src/ui/`뿐이다.
+ *
+ * **⚠️ `models/types`는 막지 않는다.** `ModelReadiness`·`DownloadProgress`는
+ * **「쓸 수 있는가·받는 중인가」이지 모델이 무엇인가가 아니다** — 003의
+ * `CharacterListScreen`이 준비 상태를 그리려면 필요하고, 그것을 막으면 화면이
+ * 상태를 말할 수 없다. 막아야 할 것은 **자산에 닿는 길**이다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const UI_TOUCHES_MODEL = /\bfrom\s+["'][^"']*models\/(?:roster|assets|expo-port|storage)["']/;
+
+/** 자산 자체를 다루는 이름. import 경로를 우회해 닿는 것도 잡는다 */
+const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets)\b/;
+
+/**
  * 소스 파일 하나를 검사한다.
  *
  * **경로로 판단한다.** `src/ui/`와 `src/app/`은 화면과 조립이며, 추론 어댑터를 직접
@@ -140,6 +167,18 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "추론 어댑터 직접 생성 — select.ts를 거쳐야 한다 (006 FR-026, 원칙 I)",
+      });
+    }
+
+    // **화면만 검사한다.** `src/app/`은 조립이므로 준비 상태를 읽을 수 있다.
+    if (
+      normalized.startsWith("src/ui/") &&
+      (UI_TOUCHES_MODEL.test(code) || UI_TOUCHES_ASSET.test(code))
+    ) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "화면이 모델 자산에 닿는다 — 캐릭터만 알아야 한다 (007 FR-007, 원칙 III)",
       });
     }
   }

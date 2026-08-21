@@ -138,3 +138,43 @@ describe("selectBackend — 어댑터 수준의 불변식", () => {
     }
   });
 });
+
+/**
+ * 007 contracts/selection.md §3 — 끊긴 배선 잇기.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **005 FR-014b(앱이 앞을 벗어나면 끊는다)가 실기기에서 한 번도 돈 적이 없었다.**
+ *
+ * `on-device.ts`가 `StoppableBackend`를 만들고 `DiaryHomeScreen`이 `stop?`을 받는데,
+ * **그 사이의 `selectBackend`가 `InferenceBackend`로 좁혀 돌려주어 `stop`이 타입에서
+ * 사라졌다.** 그래서 `App.tsx`가 넘길 것이 없었다.
+ *
+ * **`stop?`이 옵셔널이라 타입 검사가 통과했고**, 화면 테스트는 prop을 직접 주입하므로
+ * 초록불이었다 — 006의 `GenerationProbe`가 파이프라인을 건너뛴 것과 같은 종류의 결함이다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("selectBackend — 끊을 수 있는 어댑터를 좁히지 않는다 (007 §3)", () => {
+  const serverUrl = "http://localhost:8080";
+
+  it("온디바이스 어댑터에는 stop이 있다", () => {
+    const result = selectBackend(resolved("dev"));
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      // **타입에서 사라지지 않아야 한다** — 여기가 배선이 끊겨 있던 자리다.
+      expect(typeof result.backend.stop).toBe("function");
+    }
+  });
+
+  it("local에서 on-device를 고를 때도 stop이 있다", () => {
+    const result = selectBackend(resolved("local"), "on-device", serverUrl);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(typeof result.backend.stop).toBe("function");
+  });
+
+  it("데스크톱 어댑터에는 stop이 없어도 된다(005 FR-025)", () => {
+    // **넓히지 않는다.** 데스크톱에는 끊을 것이 없고 파이프라인이 알 필요가 없다.
+    const result = selectBackend(resolved("local"), "desktop-server", serverUrl);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.backend.stop).toBeUndefined();
+  });
+});

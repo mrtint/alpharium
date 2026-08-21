@@ -1,0 +1,137 @@
+# 실기기 자동 테스트 — 캐릭터 선택과 그만두기 (007)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **이 흐름이 007의 두 P1 스토리를 본다.**
+#
+# 006까지 `App.tsx`가 준비된 것 중 먼저 나오는 하나를 말없이 집었고, 30초 동안
+# 정지한 글자 하나만 있었으며 그만둘 길이 없었다.
+#
+# 검증 항목:
+#   FR-002   누가 쓰는지 화면에 보인다
+#   FR-007   고르는 자리에 모델 정보가 없다        (원칙 III)
+#   FR-010   회전 표시가 돈다
+#   FR-011   진행률·시간·토큰이 없다               (원칙 IV)
+#   FR-010b  단계 이름이 없다                      (원칙 IV)
+#   FR-013   그만둘 수 있다
+#   FR-018   목록에 사진 갈래가 보인다
+#   FR-019   「사진 없음」과 「사진 모름」이 다르다  (원칙 V)
+#   FR-023   쓰게 될 하루가 보인다
+#
+# **여기서 자동화하지 않는 것** — quickstart.md §2-1·§2-2·§6:
+#   선택이 앱 재시작을 넘어 남는가  — Maestro의 앱 재시작으로는 「완전 종료」를
+#                                     대신하기 어렵다. 사람이 확인한다
+#   캐릭터를 지웠을 때 옮겨지는가   — 캐릭터를 실제로 지워야 하며 GB 단위 재내려받기가
+#                                     따른다. 사람이 확인한다
+#   release 빌드에서 도는가         — 빌드가 31분이다. 사람이 확인한다
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# 일기 탭이 첫 화면이다(006 FR-009 유지).
+- assertVisible: "일기"
+- assertVisible: "일기 쓰기"
+
+# ★ FR-002 — **누가 쓰는지 보인다.** 006에는 이 자리가 아예 없었다.
+- assertVisible: "누가 쓸까"
+
+# 다섯 자리가 처음부터 전부 보인다(003 FR-005a를 이어받는다).
+- assertVisible: "quiet"
+- assertVisible: "narrative"
+- assertVisible: "imaginative"
+
+# ★ 헌법 로스터 MUST — `imaginative`는 상상을 섞는다고 알린다(FR-009 예외).
+#
+# **부분 문자열이 아니라 정규식으로 준다**(2026-08-21 실측). `assertVisible: "상상"`은
+# 실패했는데 화면에는 「상상을 섞어 씁니다」가 있었다 — Maestro의 기본 매칭이
+# **텍스트 노드 전체와 맞춰 보기** 때문이다. 006이 `toHaveTextContent`에서 겪은 것과
+# 같은 성질이며(AGENTS.md), 부분 문자열은 정규식으로 준다.
+- assertVisible:
+    text: ".*상상을 섞어.*"
+
+# ★ FR-007·SC-011 — 고르는 자리에 모델 정보가 없다(원칙 III).
+- assertNotVisible: "kanana"
+- assertNotVisible: "exaone"
+- assertNotVisible: "hyperclova"
+- assertNotVisible: "gguf"
+- assertNotVisible: "Q4"
+- assertNotVisible: "GB"
+- assertNotVisible: "파라미터"
+
+# FR-008 — 추천 표시가 없다. 다섯이 같은 자격이다.
+- assertNotVisible: "추천"
+- assertNotVisible: "권장"
+
+# ★ FR-023 — **쓰게 될 하루가 누르기 전에 보인다.**
+#
+# 「YYYY-MM-DD를 쓴다」 꼴이며 **오늘이 아니라 마지막으로 닫힌 하루**다(006 FR-030).
+#
+# **먼저 내려야 보인다**(2026-08-21 실측). 다섯 자리가 화면을 넘기므로 쓰기 자리가
+# 첫 화면의 아래로 밀린다 — 계층에는 있지만 Maestro가 보지 못한다.
+- scrollUntilVisible:
+    element:
+      text: ".*를 쓴다"
+    direction: DOWN
+    timeout: 20000
+
+# ★ FR-018·019 — 목록에 사진 갈래가 보인다(원칙 V).
+#
+# **일기가 없는 기기에서는 목록이 비어 있으므로 이 검사를 건너뛴다** — 없는 것을
+# 있다고 하지 않는다. 있을 때만 본다.
+#
+# ⚠️ **조건을 「일기가 없다」의 부재로 잡는다**(2026-08-21 실측). 처음에 `사진.*`으로
+# 걸었더니 **진단 화면의 「사진 접근」이 걸려** 일기가 없는데도 안쪽이 돌았다 —
+# dev 빌드에는 진단 패널이 함께 떠 있으므로 「사진」이라는 말이 목록 밖에도 있다.
+- runFlow:
+    when:
+      notVisible: "아직 일기가 없다"
+    commands:
+      # 「없음」과 「모름」이 같은 말로 뭉개지지 않았다면 셋 중 하나가 보인다.
+      - assertVisible:
+          text: "사진 (\\d+장|없음|모름)"
+
+# 쓰기를 눌러 본다.
+#
+# **모델이 없으면 「캐릭터를 먼저 준비해야 한다」로 끝나고 그것이 정상이다.**
+- tapOn: "일기 쓰기"
+
+# ★ FR-011·010b — 쓰는 중에 지표도 단계 이름도 없다(원칙 IV).
+#
+# 누른 직후에 본다. 모델이 없으면 즉시 끝나므로 어느 쪽이든 참이어야 한다.
+- assertNotVisible: "%"
+- assertNotVisible: "남음"
+- assertNotVisible: "초 남"
+- assertNotVisible: "토큰"
+- assertNotVisible: "살펴보는"
+- assertNotVisible: "깨우는"
+- assertNotVisible: "단계"
+
+# ★ FR-013 — **그만둘 수 있다.**
+#
+# 쓰는 중이면 「그만두기」가 있어야 하고, 눌러서 목록으로 돌아와야 한다.
+# **005 FR-014b의 끊김이 실기기에서 처음으로 검증되는 자리다** — 006까지 배선이
+# 끊겨 있어 확인할 수 없었다(research.md §3).
+- runFlow:
+    when:
+      visible: "쓰고 있다"
+    commands:
+      - assertVisible: "그만두기"
+      - tapOn: "그만두기"
+      # 10초 안에 목록으로 돌아온다(SC-005).
+      - extendedWaitUntil:
+          visible: "일기 쓰기"
+          timeout: 10000
+      # ★ FR-014a — **거기까지 쓴 글이 화면에 없다.**
+      - assertNotVisible: "쓰고 있다"
+
+# 어떻게 끝나든 「쓰고 있다」가 남아 있지 않다.
+- extendedWaitUntil:
+    notVisible: "쓰고 있다"
+    timeout: 240000
+
+# ★ 원칙 III — 실패가 「할 수 있는 것」으로 옮겨진다(006 S8 유지).
+- assertNotVisible: "되뱉"
+- assertNotVisible: "rejected"
+- assertNotVisible: "unfinished"

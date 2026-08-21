@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
+import { resolveSelection } from "./src/app/selection";
+import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
 import { createAppPipeline } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
@@ -112,39 +114,90 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
   const store = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
   const wiring = useMemo(() => createAppPipeline(environment, { store }), [environment, store]);
 
-  const [character, setCharacter] = useState<Character | null>(null);
+  /** 저장된 선택. 아직 읽지 않았으면 null이며 그것은 「고른 적 없음」과 다르다 */
+  const [stored, setStored] = useState<Character | null>(null);
+  const [ready, setReady] = useState<Character[]>([]);
 
-  // 준비된 캐릭터 하나를 고른다. **고르는 화면은 아직 없다** — 003의 목록이 준비를
-  // 맡고, 일기는 준비된 것 중 하나로 쓴다. 고르는 자리는 다음 기능의 몫이다.
+  const selectionPort = useMemo(() => expoSelectionPort(), []);
+
+  /**
+   * 저장된 선택과 준비 상태를 함께 읽는다 (007 FR-001·003).
+   *
+   * **판정은 여기서 하지 않는다** — 재료만 모아 `resolveSelection()`에 넘긴다.
+   * 그래야 「옮김」 규칙 전체가 기기 없이 검증된다(research.md §7).
+   */
+  const refreshSelection = useCallback(async () => {
+    const [found, saved] = await Promise.all([
+      readyCharacters(),
+      loadSelection(selectionPort).catch(() => null),
+    ]);
+    return { found, saved };
+  }, [selectionPort]);
+
   useEffect(() => {
     let alive = true;
-    void readyCharacter().then((found) => {
-      if (alive) setCharacter(found);
+    void refreshSelection().then(({ found, saved }) => {
+      if (!alive) return;
+      setReady(found);
+      setStored(saved);
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [refreshSelection]);
+
+  // **순수 함수가 판정한다.** 옮겨졌으면 `movedFrom`이 실려 화면이 알린다(FR-005a).
+  const selection = resolveSelection(stored, ready);
+
+  /** 사용자가 고른다. **저장은 그 즉시** — 앱을 껐다 켜도 남는다(FR-003) */
+  const onSelect = useCallback(
+    async (character: Character) => {
+      setStored(character);
+      await saveSelection(selectionPort, character).catch(() => {
+        // 저장하지 못해도 이번 실행 동안은 고른 대로 쓴다. 다음에 다시 고르면 된다.
+      });
+    },
+    [selectionPort],
+  );
 
   return (
     <DiaryHomeScreen
       resolution={environment}
       pipeline={wiring.ok ? wiring.pipeline : undefined}
       store={store}
-      // 준비된 캐릭터가 없으면 파이프라인이 `model-not-ready`로 멈추고, 화면이
-      // 「캐릭터를 먼저 준비해야 한다」로 옮긴다(FR-028).
-      character={character ?? "quiet"}
+      // **★ 007이 잇는 끊긴 배선**(research.md §3). 006까지 이 줄이 없어 005의 끊김
+      // 기능이 실기기에서 한 번도 돈 적이 없다 — 넘길 것이 없었기 때문이다.
+      stop={wiring.stop}
+      // 고른 것이 없으면 파이프라인이 `model-not-ready`로 멈추고, 화면이
+      // 「캐릭터를 먼저 준비해야 한다」로 옮긴다(FR-006, 006 FR-028).
+      selection={selection}
+      characters={CHARACTERS.map((character) => ({
+        character,
+        ready: ready.includes(character),
+      }))}
+      onSelectCharacter={(character) => void onSelect(character)}
       // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
       onGoToCharacters={onGoToCharacters}
     />
   );
 }
 
-/** 준비된 캐릭터 하나를 찾는다. 없으면 null */
-async function readyCharacter(): Promise<Character | null> {
+/**
+ * 준비된 캐릭터를 **전부** 찾는다 (007 FR-001).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 006까지 이 자리가 「먼저 준비된 것 하나」를 돌려주었다.**
+ *
+ * 그래서 사용자는 누가 자기 일기를 썼는지 모르고 바꿀 수도 없었다 — 헌법 원칙 III이
+ * 요구하는 「고르는 행위」가 화면에서 사라져 있었다. 이제 **목록을 주고 고르는 것은
+ * `resolveSelection()`과 사용자가 한다**(FR-008).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+async function readyCharacters(): Promise<Character[]> {
   const ports = expoModelPorts();
   try {
     const state = await readState(ports.metadata);
+    const found: Character[] = [];
     for (const character of CHARACTERS) {
       const asset = assetFor(character);
       const facts = await ports.files.facts(asset.key);
@@ -157,13 +210,13 @@ async function readyCharacter(): Promise<Character | null> {
         paused: pausedFor(state, asset.key),
         hasPartialFile: false,
       });
-      if (readiness.kind === "ready") return character;
+      if (readiness.kind === "ready") found.push(character);
     }
-    return null;
+    return found;
   } catch {
     // 기기 통로가 없는 환경(웹·시뮬레이터). 「없다」가 아니라 모르는 것이므로
     // 준비된 캐릭터를 지어내지 않는다.
-    return null;
+    return [];
   }
 }
 
