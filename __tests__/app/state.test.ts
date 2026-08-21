@@ -488,11 +488,7 @@ describe("writePromptFor (007 §4 검증 표)", () => {
   it("I2 — selectable은 최근이 먼저다", () => {
     const prompt = writePromptFor([], morning);
 
-    expect(prompt.selectable.map((s) => s.day)).toEqual([
-      "2026-08-19",
-      "2026-08-18",
-      "2026-08-17",
-    ]);
+    expect(prompt.selectable.map((s) => s.day)).toEqual(["2026-08-19", "2026-08-18", "2026-08-17"]);
   });
 
   /* ══════════ 009 US2 — 어느 하루에 무엇이 있는가 (계약 §2 10~14번 행) ══════════ */

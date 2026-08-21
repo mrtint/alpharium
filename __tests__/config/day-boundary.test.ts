@@ -11,12 +11,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import {
-  dayOf,
-  isDayClosed,
-  latestClosedDay,
-  selectableDays,
-} from "../../src/config/day-boundary";
+import { dayOf, isDayClosed, latestClosedDay, selectableDays } from "../../src/config/day-boundary";
 
 describe("dayOf — 시각이 속한 하루", () => {
   // contracts/signals.md 「dayOf 검증 표」 6행
