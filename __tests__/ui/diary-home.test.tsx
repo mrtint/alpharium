@@ -281,3 +281,156 @@ describe("고른 것이 없으면 쓰지 않는다 (007 FR-006)", () => {
     expect(screen.queryByText("쓰고 있다")).toBeNull();
   });
 });
+
+/**
+ * 009 — 고른 하루가 파이프라인까지 간다 (contracts/write-prompt.md §4).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 이 저장소가 세 번 놓친 자리다.**
+ *
+ * 006의 `GenerationProbe`(파이프라인을 건너뜀), 007의 끊긴 `stop` 배선, 008의 버려진
+ * 반환값 — **전부 조용히 실패했다.** 오류가 나는 것이 아니라 아무 일도 일어나지
+ * 않을 뿐이었고, 타입 검사도 화면 테스트도 통과했다.
+ *
+ * 009의 같은 자리는 `write()`의 `day:` 한 줄이다. **거기가 `latestClosedDay(at)`로
+ * 남아 있으면 화면에서 하루를 골라도 언제나 어제가 쓰인다** — 그리고 오류는 나지
+ * 않는다. 그래서 **대역 파이프라인이 받은 `day`를 직접 본다.**
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
+  /** `run()`이 받은 입력을 기록하는 대역 */
+  function recordingPipeline(): Pipeline & { days: string[] } {
+    const days: string[] = [];
+    return {
+      days,
+      run: (input) => {
+        days.push(input.day);
+        return Promise.resolve<PipelineResult>({ ok: true, entry, overwrote: false });
+      },
+    };
+  }
+
+  /** 2026-08-20T10:00 기준 고를 수 있는 하루는 [08-19, 08-18, 08-17]이다 */
+  const at = () => new Date("2026-08-20T10:00:00");
+
+  async function renderWith(pipeline: Pipeline) {
+    const store = memoryStore();
+    await render(
+      <DiaryHomeScreen
+        now={at}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={store}
+      />,
+    );
+    return store;
+  }
+
+  it("W-T2. 아무것도 고르지 않으면 마지막으로 닫힌 하루가 간다 (FR-007)", async () => {
+    const pipeline = recordingPipeline();
+    await renderWith(pipeline);
+
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await waitFor(() => expect(pipeline.days).toHaveLength(1));
+
+    expect(pipeline.days[0]).toBe("2026-08-19");
+  });
+
+  /**
+   * **★ W-T1이 이 기능에서 가장 중요한 검증이다.**
+   *
+   * 화면이 하루를 그려도 파이프라인까지 가지 않으면 **아무 일도 일어나지 않고 오류도
+   * 안 난다.** 여기가 실패하면 `write()`의 `day:` 줄을 본다.
+   */
+  it("★ W-T1. 고른 하루가 파이프라인에 그대로 간다 (FR-014·015, W1·W2)", async () => {
+    const pipeline = recordingPipeline();
+    await renderWith(pipeline);
+
+    // 어제가 아닌 하루를 고른다.
+    await userEvent.press(await screen.findByTestId("day-2026-08-17"));
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await waitFor(() => expect(pipeline.days).toHaveLength(1));
+
+    // **어제(08-19)가 아니라 고른 하루(08-17)다.**
+    expect(pipeline.days[0]).toBe("2026-08-17");
+  });
+
+  it("★ W-T1. 한 번 누르면 하루 하나만 간다 (FR-006a, SC-002a)", async () => {
+    const pipeline = recordingPipeline();
+    await renderWith(pipeline);
+
+    await userEvent.press(await screen.findByTestId("day-2026-08-18"));
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await waitFor(() => expect(pipeline.days).toHaveLength(1));
+
+    // **「3일」은 고를 수 있는 하루의 개수이지 일기가 덮는 기간이 아니다.**
+    expect(pipeline.days).toEqual(["2026-08-18"]);
+  });
+
+  /**
+   * **★ W-T4 — 007이 하루 하나에 세운 원칙 I의 검증을 셋으로 넓힌다.**
+   *
+   * 고를 수 있는 하루가 셋이 되면 「이미 있으면 그것을 보여주자」의 유혹도 셋이 된다.
+   */
+  it("★ W-T4. 이미 일기가 있는 하루를 골라도 생성이 실제로 돈다 (FR-019, 원칙 I)", async () => {
+    const pipeline = recordingPipeline();
+    const store = memoryStore();
+    // 그 하루의 일기를 미리 심는다.
+    await store.save({ ...entry, date: "2026-08-17" });
+
+    await render(
+      <DiaryHomeScreen
+        now={at}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={store}
+      />,
+    );
+
+    await userEvent.press(await screen.findByTestId("day-2026-08-17"));
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+
+    // **저장된 것을 대신 보여주지 않는다** — 실제로 생성이 돌았다.
+    await waitFor(() => expect(pipeline.days).toEqual(["2026-08-17"]));
+  });
+
+  /**
+   * **★ W-T3 — 범위 밖은 조용히 쓰이지 않는다**(FR-017).
+   *
+   * 04:00을 넘겨 고른 하루가 범위를 벗어난 상황이다. **말없이 다른 하루를 쓰지
+   * 않고**, 그렇다고 막다른 길에 세우지도 않는다 — 기본값으로 되돌리고 알린다.
+   */
+  it("★ W-T3. 범위 밖 하루를 골라 두면 기본값이 간다 (FR-009·017)", async () => {
+    const pipeline = recordingPipeline();
+    // 「지금」이 하루 뒤로 밀린다 — 고른 08-17이 범위를 벗어난다.
+    let current = new Date("2026-08-20T10:00:00");
+    const store = memoryStore();
+
+    await render(
+      <DiaryHomeScreen
+        now={() => current}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={store}
+      />,
+    );
+
+    await userEvent.press(await screen.findByTestId("day-2026-08-17"));
+
+    // 하루가 지났다 — 이제 고를 수 있는 것은 [08-20, 08-19, 08-18]이다.
+    current = new Date("2026-08-21T10:00:00");
+    // 목록을 다시 그리게 한다.
+    await userEvent.press(await screen.findByTestId("day-2026-08-19"));
+    await userEvent.press(await screen.findByTestId("day-2026-08-19"));
+
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await waitFor(() => expect(pipeline.days).toHaveLength(1));
+
+    // 범위 밖(08-17)이 아니다.
+    expect(pipeline.days[0]).not.toBe("2026-08-17");
+    expect(["2026-08-20", "2026-08-19", "2026-08-18"]).toContain(pipeline.days[0]);
+  });
+});

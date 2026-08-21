@@ -22,7 +22,9 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { SelectionState } from "../app/selection";
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../app/state";
 import type { Character } from "../diary/types";
+import type { DayDate } from "../config/day-boundary";
 import { CharacterPicker } from "./CharacterPicker";
+import { DayPicker } from "./DayPicker";
 
 export type DiaryListScreenProps = {
   items: DiaryListItem[];
@@ -43,6 +45,13 @@ export type DiaryListScreenProps = {
   selection?: SelectionState;
   characters?: readonly { character: Character; ready: boolean }[];
   onSelectCharacter?: (character: Character) => void;
+  /**
+   * 하루를 고른다 (009 FR-006).
+   *
+   * **`onWrite`는 여전히 하루를 받지 않는다** — 고른 하루는 이 화면 밖의 상태이고
+   * 그것을 파이프라인에 넘기는 것도 밖이다(계약 §3 금지).
+   */
+  onSelectDay?: (day: DayDate) => void;
 };
 
 /**
@@ -70,6 +79,7 @@ export function DiaryListScreen({
   selection,
   characters,
   onSelectCharacter,
+  onSelectDay,
 }: DiaryListScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -80,7 +90,7 @@ export function DiaryListScreen({
         <View style={styles.empty}>
           <Text style={styles.emptyTitle}>아직 일기가 없다</Text>
           <Text style={styles.emptyHint}>
-            아래 「일기 쓰기」를 누르면 휴대폰이 어제 하루를 일기로 쓴다.
+            아래에서 하루를 고르고 「일기 쓰기」를 누르면 휴대폰이 그 하루를 일기로 쓴다.
           </Text>
         </View>
       )}
@@ -131,7 +141,25 @@ export function DiaryListScreen({
           </Text>
         )}
 
-        {/* **오늘이 아니라 마지막으로 닫힌 하루다**(FR-023, 006 FR-030) */}
+        {/*
+          **하루를 고르는 자리**(009 FR-006). 「누가 쓸까」 바로 아래에 「언제를 쓸까」가
+          온다 — 둘 다 「누르면 무슨 일이 일어나는가」에 답하므로 한자리에 모인다.
+
+          **판정은 여기서 하지 않는다** — `write`가 이미 정해서 왔다(FR-009d).
+        */}
+        {write !== undefined && (
+          <DayPicker
+            days={write.selectable}
+            // **고를 통로가 없어도 하루 셋은 보인다**(SC-001). 보이는 것과 고를 수
+            // 있는 것을 같은 조건에 묶으면, 배선이 끊겼을 때 **자리가 통째로
+            // 사라져 아무도 눈치채지 못한다** — 007의 끊긴 `stop`이 그랬다.
+            onSelect={onSelectDay ?? (() => {})}
+            revertedFrom={write.revertedFrom}
+            selected={write.day}
+          />
+        )}
+
+        {/* **오늘이 아니라 고른 하루다**(009 FR-008, 006 FR-030) */}
         {write !== undefined && <Text style={styles.willWrite}>{write.day}를 쓴다</Text>}
 
         {/* **덮어쓴다는 것을 누르기 전에 말한다**(FR-024). 사라진 일기는 되돌릴 수 없다 */}

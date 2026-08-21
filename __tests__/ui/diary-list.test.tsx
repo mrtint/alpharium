@@ -14,7 +14,7 @@
 
 import { render, screen, userEvent } from "@testing-library/react-native";
 
-import type { DiaryListItem, PhotoHint } from "../../src/app/state";
+import type { DiaryListItem, PhotoHint, WritePrompt } from "../../src/app/state";
 import { DiaryListScreen } from "../../src/ui/DiaryListScreen";
 
 const readable = (day: string, photos: PhotoHint = { kind: "none" }): DiaryListItem => ({
@@ -30,6 +30,29 @@ const unreadable = (day: string): DiaryListItem => ({
 });
 
 const noop = () => {};
+
+/**
+ * 쓰기 예고를 만든다 (009).
+ *
+ * **`selectable`이 필수가 됐으므로** 007의 테스트들도 이것을 거친다 — 하루 셋이
+ * 없으면 화면이 고를 자리를 그릴 수 없다.
+ */
+function prompt(
+  day: string,
+  overwrites: boolean,
+  extra: { selectable?: readonly { day: string; hasDiary: boolean }[]; revertedFrom?: string } = {},
+): WritePrompt {
+  return {
+    day,
+    overwrites,
+    selectable: extra.selectable ?? [
+      { day: "2026-08-19", hasDiary: false },
+      { day: "2026-08-18", hasDiary: false },
+      { day: "2026-08-17", hasDiary: false },
+    ],
+    ...(extra.revertedFrom !== undefined ? { revertedFrom: extra.revertedFrom } : {}),
+  };
+}
 
 async function renderList(
   items: DiaryListItem[],
@@ -222,7 +245,7 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
         items={[]}
         onOpen={noop}
         onWrite={noop}
-        write={{ day: "2026-08-19", overwrites: false }}
+        write={prompt("2026-08-19", false)}
       />,
     );
 
@@ -235,7 +258,7 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
         items={[readable("2026-08-19")]}
         onOpen={noop}
         onWrite={noop}
-        write={{ day: "2026-08-19", overwrites: true }}
+        write={prompt("2026-08-19", true)}
       />,
     );
 
@@ -248,7 +271,7 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
         items={[]}
         onOpen={noop}
         onWrite={noop}
-        write={{ day: "2026-08-19", overwrites: false }}
+        write={prompt("2026-08-19", false)}
       />,
     );
 
@@ -268,7 +291,7 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
         items={[readable("2026-08-19")]}
         onOpen={noop}
         onWrite={() => (started += 1)}
-        write={{ day: "2026-08-19", overwrites: true }}
+        write={prompt("2026-08-19", true)}
       />,
     );
 
@@ -322,5 +345,274 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
     );
 
     expect(screen.queryByText(/쓸 수 없어/)).toBeNull();
+  });
+});
+
+/**
+ * 009 — 하루를 고른다 (contracts/write-prompt.md §3).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **화면은 그리기만 한다.** 어느 하루를 쓰게 되는지도, 되돌려졌는지도
+ * `writePromptFor()`가 정해서 `write`에 실어 보낸다(FR-009d).
+ *
+ * **보이면 안 되는 것이 보이는 것만큼 중요하다** — 고르는 자리에 사진 갈래를 그리면
+ * **아직 쓰지 않은 하루의 값을 지어내게 된다**(FR-011a).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("009 — 고르는 자리 (V1·V2)", () => {
+  const threeDays = [
+    { day: "2026-08-19", hasDiary: false },
+    { day: "2026-08-18", hasDiary: false },
+    { day: "2026-08-17", hasDiary: false },
+  ];
+
+  it("★ V1. 고를 수 있는 하루 셋이 보인다 (FR-001, SC-001)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-19", false, { selectable: threeDays })}
+      />,
+    );
+
+    for (const { day } of threeDays) {
+      expect(screen.getByTestId(`day-${day}`)).toBeTruthy();
+    }
+  });
+
+  it("★ V2. 하나가 골라진 것으로 표시된다 (FR-007·008)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-18", false, { selectable: threeDays })}
+      />,
+    );
+
+    // 고른 자리에만 표시가 붙는다 — 무엇을 쓰게 되는지가 눌러 보기 전에 보인다.
+    expect(screen.getByTestId("day-2026-08-18")).toHaveTextContent(/고름/);
+    expect(screen.getByTestId("day-2026-08-19")).not.toHaveTextContent(/고름/);
+    expect(screen.getByTestId("day-2026-08-17")).not.toHaveTextContent(/고름/);
+  });
+
+  it("V2. 하루를 누르면 그 하루가 밖으로 전해진다 (FR-006)", async () => {
+    const picked: string[] = [];
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onSelectDay={(day) => picked.push(day)}
+        onWrite={noop}
+        write={prompt("2026-08-19", false, { selectable: threeDays })}
+      />,
+    );
+
+    await userEvent.press(screen.getByTestId("day-2026-08-17"));
+
+    expect(picked).toEqual(["2026-08-17"]);
+  });
+
+  /**
+   * **날짜를 `YYYY-MM-DD` 그대로 적는다**(research §4).
+   *
+   * 「어제·그저께」로 옮기면 **04:00 경계 때문에 달력의 어제와 어긋나는 순간이 생긴다** —
+   * 새벽 02:00에 「어제」가 가리키는 것이 달력의 어제가 아니다.
+   */
+  it("날짜를 그대로 적는다 — 「어제」로 옮기지 않는다 (research §4)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-19", false, { selectable: threeDays })}
+      />,
+    );
+
+    // 날짜가 그대로 보인다.
+    for (const day of ["2026-08-19", "2026-08-18", "2026-08-17"]) {
+      expect(screen.getByTestId(`day-${day}`)).toHaveTextContent(new RegExp(day));
+    }
+
+    const rendered = JSON.stringify(screen.toJSON());
+    for (const relative of ["어제", "그저께", "그끄저께"]) {
+      expect(rendered).not.toContain(relative);
+    }
+  });
+});
+
+/**
+ * 009 US2 — 어느 하루에 무엇이 있는지 보고 고른다 (계약 §3 V3·V4, X1).
+ *
+ * **007이 하루 하나에 대해 세운 규칙을 셋으로 넓힌 것이다.** 온디바이스 생성은
+ * 비싸고 **사라진 일기는 되돌릴 수 없으므로**, 고를 여지가 셋이 되면 잘못 고를
+ * 여지도 셋이 된다.
+ */
+describe("009 US2 — 덮어쓰기 예고 (V3·V4)", () => {
+  const oneHasDiary = [
+    { day: "2026-08-19", hasDiary: true },
+    { day: "2026-08-18", hasDiary: false },
+    { day: "2026-08-17", hasDiary: false },
+  ];
+
+  it("★ V3. 일기가 있는 하루에만 표시가 붙는다 (FR-011)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[readable("2026-08-19")]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-18", false, { selectable: oneHasDiary })}
+      />,
+    );
+
+    expect(screen.getByTestId("day-2026-08-19")).toHaveTextContent(/일기가 있다/);
+    expect(screen.getByTestId("day-2026-08-18")).not.toHaveTextContent(/일기가 있다/);
+    expect(screen.getByTestId("day-2026-08-17")).not.toHaveTextContent(/일기가 있다/);
+  });
+
+  it("★ V4. 고른 하루에 일기가 있으면 덮어쓴다고 알린다 (FR-012, SC-006)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[readable("2026-08-19")]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-19", true, { selectable: oneHasDiary })}
+      />,
+    );
+
+    expect(screen.getByText(/덮어쓴다/)).toBeTruthy();
+  });
+
+  it("★ V4. 일기가 없는 하루를 고르면 예고가 없다 (SC-006)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[readable("2026-08-19")]}
+        onOpen={noop}
+        onWrite={noop}
+        // 다른 하루에 일기가 있어도 고른 하루에 없으면 덮어쓰지 않는다.
+        write={prompt("2026-08-18", false, { selectable: oneHasDiary })}
+      />,
+    );
+
+    expect(screen.queryByText(/덮어쓴다/)).toBeNull();
+  });
+});
+
+/**
+ * 009 — 고르는 자리에 보이면 안 되는 것 (계약 §3 X1~X4).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ X1이 이 기능에서 가장 미묘한 방어다.**
+ *
+ * 목록의 각 줄에는 사진 갈래가 **계속 보인다**(007 FR-018) — 그것은 **이미 쓴 일기**의
+ * 값이라 알려져 있다. 고르는 자리는 **아직 쓰지 않은 하루**라 알 수 없다.
+ *
+ * 같은 화면 안에서 한쪽은 보이고 한쪽은 보이면 안 되는 것이며, **그 차이를 잊으면
+ * 「사진 모름」을 세 줄 그리게 된다** — 그것은 관측이 아니라 지어낸 값이다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("009 — 고르는 자리에 없는 것 (X1~X4)", () => {
+  async function renderPicker() {
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-19", false)}
+      />,
+    );
+  }
+
+  it("★ X1. 고르는 자리에 사진 갈래가 없다 (FR-011a)", async () => {
+    await renderPicker();
+
+    for (const day of ["2026-08-19", "2026-08-18", "2026-08-17"]) {
+      const row = screen.getByTestId(`day-${day}`);
+      expect(row).not.toHaveTextContent(/사진/);
+    }
+  });
+
+  it("X2. 모델 정보가 없다 (FR-020, 원칙 III)", async () => {
+    await renderPicker();
+
+    const rendered = JSON.stringify(screen.toJSON());
+    for (const banned of ["GB", "MB", "gguf", "Q4", "kanana", "exaone", "hyperclovax"]) {
+      expect(rendered).not.toContain(banned);
+    }
+  });
+
+  it("X3. 진행률·시간·토큰·단계 이름이 없다 (FR-018, 원칙 IV)", async () => {
+    await renderPicker();
+
+    const rendered = JSON.stringify(screen.toJSON());
+    for (const banned of ["%", "토큰", "경과", "남은", "초 ", "단계"]) {
+      expect(rendered).not.toContain(banned);
+    }
+  });
+});
+
+/**
+ * 009 US3 — 되돌림 알림 (계약 §3 V5).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **화면이 스스로 판단하지 않는다**(FR-009d). `revertedFrom`을 받아 그릴 뿐이며,
+ * 이전 값과 비교하지 않는다 — 비교하면 같은 규칙이 두 곳에 생긴다.
+ *
+ * 007의 `CharacterPicker`가 `movedFrom`을 받아 그리는 것과 같은 구조다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("009 US3 — 되돌림 알림 (V5)", () => {
+  it("★ V5. 원래 고른 하루와 지금 쓸 하루가 함께 보인다 (FR-009, SC-008)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-19", false, { revertedFrom: "2026-08-16" })}
+      />,
+    );
+
+    // 무엇이 무엇으로 바뀌었는지 둘 다 있어야 사용자가 상황을 안다.
+    const notice = screen.getByText(/쓸 수 없어/);
+    expect(notice).toHaveTextContent(/2026-08-16/);
+    expect(notice).toHaveTextContent(/2026-08-19/);
+  });
+
+  it("★ V5. 되돌리지 않았으면 알림이 없다 (FR-009d)", async () => {
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onWrite={noop}
+        write={prompt("2026-08-19", false)}
+      />,
+    );
+
+    // 바뀌지 않았는데 「바뀌었다」고 알리지 않는다 — 007의 movedFrom과 같은 함정이다.
+    expect(screen.queryByText(/쓸 수 없어/)).toBeNull();
+  });
+
+  /**
+   * **★ 되돌려져도 고를 자리는 그대로다.**
+   *
+   * 알림만 뜨고 자리가 사라지면 사용자는 다시 고를 수 없어 갇힌다 — 008이 고친
+   * 「받는 중인 것이 화면에서 사라져 멈출 수 없던」 결함과 같은 성질이다.
+   */
+  it("★ 되돌려져도 하루 셋을 여전히 고를 수 있다", async () => {
+    const picked: string[] = [];
+    await render(
+      <DiaryListScreen
+        items={[]}
+        onOpen={noop}
+        onSelectDay={(day) => picked.push(day)}
+        onWrite={noop}
+        write={prompt("2026-08-19", false, { revertedFrom: "2026-08-16" })}
+      />,
+    );
+
+    await userEvent.press(screen.getByTestId("day-2026-08-18"));
+
+    expect(picked).toEqual(["2026-08-18"]);
   });
 });
