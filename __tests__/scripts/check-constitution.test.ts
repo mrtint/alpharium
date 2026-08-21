@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { checkEnvFile, checkSourceFile, formatViolations } from "../../scripts/constitution-rules";
 
 /**
@@ -174,5 +177,79 @@ describe("checkSourceFile — 어댑터 직접 사용 (006)", () => {
     );
 
     expect(violations).toHaveLength(0);
+  });
+});
+
+/**
+ * 007 FR-007 — 화면이 모델 자산에 닿는 것을 막는다 (원칙 III).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **「쓸 수 없다」를 사람의 주의력이 아니라 검사로 지킨다.**
+ *
+ * 003의 `CharacterListScreen`과 007의 `CharacterPicker`가 `roster.ts`를 import 하지
+ * 않는 것으로 방어를 세웠는데, **다음 사람이 무심코 넣으면 그 방어가 사라진다.**
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)", () => {
+  it("src/ui가 roster를 import 하면 잡는다", () => {
+    const violations = checkSourceFile(
+      "src/ui/CharacterPicker.tsx",
+      'import { assetFor } from "../models/roster";',
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 III");
+  });
+
+  it("src/ui가 assetFor를 쓰면 잡는다 — 경로를 우회해도 마찬가지다", () => {
+    const violations = checkSourceFile("src/ui/Foo.tsx", "const asset = assetFor(character);");
+
+    expect(violations).toHaveLength(1);
+  });
+
+  it("src/ui가 ModelAsset 타입에 닿으면 잡는다", () => {
+    const violations = checkSourceFile("src/ui/Foo.tsx", "let a: ModelAsset | null = null;");
+
+    expect(violations).toHaveLength(1);
+  });
+
+  /**
+   * **`ModelReadiness`는 막지 않는다.**
+   *
+   * 「쓸 수 있는가」는 모델이 무엇인지가 아니다 — 003의 목록이 준비 상태를 그리려면
+   * 필요하고, 막으면 화면이 상태를 말할 수 없다.
+   */
+  it("준비 상태 타입은 막지 않는다 — 모델 정보가 아니다", () => {
+    const violations = checkSourceFile(
+      "src/ui/CharacterListScreen.tsx",
+      'import type { ModelReadiness } from "../models/types";',
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("src/app은 자산에 닿아도 된다 — 조립이지 화면이 아니다", () => {
+    const violations = checkSourceFile(
+      "src/app/wiring.ts",
+      'import { assetFor } from "../models/roster";',
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("주석에서 설명하는 것은 위반이 아니다", () => {
+    // 왜 쓰지 않는지 설명하는 자리다. 설명이 잡히면 아무도 설명을 쓰지 않는다.
+    const violations = checkSourceFile("src/ui/Foo.tsx", "// assetFor를 쓰지 않는다");
+
+    expect(violations).toEqual([]);
+  });
+
+  it("실제 CharacterPicker는 통과한다", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "src", "ui", "CharacterPicker.tsx"),
+      "utf8",
+    );
+
+    expect(checkSourceFile("src/ui/CharacterPicker.tsx", source)).toEqual([]);
   });
 });
