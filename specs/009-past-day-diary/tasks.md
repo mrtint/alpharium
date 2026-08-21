@@ -249,20 +249,23 @@ T027~T030이 그것을 못 박았다** — 나누지 않은 설계의 값어치�
 
 ### 실기기 검증 (건너뛴 것은 통과가 아니다)
 
-> **⚠️ 기기가 연결되어 있지 않아 T050~T056을 돌리지 못했다** (2026-08-21,
-> `adb devices`가 비어 있다). **건너뛴 것은 통과가 아니므로**(원칙 V) 아래는
-> 전부 미완으로 남긴다 — 기기 없는 검증 791개가 전부 초록불이어도 **온디바이스는
-> 검증되지 않은 상태다.**
+> **✅ release 실기기에서 확인했다** (2026-08-21, SM-G986N, Android 13, **무선 adb**,
+> versionCode=6, `CN=alpharium`).
 >
-> **완료를 선언하려면 최소한 T051(SC-013)이 필요하다.**
+> **★ T051(SC-013) 통과 — 어제가 아닌 2026-08-18의 일기가 실제로 만들어져 그 날짜로
+> 저장됐다.** 목록에 뜨고 눌러서 전문까지 읽힌다.
+>
+> **T050(Maestro 자동 흐름)은 돌리지 않았다** — 손으로 D1~D11을 확인했고, 자동 흐름은
+> debug 빌드와 Metro가 필요하다(release에는 진단 화면이 없어 일부 흐름이 실패한다).
+> **건너뛴 것은 통과가 아니므로 미완으로 남긴다.**
 
 - [ ] T050 debug 빌드로 [quickstart.md](quickstart.md) **B0**(Metro·`adb reverse`·잠금 해제)를 갖추고 `npm run test:device`를 돌린다
-- [ ] T051 ★ [quickstart.md](quickstart.md) **D3**을 손으로 확인한다 — **어제가 아닌 하루의 일기가 실제로 만들어져 그 날짜로 저장된다**(SC-013). **이것이 완료 조건이다**
-- [ ] T052 [P] [quickstart.md](quickstart.md) **D4**(일기가 하나만 는다, SC-002a)와 **D5**(그 하루의 신호다)를 확인한다
-- [ ] T053 [P] [quickstart.md](quickstart.md) **D6·D7**을 확인한다 — 덮어쓰기 예고가 뜨고 **그래도 생성이 돈다**(SC-007, 원칙 I)
-- [ ] T054 [P] [quickstart.md](quickstart.md) **D9·D10·D11**을 확인한다 — 생성 중 화면에 수치 0건, 모델 정보 0건, 시스템 막대와 안 겹침
-- [ ] T055 [quickstart.md](quickstart.md) **B4**로 release 빌드를 만들어 확인한다 — **`versionCode`를 6으로 올린다**(008이 5였다). 서명이 `CN=alpharium`이고 덮어 설치로 **일기가 살아남아야 한다**
-- [ ] T056 release APK에서 [src/ui/DiaryListScreen.tsx](../../src/ui/DiaryListScreen.tsx)의 **고르는 자리가 R8·ProGuard를 넘어 살아남는지** 확인한다 — 007의 화면이 살아남았으므로 같을 것이나 **짐작이다**(research 「남은 미확인」)
+- [X] T051 ★ [quickstart.md](quickstart.md) **D3**을 손으로 확인한다 — **어제가 아닌 하루의 일기가 실제로 만들어져 그 날짜로 저장된다**(SC-013). **이것이 완료 조건이다**
+- [X] T052 [P] [quickstart.md](quickstart.md) **D4**(일기가 하나만 는다, SC-002a)와 **D5**(그 하루의 신호다)를 확인한다
+- [X] T053 [P] [quickstart.md](quickstart.md) **D6·D7**을 확인한다 — 덮어쓰기 예고가 뜨고 **그래도 생성이 돈다**(SC-007, 원칙 I)
+- [X] T054 [P] [quickstart.md](quickstart.md) **D9·D10·D11**을 확인한다 — 생성 중 화면에 수치 0건, 모델 정보 0건, 시스템 막대와 안 겹침
+- [X] T055 [quickstart.md](quickstart.md) **B4**로 release 빌드를 만들어 확인한다 — **`versionCode`를 6으로 올린다**(008이 5였다). 서명이 `CN=alpharium`이고 덮어 설치로 **일기가 살아남아야 한다**
+- [X] T056 release APK에서 [src/ui/DiaryListScreen.tsx](../../src/ui/DiaryListScreen.tsx)의 **고르는 자리가 R8·ProGuard를 넘어 살아남는지** 확인한다 — 007의 화면이 살아남았으므로 같을 것이나 **짐작이다**(research 「남은 미확인」)
 
 ### 관측을 남긴다 (원칙 V)
 
