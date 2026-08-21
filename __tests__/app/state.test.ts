@@ -13,7 +13,7 @@ import { join } from "node:path";
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { latestClosedDay } from "../../src/config/day-boundary";
+import { isDayClosed, latestClosedDay } from "../../src/config/day-boundary";
 import {
   afterGeneration,
   initialScreen,
@@ -415,6 +415,302 @@ describe("writePromptFor (007 §4 검증 표)", () => {
     expect(before.day).toBe("2026-08-18");
     expect(after.day).toBe("2026-08-19");
   });
+
+  /* ═══════════════ 009 — 하루를 고른다 (contracts/write-prompt.md §2) ═══════════════ */
+
+  /**
+   * 지금이 2026-08-20T10:00이면 고를 수 있는 하루는 `[08-19, 08-18, 08-17]`이다.
+   * 아래 표는 계약 §2의 검증 표를 그대로 옮긴 것이다.
+   */
+
+  it("009-1. 고른 적이 없으면 마지막으로 닫힌 하루다 (FR-007)", () => {
+    const prompt = writePromptFor([], morning, null);
+
+    expect(prompt.day).toBe("2026-08-19");
+    expect(prompt.revertedFrom).toBeUndefined();
+  });
+
+  it("★ 009-3. 고른 하루가 쓰인다 (FR-006)", () => {
+    const prompt = writePromptFor([], morning, "2026-08-17");
+
+    // **어제가 아닌 하루다.** 이것이 이 기능의 전부다.
+    expect(prompt.day).toBe("2026-08-17");
+    expect(prompt.revertedFrom).toBeUndefined();
+  });
+
+  it("009-4. 고른 하루에 일기가 있으면 덮어쓴다 (FR-012)", () => {
+    const prompt = writePromptFor([readable("2026-08-17")], morning, "2026-08-17");
+
+    expect(prompt.day).toBe("2026-08-17");
+    expect(prompt.overwrites).toBe(true);
+  });
+
+  /**
+   * **★ 009-5 — 덮어쓰기는 「고른 하루」를 따른다.**
+   *
+   * 007의 `items.some(...)`이 하루 하나를 볼 때 성립하던 것이 셋에서도 성립해야
+   * 한다. 다른 하루에 일기가 있는 것은 무관하다 — 무관하지 않게 되면 화면이
+   * 엉뚱한 하루의 덮어쓰기를 예고한다.
+   */
+  it("★ 009-5. 다른 하루에 일기가 있어도 고른 하루에 없으면 덮어쓰지 않는다", () => {
+    const prompt = writePromptFor([readable("2026-08-19")], morning, "2026-08-17");
+
+    expect(prompt.day).toBe("2026-08-17");
+    expect(prompt.overwrites).toBe(false);
+  });
+
+  /* ───────────────── 불변식 I1·I2 (data-model §5) ───────────────── */
+
+  /**
+   * **★ I1이 FR-017의 방어다.**
+   *
+   * 범위 밖 하루가 생성으로 갈 통로가 없다는 것이 이 한 줄에 걸려 있다.
+   * 파이프라인에 `day-too-old` 갈래를 더하지 않은 이유이기도 하다(research §5) —
+   * **넘길 하루가 여기서만 오면 범위 밖 값이 만들어질 자리가 없다.**
+   */
+  it("★ I1 — prompt.day는 언제나 selectable의 원소다 (FR-017)", () => {
+    const chosen = [null, "2026-08-19", "2026-08-17", "2026-08-01", "2026-08-20", "2099-01-01"];
+    const nows = ["2026-08-20T10:00:00", "2026-08-20T03:59:00", "2026-01-01T12:00:00"];
+
+    for (const iso of nows) {
+      for (const day of chosen) {
+        const prompt = writePromptFor([], new Date(iso), day);
+        expect(prompt.selectable.map((s) => s.day)).toContain(prompt.day);
+      }
+    }
+  });
+
+  it("I2 — selectable은 언제나 셋이다 (FR-001)", () => {
+    expect(writePromptFor([], morning).selectable).toHaveLength(3);
+    expect(writePromptFor([], morning, "2026-08-17").selectable).toHaveLength(3);
+  });
+
+  it("I2 — selectable은 최근이 먼저다", () => {
+    const prompt = writePromptFor([], morning);
+
+    expect(prompt.selectable.map((s) => s.day)).toEqual(["2026-08-19", "2026-08-18", "2026-08-17"]);
+  });
+
+  /* ══════════ 009 US2 — 어느 하루에 무엇이 있는가 (계약 §2 10~14번 행) ══════════ */
+
+  it("009-10. 일기가 하나도 없으면 셋 다 hasDiary가 false다 (FR-011)", () => {
+    const prompt = writePromptFor([], morning);
+
+    expect(prompt.selectable.every((entry) => !entry.hasDiary)).toBe(true);
+  });
+
+  it("009-11. 있는 하루만 hasDiary가 true다 (FR-011)", () => {
+    const prompt = writePromptFor([readable("2026-08-18")], morning);
+
+    expect(prompt.selectable).toEqual([
+      { day: "2026-08-19", hasDiary: false },
+      { day: "2026-08-18", hasDiary: true },
+      { day: "2026-08-17", hasDiary: false },
+    ]);
+  });
+
+  /**
+   * **★ 009-12 — 셋 다 있어도 고를 자리가 사라지지 않는다**(spec Edge Cases).
+   *
+   * 「전부 썼으니 고를 것이 없다」로 자리를 접으면 **다시 쓰고 싶은 사용자가 막힌다** —
+   * 덮어쓰기는 금지된 것이 아니라 알려야 하는 것이다.
+   */
+  it("★ 009-12. 셋 다 일기가 있어도 자리가 사라지지 않는다", () => {
+    const prompt = writePromptFor(
+      [readable("2026-08-19"), readable("2026-08-18"), readable("2026-08-17")],
+      morning,
+    );
+
+    expect(prompt.selectable).toHaveLength(3);
+    expect(prompt.selectable.every((entry) => entry.hasDiary)).toBe(true);
+    expect(prompt.overwrites).toBe(true);
+  });
+
+  it("009-13. 범위 밖의 일기는 selectable에 나타나지 않는다 (FR-001)", () => {
+    const prompt = writePromptFor([readable("2026-08-01")], morning);
+
+    expect(prompt.selectable.map((entry) => entry.day)).not.toContain("2026-08-01");
+    expect(prompt.selectable.every((entry) => !entry.hasDiary)).toBe(true);
+  });
+
+  /**
+   * **★ 009-14 — 읽을 수 없는 일기도 그 하루를 차지한다**(원칙 V).
+   *
+   * 읽지 못할 뿐 파일은 있다. 「없다」로 다루면 **조용히 덮어쓰게 된다** — 007이
+   * 하루 하나에 대해 세운 규칙이 셋에서도 그대로다.
+   */
+  it("★ 009-14. 읽을 수 없는 일기도 hasDiary다 (원칙 V)", () => {
+    const prompt = writePromptFor([unreadable("2026-08-18")], morning, "2026-08-18");
+
+    expect(prompt.selectable[1]).toEqual({ day: "2026-08-18", hasDiary: true });
+    expect(prompt.overwrites).toBe(true);
+  });
+
+  /**
+   * **I5 — 같은 답이 두 곳에서 갈리지 않는다.**
+   *
+   * `overwrites`는 `selectable`에서 골라낼 수 있는데도 따로 싣는다 — 화면이 골라내게
+   * 하면 같은 규칙이 두 곳에 생긴다. 그래서 **둘이 언제나 일치해야 한다.**
+   */
+  it("I5 — overwrites는 고른 하루의 hasDiary와 언제나 같다", () => {
+    const stored = [readable("2026-08-19"), unreadable("2026-08-17")];
+
+    for (const chosen of [null, "2026-08-19", "2026-08-18", "2026-08-17", "2026-01-01"]) {
+      const prompt = writePromptFor(stored, morning, chosen);
+      const entry = prompt.selectable.find((s) => s.day === prompt.day);
+
+      expect(prompt.overwrites).toBe(entry?.hasDiary);
+    }
+  });
+
+  /* ═══════ 009 US3 — 범위 밖은 되돌리고 알린다 (계약 §2 6~9번 행, I4) ═══════ */
+
+  /**
+   * **★ 009-6이 이 표의 핵심이다.**
+   *
+   * 쓰기 자리를 열어 둔 채 04:00을 넘겨 고른 하루가 범위를 벗어난 상황이다.
+   * **말없이 기본값을 쓰지 않고 되돌렸다는 것을 실어 보낸다** — 조용히 바꾸면
+   * 사용자는 엉뚱한 하루의 일기를 얻고 그 이유를 알 방법이 없다.
+   */
+  it("★ 009-6. 범위 밖을 골라 두면 기본값으로 되돌리고 알린다 (FR-009)", () => {
+    const prompt = writePromptFor([], morning, "2026-08-16");
+
+    expect(prompt.day).toBe("2026-08-19");
+    expect(prompt.revertedFrom).toBe("2026-08-16");
+  });
+
+  it("009-7. 되돌린 하루에 일기가 있으면 덮어쓰기도 함께 알린다", () => {
+    const prompt = writePromptFor([readable("2026-08-19")], morning, "2026-08-16");
+
+    expect(prompt.day).toBe("2026-08-19");
+    expect(prompt.revertedFrom).toBe("2026-08-16");
+    expect(prompt.overwrites).toBe(true);
+  });
+
+  /**
+   * **★ 009-8 — 오늘도 범위 밖과 같이 다뤄진다**(FR-002).
+   *
+   * 화면에서 고를 수 없지만 **판정은 그것에 기대지 않는다** — 화면만 막고 아래는
+   * 뚫려 있는 것이 이 저장소가 세 번 겪은 결함이다.
+   */
+  it("★ 009-8. 오늘을 골라 두어도 되돌린다 (FR-002·009)", () => {
+    // morning은 2026-08-20T10:00이므로 오늘은 2026-08-20이다.
+    const prompt = writePromptFor([], morning, "2026-08-20");
+
+    expect(prompt.day).toBe("2026-08-19");
+    expect(prompt.revertedFrom).toBe("2026-08-20");
+  });
+
+  /**
+   * **★ 009-9가 6번만큼 중요하다.**
+   *
+   * 고른 것이 마침 기본값과 같을 때 `revertedFrom`이 붙으면 **바뀌지 않았는데
+   * 「바뀌었다」고 알리게 된다.** 007의 `movedFrom`이 같은 함정을 가졌고,
+   * `resolveSelection()`의 1번 행이 그것을 막았다.
+   */
+  it("★ 009-9. 고른 것이 기본값과 같으면 되돌림을 알리지 않는다 (FR-009d)", () => {
+    const prompt = writePromptFor([], morning, "2026-08-19");
+
+    expect(prompt.day).toBe("2026-08-19");
+    expect(prompt).not.toHaveProperty("revertedFrom");
+  });
+
+  it("009-9. 유효한 하루를 고르면 되돌림이 없다", () => {
+    for (const day of ["2026-08-19", "2026-08-18", "2026-08-17"]) {
+      expect(writePromptFor([], morning, day)).not.toHaveProperty("revertedFrom");
+    }
+  });
+
+  it("009. 고른 적이 없으면 되돌림도 없다 (FR-007)", () => {
+    // 기본값을 쓰는 것은 되돌린 것이 아니다 — 되돌릴 선택 자체가 없었다.
+    expect(writePromptFor([], morning)).not.toHaveProperty("revertedFrom");
+    expect(writePromptFor([], morning, null)).not.toHaveProperty("revertedFrom");
+  });
+
+  /**
+   * **I4 — 되돌리지 않았는데 「되돌렸다」고 알리지 않는다.**
+   */
+  it("★ I4 — revertedFrom은 day와 다르고 selectable에 없다", () => {
+    const chosen = ["2026-08-16", "2026-08-20", "2026-01-01", "2099-12-31"];
+
+    for (const day of chosen) {
+      const prompt = writePromptFor([], morning, day);
+
+      expect(prompt.revertedFrom).toBe(day);
+      expect(prompt.revertedFrom).not.toBe(prompt.day);
+      expect(prompt.selectable.map((s) => s.day)).not.toContain(prompt.revertedFrom);
+    }
+  });
+
+  /**
+   * **★ FR-009c — 알림은 다시 고를 때까지 남는다.**
+   *
+   * **지우는 코드가 없다.** 판정이 매번 다시 도므로(FR-009a) 고른 하루가 범위 밖인
+   * 동안 계속 실려 나오고, 사용자가 유효한 하루를 고르면 **그 순간 사라진다.**
+   */
+  it("★ FR-009c — 같은 상태를 다시 물어도 알림이 남는다", () => {
+    const first = writePromptFor([], morning, "2026-08-16");
+    const again = writePromptFor([], morning, "2026-08-16");
+
+    // 한 번 보이고 사라지지 않는다 — 판정은 상태를 갖지 않는다.
+    expect(first.revertedFrom).toBe("2026-08-16");
+    expect(again.revertedFrom).toBe("2026-08-16");
+  });
+
+  it("★ FR-009c — 다시 고르면 그 순간 사라진다", () => {
+    expect(writePromptFor([], morning, "2026-08-16").revertedFrom).toBe("2026-08-16");
+    // 사용자가 유효한 하루를 골랐다.
+    expect(writePromptFor([], morning, "2026-08-18")).not.toHaveProperty("revertedFrom");
+  });
+
+  /**
+   * **★ 04:00을 넘기면 같은 선택이 범위 밖이 된다** — US3의 실제 상황이다.
+   *
+   * 실기기에서는 04:00을 기다려야 해서 확인하기 어렵고(기기 날짜를 못 바꾼다),
+   * **그래서 이 테스트가 이 갈래의 주된 검증이다**(quickstart B3).
+   */
+  it("★ 04:00을 넘기면 같은 선택이 되돌려진다 (US3의 실제 상황)", () => {
+    const chosen = "2026-08-17";
+
+    // 03:59 — 고를 수 있는 하루는 [08-18, 08-17, 08-16]이다.
+    const before = writePromptFor([], new Date("2026-08-20T03:59:00"), chosen);
+    expect(before.day).toBe(chosen);
+    expect(before).not.toHaveProperty("revertedFrom");
+
+    // 04:00 — [08-19, 08-18, 08-17]로 밀렸고 08-17은 아직 살아 있다.
+    const after = writePromptFor([], new Date("2026-08-20T04:00:00"), chosen);
+    expect(after.day).toBe(chosen);
+
+    // 하루 더 지나면 08-17이 범위를 벗어난다.
+    const later = writePromptFor([], new Date("2026-08-21T04:00:00"), chosen);
+    expect(later.day).toBe("2026-08-20");
+    expect(later.revertedFrom).toBe(chosen);
+  });
+
+  /**
+   * **I3 — selectable의 모든 하루가 닫혀 있다**(FR-002).
+   *
+   * 오늘이 섞이면 그것을 고른 사용자는 파이프라인의 `day-not-closed`에 막혀
+   * 아무것도 할 수 없다 — 화면이 고를 수 없는 것을 내민 셈이다.
+   */
+  it("★ I3 — selectable에 오늘이 섞이지 않는다 (FR-002)", () => {
+    const nows = [
+      "2026-08-20T10:00:00",
+      "2026-08-20T04:00:00",
+      "2026-08-20T03:59:00",
+      "2026-08-20T00:30:00",
+      "2026-03-01T05:00:00",
+    ];
+
+    for (const iso of nows) {
+      const now = new Date(iso);
+      const prompt = writePromptFor([], now);
+
+      for (const entry of prompt.selectable) {
+        expect(isDayClosed(entry.day, now)).toBe(true);
+      }
+    }
+  });
 });
 
 /**
@@ -477,5 +773,116 @@ describe("옮김 알림이 값으로 전해진다 (FR-005a, SC-003a)", () => {
     const state = resolveSelection("quiet", ["quiet"]);
 
     expect(state).not.toHaveProperty("movedFrom");
+  });
+});
+
+/**
+ * 009 — 타입이 곧 방어다 (data-model.md §2·§5, contracts/write-prompt.md §2).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 007의 교훈을 그대로 쓴다.**
+ *
+ * `AppScreen`에 `stage: string`을 주입했더니 **jest 38개가 전부 통과했다** — 타입은
+ * 지워지므로 런타임 검사로는 보이지 않는다. **잡은 것은 `tsc`뿐이었다.**
+ *
+ * 그래서 `WritePrompt`도 **선언을 직접 읽어** 검사한다. 고를 수 있는 하루가 셋이
+ * 되면 「진행률을 여기 담자」·「캐릭터도 싣자」의 유혹이 생기는데, **자리가 없으면
+ * 담을 수 없다.**
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("★ 009 I6·I7 — 담을 자리가 없다", () => {
+  const stateSource = () =>
+    readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
+
+  /** 주석을 걷어낸다 — 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다(008의 교훈) */
+  function withoutComments(code: string): string {
+    return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  }
+
+  /** `WritePrompt` 선언의 본문만 잘라낸다 */
+  function writePromptBody(): string {
+    const source = withoutComments(stateSource());
+    const start = source.indexOf("export type WritePrompt");
+    expect(start).toBeGreaterThanOrEqual(0);
+
+    const open = source.indexOf("{", start);
+    const close = source.indexOf("};", open);
+    expect(close).toBeGreaterThan(open);
+
+    return source.slice(open + 1, close);
+  }
+
+  /**
+   * **I6 — 필드가 정확히 넷이다** (data-model §5).
+   *
+   * `day`·`overwrites`·`selectable`·`revertedFrom` 뿐이다. 진행률·경과 시간·토큰·
+   * 캐릭터·본문이 들어올 자리가 없다(원칙 IV·III·I).
+   */
+  it("★ I6 — WritePrompt의 필드가 정확히 넷이다", () => {
+    const body = writePromptBody();
+    const fields = body
+      .split(";")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => line.split(/[?:]/)[0].trim());
+
+    expect(fields.sort()).toEqual(["day", "overwrites", "revertedFrom", "selectable"]);
+  });
+
+  it("★ I6 — 진행률·시간·토큰·모델·본문을 담을 자리가 없다 (원칙 IV·III·I)", () => {
+    const body = writePromptBody();
+
+    for (const banned of [
+      "elapsed",
+      "progress",
+      "percent",
+      "token",
+      "stage",
+      "character",
+      "model",
+      "entry",
+      "text",
+      "preview",
+      "photos",
+    ]) {
+      expect(body.toLowerCase()).not.toContain(banned);
+    }
+  });
+
+  /**
+   * **I7 — 007이 세운 원칙 I의 방어가 유지된다.**
+   *
+   * 고를 수 있는 하루가 셋이 되면 「이미 있으면 그것을 보여주자」의 유혹도 셋이 된다.
+   * `toWriting()`이 저장 상태를 **볼 수 없으므로** 그것으로 갈릴 수 없다(FR-013).
+   */
+  it("★ I7 — toWriting은 여전히 인자를 받지 않는다 (원칙 I)", () => {
+    expect(toWriting.length).toBe(0);
+    expect(Object.keys(toWriting())).toEqual(["kind"]);
+  });
+
+  /**
+   * **`SelectableDay`도 둘뿐이다**(data-model §1).
+   *
+   * 사진 갈래를 넣으면 **아직 쓰지 않은 하루의 값을 지어내게 된다**(FR-011a) —
+   * 그 값은 신호를 수집해야 나오고, 수집하려면 범위 밖의 기록 계층을 열어야 한다.
+   */
+  it("★ SelectableDay의 필드가 정확히 둘이다 (FR-011a)", () => {
+    const source = withoutComments(stateSource());
+    const start = source.indexOf("export type SelectableDay");
+    expect(start).toBeGreaterThanOrEqual(0);
+
+    const open = source.indexOf("{", start);
+    const close = source.indexOf("};", open);
+    const body = source.slice(open + 1, close);
+
+    const fields = body
+      .split(";")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => line.split(/[?:]/)[0].trim());
+
+    expect(fields.sort()).toEqual(["day", "hasDiary"]);
+    // 사진 갈래가 들어올 자리가 없다.
+    expect(body).not.toContain("PhotoHint");
   });
 });

@@ -20,7 +20,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { latestClosedDay, type DayDate } from "../config/day-boundary";
+import { selectableDays, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
 import type { DiaryEntry } from "../diary/types";
@@ -85,10 +85,50 @@ export type AppScreen =
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export type WritePrompt = {
-  /** 쓰게 될 하루. **오늘이 아니라 마지막으로 닫힌 하루다**(006 FR-030) */
+  /**
+   * 쓰게 될 하루. **`selectable` 안에 반드시 있다**(009 불변식 I1).
+   *
+   * 006에서는 언제나 마지막으로 닫힌 하루였고, 009부터는 **사용자가 고른 하루**다.
+   */
   day: DayDate;
   /** 그 하루에 이미 일기가 있는가 — 누르면 덮어쓴다(FR-024) */
   overwrites: boolean;
+  /** 고를 수 있는 하루들. 최근이 먼저다(009 FR-001) */
+  selectable: readonly SelectableDay[];
+  /**
+   * 되돌려졌으면 **사용자가 원래 고른 하루**(009 FR-009).
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **별도 갈래가 아니라 사실이다**(FR-009d) — 007의 `movedFrom`과 같은 모양이며
+   * 같은 이유다. 화면이 스스로 이전 값과 비교해 판단하면 같은 규칙이 두 곳에 생긴다.
+   *
+   * **지우는 코드가 없다.** 판정이 매번 다시 도므로(FR-009a) 고른 하루가 범위 밖인
+   * 동안 계속 실려 나오고, **사용자가 다시 고르면 그 순간 사라진다**(FR-009c).
+   * 008이 「거부 안내가 아직 참인가」를 매번 다시 물어 타이밍 버그를 없앤 것과 같다.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  revertedFrom?: DayDate;
+};
+
+/**
+ * 고를 수 있는 하루 하나 (009 FR-001·011, data-model.md §1).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **필드가 둘뿐인 것이 FR-011a의 방어다.**
+ *
+ * 사진 갈래(`PhotoHint`)를 넣지 않는다 — **아직 쓰지 않은 하루의 그 값은 지금 알 수
+ * 없다.** 신호를 수집해야 나오고, 수집하려면 고르는 화면이 세 하루를 미리 훑어야
+ * 하는데 그것은 이 기능의 범위 밖인 기록 계층을 여는 일이다.
+ *
+ * **목록의 줄과 다른 점이 여기다.** `DiaryListItem`에는 사진 갈래가 실린다 — 그것은
+ * **이미 쓴 일기**의 값이라 알려져 있다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export type SelectableDay = {
+  /** 그 하루 (`YYYY-MM-DD`) */
+  day: DayDate;
+  /** 그 하루에 일기가 이미 있는가 — 고르면 덮어쓴다(FR-011) */
+  hasDiary: boolean;
 };
 
 /**
@@ -97,9 +137,43 @@ export type WritePrompt = {
  * **「지금」을 인자로 받는다**(002 FR-018a). 안에서 `new Date()`를 부르면 04:00
  * 경계값을 테스트할 수 없다.
  */
-export function writePromptFor(items: readonly DiaryListItem[], now: Date): WritePrompt {
-  const day = latestClosedDay(now);
-  return { day, overwrites: items.some((item) => item.day === day) };
+export function writePromptFor(
+  items: readonly DiaryListItem[],
+  now: Date,
+  chosenDay?: DayDate | null,
+): WritePrompt {
+  // **04:00도 「사흘」도 여기서 계산하지 않는다**(009 FR-003·004). 하루 경계를 아는
+  // 자리는 `day-boundary.ts` 하나여야 한다.
+  const days = selectableDays(now);
+
+  // **추가 읽기가 0이다**(FR-011b). 「그 하루에 일기가 있는가」는 이미 읽은 목록에서
+  // 나온다 — 읽을 수 없는 일기도 그 하루를 차지한다(원칙 V, 007에서 세운 규칙).
+  const selectable: SelectableDay[] = days.map((day) => ({
+    day,
+    hasDiary: items.some((item) => item.day === day),
+  }));
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // **★ 매번 다시 묻는다**(FR-009a). 되돌림을 상태로 저장했다가 지우지 않는다 —
+  // 지우는 시점을 관리하는 순간 **기기에서만 보이는 타이밍 버그**가 들어온다.
+  // 008이 「거부 안내가 아직 참인가」를 매번 다시 물어 같은 종류를 막았다.
+  //
+  // **저장할 것이 없으면 지울 것도 없다.**
+  // ───────────────────────────────────────────────────────────────────────────
+  const chosenIsValid = chosenDay != null && days.includes(chosenDay);
+  const day = chosenIsValid ? chosenDay : days[0];
+
+  // **고른 것이 마침 기본값과 같으면 붙지 않는다**(계약 §2 9번 행). 007의
+  // `movedFrom`이 같은 함정을 가졌다 — 바뀌지 않았는데 「바뀌었다」고 알리는 것.
+  const reverted = chosenDay != null && !chosenIsValid;
+
+  return {
+    day,
+    // **덮어쓰기는 「고른 하루」를 따른다**(I5). 다른 하루에 일기가 있는 것은 무관하다.
+    overwrites: selectable.find((entry) => entry.day === day)?.hasDiary ?? false,
+    selectable,
+    ...(reverted ? { revertedFrom: chosenDay } : {}),
+  };
 }
 
 /**

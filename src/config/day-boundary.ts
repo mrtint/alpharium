@@ -30,6 +30,18 @@ export type DayDate = string;
  */
 const DAY_STARTS_AT_HOUR = 4;
 
+/**
+ * 고를 수 있는 하루의 개수 (009 FR-003).
+ *
+ * **이 값은 여기에만 있다.** `DAY_STARTS_AT_HOUR`와 같은 이유이며 같은 자리다 —
+ * 화면도 테스트도 3을 직접 적지 않고 `selectableDays()`가 돌려준 것의 길이로 안다.
+ * 밖으로 내보내지 않으므로 **부르는 쪽이 이 값을 알 방법이 없다.**
+ *
+ * **「3일」은 고를 수 있는 하루의 개수이지 일기 하나가 덮는 기간이 아니다**
+ * (009 FR-006a). 일기는 여전히 하루에 하나이고 그 하루만 쓴다.
+ */
+const SELECTABLE_DAY_COUNT = 3;
+
 /** Date를 기기 시간대 기준 `YYYY-MM-DD`로 만든다. UTC로 바꾸지 않는다. */
 function formatDay(date: Date): DayDate {
   const year = String(date.getFullYear()).padStart(4, "0");
@@ -98,4 +110,37 @@ export function latestClosedDay(now: Date): DayDate {
   shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
   shifted.setDate(shifted.getDate() - 1);
   return formatDay(shifted);
+}
+
+/**
+ * 지금 시점에서 **고를 수 있는 하루들**을 구한다 (009 FR-001).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `latestClosedDay(now)`에서 시작해 하루씩 거슬러 셋이며, **가장 최근이 먼저다.**
+ *
+ * **이 계산이 여기 있어야 하는 이유는 `latestClosedDay()`와 같다.** 「사흘」을
+ * 구하려면 하루씩 빼야 하고 하루의 시작은 04:00이다 — 부르는 쪽에서 `setDate(-1)`을
+ * 하면 **04:00이 이 파일 밖으로 새어 나간다**(FR-004). 004가 `dayBounds()`를 여기
+ * 둔 것과 같은 판단이며, 새는 순간 신호 수집과 일기 생성이 서로 다른 하루를 본다.
+ *
+ * **범위 크기를 인자로 받지 않는다**(FR-003). 받으면 부르는 쪽이 3을 알게 되고
+ * 그 순간 값이 두 곳에 생긴다 — `dayBounds()`에 04:00을 넘기지 않는 것과 같다.
+ *
+ * **오늘은 들어오지 않는다**(FR-002). 시작점이 `latestClosedDay()`이므로 전부 닫힌
+ * 하루이며, 그것이 불변식 D3이다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export function selectableDays(now: Date): readonly DayDate[] {
+  const shifted = new Date(now.getTime());
+  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
+
+  const days: DayDate[] = [];
+  for (let back = 1; back <= SELECTABLE_DAY_COUNT; back += 1) {
+    const day = new Date(shifted.getTime());
+    // **원본에서 매번 빼는 것이 중요하다.** 누적해서 빼면 서머타임 등으로 시각이
+    // 밀렸을 때 오차가 쌓인다. 월·연 되돌림은 Date가 처리한다.
+    day.setDate(day.getDate() - back);
+    days.push(formatDay(day));
+  }
+  return days;
 }

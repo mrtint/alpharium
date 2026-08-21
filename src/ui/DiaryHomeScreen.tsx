@@ -40,7 +40,7 @@ import {
   type DiaryListItem,
 } from "../app/state";
 import type { SelectionState } from "../app/selection";
-import { latestClosedDay } from "../config/day-boundary";
+import type { DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
@@ -88,6 +88,21 @@ export function DiaryHomeScreen({
   onGoToCharacters,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
+
+  /**
+   * 사용자가 고른 하루 (009 FR-006). `null`이면 고른 적이 없다는 뜻이고 그때
+   * 기본값(마지막으로 닫힌 하루)을 쓴다(FR-007).
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **★ 파일에 남기지 않는다**(FR-010, W3). 007의 캐릭터 선택은
+   * `files/preferences/`에 남지만 하루는 **의도적으로 다르다** — 시간이 지나면
+   * 범위를 벗어나므로 **저장된 값이 오히려 틀린 값이 된다.**
+   *
+   * **「범위 밖이라 되돌려졌다」를 여기 두지 않는다.** 그것은 상태가 아니라
+   * `writePromptFor()`가 매번 다시 계산하는 판정의 결과다(FR-009a).
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  const [chosenDay, setChosenDay] = useState<DayDate | null>(null);
 
   /** 지금 도는 생성이 있는가. `AppState` 구독이 본다 */
   const running = useRef(false);
@@ -174,9 +189,28 @@ export function DiaryHomeScreen({
 
     try {
       const at = now();
+
+      // ─────────────────────────────────────────────────────────────────────
+      // **★ 넘길 하루는 판정 함수가 돌려준 것뿐이다**(009 W1·W2, FR-017).
+      //
+      // 006~008은 여기가 `latestClosedDay(at)`였다. **그대로 두면 화면에서 하루를
+      // 골라도 언제나 어제가 쓰이고 오류는 나지 않는다** — 006의 `GenerationProbe`,
+      // 007의 끊긴 `stop` 배선과 같은 종류의 조용한 실패다.
+      //
+      // **`prompt.day`는 정의상 `selectable` 안에 있으므로**(불변식 I1) 범위 밖
+      // 하루가 생성으로 갈 통로가 없다. 파이프라인에 `day-too-old` 갈래를 더하지
+      // 않은 이유가 이것이다 — 「사흘」은 009의 값이고 파이프라인은 002의 계약이다.
+      //
+      // **고른 하루가 범위 밖이면 여기서 기본값이 된다.** 말없이 바뀌는 것이
+      // 아니라 화면도 같은 판정을 보고 되돌림을 알리고 있다(FR-009).
+      // ─────────────────────────────────────────────────────────────────────
+      // **화면이 그린 것과 같은 재료로 판정한다.** 목록이 아니면 빈 배열이며,
+      // 그때는 덮어쓸 일기도 없다 — 고를 수 있는 하루는 `now`만으로 정해진다.
+      const items = screen.kind === "list" ? screen.items : [];
+      const prompt = writePromptFor(items, at, chosenDay);
+
       const result = await pipeline.run({
-        // **오늘이 아니라 마지막으로 닫힌 하루다**(FR-030). 오늘은 정의상 닫히지 않았다.
-        day: latestClosedDay(at),
+        day: prompt.day,
         now: at,
         character: selection.character,
         vision,
@@ -198,7 +232,7 @@ export function DiaryHomeScreen({
     } finally {
       running.current = false;
     }
-  }, [pipeline, selection, vision, now]);
+  }, [pipeline, selection, vision, now, chosenDay, screen]);
 
   /**
    * 생성을 그만둔다 (007 FR-013~015).
@@ -245,11 +279,12 @@ export function DiaryHomeScreen({
           items={screen.items}
           onOpen={(item) => void openItem(item)}
           onSelectCharacter={onSelectCharacter}
+          onSelectDay={setChosenDay}
           onWrite={() => void write()}
           selection={selection}
           // **쓰기 자리에 무엇이 일어날지 싣는다**(FR-023·024). `onWrite`는 이것을
           // 보지 않으므로 원칙 I의 방어가 유지된다(FR-025).
-          write={writePromptFor(screen.items, now())}
+          write={writePromptFor(screen.items, now(), chosenDay)}
         />
       );
 

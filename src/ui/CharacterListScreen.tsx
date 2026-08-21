@@ -1,7 +1,12 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { CHARACTERS, type Character } from "../diary/types";
-import type { DownloadRejection, DownloadView, ModelReadiness, StorageUsage } from "../models/types";
+import type {
+  DownloadRejection,
+  DownloadView,
+  ModelReadiness,
+  StorageUsage,
+} from "../models/types";
 
 /**
  * 캐릭터 목록 — **엔드유저가 보는 첫 화면이다.**
@@ -116,8 +121,8 @@ function DownloadNotice({
   return (
     <View testID="download-notice" style={styles.notice}>
       <Text style={styles.noticeText}>
-        {notice.busyWith}을(를) 받는 중이라 지금은 받을 수 없다. {notice.busyWith}을(를)
-        멈추면 받을 수 있다.
+        {notice.busyWith}을(를) 받는 중이라 지금은 받을 수 없다. {notice.busyWith}을(를) 멈추면 받을
+        수 있다.
       </Text>
       <TouchableOpacity
         accessibilityRole="button"
@@ -142,9 +147,7 @@ export function CharacterListScreen(props: CharacterListProps) {
         안내는 **하나뿐이다**(FR-006). `view.notice`가 배열이 아니므로 쌓일 수 없고,
         받던 것이 끝나면 판정이 `null`을 주므로 **여기서 지우는 코드가 필요 없다**.
       */}
-      {view.notice !== null && (
-        <DownloadNotice notice={view.notice} onDismiss={onDismissNotice} />
-      )}
+      {view.notice !== null && <DownloadNotice notice={view.notice} onDismiss={onDismissNotice} />}
 
       {/*
         다섯 자리가 **처음부터 전부** 보인다(FR-005a). 아무것도 준비되지 않은 첫 화면에서도
