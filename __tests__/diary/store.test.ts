@@ -21,6 +21,7 @@ import {
 import type { DiaryEntry } from "../../src/diary/types";
 import { emptyDay, partiallyUnknownDay, richDay, unknownDay } from "../../src/signals/fake";
 import type { DayDate } from "../../src/config/day-boundary";
+import type { DaySignals } from "../../src/signals/types";
 
 function entryFor(date: DayDate, text = `${date}의 일기`): DiaryEntry {
   return {
@@ -313,6 +314,79 @@ describe("listDiaries (006 FR-017·017a)", () => {
 
     const items = await listDiaries(throwing);
 
-    expect(items).toEqual([{ day: "2026-08-12", readable: false }]);
+    // 007: **읽지 못했으면 사진도 「모른다」다**(원칙 V) — 「없었다」가 아니다.
+    // 파일을 못 읽었을 뿐이며 그날 사진이 있었는지는 알 수 없다.
+    expect(items).toEqual([{ day: "2026-08-12", readable: false, photos: { kind: "unknown" } }]);
+  });
+});
+
+/**
+ * 007 §5 — 목록이 사진 갈래를 실어 준다 (FR-018·019, data-model.md §5).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **추가 읽기가 없다.** `listDiaries()`는 `readable`을 판정하려고 **이미 전체를
+ * 역직렬화하고 있었고**, 006까지는 그 결과를 버렸다. 버리던 것을 살리는 것뿐이다.
+ *
+ * **세 갈래가 그대로 온다**(원칙 V). 불리언으로 뭉개면 `none`과 `unknown`이 같아지고,
+ * 그것이 004가 값에서 지킨 구분을 화면에서 무너뜨린다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("listDiaries — 사진 갈래 (007 FR-018·019)", () => {
+  /** 사진 신호만 갈아끼운 하루 */
+  function entryWithPhotos(date: DayDate, photos: DaySignals["photos"]): DiaryEntry {
+    return { ...entryFor(date), signalsUsed: { ...partiallyUnknownDay(date), photos } };
+  }
+
+  it("사진을 본 날은 장수가 실린다", async () => {
+    const store = memoryStore();
+    await store.save(
+      entryWithPhotos("2026-08-12", {
+        kind: "known",
+        value: {
+          photos: [
+            { id: "a", takenAt: new Date("2026-08-12T10:00:00") },
+            { id: "b", takenAt: new Date("2026-08-12T11:00:00") },
+          ],
+          complete: true,
+        },
+      }),
+    );
+
+    const [item] = await listDiaries(store);
+    expect(item.photos).toEqual({ kind: "known", count: 2 });
+  });
+
+  it("사진이 없던 날은 none이다", async () => {
+    const store = memoryStore();
+    await store.save(entryWithPhotos("2026-08-12", { kind: "none" }));
+
+    const [item] = await listDiaries(store);
+    expect(item.photos).toEqual({ kind: "none" });
+  });
+
+  it("★ 사진을 모르는 날은 unknown이며 none과 다르다(원칙 V)", async () => {
+    const store = memoryStore();
+    await store.save(entryWithPhotos("2026-08-12", { kind: "unknown", reason: "권한이 없다" }));
+    await store.save(entryWithPhotos("2026-08-11", { kind: "none" }));
+
+    const items = await listDiaries(store);
+    const unknownDay = items.find((i) => i.day === "2026-08-12");
+    const noneDay = items.find((i) => i.day === "2026-08-11");
+
+    // **두 날이 서로 다른 값이다.** 뭉개면 「모른다」가 「없었다」로 둔갑한다.
+    expect(unknownDay?.photos).toEqual({ kind: "unknown" });
+    expect(noneDay?.photos).toEqual({ kind: "none" });
+    expect(unknownDay?.photos).not.toEqual(noneDay?.photos);
+  });
+
+  it("읽을 수 없는 일기의 사진은 unknown이다 — 「없었다」가 아니다(원칙 V)", async () => {
+    const store = memoryStore();
+    await store.save(entryFor("2026-08-12"));
+
+    const broken: DiaryStore = { ...store, load: async () => null };
+    const [item] = await listDiaries(broken);
+
+    expect(item.readable).toBe(false);
+    expect(item.photos).toEqual({ kind: "unknown" });
   });
 });

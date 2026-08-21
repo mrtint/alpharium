@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 /**
  * 화면 상태 전이 계약 테스트.
  *
@@ -18,8 +20,11 @@ import {
   toDetail,
   toList,
   toWriting,
+  writePromptFor,
   type DiaryListItem,
+  type PhotoHint,
 } from "../../src/app/state";
+import { resolveSelection } from "../../src/app/selection";
 import type { PipelineResult } from "../../src/diary/pipeline";
 import type { DiaryEntry } from "../../src/diary/types";
 import { partiallyUnknownDay } from "../../src/signals/fake";
@@ -34,8 +39,17 @@ const entryFor = (day = DAY, text = "오늘 주인은 조용했다"): DiaryEntry
   createdAt: new Date("2026-08-17T06:00:00"),
 });
 
-const readable = (day: string): DiaryListItem => ({ day, readable: true });
-const unreadable = (day: string): DiaryListItem => ({ day, readable: false });
+const readable = (day: string, photos: PhotoHint = { kind: "none" }): DiaryListItem => ({
+  day,
+  readable: true,
+  photos,
+});
+// **읽지 못하면 사진도 「모른다」다**(원칙 V) — 「없었다」가 아니다.
+const unreadable = (day: string): DiaryListItem => ({
+  day,
+  readable: false,
+  photos: { kind: "unknown" },
+});
 
 describe("첫 화면 (FR-018, S7)", () => {
   it("환경 판정이 실패하면 build-error다", () => {
@@ -343,5 +357,122 @@ describe("★★ 읽기와 생성이 분리되어 있다 (원칙 I, S1)", () => 
   it("toWriting은 저장 상태를 인자로 받지 않는다", () => {
     // **인자가 없는 것이 방어다.** 저장 여부를 볼 수 없으면 그것으로 갈릴 수 없다.
     expect(toWriting.length).toBe(0);
+  });
+});
+
+/**
+ * 007 — 쓰기 자리 (contracts/screens.md §4, FR-023·024).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **「무슨 일이 일어나는가」를 아는 것과 그것으로 갈리는 것은 다르다.**
+ *
+ * `writePromptFor()`는 「이미 있다」를 알려 주지만, `toWriting()`은 여전히 인자를
+ * 받지 않으므로 **쓰기를 시작하는 함수는 그것을 볼 수 없다**(FR-025, 원칙 I).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("writePromptFor (007 §4 검증 표)", () => {
+  // 04:00 경계 뒤이므로 「마지막으로 닫힌 하루」는 전날이다.
+  const morning = new Date("2026-08-20T10:00:00+09:00");
+
+  it("1. 쓰게 될 하루는 오늘이 아니라 마지막으로 닫힌 하루다(FR-023, 006 FR-030)", () => {
+    const prompt = writePromptFor([], morning);
+
+    expect(prompt.day).toBe("2026-08-19");
+  });
+
+  it("2. 그 하루가 이미 있으면 덮어쓴다고 알린다(FR-024)", () => {
+    const prompt = writePromptFor([readable("2026-08-19")], morning);
+
+    expect(prompt.overwrites).toBe(true);
+  });
+
+  it("다른 날 일기만 있으면 덮어쓰지 않는다", () => {
+    const prompt = writePromptFor([readable("2026-08-18")], morning);
+
+    expect(prompt.overwrites).toBe(false);
+  });
+
+  it("읽을 수 없는 일기도 그 하루를 차지한다 — 쓰면 덮어쓴다(원칙 V)", () => {
+    // 읽지 못할 뿐 파일은 있다. 「없다」로 다루면 조용히 덮어쓰게 된다.
+    const prompt = writePromptFor([unreadable("2026-08-19")], morning);
+
+    expect(prompt.overwrites).toBe(true);
+  });
+
+  /**
+   * ★ 6. **04:00 경계가 지켜진다**(006 FR-021a).
+   *
+   * 03:59는 아직 전날에 속하므로 「마지막으로 닫힌 하루」가 하루 더 이르다.
+   */
+  it("6. 03:59와 04:01이 서로 다른 하루를 가리킨다", () => {
+    const before = writePromptFor([], new Date("2026-08-20T03:59:00+09:00"));
+    const after = writePromptFor([], new Date("2026-08-20T04:01:00+09:00"));
+
+    expect(before.day).not.toBe(after.day);
+    expect(before.day).toBe("2026-08-18");
+    expect(after.day).toBe("2026-08-19");
+  });
+});
+
+/**
+ * ★ 007 FR-025·SC-014 — **원칙 I의 방어가 타입에 있다.**
+ *
+ * 006이 `toWriting()`에 인자를 두지 않은 것이 방어이며, 007이 쓰기 자리에 정보를
+ * 더하면서도 **그 방어를 깨뜨리지 않았다**는 것을 여기서 못 박는다.
+ */
+describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)", () => {
+  it("인자를 받지 않는다 — 저장 상태로 갈릴 수 없다", () => {
+    // 인자가 없으므로 「이미 있으면 그것을 보여준다」를 쓸 수 없다.
+    expect(toWriting).toHaveLength(0);
+  });
+
+  it("언제 불러도 같은 값이다 — 목록과 무관하다", () => {
+    expect(toWriting()).toEqual({ kind: "writing" });
+  });
+
+  it("writing 갈래에 필드가 없다(FR-010a, SC-012, 원칙 IV)", () => {
+    // **진행률·경과 시간·단계 이름을 담을 자리가 없다.** 자리가 없으면 담을 수 없다.
+    expect(Object.keys(toWriting())).toEqual(["kind"]);
+  });
+
+  /**
+   * ★ **타입 선언 자체를 읽어 검사한다**(FR-010a).
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **위의 런타임 검사만으로는 부족하다는 것을 실측으로 확인했다**(2026-08-20).
+   *
+   * `AppScreen`의 writing 갈래에 `stage: string`을 주입해 보니 **jest는 38개 전부
+   * 통과했다** — 타입은 지워지므로 `Object.keys()`가 여전히 `["kind"]`였다.
+   * 잡은 것은 `tsc`뿐이었고, 그것은 `npm test`가 아니라 `npm run lint`에 있다.
+   *
+   * 그래서 **선언을 직접 읽는다.** 이제 어느 쪽으로 들어와도 걸린다.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  it("★ AppScreen 선언의 writing 갈래에 필드를 더할 수 없다(FR-010a)", () => {
+    const source = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
+    const writingBranch = source.match(/\|\s*\{\s*kind:\s*"writing"[^}]*\}/);
+
+    expect(writingBranch).not.toBeNull();
+    // 진행률·단계·시간이 들어올 자리가 없다 — `kind` 하나뿐이다.
+    expect(writingBranch?.[0]).toBe('| { kind: "writing" }');
+  });
+});
+
+/** 007 FR-005a — 옮겨졌다는 사실이 화면까지 온다 */
+describe("옮김 알림이 값으로 전해진다 (FR-005a, SC-003a)", () => {
+  it("movedFrom이 있으면 무엇에서 무엇으로 바뀌었는지 안다", () => {
+    const state = resolveSelection("quiet", ["narrative"]);
+
+    expect(state).toEqual({
+      kind: "selected",
+      character: "narrative",
+      movedFrom: "quiet",
+    });
+  });
+
+  it("옮기지 않았으면 알릴 것이 없다", () => {
+    const state = resolveSelection("quiet", ["quiet"]);
+
+    expect(state).not.toHaveProperty("movedFrom");
   });
 });

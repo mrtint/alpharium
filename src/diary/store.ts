@@ -101,7 +101,38 @@ export function deserializeEntry(serialized: string): DiaryEntry {
  *
  * **전문을 담지 않는다.** 목록에서 전부 읽으면 일기가 늘수록 느려진다.
  */
-export type DiaryListItem = { day: DayDate; readable: boolean };
+export type DiaryListItem = { day: DayDate; readable: boolean; photos: PhotoHint };
+
+/**
+ * 그날 일기가 사진을 얼마나 보고 쓰였는가 (007 FR-018·019).
+ *
+ * 정의는 `src/app/state.ts`에 있다 — 화면이 쓰는 모양이므로 그쪽이 주인이다.
+ */
+export type PhotoHint = { kind: "known"; count: number } | { kind: "none" } | { kind: "unknown" };
+
+/**
+ * 저장된 일기에서 사진 갈래를 꺼낸다 (007 §5).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **추가 읽기가 없다.** `listDiaries()`가 `readable`을 판정하려고 **이미 전체를
+ * 역직렬화하고 있고**, 006까지는 그것을 그냥 버렸다(research.md §5). 버리던 것을
+ * 살리는 것뿐이다.
+ *
+ * **`SignalValue`의 세 갈래를 그대로 옮긴다**(원칙 V). 뭉개면 004가 값에서 지킨
+ * 구분이 화면에서 무너진다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function photoHintOf(entry: DiaryEntry): PhotoHint {
+  const photos = entry.signalsUsed.photos;
+  switch (photos.kind) {
+    case "known":
+      return { kind: "known", count: photos.value.photos.length };
+    case "none":
+      return { kind: "none" };
+    case "unknown":
+      return { kind: "unknown" };
+  }
+}
 
 /**
  * 저장된 일기의 목록을 읽는다 (006 FR-017·017a).
@@ -122,10 +153,16 @@ export async function listDiaries(store: DiaryStore): Promise<DiaryListItem[]> {
   const items = await Promise.all(
     days.map(async (day): Promise<DiaryListItem> => {
       try {
-        return { day, readable: (await store.load(day)) !== null };
+        const entry = await store.load(day);
+
+        // **읽지 못했으면 사진도 「모른다」다**(원칙 V, 007 FR-018).
+        // 「없었다」가 아니다 — 파일을 못 읽었을 뿐 사진이 없었는지는 알 수 없다.
+        if (entry === null) return { day, readable: false, photos: { kind: "unknown" } };
+
+        return { day, readable: true, photos: photoHintOf(entry) };
       } catch {
         // 읽다가 무너져도 그 날짜를 잃지 않는다. 「읽을 수 없다」가 결론이다.
-        return { day, readable: false };
+        return { day, readable: false, photos: { kind: "unknown" } };
       }
     }),
   );
