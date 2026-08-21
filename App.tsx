@@ -10,12 +10,13 @@ import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { expoFileSystemPort, fileStore } from "./src/diary/store";
 import { CHARACTERS, type Character } from "./src/diary/types";
-import { createAcquisition } from "./src/models/acquisition";
+import { type Acquisition, createAcquisition } from "./src/models/acquisition";
+import { resolveDownloadView } from "./src/models/download-view";
 import { expoModelPorts } from "./src/models/expo-port";
 import { readinessOf } from "./src/models/readiness";
 import { assetFor } from "./src/models/roster";
 import { pausedFor, readState, removeAsset, verdictFor } from "./src/models/storage";
-import type { DownloadProgress, ModelReadiness } from "./src/models/types";
+import type { DownloadProgress, DownloadRejection, ModelReadiness } from "./src/models/types";
 import { CharacterListScreen } from "./src/ui/CharacterListScreen";
 import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
 import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
@@ -61,6 +62,35 @@ function AppFrame() {
   const environment = currentEnvironment();
   const [tab, setTab] = useState<"diary" | "characters">("diary");
 
+  /**
+   * ★ **008이 내려받기 상태를 여기로 올린다**(FR-013·014).
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * **007까지 이 넷이 `ModelSection` 안에 있었고, 그것이 셋째 결함이었다.**
+   *
+   * 아래의 탭이 **삼항 연산자로** 갈리므로 캐릭터 탭을 떠나면 `ModelSection`이
+   * 언마운트되고, `useState`에 있던 **`Acquisition` 인스턴스가 통째로 사라진다** —
+   * `running`도 `handle`도 함께. 돌아오면 새 인스턴스라 `busyWith()`가 `null`이고
+   * **받던 것을 멈출 방법이 없다.**
+   *
+   * 오류가 나지 않고 **아무 일도 일어나지 않을 뿐**이라, 006의 `GenerationProbe`나
+   * 007의 끊긴 `stop` 배선과 **같은 종류의 조용한 결함**이었다.
+   *
+   * **`AppFrame`은 탭이 바뀌어도 언마운트되지 않으므로** 여기가 그 자리다.
+   *
+   * **`expoModelPorts()`를 여기서 만들어도 안전하다**(2026-08-21 코드 확인):
+   * 클로저 객체 넷을 만들 뿐이고 기기 통로는 메서드 안의 `await import`로 열린다.
+   * 일기 탭에서도 만들어지지만 비용이 없다.
+   *
+   * **지연 생성(`useState(() => …)`)은 유지한다** — 모듈 수준 상수로 바꾸면 모듈 로드
+   * 시점에 불려 기기 통로가 없는 환경(웹·시뮬레이터)에서 터진다.
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const [ports] = useState(() => expoModelPorts());
+  const [acquisition] = useState(() => createAcquisition(ports));
+  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  const [rejection, setRejection] = useState<DownloadRejection | null>(null);
+
   return (
     // `edges`를 적어 둔다 — 기본값은 네 변 전부이며, 무엇을 피하는지가 코드에 보이는
     // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
@@ -91,7 +121,14 @@ function AppFrame() {
         // 003의 목록은 스스로 스크롤하지 않는다 — 다섯 자리가 화면을 넘길 수 있으므로
         // 여기서 감싼다.
         <ScrollView>
-          <ModelSection />
+          <ModelSection
+            ports={ports}
+            acquisition={acquisition}
+            progress={progress}
+            setProgress={setProgress}
+            rejection={rejection}
+            setRejection={setRejection}
+          />
         </ScrollView>
       )}
       <StatusBar style="auto" />
@@ -229,11 +266,25 @@ type Readiness = Record<Character, ModelReadiness> | null;
  * **판정은 순수 함수(`readinessOf`)가 하고 여기서는 재료만 모은다.** 그래야 판정 규칙이
  * 기기 없이 검증된다.
  */
-function ModelSection() {
+type ModelSectionProps = {
+  ports: ReturnType<typeof expoModelPorts>;
+  acquisition: Acquisition;
+  progress: DownloadProgress | null;
+  setProgress: (progress: DownloadProgress | null) => void;
+  rejection: DownloadRejection | null;
+  setRejection: (rejection: DownloadRejection | null) => void;
+};
+
+function ModelSection(props: ModelSectionProps) {
+  const { ports, acquisition, progress, setProgress, rejection, setRejection } = props;
+
+  /**
+   * **준비 상태는 올리지 않는다**(008).
+   *
+   * 화면에 들어올 때 다시 읽으면 되는 것이며, 오래된 값을 들고 있을 이유가 없다.
+   * 올려야 하는 것은 **내려받기처럼 화면보다 오래 사는 것**뿐이다.
+   */
   const [readiness, setReadiness] = useState<Readiness>(null);
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
-  const [ports] = useState(() => expoModelPorts());
-  const [acquisition] = useState(() => createAcquisition(ports));
 
   /**
    * 다섯 캐릭터의 준비 상태를 읽는다.
@@ -285,17 +336,72 @@ function ModelSection() {
     };
   }, [read]);
 
+  /**
+   * 탭에서 돌아왔을 때 받는 중인 것을 되찾는다 (008 FR-013).
+   *
+   * **`Acquisition`이 이제 탭보다 오래 살므로 물어볼 대상이 남아 있다.**
+   *
+   * ⚠️ **백분율은 되찾을 수 없다.** `Acquisition`은 마지막 진행률을 들고 있지 않고
+   * 콜백으로 흘려보낼 뿐이다. 그래서 `fraction: null`로 시작하고 **다음 진행 콜백이
+   * 오면 붙는다** — 「받는 중…」으로 보이며 **0%로 채우지 않는다**(원칙 V).
+   */
+  useEffect(() => {
+    const running = acquisition.busyWith();
+    if (running !== null && progress === null) {
+      setProgress({ character: running, fraction: null });
+    }
+    // 화면이 뜰 때 한 번만 본다. `progress`가 바뀔 때마다 되돌리면 안 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [acquisition]);
+
   const refresh = useCallback(async () => {
     setReadiness(await read());
   }, [read]);
 
+  /**
+   * ★ **008이 고치는 자리 — 두 버그가 여기서 함께 났다.**
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * **006까지 이 함수가 두 줄이었고 둘 다 틀렸다:**
+   *
+   * ```ts
+   * await acquisition.prepare(character, setProgress);   // ← 반환값을 버린다 (버그 ①)
+   * setProgress(null);                                   // ← 거부에서도 돈다 (버그 ②)
+   * ```
+   *
+   * **버그 ①**: `prepare()`가 `{ ok: false, failure: { kind: "busy", busyWith } }`를
+   * 정확히 돌려주는데 호출자가 값을 받지 않아, **거부가 화면까지 갈 통로가 없었다.**
+   * 사용자에게는 「눌렀는데 아무 일이 없다」로 보였다.
+   *
+   * **버그 ②**: `busy` 거부는 네트워크를 타지 않고 **즉시 반환되므로** 곧바로
+   * `setProgress(null)`이 돌아 **받던 것의 진행률이 지워졌다.** 그러면 멈추기 버튼이
+   * 함께 사라지고 — 그런데 `acquisition`의 `running`은 그대로라 — 사용자는
+   * **받는 줄도 모르고, 멈출 수도 없고, 다른 것도 못 받는** 상태에 갇혔다.
+   * 003 FR-020a가 약속한 「멈추면 새 요청이 통한다」가 화면에서 실행 불가능했다.
+   *
+   * **고침**: 반환값을 받고, **자기 요청의 결과로만 진행 표시를 거둔다.**
+   * ───────────────────────────────────────────────────────────────────────────
+   */
   const onPrepare = useCallback(
     async (character: Character) => {
-      await acquisition.prepare(character, setProgress);
+      const result = await acquisition.prepare(character, setProgress);
+
+      // ★ 거부는 **받던 것을 건드리지 않는다**(FR-008). 진행률도 멈추기 버튼도 그대로
+      //   남아야 사용자가 빠져나갈 수 있다(FR-009, 003 FR-020a).
+      if (!result.ok && result.failure.kind === "busy") {
+        setRejection({ requested: character, busyWith: result.failure.busyWith });
+        return;
+      }
+
+      // 그 외(완료·멈춤·실패)는 **내 요청이 끝난 것이므로** 진행 표시를 거둔다(FR-012).
+      // 거부 통지도 함께 비운다 — 받던 것이 끝났으면 「받는 중이라 거부했다」가
+      // 더 이상 참이 아니다(FR-005). `resolveDownloadView()`도 같은 판정을 하므로
+      // 이것은 **이중 방어**이지 유일한 방어가 아니다.
       setProgress(null);
+      setRejection(null);
       await refresh();
     },
-    [acquisition, refresh],
+    [acquisition, refresh, setProgress, setRejection],
   );
 
   const onRemove = useCallback(
@@ -317,10 +423,13 @@ function ModelSection() {
   return (
     <CharacterListScreen
       readiness={readiness}
-      progress={progress}
+      // **판정은 순수 함수가 하고 화면은 그린다**(008). 「거부 안내가 아직 참인가」가
+      // 시간에 따라 거짓이 되므로, 지우는 코드를 두지 않고 **매번 다시 묻는다.**
+      view={resolveDownloadView(progress, rejection)}
       onPrepare={(character) => void onPrepare(character)}
       onPause={() => void acquisition.pause()}
       onRemove={(character) => void onRemove(character)}
+      onDismissNotice={() => setRejection(null)}
     />
   );
 }
