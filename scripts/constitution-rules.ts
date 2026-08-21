@@ -186,6 +186,71 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
   return violations;
 }
 
+/* ─────────────────────── 심는 도구 검사 (010) ─────────────────────── */
+
+/**
+ * 심는 도구가 일기에 닿는 것을 잡는다 (010 FR-003·022, 헌법 원칙 IV).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **왜 이 검사가 필요한가**: 010의 도구는 「가상의 하루」를 기기에 심는다. 그
+ * 자리에서 **「심은 하루로 캐릭터를 비교해 보자」가 아주 자연스럽게 떠오른다** —
+ * 하루를 통제할 수 있으니 출력을 견줄 조건이 갖춰진 것처럼 보이기 때문이다.
+ *
+ * 그것이 정확히 원칙 IV가 금지한 「측정 장치」이며, 되돌리기의 이유였다. 게다가
+ * 합성 하루로 품질을 재는 것은 원칙 V의 「합성 데이터로 모델 품질을 평가하지
+ * 않는다」도 함께 어긴다.
+ *
+ * **도구는 심고 끝난다.** 생성된 일기를 읽는 코드가 있으면 여기서 걸린다 —
+ * 사람의 주의력이 아니라 검사로 막는다.
+ *
+ * **경계는 위 주석과 같다**: 이 검사는 **소스에 어떤 import·호출이 있는지**만 본다.
+ * 모델을 부르지 않고, 출력을 만들지 않고, 품질을 재지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const SEED_TOUCHES_DIARY =
+  /\bfrom\s+["'][^"']*(?:diary\/(?:store|pipeline|acceptance|prompt)|inference\/)[^"']*["']/;
+
+/** 일기 파일에 직접 닿는 것. import를 우회해도 잡는다 */
+const SEED_TOUCHES_DIARY_FILES = /files\/diary|listDiaries|readDiary|loadDiary/;
+
+/** 추론을 부르는 것 — 도구는 일기를 만들지 않는다(FR-003) */
+const SEED_GENERATES = /\bgenerate\s*\(|initLlama|completion\s*\(/;
+
+/**
+ * 소스 파일 하나가 심는 도구인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`scripts/seed*`가 대상이다.** 진입점(`seed-day.mts`)과 모듈(`seed/*.ts`) 둘 다다.
+ */
+export function checkSeedFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  const isSeed = /(^|\/)scripts\/seed/.test(normalized);
+  if (!isSeed) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (SEED_TOUCHES_DIARY.test(code) || SEED_TOUCHES_DIARY_FILES.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "심는 도구가 일기에 닿는다 — 심고 끝나야 한다 (010 FR-022, 원칙 IV)",
+      });
+    }
+    if (SEED_GENERATES.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "심는 도구가 추론을 부른다 — 일기를 만들지 않는다 (010 FR-003, 원칙 I)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";

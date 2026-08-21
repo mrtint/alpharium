@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import {
   checkEnvFile,
+  checkSeedFile,
   checkSourceFile,
   formatViolations,
   type Violation,
@@ -56,9 +57,35 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
   return violations;
 }
 
-/** 저장소를 훑는다. 설정과 소스 둘 다 본다. */
+/**
+ * 심는 도구 검사가 보는 자리 (010 FR-022, 원칙 IV).
+ *
+ * **`scripts/` 아래를 훑는다.** 어느 파일이 심는 도구인지는 `checkSeedFile`이 경로로
+ * 정한다 — 위와 같은 이유로 여기서 다시 고르지 않는다.
+ *
+ * **⚠️ 등록하지 않으면 규칙이 있어도 돌지 않는다.** `run-device-tests.mjs`의 `FLOWS`에
+ * 흐름을 등록하지 않으면 파일이 있어도 실행되지 않는 것과 같은 함정이며, 그러면
+ * 초록불인데 아무것도 검사되지 않은 상태가 된다(헌법 원칙 V).
+ */
+function checkSeedFiles(root: string, relative = "scripts"): Violation[] {
+  const violations: Violation[] = [];
+  const absolute = join(root, relative);
+
+  for (const entry of readdirSync(absolute, { withFileTypes: true })) {
+    const child = `${relative}/${entry.name}`;
+    if (entry.isDirectory()) {
+      violations.push(...checkSeedFiles(root, child));
+    } else if (/\.m?tsx?$/.test(entry.name)) {
+      violations.push(...checkSeedFile(child, readFileSync(join(root, child), "utf8")));
+    }
+  }
+
+  return violations;
+}
+
+/** 저장소를 훑는다. 설정과 소스와 심는 도구를 본다. */
 function checkRepository(root: string): Violation[] {
-  return [...checkEnvFiles(root), ...checkSourceFiles(root)];
+  return [...checkEnvFiles(root), ...checkSourceFiles(root), ...checkSeedFiles(root)];
 }
 
 const violations = checkRepository(process.cwd());

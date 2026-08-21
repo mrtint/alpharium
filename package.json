@@ -34,7 +34,10 @@
     "test:device": "node scripts/run-device-tests.mjs",
     "lint": "eslint . && tsc --noEmit && npm run check:constitution",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
-    "check:constitution": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/check-constitution.mts"
+    "check:constitution": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/check-constitution.mts",
+    "seed:day": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-day.mts",
+    "seed:list": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-list.mts",
+    "seed:clear": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-clear.mts"
   },
   "jest": {
     "preset": "jest-expo",

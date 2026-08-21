@@ -1,7 +1,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { checkEnvFile, checkSourceFile, formatViolations } from "../../scripts/constitution-rules";
+import {
+  checkEnvFile,
+  checkSeedFile,
+  checkSourceFile,
+  formatViolations,
+} from "../../scripts/constitution-rules";
 
 /**
  * contracts/constitution-check.md 「검증 표」.
@@ -251,5 +256,77 @@ describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)"
     );
 
     expect(checkSourceFile("src/ui/CharacterPicker.tsx", source)).toEqual([]);
+  });
+});
+
+/* ─────────────────────── 심는 도구 검사 (010) ─────────────────────── */
+
+describe("심는 도구가 일기에 닿는 것을 잡는다 (010 FR-022, 원칙 IV)", () => {
+  /**
+   * ─────────────────────────────────────────────────────────────────────────
+   * **왜 이 검사가 필요한가**: 010의 도구는 하루를 통제할 수 있게 해 준다. 그
+   * 자리에서 **「심은 하루로 캐릭터를 비교해 보자」가 아주 자연스럽게 떠오른다** —
+   * 조건이 갖춰진 것처럼 보이기 때문이다.
+   *
+   * 그것이 원칙 IV가 금지한 「측정 장치」이고, 합성 하루로 품질을 재는 것은 원칙 V의
+   * 「합성 데이터로 모델 품질을 평가하지 않는다」도 함께 어긴다.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  it.each([
+    ['import { listDiaries } from "../src/diary/store";', "일기 저장소를 import"],
+    ['import { runPipeline } from "../src/diary/pipeline";', "파이프라인을 import"],
+    ['import { promptFor } from "../src/diary/prompt";', "프롬프트를 import"],
+    ['const path = "files/diary/2026-08-20.json";', "일기 파일 경로"],
+    ["const all = await listDiaries(port);", "일기 목록 조회"],
+  ])("%s — %s", (line) => {
+    const violations = checkSeedFile("scripts/seed/device.ts", line);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 IV");
+  });
+
+  it.each([
+    ['import { onDeviceBackend } from "../src/inference/on-device";', "추론 어댑터 import"],
+    ["const out = await backend.generate(input);", "추론 호출"],
+    ["const ctx = await initLlama({ model });", "모델 적재"],
+  ])("%s — %s", (line) => {
+    expect(checkSeedFile("scripts/seed-day.mts", line).length).toBeGreaterThan(0);
+  });
+
+  it("심는 도구가 아닌 파일은 보지 않는다", () => {
+    // `src/`의 파일은 `checkSourceFile`의 몫이다. 두 검사가 겹치면 규칙이 두 곳에 생긴다.
+    expect(checkSeedFile("src/diary/store.ts", 'import { listDiaries } from "./store";')).toEqual(
+      [],
+    );
+    expect(checkSeedFile("scripts/run-device-tests.mjs", "listDiaries()")).toEqual([]);
+  });
+
+  it("윈도우 경로 구분자에서도 잡는다", () => {
+    // `String.raw`를 쓴다 — 보통 문자열의 `\`는 런타임에 역슬래시 **하나**라서
+    // 윈도우 경로를 흉내 내지 못한다.
+    expect(checkSeedFile(String.raw`scripts\seed\plan.ts`, "files/diary")).toHaveLength(1);
+  });
+
+  /**
+   * **주석은 규칙을 설명하는 자리다.** 008의 교훈 — 설명이 위반으로 잡히면 아무도
+   * 설명을 쓰지 않는다. 이 저장소의 코드는 주석으로 근거를 남기는 것이 관행이다.
+   */
+  it.each([
+    "// 도구는 files/diary에 닿지 않는다",
+    " * `listDiaries`를 부르지 않는다 — 원칙 IV",
+    "  // generate( 를 부르면 안 된다",
+  ])("주석은 위반이 아니다: %s", (line) => {
+    expect(checkSeedFile("scripts/seed/plan.ts", line)).toEqual([]);
+  });
+
+  it("심는 도구가 쓰는 정상적인 것은 잡지 않는다", () => {
+    const normal = [
+      'import { selectableDays } from "../../src/config/day-boundary.ts";',
+      'import { patchDate } from "./exif.ts";',
+      "const rows = queryFolder();",
+      "const planned = planSeeding(shape, day, new Date());",
+    ].join("\n");
+
+    expect(checkSeedFile("scripts/seed-day.mts", normal)).toEqual([]);
   });
 });
