@@ -56,8 +56,29 @@ export function selectLocation(
   return { ok: true, location };
 }
 
+/**
+ * 고른 어댑터. **`stop`을 좁혀 버리지 않는다**(007 contracts/selection.md §3).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 여기가 005 FR-014b를 죽여 두었던 자리다.**
+ *
+ * `on-device.ts`는 `StoppableBackend`(= `InferenceBackend & { stop() }`)를 만들고,
+ * `DiaryHomeScreen`은 `stop?`을 받아 쓴다. 그런데 **그 사이의 이 타입이
+ * `InferenceBackend`로 좁혀 `stop`을 타입에서 지웠다.** 값은 런타임에 멀쩡히 있었지만
+ * 호출자가 닿을 수 없었고, 그래서 `App.tsx`가 화면에 넘길 것이 없었다.
+ *
+ * **조용히 통과한 이유**: 화면 쪽 `stop?`이 옵셔널이라 넘기지 않아도 타입 검사가
+ * 통과했고, 화면 테스트는 prop을 직접 주입하므로 초록불이었다. 실기기에서도 오류가
+ * 나는 것이 아니라 **아무 일이 일어나지 않을 뿐**이었다.
+ *
+ * **`stop`을 옵셔널로 두는 것은 의도다**(005 FR-025). 데스크톱 경로에는 끊을 것이
+ * 없으므로 `InferenceBackend`를 넓히지 않는다 — 파이프라인은 여전히 이것을 모른다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export type SelectedBackend = InferenceBackend & { stop?: () => Promise<void> };
+
 export type BackendSelection =
-  { ok: true; backend: InferenceBackend } | { ok: false; reason: SelectionFailure; detail: string };
+  { ok: true; backend: SelectedBackend } | { ok: false; reason: SelectionFailure; detail: string };
 
 /**
  * 추론 어댑터를 고른다.
