@@ -372,7 +372,10 @@ describe("★★ 읽기와 생성이 분리되어 있다 (원칙 I, S1)", () => 
  */
 describe("writePromptFor (007 §4 검증 표)", () => {
   // 04:00 경계 뒤이므로 「마지막으로 닫힌 하루」는 전날이다.
-  const morning = new Date("2026-08-20T10:00:00+09:00");
+  // **표준시 접미사를 붙이지 않는다**(2026-08-21, CI 실패로 확인). `dayOf()`가 로컬
+  // 시각으로 판단하므로 `+09:00`을 붙이면 UTC로 도는 CI에서 하루가 어긋난다.
+  // 006의 day-boundary.test.ts도 접미사 없이 쓴다.
+  const morning = new Date("2026-08-20T10:00:00");
 
   it("1. 쓰게 될 하루는 오늘이 아니라 마지막으로 닫힌 하루다(FR-023, 006 FR-030)", () => {
     const prompt = writePromptFor([], morning);
@@ -405,8 +408,8 @@ describe("writePromptFor (007 §4 검증 표)", () => {
    * 03:59는 아직 전날에 속하므로 「마지막으로 닫힌 하루」가 하루 더 이르다.
    */
   it("6. 03:59와 04:01이 서로 다른 하루를 가리킨다", () => {
-    const before = writePromptFor([], new Date("2026-08-20T03:59:00+09:00"));
-    const after = writePromptFor([], new Date("2026-08-20T04:01:00+09:00"));
+    const before = writePromptFor([], new Date("2026-08-20T03:59:00"));
+    const after = writePromptFor([], new Date("2026-08-20T04:01:00"));
 
     expect(before.day).not.toBe(after.day);
     expect(before.day).toBe("2026-08-18");

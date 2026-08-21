@@ -24,6 +24,16 @@ import type { DiaryEntry } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 
+/**
+ * **CI에서 기본 5초로는 모자란다**(2026-08-21, PR #13 실패로 확인).
+ *
+ * 이 파일은 화면을 실제로 그리고 `AppState`·`BackHandler` 구독까지 붙이므로 한
+ * 테스트가 무겁다. 로컬(16코어)에서는 12개가 4.3초에 끝나지만 **CI는 `--maxWorkers=2`**라
+ * 첫 `render()`가 5초를 넘긴다 — 006이 `--maxWorkers=50%`로 겪은 것과 같은 성질이며
+ * **코드 결함이 아니라 워커 경합**이다(AGENTS.md).
+ */
+jest.setTimeout(30000);
+
 const resolved: EnvironmentResolution = { ok: true, environment: "dev" };
 
 // **`unknown`에는 까닭이 붙는다** — 왜 모르는지가 값에 남아야 프롬프트가 그것을 옮긴다.
