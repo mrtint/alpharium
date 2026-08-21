@@ -32,6 +32,10 @@ const FLOWS = [
   // 007 — 캐릭터 선택과 그만두기. **누가 쓰는지 고를 수 있는가**와
   // **30초를 견디고 끊을 수 있는가**를 본다.
   ".maestro/diary-character-select.yml",
+  // 008 — 내려받기 충돌. **거부가 보이는가**와 **받던 것이 사라지지 않는가**를 본다.
+  // ⚠️ 실제 내려받기가 없으면 안쪽 블록이 SKIPPED로 지나간다 — **건너뛴 것은 통과가
+  // 아니므로**(원칙 V) 그때는 quickstart.md F1~F4를 손으로 확인한다.
+  ".maestro/download-conflict.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

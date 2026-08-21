@@ -49,11 +49,22 @@ describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
    */
   it("목록 화면이 받는 값에 자산이 없다", () => {
     const code = codeOf("ui", "CharacterListScreen.tsx");
-    const props = code.slice(
-      code.indexOf("CharacterListProps"),
-      code.indexOf("function statusText"),
-    );
+
+    // **props 선언만 정확히 잘라 낸다**(008에서 고침).
+    //
+    // 007까지 `code.indexOf("function statusText")`까지를 잘랐는데, 그것은 **props
+    // 바로 뒤에 그 함수가 온다는 우연**에 기댄 것이었다. 008이 props를 고치면서 그
+    // 사이에 다른 것이 들어올 수 있게 됐고, 그러면 **범위가 어긋나도 이 검사는 조용히
+    // 통과한다** — 실패하지 않으면서 방어만 사라지는 종류의 결함이다.
+    //
+    // 이제 선언의 여는 중괄호부터 **그에 대응하는 닫는 줄까지**만 본다.
+    const start = code.indexOf("export type CharacterListProps = {");
+    expect(start).toBeGreaterThan(-1);
+    const props = code.slice(start, code.indexOf("\n};", start));
+
     expect(props).not.toMatch(/asset|url|md5|expectedBytes/i);
+    // 잘라 낸 것이 실제로 props인지 확인한다 — 범위가 비면 위 검사가 무의미하다.
+    expect(props).toMatch(/readiness/);
   });
 
   // quickstart C-1. 자산을 만드는 곳이 roster.ts 하나다

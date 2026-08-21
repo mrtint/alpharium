@@ -1,7 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { CHARACTERS, type Character } from "../diary/types";
-import type { DownloadProgress, ModelReadiness, StorageUsage } from "../models/types";
+import type { DownloadRejection, DownloadView, ModelReadiness, StorageUsage } from "../models/types";
 
 /**
  * 캐릭터 목록 — **엔드유저가 보는 첫 화면이다.**
@@ -29,13 +29,21 @@ import type { DownloadProgress, ModelReadiness, StorageUsage } from "../models/t
 export type CharacterListProps = {
   /** 캐릭터별 준비 상태 */
   readiness: Record<Character, ModelReadiness>;
-  /** 지금 받는 중인 것. 없으면 null */
-  progress: DownloadProgress | null;
+  /**
+   * 무엇을 보일 것인가 — **판정은 `download-view.ts`가 끝냈다**(008).
+   *
+   * 006까지 이 자리가 `progress: DownloadProgress | null`이었고, 화면이 「받는 중인가」를
+   * 스스로 갈랐다. 그 구조에서 **거부가 진행 표시를 지우면 멈추기 버튼이 함께 사라졌다** —
+   * 화면은 그것을 알 방법이 없었다. 이제 **화면은 그리기만 한다.**
+   */
+  view: DownloadView;
   /** 캐릭터별 저장 공간. 비어 있으면 표시하지 않는다 */
   usage?: StorageUsage[];
   onPrepare: (character: Character) => void;
   onPause: () => void;
   onRemove: (character: Character) => void;
+  /** 거부 안내를 닫는다 (008 FR-005) */
+  onDismissNotice: () => void;
 };
 
 /**
@@ -75,17 +83,68 @@ function actionLabel(readiness: ModelReadiness): string {
  * **"모름"을 지어내지 않는다**(원칙 V). 서버가 총량을 알려주지 않으면 백분율이 없고,
  * 그때 그럴듯한 숫자를 만들어 보이지 않는다.
  */
-function progressText(progress: DownloadProgress): string {
-  if (progress.fraction === null) return "받는 중…";
-  return `받는 중… ${Math.round(progress.fraction * 100)}%`;
+function progressText(fraction: number | null): string {
+  if (fraction === null) return "받는 중…";
+  return `받는 중… ${Math.round(fraction * 100)}%`;
+}
+
+/**
+ * 거부 안내 (008 FR-001·002·003·005·006).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **006까지 이 자리가 아예 없었다.** `App.tsx`가 `prepare()`의 반환값을 버려서 `busy`
+ * 거부가 사용자에게 한 글자도 닿지 않았고, 화면에는 **아무 일도 일어나지 않았다** —
+ * 「버튼이 고장났다」로 보이는 상태였다.
+ *
+ * **문구에 들어가는 것**: 거부되었다는 것, 받는 중인 **캐릭터 이름**, 그리고 **멈추면
+ * 된다는 것**(FR-003).
+ *
+ * **★ 마지막이 빠지면 안내가 무의미하다.** 「거부됨」만 말하고 빠져나갈 길을 말하지
+ * 않으면 사용자는 여전히 갇힌다 — 003 FR-020a가 막으려던 바로 그 상태다.
+ *
+ * **모델 정보가 들어가지 않는다**(FR-004). 크기·주소·식별자·남은 시간·속도가 없으며,
+ * 이 파일이 `assetFor`에 닿을 수 없으므로 **알 방법 자체가 없다.**
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function DownloadNotice({
+  notice,
+  onDismiss,
+}: {
+  notice: DownloadRejection;
+  onDismiss: () => void;
+}) {
+  return (
+    <View testID="download-notice" style={styles.notice}>
+      <Text style={styles.noticeText}>
+        {notice.busyWith}을(를) 받는 중이라 지금은 받을 수 없다. {notice.busyWith}을(를)
+        멈추면 받을 수 있다.
+      </Text>
+      <TouchableOpacity
+        accessibilityRole="button"
+        testID="dismiss-notice"
+        onPress={onDismiss}
+        style={styles.dismiss}
+      >
+        <Text>닫기</Text>
+      </TouchableOpacity>
+    </View>
+  );
 }
 
 export function CharacterListScreen(props: CharacterListProps) {
-  const { readiness, progress, usage, onPrepare, onPause, onRemove } = props;
+  const { readiness, view, usage, onPrepare, onPause, onRemove, onDismissNotice } = props;
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>캐릭터</Text>
+
+      {/*
+        안내는 **하나뿐이다**(FR-006). `view.notice`가 배열이 아니므로 쌓일 수 없고,
+        받던 것이 끝나면 판정이 `null`을 주므로 **여기서 지우는 코드가 필요 없다**.
+      */}
+      {view.notice !== null && (
+        <DownloadNotice notice={view.notice} onDismiss={onDismissNotice} />
+      )}
 
       {/*
         다섯 자리가 **처음부터 전부** 보인다(FR-005a). 아무것도 준비되지 않은 첫 화면에서도
@@ -93,27 +152,51 @@ export function CharacterListScreen(props: CharacterListProps) {
       */}
       {CHARACTERS.map((character) => {
         const state = readiness[character];
-        const busy = progress?.character === character;
+        // **`view.active`만 본다**(008 FR-010). `view.notice`는 이 판정에 관여하지
+        // 않으므로, **거부당한 줄이 받는 중으로 보이는 일도 받는 중인 줄이 거부로
+        // 지워지는 일도 없다.**
+        const busy = view.active?.character === character;
         const bytes = usage?.find((u) => u.character === character)?.bytes ?? 0;
 
         return (
-          <View key={character} style={styles.row}>
+          <View key={character} testID={`character-row-${character}`} style={styles.row}>
             <View style={styles.info}>
               {/* 자리표시 식별자를 그대로 보인다 — 이름은 사람이 짓는다(FR-004a) */}
               <Text style={styles.name}>{character}</Text>
+              {/*
+                거부당한 줄도 **평소대로다**(008 FR-007). 거부는 그 캐릭터의 준비
+                상태를 바꾸지 않았으므로 「받아야 함」이던 것은 그대로 「받아야 함」이다.
+              */}
               <Text style={styles.status}>
-                {busy && progress ? progressText(progress) : statusText(state)}
+                {busy && view.active ? progressText(view.active.fraction) : statusText(state)}
               </Text>
               {/* 저장 공간은 **캐릭터 단위**로만 보인다(FR-028a) */}
               {bytes > 0 && <Text style={styles.usage}>{formatBytes(bytes)}</Text>}
             </View>
 
             {busy ? (
-              <TouchableOpacity onPress={onPause} style={styles.button}>
+              // **멈추기는 받는 중인 줄에만 있다**(008 FR-011). 한 번에 하나뿐이므로
+              // (003 FR-020) 무엇이 멈추는지 사용자에게도 분명하다.
+              <TouchableOpacity
+                accessibilityRole="button"
+                testID={`pause-${character}`}
+                onPress={onPause}
+                style={styles.button}
+              >
                 <Text>멈추기</Text>
               </TouchableOpacity>
             ) : (
+              /*
+                **버튼에 직접 testID를 준다**(008, 2026-08-21 실측).
+
+                줄(`character-row-*`)에 testID가 있어도 **Maestro가 이 버튼을 그 줄의
+                자식으로 보지 않는다** — 좌표로는 줄 안(x=824~968 ⊂ 68~1013)인데
+                접근성 트리에서는 형제로 평탄화된다. `childOf`로 좁힐 수 없으므로
+                버튼 자신이 이름을 가져야 한다.
+              */
               <TouchableOpacity
+                accessibilityRole="button"
+                testID={`action-${character}`}
                 onPress={() =>
                   state.kind === "ready" ? onRemove(character) : onPrepare(character)
                 }
@@ -152,6 +235,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: "#ddd",
   },
+  notice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 12,
+    backgroundColor: "#fdf3d8",
+    borderRadius: 8,
+  },
+  noticeText: { flex: 1, fontSize: 13, lineHeight: 19 },
+  dismiss: { paddingHorizontal: 12, paddingVertical: 6 },
   info: { flex: 1, gap: 2 },
   name: { fontSize: 16 },
   status: { fontSize: 13, color: "#666" },
