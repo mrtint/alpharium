@@ -1,5 +1,6 @@
 import { captionAll } from "../../src/vision/caption";
 import type { Photo } from "../../src/signals/types";
+import type { ResizeExecutor } from "../../src/vision/resize";
 import type { VisionEngine } from "../../src/vision/vision-port";
 
 /**
@@ -255,5 +256,201 @@ describe("지어내지 않는다 (원칙 II)", () => {
       expect(text).not.toMatch(/설명할 수 없|알 수 없|보지 못|실패/);
       expect(text).not.toBe("");
     }
+  });
+});
+
+/**
+ * 013 — 캡션 전에 줄인다.
+ *
+ * 계약: specs/013-photo-resize-caption/contracts/resize.md 「호출자 쪽 계약」
+ *       specs/013-photo-resize-caption/data-model.md 「생애」
+ */
+describe("013 — resize를 주입하지 않으면 011 이전과 동일하다 (하위 호환)", () => {
+  it("resize를 안 주면 원본 경로로 캡션한다", async () => {
+    const seen: string[] = [];
+    const engine: VisionEngine = {
+      async load() {
+        return { ok: true };
+      },
+      async caption(path) {
+        seen.push(path);
+        return { text: "x" };
+      },
+      async stop() {},
+      async unload() {},
+    };
+
+    await captionAll(engine, FIVE.slice(0, 1), 1, resolve);
+
+    expect(seen).toEqual(["/photo/a.jpg"]);
+  });
+});
+
+describe("013 US2 — 리사이즈 실패가 하루를 무너뜨리지 않는다 (FR-010·011)", () => {
+  it("리사이즈가 실패한 장은 건너뛰고 나머지는 계속 캡션한다", async () => {
+    const failsOn = "c";
+    const resize: ResizeExecutor = async (sourcePath) => {
+      if (sourcePath.includes(failsOn)) return { ok: false };
+      return { ok: true, path: sourcePath };
+    };
+
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
+
+    expect(vision?.considered).toBe(5);
+    expect(vision?.captions).toHaveLength(4);
+    expect(vision?.captions.map((c) => c.photoId)).toEqual(["a", "b", "d", "e"]);
+  });
+
+  it("리사이즈가 던져도(계약 위반) 나머지는 계속 캡션한다", async () => {
+    const throwsOn = "b";
+    const resize: ResizeExecutor = async (sourcePath) => {
+      if (sourcePath.includes(throwsOn)) throw new Error("리사이즈 무너짐");
+      return { ok: true, path: sourcePath };
+    };
+
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
+
+    expect(vision?.captions).toHaveLength(4);
+  });
+
+  it("리사이즈 실패로 건너뛴 장의 내용을 지어내지 않는다", async () => {
+    const resize: ResizeExecutor = async (sourcePath) => {
+      if (sourcePath.includes("a")) return { ok: false };
+      return { ok: true, path: sourcePath };
+    };
+
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
+    const texts = vision?.captions.map((c) => c.text) ?? [];
+
+    for (const text of texts) {
+      expect(text).not.toMatch(/설명할 수 없|알 수 없|보지 못|실패/);
+    }
+  });
+});
+
+describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-model.md 「생애」)", () => {
+  it("캡션이 성공한 장마다 지우기가 불린다", async () => {
+    const cleaned: string[] = [];
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    expect(cleaned).toHaveLength(5);
+    expect(cleaned).toEqual(FIVE.map((p) => `/resized/${p.id}.jpg`));
+  });
+
+  it("캡션이 실패한 장도(빈 캡션) 지우기가 불린다", async () => {
+    const cleaned: string[] = [];
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    await captionAll(engineWith(["c"]), FIVE, 5, resolve, undefined, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    // c도 리사이즈에는 성공했으므로(캡션만 실패) 지우기는 5번 모두 불린다
+    expect(cleaned).toHaveLength(5);
+  });
+
+  it("리사이즈에 실패한 장은 지우기를 부르지 않는다 — 지울 사본이 없다", async () => {
+    const cleaned: string[] = [];
+    const resize: ResizeExecutor = async (sourcePath) => {
+      if (sourcePath.includes("a")) return { ok: false };
+      return { ok: true, path: sourcePath.replace("/photo/", "/resized/") };
+    };
+
+    await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    expect(cleaned).toHaveLength(4);
+    expect(cleaned).not.toContain("/resized/a.jpg");
+  });
+
+  /**
+   * ★ C1·FR-006 — 원본과 같은 경로를 그대로 쓴 경우(이미 작아 리사이즈를 건너뜀)는
+   * 지우지 않는다. 원본을 지우는 경로가 있으면 안 된다.
+   */
+  it("이미 작아 원본 경로를 그대로 쓴 장은 지우지 않는다", async () => {
+    const cleaned: string[] = [];
+    const resize: ResizeExecutor = async (sourcePath) => ({ ok: true, path: sourcePath });
+
+    await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    expect(cleaned).toHaveLength(0);
+  });
+
+  it("cleanup을 안 주입하면 지우기 없이도 정상 동작한다", async () => {
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
+
+    expect(vision?.captions).toHaveLength(5);
+  });
+
+  it("그만두어도(E5) 이미 처리한 장의 지우기는 그대로 불린다", async () => {
+    const cleaned: string[] = [];
+    const cancel = { cancelled: false };
+    let count = 0;
+    const engine: VisionEngine = {
+      async load() {
+        return { ok: true };
+      },
+      async caption() {
+        count += 1;
+        if (count === 3) cancel.cancelled = true;
+        return { text: "읽은 것" };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    const vision = await captionAll(engine, FIVE, 5, resolve, cancel, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    expect(vision).toBeNull();
+    // 세 장을 처리했고 각각 지우기가 불렸다 — 결과는 버려도 정리는 남기지 않는다
+    expect(cleaned).toHaveLength(3);
+  });
+
+  it("캡션이 그 장에서 예외를 던져도 지우기는 불린다", async () => {
+    const cleaned: string[] = [];
+    const engine: VisionEngine = {
+      async load() {
+        return { ok: true };
+      },
+      async caption() {
+        throw new Error("엔진이 무너짐");
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    await captionAll(engine, FIVE.slice(0, 1), 1, resolve, undefined, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    expect(cleaned).toEqual(["/resized/a.jpg"]);
   });
 });

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { resizedFileNameFor } from "../../src/inference/on-device";
 import { resizePhoto } from "../../src/vision/resize";
 import type { ResizeExecutor, ResizeResult } from "../../src/vision/resize";
 
@@ -88,6 +89,34 @@ describe("목표 크기는 export되지 않는다 (FR-002)", () => {
 
     expect(source).not.toMatch(/export const RESIZE_TARGET/);
     expect(source).not.toMatch(/export .*maxLongEdge\s*[:=]\s*\d/);
+  });
+});
+
+/**
+ * 013 T018 — 파일명 결정론 (research.md R3, data-model.md 「이름 규칙」).
+ *
+ * **결정론이 곧 정리 실패 방어다** — 앱이 예기치 않게 끝나 못 지운 사본이 남아도,
+ * 같은 사진을 다음에 또 읽으면 같은 이름을 덮어써 파일이 누적되지 않는다(FR-009).
+ */
+describe("resizedFileNameFor는 결정론적이다 (013 R3, FR-009)", () => {
+  it("같은 sourcePath는 항상 같은 파일명을 준다", () => {
+    const a = resizedFileNameFor("content://media/external/images/media/123");
+    const b = resizedFileNameFor("content://media/external/images/media/123");
+
+    expect(a).toBe(b);
+  });
+
+  it("다른 sourcePath는 다른 파일명을 준다", () => {
+    const a = resizedFileNameFor("content://media/external/images/media/123");
+    const b = resizedFileNameFor("content://media/external/images/media/456");
+
+    expect(a).not.toBe(b);
+  });
+
+  it("파일 시스템에 못 쓰는 문자(/·:)가 이름에 남지 않는다", () => {
+    const name = resizedFileNameFor("content://media/external/images/media/123");
+
+    expect(name).not.toMatch(/[/:]/);
   });
 });
 

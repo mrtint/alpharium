@@ -86,24 +86,24 @@ and testing of each story.
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] `src/inference/on-device.ts`에 `resizePhoto`의 실제 구현
+- [X] T009 [US1] `src/inference/on-device.ts`에 `resizePhoto`의 실제 구현
       (`ResizeExecutor`)을 추가한다 — `expo-image-manipulator`의
       `manipulate()`/`resize()`/`renderAsync()`/`saveAsync()`로 리사이즈하고,
       `expo-file-system`의 `File.move()`로 결과를 앱 문서 디렉터리
       (`vision-cache/`)로 옮긴다(research.md R1·R2)
-- [ ] T010 [US1] T009의 구현에서 파일명을 `photo.id` 기반으로 결정론적으로
+- [X] T010 [US1] T009의 구현에서 파일명을 `photo.id` 기반으로 결정론적으로
       만든다 — `content://` URI의 `/`·`:` 등을 치환하는 헬퍼를 같은 파일에 둔다
       (research.md R3, data-model.md 「이름 규칙」)
-- [ ] T011 [US1] T009의 구현에서 원본이 이미 목표 크기 이하면 리사이즈를
+- [X] T011 [US1] T009의 구현에서 원본이 이미 목표 크기 이하면 리사이즈를
       건너뛰고 `{ ok: true, path: sourcePath }`를 돌려준다(contracts/resize.md C1)
-- [ ] T012 [US1] `src/vision/caption.ts`의 `captionAll()`을 수정한다 —
+- [X] T012 [US1] `src/vision/caption.ts`의 `captionAll()`을 수정한다 —
       `resolvePath(photo)` 성공 후, `engine.caption(path)`를 부르기 전에
       `resizePhoto(path)`를 거친다. `ok: false`면 011의 기존 "경로를 못 얻음"
       분기(E4)에 합류시켜 그 장을 건너뛴다(contracts/resize.md 「호출자 쪽 계약」)
-- [ ] T013 [US1] `src/inference/on-device.ts`에서 `resizePhoto`의 기본 실행자를
+- [X] T013 [US1] `src/inference/on-device.ts`에서 `resizePhoto`의 기본 실행자를
       T009 구현으로 주입하는 배선을 완성한다 — 005·011의 포트 주입 패턴을 따른다
       (기존 `visionSupport()` 함수 확장)
-- [ ] T014 [US1] `npm run lint`로 헌법 검사(T002 규칙 포함)를 통과하는지 확인한다
+- [X] T014 [US1] `npm run lint`로 헌법 검사(T002 규칙 포함)를 통과하는지 확인한다
 
 **Checkpoint**: 리사이즈가 캡션 경로에 실제로 들어갔다 — quickstart D1(빌드)·
 D2(시간 실측)·D3(품질 확인)을 실기기에서 돌릴 준비가 됨
@@ -120,7 +120,7 @@ D2(시간 실측)·D3(품질 확인)을 실기기에서 돌릴 준비가 됨
 
 ### Tests for User Story 2
 
-- [ ] T015 [P] [US2] `__tests__/vision/resize.test.ts`에 케이스를 더한다 —
+- [X] T015 [P] [US2] `__tests__/vision/resize.test.ts`에 케이스를 더한다 —
       `execute`가 실패(`{ ok: false }` 또는 throw)하는 사진 하나가 섞인 목록을
       `captionAll()`에 넘겼을 때, 나머지 사진의 캡션은 그대로 담기고 실패한
       장만 `captions`에서 빠지는지 확인한다(011 E4가 리사이즈 실패에도 적용됨을
@@ -129,7 +129,7 @@ D2(시간 실측)·D3(품질 확인)을 실기기에서 돌릴 준비가 됨
 
 ### Implementation for User Story 2
 
-- [ ] T016 [US2] T012에서 만든 분기(리사이즈 실패 시 건너뜀)가 T015의 테스트를
+- [X] T016 [US2] T012에서 만든 분기(리사이즈 실패 시 건너뜀)가 T015의 테스트를
       통과시키는지 확인한다 — 별도 구현이 필요하면 `caption.ts`를 보강한다
       (대개는 US1의 T012가 이미 이 요구를 만족시킨다 — 실패 시 확인만 하는
       태스크일 가능성이 높다)
@@ -149,23 +149,23 @@ D2(시간 실측)·D3(품질 확인)을 실기기에서 돌릴 준비가 됨
 
 ### Tests for User Story 3
 
-- [ ] T017 [P] [US3] `__tests__/vision/caption.test.ts`(또는 관련 스위트)에 케이스를
+- [X] T017 [P] [US3] `__tests__/vision/caption.test.ts`(또는 관련 스위트)에 케이스를
       더한다 — 캡션이 끝난(성공/실패 무관) 각 장마다 "지우기" 신호가 호출되는지
       확인한다. 지우기 자체는 대역 함수로 주입해 몇 번 불렸는지 센다
       (data-model.md 「생애」 2번 — 장별 정리)
-- [ ] T018 [P] [US3] `__tests__/vision/resize.test.ts`에 케이스를 더한다 — T010의
+- [X] T018 [P] [US3] `__tests__/vision/resize.test.ts`에 케이스를 더한다 — T010의
       파일명 함수가 같은 `photo.id`에 대해 항상 같은 이름을 돌려주는지
       (결정론) 확인한다(research.md R3)
 
 ### Implementation for User Story 3
 
-- [ ] T019 [US3] `src/vision/caption.ts`의 `captionAll()`에 "그 장의 리사이즈
+- [X] T019 [US3] `src/vision/caption.ts`의 `captionAll()`에 "그 장의 리사이즈
       사본을 지운다" 단계를 추가한다 — 캡션 성공/실패/그만둠과 무관하게 각 장
       처리가 끝나면(finally 성격) 호출되도록 한다. 지우는 함수도 주입 가능하게
       만들어 T017이 대역으로 검증할 수 있게 한다
-- [ ] T020 [US3] `src/inference/on-device.ts`에서 T019가 요구하는 "지우기" 함수의
+- [X] T020 [US3] `src/inference/on-device.ts`에서 T019가 요구하는 "지우기" 함수의
       실제 구현(`expo-file-system`의 파일 삭제)을 배선한다
-- [ ] T021 [US3] T011(C1 — 원본과 같은 경로를 그대로 쓴 경우)에서는 지우기 단계가
+- [X] T021 [US3] T011(C1 — 원본과 같은 경로를 그대로 쓴 경우)에서는 지우기 단계가
       원본을 삭제하지 않는지 확인한다 — `path === sourcePath`일 때 지우기를
       건너뛰는 분기를 T019에 추가한다(FR-006 보호)
 

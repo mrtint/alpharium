@@ -24,7 +24,8 @@
 import { judge } from "../diary/acceptance";
 import { buildPrompt, instructionLines } from "../diary/prompt";
 import type { DiaryRequest } from "../diary/types";
-import { captionAll, type PhotoPathResolver } from "../vision/caption";
+import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
+import type { ResizeExecutor } from "../vision/resize";
 import { selectForVision } from "../vision/select";
 import type { PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
 import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
@@ -108,6 +109,14 @@ async function runWithTimeout(
 export type VisionSupport = {
   engine: VisionEngine;
   resolvePath: PhotoPathResolver;
+  /**
+   * 캡션 전에 사진을 줄인다(013). **옵셔널이다** — 없으면 `captionAll`이 리사이즈를
+   * 건너뛰고 원본 경로를 그대로 쓴다(013 이전과 같은 동작). 실기기 어댑터
+   * (`visionSupport()`)는 항상 채운다
+   */
+  resize?: ResizeExecutor;
+  /** 리사이즈 사본을 지운다(013). `resize`가 없으면 쓰이지 않는다 */
+  cleanupResized?: ResizedPhotoCleaner;
 };
 
 /**
@@ -154,6 +163,8 @@ async function readPhotos(
       photos.value.photos.length,
       vision.resolvePath,
       cancel,
+      vision.resize,
+      vision.cleanupResized,
     );
 
     // `null`은 그만둔 것이다 — 거기까지 읽은 것을 버린다(FR-009).
@@ -379,8 +390,106 @@ function visionSupport(): VisionSupport {
       const { expoPhotoPort } = await import("../signals/expo-port");
       return expoPhotoPort().filePathOf(photo.id);
     },
+    resize: resizeExecutor,
+    cleanupResized: cleanupResizedPhoto,
   };
 }
+
+/**
+ * 리사이즈 사본이 놓이는 앱 전용 디렉터리 (013 FR-007).
+ *
+ * **`Paths.cache`가 아니라 `Paths.document`다** — clarify에서 "OS가 앱이 모르는
+ * 사이에 지울 수 있는 자리도 아니다"로 정했다(spec 013 Clarifications). 003의
+ * `models/expo-port.ts`가 같은 이유로 이미 내린 결정과 같다.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **⚠️ `expo-image-manipulator`의 `ImageRef.saveAsync()`는 캐시 디렉터리에만
+ * 저장한다**(공식 문서, `ImageRef.d.ts` 주석 확인 — research.md R2). 그래서
+ * `resizeExecutor`가 저장 직후 `moveSync()`로 이 디렉터리로 옮긴다. 새 의존을
+ * 늘리지 않고 두 요구사항(리사이즈는 image-manipulator, "OS가 안 건드리는
+ * 자리"는 file-system)을 함께 만족시킨다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const VISION_CACHE_DIRECTORY = "vision-cache";
+
+async function openVisionCacheDirectory() {
+  const { Directory, Paths } = await import("expo-file-system");
+  const dir = new Directory(Paths.document, VISION_CACHE_DIRECTORY);
+  if (!dir.exists) dir.create({ intermediates: true });
+  return { dir, Directory, Paths };
+}
+
+/**
+ * 사진 id에서 결정론적으로 파일명을 만든다(013 research.md R3).
+ *
+ * **결정론이 곧 정리 실패 방어다.** 앱이 예기치 않게 끝나 지우지 못한 사본이
+ * 남아도, 같은 사진을 다음에 또 읽으면 **같은 이름을 덮어쓰므로** 파일이
+ * 누적되지 않는다(FR-009) — 008에서 받다 만 모델 셋이 쌓인 것과 같은 함정을
+ * 새 임의 이름을 안 쓰는 것만으로 피한다.
+ *
+ * `photo.id`가 안드로이드에서 `content://media/external/images/media/123` 꼴이므로
+ * 파일 시스템에 못 쓰는 문자(`/`·`:`)를 치환한다.
+ */
+export function resizedFileNameFor(sourcePath: string): string {
+  const safe = sourcePath.replace(/[^a-zA-Z0-9._-]/g, "_");
+  return `${safe}.jpg`;
+}
+
+/**
+ * 실제 리사이즈 구현 (013 T009~T011).
+ *
+ * contracts/resize.md C1 — **원본이 이미 목표보다 작으면 리사이즈를 건너뛰고
+ * 원본 경로를 그대로 돌려준다.** `ImageManipulator.manipulate(uri).renderAsync()`가
+ * (resize 액션 없이) 이미 원본 치수를 주므로, 그 값으로 판정한 뒤에만 `resize()`를
+ * 부른다 — 작은 사진을 굳이 다시 인코드하는 비용을 피한다.
+ */
+const resizeExecutor: ResizeExecutor = async (sourcePath, target) => {
+  const { ImageManipulator, SaveFormat } = await import("expo-image-manipulator");
+  const { File } = await import("expo-file-system");
+
+  const context = ImageManipulator.manipulate(sourcePath);
+  const original = await context.renderAsync();
+
+  const longEdge = Math.max(original.width, original.height);
+  if (longEdge <= target.maxLongEdge) {
+    // C1 — 이미 작다. 그대로 쓴다.
+    return { ok: true, path: sourcePath };
+  }
+
+  // 긴 변에만 목표를 준다 — 짧은 변은 `resize()`가 원본 비율로 자동 계산한다
+  // (공식 문서 확인, research.md R1). FR-004(비율 유지)를 라이브러리가 지킨다.
+  const isWidthLonger = original.width >= original.height;
+  const resized = isWidthLonger
+    ? context.resize({ width: target.maxLongEdge })
+    : context.resize({ height: target.maxLongEdge });
+
+  const rendered = await resized.renderAsync();
+  const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.9 });
+
+  // 캐시에 저장된 것을 앱 전용 문서 디렉터리로, 결정론적 이름으로 옮긴다
+  // (위 VISION_CACHE_DIRECTORY·resizedFileNameFor 주석). `move()`가 `File`
+  // 인스턴스를 목적지로 받으므로 이름까지 한 번에 정해진다.
+  const { dir } = await openVisionCacheDirectory();
+  const cached = new File(saved.uri);
+  const destination = new File(dir, resizedFileNameFor(sourcePath));
+  if (destination.exists) destination.delete();
+  cached.moveSync(destination);
+
+  return { ok: true, path: destination.uri };
+};
+
+/**
+ * 리사이즈 사본을 지운다 (013 T020, FR-008).
+ *
+ * `caption.ts`의 `captionAll()`이 그 장의 캡션이 끝나면(성공/실패 무관) 부른다.
+ * **원본과 같은 경로(C1)면 `caption.ts`가 애초에 이 함수를 부르지 않는다** —
+ * FR-006(원본 보호)의 방어가 호출자 쪽에 있다.
+ */
+const cleanupResizedPhoto: ResizedPhotoCleaner = async (path) => {
+  const { File } = await import("expo-file-system");
+  const file = new File(path);
+  if (file.exists) file.delete();
+};
 
 /**
  * 사진을 읽을 때 여는 컨텍스트 크기.

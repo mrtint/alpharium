@@ -18,6 +18,7 @@
  */
 
 import type { Photo } from "../signals/types";
+import { resizePhoto, type ResizeExecutor } from "./resize";
 import type { PhotoCaption, PhotoVision } from "./types";
 import type { VisionEngine } from "./vision-port";
 
@@ -30,6 +31,14 @@ import type { VisionEngine } from "./vision-port";
  */
 export type PhotoPathResolver = (photo: Photo) => Promise<string | null>;
 
+/**
+ * 리사이즈 사본을 지우는 함수 (013).
+ *
+ * **`path === sourcePath`(C1 — 이미 작아 그대로 쓴 경우)면 부르지 않는다** — 원본을
+ * 지우는 경로가 있으면 안 되기 때문이다(FR-006). 그 판정은 `captionAll` 안에서 한다.
+ */
+export type ResizedPhotoCleaner = (path: string) => Promise<void>;
+
 /** 그만두라는 신호. 있으면 매 장 앞에서 본다 */
 export type CancelSignal = { cancelled: boolean };
 
@@ -40,6 +49,13 @@ export type CancelSignal = { cancelled: boolean };
  *   호출자가 지킨다(research §2)
  * @param photos `selectForVision()`이 고른 것. 찍힌 시각 순
  * @param available 그 하루에 있던 사진의 수. `photos.length`보다 클 수 있다(FR-012)
+ * @param resolvePath 사진 id를 실제 파일 경로로 바꾼다(011)
+ * @param cancel 그만두라는 신호
+ * @param resize 사진을 캡션 전에 줄인다(013). **주입하지 않으면 리사이즈를 건너뛰고
+ *   원본 경로를 그대로 쓴다** — 013 이전 동작과 같다. 테스트가 011 시절의 케이스를
+ *   그대로 재사용할 수 있게 하는 하위 호환이다(contracts/resize.md는 필수를 요구하지
+ *   않는다 — 013이 새로 여는 것은 "리사이즈가 있으면 거친다"는 조건부 경로다)
+ * @param cleanup 리사이즈 사본을 지운다(013). `resize`가 없으면 부르지 않는다
  * @returns 읽은 결과. **`captions`가 비어도 그것은 「사진이 없다」가 아니다**
  */
 export async function captionAll(
@@ -48,6 +64,8 @@ export async function captionAll(
   available: number,
   resolvePath: PhotoPathResolver,
   cancel?: CancelSignal,
+  resize?: ResizeExecutor,
+  cleanup?: ResizedPhotoCleaner,
 ): Promise<PhotoVision | null> {
   const captions: PhotoCaption[] = [];
 
@@ -68,26 +86,55 @@ export async function captionAll(
     }
     if (path === null) continue;
 
-    // **엔진이 던지지 않기로 되어 있지만**(vision-engine.md E3) 여기서도 감싼다.
+    // ─────────────────────────────────────────────────────────────────────
+    // 013 — 캡션 전에 줄인다. **원본 경로를 캡션에 직접 넘기지 않는다.**
     //
-    // 계약을 믿고 감싸지 않으면, 엔진이 한 번 어겼을 때 **그 하루의 나머지 사진이
-    // 통째로 사라진다** — E4가 막으려던 바로 그 일이 계약 위반 한 번으로 일어난다.
-    // 방어가 둘이면 하나가 뚫려도 남는다.
-    let result: { text: string };
-    try {
-      result = await engine.caption(path);
-    } catch {
-      result = { text: "" };
+    // `resize`가 없으면(테스트가 주입하지 않은 경우) 리사이즈를 건너뛰고 원본
+    // 경로를 그대로 쓴다 — 013 이전과 같은 동작이다.
+    //
+    // 리사이즈에 실패하면(`ok: false`) **이 장을 못 읽은 것으로 다룬다** — 011의
+    // "경로를 못 얻음" 분기와 같은 자리에 합류시킨다(contracts/resize.md 「호출자
+    // 쪽 계약」). 새 판정 갈래를 만들지 않는다(FR-019, 원칙 IV).
+    // ─────────────────────────────────────────────────────────────────────
+    let captionPath = path;
+    let shouldCleanup = false;
+    if (resize !== undefined) {
+      const resized = await resizePhoto(path, resize);
+      if (!resized.ok) continue;
+      captionPath = resized.path;
+      // C1 — 원본과 같은 경로를 그대로 쓴 경우(이미 목표보다 작음)는 지우지
+      // 않는다. 원본을 지우는 경로가 있으면 안 된다(FR-006).
+      shouldCleanup = resized.path !== path;
     }
 
-    // **빈 것은 담지 않는다.** 비었다는 것이 곧 실패이며(vision-engine.md V1),
-    // `considered`와 `captions.length`의 차이가 그 사실을 말한다.
-    //
-    // **지어내지 않는다** — 「사진을 보았으나 설명할 수 없다」 같은 문장을 만들어
-    // 넣으면 그것이 기록에 없는 것이 되고, 헌법 원칙 II 위반이다.
-    if (result.text === "") continue;
+    try {
+      // **엔진이 던지지 않기로 되어 있지만**(vision-engine.md E3) 여기서도 감싼다.
+      //
+      // 계약을 믿고 감싸지 않으면, 엔진이 한 번 어겼을 때 **그 하루의 나머지 사진이
+      // 통째로 사라진다** — E4가 막으려던 바로 그 일이 계약 위반 한 번으로 일어난다.
+      // 방어가 둘이면 하나가 뚫려도 남는다.
+      let result: { text: string };
+      try {
+        result = await engine.caption(captionPath);
+      } catch {
+        result = { text: "" };
+      }
 
-    captions.push({ photoId: photo.id, takenAt: photo.takenAt, text: result.text });
+      // **빈 것은 담지 않는다.** 비었다는 것이 곧 실패이며(vision-engine.md V1),
+      // `considered`와 `captions.length`의 차이가 그 사실을 말한다.
+      //
+      // **지어내지 않는다** — 「사진을 보았으나 설명할 수 없다」 같은 문장을 만들어
+      // 넣으면 그것이 기록에 없는 것이 되고, 헌법 원칙 II 위반이다.
+      if (result.text === "") continue;
+
+      captions.push({ photoId: photo.id, takenAt: photo.takenAt, text: result.text });
+    } finally {
+      // 013 FR-008 — 그 장의 캡션이 끝나면(성공·실패 무관) 리사이즈 사본을 지운다.
+      // 그만두기(E5)로 이 장을 못 마쳐도 finally가 돈다.
+      if (shouldCleanup && cleanup !== undefined) {
+        await cleanup(captionPath).catch(() => {});
+      }
+    }
   }
 
   // 마지막으로 한 번 더 본다 — 마지막 장을 읽는 동안 그만뒀을 수 있다.
