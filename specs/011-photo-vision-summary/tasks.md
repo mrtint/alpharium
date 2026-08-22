@@ -227,7 +227,7 @@ description: "Task list for 011-photo-vision-summary"
 - [X] T061 [P] D6: 「빠르게 봄」과 「자세히 봄」이 **다른가** (SC-015). **어느 쪽이 나은지 판정하지 않는다**(원칙 IV). 거의 같으면 값을 벌린다
 - [X] T062 ⚠️ D7: **캡션 언어를 확인한다** (research.md §7 — 미결). 영어가 섞이면 캡션을 한국어로 뽑을지 **여기서 실제로 보고 정한다**
 - [X] T063 [P] D8: 그만두기와 **화면에 백분율·초·「사진 3/5」·캡션 본문이 하나도 없음** (SC-012, FR-034)
-- [ ] T064 release 빌드 검증 — **⚠️ `initMultimodal`의 JNI 심볼이 R8·ProGuard에서 사는가**(005가 `initLlama`에서 통과했으나 **멀티모달은 처음이다**). 서명 `CN=alpharium`, Metro 없이 뜨는가
+- [X] T064 release 빌드 검증 — **⚠️ `initMultimodal`의 JNI 심볼이 R8·ProGuard에서 사는가**(005가 `initLlama`에서 통과했으나 **멀티모달은 처음이다**). 서명 `CN=alpharium`, Metro 없이 뜨는가
 
 ### 기록
 
