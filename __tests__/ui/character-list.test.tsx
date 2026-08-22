@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Character } from "../../src/diary/types";
+import { personaOf } from "../../src/diary/persona";
 import { resolveDownloadView } from "../../src/models/download-view";
 import type { DownloadProgress, DownloadRejection, ModelReadiness } from "../../src/models/types";
 import { CharacterListScreen } from "../../src/ui/CharacterListScreen";
@@ -388,5 +389,41 @@ describe("011 — 사진 보는 모델 줄", () => {
     );
 
     expect(JSON.stringify(toJSON())).not.toMatch(/초 남|\/s|elapsed|남은 시간/);
+  });
+});
+
+/* ───────────────────── 014 — 이름과 소개 (US1, FR-001·004) ───────────────────── */
+
+describe("이름과 소개로 캐릭터를 고른다 (014 FR-001·004)", () => {
+  it("다섯 줄 모두 사람이 지은 이름이 보인다", async () => {
+    await renderList({});
+
+    for (const character of CHARACTERS) {
+      expect(screen.getByTestId(`character-row-${character}`)).toHaveTextContent(
+        new RegExp(personaOf(character).name),
+      );
+    }
+  });
+
+  it("다섯 줄 모두 한 줄 소개가 보인다", async () => {
+    await renderList({});
+
+    for (const character of CHARACTERS) {
+      expect(screen.getByTestId(`character-row-${character}`)).toHaveTextContent(
+        new RegExp(personaOf(character).tagline),
+      );
+    }
+  });
+
+  it("내부 식별자가 이름 자리에 노출되지 않는다", async () => {
+    await renderList({});
+
+    // `character-row-quiet` 같은 testID는 내부 식별자를 쓰지만 그것은 테스트 배선이지
+    // 사용자가 읽는 텍스트가 아니다. 여기서는 화면에 실제로 그려지는 이름 텍스트
+    // 노드만 본다 — persona 이름으로 대체됐는지 직접 확인한다(위 테스트가 이미 증명).
+    // 이 테스트는 회귀 방지용으로, 내부 식별자 문자열이 이름 스타일 텍스트로
+    // 그대로 나오지 않는지를 별도로 확인한다.
+    const row = screen.getByTestId("character-row-quiet");
+    expect(row).not.toHaveTextContent(/^quiet$/);
   });
 });

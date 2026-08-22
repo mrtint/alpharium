@@ -15,6 +15,7 @@
 import { render, screen, userEvent } from "@testing-library/react-native";
 
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../../src/app/state";
+import { personaOf } from "../../src/diary/persona";
 import { DiaryListScreen } from "../../src/ui/DiaryListScreen";
 
 const readable = (day: string, photos: PhotoHint = { kind: "none" }): DiaryListItem => ({
@@ -313,7 +314,9 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
       />,
     );
 
-    await userEvent.press(screen.getByRole("button", { name: /narrative/ }));
+    await userEvent.press(
+      screen.getByRole("button", { name: new RegExp(personaOf("narrative").name) }),
+    );
 
     expect(picked).toEqual(["narrative"]);
   });
@@ -330,7 +333,10 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
     );
 
     // **말없이 바뀌지 않는다** — 캐릭터마다 글의 성격이 다르다.
-    expect(screen.getByText(/quiet.*쓸 수 없어.*narrative/)).toBeTruthy();
+    // 014 — 안내가 내부 식별자가 아니라 persona 이름을 쓴다(FR-005).
+    const movedFromName = personaOf("quiet").name;
+    const toName = personaOf("narrative").name;
+    expect(screen.getByText(new RegExp(`${movedFromName}.*쓸 수 없어.*${toName}`))).toBeTruthy();
   });
 
   it("옮기지 않았으면 알림이 없다", async () => {

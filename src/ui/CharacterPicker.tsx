@@ -15,9 +15,10 @@
  * 지문에 닿는 경로가 아예 없으므로 **조심해서 안 쓰는 것이 아니라 쓸 수 없다**
  * (003의 `CharacterListScreen`과 같은 방어, FR-007).
  *
- * **표시 이름과 성격 문안을 짓지 않는다**(FR-009). 헌법이 "캐릭터 이름은 사람이
- * 짓는다"고 했고, 성격 설명은 실측 관측에 근거해야 하는데 그 관측은 이 저장소의 몫이
- * 아니다(원칙 IV). **유일한 예외가 `imaginative`이며 근거는 헌법 로스터 본문이다.**
+ * **★ 014 — 이름과 소개는 `persona.ts`에서 온다.** `persona.ts`도 `roster.ts`를
+ * import하지 않으므로(계약 P2) 이 파일이 persona를 거쳐도 모델 자산에는 여전히
+ * 닿지 않는다. 소개 문구는 지어낸 것이 아니라 로드맵 문서가 005~012의 실측을
+ * 사람 말로 옮겨 이미 확정해 둔 값이다(원칙 III).
  *
  * **추천하거나 미리 고르지 않는다**(FR-008). 다섯이 같은 자격으로 보인다.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { personaOf } from "../diary/persona";
 import type { Character } from "../diary/types";
 
 export type CharacterPickerProps = {
@@ -76,10 +78,16 @@ export function CharacterPicker({ characters, selected, onSelect }: CharacterPic
             style={[styles.row, isSelected && styles.rowSelected, !ready && styles.rowDisabled]}
           >
             <View style={styles.info}>
-              {/* 자리표시 식별자를 그대로 보인다 — 이름은 사람이 짓는다(FR-009) */}
-              <Text style={styles.name}>{character}</Text>
+              {/* 014 — persona.ts의 이름·소개로 보인다(FR-001·004) */}
+              <Text style={styles.name}>{personaOf(character).name}</Text>
+              <Text style={styles.hint}>{personaOf(character).tagline}</Text>
 
-              {/* **헌법 로스터가 MUST로 요구한 고지**. 나머지 넷에는 아무 말도 붙이지 않는다 */}
+              {/*
+                **헌법 로스터가 MUST로 요구한 고지**. 소개 문구와는 별개다 — 소개는
+                강점의 언어로 쓴 사람이 지은 문구이고, 이 고지는 헌법 본문이 MUST로
+                요구한 사실 전달이다(둘을 하나로 합치면 고지가 소개에 묻혀 사라질
+                위험이 있다). 나머지 넷에는 이 줄이 붙지 않는다.
+              */}
               {character === "imaginative" && <Text style={styles.hint}>{IMAGINATIVE_NOTICE}</Text>}
 
               {/* **「받아야 함」이지 「3.2GB를 받아야 함」이 아니다** — 크기는 모델 규모를 드러낸다 */}

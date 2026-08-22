@@ -125,45 +125,45 @@ US3(프롬프트 개정과 같은 파일)이 전부 이것을 필요로 하거�
 
 ### Tests for User Story 2
 
-- [X] T014 [P] [US2] `__tests__/diary/title.test.ts`를 만든다 —
+- [ ] T014 [P] [US2] `__tests__/diary/title.test.ts`를 만든다 —
       contracts/title.md P1~P4를 각각 검증: 정상 형식(첫 줄+빈 줄+본문)에서 제목이
       분리됨, 빈 줄이 없으면 전체가 body, 첫 줄이 40자 초과면 전체가 body, 예외를
       던지지 않음(빈 문자열 등 경계 입력), 반환 타입에 `title`·`body` 외 필드가
       없음을 소스를 직접 읽어 확인(007·009의 교훈)
-- [X] T015 [P] [US2] `__tests__/diary/pipeline.test.ts`에 케이스를 추가한다 —
+- [ ] T015 [P] [US2] `__tests__/diary/pipeline.test.ts`에 케이스를 추가한다 —
       `judge()`가 통과시킨 텍스트에서 `extractTitle()`이 호출되어
       `DiaryEntry.title`이 채워짐을 확인하고, **`judge()`에는 원본 전체 텍스트가
       그대로 전달됨**(제목이 미리 잘려 판정에 들어가지 않음)을 확인한다(FR-007·009)
-- [X] T016 [US2] `npm run test:logic`으로 T014·T015가 실패하는 것을 확인한다
+- [ ] T016 [US2] `npm run test:logic`으로 T014·T015가 실패하는 것을 확인한다
       (구현 전이므로 실패해야 정상)
 
 ### Implementation for User Story 2
 
-- [X] T017 [P] [US2] `src/diary/title.ts`를 만든다 — `TitleExtraction` 타입과
+- [ ] T017 [P] [US2] `src/diary/title.ts`를 만든다 — `TitleExtraction` 타입과
       `extractTitle(text)` 함수(data-model.md 「Title」, contracts/title.md
       「판정 순서」)
-- [X] T018 [US2] `src/diary/types.ts`의 `DiaryEntry`에 `title?: string`을
+- [ ] T018 [US2] `src/diary/types.ts`의 `DiaryEntry`에 `title?: string`을
       추가한다(data-model.md, FR-010 — 옵셔널이어야 기존 파일과 호환)
-- [X] T019 [US2] `src/diary/pipeline.ts`를 수정한다 — `judge()` 통과 후(기존
+- [ ] T019 [US2] `src/diary/pipeline.ts`를 수정한다 — `judge()` 통과 후(기존
       `generated.text`를 그대로 쓰던 자리), `extractTitle(generated.text)`를
       호출해 `entry.text = extraction.body`, `entry.title = extraction.title`로
       채운다. **`judge()` 호출부는 건드리지 않는다**(원본 텍스트를 그대로 넘긴다,
       research.md R5)
-- [X] T020 [US2] `src/diary/store.ts`의 `DiaryListItem`에 `title?: string`을
+- [ ] T020 [US2] `src/diary/store.ts`의 `DiaryListItem`에 `title?: string`을
       추가하고, `photoHintOf()`와 같은 자리에 `titleOf(entry)` 헬퍼를 추가해
       `listDiaries()`가 채운다(data-model.md 「DiaryListItem」, 추가 읽기 없음)
-- [X] T021 [US2] `src/ui/DiaryListScreen.tsx`의 목록 줄에 `item.title`이 있으면
+- [ ] T021 [US2] `src/ui/DiaryListScreen.tsx`의 목록 줄에 `item.title`이 있으면
       표시하는 텍스트를 추가한다(FR-011)
-- [X] T022 [US2] `src/ui/DiaryDetailScreen.tsx`에 `entry.title`이 있으면
+- [ ] T022 [US2] `src/ui/DiaryDetailScreen.tsx`에 `entry.title`이 있으면
       표시하는 텍스트를 추가한다(FR-011)
-- [X] T023 [US2] `src/diary/prompt.ts`의 `buildPrompt()`에 제목 지시문을 추가한다
+- [ ] T023 [US2] `src/diary/prompt.ts`의 `buildPrompt()`에 제목 지시문을 추가한다
       (research.md R2 — "첫 줄에 제목만, 빈 줄, 그다음 본문"을 요구하는 한 줄).
       **`instructionLines()`에도 이 줄이 들어가야** 되뱉기 판정 대상이 된다
       (기존 메커니즘, `SPEAKER_RULES` 확장과 동일한 자리)
-- [X] T024 [US2] `npm run test:logic`으로 T014·T015가 이제 통과하는지 확인한다
-- [X] T025 [US2] `npm run test:ui`로 T021·T022 관련 화면 테스트(있다면 새로
+- [ ] T024 [US2] `npm run test:logic`으로 T014·T015가 이제 통과하는지 확인한다
+- [ ] T025 [US2] `npm run test:ui`로 T021·T022 관련 화면 테스트(있다면 새로
       추가)가 통과하는지 확인한다
-- [X] T026 [US2] `npm run lint`로 헌법 검사 및 `acceptance.test.ts`의 A-7
+- [ ] T026 [US2] `npm run lint`로 헌법 검사 및 `acceptance.test.ts`의 A-7
       (판정 갈래가 넷임을 세는 테스트)이 그대로 통과하는지 확인한다 — `judge()`를
       건드리지 않았다는 증거
 
@@ -182,26 +182,26 @@ US3(프롬프트 개정과 같은 파일)이 전부 이것을 필요로 하거�
 
 ### Tests for User Story 3
 
-- [X] T027 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 — 새
+- [ ] T027 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 — 새
       짐작 어미 지시 문장이 `SPEAKER_RULES`(→ `instructionLines()`의 반환값)에
       포함되는지, 그 문장에 특정 캐릭터 이름이나 "상상력이 풍부하다" 류의 성격
       서술이 섞여 있지 않은지(FR-013·015 — 모든 캐릭터에 공통으로 적용되는 문장인지)
       확인한다
-- [X] T028 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 —
+- [ ] T028 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 —
       `buildPrompt()`가 캐릭터 이름(`personaOf().name`)을 프롬프트에 포함하되,
       `tagline`(소개 문구)은 포함하지 않는 것을 확인한다(contracts/persona.md P4,
       FR-015·016)
 
 ### Implementation for User Story 3
 
-- [X] T029 [US3] `src/diary/prompt.ts`의 `SPEAKER_RULES`에 짐작 어미 지시 한 줄을
+- [ ] T029 [US3] `src/diary/prompt.ts`의 `SPEAKER_RULES`에 짐작 어미 지시 한 줄을
       추가한다(research.md R3 — "확실하지 않은 것은 '~인 것 같다'처럼 짐작의
       말투로 써라" 류)
-- [X] T030 [US3] `src/diary/prompt.ts`의 `buildPrompt()`가 `personaOf(character).name`을
+- [ ] T030 [US3] `src/diary/prompt.ts`의 `buildPrompt()`가 `personaOf(character).name`을
       읽어 이름 한 줄을 프롬프트에 추가한다(FR-015 — 이름만, 성격 지시 없음).
       `persona.ts`를 import하되 `roster.ts`는 여전히 import하지 않는다
-- [X] T031 [US3] `npm run test:logic`으로 T027·T028이 통과하는지 확인한다
-- [X] T032 [US3] `npm run lint`로 헌법 검사(특히 `src/diary/`가 `models/roster`에
+- [ ] T031 [US3] `npm run test:logic`으로 T027·T028이 통과하는지 확인한다
+- [ ] T032 [US3] `npm run lint`로 헌법 검사(특히 `src/diary/`가 `models/roster`에
       닿지 않는 기존 규칙이 있다면) 통과를 확인한다
 
 **Checkpoint**: User Story 1+2+3 완결. 프롬프트 개정은 quickstart.md D6에서
@@ -220,27 +220,27 @@ release 빌드에서는 여전히 진단 화면에 닿는 경로가 없는 것�
 
 ### Tests for User Story 4
 
-- [X] T033 [P] [US4] `__tests__/models/roster.test.ts`에 케이스를 추가한다 —
+- [ ] T033 [P] [US4] `__tests__/models/roster.test.ts`에 케이스를 추가한다 —
       `displayName(character)`가 다섯 값 모두에 대해 빈 문자열이 아닌 값을
       반환하는 것을 확인한다
-- [X] T034 [P] [US4] `__tests__/diagnostics/report.test.ts`에 케이스를 추가한다 —
+- [ ] T034 [P] [US4] `__tests__/diagnostics/report.test.ts`에 케이스를 추가한다 —
       `collectReport()`의 결과에 `characterModels` 필드가 다섯 캐릭터 전부를
       담고 있는 것을 확인한다
 
 ### Implementation for User Story 4
 
-- [X] T035 [US4] `src/models/roster.ts`에 `displayName(character)` 함수를
+- [ ] T035 [US4] `src/models/roster.ts`에 `displayName(character)` 함수를
       추가한다(data-model.md 「roster.ts 추가」) — 기존 실측 주석의 모델명
       문자열을 그대로 옮긴다
-- [X] T036 [US4] `src/diagnostics/types.ts`의 `DiagnosticReport`에
+- [ ] T036 [US4] `src/diagnostics/types.ts`의 `DiagnosticReport`에
       `characterModels: Readonly<Record<Character, string>>`을 추가한다
-- [X] T037 [US4] `src/diagnostics/report.ts`의 `collectReport()`가
+- [ ] T037 [US4] `src/diagnostics/report.ts`의 `collectReport()`가
       `CHARACTERS.map(displayName)`으로 `characterModels`를 채운다
-- [X] T038 [US4] `src/ui/DiagnosticsScreen.tsx`에 `characterModels`를 렌더링하는
+- [ ] T038 [US4] `src/ui/DiagnosticsScreen.tsx`에 `characterModels`를 렌더링하는
       부분을 추가한다(문자열만 받아 그리기만 함 — `roster.ts`를 import하지 않음)
-- [X] T039 [US4] `npm run test:logic`·`npm run test:ui`로 T033·T034 및
+- [ ] T039 [US4] `npm run test:logic`·`npm run test:ui`로 T033·T034 및
       진단 화면 렌더링 테스트가 통과하는지 확인한다
-- [X] T040 [US4] `npm run lint`로 `src/ui/DiagnosticsScreen.tsx`가 `roster.ts`를
+- [ ] T040 [US4] `npm run lint`로 `src/ui/DiagnosticsScreen.tsx`가 `roster.ts`를
       직접 import하지 않는 것(헌법 검사 통과)을 확인한다
 
 **Checkpoint**: 네 User Story 전부 완결
@@ -251,8 +251,8 @@ release 빌드에서는 여전히 진단 화면에 닿는 경로가 없는 것�
 
 **Purpose**: 전체 통합 확인과 실기기 검증
 
-- [X] T041 `npm test`(전체) + `npm run lint`로 최종 기기 없는 검증을 통과시킨다
-- [X] T042 AGENTS.md에 014 섹션을 추가한다 — 무엇이 바뀌었는지, 지어내기 교정의
+- [ ] T041 `npm test`(전체) + `npm run lint`로 최종 기기 없는 검증을 통과시킨다
+- [ ] T042 AGENTS.md에 014 섹션을 추가한다 — 무엇이 바뀌었는지, 지어내기 교정의
       실기기 관측 결과, 제목 40자 상한의 실측 여부(D5)를 기록한다(원칙 V)
 - [ ] T043 quickstart.md D1~D8을 실기기(debug 빌드)에서 실행하고 결과를 AGENTS.md에
       기록한다 — 새 네이티브 모듈이 없으므로 debug 1회로 충분(AGENTS.md 「테스트」
