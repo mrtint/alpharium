@@ -29,16 +29,18 @@ and testing of each story.
 **Purpose**: 새 의존을 설치하고 헌법 검사 규칙을 먼저 세운다 — 규칙이 먼저 있어야
 이후 구현이 그것을 어기는 순간 잡힌다(010·011의 선례).
 
-- [ ] T001 `npx expo install expo-image-manipulator`로 새 의존을 추가한다.
+- [X] T001 `npx expo install expo-image-manipulator`로 새 의존을 추가한다.
       `package.json`의 버전 선언이 실제 설치본과 맞는지 확인한다
       (AGENTS.md 「Expo 작업 시」 — `npm view`가 아니라 `expo install`이 버전을 고른다)
-- [ ] T002 `scripts/constitution-rules.ts`에 규칙을 추가한다: `src/vision/resize.ts`가
-      `diary/store`·`DiaryEntry`·`inference/sampling`에 닿지 못하게 막는다
-      (011이 `src/vision/`에 세운 두 규칙과 같은 성격 — plan.md Constitution Check
-      「IV. 측정 장치를 이 저장소에 두지 않는다」, 「I. `inference/sampling` 재사용
-      금지」를 이 파일에도 적용한다)
-- [ ] T003 `npm run lint`(헌법 검사 포함)이 통과하는지 확인한다 — 아직 코드가 없으므로
-      규칙 추가만으로 위반이 없어야 한다
+- [X] T002 ~~새 규칙 추가~~ → **불필요로 판명.** `scripts/constitution-rules.ts`의
+      `checkVisionFile()`이 이미 `src/vision/` **디렉터리 전체**를 대상으로 하고
+      (`normalized.startsWith("src/vision/")`), `__tests__/scripts/check-constitution.test.ts`의
+      "실제 src/vision/ 파일이 규칙을 지킨다" 테스트가 `readdirSync(dir)`로 폴더를
+      매번 다시 읽으므로 `resize.ts`가 생기자마자 자동으로 검사 대상이 됐다.
+      plan.md의 서술("규칙을 추가한다")이 부정확했다 — 실제로는 011이 이미 세운
+      경계가 파일명이 아니라 디렉터리 단위였다
+- [X] T003 `npm run lint`로 확인 — **통과**(헌법 검사 위반 0건). `resize.ts`가
+      `diary/store`·`inference/sampling`에 닿지 않음이 기존 규칙으로 실증됐다
 
 **Checkpoint**: 새 의존이 설치되고 헌법 검사 규칙이 준비됨
 
@@ -52,21 +54,21 @@ and testing of each story.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T004 [P] `src/vision/resize.ts`에 `ResizeTarget` 상수와 타입을 만든다
+- [X] T004 [P] `src/vision/resize.ts`에 `ResizeTarget` 상수와 타입을 만든다
       (data-model.md 「ResizeTarget」) — `maxLongEdge: 1024`, export하지 않음
       (FR-002, FR-020: 실측 근거를 주석에 남긴다)
-- [ ] T005 [P] `src/vision/resize.ts`에 `ResizeResult` 타입을 만든다
+- [X] T005 [P] `src/vision/resize.ts`에 `ResizeResult` 타입을 만든다
       (data-model.md 「ResizeResult」) — `{ ok: true; path: string } | { ok: false }`뿐,
       다른 필드 없음(FR-015)
-- [ ] T006 `src/vision/resize.ts`에 `resizePhoto(sourcePath, execute?)` 함수를 만든다
+- [X] T006 `src/vision/resize.ts`에 `resizePhoto(sourcePath, execute?)` 함수를 만든다
       (contracts/resize.md 「함수」·「규칙 C1~C4」) — `execute`를 주입받는 순수 함수,
       예외를 잡아 `{ ok: false }`로 바꾼다(C2)
-- [ ] T007 `__tests__/vision/resize.test.ts`를 만든다 — C1(이미 작으면 그대로),
+- [X] T007 `__tests__/vision/resize.test.ts`를 만든다 — C1(이미 작으면 그대로),
       C2(예외를 던지지 않음, throw하는 대역을 주입해 확인), C3(반환 타입에
       지표 필드가 없음을 선언을 직접 읽어 확인 — 007·009의 교훈), C4는 이
       계약 자체가 방향을 모르므로 여기서 검증하지 않음(quickstart D6의 몫)을
       주석으로 남긴다
-- [ ] T008 `npm run test:logic`으로 T007이 통과하는지 확인한다
+- [X] T008 `npm run test:logic`으로 T007이 통과하는지 확인한다
 
 **Checkpoint**: `resize.ts` 계약이 서고 순수 로직이 테스트로 지켜짐 — User Story
 구현이 이제 시작 가능
