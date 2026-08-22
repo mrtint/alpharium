@@ -138,6 +138,21 @@ const UI_TOUCHES_MODEL = /\bfrom\s+["'][^"']*models\/(?:roster|assets|expo-port|
 const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets)\b/;
 
 /**
+ * 진단 경로가 사용자 화면의 축 제외 상수를 보는 것 (012, 헌법 원칙 V).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **`SignalProbe.tsx`는 다섯 축을 전부 그려야 한다**(FR-009) — 사용자 화면에서
+ * 걸음·배터리·연결이 빠지는 것과 저장소가 값을 잊는 것은 다르다. `USER_VISIBLE_
+ * SIGNAL_AXES`를 이 파일이 import하면 진단 경로도 조용히 같은 축을 숨기게 되고,
+ * 그러면 개발자가 실기기에서 그 값을 다시는 볼 수 없다.
+ *
+ * 008이 "주석을 걷어내고 검사한다"로 세운 것과 같은 이중 방어다 — 화면 테스트
+ * (`signal-probe.test.tsx`)가 런타임을, 이 검사가 소스 자체를 본다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const DIAGNOSTICS_HIDES_AXES = /\bUSER_VISIBLE_SIGNAL_AXES\b/;
+
+/**
  * 소스 파일 하나를 검사한다.
  *
  * **경로로 판단한다.** `src/ui/`와 `src/app/`은 화면과 조립이며, 추론 어댑터를 직접
@@ -179,6 +194,16 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "화면이 모델 자산에 닿는다 — 캐릭터만 알아야 한다 (007 FR-007, 원칙 III)",
+      });
+    }
+
+    // **`SignalProbe.tsx`만 검사한다.** 다른 화면(DiaryDetailScreen 등)은 이 상수를
+    // import해서 사용자 화면에 축을 숨기는 것이 맞는 동작이다 — 문제는 진단 경로뿐이다.
+    if (normalized === "src/ui/SignalProbe.tsx" && DIAGNOSTICS_HIDES_AXES.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "진단 화면이 축 제외 상수를 본다 — 다섯 축을 전부 보여야 한다 (012 FR-009, 원칙 V)",
       });
     }
   }

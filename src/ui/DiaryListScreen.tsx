@@ -54,6 +54,13 @@ export type DiaryListScreenProps = {
    */
   onSelectDay?: (day: DayDate) => void;
   /**
+   * 정오 전이라 오늘을 아직 쓸 수 없다는 안내 (012, 헌법 원칙 II MUST).
+   *
+   * `DiaryHomeScreen`이 `isDayWritable()`을 재사용해 계산한 값을 그대로 `DayPicker`에
+   * 전달한다 — 이 화면은 계산하지 않고 넘기기만 한다.
+   */
+  todayNotYetWritable?: boolean;
+  /**
    * 사진 설정을 고른다 (011 FR-015).
    *
    * **옵셔널이다** — 006~010의 기존 테스트가 그대로 통과해야 한다. 003의
@@ -90,6 +97,7 @@ export function DiaryListScreen({
   characters,
   onSelectCharacter,
   onSelectDay,
+  todayNotYetWritable,
   onSelectVision,
   vision = "none",
 }: DiaryListScreenProps) {
@@ -168,6 +176,7 @@ export function DiaryListScreen({
             onSelect={onSelectDay ?? (() => {})}
             revertedFrom={write.revertedFrom}
             selected={write.day}
+            todayNotYetWritable={todayNotYetWritable}
           />
         )}
 

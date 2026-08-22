@@ -146,20 +146,20 @@ describe("계약이 요구하는 조합을 대역으로 만들 수 있다 (SC-00
     }
   });
 
-  it("9. 상한을 넘으면 complete가 false다 (FR-014a)", async () => {
+  it("9. 012 — 사진이 아무리 많아도 전부 담기고 complete는 true다 (FR-014·015)", async () => {
     const many = Array.from({ length: 6 }, (_, i) =>
       photo(`p${i}`, `2026-08-12T${String(9 + i).padStart(2, "0")}:00:00`),
     );
 
     const signals = await collectDaySignals(
-      stubPort({ photosBetween: async (_f, _t, limit) => many.slice(0, limit) }),
+      stubPort({ photosBetween: async () => many }),
       DAY,
-      { limit: 5 },
     );
 
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {
-      expect(signals.photos.value.complete).toBe(false);
+      expect(signals.photos.value.photos).toHaveLength(6);
+      expect(signals.photos.value.complete).toBe(true);
     }
   });
 

@@ -366,6 +366,106 @@ describe("P-7 두 함수가 같은 상수에서 나온다", () => {
   });
 });
 
+/* ═══════════════ 012 — 관측 불가 축 제외 ═══════════════ */
+
+/**
+ * 계약: specs/012-today-diary/contracts/signal-visibility.md §1 「축 제외」
+ *
+ * **1번 행이 이 계약의 핵심이다.** 걸음 수가 실제로 known이어도(향후 통로가 생겼을
+ * 때를 가정) 상수가 false인 한 프롬프트에 실리지 않는다.
+ */
+describe("012 — 걸음·배터리·연결이 프롬프트에 실리지 않는다 (contracts/signal-visibility.md §1)", () => {
+  /**
+   * **★ 걸음이 실제로 known인 신호를 직접 만든다** — 004 이후 어떤 `signals/fake.ts`
+   * 시나리오도 걸음을 known으로 만들지 않으므로(안드로이드가 통로를 안 준다), 그
+   * 기존 fixture만으로는 "값을 보고 조건부로 넣는" 위반(quickstart A1 3번)이
+   * 걸리지 않는다 — 코드가 `signal.kind`를 직접 보게 바꿔도 값 자체가 known인
+   * 경우가 테스트에 없으면 초록불이 유지된다.
+   */
+  function dayWithKnownSteps(): DaySignals {
+    return { ...richDay(DAY), steps: { kind: "known", value: 5000 } };
+  }
+
+  it("★ 1. 걸음이 known이어도 프롬프트에 없다 (S1, 이 계약의 핵심)", () => {
+    const prompt = buildPrompt(requestFor(richDay(DAY)));
+    // richDay는 걸음이 known(5000걸음 등)이다 — 그래도 "걸음"이라는 단어 자체가 없다.
+    expect(prompt).not.toMatch(/걸음/);
+  });
+
+  it("★ 1b. 걸음이 실제로 known(향후 통로가 생긴 것을 가정)이어도 여전히 없다", () => {
+    const prompt = buildPrompt(requestFor(dayWithKnownSteps()));
+    expect(prompt).not.toMatch(/걸음/);
+  });
+
+  it("2. 사진은 known이면 여전히 보인다 (회귀 없음)", () => {
+    const prompt = buildPrompt(requestFor(richDay(DAY)));
+    expect(prompt).toContain("사진");
+  });
+
+  it("배터리·연결도 known이어도 프롬프트에 없다", () => {
+    const prompt = buildPrompt(requestFor(richDay(DAY)));
+    expect(prompt).not.toMatch(/배터리|충전/);
+    expect(prompt).not.toMatch(/연결|와이파이|셀룰러/);
+  });
+
+  it("걸음·배터리·연결이 unknown이어도 프롬프트에 없다 (빠지는 것과 모르는 것은 다르다)", () => {
+    const prompt = buildPrompt(requestFor(unknownDay(DAY)));
+    expect(prompt).not.toMatch(/걸음|배터리|연결/);
+  });
+});
+
+/* ═══════════════ 012 — 「하루의 끝」 문장 ═══════════════ */
+
+/**
+ * 계약: specs/012-today-diary/contracts/signal-visibility.md §2 「하루의 끝」 문장
+ *
+ * **2번 행이 이 계약의 핵심이다**(FR-004) — 사진 권한과 무관하게 붙는다.
+ */
+describe("012 — DAY_STILL_OPEN, 하루가 아직 끝나지 않았다는 문장", () => {
+  /** requestFor를 우회해 dayStillOpen을 직접 지정한다. */
+  function requestWith(signals: DaySignals, dayStillOpen: boolean): DiaryRequest {
+    const base = requestFor(signals);
+    return { ...base, dayStillOpen };
+  }
+
+  it("1. dayStillOpen: true, 사진 known → 문장이 있다", () => {
+    const prompt = buildPrompt(requestWith(richDay(DAY), true));
+    expect(prompt).toMatch(/아직.*끝나지 않았/);
+  });
+
+  it("★ 2. dayStillOpen: true, 사진 unknown(권한 없음) → 문장이 여전히 있다 (FR-004, 이 계약의 핵심)", () => {
+    const prompt = buildPrompt(requestWith(unknownDay(DAY), true));
+    expect(prompt).toMatch(/아직.*끝나지 않았/);
+  });
+
+  it("3. dayStillOpen: false(지난 하루) → 문장이 없고 011까지의 것과 바이트 단위로 같다", () => {
+    const request = requestFor(richDay(DAY)); // dayStillOpen: false가 기본
+    expect(request.dayStillOpen).toBe(false);
+    expect(buildPrompt(request)).not.toMatch(/아직.*끝나지 않았/);
+  });
+
+  it("P1 — dayStillOpen: false이면 프롬프트가 011까지의 결과와 바이트 단위로 같다", () => {
+    const withFlag = requestWith(richDay(DAY), false);
+    const withoutFlag = requestFor(richDay(DAY));
+    expect(buildPrompt(withFlag)).toBe(buildPrompt(withoutFlag));
+  });
+
+  it("P2 — DAY_STILL_OPEN이 instructionLines의 되뱉기 비교 대상에 포함된다", () => {
+    const request = requestWith(richDay(DAY), true);
+    const prompt = buildPrompt(request);
+    for (const line of instructionLines(request)) {
+      expect(prompt).toContain(line);
+    }
+    // 그 문장 자체가 지시문 목록에 있어야 한다.
+    expect(instructionLines(request).some((l) => /아직.*끝나지 않았/.test(l))).toBe(true);
+  });
+
+  it("P3 — buildPrompt는 dayStillOpen만 보고 now나 isDayClosed를 다시 부르지 않는다(결정적)", () => {
+    const request = requestWith(richDay(DAY), true);
+    expect(buildPrompt(request)).toBe(buildPrompt(request));
+  });
+});
+
 /* ═══════════════ 011 — 사진의 내용이 재료가 된다 ═══════════════ */
 
 /**

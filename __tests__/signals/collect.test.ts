@@ -9,6 +9,9 @@
  * 전부 기기 없이 돈다 — `PhotoPort`를 대역으로 갈아끼우기 때문이다(SC-007).
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { collectDaySignals } from "../../src/signals/collect";
 import type {
   LocationOutcome,
@@ -52,12 +55,13 @@ function fakePort(overrides: PortOverrides = {}): { port: PhotoPort; counters: C
       counters.requestLocation += 1;
       return locationPermission;
     },
+    // 012 — limit 파라미터가 없다(FR-014). 상한 없이 구간의 사진 전부를 돌려준다.
     photosBetween:
       overrides.photosBetween ??
-      (async (fromMs, toMs, limit) =>
-        (overrides.photos ?? [])
-          .filter((p) => p.takenAtMs === null || (p.takenAtMs >= fromMs && p.takenAtMs < toMs))
-          .slice(0, limit)),
+      (async (fromMs, toMs) =>
+        (overrides.photos ?? []).filter(
+          (p) => p.takenAtMs === null || (p.takenAtMs >= fromMs && p.takenAtMs < toMs),
+        )),
     locationOf:
       overrides.locationOf ??
       (async (id) => overrides.locations?.[id] ?? { kind: "absent" as const }),
@@ -230,62 +234,97 @@ describe("C6·C7 — 하루에 넣을 수 없는 사진은 버린다", () => {
   });
 });
 
-describe("C8·C9 — 상한을 넘으면 잘렸다고 말한다 (FR-014a·b)", () => {
-  /** 상한 + 1장을 만든다. 시각은 이른 것부터 */
+/**
+ * 012 — 사진 상한을 없앤다 (FR-014·015).
+ *
+ * 계약: specs/012-today-diary/contracts/signal-visibility.md §3 「사진 상한 제거」
+ *
+ * **이 describe가 옛 C8·C9(「상한을 넘으면 잘렸다고 말한다」)를 대체한다.** 004의
+ * `DEFAULT_PHOTO_LIMIT`과 「이른 시각부터 자르는」 로직이 사라지므로, 상한을 넘겨도
+ * `complete`는 언제나 `true`다.
+ */
+describe("012 — 사진이 아무리 많아도 전부 수집 대상이 된다 (contracts/signal-visibility.md §3)", () => {
   const manyPhotos = (count: number): PhotoFacts[] =>
     Array.from({ length: count }, (_, i) => ({
       id: `photo-${String(i).padStart(3, "0")}`,
       takenAtMs: at("2026-08-12T05:00:00") + i * 60_000,
     }));
 
-  it("상한 안이면 complete는 true다", async () => {
+  it("1. 사진 3장 → 전부 담기고 complete: true (회귀 없음)", async () => {
     const { port } = fakePort({ photos: manyPhotos(3) });
-    const signals = await collectDaySignals(port, DAY, { limit: 5 });
+    const signals = await collectDaySignals(port, DAY);
 
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {
-      expect(signals.photos.value.complete).toBe(true);
       expect(signals.photos.value.photos).toHaveLength(3);
+      expect(signals.photos.value.complete).toBe(true);
     }
   });
 
-  it("상한을 넘으면 상한만큼 담고 complete가 false다", async () => {
-    const { port } = fakePort({ photos: manyPhotos(6) });
-    const signals = await collectDaySignals(port, DAY, { limit: 5 });
+  it("★ 2. 사진 300장(과거엔 200에서 잘렸을 상황) → 전부 담기고 이른/늦은 시각 모두 포함 (FR-014, 이 계약의 핵심)", async () => {
+    const { port } = fakePort({ photos: manyPhotos(300) });
+    const signals = await collectDaySignals(port, DAY);
 
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {
-      // known이지 unknown이 아니다 — 실제로 본 사진을 버리지 않는다.
-      expect(signals.photos.value.photos).toHaveLength(5);
-      expect(signals.photos.value.complete).toBe(false);
-    }
-  });
-
-  it("잘릴 때 이른 시각부터 남는다 (FR-014b)", async () => {
-    const { port } = fakePort({ photos: manyPhotos(6) });
-    const signals = await collectDaySignals(port, DAY, { limit: 5 });
-
-    if (signals.photos.kind === "known") {
-      // 어느 쪽을 버렸는지 정해져 있어야 되짚을 수 있다.
-      expect(signals.photos.value.photos.map((p) => p.id)).toEqual([
-        "photo-000",
-        "photo-001",
-        "photo-002",
-        "photo-003",
-        "photo-004",
-      ]);
-    }
-  });
-
-  it("정확히 상한과 같으면 complete는 true다", async () => {
-    // 경계값 — 5장에 상한 5면 자르지 않았다.
-    const { port } = fakePort({ photos: manyPhotos(5) });
-    const signals = await collectDaySignals(port, DAY, { limit: 5 });
-
-    if (signals.photos.kind === "known") {
+      expect(signals.photos.value.photos).toHaveLength(300);
       expect(signals.photos.value.complete).toBe(true);
-      expect(signals.photos.value.photos).toHaveLength(5);
+      const ids = signals.photos.value.photos.map((p) => p.id);
+      expect(ids[0]).toBe("photo-000");
+      expect(ids[ids.length - 1]).toBe("photo-299");
     }
+  });
+
+  /**
+   * **★ 임의로 큰 수로도 확인한다** — 상한이 되살아나면 어떤 상수 값을 골라도
+   * 걸려야 한다. 300장 하나만 보면 "상한이 300보다 크게 재도입된" 위반을 놓친다
+   * (예: 이름을 바꿔 500으로 되살리면 300장 테스트는 초록불이다).
+   */
+  it("★ 2b. 사진 1000장 → 전부 담긴다 (임의의 상한값에도 잘리지 않는다는 것을 확인)", async () => {
+    const { port } = fakePort({ photos: manyPhotos(1000) });
+    const signals = await collectDaySignals(port, DAY);
+
+    expect(signals.photos.kind).toBe("known");
+    if (signals.photos.kind === "known") {
+      expect(signals.photos.value.photos).toHaveLength(1000);
+    }
+  });
+
+  it("L3 — 사진 수가 많다는 이유만으로는 TRUNCATED_WARNING이 붙지 않는다 (FR-015)", async () => {
+    const { port } = fakePort({ photos: manyPhotos(500) });
+    const signals = await collectDaySignals(port, DAY);
+
+    expect(signals.photos.kind).toBe("known");
+    if (signals.photos.kind === "known") {
+      // complete가 항상 true이므로 프롬프트에서 잘림 경고를 촉발하지 않는다.
+      expect(signals.photos.value.complete).toBe(true);
+    }
+  });
+
+  /**
+   * **L1 — 소스를 직접 읽어 확인한다**(contracts/signal-visibility.md L1, 008의
+   * "주석을 걷어내고 검사한다" 방식). 상한 자체가 없다는 것은 값으로도 확인되지만,
+   * 상수가 재도입되어 어딘가에서만 안 쓰이는 상태(죽은 코드)도 잡아야 한다.
+   */
+  it("L1 — 소스에 DEFAULT_PHOTO_LIMIT 상수가 더 이상 없다", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "src", "signals", "collect.ts"),
+      "utf8",
+    );
+    expect(source).not.toContain("DEFAULT_PHOTO_LIMIT");
+  });
+});
+
+describe("012 — 조회 실패는 잘라서 보여주지 않고 unknown이 된다 (FR-016)", () => {
+  it("3. 조회 자체가 예외를 던진다 → unknown, 부분 결과가 known으로 오지 않는다", async () => {
+    const { port } = fakePort({
+      photosBetween: async () => {
+        throw new Error("타임아웃");
+      },
+    });
+    const signals = await collectDaySignals(port, DAY);
+
+    expect(signals.photos.kind).toBe("unknown");
   });
 });
 

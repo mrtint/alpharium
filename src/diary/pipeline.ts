@@ -8,7 +8,7 @@
  * 파이프라인이 거기까지 도달한다는 것 자체가 검증 대상이다.
  */
 
-import { isDayClosed, type DayDate } from "../config/day-boundary";
+import { isDayWritable, type DayDate } from "../config/day-boundary";
 import { isGenerationFailure, type InferenceBackend } from "../inference/types";
 import type { DaySignals } from "../signals/types";
 import { buildRequest } from "./request";
@@ -124,8 +124,11 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
 
   return {
     async run(input: PipelineInput): Promise<PipelineResult> {
-      // 1. 하루가 닫혔는가? — 끝나지 않은 하루의 일기는 그 하루를 다 보지 못한 것이다.
-      if (!isDayClosed(input.day, input.now)) {
+      // 1. 이 하루를 지금 쓸 수 있는가? — 닫혔거나(지난 하루), 오늘이면서
+      //    정오를 지났으면 쓸 수 있다(012, 헌법 원칙 II 「하루의 끝」).
+      //    ★ isDayClosed()만 보던 이전 게이트는 오늘을 언제나 거부했다
+      //    (research.md §9) — isDayWritable()이 그 자리를 대신한다.
+      if (!isDayWritable(input.day, input.now)) {
         return stop("day-not-closed", `${input.day}는 아직 닫히지 않았다`);
       }
 
@@ -159,7 +162,7 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
   }
 
   // 4. 요청을 만든다. 신호의 양으로는 거부하지 않는다(FR-005a) — 캐릭터 유무만 본다.
-  const request = buildRequest(signals, input.character, input.vision);
+  const request = buildRequest(signals, input.character, input.vision, input.day, input.now);
   if (!request.ok) {
     return stop("request-build", "캐릭터가 정해지지 않아 요청을 만들지 못했다");
   }

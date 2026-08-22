@@ -30,7 +30,7 @@
  * 데스크톱 경로와 맞추기 쉽다.
  */
 
-import type { DaySignals, SignalValue } from "../signals/types";
+import { USER_VISIBLE_SIGNAL_AXES, type DaySignals, type SignalValue } from "../signals/types";
 import type { PhotoVision } from "../vision/types";
 import type { Character, DiaryRequest } from "./types";
 
@@ -90,6 +90,23 @@ const LANGUAGE: Readonly<Record<Character, string>> = {
   chinese: "중국어",
   english: "영어",
 };
+
+/**
+ * 아직 끝나지 않은 하루에 붙는 문장 (012 FR-003·004).
+ *
+ * **사진 축과 무관하게 붙는다** — `signalLines()` 안이 아니라 `buildPrompt()`의
+ * 최상단, `SPEAKER_RULES` 다음에 온다(로드맵 결정 (c), spec Clarifications). 사진
+ * 권한이 없는 사용자에게도 전달되어야 하므로 신호 목록의 일부가 아니라 하루 자체에
+ * 대한 진술로 둔다.
+ *
+ * **`SPEAKER_RULES`처럼 신호 값을 담지 않는 고정 문구다** — 되뱉기 판정의 비교
+ * 대상에 들어간다(`instructionLines()`). `SPEAKER_RULES`가 "기록에 없는 것을
+ * 단언하지 마라"를 이미 모든 요청에 무조건 포함하므로(FR-005), 이 문장은 그 위에
+ * "하루가 아직 안 끝났다"는 사실 하나만 더할 뿐 새 판정 갈래를 만들지 않는다
+ * (research.md §8 "FR-005는 새 판정을 만들지 않는다").
+ */
+const DAY_STILL_OPEN =
+  "오늘은 아직 끝나지 않았다. 이 기록 뒤에 무슨 일이 더 있었는지는 알 수 없다.";
 
 /** 잘린 사진 목록에 붙는 경고 (FR-012c, 004 FR-014d) */
 const TRUNCATED_WARNING =
@@ -157,6 +174,11 @@ const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못�
  */
 export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
   const lines = [...SPEAKER_RULES];
+
+  // 012 — 사진 축과 무관하게, 하루가 아직 끝나지 않았으면 붙는다(FR-004).
+  if (request.dayStillOpen) {
+    lines.push(DAY_STILL_OPEN);
+  }
 
   if (request.signals.photos.kind === "known" && !request.signals.photos.value.complete) {
     lines.push(TRUNCATED_WARNING);
@@ -283,27 +305,36 @@ function signalLines(signals: DaySignals): string[] {
     lines.push(PLACES_LIMITATION);
   }
 
-  lines.push(...describe("걸음 수", signals.steps, (steps) => `${steps}걸음`));
+  // 012 — 관측 통로가 없는 축은 값과 무관하게 프롬프트에 싣지 않는다(FR-006·007·010).
+  // 사람이 적은 USER_VISIBLE_SIGNAL_AXES가 유일한 판정처다 — 값(kind)을 보고
+  // 코드가 스스로 정하지 않는다(헌법 원칙 V MUST NOT).
+  if (USER_VISIBLE_SIGNAL_AXES.steps) {
+    lines.push(...describe("걸음 수", signals.steps, (steps) => `${steps}걸음`));
+  }
 
-  lines.push(
-    ...describe(
-      "배터리",
-      signals.battery,
-      (battery) =>
-        `${Math.round(battery.startLevel * 100)}%에서 ${Math.round(battery.endLevel * 100)}%로, ` +
-        `충전${battery.charged ? "했다" : "하지 않았다"}`,
-    ),
-  );
+  if (USER_VISIBLE_SIGNAL_AXES.battery) {
+    lines.push(
+      ...describe(
+        "배터리",
+        signals.battery,
+        (battery) =>
+          `${Math.round(battery.startLevel * 100)}%에서 ${Math.round(battery.endLevel * 100)}%로, ` +
+          `충전${battery.charged ? "했다" : "하지 않았다"}`,
+      ),
+    );
+  }
 
-  lines.push(
-    ...describe(
-      "연결",
-      signals.connectivity,
-      (net) =>
-        `와이파이 ${net.wifiMinutes}분, 셀룰러 ${net.cellularMinutes}분` +
-        (net.wentOffline ? ", 아무 데도 닿지 못한 때가 있었다" : ""),
-    ),
-  );
+  if (USER_VISIBLE_SIGNAL_AXES.connectivity) {
+    lines.push(
+      ...describe(
+        "연결",
+        signals.connectivity,
+        (net) =>
+          `와이파이 ${net.wifiMinutes}분, 셀룰러 ${net.cellularMinutes}분` +
+          (net.wentOffline ? ", 아무 데도 닿지 못한 때가 있었다" : ""),
+      ),
+    );
+  }
 
   return lines;
 }
@@ -333,11 +364,15 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
   const visionPart =
     vision === undefined ? [] : [...visionLines(vision), ...visionLimitLines(vision)];
 
+  // 012 — 사진 축과 무관하게, 신호 목록과 독립된 자리에 온다(FR-004).
+  const dayStillOpenPart = request.dayStillOpen ? [DAY_STILL_OPEN, ""] : [];
+
   return [
     ...SPEAKER_RULES,
     "",
     `${language}로 써라.`,
     "",
+    ...dayStillOpenPart,
     `${request.signals.date}에 네가 본 것:`,
     ...signalLines(request.signals),
     ...visionPart,

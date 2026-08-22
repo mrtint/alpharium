@@ -6,6 +6,7 @@
  * 신호 + 캐릭터 + 시각 설정을 추론 어댑터가 받을 하나의 입력으로 묶는다.
  */
 
+import { isDayClosed, type DayDate } from "../config/day-boundary";
 import type { DaySignals } from "../signals/types";
 import type { Character, DiaryRequest, VisionSetting } from "./types";
 
@@ -28,15 +29,24 @@ export type RequestResult =
  * 거부하는 경우는 하나뿐이다: **캐릭터가 없을 때**(FR-007). 누가 쓰는지 모르면 쓸 수 없다.
  * 이때 임의의 캐릭터를 골라 채우지 않는다 — 사용자가 고르지 않은 성격으로 쓴 일기는
  * 사용자의 일기가 아니다.
+ *
+ * **012 — `day`·`now`가 옵셔널로 늘었다**(research.md §8). `dayStillOpen`의 유일한
+ * 출처는 `isDayClosed(day, now)`이며, **새 계산을 만들지 않는다.** 둘을 안 주면
+ * `dayStillOpen: false`다(지난 하루와 같은 동작 — 003의 `isModelReady?` 선례를 따라
+ * 기존 호출자가 깨지지 않도록 옵셔널로 확장했다).
  */
 export function buildRequest(
   signals: DaySignals,
   character: Character | undefined,
   vision: VisionSetting,
+  day?: DayDate,
+  now?: Date,
 ): RequestResult {
   if (character === undefined) {
     return { ok: false, reason: "no-character" };
   }
 
-  return { ok: true, request: { signals, character, vision } };
+  const dayStillOpen = day !== undefined && now !== undefined ? !isDayClosed(day, now) : false;
+
+  return { ok: true, request: { signals, character, vision, dayStillOpen } };
 }

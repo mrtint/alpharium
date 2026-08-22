@@ -73,10 +73,10 @@ export interface PhotoPort {
   /**
    * `[fromMs, toMs)` 구간의 사진 메타데이터를 **찍힌 시각 순으로**(FR-004).
    *
-   * `limit`장까지 돌려준다. **상한을 넘었는지 알려면 호출자가 `limit + 1`을 준다** —
-   * `limit + 1`장이 오면 잘린 것이다(FR-014a).
+   * **상한이 없다**(012 FR-014). 그 구간의 사진 전부를 돌려준다 — 004가 두었던
+   * `limit` 파라미터는 짐작값이었고(research.md §7), 012가 상한 자체를 없앴다.
    */
-  photosBetween(fromMs: number, toMs: number, limit: number): Promise<PhotoFacts[]>;
+  photosBetween(fromMs: number, toMs: number): Promise<PhotoFacts[]>;
 
   /**
    * 사진 하나의 좌표. **어떤 경우에도 던지지 않는다**(FR-012).

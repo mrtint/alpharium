@@ -55,6 +55,14 @@ export type DiaryRequest = {
   signals: DaySignals;
   character: Character;
   vision: VisionSetting;
+  /**
+   * 이 하루가 아직 끝나지 않았는가 (012, 헌법 원칙 II "하루의 끝").
+   *
+   * **`buildRequest()`가 `pipeline.ts`의 `isDayClosed(day, now)`를 재사용해 채운다**
+   * (research.md §8) — `buildPrompt()`는 여전히 `now`를 읽지 않고 결정적이다.
+   * 오늘인지 여부는 이미 계산된 값으로 전달받을 뿐이다.
+   */
+  dayStillOpen: boolean;
 };
 
 /**

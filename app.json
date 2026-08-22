@@ -16,7 +16,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "versionCode": 7,
+      "versionCode": 8,
       "predictiveBackGestureEnabled": false,
       "package": "com.anonymous.alpharium"
     },

@@ -236,8 +236,9 @@ describe("하루 경계 — 닫히지 않은 하루는 거부된다 (FR-018c, SC
   });
 
   it("진행 중인 하루는 거부된다", async () => {
+    // 012: 오늘 + 정오 이전이어야 거부된다. 정오 이후는 isDayWritable()이 true다.
     const { pipeline } = makePipeline();
-    const result = await pipeline.run(inputFor({ now: new Date("2026-08-12T12:00:00") }));
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-12T09:00:00") }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.stage).toBe("day-not-closed");
@@ -252,7 +253,8 @@ describe("하루 경계 — 닫히지 않은 하루는 거부된다 (FR-018c, SC
       },
     });
 
-    await pipeline.run(inputFor({ now: new Date("2026-08-12T12:00:00") }));
+    // 012: 정오 이전이어야 앞에서 멈춘다.
+    await pipeline.run(inputFor({ now: new Date("2026-08-12T09:00:00") }));
     expect(called).toBe(false);
   });
 });
@@ -719,6 +721,58 @@ describe("011 — vision 단계", () => {
 
       expect(result.ok).toBe(false);
       if (!result.ok) expect(result.reason).toContain(reason);
+    }
+  });
+});
+
+/**
+ * 012 — 파이프라인 게이트가 오늘을 열어준다.
+ *
+ * 계약: specs/012-today-diary/contracts/day-boundary.md §3 「파이프라인 게이트」
+ *
+ * ★ 이 기능에서 가장 위험한 배선 지점이다(research.md §9). 지금 게이트는
+ * `isDayClosed()`만 보므로 오늘은 언제나 `day-not-closed`로 멈춘다. **"일기가
+ * 생성됐다"만으로 통과시키지 않고, day-not-closed를 지나 다음 단계(여기서는
+ * generation)까지 실제로 진행하는지 직접 검사한다**(009의 W-T1과 같은 방식).
+ */
+describe("012 — 정오 이후 오늘이 day-not-closed를 지나 진행한다 (contracts/day-boundary.md §3)", () => {
+  const TODAY: DayDate = "2026-08-21";
+
+  it("1. 오늘 + 정오 이전 → day-not-closed로 멈춘다 (FR-002)", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(
+      inputFor({ day: TODAY, now: new Date("2026-08-21T11:59:00") }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("day-not-closed");
+  });
+
+  it("★ 2. 오늘 + 정오 이후 → day-not-closed를 지나 다음 단계(generation)로 진행한다 (FR-001, 이 계약의 핵심)", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(
+      inputFor({ day: TODAY, now: new Date("2026-08-21T12:00:00") }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      // day-not-closed가 아니라 그 뒤 단계(이 스위트의 대역은 not-implemented를
+      // 반환하므로 generation)까지 도달했는지가 핵심이다.
+      expect(result.stage).not.toBe("day-not-closed");
+      expect(result.stage).toBe("generation");
+    }
+  });
+
+  it("3. 어제(닫힘) + 아무 때나 → 지금과 동일하게 통과한다 (회귀 없음)", async () => {
+    const { pipeline } = makePipeline();
+    const result = await pipeline.run(
+      inputFor({ day: "2026-08-20", now: new Date("2026-08-21T09:00:00") }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.stage).not.toBe("day-not-closed");
+      expect(result.stage).toBe("generation");
     }
   });
 });

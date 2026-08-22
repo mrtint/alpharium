@@ -108,8 +108,11 @@ export function expoPhotoPort(): PhotoPort {
      * **`exeForMetadata()`를 쓰고 `exe()`를 쓰지 않는다**(research.md §1). 전자가 돌려주는
      * `AssetMetadata`는 "파일 경로를 풀거나 파일을 열지 않고" 얻어지며(타입 주석 명시),
      * **픽셀에 닿을 문 자체가 없다.** 그것이 FR-005를 계약이 아니라 구조로 보장한다.
+     *
+     * **012 — `.limit()`을 호출하지 않는다**(FR-014). 그 구간의 사진 전부를 돌려준다 —
+     * 상한 자체가 없다.
      */
-    async photosBetween(fromMs: number, toMs: number, limit: number): Promise<PhotoFacts[]> {
+    async photosBetween(fromMs: number, toMs: number): Promise<PhotoFacts[]> {
       const lib = await import("expo-media-library");
       const { AssetField, MediaType, Query } = lib;
 
@@ -118,7 +121,6 @@ export function expoPhotoPort(): PhotoPort {
         .lt(AssetField.CREATION_TIME, toMs)
         .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
         .orderBy(AssetField.CREATION_TIME)
-        .limit(limit)
         .exeForMetadata();
 
       return metadata.map((asset) => ({ id: asset.id, takenAtMs: asset.creationTime }));

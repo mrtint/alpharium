@@ -8,6 +8,7 @@
  *  - **요청 어디에도 모델 식별자가 없다**(FR-008, 원칙 III)
  */
 
+import { isDayClosed } from "../../src/config/day-boundary";
 import { CHARACTERS, VISION_SETTINGS } from "../../src/diary/types";
 import { buildRequest } from "../../src/diary/request";
 import { emptyDay, partiallyUnknownDay, richDay, unknownDay } from "../../src/signals/fake";
@@ -69,6 +70,50 @@ describe("신호의 양으로 거부하지 않는다 (FR-005a)", () => {
   });
 });
 
+/**
+ * 012 — "하루가 아직 열려 있는가"를 요청에 싣는다.
+ *
+ * research.md §8 — `dayStillOpen`의 유일한 출처는 `isDayClosed()`다. `buildRequest()`가
+ * `now`를 받아 채운다.
+ */
+describe("012 — buildRequest가 dayStillOpen을 채운다 (research.md §8)", () => {
+  it("어제(닫힌 하루) → dayStillOpen: false", () => {
+    const result = buildRequest(
+      richDay("2026-08-20"),
+      "quiet",
+      "none",
+      "2026-08-20",
+      new Date("2026-08-21T09:00:00"),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.request.dayStillOpen).toBe(false);
+  });
+
+  it("오늘(정오 이후, 아직 열림) → dayStillOpen: true", () => {
+    const result = buildRequest(
+      richDay("2026-08-21"),
+      "quiet",
+      "none",
+      "2026-08-21",
+      new Date("2026-08-21T12:00:00"),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.request.dayStillOpen).toBe(true);
+  });
+
+  it("isDayClosed()의 결과를 그대로 반영한다 — 새 계산을 만들지 않는다", () => {
+    const now = new Date("2026-08-21T12:00:00");
+    const day = "2026-08-21";
+    const expected = !isDayClosed(day, now);
+
+    const result = buildRequest(richDay(day), "quiet", "none", day, now);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.request.dayStillOpen).toBe(expected);
+  });
+});
+
 describe("요청에 모델 식별자가 없다 (FR-008, SC-005, 원칙 III)", () => {
   /**
    * 객체를 문자열로 만들어 모델 이름이 나오지 않는지 본다(contracts/diary.md).
@@ -107,7 +152,13 @@ describe("요청에 모델 식별자가 없다 (FR-008, SC-005, 원칙 III)", ()
     if (!result.ok) return;
 
     // 모델 경로·파라미터 수·양자화 같은 필드가 끼어들 자리가 없다.
-    expect(Object.keys(result.request).sort()).toEqual(["character", "signals", "vision"]);
+    // 012 — dayStillOpen이 새로 더해졌다(research.md §8).
+    expect(Object.keys(result.request).sort()).toEqual([
+      "character",
+      "dayStillOpen",
+      "signals",
+      "vision",
+    ]);
   });
 
   it("캐릭터 식별자 자체가 모델 이름이 아니다", () => {

@@ -25,18 +25,6 @@ import { isUsableCoordinate, tracePlaces, type TimedCoordinate } from "./places"
 import type { LocationOutcome, PermissionState, PhotoFacts, PhotoPort } from "./port";
 import type { DaySignals, Photo, PhotoObservation, PhotoPlaces, SignalValue } from "./types";
 
-/**
- * 하루에서 다루는 사진 수의 상한.
- *
- * **200은 짐작이며 실측이 아니다**(research.md §7, 헌법 원칙 V). 근거는 두 가지다:
- * 좌표를 사진마다 물어야 해서(`AssetMetadata`에 좌표가 없다) 200번의 네이티브 왕복은
- * 감당할 만하지만 2000번은 아니라는 것, 그리고 하루 200장을 넘기는 날의 일기는 어차피
- * "아주 많이 찍었다"가 된다는 것이다.
- *
- * **실기기에서 200장의 좌표를 읽는 시간을 재면 근거가 실측으로 바뀐다**(quickstart D4).
- */
-export const DEFAULT_PHOTO_LIMIT = 200;
-
 /** 걸음 수를 모르는 까닭. **「못 한다」이지 「안 했다」가 아니다**(FR-015a) */
 const STEPS_UNAVAILABLE = "안드로이드가 기간 걸음 수를 제공하지 않는다";
 /** 아직 수집하지 않는 신호의 까닭. 위와 달라야 한다(FR-015a) */
@@ -78,11 +66,14 @@ function usablePhotos(facts: PhotoFacts[], endMs: number): Photo[] {
  * 그 하루의 사진을 판정한다.
  *
  * 순서가 계약이다(contracts/collection.md 「photos」): 권한 → 조회 실패 → 0장 → known.
+ *
+ * **012 — 상한이 없다**(FR-014). 조회에 성공하면 그 구간의 사진 전부가 담기므로
+ * `complete`는 언제나 `true`다 — 잘림 판정 자체가 사라졌다(FR-015). 조회가 실패하면
+ * `unknown`이며, 부분 결과를 잘라서 `known`으로 돌려주지 않는다(FR-016).
  */
 async function collectPhotos(
   port: PhotoPort,
   day: DayDate,
-  limit: number,
 ): Promise<SignalValue<PhotoObservation>> {
   let permission: PermissionState;
   try {
@@ -100,10 +91,9 @@ async function collectPhotos(
 
   let facts: PhotoFacts[];
   try {
-    // **상한을 넘었는지 알려면 하나 더 물어야 한다**(FR-014a).
-    facts = await port.photosBetween(startMs, endMs, limit + 1);
+    facts = await port.photosBetween(startMs, endMs);
   } catch (error) {
-    // 2. 조회 실패도 unknown이다(FR-012). 던지지 않는다.
+    // 2. 조회 실패도 unknown이다(FR-012, FR-016). 던지지 않고, 잘라서 주지 않는다.
     return { kind: "unknown", reason: `사진을 조회하지 못했다: ${messageOf(error)}` };
   }
 
@@ -114,12 +104,8 @@ async function collectPhotos(
     return { kind: "none" };
   }
 
-  // 4. 잘렸으면 이른 시각부터 남긴다(FR-014b).
-  const complete = usable.length <= limit;
-  return {
-    kind: "known",
-    value: { photos: complete ? usable : usable.slice(0, limit), complete },
-  };
+  // 4. 상한이 없으므로 조회에 성공하면 언제나 전부를 본 것이다(FR-014·015).
+  return { kind: "known", value: { photos: usable, complete: true } };
 }
 
 function messageOf(error: unknown): string {
@@ -217,13 +203,8 @@ async function collectPlaces(
  * **"지금"을 받지 않는다** — 어느 하루를 물을지는 `day`가 정한다. 하루가 닫혔는지는
  * `isDayClosed()`가 따로 답하며 그것은 파이프라인의 몫이다(002 FR-018a).
  */
-export async function collectDaySignals(
-  port: PhotoPort,
-  day: DayDate,
-  options: { limit?: number } = {},
-): Promise<DaySignals> {
-  const limit = options.limit ?? DEFAULT_PHOTO_LIMIT;
-  const photos = await collectPhotos(port, day, limit);
+export async function collectDaySignals(port: PhotoPort, day: DayDate): Promise<DaySignals> {
+  const photos = await collectPhotos(port, day);
   // **`photos`를 먼저 정하고 그다음 좌표를 묻는다.** 좌표 단계가 통째로 실패해도
   // `photos`는 이미 손에 있다 — 그것이 FR-013a가 구현에서 성립하는 방식이다.
   const places = await collectPlaces(port, photos);
