@@ -43,8 +43,17 @@ function makePorts(options: Options = {}) {
         const bytes = files.get(key);
         return bytes === undefined ? { exists: false, bytes: null } : { exists: true, bytes };
       },
-      async contentHash() {
-        return options.hash === undefined ? "abc123" : options.hash;
+      /**
+       * **로스터의 지문을 그대로 돌려주는 것이 기본이다.**
+       *
+       * 2026-08-22에 실기기에서 md5를 채록한 뒤로 `prepareVision()`이 **실제로
+       * 검증한다** — 아무 문자열이나 돌려주면 그 검증에 걸려 실패한다. 그것이 검증이
+       * 도는 증거이므로 대역을 「맞는 지문」으로 두고, **틀린 지문은 아래에서 일부러
+       * 준다**(「지문이 다르면 거부한다」).
+       */
+      async contentHash(key) {
+        if (options.hash !== undefined) return options.hash;
+        return key === ASSETS.base.key ? ASSETS.base.md5 : ASSETS.projector.md5;
       },
       async remove(key) {
         removed.push(key);
@@ -193,11 +202,29 @@ describe("받기 — 두 파일을 함께 (FR-027)", () => {
  * **미리 적는 지문은 어디서 왔든 짐작이다.**
  */
 describe("md5 — 채록하고 검증한다 (FR-031)", () => {
-  it("★ 첫 내려받기에서 지문을 남긴다", async () => {
-    const { ports, metadataOf } = makePorts({ hash: "deadbeef" });
+  it("★ 내려받은 파일의 지문을 남긴다", async () => {
+    const { ports, metadataOf } = makePorts();
     await prepareVision(ports);
 
-    expect(metadataOf()).toContain("deadbeef");
+    expect(metadataOf()).toContain(ASSETS.base.md5);
+    expect(metadataOf()).toContain(ASSETS.projector.md5);
+  });
+
+  /**
+   * **★ 지문이 채록되기 전에는 이 갈래가 존재하지 않았다.**
+   *
+   * 로스터의 md5가 비어 있는 동안 `prepareVision()`은 무엇이 오든 통과시켰다 —
+   * 채록이지 검증이 아니었고, 그 사실이 빈 문자열로 드러나 있었다. 실기기에서
+   * 지문을 얻은 지금은 **다른 파일이 오면 거부한다.**
+   */
+  it("★ 지문이 다르면 거부하고 파일을 남기지 않는다", async () => {
+    const { ports, removed } = makePorts({ hash: "0".repeat(32) });
+    const result = await prepareVision(ports);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.failure.kind).toBe("verification-failed");
+    // 온전하지 않은 파일이 남으면 다음에 「있다」로 읽힌다
+    expect(removed).toContain(ASSETS.base.key);
   });
 
   it("지문을 읽지 못하면 거부한다 — 확인하지 않은 것을 통과시키지 않는다", async () => {
@@ -208,9 +235,10 @@ describe("md5 — 채록하고 검증한다 (FR-031)", () => {
     if (!result.ok) expect(result.failure.kind).toBe("verification-failed");
   });
 
-  it("로스터의 지문이 비어 있으므로 지금은 채록이다 (원칙 V)", () => {
-    expect(ASSETS.base.md5).toBe("");
-    expect(ASSETS.projector.md5).toBe("");
+  it("로스터의 지문이 실기기에서 채록한 값이다 (원칙 V)", () => {
+    // 실측 (2026-08-22, SM-G986N). 두 번 받아 두 번 다 같은 값이었다.
+    expect(ASSETS.base.md5).toBe("b0f40eda778e7563d8bc8a64be19134d");
+    expect(ASSETS.projector.md5).toBe("7e8624e77234ee00c3c2f918220070c9");
   });
 });
 

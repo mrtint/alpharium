@@ -79,21 +79,34 @@ describe("자산의 값 — 실측이며 짐작이 아니다 (원칙 V)", () => 
  *
  * quickstart D1이 첫 내려받기에서 채록하며, 그때 이 테스트를 뒤집는다.
  */
-describe("md5 — 아직 채록되지 않았다 (원칙 V)", () => {
+describe("md5 — 실기기에서 채록했다 (FR-031, 원칙 V)", () => {
   const assets = visionAssets();
 
-  it("아직 비어 있다 — 첫 내려받기에서 채록한다 (FR-031)", () => {
-    expect(assets.base.md5).toBe("");
-    expect(assets.projector.md5).toBe("");
+  /**
+   * **2026-08-22에 SM-G986N에서 채록했다**(quickstart D1).
+   *
+   * 같은 기기에서 두 번 받아 **두 번 다 같은 값**이 나온 것을 확인했고, 바이트 수도
+   * `Content-Length`와 정확히 일치했다. **미리 적었다면 짐작이었을 값이 실측이 된
+   * 자리**이며, 003의 `quiet`이 같은 길을 갔다.
+   *
+   * ⚠️ **여기의 값을 「고쳐서 통과시키는」 일이 없어야 한다.** 검증이 실패하면 그것은
+   * 받은 파일이 다르다는 뜻이지 지문이 틀렸다는 뜻이 아니다 — 지문을 파일에 맞추면
+   * 검증이 아무것도 지키지 않게 된다.
+   */
+  it("두 지문이 실기기에서 얻은 값이다 (FR-031)", () => {
+    expect(assets.base.md5).toBe("b0f40eda778e7563d8bc8a64be19134d");
+    expect(assets.projector.md5).toBe("7e8624e77234ee00c3c2f918220070c9");
   });
 
-  it("지어낸 지문이 들어 있지 않다", () => {
+  it("지문이 md5의 모양이다", () => {
     for (const asset of [assets.base, assets.projector]) {
-      // 32자 hex는 md5의 모양이다. 비어 있거나 진짜 채록값이어야 한다.
-      if (asset.md5 !== "") {
-        expect(asset.md5).toMatch(/^[0-9a-f]{32}$/);
-      }
+      expect(asset.md5).toMatch(/^[0-9a-f]{32}$/);
     }
+  });
+
+  /** 둘이 같으면 한쪽을 베낀 것이다 — 파일이 다르므로 지문도 달라야 한다 */
+  it("두 파일의 지문이 서로 다르다", () => {
+    expect(assets.base.md5).not.toBe(assets.projector.md5);
   });
 });
 
