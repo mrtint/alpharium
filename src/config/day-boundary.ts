@@ -42,6 +42,18 @@ const DAY_STARTS_AT_HOUR = 4;
  */
 const SELECTABLE_DAY_COUNT = 3;
 
+/**
+ * 오늘을 쓸 수 있게 되는 시각(시). 기기의 현재 시간대를 따른다.
+ *
+ * **이 값은 여기에만 있다**(012 FR-002). `DAY_STARTS_AT_HOUR`와 같은 이유다 —
+ * 부르는 쪽에서 `now.getHours() >= 12`를 직접 계산하면 화면·파이프라인·프롬프트가
+ * 서로 다른 정오를 볼 수 있다.
+ *
+ * 04:00(하루의 시작)과는 다른 축이다. 04:00은 "어느 하루에 속하는가", 이 값은
+ * "그 하루를 지금 쓸 수 있는가"를 가른다.
+ */
+const WRITABLE_FROM_HOUR = 12;
+
 /** Date를 기기 시간대 기준 `YYYY-MM-DD`로 만든다. UTC로 바꾸지 않는다. */
 function formatDay(date: Date): DayDate {
   const year = String(date.getFullYear()).padStart(4, "0");
@@ -91,6 +103,18 @@ export function isDayClosed(day: DayDate, now: Date): boolean {
 }
 
 /**
+ * 이 하루를 지금 쓸 수 있는가 (012, 헌법 원칙 II 「하루의 끝」).
+ *
+ * 닫혔거나(지난 하루), 오늘이면서 정오를 지났으면 쓸 수 있다. **새 판정 방식이
+ * 아니라 `isDayClosed()`를 감싼 것이다** — `pipeline.ts`의 1단계 게이트, 화면 안내,
+ * `selectableDays()`가 전부 이 함수 하나만 부른다. 세 곳이 각자 계산하면 006~011이
+ * 반복한 조용한 배선 끊김과 같은 위험이 생긴다.
+ */
+export function isDayWritable(day: DayDate, now: Date): boolean {
+  return isDayClosed(day, now) || (day === dayOf(now) && now.getHours() >= WRITABLE_FROM_HOUR);
+}
+
+/**
  * 지금 시점에서 **일기를 쓸 수 있는 가장 최근의 하루**를 구한다 (006 FR-030).
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -113,21 +137,26 @@ export function latestClosedDay(now: Date): DayDate {
 }
 
 /**
- * 지금 시점에서 **고를 수 있는 하루들**을 구한다 (009 FR-001).
+ * 지금 시점에서 **고를 수 있는 하루들**을 구한다 (009 FR-001, 012 FR-001a).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * `latestClosedDay(now)`에서 시작해 하루씩 거슬러 셋이며, **가장 최근이 먼저다.**
+ * **언제나 정확히 셋이다**(012 FR-001a). 정오 이전에는 지금과 같이 어제·그제·
+ * 그그제이고, 정오 이후에는 **그그제가 빠지고 오늘이 맨 앞에 온다** — 오늘이
+ * 넷째로 더해지는 것이 아니라 셋을 구성하는 규칙이 조건부로 바뀐다(사용자 결정,
+ * spec Clarifications).
+ *
+ * `latestClosedDay(now)`에서 시작해 하루씩 거슬러 셋을 모으는 것이 기본이고,
+ * **정오를 지났으면 그중 가장 오래된 것(그그제)을 오늘로 바꿔치기한 뒤 다시
+ * 내림차순으로 정렬한다.**
  *
  * **이 계산이 여기 있어야 하는 이유는 `latestClosedDay()`와 같다.** 「사흘」을
  * 구하려면 하루씩 빼야 하고 하루의 시작은 04:00이다 — 부르는 쪽에서 `setDate(-1)`을
  * 하면 **04:00이 이 파일 밖으로 새어 나간다**(FR-004). 004가 `dayBounds()`를 여기
  * 둔 것과 같은 판단이며, 새는 순간 신호 수집과 일기 생성이 서로 다른 하루를 본다.
+ * **정오도 같은 이유로 여기 하나뿐이다** — `isDayWritable()`을 통해서만 본다.
  *
  * **범위 크기를 인자로 받지 않는다**(FR-003). 받으면 부르는 쪽이 3을 알게 되고
  * 그 순간 값이 두 곳에 생긴다 — `dayBounds()`에 04:00을 넘기지 않는 것과 같다.
- *
- * **오늘은 들어오지 않는다**(FR-002). 시작점이 `latestClosedDay()`이므로 전부 닫힌
- * 하루이며, 그것이 불변식 D3이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function selectableDays(now: Date): readonly DayDate[] {
@@ -142,5 +171,13 @@ export function selectableDays(now: Date): readonly DayDate[] {
     day.setDate(day.getDate() - back);
     days.push(formatDay(day));
   }
+
+  const today = dayOf(now);
+  if (isDayWritable(today, now) && !isDayClosed(today, now)) {
+    // 정오를 지난 오늘 — 가장 오래된 것(그그제, 배열 끝)을 오늘로 바꾸고 맨 앞으로.
+    days.pop();
+    days.unshift(today);
+  }
+
   return days;
 }

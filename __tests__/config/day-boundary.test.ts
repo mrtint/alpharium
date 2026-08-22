@@ -11,7 +11,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { dayOf, isDayClosed, latestClosedDay, selectableDays } from "../../src/config/day-boundary";
+import {
+  dayOf,
+  isDayClosed,
+  isDayWritable,
+  latestClosedDay,
+  selectableDays,
+} from "../../src/config/day-boundary";
 
 describe("dayOf — 시각이 속한 하루", () => {
   // contracts/signals.md 「dayOf 검증 표」 6행
@@ -144,12 +150,19 @@ describe("latestClosedDay (006 FR-030)", () => {
  * ─────────────────────────────────────────────────────────────────────────────
  */
 describe("selectableDays (009 §1 검증 표)", () => {
-  // contracts/write-prompt.md §1 「검증 표」 6행
+  /**
+   * **012에서 시각을 정오 이전(09:00)으로 옮겼다.** 009 시절엔 정오가 특별한
+   * 의미가 없어 임의로 12:00을 썼지만, 012가 정오를 "오늘이 그그제를 대신하는"
+   * 경계로 만들면서 이 표의 시각들이 전부 정오 이후로 바뀌어 버렸다 — 이 표의
+   * 목적(월·연 경계 넘김)과 무관한 변화이므로 09:00으로 옮겨 원래 의도를 지킨다.
+   * 정오 자체의 경계값은 별도 describe(§2 검증 표)가 전담한다.
+   */
+  // contracts/write-prompt.md §1 「검증 표」 6행 (012에서 시각 일부를 정오 이전으로 조정)
   const cases: readonly { now: string; expected: readonly string[]; why: string }[] = [
     {
-      now: "2026-08-21T14:00:00",
+      now: "2026-08-21T09:00:00",
       expected: ["2026-08-20", "2026-08-19", "2026-08-18"],
-      why: "한낮",
+      why: "한낮, 정오 이전",
     },
     {
       now: "2026-08-21T04:00:00",
@@ -162,19 +175,19 @@ describe("selectableDays (009 §1 검증 표)", () => {
       why: "★ 경계 직전 — 셋이 통째로 하루 밀린다",
     },
     {
-      now: "2026-03-01T12:00:00",
+      now: "2026-03-01T09:00:00",
       expected: ["2026-02-28", "2026-02-27", "2026-02-26"],
-      why: "월넘김",
+      why: "월넘김, 정오 이전",
     },
     {
-      now: "2026-01-01T12:00:00",
+      now: "2026-01-01T09:00:00",
       expected: ["2025-12-31", "2025-12-30", "2025-12-29"],
-      why: "연넘김",
+      why: "연넘김, 정오 이전",
     },
     {
-      now: "2026-03-02T12:00:00",
+      now: "2026-03-02T09:00:00",
       expected: ["2026-03-01", "2026-02-28", "2026-02-27"],
-      why: "월 경계를 걸친다",
+      why: "월 경계를 걸친다, 정오 이전",
     },
   ];
 
@@ -201,48 +214,70 @@ describe("selectableDays (009 §1 검증 표)", () => {
 
   /* ───────────────────── 불변식 D1~D5 (계약 §1) ───────────────────── */
 
+  /**
+   * **012에서 좁혔다**: 이 목록은 전부 「정오 이전」 시각이다. 009 당시의 D1·D3은
+   * "오늘은 언제나 섞이지 않는다"였지만, 012가 "정오 이후에는 오늘이 그그제를
+   * 대신한다"로 그 전제를 바꿨다(FR-001a) — 아래 두 불변식은 이제 정오 이전에만
+   * 성립한다. 정오 이후의 새 불변식(오늘이 섞인다)은 별도 describe로 검사한다.
+   */
   const instants = [
-    "2026-08-21T14:00:00",
     "2026-08-21T04:00:00",
     "2026-08-21T03:59:00",
     "2026-08-21T00:30:00",
     "2026-03-01T05:00:00",
     "2026-01-01T02:00:00",
-    "2026-02-28T23:59:00",
+    "2026-02-28T09:00:00",
   ];
 
   /**
-   * **D1 — 006·007이 쓰는 값과 어긋나지 않는다.**
+   * **D1 — 006·007이 쓰는 값과 어긋나지 않는다(정오 이전).**
    *
    * `latestClosedDay()`를 지우지 않는 이유가 이것이다(T007). 둘이 갈리면 쓰기 자리가
    * 보여주는 기본값과 실제로 쓰이는 하루가 달라진다.
    */
-  it("D1 — 첫째는 latestClosedDay와 같다", () => {
+  it("D1 — 정오 이전엔 첫째가 latestClosedDay와 같다", () => {
     for (const iso of instants) {
       const now = new Date(iso);
       expect(selectableDays(now)[0]).toBe(latestClosedDay(now));
     }
   });
 
-  it("D2 — 언제나 셋이다 (FR-001)", () => {
+  it("D2 — 언제나 셋이다 (FR-001a)", () => {
     for (const iso of instants) {
       expect(selectableDays(new Date(iso))).toHaveLength(3);
     }
+    // 정오 이후에도 셋이다.
+    expect(selectableDays(new Date("2026-08-21T14:00:00"))).toHaveLength(3);
   });
 
   /**
-   * **★ D3이 FR-002의 방어다.** 오늘이 섞이면 그것을 고른 사용자는 파이프라인의
-   * `day-not-closed`에 막혀 아무것도 할 수 없다 — 화면이 고를 수 없는 것을 내민 셈이다.
+   * **★ D3이 FR-002의 방어다(정오 이전).** 오늘이 섞이면 그것을 고른 사용자는
+   * 파이프라인의 `day-not-closed`에 막혀 아무것도 할 수 없다 — 화면이 고를 수
+   * 없는 것을 내민 셈이다.
    */
-  it("★ D3 — 모든 원소가 닫힌 하루다 (FR-002 — 오늘이 섞이지 않는다)", () => {
+  it("★ D3 — 정오 이전엔 모든 원소가 닫힌 하루다 (FR-002 — 오늘이 섞이지 않는다)", () => {
     for (const iso of instants) {
       const now = new Date(iso);
       for (const day of selectableDays(now)) {
         expect(isDayClosed(day, now)).toBe(true);
       }
-      // 오늘은 정의상 닫히지 않았으므로 목록에 없다.
+      // 오늘은 정의상 닫히지 않았으므로 정오 전에는 목록에 없다.
       expect(selectableDays(now)).not.toContain(dayOf(now));
     }
+  });
+
+  /**
+   * **012 신설 — 정오 이후엔 D1·D3이 뒤집힌다.** 오늘이 첫째로 오고, 오늘만은
+   * 닫히지 않은 채로 목록에 있다(FR-001a).
+   */
+  it("★ 012 — 정오 이후엔 오늘이 첫째이고 닫히지 않은 채로 목록에 있다 (FR-001a)", () => {
+    const now = new Date("2026-08-21T14:00:00");
+    const days = selectableDays(now);
+    expect(days[0]).toBe(dayOf(now));
+    expect(isDayClosed(days[0], now)).toBe(false);
+    // 나머지 둘은 여전히 닫힌 하루다.
+    expect(isDayClosed(days[1], now)).toBe(true);
+    expect(isDayClosed(days[2], now)).toBe(true);
   });
 
   it("D4 — 내림차순이며 하루씩 연속한다", () => {
@@ -330,5 +365,134 @@ describe("selectableDays (009 §1 검증 표)", () => {
 
     expect(source).toContain("const SELECTABLE_DAY_COUNT");
     expect(source).not.toContain("export const SELECTABLE_DAY_COUNT");
+  });
+});
+
+/**
+ * 012 — 정오 판정.
+ *
+ * 계약: specs/012-today-diary/contracts/day-boundary.md §1 「정오 판정」
+ *
+ * **3번 행이 이 표의 핵심이다** — 11:59와 12:00 사이 1분 차이로 결과가 갈린다.
+ */
+describe("isDayWritable — 이 하루를 지금 쓸 수 있는가 (012 §1)", () => {
+  const cases: readonly { day: string; now: string; expected: boolean; why: string }[] = [
+    { day: "2026-08-20", now: "2026-08-21T09:00:00", expected: true, why: "지난 하루, 이미 닫힘" },
+    { day: "2026-08-21", now: "2026-08-21T11:59:00", expected: false, why: "오늘, 정오 전" },
+    {
+      day: "2026-08-21",
+      now: "2026-08-21T12:00:00",
+      expected: true,
+      why: "★ 오늘, 정오 정각 — 경계값",
+    },
+    { day: "2026-08-21", now: "2026-08-21T12:01:00", expected: true, why: "오늘, 정오 후" },
+    {
+      day: "2026-08-22",
+      now: "2026-08-21T13:00:00",
+      expected: false,
+      why: "아직 오지 않은 하루",
+    },
+  ];
+
+  it.each(cases)("$day @ $now → $expected ($why)", ({ day, now, expected }) => {
+    expect(isDayWritable(day, new Date(now))).toBe(expected);
+  });
+
+  it("지난 하루는 isDayClosed를 포함한다 — 게이트에서 지난 하루가 새로 막히지 않는다", () => {
+    const now = new Date("2026-08-21T09:00:00");
+    expect(isDayClosed("2026-08-20", now)).toBe(true);
+    expect(isDayWritable("2026-08-20", now)).toBe(true);
+  });
+});
+
+/**
+ * 012 — 셋 구성이 정오 전후로 갈린다.
+ *
+ * 계약: specs/012-today-diary/contracts/day-boundary.md §2 「셋 구성」
+ *
+ * **1번과 2번이 이 계약의 핵심이다.** 정오를 지나는 순간 셋의 구성 자체가 바뀐다.
+ */
+describe("selectableDays — 정오 이후 오늘이 그그제를 대신한다 (012 §2)", () => {
+  it("정오 이전 — 어제·그제·그그제 (지금과 동일)", () => {
+    expect(selectableDays(new Date("2026-08-21T11:59:00"))).toEqual([
+      "2026-08-20",
+      "2026-08-19",
+      "2026-08-18",
+    ]);
+  });
+
+  it("★ 정오 이후 — 오늘·어제·그제. 그그제는 사라진다 (FR-001a)", () => {
+    expect(selectableDays(new Date("2026-08-21T12:00:00"))).toEqual([
+      "2026-08-21",
+      "2026-08-20",
+      "2026-08-19",
+    ]);
+  });
+
+  it("자정 근처에도 오늘은 여전히 오늘이다", () => {
+    expect(selectableDays(new Date("2026-08-21T23:59:00"))).toEqual([
+      "2026-08-21",
+      "2026-08-20",
+      "2026-08-19",
+    ]);
+  });
+
+  it("04:00 경계 전은 아직 전날이다 — 하루 경계가 정오보다 먼저 적용된다", () => {
+    expect(selectableDays(new Date("2026-08-21T03:59:00"))).toEqual([
+      "2026-08-19",
+      "2026-08-18",
+      "2026-08-17",
+    ]);
+  });
+});
+
+/**
+ * data-model.md §6 불변식 I1~I5 — 012.
+ */
+describe("불변식 I1~I5 (data-model.md §6, 012)", () => {
+  const instants = [
+    "2026-08-21T00:30:00",
+    "2026-08-21T03:59:00",
+    "2026-08-21T04:00:00",
+    "2026-08-21T11:59:00",
+    "2026-08-21T12:00:00",
+    "2026-08-21T12:01:00",
+    "2026-08-21T18:00:00",
+    "2026-08-21T23:59:00",
+  ];
+
+  it("I1 — selectableDays(now).length는 언제나 3이다", () => {
+    for (const iso of instants) {
+      expect(selectableDays(new Date(iso)).length).toBe(3);
+    }
+  });
+
+  it("I2 — 정오 이후 selectableDays(now)[0] === dayOf(now)이고 그그제는 없다", () => {
+    const now = new Date("2026-08-21T12:00:00");
+    const days = selectableDays(now);
+    expect(days[0]).toBe(dayOf(now));
+    expect(days).not.toContain("2026-08-18"); // 그그제
+  });
+
+  it("I3 — 정오 이전 모든 원소가 닫힌 하루다", () => {
+    const now = new Date("2026-08-21T11:59:00");
+    for (const day of selectableDays(now)) {
+      expect(isDayClosed(day, now)).toBe(true);
+    }
+  });
+
+  it("I4 — isDayWritable(day, now)가 true인 하루만 통과한다는 것을 값으로 확인한다", () => {
+    // day-not-closed 게이트가 실제로 이 함수를 쓰는지는 pipeline.test.ts가 검사한다.
+    // 여기서는 판정 함수 자체의 일관성만 본다 — 오늘 정오 전은 false, 정오 후는 true.
+    const today = "2026-08-21";
+    expect(isDayWritable(today, new Date("2026-08-21T11:59:00"))).toBe(false);
+    expect(isDayWritable(today, new Date("2026-08-21T12:00:00"))).toBe(true);
+  });
+
+  it("I5 — dayStillOpen 판정의 원천은 isDayClosed 하나뿐이다(새 계산이 없다는 것을 값으로 확인)", () => {
+    const now = new Date("2026-08-21T12:00:00");
+    const today = dayOf(now);
+    // 오늘은 아직 열려 있다 — isDayClosed(today, now) === false가 dayStillOpen: true의 원천이다.
+    expect(isDayClosed(today, now)).toBe(false);
   });
 });

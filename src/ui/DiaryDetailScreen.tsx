@@ -58,7 +58,13 @@ function describe<T>(signal: SignalValue<T>, known: (value: T) => string): strin
   }
 }
 
-/** 그 일기가 무엇을 보고 쓰였는가 (002 FR-011) */
+/**
+ * 그 일기가 무엇을 보고 쓰였는가 (002 FR-011).
+ *
+ * **012 — 걸음·배터리·연결이 빠졌다**(`USER_VISIBLE_SIGNAL_AXES`, FR-006·007).
+ * 이 화면에는 원래도 배터리·연결 줄이 없었다 — 여기서 새로 빠진 것은 걸음뿐이다.
+ * 사진·다닌 자리는 실제로 수집되는 축이라 그대로 남는다(FR-008).
+ */
 function signalLines(signals: DaySignals): { label: string; value: string }[] {
   return [
     {
@@ -69,7 +75,6 @@ function signalLines(signals: DaySignals): { label: string; value: string }[] {
       label: "다닌 자리",
       value: describe(signals.places, (places) => `${places.trace.visitCount}곳`),
     },
-    { label: "걸음 수", value: describe(signals.steps, (steps) => `${steps}걸음`) },
   ];
 }
 

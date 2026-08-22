@@ -45,10 +45,26 @@ export type DayPickerProps = {
    * 돌므로 유효한 하루를 고르면 다음 렌더에서 저절로 빠진다.
    */
   revertedFrom?: DayDate;
+  /**
+   * 정오 전이라 오늘을 아직 쓸 수 없다는 안내 (012, 헌법 원칙 II MUST).
+   *
+   * **문자열이 아니라 `true | undefined`다.** 문구("정오부터 오늘을 쓸 수 있다")는
+   * 화면이 스스로 짓는다 — `WRITABLE_FROM_HOUR`(12)를 문자열로 바꾸는 판정을
+   * 화면 밖(`day-boundary.ts`)에 둘 필요가 없다.
+   *
+   * **`now`를 직접 읽지 않는다** — 이 값을 인자로 받을 뿐이다(계약 §4 금지).
+   */
+  todayNotYetWritable?: boolean;
   onSelect: (day: DayDate) => void;
 };
 
-export function DayPicker({ days, selected, revertedFrom, onSelect }: DayPickerProps) {
+export function DayPicker({
+  days,
+  selected,
+  revertedFrom,
+  todayNotYetWritable,
+  onSelect,
+}: DayPickerProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>언제를 쓸까</Text>
@@ -62,6 +78,15 @@ export function DayPicker({ days, selected, revertedFrom, onSelect }: DayPickerP
         <Text style={styles.reverted}>
           {revertedFrom}는 이제 쓸 수 없어 {selected}로 바꿨다
         </Text>
+      )}
+
+      {/*
+        **012 — 헌법 원칙 II "하루의 끝" MUST**: "왜 아직인지"와 "언제부터"를
+        함께 알린다. `WRITABLE_FROM_HOUR`(12시) 외의 곳에서 시각을 얻지 않는다 —
+        이 문구가 유일하게 "정오"라는 값을 사람이 읽는 말로 바꾸는 자리다.
+      */}
+      {todayNotYetWritable === true && (
+        <Text style={styles.notice}>오늘은 아직 하루가 끝나지 않아 정오(12시)부터 쓸 수 있다</Text>
       )}
 
       {days.map(({ day, hasDiary }) => {
@@ -102,6 +127,7 @@ const styles = StyleSheet.create({
   container: { gap: 8 },
   title: { fontSize: 15, fontWeight: "600" },
   reverted: { fontSize: 13, opacity: 0.8, lineHeight: 18 },
+  notice: { fontSize: 13, opacity: 0.8, lineHeight: 18 },
   row: {
     flexDirection: "row",
     alignItems: "center",

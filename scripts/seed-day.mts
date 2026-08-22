@@ -23,8 +23,9 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { patchDate, patchLocation, templatePath } from "./seed/exif.ts";
+import { patchDate, patchLocation } from "./seed/exif.ts";
 import { planSeeding } from "./seed/plan.ts";
+import { pickNoGpsSample, pickWithGpsSample } from "./seed/samples.ts";
 import { shapeNames } from "./seed/shapes.ts";
 import { recordSeeding, type SeededPhoto } from "./seed/ledger.ts";
 import { verifySeeded } from "./seed/verify.ts";
@@ -115,8 +116,8 @@ async function main(): Promise<never> {
   const existing = before.value.length;
 
   // ── 2단계: EXIF 패치 (개발 기계 안, 기기에 안 닿는다) ─────────────────────
-  const withGps = readFileSync(templatePath(true));
-  const withoutGps = readFileSync(templatePath(false));
+  // 사진마다 새로 고른다 — `scripts/samples/`에 여럿 있으면 장마다 다른 실사
+  // 이미지가 쓰인다(scripts/samples/README.md). 비어 있으면 검은 단색 템플릿이다.
   const workDir = mkdtempSync(join(tmpdir(), "alpharium-seed-"));
   const pushed: string[] = [];
   const recorded: SeededPhoto[] = [];
@@ -127,7 +128,8 @@ async function main(): Promise<never> {
       let buffer: Buffer;
 
       try {
-        buffer = patchDate(hasLocation ? withGps : withoutGps, new Date(photo.takenAtMs));
+        const source = readFileSync(hasLocation ? pickWithGpsSample() : pickNoGpsSample());
+        buffer = patchDate(source, new Date(photo.takenAtMs));
         if (photo.location !== null) {
           buffer = patchLocation(buffer, photo.location.latitude, photo.location.longitude);
         }

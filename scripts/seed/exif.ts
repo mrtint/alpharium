@@ -24,8 +24,36 @@
 
 import { join } from "node:path";
 
-/** TIFF 헤더가 APP1 안에서 시작하는 자리: SOI(2) + FFE1(2) + len(2) + "Exif\0\0"(6) */
-const TIFF_OFFSET = 12;
+/**
+ * 010의 검은 단색 템플릿에서는 TIFF 헤더가 언제나 APP1의 자리(SOI(2) + FFE1(2) +
+ * len(2) + "Exif\0\0"(6) = 12)에서 시작한다. **실사 사진은 이 값이 다르다** —
+ * 앞에 다른 세그먼트(썸네일, 다른 APP 마커)가 올 수 있어 파일마다 찾는다.
+ */
+
+/**
+ * JPEG 세그먼트를 훑어 APP1(Exif) 마커를 찾고 TIFF 헤더가 시작하는 자리를 준다.
+ *
+ * scripts/samples/의 실사 사진(011)을 지원하기 위해 추가됐다. **길이 유지
+ * 원칙은 그대로다** — 여기서 하는 일은 오프셋을 "찾는" 것뿐이고, 아래 patch
+ * 함수들은 여전히 찾은 자리의 바이트만 길이를 바꾸지 않고 덮어쓴다.
+ */
+function findTiffOffset(buf: Buffer): number {
+  if (buf.readUInt16BE(0) !== 0xffd8) {
+    throw new Error("JPEG이 아니다 — SOI 마커가 없다");
+  }
+  let pos = 2;
+  while (pos + 4 <= buf.length) {
+    const marker = buf.readUInt16BE(pos);
+    if (marker < 0xff01 || marker > 0xfffe) break; // 마커가 아니다
+    const len = buf.readUInt16BE(pos + 2);
+    if (marker === 0xffe1 && buf.subarray(pos + 4, pos + 10).toString("ascii") === "Exif\0\0") {
+      return pos + 10;
+    }
+    if (marker === 0xffda) break; // SOS — 그 뒤는 압축 데이터다
+    pos += 2 + len;
+  }
+  throw new Error("APP1(Exif) 세그먼트를 찾지 못했다 — 사진에 EXIF가 없다");
+}
 
 /** EXIF 날짜 문자열의 길이. `"YYYY:MM:DD HH:MM:SS\0"` — **20바이트 고정이다** */
 const DATE_LENGTH = 20;
@@ -38,6 +66,10 @@ const TAG_GPS_LAT_REF = 0x0001;
 const TAG_GPS_LAT = 0x0002;
 const TAG_GPS_LON_REF = 0x0003;
 const TAG_GPS_LON = 0x0004;
+const TAG_GPS_DATE_STAMP = 0x001d;
+
+/** `GPSDateStamp`의 길이. `"YYYY:MM:DD\0"` — **11바이트 고정이다**(실측, 2026-08-22) */
+const GPS_DATE_LENGTH = 11;
 
 /**
  * 템플릿의 자리. **`scripts/` 아래다 — `src/`가 아니므로 번들에 들어갈 길이 없다**(FR-001).
@@ -60,14 +92,17 @@ export function templatePath(withGps: boolean): string {
  * 고정으로 박으면 다음 사람이 템플릿을 바꿨을 때 조용히 어긋난다.
  */
 type Reader = {
+  tiffOffset: number;
   u16: (offset: number) => number;
   u32: (offset: number) => number;
   writeU32: (value: number, offset: number) => void;
 };
 
 function readerFor(buf: Buffer): Reader {
-  const little = buf.subarray(TIFF_OFFSET, TIFF_OFFSET + 2).toString("ascii") === "II";
+  const tiffOffset = findTiffOffset(buf);
+  const little = buf.subarray(tiffOffset, tiffOffset + 2).toString("ascii") === "II";
   return {
+    tiffOffset,
     u16: (o) => (little ? buf.readUInt16LE(o) : buf.readUInt16BE(o)),
     u32: (o) => (little ? buf.readUInt32LE(o) : buf.readUInt32BE(o)),
     writeU32: (v, o) => (little ? buf.writeUInt32LE(v, o) : buf.writeUInt32BE(v, o)),
@@ -76,7 +111,7 @@ function readerFor(buf: Buffer): Reader {
 
 /** IFD 하나를 훑어 각 엔트리를 준다 */
 function* entriesOf(buf: Buffer, r: Reader, ifdOffset: number) {
-  const base = TIFF_OFFSET + ifdOffset;
+  const base = r.tiffOffset + ifdOffset;
   const count = r.u16(base);
   for (let i = 0; i < count; i++) {
     const at = base + 2 + i * 12;
@@ -86,7 +121,7 @@ function* entriesOf(buf: Buffer, r: Reader, ifdOffset: number) {
 
 /** IFD0에서 하위 IFD로 가는 포인터를 찾는다. 없으면 null */
 function subIfdOffset(buf: Buffer, r: Reader, tag: number): number | null {
-  for (const e of entriesOf(buf, r, r.u32(TIFF_OFFSET + 4))) {
+  for (const e of entriesOf(buf, r, r.u32(r.tiffOffset + 4))) {
     if (e.tag === tag) return r.u32(e.at + 8);
   }
   return null;
@@ -94,7 +129,7 @@ function subIfdOffset(buf: Buffer, r: Reader, tag: number): number | null {
 
 /** ASCII 값이 실제로 놓인 자리. 4바이트 이하면 엔트리 안에 있다 */
 function valueOffset(buf: Buffer, r: Reader, at: number, byteLength: number): number {
-  return byteLength <= 4 ? at + 8 : TIFF_OFFSET + r.u32(at + 8);
+  return byteLength <= 4 ? at + 8 : r.tiffOffset + r.u32(at + 8);
 }
 
 /** `"YYYY:MM:DD HH:MM:SS"` */
@@ -137,7 +172,30 @@ export function patchDate(template: Buffer, at: Date): Buffer {
   }
 
   if (written === 0) throw new Error("템플릿에 날짜 자리가 없다 — 템플릿이 손상됐다");
+
+  // GPS IFD가 있으면 GPSDateStamp도 함께 맞춘다. **어긋난 채로 두면 안드로이드
+  // 미디어 스캐너가 datetaken을 NULL로 둔다** — 011 실측(scripts/samples/README.md).
+  // GPS 없는 사진은 이 태그 자체가 없으므로 조용히 건너뛴다.
+  const gpsIfd = subIfdOffset(buf, r, TAG_GPS_IFD);
+  if (gpsIfd !== null) {
+    const gpsDateText = `${formatGpsDate(at)}\0`;
+    for (const e of entriesOf(buf, r, gpsIfd)) {
+      if (e.tag !== TAG_GPS_DATE_STAMP) continue;
+      if (e.count !== GPS_DATE_LENGTH) {
+        throw new Error(`GPSDateStamp 자리가 ${GPS_DATE_LENGTH}바이트가 아니다: ${e.count}`);
+      }
+      buf.write(gpsDateText, valueOffset(buf, r, e.at, e.count), "ascii");
+    }
+  }
+
   return buf;
+}
+
+/** `"YYYY:MM:DD"` — GPSDateStamp는 시각 없이 날짜만 담는다(UTC 기준이 관례이나
+ * 여기서는 심는 날짜와 맞추는 것이 목적이므로 로컬 날짜를 그대로 쓴다) */
+function formatGpsDate(at: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}:${p(at.getMonth() + 1)}:${p(at.getDate())}`;
 }
 
 /** 저장된 날짜를 읽는다. 확인용이며 심을 때도 쓴다 */
@@ -238,11 +296,11 @@ export function patchLocation(template: Buffer, latitude: number, longitude: num
         wrote++;
         break;
       case TAG_GPS_LAT:
-        writeDms(buf, r, TIFF_OFFSET + r.u32(e.at + 8), latitude);
+        writeDms(buf, r, r.tiffOffset + r.u32(e.at + 8), latitude);
         wrote++;
         break;
       case TAG_GPS_LON:
-        writeDms(buf, r, TIFF_OFFSET + r.u32(e.at + 8), longitude);
+        writeDms(buf, r, r.tiffOffset + r.u32(e.at + 8), longitude);
         wrote++;
         break;
     }
@@ -272,10 +330,10 @@ export function readLocation(buf: Buffer): { latitude: number; longitude: number
         lonSign = buf.subarray(e.at + 8, e.at + 9).toString("ascii") === "W" ? -1 : 1;
         break;
       case TAG_GPS_LAT:
-        latitude = readDms(buf, r, TIFF_OFFSET + r.u32(e.at + 8));
+        latitude = readDms(buf, r, r.tiffOffset + r.u32(e.at + 8));
         break;
       case TAG_GPS_LON:
-        longitude = readDms(buf, r, TIFF_OFFSET + r.u32(e.at + 8));
+        longitude = readDms(buf, r, r.tiffOffset + r.u32(e.at + 8));
         break;
     }
   }

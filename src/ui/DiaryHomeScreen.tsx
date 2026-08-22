@@ -30,17 +30,19 @@ import {
 
 import {
   afterGeneration,
+  cancelOverwrite,
+  confirmOverwrite,
   initialScreen,
+  startWriting,
   toDetail,
   toFailed,
   toList,
-  toWriting,
   writePromptFor,
   type AppScreen,
   type DiaryListItem,
 } from "../app/state";
 import type { SelectionState } from "../app/selection";
-import type { DayDate } from "../config/day-boundary";
+import { dayOf, isDayWritable, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
@@ -49,6 +51,7 @@ import type { Character, VisionSetting } from "../diary/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DiaryDetailScreen } from "./DiaryDetailScreen";
 import { DiaryListScreen } from "./DiaryListScreen";
+import { OverwriteConfirmScreen } from "./OverwriteConfirmScreen";
 
 export type DiaryHomeScreenProps = {
   resolution: EnvironmentResolution;
@@ -176,15 +179,76 @@ export function DiaryHomeScreen({
   }, [refresh]);
 
   /**
-   * 일기를 쓴다.
+   * 실제로 생성을 돌린다.
    *
    * **★ 저장 상태를 보지 않는다**(S1, 원칙 I). 목록에 그 하루가 이미 있어도 **언제나
    * 실제 생성을 돈다** — 「이미 있으면 보여준다」는 지름길을 만들면 저장된 것이 생성을
    * 대신하고, 그 순간 헌법 원칙 I이 깨진다.
+   *
+   * **012 — `write()`(누름 핸들러)와 `confirmOverwrite`(확인 버튼) 둘 다 이것을
+   * 부른다.** `day`를 인자로 받되, 그 값의 유일한 출처는 `writePromptFor()`가
+   * 돌려준 것이다(009 W1·W2, FR-017) — 이 함수 자체가 하루를 다시 계산하지 않는다.
+   */
+  const generate = useCallback(
+    async (day: DayDate) => {
+      if (pipeline === undefined || selection.kind === "none") return;
+
+      setScreen({ kind: "writing" });
+      running.current = true;
+      cancelled.current = false;
+
+      try {
+        const at = now();
+
+        const result = await pipeline.run({
+          day,
+          now: at,
+          character: selection.character,
+          vision,
+        });
+
+        // ─────────────────────────────────────────────────────────────────────
+        // **★ 그만두었으면 결과를 버린다**(FR-014a).
+        //
+        // `stopCompletion()`은 생성을 거부시키지 않고 **거기까지 만들어진 글이 담긴
+        // 결과로 정상 resolve된다**(2026-08-17 실측). 「끊었으니 글이 없다」가 성립하지
+        // 않으므로 **명시적으로 버려야 한다** — `afterGeneration()`을 부르지 않는다.
+        //
+        // 판정 계층도 같은 것을 막지만(끊긴 글은 `rejected: unfinished`가 되어
+        // `entry`가 실리지 않는다) **이중 방어다.**
+        // ─────────────────────────────────────────────────────────────────────
+        if (cancelled.current) return;
+
+        setScreen(afterGeneration(result));
+      } finally {
+        running.current = false;
+      }
+    },
+    [pipeline, selection, vision, now],
+  );
+
+  /**
+   * 「일기 쓰기」를 누른다.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **★ 넘길 하루는 판정 함수가 돌려준 것뿐이다**(009 W1·W2, FR-017).
+   *
+   * 006~008은 여기가 `latestClosedDay(at)`였다. **그대로 두면 화면에서 하루를
+   * 골라도 언제나 어제가 쓰이고 오류는 나지 않는다** — 006의 `GenerationProbe`,
+   * 007의 끊긴 `stop` 배선과 같은 종류의 조용한 실패다.
+   *
+   * **`prompt.day`는 정의상 `selectable` 안에 있으므로**(불변식 I1) 범위 밖
+   * 하루가 생성으로 갈 통로가 없다. 파이프라인에 `day-too-old` 갈래를 더하지
+   * 않은 이유가 이것이다 — 「사흘」은 009의 값이고 파이프라인은 002의 계약이다.
+   *
+   * **고른 하루가 범위 밖이면 여기서 기본값이 된다.** 말없이 바뀌는 것이
+   * 아니라 화면도 같은 판정을 보고 되돌림을 알리고 있다(FR-009).
+   *
+   * **012 — 이미 있으면 곧바로 생성하지 않고 확인을 거친다**(`startWriting()`,
+   * contracts/overwrite-confirm.md §1). `WritePrompt.overwrites`를 재사용한다.
+   * ─────────────────────────────────────────────────────────────────────────
    */
   const write = useCallback(async () => {
-    if (pipeline === undefined) return;
-
     // **고른 것이 없으면 쓰지 않는다**(FR-006). 006은 없을 때 `"quiet"`으로 채워
     // 파이프라인이 `model-not-ready`로 멈추게 두었지만, 그것은 **고르지도 않은
     // 캐릭터로 쓰려 든 것**이다. 여기서 먼저 가른다.
@@ -193,56 +257,19 @@ export function DiaryHomeScreen({
       return;
     }
 
-    setScreen(toWriting());
-    running.current = true;
-    cancelled.current = false;
+    // **화면이 그린 것과 같은 재료로 판정한다.** 목록이 아니면 빈 배열이며,
+    // 그때는 덮어쓸 일기도 없다 — 고를 수 있는 하루는 `now`만으로 정해진다.
+    const items = screen.kind === "list" ? screen.items : [];
+    const prompt = writePromptFor(items, now(), chosenDay);
+    const next = startWriting(prompt);
 
-    try {
-      const at = now();
-
-      // ─────────────────────────────────────────────────────────────────────
-      // **★ 넘길 하루는 판정 함수가 돌려준 것뿐이다**(009 W1·W2, FR-017).
-      //
-      // 006~008은 여기가 `latestClosedDay(at)`였다. **그대로 두면 화면에서 하루를
-      // 골라도 언제나 어제가 쓰이고 오류는 나지 않는다** — 006의 `GenerationProbe`,
-      // 007의 끊긴 `stop` 배선과 같은 종류의 조용한 실패다.
-      //
-      // **`prompt.day`는 정의상 `selectable` 안에 있으므로**(불변식 I1) 범위 밖
-      // 하루가 생성으로 갈 통로가 없다. 파이프라인에 `day-too-old` 갈래를 더하지
-      // 않은 이유가 이것이다 — 「사흘」은 009의 값이고 파이프라인은 002의 계약이다.
-      //
-      // **고른 하루가 범위 밖이면 여기서 기본값이 된다.** 말없이 바뀌는 것이
-      // 아니라 화면도 같은 판정을 보고 되돌림을 알리고 있다(FR-009).
-      // ─────────────────────────────────────────────────────────────────────
-      // **화면이 그린 것과 같은 재료로 판정한다.** 목록이 아니면 빈 배열이며,
-      // 그때는 덮어쓸 일기도 없다 — 고를 수 있는 하루는 `now`만으로 정해진다.
-      const items = screen.kind === "list" ? screen.items : [];
-      const prompt = writePromptFor(items, at, chosenDay);
-
-      const result = await pipeline.run({
-        day: prompt.day,
-        now: at,
-        character: selection.character,
-        vision,
-      });
-
-      // ─────────────────────────────────────────────────────────────────────
-      // **★ 그만두었으면 결과를 버린다**(FR-014a).
-      //
-      // `stopCompletion()`은 생성을 거부시키지 않고 **거기까지 만들어진 글이 담긴
-      // 결과로 정상 resolve된다**(2026-08-17 실측). 「끊었으니 글이 없다」가 성립하지
-      // 않으므로 **명시적으로 버려야 한다** — `afterGeneration()`을 부르지 않는다.
-      //
-      // 판정 계층도 같은 것을 막지만(끊긴 글은 `rejected: unfinished`가 되어
-      // `entry`가 실리지 않는다) **이중 방어다.**
-      // ─────────────────────────────────────────────────────────────────────
-      if (cancelled.current) return;
-
-      setScreen(afterGeneration(result));
-    } finally {
-      running.current = false;
+    if (next.kind === "confirm-overwrite") {
+      setScreen(next);
+      return;
     }
-  }, [pipeline, selection, vision, now, chosenDay, screen]);
+
+    await generate(prompt.day);
+  }, [selection, screen, now, chosenDay, generate]);
 
   /**
    * 생성을 그만둔다 (007 FR-013~015).
@@ -293,6 +320,9 @@ export function DiaryHomeScreen({
           onSelectVision={onSelectVision}
           onWrite={() => void write()}
           selection={selection}
+          // **012 — 새 판정을 만들지 않고 isDayWritable()을 재사용한다**
+          // (contracts/day-boundary.md §4 「계산 위치」, 헌법 원칙 II MUST).
+          todayNotYetWritable={!isDayWritable(dayOf(now()), now())}
           vision={vision}
           // **쓰기 자리에 무엇이 일어날지 싣는다**(FR-023·024). `onWrite`는 이것을
           // 보지 않으므로 원칙 I의 방어가 유지된다(FR-025).
@@ -305,6 +335,20 @@ export function DiaryHomeScreen({
         <Frame onBack={() => void backToList()}>
           <DiaryDetailScreen entry={screen.entry} />
         </Frame>
+      );
+
+    case "confirm-overwrite":
+      return (
+        <OverwriteConfirmScreen
+          day={screen.day}
+          onCancel={() => {
+            void refresh().then((items) => setScreen(cancelOverwrite(items)));
+          }}
+          onConfirm={() => {
+            setScreen(confirmOverwrite());
+            void generate(screen.day);
+          }}
+        />
       );
 
     case "unreadable":

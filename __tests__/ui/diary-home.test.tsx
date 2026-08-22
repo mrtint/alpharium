@@ -373,7 +373,10 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
    *
    * 고를 수 있는 하루가 셋이 되면 「이미 있으면 그것을 보여주자」의 유혹도 셋이 된다.
    */
-  it("★ W-T4. 이미 일기가 있는 하루를 골라도 생성이 실제로 돈다 (FR-019, 원칙 I)", async () => {
+  it("★ W-T4. 이미 일기가 있는 하루를 골라도 확인 후 생성이 실제로 돈다 (FR-019, 원칙 I)", async () => {
+    // **012 — 이제 곧바로 생성되지 않고 확인을 한 번 더 거친다**(US3, FR-011).
+    // 007이 세운 「곧바로 생성」은 이 검증에서 뒤집혔다 — spec Clarifications의
+    // 근거(오늘 쓰기가 열리면 하루에 여러 번 누를 상황이 흔해진다)를 따른다.
     const pipeline = recordingPipeline();
     const store = memoryStore();
     // 그 하루의 일기를 미리 심는다.
@@ -391,6 +394,12 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
 
     await userEvent.press(await screen.findByTestId("day-2026-08-17"));
     await userEvent.press(await screen.findByText("일기 쓰기"));
+
+    // 확인 화면이 뜨고, 아직 생성은 시작되지 않았다.
+    await screen.findByText("확인");
+    expect(pipeline.days).toEqual([]);
+
+    await userEvent.press(screen.getByText("확인"));
 
     // **저장된 것을 대신 보여주지 않는다** — 실제로 생성이 돌았다.
     await waitFor(() => expect(pipeline.days).toEqual(["2026-08-17"]));

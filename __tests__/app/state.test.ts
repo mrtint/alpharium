@@ -16,13 +16,17 @@ import { join } from "node:path";
 import { isDayClosed, latestClosedDay } from "../../src/config/day-boundary";
 import {
   afterGeneration,
+  cancelOverwrite,
+  confirmOverwrite,
   initialScreen,
+  startWriting,
   toDetail,
   toList,
   toWriting,
   writePromptFor,
   type DiaryListItem,
   type PhotoHint,
+  type WritePrompt,
 } from "../../src/app/state";
 import { resolveSelection } from "../../src/app/selection";
 import type { PipelineResult } from "../../src/diary/pipeline";
@@ -884,5 +888,90 @@ describe("★ 009 I6·I7 — 담을 자리가 없다", () => {
     expect(fields.sort()).toEqual(["day", "hasDiary"]);
     // 사진 갈래가 들어올 자리가 없다.
     expect(body).not.toContain("PhotoHint");
+  });
+});
+
+/**
+ * 012 — 덮어쓰기 확인 전이.
+ *
+ * 계약: specs/012-today-diary/contracts/overwrite-confirm.md §1 「전이」
+ */
+describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)", () => {
+  const stateSource = () =>
+    readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
+
+  function withoutComments(code: string): string {
+    return code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+  }
+
+  const promptFor = (overrides: Partial<WritePrompt> = {}): WritePrompt => ({
+    day: DAY,
+    overwrites: false,
+    selectable: [{ day: DAY, hasDiary: false }],
+    ...overrides,
+  });
+
+  it("1. 일기 없음 + 누름 → writing(곧바로 생성 시작) (FR-011 부정 조건)", () => {
+    const screen = startWriting(promptFor({ overwrites: false }));
+    expect(screen.kind).toBe("writing");
+  });
+
+  it("★ 2. 일기 있음 + 누름 → confirm-overwrite(생성 시작 안 함) (FR-011, 이 계약의 핵심)", () => {
+    const screen = startWriting(promptFor({ overwrites: true, day: DAY }));
+    expect(screen.kind).toBe("confirm-overwrite");
+    if (screen.kind === "confirm-overwrite") expect(screen.day).toBe(DAY);
+  });
+
+  it("3. confirm-overwrite에서 취소 → list(기존 일기 그대로) (FR-012)", () => {
+    const items = [readable(DAY)];
+    const screen = cancelOverwrite(items);
+    expect(screen.kind).toBe("list");
+    if (screen.kind === "list") expect(screen.items).toEqual(items);
+  });
+
+  it("4. confirm-overwrite에서 확인 → writing(생성 시작) (FR-011)", () => {
+    expect(confirmOverwrite().kind).toBe("writing");
+  });
+
+  it("C2 — 확인한 하루와 실제로 쓰는 하루가 어긋나지 않는다", () => {
+    // confirm-overwrite.day가 곧 쓰게 될 하루다. confirmOverwrite() 자체는 인자를
+    // 받지 않으므로(C3), 호출하는 쪽이 confirm-overwrite.day를 그대로 파이프라인에
+    // 넘긴다는 것을 값으로 확인한다.
+    const confirmed = startWriting(promptFor({ overwrites: true, day: "2026-08-19" }));
+    expect(confirmed.kind).toBe("confirm-overwrite");
+    if (confirmed.kind === "confirm-overwrite") {
+      expect(confirmed.day).toBe("2026-08-19");
+    }
+  });
+
+  /**
+   * **C1 — `confirm-overwrite`의 필드는 정확히 `kind`·`day` 둘뿐이다.**
+   *
+   * 선언을 `readFileSync`로 직접 읽는다(007에서 배운 것 — `npm test`만으로는
+   * 타입 위반을 놓친다).
+   */
+  it("★ C1 — AppScreen에 confirm-overwrite 갈래가 있고 필드는 kind·day 둘뿐이다", () => {
+    const source = withoutComments(stateSource());
+    const match = source.match(/\{\s*kind:\s*"confirm-overwrite"[^}]*\}/);
+
+    expect(match).not.toBeNull();
+    const body = match?.[0] ?? "";
+    const fields = body
+      .replace(/^\{|\}$/g, "")
+      .split(";")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .map((line) => line.split(":")[0].trim());
+
+    expect(fields.sort()).toEqual(["day", "kind"]);
+  });
+
+  /**
+   * **C3 — `toWriting()`은 여전히 인자를 받지 않는다.** 012가 확인 갈래를 더해도
+   * 007의 방어(원칙 I)가 흔들리지 않는다는 것을 다시 못박는다.
+   */
+  it("★ C3 — toWriting은 012 이후에도 여전히 인자를 받지 않는다", () => {
+    expect(toWriting.length).toBe(0);
+    expect(Object.keys(toWriting())).toEqual(["kind"]);
   });
 });

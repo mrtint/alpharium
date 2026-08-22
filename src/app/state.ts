@@ -66,6 +66,14 @@ export type AppScreen =
   | { kind: "list"; items: DiaryListItem[] }
   | { kind: "detail"; day: DayDate; entry: DiaryEntry }
   | { kind: "unreadable"; day: DayDate }
+  /**
+   * 이미 있는 하루를 다시 쓰려 한다 (012 US3, FR-011~013).
+   *
+   * **필드가 `day` 하나뿐이다** — 007의 `toWriting()`이 인자를 받지 않는 것과 같은
+   * 방어다(원칙 I). 기존 일기의 본문·글자 수·미리보기를 담지 않는다 — 담으면 이
+   * 화면이 「확인 대신 미리 보기」로 미끄러질 수 있다.
+   */
+  | { kind: "confirm-overwrite"; day: DayDate }
   | { kind: "writing" }
   | { kind: "written"; entry: DiaryEntry; saved: boolean; overwrote: boolean }
   | { kind: "failed"; message: string };
@@ -224,6 +232,43 @@ export function toDetail(item: DiaryListItem, entry: DiaryEntry | null): AppScre
  */
 export function toWriting(): AppScreen {
   return { kind: "writing" };
+}
+
+/**
+ * 「일기 쓰기」를 눌렀을 때 갈 곳을 정한다 (012 US3, contracts/overwrite-confirm.md §1).
+ *
+ * **`WritePrompt.overwrites`를 재사용한다** — 새 판정을 만들지 않는다(C4). 007이
+ * 세운 "누르기 전 예고"(`overwrites`)와 이 함수가 만드는 "누른 뒤 확인"이 같은
+ * 사실을 본다.
+ *
+ * 이미 있으면 `confirm-overwrite`로 가서 곧바로 생성을 시작하지 않는다(FR-011).
+ * 없으면 지금처럼 바로 `writing`이다.
+ */
+export function startWriting(prompt: WritePrompt): AppScreen {
+  if (prompt.overwrites) {
+    return { kind: "confirm-overwrite", day: prompt.day };
+  }
+  return toWriting();
+}
+
+/**
+ * 덮어쓰기 확인에서 취소한다 (012, FR-012).
+ *
+ * 기존 일기는 그대로 남고 아무것도 생성되지 않는다 — 목록으로 돌아갈 뿐이다.
+ */
+export function cancelOverwrite(items: DiaryListItem[]): AppScreen {
+  return toList(items);
+}
+
+/**
+ * 덮어쓰기 확인에서 확인한다 (012, FR-011).
+ *
+ * **`toWriting()`은 여전히 인자를 받지 않는다**(C3) — `confirm-overwrite`가 들고
+ * 있던 날짜를 그대로 파이프라인에 넘길 뿐이며, "이미 있는 일기를 보여주는" 지름길이
+ * 생기지 않는다.
+ */
+export function confirmOverwrite(): AppScreen {
+  return toWriting();
 }
 
 /**

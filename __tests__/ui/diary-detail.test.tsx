@@ -127,6 +127,34 @@ describe("★ 모르는 것과 없는 것이 구분된다 (FR-032)", () => {
 });
 
 /**
+ * 012 — 관측 불가 축이 상세 화면에서 사라진다.
+ *
+ * 계약: specs/012-today-diary/contracts/signal-visibility.md §1의 3번 행
+ */
+describe("012 — 걸음·배터리·연결이 상세 화면에 없다 (contracts/signal-visibility.md §1)", () => {
+  it("사진이 known인 하루에도 걸음 줄이 없다 (회귀 없음 포함)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor("2026-08-16", richDay("2026-08-16"))} />);
+
+    expect(screen.queryByText(/걸음/)).toBeNull();
+  });
+
+  it("걸음이 unknown이어도 걸음 줄이 없다", async () => {
+    await render(
+      <DiaryDetailScreen entry={entryFor("2026-08-16", partiallyUnknownDay("2026-08-16"))} />,
+    );
+
+    expect(screen.queryByText(/걸음/)).toBeNull();
+  });
+
+  it("사진과 다닌 자리만 보인다", async () => {
+    await render(<DiaryDetailScreen entry={entryFor("2026-08-16", richDay("2026-08-16"))} />);
+
+    expect(screen.getByText(/^사진: /)).toBeTruthy();
+    expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+  });
+});
+
+/**
  * ★ 원칙 III·IV — **모델 정보와 지표가 화면에 없다**(S4·S5).
  */
 describe("★ 화면에 없어야 하는 것", () => {

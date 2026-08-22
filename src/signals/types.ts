@@ -155,3 +155,27 @@ export type DaySignals = {
   battery: SignalValue<BatteryTrace>;
   connectivity: SignalValue<ConnectivityTrace>;
 };
+
+/**
+ * 이 축을 일기 프롬프트·사용자 화면에 실을 것인가 (012 FR-006~010).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **코드가 판정하지 않는다**(헌법 원칙 V MUST NOT, FR-010). 값을 보고 "계속
+ * unknown이니 빼자"로 정하면 그것이 임계값이다. 사람이 여기 적고, 통로가 생기면
+ * 사람이 상수를 고친다.
+ *
+ * **`prompt.ts`와 `DiaryDetailScreen.tsx`가 이 상수를 본다.** `SignalProbe.tsx`
+ * (진단)는 이 상수를 **보지 않고** 다섯 축을 전부 그린다 — 사용자 화면에서 빠지는
+ * 것과 저장소가 값을 잊는 것은 다르다(FR-009).
+ *
+ * **`DaySignals`의 필드는 지우지 않는다.** 값은 그대로 수집·저장되며, 이 상수는
+ * 오직 "보여줄 것인가"만 정한다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export const USER_VISIBLE_SIGNAL_AXES = {
+  photos: true, // 실제로 수집한다(004)
+  places: true, // 사진 좌표에서 온다(004)
+  steps: false, // 안드로이드가 기간 걸음 수를 주지 않는다 — 영영 막혔다(FR-006)
+  battery: false, // 기록 계층이 없다 — 생기면 되살린다(FR-007)
+  connectivity: false, // 기록 계층이 없다 — 생기면 되살린다(FR-007)
+} as const;
