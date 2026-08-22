@@ -16,8 +16,10 @@
  *
  * **여기서 지키는 것**:
  *  1. 화자 규칙이 항상 들어간다(FR-013). 어떤 캐릭터, 어떤 신호에서도
- *  2. 캐릭터에서 오는 것은 **언어뿐이다**(FR-014a). 성격 지시를 넣지 않는다 — 성격은
- *     모델의 성질이지 우리가 만드는 것이 아니다(원칙 III)
+ *  2. 캐릭터에서 오는 것은 **언어와 이름뿐이다**(FR-014a, 014 FR-015). 성격 지시를
+ *     넣지 않는다 — 성격은 모델의 성질이지 우리가 만드는 것이 아니다(원칙 III).
+ *     **014가 이름을 더했다** — `persona.ts`의 `tagline`(소개)은 프롬프트에 들어가지
+ *     않는다(persona.md 계약 P4), `name`(이름)만 호칭으로 들어간다
  *  3. `known`/`none`/`unknown`이 **서로 다른 말**이 된다(FR-012a·b)
  *  4. 관측의 한계가 함께 간다(FR-012c·d). 004가 값에 붙여 둔 것을 떨어뜨리지 않는다
  *  5. 모델 정보를 담지 않는다(FR-015)
@@ -32,6 +34,7 @@
 
 import { USER_VISIBLE_SIGNAL_AXES, type DaySignals, type SignalValue } from "../signals/types";
 import type { PhotoVision } from "../vision/types";
+import { personaOf } from "./persona";
 import type { Character, DiaryRequest } from "./types";
 
 /* ────────────────────────── 고정 지시문 ────────────────────────── */
@@ -79,6 +82,13 @@ const SPEAKER_RULES: readonly string[] = [
   // ★ 구체적인 예. 추상적 금지만으로는 부족했다.
   "예를 들어 날씨, 주인이 먹은 것, 만난 사람, 집에서 한 일은 네가 알 수 없는 것이다. 기록에 없으면 쓰지 마라.",
   "정확한 기록이 아니라 하루의 감상을 쓴다.",
+  // ─────────────────────────────────────────────────────────────────────────
+  // ★ 014 US3 — 짐작 어미 지시 (research.md R3).
+  //
+  // 005·007·011의 위반 공통 패턴은 "짐작해도 될 만한 것을 단정형 어미로 썼다"는
+  // 것이었다("~것 같다"였다면 위반이 아니었을 문장이 "~했다"로 쓰여 위반이 됐다).
+  // 기존 문구는 "무엇을 쓸지"는 말했지만 "어떻게(어떤 어미로) 쓸지"는 말하지 않았다.
+  "확실하지 않은 것은 '~인 것 같다', '~였을지도 모른다'처럼 짐작의 말투로 써라. 있었다, 했다처럼 단정하는 말투는 실제로 본 것에만 써라.",
 ];
 
 /**
@@ -95,7 +105,20 @@ const SPEAKER_RULES: readonly string[] = [
 const TITLE_INSTRUCTION =
   "첫 줄에 제목을 짧게 쓰고, 빈 줄을 하나 넣은 뒤, 그 아래에 본문을 이어서 적어라.";
 
-/** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것뿐이다** */
+/**
+ * 캐릭터 호칭 지시문 (014 FR-015).
+ *
+ * **이름만 알린다 — 성격은 지시하지 않는다.** `persona.ts`가 캐릭터 내부 식별자와
+ * 사람이 읽는 이름 사이의 유일한 통과 지점이듯, 이 함수가 프롬프트로 넘어가는
+ * 그 이름의 유일한 형태다. `personaOf(character).tagline`(소개)은 여기서
+ * 절대 읽지 않는다(persona.md 계약 P4) — 소개 문구가 프롬프트에 섞이면 "군더더기
+ * 없이 담백하게 적어요" 같은 문구가 성격 지시로 오독될 위험이 있다.
+ */
+function nameLine(character: Character): string {
+  return `너는 '${personaOf(character).name}'이라 불린다.`;
+}
+
+/** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것과 이름뿐이다** */
 const LANGUAGE: Readonly<Record<Character, string>> = {
   quiet: "한국어",
   narrative: "한국어",
@@ -187,7 +210,7 @@ const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못�
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
-  const lines = [...SPEAKER_RULES, TITLE_INSTRUCTION];
+  const lines = [...SPEAKER_RULES, nameLine(request.character), TITLE_INSTRUCTION];
 
   // 012 — 사진 축과 무관하게, 하루가 아직 끝나지 않았으면 붙는다(FR-004).
   if (request.dayStillOpen) {
@@ -383,6 +406,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
 
   return [
     ...SPEAKER_RULES,
+    nameLine(request.character),
     TITLE_INSTRUCTION,
     "",
     `${language}로 써라.`,

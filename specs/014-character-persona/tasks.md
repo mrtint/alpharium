@@ -185,26 +185,26 @@ US3(프롬프트 개정과 같은 파일)이 전부 이것을 필요로 하거�
 
 ### Tests for User Story 3
 
-- [ ] T027 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 — 새
+- [X] T027 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 — 새
       짐작 어미 지시 문장이 `SPEAKER_RULES`(→ `instructionLines()`의 반환값)에
       포함되는지, 그 문장에 특정 캐릭터 이름이나 "상상력이 풍부하다" 류의 성격
       서술이 섞여 있지 않은지(FR-013·015 — 모든 캐릭터에 공통으로 적용되는 문장인지)
       확인한다
-- [ ] T028 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 —
+- [X] T028 [P] [US3] `__tests__/diary/prompt.test.ts`에 케이스를 추가한다 —
       `buildPrompt()`가 캐릭터 이름(`personaOf().name`)을 프롬프트에 포함하되,
       `tagline`(소개 문구)은 포함하지 않는 것을 확인한다(contracts/persona.md P4,
       FR-015·016)
 
 ### Implementation for User Story 3
 
-- [ ] T029 [US3] `src/diary/prompt.ts`의 `SPEAKER_RULES`에 짐작 어미 지시 한 줄을
+- [X] T029 [US3] `src/diary/prompt.ts`의 `SPEAKER_RULES`에 짐작 어미 지시 한 줄을
       추가한다(research.md R3 — "확실하지 않은 것은 '~인 것 같다'처럼 짐작의
       말투로 써라" 류)
-- [ ] T030 [US3] `src/diary/prompt.ts`의 `buildPrompt()`가 `personaOf(character).name`을
+- [X] T030 [US3] `src/diary/prompt.ts`의 `buildPrompt()`가 `personaOf(character).name`을
       읽어 이름 한 줄을 프롬프트에 추가한다(FR-015 — 이름만, 성격 지시 없음).
       `persona.ts`를 import하되 `roster.ts`는 여전히 import하지 않는다
-- [ ] T031 [US3] `npm run test:logic`으로 T027·T028이 통과하는지 확인한다
-- [ ] T032 [US3] `npm run lint`로 헌법 검사(특히 `src/diary/`가 `models/roster`에
+- [X] T031 [US3] `npm run test:logic`으로 T027·T028이 통과하는지 확인한다
+- [X] T032 [US3] `npm run lint`로 헌법 검사(특히 `src/diary/`가 `models/roster`에
       닿지 않는 기존 규칙이 있다면) 통과를 확인한다
 
 **Checkpoint**: User Story 1+2+3 완결. 프롬프트 개정은 quickstart.md D6에서

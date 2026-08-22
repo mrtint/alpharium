@@ -13,6 +13,7 @@
  */
 
 import { buildPrompt, instructionLines } from "../../src/diary/prompt";
+import { personaOf } from "../../src/diary/persona";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character, type DiaryRequest } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
@@ -108,6 +109,37 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
       expect(prompt).toMatch(/짧(게|아도)/);
     }
   });
+
+  /**
+   * ★ 014 US3 — 짐작 어미 지시 (research.md R3, FR-012·013).
+   *
+   * 005~012의 반복 관측 패턴은 "짐작해도 될 만한 것을 단정형 어미로 썼다"는
+   * 것이었다. 이 지시가 확실하지 않은 것은 짐작의 말투로 쓰라고 명시한다.
+   */
+  it("확실하지 않은 것은 짐작의 말투로 쓰라는 지시가 담긴다(FR-012)", () => {
+    const prompt = buildPrompt(requestFor(unknownDay(DAY)));
+    expect(prompt).toMatch(/것 같다|일지도 모른다|~것 같/);
+  });
+
+  it("짐작 어미 지시가 모든 캐릭터에 공통이다(캐릭터 차이와는 별개의 공통 규칙)", () => {
+    const prompts = CHARACTERS.map((c) => buildPrompt(requestFor(unknownDay(DAY), c)));
+    const withoutNamesAndLanguage = prompts.map((p) => {
+      const names = CHARACTERS.map((c) => personaOf(c).name).join("|");
+      return p
+        .split("\n")
+        .filter((line) => !/한국어|중국어|영어/.test(line))
+        .filter((line) => !new RegExp(names).test(line))
+        .join("\n");
+    });
+    for (const prompt of withoutNamesAndLanguage) {
+      expect(prompt).toMatch(/것 같다|일지도 모른다|~것 같/);
+    }
+  });
+
+  it("짐작 어미 지시가 instructionLines()에도 담긴다(되뱉기 판정 대상)", () => {
+    const lines = instructionLines(requestFor(unknownDay(DAY)));
+    expect(lines.some((line) => /것 같다|일지도 모른다|~것 같/.test(line))).toBe(true);
+  });
 });
 
 describe("P-2 캐릭터에서 오는 것은 언어뿐이다 (FR-014·014a·014b)", () => {
@@ -129,18 +161,51 @@ describe("P-2 캐릭터에서 오는 것은 언어뿐이다 (FR-014·014a·014b)
     expect(prompt).not.toContain("한국어");
   });
 
-  it("언어 문장을 빼면 다섯 캐릭터의 프롬프트가 같다", () => {
-    // **이것이 FR-014의 핵심 검증이다.** 성격 지시("짧게 써라", "감정을 얹어라")가
+  it("언어·이름 문장을 빼면 다섯 캐릭터의 프롬프트가 같다", () => {
+    // **이것이 FR-014·015의 핵심 검증이다.** 성격 지시("짧게 써라", "감정을 얹어라")가
     // 하나라도 들어가면 이 테스트가 깨진다 — 그 순간 성격이 모델이 아니라 우리가 지어낸
     // 것이 되고 로스터의 근거가 무너진다(원칙 III).
+    //
+    // 014 — 이름도 캐릭터마다 다른 문장이므로 언어와 함께 걷어낸다. 소개(tagline)는
+    // 애초에 프롬프트에 들어가지 않으므로(FR-016, 아래 별도 검사) 여기서 걷어낼
+    // 대상이 아니다.
+    const names = CHARACTERS.map((c) => personaOf(c).name).join("|");
     const stripped = CHARACTERS.map((character) =>
       buildPrompt(requestFor(richDay(DAY), character))
         .split("\n")
         .filter((line) => !/한국어|중국어|영어/.test(line))
+        .filter((line) => !new RegExp(names).test(line))
         .join("\n"),
     );
 
     for (const prompt of stripped) expect(prompt).toBe(stripped[0]);
+  });
+
+  /**
+   * ★ 014 — 프롬프트에 캐릭터 이름은 들어가되(FR-015), 소개(tagline)는 들어가지
+   * 않는다(계약 persona.md P4). 이름과 소개는 다른 자격이다 — 이름은 호칭이고
+   * 소개는 사용자 화면 전용 문구다.
+   */
+  it("프롬프트에 캐릭터 이름이 들어간다(FR-015)", () => {
+    for (const character of CHARACTERS) {
+      const prompt = buildPrompt(requestFor(richDay(DAY), character));
+      expect(prompt).toContain(personaOf(character).name);
+    }
+  });
+
+  it("프롬프트에 소개(tagline)는 들어가지 않는다(persona.md P4)", () => {
+    for (const character of CHARACTERS) {
+      const prompt = buildPrompt(requestFor(richDay(DAY), character));
+      expect(prompt).not.toContain(personaOf(character).tagline);
+    }
+  });
+
+  it("성격을 지시하는 문장이 없다(FR-015, 원칙 III)", () => {
+    // "너는 상상력이 풍부하다" 류의 직접적인 성격 지시가 없는지 확인한다.
+    for (const character of CHARACTERS) {
+      const prompt = buildPrompt(requestFor(richDay(DAY), character));
+      expect(prompt).not.toMatch(/상상력이 풍부|담백하게|이야기처럼|여운을|차분한 눈으로/);
+    }
   });
 });
 
