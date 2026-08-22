@@ -11,6 +11,7 @@
  */
 
 import type { EnvironmentResolution } from "../config/types";
+import type { Character } from "../diary/types";
 import type { InferenceLocation, ModuleStatus, SelectionFailure } from "../inference/types";
 import type { StorageCheck } from "./storage-check";
 
@@ -43,5 +44,13 @@ export type DiagnosticReport = {
    * 이 자리는 상태를 담을 뿐 성능을 담지 않는다 — 소요 시간·크기를 넣지 않는다(원칙 IV).
    */
   storage: StorageCheck;
+  /**
+   * 캐릭터 → 모델 표시 이름 (014, local·dev 전용).
+   *
+   * **사용자 화면 금지의 예외다**(헌법 원칙 III "사용자 화면과 진단 경로").
+   * 진단 화면이 배포 빌드에서 닿지 않는 것(001 SC-013)이 이 필드의 유일한 방어다 —
+   * 여기서만 캐릭터와 모델의 대응이 문자열로 드러난다.
+   */
+  characterModels: Readonly<Record<Character, string>>;
   failures: Failure[];
 };

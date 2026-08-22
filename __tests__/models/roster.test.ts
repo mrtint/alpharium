@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { CHARACTERS } from "../../src/diary/types";
-import { assetFor } from "../../src/models/roster";
+import { assetFor, displayName } from "../../src/models/roster";
 
 const ROSTER_SOURCE = readFileSync(join(__dirname, "../../src/models/roster.ts"), "utf8");
 
@@ -129,6 +129,25 @@ describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
       expect(asset).not.toHaveProperty("temperature");
       expect(asset).not.toHaveProperty("contextLength");
       expect(asset).not.toHaveProperty("prompt");
+    }
+  });
+});
+
+/**
+ * 014 US4 — 진단 전용 모델 표시 이름.
+ *
+ * **R8과 모순되지 않는다.** R8은 `ModelAsset`(assetFor의 반환값) 자체에
+ * displayName 필드가 없다는 것을 검사한다 — `ModelAsset`은 여전히 그렇다.
+ * `displayName()`은 별도 함수이며, 헌법 1.1.0이 연 "진단 경로는 모델을 알아도
+ * 된다"(원칙 III)를 이용하는 자리다. `src/diagnostics/report.ts`만 이 함수를
+ * 부르고, `src/ui/`는 여전히 이 파일 전체를 import할 수 없다(007 헌법 검사).
+ */
+describe("진단 전용 모델 표시 이름 (014 FR-017)", () => {
+  it("다섯 캐릭터 모두 빈 문자열이 아닌 표시 이름을 준다", () => {
+    for (const character of CHARACTERS) {
+      const name = displayName(character);
+      expect(typeof name).toBe("string");
+      expect(name.trim().length).toBeGreaterThan(0);
     }
   });
 });

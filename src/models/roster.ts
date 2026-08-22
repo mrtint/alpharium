@@ -106,3 +106,28 @@ const ASSETS: Readonly<Record<Character, ModelAsset>> = {
 export function assetFor(character: Character): ModelAsset {
   return ASSETS[character];
 }
+
+/**
+ * 모델 표시 이름 (014, 진단 전용).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **`src/ui/`가 이 파일을 import할 수 없다**(007 헌법 검사, `UI_TOUCHES_MODEL`).
+ * 이 함수는 `src/diagnostics/report.ts`만 부른다 — 그 경로가 배포 빌드에서 닿지
+ * 않는 것(001 SC-013)이 유일한 방어선이다.
+ *
+ * **값은 헌법 「로스터」 본문에서 그대로 옮긴 것이다** — 새로 짓지 않는다. 캐릭터별
+ * `md5` 채록 주석 위에 이미 적혀 있던 모델명 문자열과 같다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const DISPLAY_NAMES: Readonly<Record<Character, string>> = {
+  quiet: "kanana-1.5-2.1b",
+  narrative: "exaone-3.5-2.4b",
+  imaginative: "hyperclovax-seed-1.5b",
+  chinese: "qwen3-1.7b",
+  english: "gemma3-1b",
+};
+
+/** 캐릭터의 모델 표시 이름을 찾는다(진단 전용). */
+export function displayName(character: Character): string {
+  return DISPLAY_NAMES[character];
+}

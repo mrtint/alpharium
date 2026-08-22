@@ -223,27 +223,35 @@ release 빌드에서는 여전히 진단 화면에 닿는 경로가 없는 것�
 
 ### Tests for User Story 4
 
-- [ ] T033 [P] [US4] `__tests__/models/roster.test.ts`에 케이스를 추가한다 —
+- [X] T033 [P] [US4] `__tests__/models/roster.test.ts`에 케이스를 추가한다 —
       `displayName(character)`가 다섯 값 모두에 대해 빈 문자열이 아닌 값을
       반환하는 것을 확인한다
-- [ ] T034 [P] [US4] `__tests__/diagnostics/report.test.ts`에 케이스를 추가한다 —
+- [X] T034 [P] [US4] `__tests__/diagnostics/report.test.ts`에 케이스를 추가한다 —
       `collectReport()`의 결과에 `characterModels` 필드가 다섯 캐릭터 전부를
       담고 있는 것을 확인한다
 
 ### Implementation for User Story 4
 
-- [ ] T035 [US4] `src/models/roster.ts`에 `displayName(character)` 함수를
+- [X] T035 [US4] `src/models/roster.ts`에 `displayName(character)` 함수를
       추가한다(data-model.md 「roster.ts 추가」) — 기존 실측 주석의 모델명
       문자열을 그대로 옮긴다
-- [ ] T036 [US4] `src/diagnostics/types.ts`의 `DiagnosticReport`에
+- [X] T036 [US4] `src/diagnostics/types.ts`의 `DiagnosticReport`에
       `characterModels: Readonly<Record<Character, string>>`을 추가한다
-- [ ] T037 [US4] `src/diagnostics/report.ts`의 `collectReport()`가
+- [X] T037 [US4] `src/diagnostics/report.ts`의 `collectReport()`가
       `CHARACTERS.map(displayName)`으로 `characterModels`를 채운다
-- [ ] T038 [US4] `src/ui/DiagnosticsScreen.tsx`에 `characterModels`를 렌더링하는
+- [X] T038 [US4] `src/ui/DiagnosticsScreen.tsx`에 `characterModels`를 렌더링하는
       부분을 추가한다(문자열만 받아 그리기만 함 — `roster.ts`를 import하지 않음)
-- [ ] T039 [US4] `npm run test:logic`·`npm run test:ui`로 T033·T034 및
-      진단 화면 렌더링 테스트가 통과하는지 확인한다
-- [ ] T040 [US4] `npm run lint`로 `src/ui/DiagnosticsScreen.tsx`가 `roster.ts`를
+- [X] T039 [US4] `npm run test:logic`으로 T033·T034가 통과하는지 확인한다.
+      **★ 구현 중 발견**: `DiagnosticsScreen` 전체를 `render()`하는 UI 테스트는
+      만들지 않았다 — `PermissionPanel`이 `expo-media-library`를 동적 import
+      하며 jest 환경(node/jsdom)에서 `TypeError: A dynamic import callback was
+      invoked without --experimental-vm-modules`로 죽는다. 001~004도 이 화면을
+      UI 테스트 대상으로 삼은 적이 없다(진단 화면 자체가 기기 없이 렌더링
+      검증하기 어려운 구조). `report.test.ts`(로직 레벨)가 `characterModels`
+      데이터가 옳음을 검증하고, 화면 쪽은 기존 `Row` 컴포넌트를 그대로 재사용해
+      새 렌더링 로직이 없으므로 이걸로 충분하다고 판단했다 — 실기기 확인은
+      quickstart D7의 몫이다
+- [X] T040 [US4] `npm run lint`로 `src/ui/DiagnosticsScreen.tsx`가 `roster.ts`를
       직접 import하지 않는 것(헌법 검사 통과)을 확인한다
 
 **Checkpoint**: 네 User Story 전부 완결

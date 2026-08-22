@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { createAppPipeline } from "../app/wiring";
 import { currentEnvironment } from "../config/environment";
-import type { Character } from "../diary/types";
+import { CHARACTERS, type Character } from "../diary/types";
 import { collectReport } from "../diagnostics/report";
 import type { DiagnosticReport } from "../diagnostics/types";
 import { expoPhotoPort } from "../signals/expo-port";
@@ -92,6 +92,15 @@ export function DiagnosticsScreen() {
       <Row label="추론 위치" value={locationText} />
       <Row label="모듈 상태" value={formatModuleStatus(report)} />
       <Row label="저장 점검" value={formatStorage(report)} />
+
+      {/*
+        014 — 캐릭터별 모델 표시 이름 (local·dev 전용, FR-017·019). `report`가 이미
+        `roster.ts`의 `displayName()`을 담아 왔으므로 여기서는 그리기만 한다 —
+        이 파일이 `roster.ts`를 직접 import하지 않는다(007 헌법 검사 유지).
+      */}
+      {CHARACTERS.map((character) => (
+        <Row key={character} label={character} value={report.characterModels[character]} />
+      ))}
 
       {/* 004 — 권한 상태와 요청. 이것이 없으면 실기기에서 영원히 unknown이다 */}
       <PermissionPanel port={photoPort} />
