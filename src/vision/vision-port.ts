@@ -87,8 +87,7 @@ export type VisionRunResult = {
  * `not-found`(파일이 없다)와는 사용자가 할 일이 다르다.
  */
 export type VisionLoadResult =
-  | { ok: true }
-  | { ok: false; reason: "not-found" | "load-failed" | "no-vision-support" };
+  { ok: true } | { ok: false; reason: "not-found" | "load-failed" | "no-vision-support" };
 
 /**
  * 사진 보는 엔진.
@@ -114,10 +113,7 @@ export interface VisionEngine {
 
 /** `llama.rn`의 컨텍스트에서 **우리가 쓰는 부분만**. 전체를 들고 다니지 않는다 */
 type VisionContext = {
-  initMultimodal(params: {
-    path: string;
-    image_max_tokens?: number;
-  }): Promise<boolean>;
+  initMultimodal(params: { path: string; image_max_tokens?: number }): Promise<boolean>;
   getMultimodalSupport(): Promise<{ vision: boolean; audio: boolean }>;
   releaseMultimodal(): Promise<void>;
   completion(params: Record<string, unknown>): Promise<NativeResult>;

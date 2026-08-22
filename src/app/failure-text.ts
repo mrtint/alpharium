@@ -118,10 +118,7 @@ export function describeGenerationReason(reason: string): string {
     case "vision-failed":
       return describeFailure({
         kind: "vision-failed",
-        reason:
-          detail === "not-ready" || detail === "cancelled"
-            ? detail
-            : "failed",
+        reason: detail === "not-ready" || detail === "cancelled" ? detail : "failed",
       });
     default:
       return "일기를 쓰는 중에 문제가 생겼다. 다시 시도해 볼 만하다";

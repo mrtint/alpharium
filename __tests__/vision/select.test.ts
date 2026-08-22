@@ -42,12 +42,7 @@ const spread = (n: number): Photo[] =>
 const hoursOf = (photos: Photo[]): number[] => photos.map((p) => p.takenAt.getHours());
 
 describe("R1. 5장 이하면 전부 고른다", () => {
-  it.each([
-    [[]],
-    [[9]],
-    [[9, 13, 19]],
-    [[8, 10, 12, 14, 16]],
-  ])("%j → 전부", (hours) => {
+  it.each([[[]], [[9]], [[9, 13, 19]], [[8, 10, 12, 14, 16]]])("%j → 전부", (hours) => {
     const photos = hours.map(at);
     expect(selectForVision(photos)).toEqual(photos);
   });
@@ -60,7 +55,7 @@ describe("R2·R3. 5장을 넘으면 균등 분위로 고르고 양 끝을 포함
   });
 
   it("12장 → 인덱스 0,3,6,8,11", () => {
-    const photos = [7,8,9,10,11,12,13,14,15,16,17,18].map(at);
+    const photos = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(at);
     expect(hoursOf(selectForVision(photos))).toEqual([7, 10, 13, 15, 18]);
   });
 
@@ -86,13 +81,16 @@ describe("R2·R3. 5장을 넘으면 균등 분위로 고르고 양 끝을 포함
 });
 
 describe("R4. 중복을 만들지 않는다", () => {
-  it.each([[6], [7], [8], [9], [10], [13], [17], [50], [201]])("%i장에서 다섯이 서로 다르다", (n) => {
-    const photos = spread(n);
-    const selected = selectForVision(photos);
+  it.each([[6], [7], [8], [9], [10], [13], [17], [50], [201]])(
+    "%i장에서 다섯이 서로 다르다",
+    (n) => {
+      const photos = spread(n);
+      const selected = selectForVision(photos);
 
-    expect(selected).toHaveLength(5);
-    expect(new Set(selected.map((p) => p.id)).size).toBe(5);
-  });
+      expect(selected).toHaveLength(5);
+      expect(new Set(selected.map((p) => p.id)).size).toBe(5);
+    },
+  );
 });
 
 describe("R5. 입력 순서(시각 순)를 유지한다", () => {

@@ -192,9 +192,7 @@ export async function visionStorageBytes(ports: VisionAcquisitionPorts): Promise
   // **`bytesUsed`를 쓴다 — 부분 파일까지 센다**(003 FR-028). `facts()`는 완성된 파일만
   // 보므로, 받다 만 것이 자리를 차지하고 있는데 0으로 보인다.
   const sizes = await Promise.all(
-    [assets.base, assets.projector].map((asset) =>
-      ports.files.bytesUsed(asset.key).catch(() => 0),
-    ),
+    [assets.base, assets.projector].map((asset) => ports.files.bytesUsed(asset.key).catch(() => 0)),
   );
 
   return sizes.reduce((sum, bytes) => sum + bytes, 0);

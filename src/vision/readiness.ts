@@ -40,7 +40,10 @@ import type { ModelReadiness } from "../models/types";
  * 이어받기로 해결되지 않기 때문이며, 003이 `partial`과 `unusable`을 가른 이유가
  * 그것이다(FR-006a).
  */
-export function foldVisionReadiness(base: ModelReadiness, projector: ModelReadiness): ModelReadiness {
+export function foldVisionReadiness(
+  base: ModelReadiness,
+  projector: ModelReadiness,
+): ModelReadiness {
   // 1. 쓸 수 없는 것이 있으면 정리가 먼저다 — 이어받아도 해결되지 않는다.
   if (base.kind === "unusable") return base;
   if (projector.kind === "unusable") return projector;
@@ -57,7 +60,11 @@ export function foldVisionReadiness(base: ModelReadiness, projector: ModelReadin
   //    「없음」으로 적으면 사용자가 처음부터 받는다고 생각하는데, 실제로는 이미 받아 둔
   //    파일이 자리를 차지하고 있다. **받다 만 것과 같은 상태다.**
   if (base.kind === "ready" || projector.kind === "ready") {
-    return { kind: "partial", reason: "사진을 보는 데 필요한 것이 아직 다 준비되지 않았다", resumable: true };
+    return {
+      kind: "partial",
+      reason: "사진을 보는 데 필요한 것이 아직 다 준비되지 않았다",
+      resumable: true,
+    };
   }
 
   // 5. 둘 다 없다.

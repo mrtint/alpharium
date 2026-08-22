@@ -97,7 +97,10 @@ describe("load — 본체를 열고 mmproj를 붙인다", () => {
 
   it("파일이 없으면 not-found — 있는데 못 여는 것과 가른다", async () => {
     const calls: Call[] = [];
-    const engine = createVisionEngine(loaderFor(calls, { loaderThrows: "ENOENT: no such file" }), paths);
+    const engine = createVisionEngine(
+      loaderFor(calls, { loaderThrows: "ENOENT: no such file" }),
+      paths,
+    );
 
     expect(await engine.load("quick")).toEqual({ ok: false, reason: "not-found" });
   });
@@ -112,7 +115,10 @@ describe("load — 본체를 열고 mmproj를 붙인다", () => {
   // 원칙 III — 오류 문구에 경로가 들어 있고, 경로에는 자산키가 들어 있다.
   it("실패에 경로·모델 정보를 담지 않는다 (원칙 III)", async () => {
     const calls: Call[] = [];
-    const engine = createVisionEngine(loaderFor(calls, { loaderThrows: "/models/v1.gguf 없음" }), paths);
+    const engine = createVisionEngine(
+      loaderFor(calls, { loaderThrows: "/models/v1.gguf 없음" }),
+      paths,
+    );
 
     const result = await engine.load("quick");
     expect(JSON.stringify(result)).not.toMatch(/models|gguf|v1|LFM|mmproj/i);

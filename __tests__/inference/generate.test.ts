@@ -457,9 +457,12 @@ describe("011 — 사진을 읽는다", () => {
 
   it("깊이가 설정에서 온다 (FR-019)", async () => {
     const quick: string[] = [];
-    await createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision(quick)).generate(
-      requestFor(richDay("2026-08-12"), "quick"),
-    );
+    await createOnDeviceBackend(
+      async () => ({}),
+      goodEngine(),
+      180_000,
+      fakeVision(quick),
+    ).generate(requestFor(richDay("2026-08-12"), "quick"));
 
     const detailed: string[] = [];
     await createOnDeviceBackend(
