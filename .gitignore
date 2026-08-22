@@ -61,3 +61,6 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 .pnpm-debug.log*
+
+# 010 — 심은 기록. 개발 기계마다 다르므로 커밋하지 않는다
+.seed-ledger.json
