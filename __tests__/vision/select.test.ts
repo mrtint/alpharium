@@ -162,3 +162,29 @@ describe("S1. 상한이 한 자리에만 있다", () => {
     expect(selectForVision(photos)).toHaveLength(5);
   });
 });
+
+/**
+ * ★ US3 — 「빠르게 봄」과 「자세히 봄」이 **같은 수의 사진**을 본다 (FR-019, SC-015).
+ *
+ * 사용자가 clarify에서 「한 장을 보는 깊이가 다르다」로 확정했다. **보는 수로 가르면**
+ * 상한이 둘이 되어 「본 것이 전부인가」가 설정에 따라 달라진다(FR-007).
+ *
+ * `selectForVision()`이 깊이를 **인자로 받지 않는 것**이 그 구현이다 — 받을 수 없으면
+ * 가를 수도 없다.
+ */
+describe("US3. 깊이가 고르기에 영향을 주지 않는다 (FR-019, SC-015)", () => {
+  it("깊이를 받는 자리가 없다 — 보는 수로 가를 수 없다", () => {
+    const source = readFileSync(join(__dirname, "../../src/vision/select.ts"), "utf8");
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const declaration = code.match(/export function selectForVision\(([^)]*)\)/);
+    const params = declaration?.[1] ?? "";
+
+    expect(params).not.toMatch(/depth|quick|detailed|VisionDepth/);
+  });
+
+  it("깊이와 무관하게 같은 다섯 장이 나온다", () => {
+    const photos = spread(12);
+    // 부를 방법이 하나뿐이므로 결과도 하나뿐이다.
+    expect(selectForVision(photos)).toEqual(selectForVision(photos));
+  });
+});

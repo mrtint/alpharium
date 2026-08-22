@@ -195,9 +195,9 @@ description: "Task list for 011-photo-vision-summary"
 **⚠️ 마지막인 까닭**: 값(256/1024)이 **짐작이며**(research.md §4), US1이 실기기에서
 서야 조절할 자리가 생긴다
 
-- [ ] T051 [P] [US3] `__tests__/vision/engine.test.ts`에 `VisionDepth`가 `image_max_tokens`로 옮겨지는 것을 검사 — **그 수가 밖으로 나가지 않는 것**도 함께(원칙 III)
-- [ ] T052 [US3] `src/vision/vision-port.ts`의 `load(depth)`에서 `initMultimodal({ image_max_tokens })` 분기 — `quick` 256 / `detailed` 1024 (research.md §4). **짐작임을 주석에 남긴다**(원칙 V)
-- [ ] T053 [P] [US3] `__tests__/vision/select.test.ts`에 **두 깊이가 같은 수의 사진을 고름**을 검사 (FR-019, SC-015). **보는 수로 가르지 않는다**
+- [X] T051 [P] [US3] `__tests__/vision/engine.test.ts`에 `VisionDepth`가 `image_max_tokens`로 옮겨지는 것을 검사 — **그 수가 밖으로 나가지 않는 것**도 함께(원칙 III)
+- [X] T052 [US3] `src/vision/vision-port.ts`의 `load(depth)`에서 `initMultimodal({ image_max_tokens })` 분기 — `quick` 256 / `detailed` 1024 (research.md §4). **짐작임을 주석에 남긴다**(원칙 V)
+- [X] T053 [P] [US3] `__tests__/vision/select.test.ts`에 **두 깊이가 같은 수의 사진을 고름**을 검사 (FR-019, SC-015). **보는 수로 가르지 않는다**
 
 **Checkpoint**: 세 설정이 서로 다르게 동작한다 — 기기 없는 검증 완료
 
@@ -210,10 +210,14 @@ description: "Task list for 011-photo-vision-summary"
 
 ### 자동 흐름
 
-- [ ] T054 [P] `.maestro/photo-vision.yml` 작성 — 사진 설정 고르기, 생성, **모델 정보 0건**, **진행 지표 0건**. **⚠️ 부분 문자열은 정규식으로 준다**(007이 배운 것). **`childOf`를 쓰지 않는다**(008 — RN은 접근성 트리가 평탄하다)
-- [ ] T055 `scripts/run-device-tests.mjs`의 `FLOWS`에 `.maestro/photo-vision.yml` 등록. **⚠️ 등록하지 않으면 파일이 있어도 돌지 않고, 그러면 초록불인데 아무것도 검증되지 않는다**
+- [X] T054 [P] `.maestro/photo-vision.yml` 작성 — 사진 설정 고르기, 생성, **모델 정보 0건**, **진행 지표 0건**. **⚠️ 부분 문자열은 정규식으로 준다**(007이 배운 것). **`childOf`를 쓰지 않는다**(008 — RN은 접근성 트리가 평탄하다)
+- [X] T055 `scripts/run-device-tests.mjs`의 `FLOWS`에 `.maestro/photo-vision.yml` 등록. **⚠️ 등록하지 않으면 파일이 있어도 돌지 않고, 그러면 초록불인데 아무것도 검증되지 않는다**
 
 ### 실기기 (quickstart.md)
+
+**⚠️ 아래 아홉은 기기가 있어야 돈다.** 기기 없는 검증이 전부 초록불이어도
+**온디바이스는 검증되지 않은 상태다**(헌법 원칙 V). **SC-016이 성공 기준에 올라
+있으므로 이것 없이는 이 기능이 끝나지 않는다.**
 
 - [ ] T056 D1: 사진 보는 모델을 받고 **5장이 몇 초인지 잰다**. **★ md5를 채록해 `src/vision/roster.ts`에 옮겨 적는다**(T006이 비워 둔 자리)
 - [ ] T057 ★ D2: **같은 하루를 「보지 않음」과 「빠르게 봄」으로 각각 생성해 전문을 견준다** (SC-001). **둘이 사실상 같으면 실패다** — 「일기가 나왔다」로 통과시키지 않는다
@@ -227,8 +231,8 @@ description: "Task list for 011-photo-vision-summary"
 
 ### 기록
 
-- [ ] T065 `AGENTS.md`에 011 절 추가 — **실측과 짐작을 구분해** 적는다(원칙 V). quickstart.md 「검증 뒤에 남기는 것」의 표를 채운다. **「합성 하루에서의 관측」으로 구분한다**(010 FR-020)
-- [ ] T066 [P] 위반 주입 검증 — ① `VisionRunResult`에 `elapsedMs` ② 캡션을 `instructionLines()`에 넣기 ③ `selectForVision`을 `slice(0,5)`로 ④ `vision` 실패를 `none`으로 낮추기. **넷 다 걸리는지 확인한다**(008·010이 같은 절차를 밟았다)
+- [X] T065 `AGENTS.md`에 011 절 추가 — **실측과 짐작을 구분해** 적는다(원칙 V). quickstart.md 「검증 뒤에 남기는 것」의 표를 채운다. **「합성 하루에서의 관측」으로 구분한다**(010 FR-020)
+- [X] T066 [P] 위반 주입 검증 — ① `VisionRunResult`에 `elapsedMs` ② 캡션을 `instructionLines()`에 넣기 ③ `selectForVision`을 `slice(0,5)`로 ④ `vision` 실패를 `none`으로 낮추기. **넷 다 걸리는지 확인한다**(008·010이 같은 절차를 밟았다)
 
 ---
 
