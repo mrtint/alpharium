@@ -5,11 +5,16 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { resolveSelection } from "./src/app/selection";
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
+import {
+  expoVisionSettingPort,
+  loadVisionSetting,
+  saveVisionSetting,
+} from "./src/app/vision-setting-store";
 import { createAppPipeline } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { expoFileSystemPort, fileStore } from "./src/diary/store";
-import { CHARACTERS, type Character } from "./src/diary/types";
+import { CHARACTERS, type Character, type VisionSetting } from "./src/diary/types";
 import { type Acquisition, createAcquisition } from "./src/models/acquisition";
 import { resolveDownloadView } from "./src/models/download-view";
 import { expoModelPorts } from "./src/models/expo-port";
@@ -158,6 +163,39 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
   const selectionPort = useMemo(() => expoSelectionPort(), []);
 
   /**
+   * 고른 사진 설정 (011 FR-015·017·018).
+   *
+   * **`null`이면 고른 적이 없다는 뜻이고, 그때 「보지 않음」을 쓴다**(FR-018).
+   * 007이 캐릭터를 말없이 집지 않은 것과 같은 판단이다 — 사진을 보는 것은 시간과
+   * 저장 공간을 쓰는 일이므로 고르지 않았는데 시작하지 않는다.
+   */
+  const [vision, setVision] = useState<VisionSetting | null>(null);
+  const visionPort = useMemo(() => expoVisionSettingPort(), []);
+
+  useEffect(() => {
+    let alive = true;
+    void loadVisionSetting(visionPort)
+      .catch(() => null)
+      .then((saved) => {
+        if (alive) setVision(saved);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [visionPort]);
+
+  /** 사용자가 고른다. **저장은 그 즉시** — 앱을 껐다 켜도 남는다(FR-017) */
+  const onSelectVision = useCallback(
+    async (chosen: VisionSetting) => {
+      setVision(chosen);
+      await saveVisionSetting(visionPort, chosen).catch(() => {
+        // 저장하지 못해도 이번 실행 동안은 고른 대로 쓴다. 다음에 다시 고르면 된다.
+      });
+    },
+    [visionPort],
+  );
+
+  /**
    * 저장된 선택과 준비 상태를 함께 읽는다 (007 FR-001·003).
    *
    * **판정은 여기서 하지 않는다** — 재료만 모아 `resolveSelection()`에 넘긴다.
@@ -213,6 +251,10 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
         ready: ready.includes(character),
       }))}
       onSelectCharacter={(character) => void onSelect(character)}
+      // ★ 011 — **이 두 줄이 없으면 화면에서 골라도 언제나 「보지 않음」이 쓰인다.**
+      // 007의 끊긴 `stop`, 009의 `day:` 한 줄과 같은 자리다.
+      vision={vision ?? "none"}
+      onSelectVision={(chosen) => void onSelectVision(chosen)}
       // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
       onGoToCharacters={onGoToCharacters}
     />

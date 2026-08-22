@@ -18,9 +18,9 @@ import { BackHandler } from "react-native";
 
 import type { SelectionState } from "../../src/app/selection";
 import type { EnvironmentResolution } from "../../src/config/types";
-import type { Pipeline, PipelineResult } from "../../src/diary/pipeline";
+import type { Pipeline, PipelineInput, PipelineResult } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
-import type { DiaryEntry } from "../../src/diary/types";
+import type { DiaryEntry, VisionSetting } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 
@@ -432,5 +432,126 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     // 범위 밖(08-17)이 아니다.
     expect(pipeline.days[0]).not.toBe("2026-08-17");
     expect(["2026-08-20", "2026-08-19", "2026-08-18"]).toContain(pipeline.days[0]);
+  });
+});
+
+/* ═══════════════ 011 — 고른 사진 설정이 파이프라인까지 간다 ═══════════════ */
+
+/**
+ * 계약: specs/011-photo-vision-summary/spec.md FR-015·017·018
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 이것이 007의 끊긴 `stop`, 009의 `day:` 한 줄과 같은 자리다.**
+ *
+ * 화면에서 사진 설정을 골라도 **`pipeline.run`에 닿지 않으면 언제나 「보지 않음」이
+ * 쓰인다.** 오류가 나지 않고, 화면은 멀쩡히 「고름」을 보이고, 일기도 나온다 —
+ * **사진만 안 볼 뿐이다.**
+ *
+ * 그래서 아래 테스트가 **파이프라인이 받은 `vision`을 직접 읽는다.**
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("011 — 사진 설정이 파이프라인까지 간다", () => {
+  /** `run`이 받은 입력을 기록하는 대역 */
+  function recordingPipeline(seen: PipelineInput[]): Pipeline {
+    return {
+      run: async (input) => {
+        seen.push(input);
+        return { ok: true, entry, overwrote: false };
+      },
+    };
+  }
+
+  async function renderWithVision(vision: VisionSetting, seen: PipelineInput[]) {
+    await render(
+      <DiaryHomeScreen
+        pipeline={recordingPipeline(seen)}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision={vision}
+      />,
+    );
+  }
+
+  // ★ T039 — 배선 검증.
+  it.each(["none", "quick", "detailed"] as const)(
+    "★ 고른 설정 %s이 pipeline.run까지 도달한다",
+    async (vision) => {
+      const seen: PipelineInput[] = [];
+      await renderWithVision(vision, seen);
+
+      await userEvent.press(await screen.findByText("일기 쓰기"));
+
+      expect(seen).toHaveLength(1);
+      expect(seen[0].vision).toBe(vision);
+    },
+  );
+
+  it("설정을 넘기지 않으면 「보지 않음」이다 (FR-018)", async () => {
+    const seen: PipelineInput[] = [];
+    await render(
+      <DiaryHomeScreen
+        pipeline={recordingPipeline(seen)}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+      />,
+    );
+
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+
+    expect(seen[0].vision).toBe("none");
+  });
+
+  it("고르는 자리가 화면에 있다 (FR-015)", async () => {
+    await render(
+      <DiaryHomeScreen
+        onSelectVision={() => {}}
+        pipeline={hangingPipeline()}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    expect(await screen.findByTestId("vision-quick")).toBeTruthy();
+  });
+
+  it("고르면 통로로 전달된다", async () => {
+    const chosen: VisionSetting[] = [];
+    await render(
+      <DiaryHomeScreen
+        onSelectVision={(v) => chosen.push(v)}
+        pipeline={hangingPipeline()}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    await userEvent.press(await screen.findByTestId("vision-detailed"));
+    expect(chosen).toEqual(["detailed"]);
+  });
+
+  /**
+   * **고를 통로가 없어도 자리는 보이지 않는다** — 009가 하루 셋에서 내린 판단과
+   * 반대다. 하루는 「무엇을 쓸지」라 언제나 보여야 하지만, 사진 설정은 **고칠 수 없으면
+   * 보여 줄 이유가 없다**(누르면 아무 일도 안 일어나는 자리가 생긴다).
+   */
+  it("고를 통로가 없으면 자리가 없다", async () => {
+    await render(
+      <DiaryHomeScreen
+        pipeline={hangingPipeline()}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    await screen.findByText("일기 쓰기");
+    expect(screen.queryByTestId("vision-quick")).toBeNull();
   });
 });

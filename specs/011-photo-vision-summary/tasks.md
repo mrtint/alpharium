@@ -137,13 +137,13 @@ description: "Task list for 011-photo-vision-summary"
 자리가 한 번도 없었다** — 지금까지 언제나 `none`이 하드코딩돼 있다. US1을 실기기에서
 검증하려면 이 자리가 필요하다
 
-- [ ] T033 [P] [US2] `__tests__/app/vision-setting-store.test.ts`를 **먼저** 쓴다 — 저장·조회·고른 적 없음의 기본값(FR-018)
-- [ ] T034 [US2] `src/app/vision-setting-store.ts`에 `files/preferences/vision-setting.json` 읽기·쓰기 (007의 `selection-store.ts`와 같은 방식, `expo-file-system`). **새 의존 0개**
-- [ ] T035 [P] [US2] `__tests__/ui/vision-setting.test.tsx`를 **먼저** 쓴다 — 셋이 보이고, 고른 표시가 붙고, **모델 정보가 하나도 없다**(FR-016, SC-004)
-- [ ] T036 [US2] `src/ui/DiaryHomeScreen.tsx`에 사진 설정 고르는 자리 추가 — 「보지 않음/빠르게 봄/자세히 봄」과 **결과의 차이로 쓴 설명**(FR-019a)
-- [ ] T037 [US2] `src/ui/DiaryHomeScreen.tsx`에 「자세히 봄」이 더 오래 걸린다는 고지 (FR-020). **초·백분율·속도를 쓰지 않는다**(원칙 IV) — 헌법 원칙 III의 「기다림은 그 순간에 알린다」
-- [ ] T038 [US2] `App.tsx`에서 고른 설정을 파이프라인까지 잇는다 — **⚠️ 007의 `stop`, 008의 반환값, 009의 `day:`가 끊겼던 자리와 같은 종류**. 잇지 않으면 화면에서 골라도 언제나 `none`이 쓰인다
-- [ ] T039 [P] [US2] `__tests__/app/wiring.test.ts`에 고른 설정이 `PipelineInput.vision`까지 도달하는지 검사 — **T038이 조용히 빠지는 것을 막는다**
+- [X] T033 [P] [US2] `__tests__/app/vision-setting-store.test.ts`를 **먼저** 쓴다 — 저장·조회·고른 적 없음의 기본값(FR-018)
+- [X] T034 [US2] `src/app/vision-setting-store.ts`에 `files/preferences/vision-setting.json` 읽기·쓰기 (007의 `selection-store.ts`와 같은 방식, `expo-file-system`). **새 의존 0개**
+- [X] T035 [P] [US2] `__tests__/ui/vision-setting.test.tsx`를 **먼저** 쓴다 — 셋이 보이고, 고른 표시가 붙고, **모델 정보가 하나도 없다**(FR-016, SC-004)
+- [X] T036 [US2] `src/ui/DiaryHomeScreen.tsx`에 사진 설정 고르는 자리 추가 — 「보지 않음/빠르게 봄/자세히 봄」과 **결과의 차이로 쓴 설명**(FR-019a)
+- [X] T037 [US2] `src/ui/DiaryHomeScreen.tsx`에 「자세히 봄」이 더 오래 걸린다는 고지 (FR-020). **초·백분율·속도를 쓰지 않는다**(원칙 IV) — 헌법 원칙 III의 「기다림은 그 순간에 알린다」
+- [X] T038 [US2] `App.tsx`에서 고른 설정을 파이프라인까지 잇는다 — **⚠️ 007의 `stop`, 008의 반환값, 009의 `day:`가 끊겼던 자리와 같은 종류**. 잇지 않으면 화면에서 골라도 언제나 `none`이 쓰인다
+- [X] T039 [P] [US2] `__tests__/app/wiring.test.ts`에 고른 설정이 `PipelineInput.vision`까지 도달하는지 검사 — **T038이 조용히 빠지는 것을 막는다**
 
 **Checkpoint**: 사용자가 사진 설정을 고를 수 있다 — **US1의 실기기 검증이 가능해진다**
 

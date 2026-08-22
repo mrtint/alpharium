@@ -66,7 +66,16 @@ export type DiaryHomeScreenProps = {
   /** 고를 수 있는 자리들. 고르는 화면에 그대로 넘어간다(FR-007 — 모델 정보가 없다) */
   characters?: readonly { character: Character; ready: boolean }[];
   onSelectCharacter?: (character: Character) => void;
+  /** 지금 고른 사진 설정 (011 FR-015). 고른 적이 없으면 「보지 않음」이다(FR-018) */
   vision?: VisionSetting;
+  /**
+   * 사진 설정을 고른다 (011 FR-015).
+   *
+   * ⚠️ **이 통로가 끊기면 화면에서 골라도 언제나 「보지 않음」이 쓰인다.** 007의 `stop`,
+   * 008의 버려진 반환값, 009의 `day:` 한 줄과 같은 종류의 조용한 실패다 —
+   * 오류가 나지 않고 아무 일도 일어나지 않을 뿐이다.
+   */
+  onSelectVision?: (vision: VisionSetting) => void;
   /** 생성을 끊는 통로(005 FR-014b). 앱이 앞을 벗어날 때 쓴다 */
   stop?: () => Promise<void>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
@@ -83,6 +92,7 @@ export function DiaryHomeScreen({
   characters,
   onSelectCharacter,
   vision = "none",
+  onSelectVision,
   stop,
   now = () => new Date(),
   onGoToCharacters,
@@ -280,8 +290,10 @@ export function DiaryHomeScreen({
           onOpen={(item) => void openItem(item)}
           onSelectCharacter={onSelectCharacter}
           onSelectDay={setChosenDay}
+          onSelectVision={onSelectVision}
           onWrite={() => void write()}
           selection={selection}
+          vision={vision}
           // **쓰기 자리에 무엇이 일어날지 싣는다**(FR-023·024). `onWrite`는 이것을
           // 보지 않으므로 원칙 I의 방어가 유지된다(FR-025).
           write={writePromptFor(screen.items, now(), chosenDay)}
