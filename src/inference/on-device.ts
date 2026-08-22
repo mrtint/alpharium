@@ -365,9 +365,20 @@ function visionSupport(): VisionSupport {
         n_gpu_layers: 0,
       })) as never;
     }),
-    // 004의 `Photo.id`가 곧 경로인 경우를 기본으로 둔다. 미디어 라이브러리 id를
-    // 경로로 바꾸는 일은 기기에서 확인하며 정한다(quickstart D2).
-    resolvePath: async (photo) => photo.id,
+    /**
+     * ★ **사진 id를 실제 파일 경로로 바꾼다** (2026-08-22 실기기에서 고쳤다).
+     *
+     * 처음에는 `photo.id`를 그대로 넘기며 「기기에서 확인하며 정한다」고 적었다.
+     * **그 확인이 quickstart D2였고, 틀렸다** — 안드로이드에서 id는
+     * `content://media/external/images/media/…` 꼴이라 네이티브가 파일로 열지 못한다.
+     *
+     * **조용히 실패했다**: 오류도 크래시도 없이 다섯 장이 92밀리초에 「처리」되고
+     * 일기는 멀쩡히 나왔다. 로그의 `has_media=0`을 봐야 드러났다.
+     */
+    resolvePath: async (photo) => {
+      const { expoPhotoPort } = await import("../signals/expo-port");
+      return expoPhotoPort().filePathOf(photo.id);
+    },
   };
 }
 
