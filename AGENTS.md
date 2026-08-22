@@ -1253,8 +1253,10 @@ cd android && NODE_ENV=production ./gradlew assembleRelease
 
 | 명령 | 무엇 | 기기 |
 | --- | --- | --- |
-| `npm test` | 기기 불필요 갈래 | 필요 없음. **항상 돈다** |
-| `npm run test:device` | 실기기 갈래 (Maestro, 흐름 3개) | 있으면 돌고 없으면 건너뛴다 |
+| `npm test` | 기기 불필요 갈래 전부 (약 13초) | 필요 없음. **항상 돈다** |
+| `npm run test:logic` | 순수 로직만 (**약 7초**) — 개발 중 기본 | 필요 없음 |
+| `npm run test:ui` | 화면만 | 필요 없음 |
+| `npm run test:device` | 실기기 갈래 (Maestro) | 있으면 돌고 없으면 건너뛴다 |
 | `npm run lint` | eslint + tsc + 헌법 검사 | 필요 없음 |
 
 **건너뛴 실기기 테스트는 통과가 아니다.** 기기 없이 전부 초록불이어도 온디바이스는
@@ -1264,6 +1266,51 @@ cd android && NODE_ENV=production ./gradlew assembleRelease
 **⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야 돈다.**
 등록하지 않으면 파일이 있어도 실행기가 돌리지 않고, 그러면 초록불인데 아무것도 검증되지
 않은 상태가 된다 — 원칙 V가 막으려는 바로 그 상황이다.
+
+### 테스트가 두 갈래로 나뉜다 — 화면만 RN 런타임을 진다 (2026-08-22 실측)
+
+`jest-expo` 프리셋은 **워커마다 React Native 런타임을 세운다.** 그 비용을 화면을
+그리지 않는 스위트 40개가 함께 물고 있었다. `package.json`의 jest 설정을
+`projects` 둘로 갈랐다:
+
+| 프로젝트 | 무엇 | 환경 |
+| --- | --- | --- |
+| `logic` | `__tests__/**/*.test.ts` (40개) | `node` + babel-preset-expo |
+| `ui` | `__tests__/**/*.test.tsx` (9개) | `jest-expo` (그대로) |
+
+**실측 (16코어, 웜 캐시):**
+
+| 무엇 | 전 | 후 |
+| --- | --- | --- |
+| 같은 순수 로직 40개 | 43.8초 | **12.4초** |
+| 전체 (`npm test`) | 17~22초 | **12~14초** |
+| **`npm run test:logic`** | — | **약 7초** |
+
+**개발 중에는 `npm run test:logic`을 쓴다** — 화면을 안 건드렸으면 787개가 7초에
+돈다. 화면을 건드렸으면 `npm run test:ui`, 커밋 전에는 `npm test`다.
+
+- **가르는 기준은 확장자다.** `.tsx`면 화면, `.ts`면 순수 로직이다. 이 저장소에서
+  `@testing-library`를 import 하는 `.ts` 스위트는 **0개**이므로 확장자가 곧 경계이며,
+  `__tests__/jest-projects.test.ts`가 그것을 못 박는다.
+- **새 화면 테스트는 `.tsx`로 만든다.** `.ts`로 만들면 node 환경에 잡혀 `render()`가
+  없다고 실패한다 — 오류가 원인을 가리키므로 조용한 실패는 아니다.
+- **`transformIgnorePatterns`가 필요하다.** `expo` 패키지가 ESM으로 배포되며, 이것을
+  빼면 스위트 4개가 파싱에서 죽는다.
+- **`--maxWorkers=50%`는 그대로 옳다.** 75%·100%를 재 보니 **오히려 느렸다**(18초 →
+  23.6초 → 27.6초). 워커끼리 CPU를 뺏는다.
+
+#### ⚠️ `testMatch`가 어긋나면 스위트가 조용히 사라진다
+
+**나눈 대가로 새 실패 양상이 생겼다.** 어느 프로젝트에도 안 잡힌 파일을 jest는
+**오류 없이 그냥 안 돌린다.** 위반 주입에서 `logic`의 패턴을 좁혀 보니 **33개
+스위트·약 700개 테스트가 사라졌는데 「7 passed, 90 tests」로 초록불이었다** —
+`FLOWS` 미등록과 같은 종류다.
+
+`__tests__/jest-projects.test.ts`가 파일 수를 직접 세어 막는다.
+
+**⚠️ 그 가드는 일부러 양쪽 프로젝트에 들어 있다.** 처음엔 `logic`에만 두었는데,
+패턴을 좁히는 위반을 주입하니 **가드 자신이 함께 사라져 아무 말도 못 했다.**
+지키려는 것과 함께 없어지는 것은 가드가 아니다.
 
 ### Windows에서 느린 것은 Defender다 (2026-08-18 실측)
 

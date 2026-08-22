@@ -31,6 +31,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "test": "jest --maxWorkers=50%",
+    "test:logic": "jest --selectProjects logic --maxWorkers=50%",
+    "test:ui": "jest --selectProjects ui --maxWorkers=50%",
     "test:device": "node scripts/run-device-tests.mjs",
     "lint": "eslint . && tsc --noEmit && npm run check:constitution",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
@@ -40,10 +42,35 @@
     "seed:clear": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-clear.mts"
   },
   "jest": {
-    "preset": "jest-expo",
-    "testPathIgnorePatterns": [
-      "/node_modules/",
-      "/.maestro/"
+    "projects": [
+      {
+        "displayName": "logic",
+        "testEnvironment": "node",
+        "testMatch": [
+          "<rootDir>/__tests__/**/*.test.ts"
+        ],
+        "transform": {
+          "^.+\\.[jt]sx?$": [
+            "babel-jest",
+            {
+              "presets": [
+                "babel-preset-expo"
+              ]
+            }
+          ]
+        },
+        "transformIgnorePatterns": [
+          "node_modules/(?!(expo|expo-modules-core|@expo)/)"
+        ]
+      },
+      {
+        "displayName": "ui",
+        "preset": "jest-expo",
+        "testMatch": [
+          "<rootDir>/__tests__/**/*.test.tsx",
+          "<rootDir>/__tests__/jest-projects.test.ts"
+        ]
+      }
     ]
   },
   "engines": {
