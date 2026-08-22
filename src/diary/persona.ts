@@ -49,8 +49,9 @@ const PERSONAS: Readonly<Record<Character, Persona>> = {
   narrative: { name: "루이", tagline: "하루를 이야기처럼 풀어내요" },
   // 오드(imaginative, hyperclovax-seed-1.5b) — 상상을 많이 섞는다. 헌법
   // 로스터가 이 성질의 고지를 MUST로 요구한다 — CharacterPicker의
-  // IMAGINATIVE_NOTICE가 그 고지를 별도로 유지한다.
-  imaginative: { name: "오드", tagline: "상상력이 풍부해요" },
+  // IMAGINATIVE_NOTICE가 그 고지를 별도로 유지한다. tagline은 그 고지와
+  // 겹치지 않도록 「사실보다 느낌」 쪽(헌법 로스터 원문)을 다른 말로 옮긴다.
+  imaginative: { name: "오드", tagline: "느낌으로 하루를 그려요" },
   // 샤오바이(chinese, qwen3-1.7b) — 중국어로 시적이고 짧게 쓴다.
   chinese: { name: "샤오바이", tagline: "짧은 글에 여운을 담아요" },
   // 모카(english, gemma3-1b) — 영어로 차분한 관찰체로 길게 쓴다.

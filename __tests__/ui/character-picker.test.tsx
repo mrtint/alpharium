@@ -129,8 +129,7 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
   it("7. imaginative에 「상상을 섞는다」 고지가 있다(헌법 로스터 MUST)", async () => {
     await renderPicker(["imaginative"], "imaginative");
 
-    // 014 — 오드의 소개("상상력이 풍부해요")와 헌법 MUST 고지("상상을 섞어
-    // 씁니다")가 둘 다 "상상"을 포함하므로 고지 문구로 정확히 매칭한다.
+    // 014 — 헌법 MUST 고지 문구로 정확히 매칭한다.
     expect(screen.getByText("상상을 섞어 씁니다")).toBeTruthy();
   });
 
@@ -150,8 +149,8 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
     }
 
     // 헌법 MUST 고지("상상을 섞어 씁니다")는 imaginative 자리에 **하나만** 있다 —
-    // 넷으로 번지지 않았다. 오드의 소개("상상력이 풍부해요")는 별개이며 이 검사의
-    // 대상이 아니다.
+    // 넷으로 번지지 않았다. 오드의 소개(tagline)는 고지와 겹치지 않는 문구로
+    // 바뀌었으므로("느낌으로 하루를 그려요") 이 검사의 대상이 아니다.
     expect(screen.getAllByText("상상을 섞어 씁니다")).toHaveLength(1);
   });
 

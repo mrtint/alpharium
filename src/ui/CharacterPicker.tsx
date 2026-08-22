@@ -90,8 +90,11 @@ export function CharacterPicker({ characters, selected, onSelect }: CharacterPic
               */}
               {character === "imaginative" && <Text style={styles.hint}>{IMAGINATIVE_NOTICE}</Text>}
 
-              {/* **「받아야 함」이지 「3.2GB를 받아야 함」이 아니다** — 크기는 모델 규모를 드러낸다 */}
-              {!ready && <Text style={styles.hint}>아직 준비되지 않았다</Text>}
+              {/*
+                **텍스트 안내를 두지 않는다.** `disabled`(accessibilityState·
+                rowDisabled의 흐림 처리)만으로 「고를 수 없다」가 전달된다 —
+                문구를 더하면 같은 사실을 두 번 말하는 것이다.
+              */}
             </View>
 
             {isSelected && <Text style={styles.mark}>고름</Text>}
