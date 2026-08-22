@@ -1730,11 +1730,21 @@ cd android && NODE_ENV=production ./gradlew assembleRelease
 | `npm run test:logic` | 순수 로직만 (**약 7초**) — 개발 중 기본 | 필요 없음 |
 | `npm run test:ui` | 화면만 | 필요 없음 |
 | `npm run test:device` | 실기기 갈래 (Maestro) | 있으면 돌고 없으면 건너뛴다 |
-| `npm run lint` | eslint + tsc + 헌법 검사 | 필요 없음 |
+| `npm run lint` | eslint + tsc + 헌법 검사 + prettier 포맷 검사 | 필요 없음 |
 
 **건너뛴 실기기 테스트는 통과가 아니다.** 기기 없이 전부 초록불이어도 온디바이스는
 검증되지 않은 상태다. 기능이 끝났다고 말하려면 최소 한 번은 실기기에서 돌아야 한다
 (헌법 원칙 V).
+
+**"최소 한 번"이지 debug와 release를 매번 둘 다가 아니다** (2026-08-22 정리, 012에서
+확립). 새 네이티브 모듈이나 빌드 설정(동적 `import`, R8·ProGuard 대상, JNI 심볼 등)을
+건드리지 않는 순수 로직·화면 기능이면 **debug 실기기 확인 1회로 충분하다.** release
+재확인은 그런 경계를 새로 건드릴 때만 한다 — "debug에서 돌았다는 것이 release에서
+돈다는 뜻이 아니다"는 실제로 여러 번 깨졌던 축(005의 `initLlama` JNI, 011의
+`initMultimodal` JNI, 006~012의 동적 import)에 적용되는 말이며, UI·로직 변경까지
+일반화되는 말이 아니다. 시뮬레이터(Expo Go 등)는 이 프로젝트에서 애초에 옵션이
+아니다 — `llama.rn`이 Expo Go에 없고, `local` 환경은 데스크톱 서버 추론이라 dev/prod의
+온디바이스 강제 게이트를 애초에 검증하지 못한다.
 
 **⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야 돈다.**
 등록하지 않으면 파일이 있어도 실행기가 돌리지 않고, 그러면 초록불인데 아무것도 검증되지

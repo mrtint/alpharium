@@ -21,7 +21,7 @@ jobs:
           cache: "npm"
       - run: npm ci
 
-      # eslint + tsc + 헌법 위반 검사(FR-026)
+      # eslint + tsc + 헌법 위반 검사 + prettier 포맷 검사(FR-026)
       - run: npm run lint
 
       # 기기 불필요 갈래. 기기 없이 항상 돈다(FR-021c)
@@ -30,8 +30,6 @@ jobs:
       # 기준으로 잡은 값이라 여기서는 워커가 1개가 되어 오히려 느려진다.
       # CI에서는 코어 수를 그대로 쓴다.
       - run: npm test -- --maxWorkers=2
-
-      - run: npx prettier --check "src/**/*.{ts,tsx}" "__tests__/**/*.{ts,tsx}" "*.{ts,tsx}"
 
       # 의존성 선언과 SDK 기대값이 어긋나는지 확인(FR-022)
       #
