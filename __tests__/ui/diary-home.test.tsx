@@ -555,3 +555,111 @@ describe("011 — 사진 설정이 파이프라인까지 간다", () => {
     expect(screen.queryByTestId("vision-quick")).toBeNull();
   });
 });
+
+/* ═══════════════ 011 US4 — 사진을 볼 수 없으면 그렇다고 말한다 ═══════════════ */
+
+/**
+ * 계약: specs/011-photo-vision-summary/spec.md FR-021·022·023·024
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **005 FR-022의 판단을 잇는다.**
+ *
+ * 사용자가 「빠르게 봄」을 골랐는데 사진을 보지 않은 일기가 나오면, **그 일기는
+ * 사용자가 요청한 것이 아니다.** 001이 차단된 추론 위치를 바꿔치기하지 않은 것,
+ * 003이 없는 모델을 다른 캐릭터로 대체하지 않은 것과 같은 계열이다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("011 US4 — 사진을 볼 수 없을 때", () => {
+  /** `vision` 단계에서 멈추는 파이프라인 */
+  const visionFailure = (reason: string): Pipeline => ({
+    run: async () => ({
+      ok: false,
+      stage: "vision",
+      reason: `vision-failed: ${reason}`,
+    }),
+  });
+
+  async function writeWith(pipeline: Pipeline, onGoToCharacters?: () => void) {
+    await render(
+      <DiaryHomeScreen
+        onGoToCharacters={onGoToCharacters}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="quick"
+      />,
+    );
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+  }
+
+  // ★ FR-021 — 가짜 일기를 대신 주지 않는다.
+  it("★ 사진을 못 보면 일기가 나오지 않는다 (FR-021, SC-005)", async () => {
+    await writeWith(visionFailure("not-ready"));
+
+    // 일기 본문이 화면에 없다.
+    expect(screen.queryByText(entry.text)).toBeNull();
+    expect(await screen.findByText(/사진을 보는 데 필요한 것/)).toBeTruthy();
+  });
+
+  it("무엇이 필요한지와 빠져나갈 길을 함께 말한다 (FR-022)", async () => {
+    await writeWith(visionFailure("not-ready"));
+
+    const message = await screen.findByText(/사진을 보는 데 필요한 것/);
+    // 「준비해야 한다」와 「보지 않고 쓸 수도 있다」가 함께 있다.
+    expect(message.props.children).toMatch(/준비/);
+    expect(message.props.children).toMatch(/보지 않고/);
+  });
+
+  it("준비하러 가는 길이 있다 (FR-022, 003 FR-028)", async () => {
+    await writeWith(visionFailure("not-ready"), () => {});
+
+    expect(await screen.findByText(/캐릭터 준비하러 가기/)).toBeTruthy();
+  });
+
+  it.each([
+    ["not-ready", /필요한 것/],
+    ["failed", /문제가 생겼다/],
+    ["cancelled", /멈췄다/],
+  ])("%s는 서로 다른 말이 된다 (FR-022)", async (reason, pattern) => {
+    await writeWith(visionFailure(reason));
+    expect(await screen.findByText(pattern)).toBeTruthy();
+  });
+
+  // ★ FR-023 — 오류 문구가 원칙 III의 누출 경로다.
+  it("★ 안내에 모델 정보가 없다 (FR-023, 원칙 III)", async () => {
+    await writeWith(visionFailure("not-ready"));
+
+    const message = await screen.findByText(/사진을 보는 데 필요한 것/);
+    expect(String(message.props.children)).not.toMatch(/LFM|SmolVLM|mmproj|gguf|450M/i);
+  });
+
+  it("안내에 시간·토큰이 없다 (원칙 IV)", async () => {
+    await writeWith(visionFailure("failed"));
+
+    const message = await screen.findByText(/문제가 생겼다/);
+    expect(String(message.props.children)).not.toMatch(/\d+초|\d+토큰|ms|%/);
+  });
+
+  /**
+   * **`generation`과 뭉개지지 않는다** — 사용자가 할 일이 다르다.
+   *
+   * 「캐릭터를 준비해야 한다」와 「사진 보는 것을 준비해야 한다」는 서로 다른 화면으로
+   * 이어지며, 뭉개면 사용자가 엉뚱한 것을 준비한다.
+   */
+  it("캐릭터 준비 실패와 다른 말이 된다", async () => {
+    const characterFailure: Pipeline = {
+      run: async () => ({
+        ok: false,
+        stage: "generation",
+        reason: "model-load-failed: not-found",
+      }),
+    };
+
+    await writeWith(characterFailure);
+    const message = await screen.findByText(/준비/);
+
+    expect(String(message.props.children)).toMatch(/캐릭터/);
+    expect(String(message.props.children)).not.toMatch(/사진/);
+  });
+});

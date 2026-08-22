@@ -159,11 +159,11 @@ description: "Task list for 011-photo-vision-summary"
 **⚠️ US5보다 먼저다**: US5(받기)가 없어도 「없을 때 어떻게 하는가」는 검증할 수 있고,
 **그것이 원칙 I의 방어선이다**
 
-- [ ] T040 [P] [US4] `__tests__/diary/pipeline.test.ts`에 `vision` 단계 실패가 **`none`으로 낮추지 않음**을 **먼저** 검사로 쓴다 (FR-021, SC-005). **005 FR-022의 판단을 잇는다**
-- [ ] T041 [US4] `src/diary/pipeline.ts`에서 `vision` 단계 실패를 `stop("vision", …)`으로 돌려준다 — **`generation`으로 뭉개지 않는다**(사용자가 할 일이 다르다)
-- [ ] T042 [P] [US4] `__tests__/ui/diary-home.test.tsx`에 `vision` 실패의 안내와 **빠져나갈 길**(준비하러 가기)을 검사 (FR-022)
-- [ ] T043 [US4] `src/ui/DiaryHomeScreen.tsx`에 `vision` 실패 안내 — **모델 정보를 담지 않는다**(FR-023, 원칙 III). 003 FR-028·007의 「캐릭터 준비하러 가기」와 같은 구조
-- [ ] T044 [US4] `src/ui/DiaryHomeScreen.tsx`에 **일기를 쓰기 전에** 준비 여부를 알린다 (FR-024). **10초를 기다린 뒤 실패를 알리지 않는다**
+- [X] T040 [P] [US4] `__tests__/diary/pipeline.test.ts`에 `vision` 단계 실패가 **`none`으로 낮추지 않음**을 **먼저** 검사로 쓴다 (FR-021, SC-005). **005 FR-022의 판단을 잇는다**
+- [X] T041 [US4] `src/diary/pipeline.ts`에서 `vision` 단계 실패를 `stop("vision", …)`으로 돌려준다 — **`generation`으로 뭉개지 않는다**(사용자가 할 일이 다르다)
+- [X] T042 [P] [US4] `__tests__/ui/diary-home.test.tsx`에 `vision` 실패의 안내와 **빠져나갈 길**(준비하러 가기)을 검사 (FR-022)
+- [X] T043 [US4] `src/ui/DiaryHomeScreen.tsx`에 `vision` 실패 안내 — **모델 정보를 담지 않는다**(FR-023, 원칙 III). 003 FR-028·007의 「캐릭터 준비하러 가기」와 같은 구조
+- [X] T044 [US4] `src/ui/DiaryHomeScreen.tsx`에 **일기를 쓰기 전에** 준비 여부를 알린다 (FR-024). **10초를 기다린 뒤 실패를 알리지 않는다**
 
 **Checkpoint**: 준비되지 않았을 때 가짜 일기가 나오지 않는다
 
