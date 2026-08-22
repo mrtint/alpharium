@@ -49,12 +49,7 @@ describe("012 §4 — 정오 이전 안내 (검증 표)", () => {
 
   it("2b. todayNotYetWritable: false → 안내가 안 보인다", async () => {
     await render(
-      <DayPicker
-        days={days}
-        onSelect={noop}
-        selected="2026-08-20"
-        todayNotYetWritable={false}
-      />,
+      <DayPicker days={days} onSelect={noop} selected="2026-08-20" todayNotYetWritable={false} />,
     );
 
     expect(screen.queryByText(/정오|12시/)).toBeNull();

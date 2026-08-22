@@ -151,10 +151,7 @@ describe("계약이 요구하는 조합을 대역으로 만들 수 있다 (SC-00
       photo(`p${i}`, `2026-08-12T${String(9 + i).padStart(2, "0")}:00:00`),
     );
 
-    const signals = await collectDaySignals(
-      stubPort({ photosBetween: async () => many }),
-      DAY,
-    );
+    const signals = await collectDaySignals(stubPort({ photosBetween: async () => many }), DAY);
 
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {

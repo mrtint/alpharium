@@ -23,11 +23,7 @@ export type OverwriteConfirmScreenProps = {
   onConfirm: () => void;
 };
 
-export function OverwriteConfirmScreen({
-  day,
-  onCancel,
-  onConfirm,
-}: OverwriteConfirmScreenProps) {
+export function OverwriteConfirmScreen({ day, onCancel, onConfirm }: OverwriteConfirmScreenProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.day}>{day}</Text>

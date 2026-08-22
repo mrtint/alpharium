@@ -379,7 +379,12 @@ describe("isDayWritable — 이 하루를 지금 쓸 수 있는가 (012 §1)", (
   const cases: readonly { day: string; now: string; expected: boolean; why: string }[] = [
     { day: "2026-08-20", now: "2026-08-21T09:00:00", expected: true, why: "지난 하루, 이미 닫힘" },
     { day: "2026-08-21", now: "2026-08-21T11:59:00", expected: false, why: "오늘, 정오 전" },
-    { day: "2026-08-21", now: "2026-08-21T12:00:00", expected: true, why: "★ 오늘, 정오 정각 — 경계값" },
+    {
+      day: "2026-08-21",
+      now: "2026-08-21T12:00:00",
+      expected: true,
+      why: "★ 오늘, 정오 정각 — 경계값",
+    },
     { day: "2026-08-21", now: "2026-08-21T12:01:00", expected: true, why: "오늘, 정오 후" },
     {
       day: "2026-08-22",

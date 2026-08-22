@@ -34,7 +34,10 @@ describe("S4 — SignalProbe가 소스에서 USER_VISIBLE_SIGNAL_AXES를 import�
   // 008의 "주석을 걷어내고 검사한다" 방식 — 우연히 안 부르는 것과 구조로 못 부르는
   // 것은 다르다. 나중에 리팩터링 중에 조용히 새로 import될 수 있다.
   it("소스에 USER_VISIBLE_SIGNAL_AXES 문자열이 없다", () => {
-    const source = readFileSync(join(__dirname, "..", "..", "src", "ui", "SignalProbe.tsx"), "utf8");
+    const source = readFileSync(
+      join(__dirname, "..", "..", "src", "ui", "SignalProbe.tsx"),
+      "utf8",
+    );
     expect(source).not.toContain("USER_VISIBLE_SIGNAL_AXES");
   });
 });

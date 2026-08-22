@@ -31,10 +31,7 @@ describe("USER_VISIBLE_SIGNAL_AXES (contracts/signal-visibility.md §1)", () => 
   });
 
   it("사람이 적은 리터럴 값이다 — 소스에 조건문·값 판정이 없다", () => {
-    const source = readFileSync(
-      join(__dirname, "..", "..", "src", "signals", "types.ts"),
-      "utf8",
-    );
+    const source = readFileSync(join(__dirname, "..", "..", "src", "signals", "types.ts"), "utf8");
     const declaration = source.match(
       /USER_VISIBLE_SIGNAL_AXES[\s\S]*?=\s*\{[\s\S]*?\}\s*(?:as const)?/,
     );
