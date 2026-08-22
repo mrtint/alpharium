@@ -64,3 +64,8 @@ lerna-debug.log*
 
 # 010 — 심은 기록. 개발 기계마다 다르므로 커밋하지 않는다
 .seed-ledger.json
+
+# 010 — 실사 샘플 사진. 사람의 실제 촬영본이라 기기 정보·GPS가 남을 수 있다
+# (scripts/samples/README.md 참조). 폴더 구조만 .gitkeep으로 유지한다
+scripts/samples/**/*.jpg
+scripts/samples/**/*.jpeg

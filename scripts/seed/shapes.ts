@@ -121,9 +121,20 @@ const SHAPES: DayShape[] = [
      */
     build: (day) => {
       const count = 12;
-      // 하루 24시간 중 1시간대부터 약 1.9시간 간격 — 마지막이 하루 끝에 닿지 않게 둔다
+      /**
+       * **하루(04:00~익일04:00, 24시간)의 끝과 자정(로컬 달력 날짜의 경계)은 다르다.**
+       *
+       * 처음엔 1시간대부터 1.9시간 간격으로 두어 마지막이 `dayBounds`의 끝(익일 04:00)에
+       * 닿지 않게만 신경 썼는데(21.9시간 지점 = 익일 01:54), **그사이에 자정을 넘어간다.**
+       * 자정을 넘으면 EXIF/GPSDateStamp의 로컬 날짜가 실제로 다음날로 바뀌어 미디어
+       * 스캐너가 그 사진을 `day`가 아닌 다음날로 색인한다(011 실측, verify-mismatch).
+       *
+       * 그래서 마지막 사진이 **자정 전(04:00부터 20시간 이내 = 로컬 24:00 전)**에 들도록
+       * 좁힌다. `stepHours = 1.7`이면 마지막(11칸째)이 04:00+1+18.7=23:42로 여유 있게
+       * 자정 앞에 들어온다.
+       */
       const firstHour = 1;
-      const stepHours = 1.9;
+      const stepHours = 1.7;
 
       return Array.from({ length: count }, (_, i) => ({
         takenAtMs: hoursIntoDay(day, firstHour + i * stepHours),
