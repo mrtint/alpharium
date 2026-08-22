@@ -87,6 +87,9 @@ export function DiaryDetailScreen({
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.day}>{entry.date}</Text>
 
+      {/* 014 — 제목이 있으면 날짜 아래에 보인다(FR-011). 없으면 아무것도 없다 */}
+      {entry.title !== undefined && <Text style={styles.title}>{entry.title}</Text>}
+
       {/* **저장하지 못했으면 남지 않는다는 것을 말한다**(FR-012b) */}
       {!saved && (
         <Text style={styles.unsaved}>저장하지 못했다. 앱을 나가면 이 일기는 사라진다</Text>
@@ -116,6 +119,7 @@ export function DiaryDetailScreen({
 const styles = StyleSheet.create({
   page: { padding: 20, gap: 16 },
   day: { fontSize: 14, opacity: 0.6 },
+  title: { fontSize: 20, fontWeight: "600" },
   unsaved: { fontSize: 14 },
   overwrote: { fontSize: 13, opacity: 0.7 },
   text: { fontSize: 16, lineHeight: 26 },

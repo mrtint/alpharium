@@ -81,6 +81,20 @@ const SPEAKER_RULES: readonly string[] = [
   "정확한 기록이 아니라 하루의 감상을 쓴다.",
 ];
 
+/**
+ * 제목 지시문 (014 FR-006).
+ *
+ * **판정 갈래를 늘리지 않는다**(contracts/title.md P1, 원칙 IV) — `judge()`는
+ * 이 지시를 지켰는지 확인하지 않는다. `pipeline.ts`의 `extractTitle()`이 판정
+ * 통과 후 사후 분리를 시도할 뿐이며, 형식을 안 지켜도 거부되지 않는다(FR-009).
+ *
+ * **되뱉기 판정 대상이 된다** — `SPEAKER_RULES`처럼 `instructionLines()`에도
+ * 담기므로(research.md R5), 모델이 이 지시문을 그대로 되뱉으면 기존 `isEcho()`가
+ * 자동으로 잡는다(별도 배선 불필요).
+ */
+const TITLE_INSTRUCTION =
+  "첫 줄에 제목을 짧게 쓰고, 빈 줄을 하나 넣은 뒤, 그 아래에 본문을 이어서 적어라.";
+
 /** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것뿐이다** */
 const LANGUAGE: Readonly<Record<Character, string>> = {
   quiet: "한국어",
@@ -173,7 +187,7 @@ const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못�
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
-  const lines = [...SPEAKER_RULES];
+  const lines = [...SPEAKER_RULES, TITLE_INSTRUCTION];
 
   // 012 — 사진 축과 무관하게, 하루가 아직 끝나지 않았으면 붙는다(FR-004).
   if (request.dayStillOpen) {
@@ -369,6 +383,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
 
   return [
     ...SPEAKER_RULES,
+    TITLE_INSTRUCTION,
     "",
     `${language}로 써라.`,
     "",

@@ -36,7 +36,13 @@ import { describeStage } from "./failure-text";
  * 조용히 빼면 「그날 일기가 없다」와 구분이 사라진다. 날짜는 파일 이름에서 오므로
  * **내용이 깨져도 어느 날인지는 안다** — 그것이 이 갈래를 만들 수 있는 이유다.
  */
-export type DiaryListItem = { day: DayDate; readable: boolean; photos: PhotoHint };
+export type DiaryListItem = {
+  day: DayDate;
+  readable: boolean;
+  photos: PhotoHint;
+  /** 일기 제목 (014, 옵셔널). `diary/store.ts`의 같은 이름 타입과 짝을 이룬다 */
+  title?: string;
+};
 
 /**
  * 그날 일기가 사진을 얼마나 보고 쓰였는가 (007 FR-018·019, data-model.md §5).

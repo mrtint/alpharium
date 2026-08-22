@@ -114,6 +114,25 @@ describe("목록 (FR-017)", () => {
 });
 
 /**
+ * 014 US2 — 목록 줄에 제목이 보인다(FR-011).
+ */
+describe("제목 (014 FR-011)", () => {
+  it("제목이 있으면 보인다", async () => {
+    await renderList([{ ...readable("2026-08-16"), title: "조용한 하루" }]);
+
+    expect(screen.getByText("조용한 하루")).toBeTruthy();
+  });
+
+  it("제목이 없으면 아무것도 보이지 않는다 — 날짜만 있다", async () => {
+    await renderList([readable("2026-08-16")]);
+
+    expect(screen.getByText("2026-08-16")).toBeTruthy();
+    // 제목 자리에 빈 텍스트나 placeholder가 남지 않는다.
+    expect(screen.queryByText("undefined")).toBeNull();
+  });
+});
+
+/**
  * ★ S3 — **「읽을 수 없다」와 「일기가 없다」가 다르게 보인다**(원칙 V).
  *
  * 004가 값에서 지킨 `unknown` ≠ `none` 구분을 화면에서도 지킨다.

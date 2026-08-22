@@ -37,6 +37,22 @@ describe("전문을 읽는다 (FR-019)", () => {
   });
 });
 
+/** 014 US2 — 제목이 있으면 보인다(FR-011) */
+describe("제목 (014 FR-011)", () => {
+  it("제목이 있으면 보인다", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), title: "조용한 하루" }} />);
+
+    expect(screen.getByText("조용한 하루")).toBeTruthy();
+  });
+
+  it("제목이 없으면 본문만 보인다", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.getByText(DIARY)).toBeTruthy();
+    expect(screen.queryByText("undefined")).toBeNull();
+  });
+});
+
 /**
  * ★ 006 FR-012b — **저장되지 않은 일기는 그 사실을 말한다.**
  *

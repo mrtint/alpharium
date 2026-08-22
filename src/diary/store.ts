@@ -101,7 +101,13 @@ export function deserializeEntry(serialized: string): DiaryEntry {
  *
  * **전문을 담지 않는다.** 목록에서 전부 읽으면 일기가 늘수록 느려진다.
  */
-export type DiaryListItem = { day: DayDate; readable: boolean; photos: PhotoHint };
+export type DiaryListItem = {
+  day: DayDate;
+  readable: boolean;
+  photos: PhotoHint;
+  /** 일기 제목 (014, 옵셔널). 없으면 목록에 날짜만 보인다 */
+  title?: string;
+};
 
 /**
  * 그날 일기가 사진을 얼마나 보고 쓰였는가 (007 FR-018·019).
@@ -159,7 +165,13 @@ export async function listDiaries(store: DiaryStore): Promise<DiaryListItem[]> {
         // 「없었다」가 아니다 — 파일을 못 읽었을 뿐 사진이 없었는지는 알 수 없다.
         if (entry === null) return { day, readable: false, photos: { kind: "unknown" } };
 
-        return { day, readable: true, photos: photoHintOf(entry) };
+        // 014 — title이 있으면 목록에 담긴다. photoHintOf()와 같은 자리, 추가 읽기 없음.
+        return {
+          day,
+          readable: true,
+          photos: photoHintOf(entry),
+          ...(entry.title !== undefined ? { title: entry.title } : {}),
+        };
       } catch {
         // 읽다가 무너져도 그 날짜를 잃지 않는다. 「읽을 수 없다」가 결론이다.
         return { day, readable: false, photos: { kind: "unknown" } };

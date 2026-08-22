@@ -125,45 +125,48 @@ US3(프롬프트 개정과 같은 파일)이 전부 이것을 필요로 하거�
 
 ### Tests for User Story 2
 
-- [ ] T014 [P] [US2] `__tests__/diary/title.test.ts`를 만든다 —
+- [X] T014 [P] [US2] `__tests__/diary/title.test.ts`를 만든다 —
       contracts/title.md P1~P4를 각각 검증: 정상 형식(첫 줄+빈 줄+본문)에서 제목이
       분리됨, 빈 줄이 없으면 전체가 body, 첫 줄이 40자 초과면 전체가 body, 예외를
       던지지 않음(빈 문자열 등 경계 입력), 반환 타입에 `title`·`body` 외 필드가
       없음을 소스를 직접 읽어 확인(007·009의 교훈)
-- [ ] T015 [P] [US2] `__tests__/diary/pipeline.test.ts`에 케이스를 추가한다 —
+- [X] T015 [P] [US2] `__tests__/diary/pipeline.test.ts`에 케이스를 추가한다 —
       `judge()`가 통과시킨 텍스트에서 `extractTitle()`이 호출되어
       `DiaryEntry.title`이 채워짐을 확인하고, **`judge()`에는 원본 전체 텍스트가
       그대로 전달됨**(제목이 미리 잘려 판정에 들어가지 않음)을 확인한다(FR-007·009)
-- [ ] T016 [US2] `npm run test:logic`으로 T014·T015가 실패하는 것을 확인한다
+- [X] T016 [US2] `npm run test:logic`으로 T014·T015가 실패하는 것을 확인한다
       (구현 전이므로 실패해야 정상)
 
 ### Implementation for User Story 2
 
-- [ ] T017 [P] [US2] `src/diary/title.ts`를 만든다 — `TitleExtraction` 타입과
+- [X] T017 [P] [US2] `src/diary/title.ts`를 만든다 — `TitleExtraction` 타입과
       `extractTitle(text)` 함수(data-model.md 「Title」, contracts/title.md
       「판정 순서」)
-- [ ] T018 [US2] `src/diary/types.ts`의 `DiaryEntry`에 `title?: string`을
+- [X] T018 [US2] `src/diary/types.ts`의 `DiaryEntry`에 `title?: string`을
       추가한다(data-model.md, FR-010 — 옵셔널이어야 기존 파일과 호환)
-- [ ] T019 [US2] `src/diary/pipeline.ts`를 수정한다 — `judge()` 통과 후(기존
+- [X] T019 [US2] `src/diary/pipeline.ts`를 수정한다 — `judge()` 통과 후(기존
       `generated.text`를 그대로 쓰던 자리), `extractTitle(generated.text)`를
       호출해 `entry.text = extraction.body`, `entry.title = extraction.title`로
       채운다. **`judge()` 호출부는 건드리지 않는다**(원본 텍스트를 그대로 넘긴다,
       research.md R5)
-- [ ] T020 [US2] `src/diary/store.ts`의 `DiaryListItem`에 `title?: string`을
-      추가하고, `photoHintOf()`와 같은 자리에 `titleOf(entry)` 헬퍼를 추가해
-      `listDiaries()`가 채운다(data-model.md 「DiaryListItem」, 추가 읽기 없음)
-- [ ] T021 [US2] `src/ui/DiaryListScreen.tsx`의 목록 줄에 `item.title`이 있으면
+- [X] T020 [US2] `src/diary/store.ts`의 `DiaryListItem`에 `title?: string`을
+      추가하고 `listDiaries()`에 인라인으로 채운다(data-model.md 「DiaryListItem」,
+      추가 읽기 없음). **★ 구현 중 발견**: `src/app/state.ts`에 같은 이름의
+      독립된 `DiaryListItem` 타입이 006부터 따로 있었다(`DiaryListScreen`이 이쪽을
+      쓴다) — plan.md가 이것을 놓쳤다. 그쪽에도 `title?: string`을 추가해야
+      `DiaryListScreen.tsx`가 `item.title`을 읽을 수 있다(data-model.md 갱신함)
+- [X] T021 [US2] `src/ui/DiaryListScreen.tsx`의 목록 줄에 `item.title`이 있으면
       표시하는 텍스트를 추가한다(FR-011)
-- [ ] T022 [US2] `src/ui/DiaryDetailScreen.tsx`에 `entry.title`이 있으면
+- [X] T022 [US2] `src/ui/DiaryDetailScreen.tsx`에 `entry.title`이 있으면
       표시하는 텍스트를 추가한다(FR-011)
-- [ ] T023 [US2] `src/diary/prompt.ts`의 `buildPrompt()`에 제목 지시문을 추가한다
+- [X] T023 [US2] `src/diary/prompt.ts`의 `buildPrompt()`에 제목 지시문을 추가한다
       (research.md R2 — "첫 줄에 제목만, 빈 줄, 그다음 본문"을 요구하는 한 줄).
       **`instructionLines()`에도 이 줄이 들어가야** 되뱉기 판정 대상이 된다
       (기존 메커니즘, `SPEAKER_RULES` 확장과 동일한 자리)
-- [ ] T024 [US2] `npm run test:logic`으로 T014·T015가 이제 통과하는지 확인한다
-- [ ] T025 [US2] `npm run test:ui`로 T021·T022 관련 화면 테스트(있다면 새로
+- [X] T024 [US2] `npm run test:logic`으로 T014·T015가 이제 통과하는지 확인한다
+- [X] T025 [US2] `npm run test:ui`로 T021·T022 관련 화면 테스트(있다면 새로
       추가)가 통과하는지 확인한다
-- [ ] T026 [US2] `npm run lint`로 헌법 검사 및 `acceptance.test.ts`의 A-7
+- [X] T026 [US2] `npm run lint`로 헌법 검사 및 `acceptance.test.ts`의 A-7
       (판정 갈래가 넷임을 세는 테스트)이 그대로 통과하는지 확인한다 — `judge()`를
       건드리지 않았다는 증거
 

@@ -125,6 +125,9 @@ export function DiaryListScreen({
         >
           <Text style={styles.day}>{item.day}</Text>
 
+          {/* 014 — 제목이 있으면 날짜 아래에 보인다(FR-011). 없으면 아무것도 없다 */}
+          {item.title !== undefined && <Text style={styles.entryTitle}>{item.title}</Text>}
+
           {/*
             ★ 「읽을 수 없다」와 「일기가 없다」는 다른 상태다(S3, 원칙 V).
             조용히 빼면 사용자는 일기를 쓴 기억과 화면이 어긋나는 것을 설명할 수 없다.
@@ -225,6 +228,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   day: { fontSize: 16 },
+  entryTitle: { fontSize: 14 },
   unreadable: { fontSize: 13, opacity: 0.6 },
   photos: { fontSize: 13, opacity: 0.6 },
   writeArea: {

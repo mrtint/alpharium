@@ -80,6 +80,16 @@ export type DiaryRequest = {
 export type DiaryEntry = {
   date: DayDate;
   text: string;
+  /**
+   * 일기 제목 (014, 옵셔널).
+   *
+   * **판정을 통과한 전체 텍스트에서 사후 분리된 것**이지, 별도로 생성되거나
+   * 검증되지 않는다 — `src/diary/title.ts`의 `extractTitle()` 참조.
+   *
+   * **옵셔널이어야 한다.** 이 필드 이전에 저장된 파일에는 이 키가 없고, 모델이
+   * 제목 형식을 지키지 않아도 일기는 거부되지 않는다(제목 없이 저장된다).
+   */
+  title?: string;
   character: Character;
   signalsUsed: DaySignals;
   createdAt: Date;

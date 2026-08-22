@@ -69,7 +69,12 @@ export type DiaryEntry = {
 5. 기존(이 기능 이전) 파일에는 `title` 필드가 JSON에 없다 — `title: undefined`로
    읽힌다. 마이그레이션 코드를 두지 않는다(FR-010).
 
-## DiaryListItem (수정, `src/diary/store.ts`)
+## DiaryListItem (수정, `src/diary/store.ts` **그리고** `src/app/state.ts`)
+
+**★ 구현 중 발견 — plan.md가 놓친 것.** `DiaryListItem`이라는 같은 이름의 타입이
+**두 곳에 독립적으로** 정의돼 있다: `src/diary/store.ts`(`listDiaries()`가
+반환)와 `src/app/state.ts`(006이 화면 상태 전용으로 따로 정의, `DiaryListScreen`이
+이쪽을 쓴다). 둘은 구조적으로 호환되지만 별개 선언이므로 **둘 다 고쳐야** 한다.
 
 ```ts
 export type DiaryListItem = {
@@ -80,9 +85,10 @@ export type DiaryListItem = {
 };
 ```
 
-`titleOf(entry: DiaryEntry): string | undefined`가 `photoHintOf()`와 같은 자리·같은
-패턴으로 추가된다 — `listDiaries()`가 이미 전체를 역직렬화하므로 추가 읽기가 없다
-(006·007이 세운 관례).
+`store.ts`에는 `photoHintOf()`와 같은 자리·같은 패턴으로 인라인 처리를 추가한다 —
+`listDiaries()`가 이미 전체를 역직렬화하므로 추가 읽기가 없다(006·007이 세운
+관례). `app/state.ts`의 선언에는 필드만 추가한다(그 파일은 화면 상태의 계약이며
+읽기 로직을 갖지 않는다).
 
 ## DiagnosticReport (수정, `src/diagnostics/types.ts`)
 
