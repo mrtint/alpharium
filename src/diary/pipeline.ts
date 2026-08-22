@@ -22,6 +22,15 @@ export type PipelineStage =
   | "signals" // 신호를 가져오지 못함
   | "request-build" // 캐릭터가 없어 요청 실패 (FR-007)
   | "model-not-ready" // 고른 캐릭터의 모델이 기기에 없다 (003 FR-008)
+  /**
+   * 사진을 보지 못했다 (011 FR-021).
+   *
+   * **`generation`과 따로 두는 까닭**: 사용자가 할 일이 다르다 — 이쪽은 「사진 보는 것을
+   * 준비하거나 설정을 바꿔라」이고 저쪽은 「캐릭터를 준비하거나 다시 시도하라」이다.
+   * 003이 `model-not-ready`를 따로 둔 것과 같은 판단이며, 뭉개면 002 FR-019(어느
+   * 단계에서 멈췄는지 말한다)가 무의미해진다.
+   */
+  | "vision"
   | "generation" // 추론 실패 또는 not-implemented
   | "storage"; // 저장 실패 (FR-024)
 
@@ -170,7 +179,12 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
   const generated = await deps.backend.generate(request.request);
   if (isGenerationFailure(generated)) {
     const detail = "reason" in generated ? `: ${generated.reason}` : "";
-    return stop("generation", `${generated.kind}${detail}`);
+
+    // 011 — **사진을 못 본 것은 생성 실패가 아니다.** 사용자가 할 일이 다르므로 단계를
+    // 가른다(FR-021). 어댑터가 두 단계를 함께 돌지만(E1의 순서 때문이다), **어느
+    // 단계에서 멈췄는지는 밖에서 구분되어야 한다**(002 FR-019).
+    const stage = generated.kind === "vision-failed" ? "vision" : "generation";
+    return stop(stage, `${generated.kind}${detail}`);
   }
 
   // 6. 저장한다. 생성에 성공한 경우에만 도달한다(FR-023b).
