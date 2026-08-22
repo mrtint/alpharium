@@ -175,12 +175,12 @@ description: "Task list for 011-photo-vision-summary"
 
 **Independent Test**: 지운 뒤 다시 받고, 사진을 본 일기가 나오는지 확인
 
-- [ ] T045 [P] [US5] `__tests__/vision/acquisition.test.ts`를 **먼저** 쓴다 — 두 파일을 받고, 하나만 받히면 `partial`이며, 지우면 둘 다 사라진다(FR-027·028)
-- [ ] T046 [US5] `src/vision/acquisition.ts`에 003의 `expoDownloadPort`·검증·삭제를 재사용해 본체·mmproj 두 파일을 다룬다. **003의 `acquisition.ts`를 고치지 않는다** — 그 테스트가 두껍다(008이 같은 판단을 했다)
-- [ ] T047 [P] [US5] `__tests__/ui/character-list.test.tsx`에 사진 보는 모델 줄이 **하나의 준비 상태**로 보이고 **파일이 둘인 것이 드러나지 않음**을 검사 (FR-026, SC-008)
-- [ ] T048 [US5] `src/ui/CharacterListScreen.tsx`에 사진 보는 모델 준비 자리 추가 — **「사진을 보는 데 필요한 것」으로만 보인다**(FR-031a). 모델명·파일명·크기가 없다
-- [ ] T049 [US5] 저장 공간 표시에 사진 보는 모델을 합산 (FR-029). **파일별로 쪼개지 않는다**
-- [ ] T050 [P] [US5] `__tests__/vision/acquisition.test.ts`에 **첫 내려받기에서 md5를 채록하는 경로** 검사 (FR-031, 003 contracts/readiness.md 「기준값이 아직 없을 때」)
+- [X] T045 [P] [US5] `__tests__/vision/acquisition.test.ts`를 **먼저** 쓴다 — 두 파일을 받고, 하나만 받히면 `partial`이며, 지우면 둘 다 사라진다(FR-027·028)
+- [X] T046 [US5] `src/vision/acquisition.ts`에 003의 `expoDownloadPort`·검증·삭제를 재사용해 본체·mmproj 두 파일을 다룬다. **003의 `acquisition.ts`를 고치지 않는다** — 그 테스트가 두껍다(008이 같은 판단을 했다)
+- [X] T047 [P] [US5] `__tests__/ui/character-list.test.tsx`에 사진 보는 모델 줄이 **하나의 준비 상태**로 보이고 **파일이 둘인 것이 드러나지 않음**을 검사 (FR-026, SC-008)
+- [X] T048 [US5] `src/ui/CharacterListScreen.tsx`에 사진 보는 모델 준비 자리 추가 — **「사진을 보는 데 필요한 것」으로만 보인다**(FR-031a). 모델명·파일명·크기가 없다
+- [X] T049 [US5] 저장 공간 표시에 사진 보는 모델을 합산 (FR-029). **파일별로 쪼개지 않는다**
+- [X] T050 [P] [US5] `__tests__/vision/acquisition.test.ts`에 **첫 내려받기에서 md5를 채록하는 경로** 검사 (FR-031, 003 contracts/readiness.md 「기준값이 아직 없을 때」)
 
 **Checkpoint**: 사진 보는 모델을 받고 지울 수 있다 — **실기기 검증의 전제가 갖춰진다**
 

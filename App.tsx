@@ -22,6 +22,12 @@ import { readinessOf } from "./src/models/readiness";
 import { assetFor } from "./src/models/roster";
 import { pausedFor, readState, removeAsset, verdictFor } from "./src/models/storage";
 import type { DownloadProgress, DownloadRejection, ModelReadiness } from "./src/models/types";
+import {
+  prepareVision,
+  removeVision,
+  visionReadiness,
+  visionStorageBytes,
+} from "./src/vision/acquisition";
 import { CharacterListScreen } from "./src/ui/CharacterListScreen";
 import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
 import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
@@ -454,6 +460,60 @@ function ModelSection(props: ModelSectionProps) {
     [ports, refresh],
   );
 
+  /* ───────────── 011 — 사진을 보는 데 필요한 것 ───────────── */
+
+  /**
+   * 사진 보는 모델의 준비 상태와 진행률.
+   *
+   * **캐릭터와 따로 둔다**(FR-025). 같은 상태에 넣으면 그것이 곧 「캐릭터가 사진을
+   * 본다」는 잘못된 모양이다.
+   *
+   * ⚠️ **지금은 캐릭터와 동시에 받을 수 있다** — 003의 「한 번에 하나」가 이 쌍에는
+   * 적용되지 않는다(tasks.md T009~T011의 「미룬 까닭」). 잊은 것이 아니라 미룬 것이다.
+   */
+  const [visionState, setVisionState] = useState<ModelReadiness | null>(null);
+  const [visionProgress, setVisionProgress] = useState<number | null>(null);
+  const [visionBytes, setVisionBytes] = useState(0);
+
+  const readVision = useCallback(async () => {
+    const [state, bytes] = await Promise.all([
+      visionReadiness(ports).catch(() => ({ kind: "not-downloaded" }) as ModelReadiness),
+      visionStorageBytes(ports).catch(() => 0),
+    ]);
+    return { state, bytes };
+  }, [ports]);
+
+  const refreshVision = useCallback(async () => {
+    const { state, bytes } = await readVision();
+    setVisionState(state);
+    setVisionBytes(bytes);
+  }, [readVision]);
+
+  // **`alive` 자물쇠를 둔다** — 화면이 사라진 뒤 상태를 세우면 경고가 난다.
+  // 007의 선택 읽기가 같은 방식이다.
+  useEffect(() => {
+    let alive = true;
+    void readVision().then(({ state, bytes }) => {
+      if (!alive) return;
+      setVisionState(state);
+      setVisionBytes(bytes);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [readVision]);
+
+  const onPrepareVision = useCallback(async () => {
+    await prepareVision(ports, setVisionProgress);
+    setVisionProgress(null);
+    await refreshVision();
+  }, [ports, refreshVision]);
+
+  const onRemoveVision = useCallback(async () => {
+    await removeVision(ports);
+    await refreshVision();
+  }, [ports, refreshVision]);
+
   if (readiness === null) {
     return (
       <View style={styles.placeholder}>
@@ -472,6 +532,12 @@ function ModelSection(props: ModelSectionProps) {
       onPause={() => void acquisition.pause()}
       onRemove={(character) => void onRemove(character)}
       onDismissNotice={() => setRejection(null)}
+      // ★ 011 — **이 줄들이 없으면 사진 보는 모델을 받을 길이 없다.**
+      visionReadiness={visionState ?? undefined}
+      visionProgress={visionProgress}
+      visionBytes={visionBytes}
+      onPrepareVision={() => void onPrepareVision()}
+      onRemoveVision={() => void onRemoveVision()}
     />
   );
 }
