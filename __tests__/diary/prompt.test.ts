@@ -365,3 +365,161 @@ describe("P-7 두 함수가 같은 상수에서 나온다", () => {
     }
   });
 });
+
+/* ═══════════════ 011 — 사진의 내용이 재료가 된다 ═══════════════ */
+
+/**
+ * 계약: specs/011-photo-vision-summary/contracts/prompt.md P1~P9
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **P-1이 이 묶음의 방어선이다**: `vision`이 없으면 005와 **바이트 단위로 같다.**
+ * 「보지 않음」인 하루가 이 기능 이전과 똑같이 동작한다는 것(SC-002)의 구현이며,
+ * 이것이 깨지면 010까지의 검증이 전부 흔들린다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("011 — 캡션이 프롬프트에 들어간다", () => {
+  const caption = (hour: number, text: string) => ({
+    photoId: `p${hour}`,
+    takenAt: new Date(2026, 7, 20, hour, 0, 0),
+    text,
+  });
+
+  const seen = (
+    captions: ReturnType<typeof caption>[],
+    considered = captions.length,
+    available = considered,
+  ) => ({ captions, considered, available });
+
+  const dayWithPhotos = (): DiaryRequest => {
+    const base = requestFor(partiallyUnknownDay("2026-08-20"));
+    return base;
+  };
+
+  // ★ P-1 — SC-002의 방어.
+  it("P-1. vision이 없으면 005와 바이트 단위로 같다", () => {
+    const request = dayWithPhotos();
+    expect(buildPrompt(request, undefined)).toBe(buildPrompt(request));
+  });
+
+  it("P-2. 캡션 줄에 시각이 붙는다 (FR-007b)", () => {
+    const prompt = buildPrompt(
+      dayWithPhotos(),
+      seen([caption(8, "창가의 커피잔"), caption(20, "불 켜진 실내")]),
+    );
+
+    expect(prompt).toContain("- 8시: 창가의 커피잔");
+    expect(prompt).toContain("- 20시: 불 켜진 실내");
+  });
+
+  it("캡션이 신호 뒤, 마지막 지시 앞에 온다", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")]));
+
+    expect(prompt.indexOf("사진에 담긴 것:")).toBeGreaterThan(prompt.indexOf("네가 본 것:"));
+    expect(prompt.indexOf("사진에 담긴 것:")).toBeLessThan(prompt.indexOf("일기를 써라"));
+  });
+
+  // ★ P-3 — 사용자가 clarify에서 확정한 것이다.
+  it("P-3. 캡션에 짐작 표시·한계 문구를 붙이지 않는다 (FR-011)", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "창가의 커피잔")]));
+    const line = prompt.split("\n").find((l) => l.includes("커피잔")) ?? "";
+
+    expect(line).toBe("- 8시: 창가의 커피잔");
+    expect(prompt).not.toMatch(/틀릴 수 있|잘못 읽|확신|것 같다고 보인다/);
+  });
+
+  it("P-4. 있는 것 중 일부만 보면 「전부가 아니다」가 붙는다 (SC-007)", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 12));
+    expect(prompt).toMatch(/그날의 전부가 아니다/);
+  });
+
+  it("고른 것 중 일부를 못 읽으면 그렇게 적는다 (FR-006)", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 5));
+    expect(prompt).toContain("일부는 내용을 보지 못했다");
+  });
+
+  /**
+   * ★ P-5 — 원칙 V의 자리다.
+   *
+   * **「사진이 없었다」와 완전히 다른 사실이다.** 004가 값에서 지킨 구분이 한 겹 위에서
+   * 반복되며, 뭉개면 010이 실기기에서 확인한 「없었다 / 모른다」의 성취가 무너진다.
+   */
+  it("P-5. 사진은 있는데 하나도 못 읽으면 「없었다」가 아니다 (SC-006)", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([], 5, 5));
+
+    expect(prompt).toContain("사진은 있었으나 내용을 하나도 보지 못했다");
+    expect(prompt).not.toContain("사진에 담긴 것:");
+  });
+
+  it("P-6. 두 한계가 겹치면 둘 다 나온다", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 20));
+
+    expect(prompt).toMatch(/그날의 전부가 아니다/);
+    expect(prompt).toContain("일부는 내용을 보지 못했다");
+  });
+
+  // ★ P-7 — SC-001a. 구조로 보장되는 것을 검사로 못 박는다.
+  it("P-7. 캐릭터를 바꿔도 캡션 부분이 같다 (FR-013, SC-001a)", () => {
+    const vision = seen([caption(8, "창가의 커피잔"), caption(20, "강가의 산책로")]);
+    const captionPart = (character: Character) => {
+      const request = { ...dayWithPhotos(), character };
+      const prompt = buildPrompt(request, vision);
+      return prompt.slice(prompt.indexOf("사진에 담긴 것:"));
+    };
+
+    const first = captionPart("quiet");
+    for (const character of CHARACTERS) {
+      expect(captionPart(character)).toBe(first);
+    }
+  });
+
+  /**
+   * ★ P-8 — 이것이 빠지면 **성공한 일기가 거부된다.**
+   *
+   * 005가 「신호가 들어간 줄은 넣지 않는다」고 이미 적었고, **캡션은 신호 그 자체다.**
+   * 「창가에 놓인 커피잔」이 일기에 나오는 것은 정확히 우리가 원하는 것이다.
+   */
+  it("P-8. instructionLines가 캡션 본문을 담지 않는다", () => {
+    const vision = seen([caption(8, "창가의 커피잔"), caption(20, "강가의 산책로")]);
+    const lines = instructionLines(dayWithPhotos(), vision);
+
+    for (const line of lines) {
+      expect(line).not.toContain("창가의 커피잔");
+      expect(line).not.toContain("강가의 산책로");
+      expect(line).not.toContain("8시:");
+    }
+  });
+
+  it("instructionLines가 한계 줄은 담는다 — 지시문이므로 되뱉으면 잡아야 한다", () => {
+    const lines = instructionLines(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 12));
+    expect(lines.some((l) => /그날의 전부가 아니다/.test(l))).toBe(true);
+  });
+
+  it("instructionLines의 모든 줄이 프롬프트에 실제로 들어 있다 (P-7의 성질 유지)", () => {
+    const vision = seen([caption(8, "커피잔")], 5, 12);
+    const request = dayWithPhotos();
+    const prompt = buildPrompt(request, vision);
+
+    for (const line of instructionLines(request, vision)) {
+      expect(prompt).toContain(line);
+    }
+  });
+
+  it("P-9. vision을 넣어도 결정적이다", () => {
+    const vision = seen([caption(8, "커피잔")]);
+    const request = dayWithPhotos();
+
+    expect(buildPrompt(request, vision)).toBe(buildPrompt(request, vision));
+  });
+
+  it("캡션이 없고 고른 것도 없으면 아무 줄도 붙지 않는다", () => {
+    const request = dayWithPhotos();
+    expect(buildPrompt(request, seen([], 0, 0))).toBe(buildPrompt(request));
+  });
+
+  // 원칙 III·IV — 모델 정보와 지표가 프롬프트에 새지 않는다.
+  it("캡션 부분에 모델 정보·시간·토큰이 없다", () => {
+    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 12));
+
+    expect(prompt).not.toMatch(/LFM|SmolVLM|mmproj|gguf|토큰|ms|초 걸/i);
+  });
+});

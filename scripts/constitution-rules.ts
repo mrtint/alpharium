@@ -251,6 +251,82 @@ export function checkSeedFile(fileName: string, contents: string): Violation[] {
   return violations;
 }
 
+/* ─────────────────────── 사진 읽기 검사 (011) ─────────────────────── */
+
+/**
+ * 사진 읽는 자리가 일기에 닿는 것을 잡는다 (011 FR-033, 헌법 원칙 IV).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **왜 이 검사가 필요한가**: 011은 캡션이 일기의 재료가 되게 한다. 그 자리에서
+ * **「캡션이 일기 품질을 올렸는지 재 보자」가 아주 자연스럽게 떠오른다** — 캡션이
+ * 있는 일기와 없는 일기를 견줄 조건이 갖춰진 것처럼 보이기 때문이다.
+ *
+ * **옆 저장소가 이미 쟀고**(2026-08-10: SmolVLM 3.62 대 LFM2.5 3.31), 그 결과를
+ * 이 저장소로 옮기면 측정 장치가 된다. 010의 심는 도구가 같은 이유로 막힌 자리이며,
+ * 같은 방식으로 막는다.
+ *
+ * **사진 읽는 자리는 캡션을 만들고 끝난다.** 일기를 읽는 코드가 있으면 여기서 걸린다.
+ *
+ * **경계는 위 주석들과 같다**: 소스에 어떤 import·호출이 있는지만 본다. 모델을
+ * 부르지 않고, 출력을 만들지 않고, 품질을 재지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const VISION_TOUCHES_DIARY =
+  /\bfrom\s+["'][^"']*diary\/(?:store|pipeline|acceptance|entry)[^"']*["']/;
+
+/** 일기 파일에 직접 닿는 것. import를 우회해도 잡는다 */
+const VISION_TOUCHES_DIARY_FILES = /files\/diary|listDiaries|readDiary|loadDiary|DiaryEntry/;
+
+/**
+ * 캡션 샘플링이 일기 샘플링을 함께 쓰는 것을 잡는다 (011 research §7, 헌법 원칙 I).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **원칙 I이 조용히 깨지는 경로다.**
+ *
+ * `src/inference/sampling.ts`는 「온디바이스와 데스크톱이 동일한 샘플링 파라미터」를
+ * 지키는 자리다(원칙 I). **캡션이 그것을 같이 쓰면**, 캡션을 위해 `temperature`를
+ * 낮추는 순간 **일기 생성의 파라미터가 함께 바뀐다.**
+ *
+ * 게다가 값이 정반대여야 한다 — 일기는 0.8(감상), 캡션은 0.1(관찰). 같은 자리에 둘
+ * 수 없는 값이며, 그래서 캡션 값은 `src/vision/sampling.ts`에 따로 둔다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const VISION_SHARES_SAMPLING = /\bfrom\s+["'][^"']*inference\/sampling["']/;
+
+/**
+ * 소스 파일 하나가 사진 읽는 자리인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`src/vision/`이 대상이다.**
+ */
+export function checkVisionFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/vision/")) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (VISION_TOUCHES_DIARY.test(code) || VISION_TOUCHES_DIARY_FILES.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "사진 읽는 자리가 일기에 닿는다 — 캡션을 만들고 끝나야 한다 (011 FR-033, 원칙 IV)",
+      });
+    }
+    if (VISION_SHARES_SAMPLING.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "캡션이 일기의 샘플링을 함께 쓴다 — 고치면 일기가 함께 바뀐다 (011 research §7, 원칙 I)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";

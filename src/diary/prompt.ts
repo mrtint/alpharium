@@ -31,6 +31,7 @@
  */
 
 import type { DaySignals, SignalValue } from "../signals/types";
+import type { PhotoVision } from "../vision/types";
 import type { Character, DiaryRequest } from "./types";
 
 /* ────────────────────────── 고정 지시문 ────────────────────────── */
@@ -98,6 +99,37 @@ const TRUNCATED_WARNING =
 const PLACES_LIMITATION =
   "이 자리들은 하루의 궤적이 아니라 사진이 찍힌 지점들이다. 사진을 찍지 않은 곳은 여기 없다.";
 
+/* ──────────────────── 사진의 내용 (011) ──────────────────── */
+
+/**
+ * 캡션 묶음에 붙는 한계 (011 FR-012, contracts/prompt.md P3).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **범위에 대한 것이지 정확도가 아니다.**
+ *
+ * 「다섯 장만 보았다」는 **관측된 사실**이고, 「그 다섯 장을 잘못 읽었을 수 있다」는
+ * 여기 오지 않는다(FR-011). 둘을 섞으면 모델이 전부를 얼버무리게 되고, 005가 관측한
+ * 것은 **압력이 지어내기를 낳는다**는 것이었다 — 방어를 더하는 것이 오히려 위반을 부른다.
+ *
+ * **휴대폰은 그 사진을 실제로 보았다.** 캡션은 004의 장수·좌표와 **같은 자격의 관측**이며,
+ * 그래서 같은 말투로 적힌다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const VISION_PARTIAL =
+  "사진이 더 있었으나 그중 몇 장만 보았다. 위에 적힌 것이 그날의 전부가 아니다.";
+
+/** 고른 것 중 일부를 읽지 못했다 (FR-006) */
+const VISION_UNREAD = "보려 한 사진 중 일부는 내용을 보지 못했다.";
+
+/**
+ * 사진은 있는데 하나도 읽지 못했다 (FR-005, SC-006).
+ *
+ * **「사진이 없었다」와 다르다.** 004가 값에서 지킨 `none`/`unknown` 구분이 한 겹
+ * 위에서 반복되는 자리이며, 뭉개면 010이 실기기에서 확인한 「없었다 / 모른다」의 성취가
+ * 무너진다.
+ */
+const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못했다.";
+
 /**
  * 되뱉기 판정이 비교할 지시문 줄 (FR-016b-1, contracts/prompt.md P7).
  *
@@ -123,7 +155,7 @@ const PLACES_LIMITATION =
  * 담지 않으므로(오탐이 나지 않으므로) 계약의 의도는 그대로다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export function instructionLines(request: DiaryRequest): string[] {
+export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
   const lines = [...SPEAKER_RULES];
 
   if (request.signals.photos.kind === "known" && !request.signals.photos.value.complete) {
@@ -133,7 +165,65 @@ export function instructionLines(request: DiaryRequest): string[] {
     lines.push(PLACES_LIMITATION);
   }
 
+  // 011 — **한계 줄만 넣고 캡션 본문은 넣지 않는다**(contracts/prompt.md P5).
+  //
+  // ⚠️ **캡션을 넣으면 성공한 일기가 거부된다.** 005가 이미 「신호가 들어간 줄은 넣지
+  // 않는다」고 적어 두었고, **캡션은 신호 그 자체다** — 「창가에 놓인 커피잔」이 일기에
+  // 나오는 것은 **정확히 우리가 원하는 것**이며, 그것을 되뱉기로 판정하면 재료를 쓴
+  // 일기가 통째로 버려진다.
+  if (vision !== undefined) lines.push(...visionLimitLines(vision));
+
   return lines;
+}
+
+/**
+ * 사진을 읽은 결과에 붙는 한계 줄 (FR-012, contracts/prompt.md P3).
+ *
+ * **범위에 대한 것만이다** — 「몇 장을 보았는가」이지 「잘 읽었는가」가 아니다(FR-011).
+ *
+ * **`instructionLines()`와 `buildPrompt()`가 같은 함수에서 가져간다.** 각자 문자열을
+ * 들고 있으면 한쪽만 고쳐지고, 그 순간 판정이 조용히 무력해진다 — 005가
+ * `SPEAKER_RULES`를 한 자리에 둔 것과 같은 판단이다.
+ */
+function visionLimitLines(vision: PhotoVision): string[] {
+  const lines: string[] = [];
+
+  // 있는 것 중 일부만 보았다 (SC-007).
+  if (vision.available > vision.considered) lines.push(VISION_PARTIAL);
+
+  if (vision.captions.length === 0) {
+    // ★ 사진은 있는데 하나도 못 읽었다 — **「사진이 없었다」가 아니다**(SC-006).
+    if (vision.considered > 0) lines.push(VISION_NONE_READ);
+  } else if (vision.captions.length < vision.considered) {
+    lines.push(VISION_UNREAD);
+  }
+
+  return lines;
+}
+
+/**
+ * 캡션을 프롬프트 줄로 옮긴다 (FR-011, contracts/prompt.md P2).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **있는 그대로 적는다.** 짐작 표시·한계 문구·확신도를 붙이지 않는다.
+ *
+ * **휴대폰은 그 사진을 실제로 보았다.** 날씨나 커피잔처럼 관측한 적 없는 것과 달리
+ * 사진은 진짜 입력이며, 요약은 004의 장수·좌표와 같은 자격의 관측이다. 「틀릴 수 있다」를
+ * 덧붙이면 모델이 전부를 얼버무리게 되고, 005의 실측이 가르친 것은 **압력이 지어내기를
+ * 낳는다**는 것이었다.
+ *
+ * **시각을 함께 적는 것이 FR-007b다.** 별도 문장을 더하지 않고 **줄 자체가 그것을
+ * 보인다** — 저녁에만 찍은 하루는 `19시·20시·21시`가 나열되어 모델이 스스로
+ * 「저녁의 기록만 있다」를 읽을 수 있다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function visionLines(vision: PhotoVision): string[] {
+  if (vision.captions.length === 0) return [];
+
+  return [
+    "사진에 담긴 것:",
+    ...vision.captions.map((c) => `- ${c.takenAt.getHours()}시: ${c.text}`),
+  ];
 }
 
 /* ────────────────────────── 신호 → 문장 ────────────────────────── */
@@ -233,8 +323,15 @@ function signalLines(signals: DaySignals): string[] {
  * **모델 정보를 담지 않는다**(FR-015). 캐릭터 식별자조차 넣지 않는다 — 새면 그것으로
  * 모델을 역추적할 수 있다.
  */
-export function buildPrompt(request: DiaryRequest): string {
+export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string {
   const language = LANGUAGE[request.character];
+
+  // 011 — 사진을 읽었으면 그 내용과 한계가 신호 뒤에 붙는다.
+  //
+  // **`vision`이 없으면 005와 바이트 단위로 같은 문자열이 나온다**(P-1, SC-002) —
+  // 「보지 않음」인 하루가 이 기능 이전과 똑같이 동작한다는 것의 구현이다.
+  const visionPart =
+    vision === undefined ? [] : [...visionLines(vision), ...visionLimitLines(vision)];
 
   return [
     ...SPEAKER_RULES,
@@ -243,6 +340,7 @@ export function buildPrompt(request: DiaryRequest): string {
     "",
     `${request.signals.date}에 네가 본 것:`,
     ...signalLines(request.signals),
+    ...visionPart,
     "",
     "이 기록으로 그 하루의 일기를 써라.",
   ].join("\n");

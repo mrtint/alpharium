@@ -149,5 +149,30 @@ export function expoPhotoPort(): PhotoPort {
         return { kind: "failed", reason: messageOf(error) };
       }
     },
+
+    /**
+     * 사진 파일의 실제 경로 (011).
+     *
+     * **`getUri()`를 쓴다.** 설치본 타입이 안드로이드 예시를 직접 적는다:
+     * `file:///storage/emulated/0/DCIM/Camera/IMG_20230915_123456.jpg`.
+     *
+     * **`file://`를 떼어 낸다** — 네이티브(`llama.rn`)가 받는 것은 파일 경로이지 URI가
+     * 아니다. 붙은 채로 넘기면 **열지 못하고 빈 캡션이 되며 오류는 나지 않는다.**
+     *
+     * **반드시 감싼다** — `locationOf()`와 같은 이유다. 사진이 지워졌거나 권한이 없으면
+     * 던지며, 그것이 하루 전체를 무너뜨리면 안 된다(FR-005a).
+     */
+    async filePathOf(photoId: string): Promise<string | null> {
+      try {
+        const lib = await import("expo-media-library");
+        const uri = await new lib.Asset(photoId).getUri();
+
+        if (typeof uri !== "string" || uri === "") return null;
+        return uri.startsWith("file://") ? uri.slice("file://".length) : uri;
+      } catch {
+        // 못 읽은 것이다. 그 장은 읽히지 않고 나머지는 계속 읽는다.
+        return null;
+      }
+    },
   };
 }

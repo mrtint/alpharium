@@ -24,6 +24,10 @@
 import { judge } from "../diary/acceptance";
 import { buildPrompt, instructionLines } from "../diary/prompt";
 import type { DiaryRequest } from "../diary/types";
+import { captionAll, type PhotoPathResolver } from "../vision/caption";
+import { selectForVision } from "../vision/select";
+import type { PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
+import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
@@ -93,6 +97,77 @@ async function runWithTimeout(
 }
 
 /**
+ * 사진을 읽는 데 필요한 것 (011).
+ *
+ * **`InferenceBackend`를 넓히지 않는다** — 007이 `StoppableBackend`를 따로 둔 것과 같은
+ * 방식이며, 데스크톱 경로에는 이것이 없다.
+ *
+ * `resolvePath`가 밖에서 오는 까닭: 004의 `Photo.id`는 미디어 라이브러리 id일 수도
+ * 파일 경로일 수도 있고, 네이티브가 읽으려면 실제 경로가 필요하다.
+ */
+export type VisionSupport = {
+  engine: VisionEngine;
+  resolvePath: PhotoPathResolver;
+};
+
+/**
+ * 사진을 읽는다. **연 것을 반드시 닫는다**(E2).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **`finally`가 이 함수의 핵심이다.**
+ *
+ * 005의 E2보다 결과가 나쁘다: 그때는 **다음 요청**이 메모리 부족으로 죽었고, 여기서는
+ * **같은 요청 안에서** 캐릭터 모델을 열다 죽는다. 정리를 잊으면 사진을 본 일기가 한
+ * 번도 나오지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+async function readPhotos(
+  vision: VisionSupport,
+  request: DiaryRequest,
+  cancel: { cancelled: boolean },
+): Promise<VisionOutcome> {
+  // 004가 사진을 못 봤으면(`none`·`unknown`) 읽을 것이 없다.
+  //
+  // **004의 두 갈래를 뭉개지 않는다** — 프롬프트는 `photos` 신호를 여전히 그대로 적으며
+  // (「없었다」 / 「모른다」), 이 값은 「그래서 캡션 단계를 돌지 않았다」는 뜻일 뿐이다.
+  const photos = request.signals.photos;
+  if (photos.kind !== "known" || photos.value.photos.length === 0) {
+    return { kind: "no-photos" };
+  }
+
+  // 깊이는 설정에서 온다. `none`은 위에서 걸러졌다.
+  const depth: VisionDepth = request.vision === "detailed" ? "detailed" : "quick";
+
+  const loaded = await vision.engine.load(depth);
+  if (!loaded.ok) {
+    // **없는 것을 없다고 말한다**(원칙 I). 대신 쓸 모델을 찾지 않는다.
+    return loaded.reason === "not-found"
+      ? { kind: "not-ready", reason: "사진을 보는 데 필요한 것이 아직 준비되지 않았다" }
+      : { kind: "failed", reason: "사진을 보는 것을 시작하지 못했다" };
+  }
+
+  try {
+    const selected = selectForVision(photos.value.photos);
+    const result = await captionAll(
+      vision.engine,
+      selected,
+      photos.value.photos.length,
+      vision.resolvePath,
+      cancel,
+    );
+
+    // `null`은 그만둔 것이다 — 거기까지 읽은 것을 버린다(FR-009).
+    return result === null ? { kind: "cancelled" } : { kind: "seen", vision: result };
+  } catch (error) {
+    return { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
+  } finally {
+    // ★ **성공·실패·예외 어느 경로로도 닫는다.** 닫지 않으면 바로 아래에서 캐릭터
+    // 모델을 열 때 메모리가 모자라 죽는다.
+    await vision.engine.unload().catch(() => {});
+  }
+}
+
+/**
  * 온디바이스 어댑터를 만든다.
  *
  * `probe`와 `engine`을 주입받아 테스트에서 기기 없이 검증할 수 있게 한다 — 001이
@@ -106,7 +181,16 @@ export function createOnDeviceBackend(
   probe: BackendProbe,
   engine?: GenerationEngine,
   timeoutMs: number = GENERATION_TIMEOUT_MS,
+  vision?: VisionSupport,
 ): StoppableBackend {
+  /**
+   * 그만두라는 신호. **캡션 단계와 생성 단계가 함께 본다.**
+   *
+   * 007이 생성에 만든 「그만두기」가 사진을 읽는 동안에도 들어야 한다 — 캡션이 약 10초
+   * 걸리므로(research §6) **사용자가 기다리는 시간의 대부분이 이 단계다.**
+   */
+  let cancel = { cancelled: false };
+
   return {
     location: "on-device",
 
@@ -120,6 +204,10 @@ export function createOnDeviceBackend(
      * `unfinished`로 거부한다. 그래서 여기서는 신호만 보내면 된다.
      */
     async stop(): Promise<void> {
+      // 011 — **캡션 단계도 끊는다.** 사용자가 기다리는 시간의 대부분이 그 단계이고,
+      // 여기서 신호를 세우지 않으면 「그만두기」를 눌러도 사진 다섯 장을 다 읽는다.
+      cancel.cancelled = true;
+      await vision?.engine.stop().catch(() => {});
       await engine?.stop().catch(() => {});
     },
 
@@ -148,9 +236,15 @@ export function createOnDeviceBackend(
       //
       // **`none`으로 조용히 낮추지 않는다.** 낮추는 한 줄이 들어가면 다음 기능까지 남아
       // 「본다고 했는데 안 보는」 버그가 된다(001 FR-009c·003 FR-008a와 같은 판단).
-      if (request.vision !== "none") {
+      //
+      // **011이 이 자리를 채웠다.** 사진 읽기를 붙일 수단이 없으면 여전히 거부한다 —
+      // 시뮬레이터·웹에서 네이티브가 없는 경우이며, 그때는 못 한다고 말하는 것이 정직하다.
+      if (request.vision !== "none" && vision === undefined) {
         return { kind: "not-implemented" };
       }
+
+      // 새 요청이 시작되므로 지난 요청의 그만두기 신호를 물려받지 않는다.
+      cancel = { cancelled: false };
 
       if (engine === undefined) {
         return {
@@ -159,8 +253,34 @@ export function createOnDeviceBackend(
         };
       }
 
+      // ─────────────────────────────────────────────────────────────────────
+      // 0b. 사진을 읽는다 (011).
+      //
+      // **★ E1 — 캐릭터 모델을 열기 전에 끝내고 완전히 닫는다.**
+      //
+      // `engine-port.ts`의 E1이 「한 번에 하나만 열린다」를 요구한다. 두 엔진이 서로를
+      // 모르므로 **호출자인 이 자리가 순서를 지킨다** — 여기서 어기면 GB 단위 모델 둘이
+      // 동시에 열려 **기기가 죽는다.**
+      //
+      // **캐릭터 모델을 여는 것보다 먼저인 까닭**은 위 순서 그 자체이고, **모델 준비
+      // 검사(파이프라인 4b)보다 나중인 까닭**은 캐릭터가 없는데 10초를 쓰지 않기
+      // 위해서다.
+      // ─────────────────────────────────────────────────────────────────────
+      let seen: PhotoVision | undefined;
+      if (request.vision !== "none" && vision !== undefined) {
+        const outcome = await readPhotos(vision, request, cancel);
+
+        // **「보지 않음」으로 낮추지 않는다**(FR-021). 실패는 실패로 돌려준다.
+        if (outcome.kind === "not-ready") return { kind: "vision-failed", reason: "not-ready" };
+        if (outcome.kind === "failed") return { kind: "vision-failed", reason: "failed" };
+        if (outcome.kind === "cancelled") return { kind: "vision-failed", reason: "cancelled" };
+
+        // `skipped`·`no-photos`는 실패가 아니다 — 볼 것이 없었을 뿐이며 일기는 나온다.
+        if (outcome.kind === "seen") seen = outcome.vision;
+      }
+
       // 1. 프롬프트를 만든다. 순수 함수이며 기기를 모른다.
-      const prompt = buildPrompt(request);
+      const prompt = buildPrompt(request, seen);
 
       // 2. 모델을 연다. 실패하면 **다른 캐릭터로 대신하지 않는다**(FR-010).
       const loaded = await engine.load(request.character);
@@ -180,7 +300,9 @@ export function createOnDeviceBackend(
           run.run.text,
           run.run.ending,
           request.character,
-          instructionLines(request),
+          // **`buildPrompt`에 넘긴 것과 같은 `seen`을 넘긴다**(005 P-7의 성질).
+          // 어긋나면 프롬프트에 든 한계 줄이 판정에서 빠져 되뱉기를 놓친다.
+          instructionLines(request, seen),
         );
 
         if (!verdict.ok) {
@@ -219,5 +341,51 @@ export function onDeviceBackend(): StoppableBackend {
     // 005가 더한 것. `llamaEngine()` 자체는 지연 import를 안에서 하므로 여기서
     // 만들어도 시뮬레이터에서 모듈 해석이 터지지 않는다.
     llamaEngine(),
+    GENERATION_TIMEOUT_MS,
+    // ★ 011 — 사진을 읽는 수단. **이것을 넘기지 않으면 `quick`/`detailed`가 영영
+    // `not-implemented`로 거부된다** — 006의 `GenerationProbe`, 007의 끊긴 `stop`
+    // 배선과 같은 종류의 조용한 실패가 나는 자리다.
+    visionSupport(),
   );
 }
+
+/**
+ * 실제 사진 읽기 수단 (011).
+ *
+ * `llamaEngine()`과 같은 방식으로 지연 import 한다 — 시뮬레이터·웹에서 네이티브 모듈
+ * 해석이 터지지 않게 하기 위해서다.
+ */
+function visionSupport(): VisionSupport {
+  return {
+    engine: createVisionEngine(async (path: string) => {
+      const llama = await import("llama.rn");
+      return (await llama.initLlama({
+        model: path,
+        n_ctx: VISION_CONTEXT_SIZE,
+        n_gpu_layers: 0,
+      })) as never;
+    }),
+    /**
+     * ★ **사진 id를 실제 파일 경로로 바꾼다** (2026-08-22 실기기에서 고쳤다).
+     *
+     * 처음에는 `photo.id`를 그대로 넘기며 「기기에서 확인하며 정한다」고 적었다.
+     * **그 확인이 quickstart D2였고, 틀렸다** — 안드로이드에서 id는
+     * `content://media/external/images/media/…` 꼴이라 네이티브가 파일로 열지 못한다.
+     *
+     * **조용히 실패했다**: 오류도 크래시도 없이 다섯 장이 92밀리초에 「처리」되고
+     * 일기는 멀쩡히 나왔다. 로그의 `has_media=0`을 봐야 드러났다.
+     */
+    resolvePath: async (photo) => {
+      const { expoPhotoPort } = await import("../signals/expo-port");
+      return expoPhotoPort().filePathOf(photo.id);
+    },
+  };
+}
+
+/**
+ * 사진을 읽을 때 여는 컨텍스트 크기.
+ *
+ * **일기 생성의 `n_ctx`(2048)와 별개다** — 캡션은 짧은 문장 하나이고 사진 토큰이 함께
+ * 들어가므로 요구가 다르다. **짐작이며 실측이 아니다**(원칙 V, quickstart D1).
+ */
+const VISION_CONTEXT_SIZE = 4096;

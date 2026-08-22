@@ -34,9 +34,9 @@ describe("모양의 이름이 계약이다 (FR-008)", () => {
    * **이 목록이 바뀌면 에이전트의 호출이 깨진다.** 늘리는 것은 괜찮지만 이름을
    * 바꾸거나 지우는 것은 계약 위반이며, 여기서 걸린다.
    */
-  it("정해 둔 다섯 모양이 있다", () => {
+  it("정해 둔 여섯 모양이 있다", () => {
     expect(shapeNames().sort()).toEqual(
-      ["empty", "one-place", "over-limit", "partial-location", "rich"].sort(),
+      ["empty", "one-place", "over-limit", "partial-location", "rich", "spread-day"].sort(),
     );
   });
 
@@ -166,6 +166,57 @@ describe("over-limit — 상한을 넘는 하루 (US2, SC-005)", () => {
    */
   it("상한(200)을 넘는다", () => {
     expect(photos.length).toBeGreaterThan(200);
+  });
+
+  it("서로 다른 시각을 가진다 — 같은 밀리초로 뭉치지 않는다", () => {
+    expect(new Set(photos.map((p) => p.takenAtMs)).size).toBe(photos.length);
+  });
+});
+
+describe("spread-day — 5장을 넘어 하루에 흩어진 하루 (011 D5, FR-007a)", () => {
+  const photos = shapeNamed("spread-day")!.build(DAY);
+
+  /**
+   * **011의 균일 선택을 실기기에서 보려면 5장을 넘어야 한다.**
+   *
+   * 5장 이하는 `selectForVision()`의 R1이 전부 돌려주므로 **고르는 일 자체가
+   * 일어나지 않는다** — 그러면 「앞에서부터 잘랐는지」를 구분할 수 없다.
+   * 기존 모양 중 가장 큰 `partial-location`이 정확히 5장이라 쓸 수 없고,
+   * `over-limit`(201장)은 010 실측에서 색인이 밀려 실패했다(322초/150장).
+   */
+  it("사진이 12장이다 — 5장 상한을 넘는다", () => {
+    expect(photos).toHaveLength(12);
+  });
+
+  /**
+   * **아침과 저녁이 둘 다 있어야 D5가 성립한다.**
+   *
+   * 앞에서부터 다섯 장을 자르면 아침만 남는다 — 그것이 004의 `slice(0, limit)`이며
+   * 011이 정반대로 가는 이유다. 전부 아침에 몰려 있으면 두 방식이 같은 답을 내어
+   * **검증이 아무것도 가르지 못한다.**
+   */
+  it("하루의 이른 때와 늦은 때에 걸쳐 있다", () => {
+    const { startMs, endMs } = dayBounds(DAY);
+    const span = endMs - startMs;
+    const offsets = photos.map((p) => p.takenAtMs - startMs);
+
+    // 첫 장은 하루의 앞 1/4 안, 마지막 장은 뒤 1/4 안
+    expect(offsets[0]).toBeLessThan(span / 4);
+    expect(offsets[offsets.length - 1]).toBeGreaterThan((span * 3) / 4);
+  });
+
+  /**
+   * **균일 선택이 고를 다섯 장이 시각으로 구분되는지 미리 본다.**
+   *
+   * 계약(selection.md R2)이 n=12, limit=5에서 인덱스 `0,3,6,8,11`을 고른다고
+   * 못 박았다. 그 다섯이 서로 다른 시각이어야 일기에서 「아침 것과 저녁 것이
+   * 둘 다 나왔는가」를 사람이 읽어 가를 수 있다.
+   */
+  it("계약이 고를 다섯 장이 서로 다른 시각이다", () => {
+    const chosen = [0, 3, 6, 8, 11].map((i) => photos[i].takenAtMs);
+
+    expect(new Set(chosen).size).toBe(5);
+    expect([...chosen].sort((a, b) => a - b)).toEqual(chosen);
   });
 
   it("서로 다른 시각을 가진다 — 같은 밀리초로 뭉치지 않는다", () => {

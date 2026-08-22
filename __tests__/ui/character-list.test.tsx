@@ -257,3 +257,136 @@ describe("원칙 III — 모델 정보가 새지 않는다 (FR-004, V14)", () =>
     expect(code).not.toMatch(/from\s+["'].*models\/roster["']/);
   });
 });
+
+/* ═══════════════ 011 — 사진을 보는 데 필요한 것 ═══════════════ */
+
+/**
+ * 계약: specs/011-photo-vision-summary/spec.md FR-026·028·029·031a
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **캐릭터 다섯 아래에 따로 온다 — 캐릭터가 아니기 때문이다**(FR-025).
+ *
+ * 한 번 준비하면 다섯 캐릭터 어느 것으로도 사진을 본다(SC-008). 그래서 캐릭터마다
+ * 이 줄이 생기지 않고, 준비 상태도 캐릭터별 Record에 들어가지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("011 — 사진 보는 모델 줄", () => {
+  const baseProps = () => ({
+    readiness: Object.fromEntries(
+      CHARACTERS.map((c) => [c, { kind: "not-downloaded" } as ModelReadiness]),
+    ) as Record<Character, ModelReadiness>,
+    view: { active: null, notice: null },
+    onPrepare: () => {},
+    onPause: () => {},
+    onRemove: () => {},
+    onDismissNotice: () => {},
+  });
+
+  it("준비 상태를 주지 않으면 줄이 없다 — 003~010이 그대로 통과한다", async () => {
+    await render(<CharacterListScreen {...baseProps()} />);
+    expect(screen.queryByTestId("vision-row")).toBeNull();
+  });
+
+  it("★ 줄이 하나뿐이다 — 캐릭터마다 생기지 않는다 (FR-025, SC-008)", async () => {
+    await render(
+      <CharacterListScreen {...baseProps()} visionReadiness={{ kind: "not-downloaded" }} />,
+    );
+
+    expect(screen.getAllByTestId("vision-row")).toHaveLength(1);
+  });
+
+  it("준비 상태가 보인다 (FR-026)", async () => {
+    await render(<CharacterListScreen {...baseProps()} visionReadiness={{ kind: "ready" }} />);
+
+    expect(screen.getByTestId("vision-row")).toBeTruthy();
+    expect(screen.getByText("사진을 보는 데 필요한 것")).toBeTruthy();
+  });
+
+  it("★ 파일이 둘이라는 것이 드러나지 않는다 (FR-026, 원칙 III)", async () => {
+    const { toJSON } = await render(
+      <CharacterListScreen
+        {...baseProps()}
+        visionBytes={482_034_272}
+        visionReadiness={{ kind: "partial", reason: "다 준비되지 않았다", resumable: true }}
+      />,
+    );
+
+    const rendered = JSON.stringify(toJSON());
+    expect(rendered).not.toMatch(/mmproj|projector|본체|파일 2|두 파일/);
+  });
+
+  // ★ FR-031a — 헌법이 「시각 인코더를 고르게 하지 않는다」로 못 박은 자리.
+  it("★ 모델 이름·파일명이 없다 (FR-031a, SC-004)", async () => {
+    const { toJSON } = await render(
+      <CharacterListScreen {...baseProps()} visionReadiness={{ kind: "not-downloaded" }} />,
+    );
+
+    expect(JSON.stringify(toJSON())).not.toMatch(/LFM|SmolVLM|gguf|450M|Liquid/i);
+  });
+
+  it("준비되지 않았으면 준비 버튼이다", async () => {
+    const pressed: string[] = [];
+    await render(
+      <CharacterListScreen
+        {...baseProps()}
+        onPrepareVision={() => pressed.push("prepare")}
+        visionReadiness={{ kind: "not-downloaded" }}
+      />,
+    );
+
+    await userEvent.press(screen.getByTestId("action-vision"));
+    expect(pressed).toEqual(["prepare"]);
+  });
+
+  it("준비됐으면 지우기 버튼이다 (FR-028)", async () => {
+    const pressed: string[] = [];
+    await render(
+      <CharacterListScreen
+        {...baseProps()}
+        onRemoveVision={() => pressed.push("remove")}
+        visionReadiness={{ kind: "ready" }}
+      />,
+    );
+
+    await userEvent.press(screen.getByTestId("action-vision"));
+    expect(pressed).toEqual(["remove"]);
+  });
+
+  it("받는 중이면 진행률이 보인다", async () => {
+    await render(
+      <CharacterListScreen
+        {...baseProps()}
+        visionProgress={0.42}
+        visionReadiness={{ kind: "not-downloaded" }}
+      />,
+    );
+
+    expect(screen.getByText(/42/)).toBeTruthy();
+  });
+
+  it("저장 공간이 하나의 수로 보인다 (FR-029)", async () => {
+    await render(
+      <CharacterListScreen
+        {...baseProps()}
+        visionBytes={482_034_272}
+        visionReadiness={{ kind: "ready" }}
+      />,
+    );
+
+    // 파일별로 쪼개지 않는다 — 크기 표시가 하나뿐이다.
+    expect(screen.getAllByText(/MB|GB/).length).toBe(1);
+  });
+
+  // 원칙 IV — 시간·속도가 어디에도 없다.
+  it("시간·속도가 없다 (원칙 IV)", async () => {
+    const { toJSON } = await render(
+      <CharacterListScreen
+        {...baseProps()}
+        visionProgress={0.42}
+        visionReadiness={{ kind: "not-downloaded" }}
+      />,
+    );
+
+    expect(JSON.stringify(toJSON())).not.toMatch(/초 남|\/s|elapsed|남은 시간/);
+  });
+});

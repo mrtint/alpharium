@@ -103,6 +103,36 @@ const SHAPES: DayShape[] = [
       NEAR_A.map((location, i) => ({ takenAtMs: hoursIntoDay(day, 5 + i * 3), location })),
   },
   {
+    name: "spread-day",
+    description: "사진 12장, 이른 때부터 늦은 때까지 흩어짐 — 다섯 장을 고르는 하루",
+    /**
+     * **011의 균일 선택(FR-007a)을 실기기에서 보려고 만든 모양이다.**
+     *
+     * 011은 5장을 넘는 하루에서만 실제로 「고른다」 — 5장 이하는 전부 읽으므로
+     * **앞에서부터 잘랐는지 균일하게 골랐는지 구분되지 않는다.** 기존 모양 중
+     * 가장 큰 `partial-location`이 정확히 5장이라 쓸 수 없고, `over-limit`(201장)은
+     * 010 실측에서 색인이 밀려 실패했다(322초에 150장만 색인).
+     *
+     * **하루의 이른 때부터 늦은 때까지 벌린다.** 전부 아침에 몰리면 앞에서 자른
+     * 결과와 균일하게 고른 결과가 같아져 검증이 아무것도 가르지 못한다.
+     *
+     * **좌표를 자리별로 나눠 둔다** — 이른 때는 A 근처, 늦은 때는 B다. 그래야
+     * 일기에 나온 장면이 하루의 어느 때 것인지 사람이 견줄 실마리가 하나 더 생긴다.
+     */
+    build: (day) => {
+      const count = 12;
+      // 하루 24시간 중 1시간대부터 약 1.9시간 간격 — 마지막이 하루 끝에 닿지 않게 둔다
+      const firstHour = 1;
+      const stepHours = 1.9;
+
+      return Array.from({ length: count }, (_, i) => ({
+        takenAtMs: hoursIntoDay(day, firstHour + i * stepHours),
+        // 앞 절반은 A 근처, 뒤 절반은 B — 시각과 자리가 함께 움직인다
+        location: i < count / 2 ? NEAR_A[i % NEAR_A.length] : PLACE_B,
+      }));
+    },
+  },
+  {
     name: "over-limit",
     description: "사진 201장 — 상한에 걸려 잘리는 하루",
     /**

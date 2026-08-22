@@ -630,3 +630,95 @@ describe("005 — 하루에 일기는 하나다 (FR-020a, SC-004c)", () => {
     expect((await store.load(DAY))?.text).toBe("생성 2회차");
   });
 });
+
+/* ═══════════════ 011 — vision 단계 (FR-021) ═══════════════ */
+
+/**
+ * 계약: specs/011-photo-vision-summary/data-model.md 「파이프라인 단계가 하나 는다」
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **`generation`과 따로 두는 까닭**: 사용자가 할 일이 다르다.
+ *
+ * - `vision` 실패 → 「사진 보는 것을 준비하거나 설정을 바꿔라」
+ * - `generation` 실패 → 「캐릭터를 준비하거나 다시 시도하라」
+ *
+ * 003이 `model-not-ready`를 따로 둔 것과 같은 판단이며, 뭉개면 002 FR-019(어느
+ * 단계에서 멈췄는지 말한다)가 무의미해진다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("011 — vision 단계", () => {
+  const failingVision: InferenceBackend = {
+    location: "on-device",
+    async isAvailable() {
+      return { kind: "loaded" };
+    },
+    async generate() {
+      return { kind: "vision-failed", reason: "not-ready" };
+    },
+  };
+
+  it("★ 사진을 못 보면 vision 단계에서 멈춘다 — generation이 아니다", async () => {
+    const { pipeline } = makePipeline({ backend: failingVision });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.stage).toBe("vision");
+      expect(result.reason).toContain("vision-failed");
+    }
+  });
+
+  it("사진을 못 보면 저장하지 않는다 — 가짜 일기가 남지 않는다 (FR-021)", async () => {
+    const { pipeline, store } = makePipeline({ backend: failingVision });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    expect(await store.listDays()).toEqual([]);
+  });
+
+  it("실패에 글이 없다 (002 FR-016)", async () => {
+    const { pipeline } = makePipeline({ backend: failingVision });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.entry).toBeUndefined();
+  });
+
+  it("다른 생성 실패는 여전히 generation이다 — 뭉개지지 않는다", async () => {
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        return { kind: "generation-failed", reason: "무너졌다" };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("generation");
+  });
+
+  it("까닭이 세 갈래로 구분되어 전달된다 (FR-022)", async () => {
+    for (const reason of ["not-ready", "failed", "cancelled"] as const) {
+      const backend: InferenceBackend = {
+        location: "on-device",
+        async isAvailable() {
+          return { kind: "loaded" };
+        },
+        async generate() {
+          return { kind: "vision-failed", reason };
+        },
+      };
+
+      const { pipeline } = makePipeline({ backend });
+      const result = await pipeline.run(inputFor());
+
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.reason).toContain(reason);
+    }
+  });
+});

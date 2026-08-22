@@ -61,6 +61,9 @@ function fakePort(overrides: PortOverrides = {}): { port: PhotoPort; counters: C
     locationOf:
       overrides.locationOf ??
       (async (id) => overrides.locations?.[id] ?? { kind: "absent" as const }),
+    // 011이 넓힌 계약. **004의 신호 수집은 이것을 부르지 않는다** — 부르면 사진을
+    // 세기만 하는 경로가 파일 경로를 들고 다니게 된다.
+    filePathOf: async () => null,
   };
 
   return { port, counters };

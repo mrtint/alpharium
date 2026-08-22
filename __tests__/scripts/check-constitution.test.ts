@@ -1,10 +1,11 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
   checkEnvFile,
   checkSeedFile,
   checkSourceFile,
+  checkVisionFile,
   formatViolations,
 } from "../../scripts/constitution-rules";
 
@@ -328,5 +329,77 @@ describe("심는 도구가 일기에 닿는 것을 잡는다 (010 FR-022, 원칙
     ].join("\n");
 
     expect(checkSeedFile("scripts/seed-day.mts", normal)).toEqual([]);
+  });
+});
+
+/* ─────────────────────── 사진 읽기 검사 (011) ─────────────────────── */
+
+/**
+ * 011 FR-033·research §7. 010의 심는 도구 검사와 같은 자리다.
+ *
+ * **캡션이 일기의 재료가 되는 자리에서 「품질을 재 보자」가 자연스럽게 떠오른다.**
+ * 옆 저장소가 이미 쟀고(2026-08-10), 그 측정을 이 저장소로 옮기면 측정 장치가 된다.
+ */
+describe("checkVisionFile", () => {
+  it("src/vision/ 밖은 보지 않는다", () => {
+    const line = 'import { listDiaries } from "../diary/store";';
+    expect(checkVisionFile("src/diary/store.ts", line)).toEqual([]);
+    expect(checkVisionFile("src/ui/DiaryHomeScreen.tsx", line)).toEqual([]);
+  });
+
+  it.each([
+    ['import { saveDiary } from "../diary/store";', "일기 저장소를 import"],
+    ['import { createPipeline } from "../diary/pipeline";', "파이프라인을 import"],
+    ['import { judge } from "../diary/acceptance";', "판정을 import"],
+    ['const path = "files/diary/2026-08-20.json";', "일기 파일 경로"],
+    ["const all = await listDiaries(port);", "일기 목록 조회"],
+    ["function compare(entry: DiaryEntry) {", "일기 타입에 닿음"],
+  ])("%s — %s (원칙 IV)", (line) => {
+    const violations = checkVisionFile("src/vision/caption.ts", line);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 IV");
+  });
+
+  // research §7 — 원칙 I이 조용히 깨지는 경로다.
+  it("캡션이 일기의 샘플링을 함께 쓰면 위반 (원칙 I)", () => {
+    const violations = checkVisionFile(
+      "src/vision/vision-port.ts",
+      'import { SAMPLING } from "../inference/sampling";',
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 I");
+    expect(violations[0].rule).toContain("일기가 함께 바뀐다");
+  });
+
+  /** 008의 교훈 — 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다. */
+  it.each([
+    "// 이 파일은 files/diary에 닿지 않는다",
+    " * `DiaryEntry`를 import 하지 않는다 — 원칙 IV",
+    "  // inference/sampling을 재사용하지 않는다",
+  ])("주석은 위반이 아니다: %s", (line) => {
+    expect(checkVisionFile("src/vision/types.ts", line)).toEqual([]);
+  });
+
+  it("사진 읽는 자리가 쓰는 정상적인 것은 잡지 않는다", () => {
+    const normal = [
+      'import type { Photo } from "../signals/types";',
+      'import { CAPTION_SAMPLING } from "./sampling";',
+      'import type { VisionDepth } from "./types";',
+      "const selected = selectForVision(photos);",
+    ].join("\n");
+
+    expect(checkVisionFile("src/vision/caption.ts", normal)).toEqual([]);
+  });
+
+  it("실제 src/vision/ 파일이 규칙을 지킨다", () => {
+    const dir = join(__dirname, "../../src/vision");
+    const files = readdirSync(dir);
+    const violations = files
+      .filter((f) => /\.tsx?$/.test(f))
+      .flatMap((f) => checkVisionFile(`src/vision/${f}`, readFileSync(join(dir, f), "utf8")));
+
+    expect(violations).toEqual([]);
   });
 });

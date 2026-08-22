@@ -18,6 +18,7 @@ import {
   checkEnvFile,
   checkSeedFile,
   checkSourceFile,
+  checkVisionFile,
   formatViolations,
   type Violation,
 } from "./constitution-rules.ts";
@@ -50,7 +51,10 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
     if (entry.isDirectory()) {
       violations.push(...checkSourceFiles(root, child));
     } else if (/\.tsx?$/.test(entry.name)) {
-      violations.push(...checkSourceFile(child, readFileSync(join(root, child), "utf8")));
+      const contents = readFileSync(join(root, child), "utf8");
+      violations.push(...checkSourceFile(child, contents));
+      // 011 — 사진 읽는 자리. 어느 파일이 대상인지는 checkVisionFile이 경로로 정한다.
+      violations.push(...checkVisionFile(child, contents));
     }
   }
 

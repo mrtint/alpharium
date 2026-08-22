@@ -21,10 +21,11 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { SelectionState } from "../app/selection";
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../app/state";
-import type { Character } from "../diary/types";
+import type { Character, VisionSetting } from "../diary/types";
 import type { DayDate } from "../config/day-boundary";
 import { CharacterPicker } from "./CharacterPicker";
 import { DayPicker } from "./DayPicker";
+import { VisionPicker } from "./VisionPicker";
 
 export type DiaryListScreenProps = {
   items: DiaryListItem[];
@@ -52,6 +53,15 @@ export type DiaryListScreenProps = {
    * 그것을 파이프라인에 넘기는 것도 밖이다(계약 §3 금지).
    */
   onSelectDay?: (day: DayDate) => void;
+  /**
+   * 사진 설정을 고른다 (011 FR-015).
+   *
+   * **옵셔널이다** — 006~010의 기존 테스트가 그대로 통과해야 한다. 003의
+   * `isModelReady?`, 009의 `onSelectDay?`와 같은 방식이며 계약을 넓히는 것이다.
+   */
+  onSelectVision?: (vision: VisionSetting) => void;
+  /** 지금 고른 사진 설정. **고른 적이 없으면 「보지 않음」이다**(FR-018) */
+  vision?: VisionSetting;
 };
 
 /**
@@ -80,6 +90,8 @@ export function DiaryListScreen({
   characters,
   onSelectCharacter,
   onSelectDay,
+  onSelectVision,
+  vision = "none",
 }: DiaryListScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -157,6 +169,16 @@ export function DiaryListScreen({
             revertedFrom={write.revertedFrom}
             selected={write.day}
           />
+        )}
+
+        {/*
+          **사진을 어떻게 볼지 고르는 자리**(011 FR-015). 「언제를 쓸까」 아래에 온다 —
+          셋 다 「누르면 무슨 일이 일어나는가」에 답하므로 한자리에 모인다.
+
+          **헌법이 「캐릭터가 아니라 설정」이라고 못 박았으므로** 캐릭터 자리와 따로 있다.
+        */}
+        {onSelectVision !== undefined && (
+          <VisionPicker onSelect={onSelectVision} selected={vision} />
         )}
 
         {/* **오늘이 아니라 고른 하루다**(009 FR-008, 006 FR-030) */}

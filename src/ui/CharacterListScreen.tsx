@@ -49,6 +49,25 @@ export type CharacterListProps = {
   onRemove: (character: Character) => void;
   /** 거부 안내를 닫는다 (008 FR-005) */
   onDismissNotice: () => void;
+
+  /* ───────────── 011 — 사진을 보는 데 필요한 것 ───────────── */
+
+  /**
+   * 사진 보는 모델의 준비 상태 (FR-026).
+   *
+   * **옵셔널이다** — 003~010의 기존 테스트가 그대로 통과해야 한다. 003의
+   * `isModelReady?`, 009의 `onSelectDay?`와 같은 방식이며 계약을 넓히는 것이다.
+   *
+   * **캐릭터가 아니므로 `readiness`와 따로 온다.** 같은 Record에 넣으면 그것이 곧
+   * 「캐릭터가 사진을 본다」는 잘못된 모양이다(FR-025).
+   */
+  visionReadiness?: ModelReadiness;
+  /** 받는 중이면 0~1, 모르면 null. 없으면 받는 중이 아니다 */
+  visionProgress?: number | null;
+  onPrepareVision?: () => void;
+  onRemoveVision?: () => void;
+  /** 사진 보는 모델이 차지하는 자리. **두 파일을 합친 하나의 수다**(FR-029) */
+  visionBytes?: number;
 };
 
 /**
@@ -138,6 +157,7 @@ function DownloadNotice({
 
 export function CharacterListScreen(props: CharacterListProps) {
   const { readiness, view, usage, onPrepare, onPause, onRemove, onDismissNotice } = props;
+  const { visionReadiness, visionProgress, onPrepareVision, onRemoveVision, visionBytes } = props;
 
   return (
     <View style={styles.container}>
@@ -211,6 +231,42 @@ export function CharacterListScreen(props: CharacterListProps) {
           </View>
         );
       })}
+
+      {/*
+        **사진을 보는 데 필요한 것**(011 FR-026·031a).
+
+        캐릭터 다섯 아래에 따로 온다 — **캐릭터가 아니기 때문이다**(FR-025). 한 번
+        준비하면 다섯 캐릭터 어느 것으로도 사진을 본다(SC-008).
+
+        **모델 이름·파일명·크기가 없다**(FR-031a) — 「사진을 보는 데 필요한 것」으로만
+        보이며, 파일이 둘이라는 것도 드러나지 않는다(FR-026).
+      */}
+      {visionReadiness !== undefined && (
+        <View testID="vision-row" style={styles.row}>
+          <View style={styles.info}>
+            <Text style={styles.name}>사진을 보는 데 필요한 것</Text>
+            <Text style={styles.status}>
+              {visionProgress !== undefined && visionProgress !== null
+                ? progressText(visionProgress)
+                : statusText(visionReadiness)}
+            </Text>
+            {visionBytes !== undefined && visionBytes > 0 && (
+              <Text style={styles.usage}>{formatBytes(visionBytes)}</Text>
+            )}
+          </View>
+
+          <TouchableOpacity
+            accessibilityRole="button"
+            testID="action-vision"
+            onPress={() =>
+              visionReadiness.kind === "ready" ? onRemoveVision?.() : onPrepareVision?.()
+            }
+            style={styles.button}
+          >
+            <Text>{actionLabel(visionReadiness)}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 }

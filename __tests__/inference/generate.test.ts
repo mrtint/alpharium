@@ -250,3 +250,265 @@ describe("요청에 맞춘 그럴듯한 답을 만들지 않는다 (원칙 I)", 
     expect("text" in forRich).toBe(false);
   });
 });
+
+/* ═══════════════ 011 — 사진을 읽고 그 내용이 프롬프트에 닿는다 ═══════════════ */
+
+/**
+ * 계약: specs/011-photo-vision-summary/contracts/vision-engine.md
+ *       specs/011-photo-vision-summary/plan.md 「E1 순서」
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 이 묶음이 이 기능의 조용한 실패를 막는 그물이다.**
+ *
+ * 이 저장소에서 반복된 실패는 **오류 없이 아무 일도 일어나지 않는 것**이었다:
+ * 006의 `GenerationProbe`, 007의 끊긴 `stop` 배선, 008의 버려진 반환값, 009의 `day:`.
+ *
+ * **시각 처리의 같은 실패는 「캡션이 프롬프트에 안 들어갔는데 일기는 멀쩡히 나오는 것」이다.**
+ * 그래서 아래 첫 테스트가 **엔진이 받은 프롬프트를 직접 읽는다** — 009의 W-T1과 같은 구조.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("011 — 사진을 읽는다", () => {
+  /** 엔진이 받은 프롬프트를 기록하는 대역 */
+  const recordingEngine = (seen: string[]): GenerationEngine => ({
+    async load() {
+      return { ok: true };
+    },
+    async run(prompt: string) {
+      seen.push(prompt);
+      return { text: GOOD_KO, ending: { kind: "eos" } };
+    },
+    async stop() {},
+    async unload() {},
+  });
+
+  const pathOf = async (photo: { id: string }) => `/photo/${photo.id}.jpg`;
+
+  /** 사진을 읽는 대역. 열림·닫힘을 기록한다 */
+  function fakeVision(opened: string[], captionText = "창가에 놓인 커피잔") {
+    return {
+      engine: {
+        async load(depth: string) {
+          opened.push(`vision:load:${depth}`);
+          return { ok: true as const };
+        },
+        async caption() {
+          opened.push("vision:caption");
+          return { text: captionText };
+        },
+        async stop() {
+          opened.push("vision:stop");
+        },
+        async unload() {
+          opened.push("vision:unload");
+        },
+      },
+      resolvePath: pathOf,
+    };
+  }
+
+  /** 사진 엔진을 열지 못하는 대역 */
+  const brokenVision = (reason: "not-found" | "load-failed") => ({
+    engine: {
+      async load() {
+        return { ok: false as const, reason };
+      },
+      async caption() {
+        return { text: "" };
+      },
+      async stop() {},
+      async unload() {},
+    },
+    resolvePath: pathOf,
+  });
+
+  // ★ T031 — 이 기능의 배선 검증.
+  it("★ 캡션이 실제로 프롬프트에 들어간다", async () => {
+    const prompts: string[] = [];
+    const backend = createOnDeviceBackend(
+      async () => ({}),
+      recordingEngine(prompts),
+      180_000,
+      fakeVision([]),
+    );
+
+    const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect("text" in result).toBe(true);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("창가에 놓인 커피잔");
+    expect(prompts[0]).toContain("사진에 담긴 것:");
+  });
+
+  it("「보지 않음」이면 캡션이 프롬프트에 없다 (FR-003, SC-002)", async () => {
+    const prompts: string[] = [];
+    const opened: string[] = [];
+    const backend = createOnDeviceBackend(
+      async () => ({}),
+      recordingEngine(prompts),
+      180_000,
+      fakeVision(opened),
+    );
+
+    await backend.generate(requestFor(richDay("2026-08-12"), "none"));
+
+    expect(prompts[0]).not.toContain("사진에 담긴 것:");
+    // **사진 읽기를 아예 시작하지 않는다** — 10초를 쓰지 않는다.
+    expect(opened).toEqual([]);
+  });
+
+  /**
+   * ★ E1 — 이것을 어기면 GB 단위 모델 둘이 동시에 열려 **기기가 죽는다.**
+   *
+   * research §2가 「미관측」으로 남긴 자리이며, quickstart D3이 실기기에서 잰다.
+   * 여기서는 **순서만이라도** 기기 없이 못 박는다.
+   */
+  it("★ E1. 캐릭터 모델을 열기 전에 사진 엔진을 완전히 닫는다", async () => {
+    const order: string[] = [];
+    const engine: GenerationEngine = {
+      async load() {
+        order.push("character:load");
+        return { ok: true };
+      },
+      async run() {
+        order.push("character:run");
+        return { text: GOOD_KO, ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {
+        order.push("character:unload");
+      },
+    };
+
+    const backend = createOnDeviceBackend(async () => ({}), engine, 180_000, fakeVision(order));
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    // 사진 엔진의 unload가 캐릭터 모델의 load보다 **먼저** 와야 한다.
+    expect(order.indexOf("vision:unload")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("character:load")).toBeGreaterThanOrEqual(0);
+    expect(order.indexOf("vision:unload")).toBeLessThan(order.indexOf("character:load"));
+  });
+
+  it("사진 엔진이 실패해도 닫힌다 (E2)", async () => {
+    const opened: string[] = [];
+    const vision = {
+      engine: {
+        async load() {
+          opened.push("vision:load");
+          return { ok: true as const };
+        },
+        async caption(): Promise<{ text: string }> {
+          throw new Error("무너졌다");
+        },
+        async stop() {},
+        async unload() {
+          opened.push("vision:unload");
+        },
+      },
+      resolvePath: pathOf,
+    };
+
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, vision);
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect(opened).toContain("vision:unload");
+  });
+
+  /**
+   * ★ FR-021 — 005 FR-022의 판단을 잇는다.
+   *
+   * **「보지 않음」으로 조용히 낮추지 않는다.** 사용자가 「빠르게 봄」을 골랐는데 사진을
+   * 보지 않은 일기가 나오면, 그 일기는 사용자가 요청한 것이 아니다.
+   */
+  it("★ 사진을 못 보면 일기를 주지 않는다 — none으로 낮추지 않는다 (FR-021)", async () => {
+    const prompts: string[] = [];
+    const backend = createOnDeviceBackend(
+      async () => ({}),
+      recordingEngine(prompts),
+      180_000,
+      brokenVision("not-found"),
+    );
+
+    const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect(result).toEqual({ kind: "vision-failed", reason: "not-ready" });
+    // **생성을 아예 시도하지 않는다** — 사진을 안 본 일기가 나올 경로가 없다.
+    expect(prompts).toEqual([]);
+  });
+
+  it("실패 갈래에 text가 없다 (002 FR-016)", async () => {
+    const backend = createOnDeviceBackend(
+      async () => ({}),
+      goodEngine(),
+      180_000,
+      brokenVision("load-failed"),
+    );
+    const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect("text" in result).toBe(false);
+    expect(result).toEqual({ kind: "vision-failed", reason: "failed" });
+  });
+
+  it("사진을 읽을 수단이 없으면 여전히 not-implemented다", async () => {
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect(result).toEqual({ kind: "not-implemented" });
+  });
+
+  it("깊이가 설정에서 온다 (FR-019)", async () => {
+    const quick: string[] = [];
+    await createOnDeviceBackend(
+      async () => ({}),
+      goodEngine(),
+      180_000,
+      fakeVision(quick),
+    ).generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    const detailed: string[] = [];
+    await createOnDeviceBackend(
+      async () => ({}),
+      goodEngine(),
+      180_000,
+      fakeVision(detailed),
+    ).generate(requestFor(richDay("2026-08-12"), "detailed"));
+
+    expect(quick).toContain("vision:load:quick");
+    expect(detailed).toContain("vision:load:detailed");
+  });
+
+  // FR-009 — 그만두면 거기까지 읽은 것을 버린다.
+  it("★ 그만두면 사진 읽기가 끊기고 일기가 나오지 않는다 (FR-009)", async () => {
+    const prompts: string[] = [];
+    let stopIt: () => Promise<void> = async () => {};
+
+    const vision = {
+      engine: {
+        async load() {
+          return { ok: true as const };
+        },
+        async caption() {
+          // 첫 장을 읽는 동안 사용자가 그만둔다.
+          await stopIt();
+          return { text: "읽은 것" };
+        },
+        async stop() {},
+        async unload() {},
+      },
+      resolvePath: pathOf,
+    };
+
+    const backend = createOnDeviceBackend(
+      async () => ({}),
+      recordingEngine(prompts),
+      180_000,
+      vision,
+    );
+    stopIt = () => backend.stop();
+
+    const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect(result).toEqual({ kind: "vision-failed", reason: "cancelled" });
+    // **거기까지 읽은 것으로 일기를 쓰지 않는다.**
+    expect(prompts).toEqual([]);
+  });
+});

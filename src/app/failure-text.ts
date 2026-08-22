@@ -50,6 +50,25 @@ export function describeFailure(result: GenerationResult): string {
       return "앱을 떠나 있는 동안 멈췄다. 다시 시도할 수 있다";
     case "generation-failed":
       return "일기를 쓰는 중에 문제가 생겼다. 다시 시도해 볼 만하다";
+    /**
+     * 011 — 사진을 보지 못했다 (FR-022·023).
+     *
+     * **「사진을 보지 않고 썼다」를 대신 주지 않는다**(FR-021). 그래서 여기서 할 일은
+     * **빠져나갈 길을 주는 것**이다 — 준비하거나, 사진 설정을 「보지 않음」으로 바꾸면
+     * 된다는 것을 말한다(003 FR-028·007과 같은 구조).
+     *
+     * **모델 정보를 담지 않는다**(FR-023, 원칙 III) — 「LFM2.5가 없다」가 아니라
+     * 「사진을 보는 데 필요한 것」이다.
+     */
+    case "vision-failed":
+      switch (result.reason) {
+        case "not-ready":
+          return "사진을 보는 데 필요한 것을 먼저 준비해야 한다. 사진을 보지 않고 쓸 수도 있다";
+        case "cancelled":
+          return "사진을 보다 멈췄다. 다시 시도할 수 있다";
+        case "failed":
+          return "사진을 보는 데 문제가 생겼다. 사진을 보지 않고 쓸 수도 있다";
+      }
   }
 }
 
@@ -94,6 +113,13 @@ export function describeGenerationReason(reason: string): string {
       return describeFailure({ kind: "interrupted" });
     case "generation-failed":
       return describeFailure({ kind: "generation-failed", reason: detail });
+    // 011 — 세 갈래가 서로 다른 말이 된다(FR-022). 「준비해야 한다」와 「멈췄다」는
+    // 사용자가 할 일이 다르므로 뭉개지 않는다.
+    case "vision-failed":
+      return describeFailure({
+        kind: "vision-failed",
+        reason: detail === "not-ready" || detail === "cancelled" ? detail : "failed",
+      });
     default:
       return "일기를 쓰는 중에 문제가 생겼다. 다시 시도해 볼 만하다";
   }
@@ -121,6 +147,10 @@ export function describeStage(stage: PipelineStage, reason: string): string {
       // **글이 있으면 여기 오지 않는다**(FR-012a) — 화면이 `written{saved:false}`로
       // 갈린다. 이 문구는 글 없이 저장만 실패한 경우의 대비책이다.
       return "일기를 저장하지 못했다. 다시 시도해 볼 만하다";
+    // 011 — 사진을 못 봤다. **`generation`과 같은 통로를 쓴다** — 어댑터가 담아 온
+    // `vision-failed: …`를 `describeFailure()`가 다시 갈래로 되돌리므로 문구의 출처가
+    // 하나로 남는다(원칙 III의 방어가 갈라지지 않는다).
+    case "vision":
     case "generation":
       return describeGenerationReason(reason);
   }
