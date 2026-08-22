@@ -432,7 +432,7 @@ async function openVisionCacheDirectory() {
  */
 export function resizedFileNameFor(sourcePath: string): string {
   const safe = sourcePath.replace(/[^a-zA-Z0-9._-]/g, "_");
-  return `${safe}.jpg`;
+  return safe.endsWith(".jpg") ? safe : `${safe}.jpg`;
 }
 
 /**
@@ -447,7 +447,13 @@ const resizeExecutor: ResizeExecutor = async (sourcePath, target) => {
   const { ImageManipulator, SaveFormat } = await import("expo-image-manipulator");
   const { File } = await import("expo-file-system");
 
-  const context = ImageManipulator.manipulate(sourcePath);
+  // ★ `sourcePath`는 011의 `filePathOf()`가 `file://`를 떼어낸 순수 파일 경로다
+  // (llama.rn의 `completion()`이 그것을 요구했기 때문, 005 실측). 그런데
+  // `expo-image-manipulator`의 `manipulate(source)`는 **URI**를 요구한다(공식
+  // 예제가 `Asset.uri`를 그대로 넘긴다) — 두 경계가 정반대 계약이다
+  // (2026-08-23 실기기 실측으로 확인, D2가 처음 이 어긋남을 잡았다).
+  const sourceUri = sourcePath.startsWith("file://") ? sourcePath : `file://${sourcePath}`;
+  const context = ImageManipulator.manipulate(sourceUri);
   const original = await context.renderAsync();
 
   const longEdge = Math.max(original.width, original.height);
@@ -475,7 +481,16 @@ const resizeExecutor: ResizeExecutor = async (sourcePath, target) => {
   if (destination.exists) destination.delete();
   cached.moveSync(destination);
 
-  return { ok: true, path: destination.uri };
+  // ★ 결과에서도 `file://`를 뗀다 — `resolvePath()`(011)와 같은 규칙이다.
+  // `vision-port.ts`의 `media_paths`가 받는 것은 파일 경로이지 URI가 아니다
+  // (005·011 실측). 앞에서는 `manipulate()`가 URI를 요구해 붙였지만, 캡션
+  // 엔진에 넘길 때는 다시 떼야 한다 — 입출력 경계가 반대 방향의 계약이다
+  // (2026-08-23 실측: 이 줄이 없으면 다섯 장이 조용히 실패했다).
+  const resultPath = destination.uri.startsWith("file://")
+    ? destination.uri.slice("file://".length)
+    : destination.uri;
+
+  return { ok: true, path: resultPath };
 };
 
 /**
