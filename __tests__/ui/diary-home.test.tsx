@@ -68,6 +68,30 @@ function hangingPipeline(): Pipeline & { finish: (result: PipelineResult) => voi
   };
 }
 
+/**
+ * onProgress를 밖에서 호출할 수 있게 노출하는 파이프라인 대역 (branch 포함, 016).
+ *
+ * 015의 `progressPipeline()`과 같은 패턴이되, `branch` 인자를 함께 나른다 —
+ * "016 — 모델 로드 독백"·"016 — 사진 보기 갈래" 두 describe가 공유한다.
+ */
+function loadProgressPipeline(): Pipeline & {
+  onProgress: (stage: string, branch?: string) => void;
+  finish: (result: PipelineResult) => void;
+} {
+  let release: (result: PipelineResult) => void = () => {};
+  let sendProgress: (stage: string, branch?: string) => void = () => {};
+  return {
+    run: (_input, onProgress) =>
+      new Promise<PipelineResult>((resolve) => {
+        release = resolve;
+        sendProgress = (stage, branch) =>
+          (onProgress as unknown as (s: string, b?: string) => void)?.(stage, branch);
+      }),
+    onProgress: (stage, branch) => sendProgress(stage, branch),
+    finish: (result) => release(result),
+  };
+}
+
 async function renderHome(
   options: {
     pipeline?: Pipeline;
@@ -803,25 +827,6 @@ describe("015 — 쓰는 중 독백", () => {
  * "금동이"다. 로드 단계 문구는 이 이름을 포함해야 한다.
  */
 describe("016 — 모델 로드 독백", () => {
-  /** onProgress를 밖에서 호출할 수 있게 노출하는 파이프라인 대역 (branch 포함) */
-  function loadProgressPipeline(): Pipeline & {
-    onProgress: (stage: string, branch?: string) => void;
-    finish: (result: PipelineResult) => void;
-  } {
-    let release: (result: PipelineResult) => void = () => {};
-    let sendProgress: (stage: string, branch?: string) => void = () => {};
-    return {
-      run: (_input, onProgress) =>
-        new Promise<PipelineResult>((resolve) => {
-          release = resolve;
-          sendProgress = (stage, branch) =>
-            (onProgress as unknown as (s: string, b?: string) => void)?.(stage, branch);
-        }),
-      onProgress: (stage, branch) => sendProgress(stage, branch),
-      finish: (result) => release(result),
-    };
-  }
-
   it("onProgress('load')(branch 없음)를 받아도 화면 문구가 갱신되지 않는다", async () => {
     const pipeline = loadProgressPipeline();
     await startWriting(pipeline);
@@ -896,5 +901,45 @@ describe("016 — 모델 로드 독백", () => {
 
     const rendered = JSON.stringify(screen.toJSON());
     expect(rendered).not.toContain("금동이");
+  });
+});
+
+/**
+ * 016 — 사진 보기 갈래(많음/보통).
+ *
+ * 계약: specs/016-writing-monologue-expansion/spec.md User Story 2·3
+ *       specs/016-writing-monologue-expansion/contracts/monologue-branch.md
+ */
+describe("016 — 사진 보기 갈래(많음/보통)", () => {
+  it("onProgress('vision', 'normal')을 받으면 '보통' 갈래 문구가 보인다", async () => {
+    const pipeline = loadProgressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("vision", "normal"));
+
+    expect(screen.queryByText("쓰고 있다")).toBeNull();
+    expect(screen.getByText(/중…/)).toBeTruthy();
+  });
+
+  it("onProgress('vision', 'many')를 받으면 '많음' 갈래 문구가 보인다", async () => {
+    const pipeline = loadProgressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("vision", "many"));
+
+    expect(screen.queryByText("쓰고 있다")).toBeNull();
+    expect(screen.getByText(/중…/)).toBeTruthy();
+  });
+
+  it("렌더된 사진 보기 문구 어디에도 정확한 장수(숫자)가 없다 (FR-007)", async () => {
+    for (const branch of ["normal", "many"] as const) {
+      const pipeline = loadProgressPipeline();
+      await startWriting(pipeline);
+
+      await act(async () => pipeline.onProgress("vision", branch));
+
+      const line = screen.getByText(/중…/);
+      expect(String(line.props.children)).not.toMatch(/\d/);
+    }
   });
 });

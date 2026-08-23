@@ -26,7 +26,7 @@ import { buildPrompt, instructionLines } from "../diary/prompt";
 import type { DiaryRequest } from "../diary/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
-import { selectForVision } from "../vision/select";
+import { reachedVisionLimit, selectForVision } from "../vision/select";
 import type { PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
 import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import type { GenerationEngine, RunResult } from "./engine-port";
@@ -164,6 +164,16 @@ async function readPhotos(
 
   try {
     const selected = selectForVision(photos.value.photos);
+
+    // 016 — 사진 보기 갈래(많음/보통, research.md §3). 그날 사진 수가 캡션
+    // 상한에 닿았는지로 가른다. `reachedVisionLimit()`이 011의 S1(상한
+    // 숫자를 export하지 않는다)을 지키면서 이 판정만 대신해 준다 — 숫자
+    // 자체는 select.ts 밖으로 나가지 않는다. `captionAll()`을 부르기 전에
+    // 딱 한 번 보낸다 — 015의 `onPhotoStart`(장 전환, branch 없음) 계약은
+    // 그대로 두고, 화면이 이 branch를 기억해 재사용한다(contracts/
+    // load-signal.md, data-model.md 「AppScreen 확장」).
+    onStage?.("vision", reachedVisionLimit(photos.value.photos.length) ? "many" : "normal");
+
     // 015 — 사진 전환 신호. `"vision"`이 나가는 유일한 자리다(C1, contracts/
     // photo-advance.md) — 이 함수를 부르기 전에는 `onStage("vision")`을 별도로
     // 보내지 않는다(generate()의 주석 참조).

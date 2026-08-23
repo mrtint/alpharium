@@ -33,8 +33,29 @@ import type { Photo } from "../signals/types";
  * **다만 이 저장소에서 다시 재지 않았다**(quickstart D1이 잰다).
  *
  * **한 자리에만 있다** — 004의 `DEFAULT_PHOTO_LIMIT`와 같은 성격이다.
+ *
+ * **016이 이 숫자 자체는 export하지 않고, 판정 함수(`selectedAllAvailable`)
+ * 만 export한다** — 011의 S1(「export하지 않는다」) 취지를 지키면서도
+ * 「상한에 닿았는가」라는 질문에는 답할 수 있게 한다(specs/016 research.md
+ * §3 정정 — 처음엔 상수를 직접 export했으나 011의 계약과 충돌해 되돌렸다).
  */
 const VISION_PHOTO_LIMIT = 5;
+
+/**
+ * 그날 사진 수가 캡션 상한에 닿았는가 — 사진 보기 갈래(많음/보통) 판정
+ * (016, spec Clarifications).
+ *
+ * **"닿았다"는 상한과 같거나 그 이상이라는 뜻이다** — 정확히 5장이어도
+ * "많음"이다(`selectForVision()`이 5장 전부를 고르는 것과 별개로, 사용자가
+ * 가진 사진 수 자체가 상한과 같다는 사실이 판정 기준이다).
+ *
+ * **숫자 자체는 이 함수 밖으로 나가지 않는다** — 011의 S1(상한 숫자를
+ * export하지 않는다)이 지키려던 것(상수를 다른 파일이 알지 못하게 하는
+ * 것)이 그대로 유지된다.
+ */
+export function reachedVisionLimit(availableCount: number): boolean {
+  return availableCount >= VISION_PHOTO_LIMIT;
+}
 
 /**
  * 읽을 사진을 고른다.

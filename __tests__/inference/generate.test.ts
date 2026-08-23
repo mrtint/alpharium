@@ -584,21 +584,29 @@ describe("015 — onStage 진행 신호", () => {
     expect("kind" in result && result.kind).toBe("backend-unavailable");
   });
 
-  it("사진 N장 → onStage가 정확히 N번만 'vision'으로 불린다 (2배가 아니다, C1)", async () => {
-    const stages: string[] = [];
+  it("사진 N장 → onStage가 장 전환마다 정확히 N번만 'vision'(branch 없음)으로 불린다 (2배가 아니다, C1)", async () => {
+    const stages: [string, string | undefined][] = [];
     const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
 
     // richDay는 사진 3장을 준다 — generate()가 readPhotos() 앞에서 별도로
-    // "vision"을 보내면 3(진입) + 3(onPhotoStart) = 6이 되어 이 검사가 잡는다.
-    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage) =>
-      stages.push(stage),
+    // "vision"(장 전환용)을 보내면 3(진입) + 3(onPhotoStart) = 6이 되어 이
+    // 검사가 잡는다.
+    //
+    // 016 — `readPhotos()`가 `captionAll()` 호출 **전에** branch(많음/보통)를
+    // 실은 "vision" 신호를 한 번 더 보낸다(별도 계약, research.md §3) — 이
+    // 신호는 `branch`가 있다는 점으로 `onPhotoStart`(장 전환, branch 없음)와
+    // 구분된다. 여기서는 `branch`가 없는 장 전환 신호만 세어 015의 원래
+    // 의도(장 전환 신호가 이중 발화하지 않는다)를 그대로 검증한다.
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage, branch) =>
+      stages.push([stage, branch]),
     );
 
-    expect(stages.filter((s) => s === "vision")).toHaveLength(3);
+    const photoAdvanceSignals = stages.filter(([s, b]) => s === "vision" && b === undefined);
+    expect(photoAdvanceSignals).toHaveLength(3);
   });
 
-  it("generate()는 'vision'을 직접 보내지 않는다 — readPhotos() 호출 전에는 신호가 없다", async () => {
-    const stages: string[] = [];
+  it("generate()는 'vision'(branch 없음)을 직접 보내지 않는다 — readPhotos() 호출 전에는 장 전환 신호가 없다", async () => {
+    const stages: [string, string | undefined][] = [];
     let visionLoaded = false;
     const vision = {
       engine: {
@@ -607,9 +615,13 @@ describe("015 — onStage 진행 신호", () => {
           return { ok: true as const };
         },
         async caption() {
-          // 캡션이 시작된 시점에 이미 정확히 1번의 'vision'이 왔어야 한다
-          // (readPhotos() 호출 직전의 별도 발화가 없다는 것의 증거).
-          expect(stages.filter((s) => s === "vision")).toHaveLength(1);
+          // 캡션이 시작된 시점에는 016의 branch 신호(1회) + 첫 onPhotoStart
+          // (1회) = 2번의 'vision'이 왔어야 한다 — `readPhotos()` 호출 직전에
+          // `generate()`가 별도로 장 전환 신호를 만들어 보내지는 않는다는
+          // 것의 증거는 branch 없는 신호가 정확히 1개(첫 장 전환)라는 사실로
+          // 확인한다.
+          expect(stages.filter(([s]) => s === "vision")).toHaveLength(2);
+          expect(stages.filter(([s, b]) => s === "vision" && b === undefined)).toHaveLength(1);
           return { text: "창가에 놓인 커피잔" };
         },
         async stop() {},
@@ -619,8 +631,8 @@ describe("015 — onStage 진행 신호", () => {
     };
     const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, vision);
 
-    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage) =>
-      stages.push(stage),
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage, branch) =>
+      stages.push([stage, branch]),
     );
 
     expect(visionLoaded).toBe(true);
@@ -782,5 +794,99 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
     expect(signals).toContainEqual(["load", "cold"]);
     expect(signals).toContainEqual(["generation", undefined]);
     expect(result).toEqual({ text: GOOD_KO });
+  });
+});
+
+/* ═══════════ 016 — 사진 보기 갈래(많음/보통) 신호 ═══════════ */
+
+/**
+ * 계약: specs/016-writing-monologue-expansion/research.md §3
+ *       specs/016-writing-monologue-expansion/contracts/load-signal.md
+ *
+ * `selectForVision()`이 고른 장수가 상한(VISION_PHOTO_LIMIT=5)에 닿았는지로
+ * many/normal을 가른다. `readPhotos()`가 `captionAll()` 호출 전에 이 신호를
+ * 한 번 보낸다 — 015의 `onPhotoStart`(장 전환, branch 없음) 계약은 그대로다.
+ */
+describe("016 — 사진 보기 갈래(많음/보통) 신호", () => {
+  const pathOf = async (photo: { id: string }) => `/photo/${photo.id}.jpg`;
+
+  function fakeVision() {
+    return {
+      engine: {
+        async load() {
+          return { ok: true as const };
+        },
+        async caption() {
+          return { text: "창가에 놓인 커피잔" };
+        },
+        async stop() {},
+        async unload() {},
+      },
+      resolvePath: pathOf,
+    };
+  }
+
+  function dayWithPhotos(count: number): DaySignals {
+    const base = richDay("2026-08-12");
+    if (base.photos.kind !== "known") throw new Error("테스트 준비 실패");
+    return {
+      ...base,
+      photos: {
+        kind: "known",
+        value: {
+          photos: Array.from({ length: count }, (_, i) => ({
+            id: `fake-photo-${i}`,
+            takenAt: new Date(`2026-08-12T${String(9 + i).padStart(2, "0")}:00:00`),
+          })),
+          complete: true,
+        },
+      },
+    };
+  }
+
+  it("사진이 상한(5장)에 닿으면 onStage가 ('vision', 'many')로 불린다", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(5), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["vision", "many"]);
+    expect(signals).not.toContainEqual(["vision", "normal"]);
+  });
+
+  it("사진이 상한보다 많아도(12장) 'many'다", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(12), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["vision", "many"]);
+  });
+
+  it("사진이 상한 미만이면(3장) onStage가 ('vision', 'normal')로 불린다", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(3), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["vision", "normal"]);
+    expect(signals).not.toContainEqual(["vision", "many"]);
+  });
+
+  it("사진이 0장이거나 vision이 꺼져 있으면 vision 신호 자체가 없다 (015 계약 유지)", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(3), "none"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals.filter(([s]) => s === "vision")).toHaveLength(0);
   });
 });

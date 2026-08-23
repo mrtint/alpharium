@@ -254,7 +254,7 @@ T009·T010에서 작성·검증됐다(정직성 경계 검사가 T009에 포함�
 
 ### Tests for User Story 2
 
-- [ ] T018 [US2] `__tests__/ui/diary-home.test.tsx`에 다음을 검사하는
+- [X] T018 [US2] `__tests__/ui/diary-home.test.tsx`에 다음을 검사하는
   테스트를 추가한다(**먼저 작성해 실패를 확인**):
   - `onProgress("vision", "normal")`을 받으면 화면에 "보통" 갈래 사진
     보기 문구가 보인다.
@@ -264,7 +264,7 @@ T009·T010에서 작성·검증됐다(정직성 경계 검사가 T009에 포함�
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] T017에서 이미 구현한 `onProgress` 처리가
+- [X] T019 [US2] T017에서 이미 구현한 `onProgress` 처리가
   `stage === "vision"`이고 `branch`가 실린 신호에서 `branch`를 상태에
   저장하고, 이후 `branch` 없는 `"vision"` 신호(사진 전환, 015의
   `onPhotoStart`발)에서는 저장된 `branch`를 계속 사용해
@@ -288,7 +288,7 @@ T009·T010에서 작성·검증됐다(정직성 경계 검사가 T009에 포함�
 
 ### Tests for User Story 3
 
-- [ ] T020 [P] [US3] `__tests__/inference/on-device.test.ts`에 다음
+- [X] T020 [P] [US3] `__tests__/inference/on-device.test.ts`에 다음
   테스트를 추가한다(**먼저 작성해 실패를 확인**) — research.md §3,
   contracts/load-signal.md 근거:
   - 사진이 `VISION_PHOTO_LIMIT`(5)에 닿는 하루로 생성하면,
@@ -298,7 +298,7 @@ T009·T010에서 작성·검증됐다(정직성 경계 검사가 T009에 포함�
     로 불린다.
   - 사진이 0장이거나 vision이 꺼져 있으면 `("vision", ...)` 신호 자체가
     한 번도 안 온다(015 기존 계약 유지).
-- [ ] T021 [US3] `src/inference/on-device.ts`의 `readPhotos()`를 고쳐,
+- [X] T021 [US3] `src/inference/on-device.ts`의 `readPhotos()`를 고쳐,
   `selectForVision(photos.value.photos)` 직후·`captionAll()` 호출 전에
   `onStage?.("vision", selected.length >= VISION_PHOTO_LIMIT ? "many" :
   "normal")`를 한 번 보낸다(research.md §3 「채택」). `VISION_PHOTO_LIMIT`
