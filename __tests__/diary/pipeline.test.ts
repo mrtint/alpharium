@@ -776,3 +776,39 @@ describe("012 — 정오 이후 오늘이 day-not-closed를 지나 진행한다 
     }
   });
 });
+
+/**
+ * 014 US2 — 제목이 판정 통과 후 사후 분리된다 (FR-006·007·009).
+ *
+ * **`judge()`는 이 테스트가 건드리지 않는다** — `generating()` 대역이 이미
+ * `judge()`를 우회해 `{ text }`를 곧바로 파이프라인에 전달한다(002 이래의 구조).
+ * 여기서 보는 것은 오직 `pipeline.ts`가 `generated.text`를 받은 뒤 `title`과
+ * `text`(본문)로 어떻게 나누는가다.
+ */
+describe("014 — 제목이 사후 분리된다 (FR-006·007·009)", () => {
+  it("제목 형식(첫 줄+빈 줄+본문)이면 title과 text가 나뉜다", async () => {
+    const { pipeline } = makePipeline({
+      backend: generating("조용한 하루\n\n오늘은 아무 일도 없었다."),
+    });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.title).toBe("조용한 하루");
+      expect(result.entry.text).toBe("오늘은 아무 일도 없었다.");
+    }
+  });
+
+  it("제목 형식이 아니면 title 없이 전체가 text다(FR-009 — 거부되지 않는다)", async () => {
+    const { pipeline } = makePipeline({
+      backend: generating("오늘은 아무 일도 없었다. 그냥 하루가 지나갔다."),
+    });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.title).toBeUndefined();
+      expect(result.entry.text).toBe("오늘은 아무 일도 없었다. 그냥 하루가 지나갔다.");
+    }
+  });
+});

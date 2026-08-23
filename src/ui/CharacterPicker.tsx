@@ -15,9 +15,10 @@
  * 지문에 닿는 경로가 아예 없으므로 **조심해서 안 쓰는 것이 아니라 쓸 수 없다**
  * (003의 `CharacterListScreen`과 같은 방어, FR-007).
  *
- * **표시 이름과 성격 문안을 짓지 않는다**(FR-009). 헌법이 "캐릭터 이름은 사람이
- * 짓는다"고 했고, 성격 설명은 실측 관측에 근거해야 하는데 그 관측은 이 저장소의 몫이
- * 아니다(원칙 IV). **유일한 예외가 `imaginative`이며 근거는 헌법 로스터 본문이다.**
+ * **★ 014 — 이름과 소개는 `persona.ts`에서 온다.** `persona.ts`도 `roster.ts`를
+ * import하지 않으므로(계약 P2) 이 파일이 persona를 거쳐도 모델 자산에는 여전히
+ * 닿지 않는다. 소개 문구는 지어낸 것이 아니라 로드맵 문서가 005~012의 실측을
+ * 사람 말로 옮겨 이미 확정해 둔 값이다(원칙 III).
  *
  * **추천하거나 미리 고르지 않는다**(FR-008). 다섯이 같은 자격으로 보인다.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +26,7 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import { personaOf } from "../diary/persona";
 import type { Character } from "../diary/types";
 
 export type CharacterPickerProps = {
@@ -40,15 +42,6 @@ export type CharacterPickerProps = {
   selected: Character | null;
   onSelect: (character: Character) => void;
 };
-
-/**
- * 헌법 로스터가 고지를 MUST로 요구한 캐릭터.
- *
- * **이것은 지어낸 성격 설명이 아니다**(FR-009 예외). 헌법 「로스터」가
- * "이 캐릭터는 상상을 섞는다는 것을 사용자에게 알린다(MUST)"고 적었고,
- * 006 실기기 실측이 그것을 뒷받침한다.
- */
-const IMAGINATIVE_NOTICE = "상상을 섞어 씁니다";
 
 export function CharacterPicker({ characters, selected, onSelect }: CharacterPickerProps) {
   const anyReady = characters.some((entry) => entry.ready);
@@ -76,17 +69,23 @@ export function CharacterPicker({ characters, selected, onSelect }: CharacterPic
             style={[styles.row, isSelected && styles.rowSelected, !ready && styles.rowDisabled]}
           >
             <View style={styles.info}>
-              {/* 자리표시 식별자를 그대로 보인다 — 이름은 사람이 짓는다(FR-009) */}
-              <Text style={styles.name}>{character}</Text>
+              {/*
+                014 — persona.ts의 이름·소개로 보인다(FR-001·004). 오드의
+                tagline("상상력이 풍부해요")은 헌법 로스터 1.1.1이 요구한
+                「상상을 섞는다」 고지를 강점의 언어로 겸한다 — 별도 고지 줄을
+                더 두지 않는다(같은 사실의 중복 표시를 막는다).
+              */}
+              <Text style={styles.name}>{personaOf(character).name}</Text>
+              <Text style={styles.hint}>{personaOf(character).tagline}</Text>
 
-              {/* **헌법 로스터가 MUST로 요구한 고지**. 나머지 넷에는 아무 말도 붙이지 않는다 */}
-              {character === "imaginative" && <Text style={styles.hint}>{IMAGINATIVE_NOTICE}</Text>}
-
-              {/* **「받아야 함」이지 「3.2GB를 받아야 함」이 아니다** — 크기는 모델 규모를 드러낸다 */}
-              {!ready && <Text style={styles.hint}>아직 준비되지 않았다</Text>}
+              {/*
+                **텍스트 안내를 두지 않는다.** `disabled`(accessibilityState·
+                rowDisabled의 흐림 처리)만으로 「고를 수 없다」가 전달된다 —
+                문구를 더하면 같은 사실을 두 번 말하는 것이다.
+              */}
             </View>
 
-            {isSelected && <Text style={styles.mark}>고름</Text>}
+            {isSelected && <Text style={styles.mark}>선택</Text>}
           </Pressable>
         );
       })}

@@ -53,7 +53,7 @@ appId: com.anonymous.alpharium
 # 전체와 맞춰 보므로 「2026-08-20를 쓴다」를 부분으로 찾으면 실패한다.
 - assertVisible:
     text: ".*를 쓴다"
-- assertVisible: "고름"
+- assertVisible: "선택"
 
 # ★ FR-020 — 고르는 자리가 늘어도 모델 정보가 없다(원칙 III).
 - assertNotVisible: "kanana"
@@ -76,7 +76,7 @@ appId: com.anonymous.alpharium
 # ★ M2 / FR-006 — **어제가 아닌 하루를 고른다.**
 #
 # 화면이 어느 날짜를 보여줄지는 기기의 오늘에 달렸으므로 **날짜를 적지 않는다.**
-# 대신 「고름」이 붙지 않은 자리를 누른다 — 그것이 곧 어제가 아닌 하루다.
+# 대신 「선택」이 붙지 않은 자리를 누른다 — 그것이 곧 어제가 아닌 하루다.
 #
 # ⚠️ `testID`로 찾으려면 날짜를 알아야 하므로 여기서는 쓰지 않는다. 사람이 하는
 # 확인(quickstart D3)이 `testID`를 쓴다.

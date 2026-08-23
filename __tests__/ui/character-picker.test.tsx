@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { Character } from "../../src/diary/types";
+import { personaOf } from "../../src/diary/persona";
 import { CharacterPicker } from "../../src/ui/CharacterPicker";
 
 const noop = () => {};
@@ -45,14 +46,17 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
     await renderPicker(["quiet", "narrative"], "quiet");
 
     // 고른 것이 눌린 상태로 표시된다 — 접근성 상태로 검사하므로 스타일에 묶이지 않는다.
-    const chosen = screen.getByRole("button", { name: /quiet/ });
+    // 014 — 버튼의 접근성 이름이 내부 식별자가 아니라 persona 이름으로 바뀐다.
+    const chosen = screen.getByRole("button", { name: new RegExp(personaOf("quiet").name) });
     expect(chosen.props.accessibilityState?.selected).toBe(true);
   });
 
   it("2. 준비되지 않은 캐릭터는 고를 수 있는 것으로 보이지 않는다(FR-004)", async () => {
     await renderPicker(["quiet"], "quiet");
 
-    const notReady = screen.getByRole("button", { name: /narrative/ });
+    const notReady = screen.getByRole("button", {
+      name: new RegExp(personaOf("narrative").name),
+    });
     expect(notReady.props.accessibilityState?.disabled).toBe(true);
   });
 
@@ -60,7 +64,9 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
     const picked: Character[] = [];
     await renderPicker(["quiet", "narrative"], "quiet", (c) => picked.push(c));
 
-    await userEvent.press(screen.getByRole("button", { name: /narrative/ }));
+    await userEvent.press(
+      screen.getByRole("button", { name: new RegExp(personaOf("narrative").name) }),
+    );
 
     expect(picked).toEqual(["narrative"]);
   });
@@ -69,7 +75,9 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
     const picked: Character[] = [];
     await renderPicker(["quiet"], "quiet", (c) => picked.push(c));
 
-    await userEvent.press(screen.getByRole("button", { name: /english/ }));
+    await userEvent.press(
+      screen.getByRole("button", { name: new RegExp(personaOf("english").name) }),
+    );
 
     // **고를 수 없는 것을 고른 상태로 만들지 않는다** — 쓰려다 실패하게 된다.
     expect(picked).toEqual([]);
@@ -112,43 +120,50 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
   });
 
   /**
-   * 7. **`imaginative`만 고지가 붙는다**(FR-009 예외).
+   * 7. **`imaginative`의 소개 문구 자체가 고지를 겸한다**(헌법 로스터 1.1.1).
    *
    * 헌법 로스터가 "이 캐릭터는 상상을 섞는다는 것을 사용자에게 알린다(MUST)"고
-   * 요구했다 — **지어낸 설명이 아니라 헌법 본문이 근거다.** 006 실측이 이를
-   * 뒷받침한다(같은 하루에 quiet 0건, imaginative 2건 지어냄).
+   * 요구했다 — **지어낸 설명이 아니라 헌법 본문이 근거다.** 1.1.1이 "소개
+   * 문구 자체가 강점의 언어로 그 사실을 담으면 별도 고지가 필요 없다"고
+   * 명시했고, "상상력이 풍부해요"가 헌법이 직접 든 그 예다. 006 실측이
+   * 「상상을 섞는다」는 사실 자체를 뒷받침한다(같은 하루에 quiet 0건,
+   * imaginative 2건 지어냄).
    */
-  it("7. imaginative에 「상상을 섞는다」 고지가 있다(헌법 로스터 MUST)", async () => {
+  it("7. imaginative의 소개가 「상상을 섞는다」 고지를 겸한다(헌법 로스터 1.1.1)", async () => {
     await renderPicker(["imaginative"], "imaginative");
 
-    expect(screen.getByText(/상상/)).toBeTruthy();
+    expect(screen.getByText(personaOf("imaginative").tagline)).toBeTruthy();
   });
 
   /**
-   * **나머지 넷에는 성격 문안이 붙지 않는다**(FR-009).
+   * ★ 014 — **성격 문안은 이제 persona.ts가 정한 한 줄 소개로만 나온다**(FR-001·002).
    *
-   * ⚠️ `imaginative`의 고지는 **준비 여부와 무관하게** 붙는다 — 다섯 자리가 언제나
-   * 전부 보이고(003 FR-005a), 헌법 로스터의 MUST는 「고를 수 있을 때만 알린다」가
-   * 아니다. 그래서 여기서는 **다른 넷에 문안이 없는 것**만 본다.
+   * 이전에는 성격 설명 자체가 없었다("관측 근거가 이 저장소에 없다"). 이제
+   * `persona.ts`가 로드맵 문서의 실측 근거 있는 소개를 담아 다섯 자리 모두에
+   * 소개가 붙는다 — 지어낸 문구가 새로 추가된 것이 아니라, 근거가 이미 있던
+   * 값이 화면에 연결됐다(원칙 III).
    */
-  it("나머지 넷에는 성격 문안이 붙지 않는다(FR-009)", async () => {
+  it("다섯 자리 모두 persona.ts의 소개가 보인다(014 FR-001)", async () => {
     await renderPicker(["quiet", "narrative", "chinese", "english"], "quiet");
 
-    // 관측 근거가 이 저장소에 없으므로 성격을 말하지 않는다(원칙 III·IV).
-    expect(screen.queryByText(/짧고 정확/)).toBeNull();
-    expect(screen.queryByText(/시적/)).toBeNull();
-    expect(screen.queryByText(/차분한 관찰/)).toBeNull();
-    expect(screen.queryByText(/감정과 추측/)).toBeNull();
-
-    // 「상상을 섞는다」는 imaginative 자리에 **하나만** 있다 — 넷으로 번지지 않았다.
-    expect(screen.getAllByText(/상상/)).toHaveLength(1);
+    for (const character of ["quiet", "narrative", "chinese", "english"] as const) {
+      expect(screen.getByText(new RegExp(personaOf(character).tagline))).toBeTruthy();
+    }
   });
 
   it("다섯 자리가 처음부터 전부 보인다(003 FR-005a를 이어받는다)", async () => {
     await renderPicker([], null);
 
+    for (const character of ["quiet", "narrative", "imaginative", "chinese", "english"] as const) {
+      expect(screen.getByText(new RegExp(personaOf(character).name))).toBeTruthy();
+    }
+  });
+
+  it("내부 식별자가 화면에 노출되지 않는다(014 FR-004)", async () => {
+    await renderPicker(["quiet", "narrative", "imaginative", "chinese", "english"], "quiet");
+
     for (const character of ["quiet", "narrative", "imaginative", "chinese", "english"]) {
-      expect(screen.getByText(new RegExp(character))).toBeTruthy();
+      expect(screen.queryByText(new RegExp(`^${character}$`))).toBeNull();
     }
   });
 
@@ -199,10 +214,16 @@ describe("CharacterPicker 모듈 그래프 (원칙 III)", () => {
     expect(code).not.toMatch(/from\s+["'][^"']*models\//);
   });
 
-  /** import 문 자체를 세어 둔다 — 늘어나면 무엇이 들어왔는지 보게 된다 */
-  it("import 하는 것은 react-native와 캐릭터 타입뿐이다", () => {
+  /**
+   * import 문 자체를 세어 둔다 — 늘어나면 무엇이 들어왔는지 보게 된다.
+   *
+   * 014 — `../diary/persona`가 새로 추가된다. `persona.ts`는 `roster.ts`를
+   * import하지 않으므로(계약 P2, persona.test.ts가 별도로 검증) 이 파일이
+   * persona를 거쳐도 모델 자산에는 여전히 닿지 않는다.
+   */
+  it("import 하는 것은 react-native·캐릭터 타입·persona뿐이다", () => {
     const imports = [...code.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]);
 
-    expect(imports.sort()).toEqual(["../diary/types", "react-native"]);
+    expect(imports.sort()).toEqual(["../diary/persona", "../diary/types", "react-native"]);
   });
 });

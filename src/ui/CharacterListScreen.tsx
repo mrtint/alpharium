@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 import { CHARACTERS, type Character } from "../diary/types";
+import { personaOf } from "../diary/persona";
 import type {
   DownloadRejection,
   DownloadView,
@@ -184,8 +185,12 @@ export function CharacterListScreen(props: CharacterListProps) {
         return (
           <View key={character} testID={`character-row-${character}`} style={styles.row}>
             <View style={styles.info}>
-              {/* 자리표시 식별자를 그대로 보인다 — 이름은 사람이 짓는다(FR-004a) */}
-              <Text style={styles.name}>{character}</Text>
+              {/*
+                014 — persona.ts의 이름·소개로 보인다(FR-001·004). 003의 FR-004a
+                주석("이름은 사람이 짓는다")이 가리키던 빈자리를 이제 채운다.
+              */}
+              <Text style={styles.name}>{personaOf(character).name}</Text>
+              <Text style={styles.tagline}>{personaOf(character).tagline}</Text>
               {/*
                 거부당한 줄도 **평소대로다**(008 FR-007). 거부는 그 캐릭터의 준비
                 상태를 바꾸지 않았으므로 「받아야 함」이던 것은 그대로 「받아야 함」이다.
@@ -306,6 +311,7 @@ const styles = StyleSheet.create({
   dismiss: { paddingHorizontal: 12, paddingVertical: 6 },
   info: { flex: 1, gap: 2 },
   name: { fontSize: 16 },
+  tagline: { fontSize: 12, color: "#666" },
   status: { fontSize: 13, color: "#666" },
   usage: { fontSize: 12, color: "#999" },
   button: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#eee", borderRadius: 6 },

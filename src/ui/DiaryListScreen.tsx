@@ -21,6 +21,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 
 import type { SelectionState } from "../app/selection";
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../app/state";
+import { personaOf } from "../diary/persona";
 import type { Character, VisionSetting } from "../diary/types";
 import type { DayDate } from "../config/day-boundary";
 import { CharacterPicker } from "./CharacterPicker";
@@ -124,6 +125,9 @@ export function DiaryListScreen({
         >
           <Text style={styles.day}>{item.day}</Text>
 
+          {/* 014 — 제목이 있으면 날짜 아래에 보인다(FR-011). 없으면 아무것도 없다 */}
+          {item.title !== undefined && <Text style={styles.entryTitle}>{item.title}</Text>}
+
           {/*
             ★ 「읽을 수 없다」와 「일기가 없다」는 다른 상태다(S3, 원칙 V).
             조용히 빼면 사용자는 일기를 쓴 기억과 화면이 어긋나는 것을 설명할 수 없다.
@@ -154,10 +158,14 @@ export function DiaryListScreen({
           />
         )}
 
-        {/* **말없이 옮기지 않는다**(FR-005a) — 캐릭터마다 글의 성격이 다르다 */}
+        {/*
+          **말없이 옮기지 않는다**(FR-005a) — 캐릭터마다 글의 성격이 다르다.
+          014 — 안내가 내부 식별자가 아니라 persona 이름을 쓴다(FR-005).
+        */}
         {selection?.kind === "selected" && selection.movedFrom !== undefined && (
           <Text style={styles.moved}>
-            {selection.movedFrom}을(를) 쓸 수 없어 {selection.character}(으)로 바꿨다
+            {personaOf(selection.movedFrom).name}을(를) 쓸 수 없어{" "}
+            {personaOf(selection.character).name}(으)로 바꿨다
           </Text>
         )}
 
@@ -220,6 +228,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   day: { fontSize: 16 },
+  entryTitle: { fontSize: 14 },
   unreadable: { fontSize: 13, opacity: 0.6 },
   photos: { fontSize: 13, opacity: 0.6 },
   writeArea: {

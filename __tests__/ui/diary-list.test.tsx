@@ -15,6 +15,7 @@
 import { render, screen, userEvent } from "@testing-library/react-native";
 
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../../src/app/state";
+import { personaOf } from "../../src/diary/persona";
 import { DiaryListScreen } from "../../src/ui/DiaryListScreen";
 
 const readable = (day: string, photos: PhotoHint = { kind: "none" }): DiaryListItem => ({
@@ -109,6 +110,25 @@ describe("목록 (FR-017)", () => {
     await userEvent.press(screen.getByText("일기 쓰기"));
 
     expect(wrote).toBe(1);
+  });
+});
+
+/**
+ * 014 US2 — 목록 줄에 제목이 보인다(FR-011).
+ */
+describe("제목 (014 FR-011)", () => {
+  it("제목이 있으면 보인다", async () => {
+    await renderList([{ ...readable("2026-08-16"), title: "조용한 하루" }]);
+
+    expect(screen.getByText("조용한 하루")).toBeTruthy();
+  });
+
+  it("제목이 없으면 아무것도 보이지 않는다 — 날짜만 있다", async () => {
+    await renderList([readable("2026-08-16")]);
+
+    expect(screen.getByText("2026-08-16")).toBeTruthy();
+    // 제목 자리에 빈 텍스트나 placeholder가 남지 않는다.
+    expect(screen.queryByText("undefined")).toBeNull();
   });
 });
 
@@ -313,7 +333,9 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
       />,
     );
 
-    await userEvent.press(screen.getByRole("button", { name: /narrative/ }));
+    await userEvent.press(
+      screen.getByRole("button", { name: new RegExp(personaOf("narrative").name) }),
+    );
 
     expect(picked).toEqual(["narrative"]);
   });
@@ -330,7 +352,10 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
     );
 
     // **말없이 바뀌지 않는다** — 캐릭터마다 글의 성격이 다르다.
-    expect(screen.getByText(/quiet.*쓸 수 없어.*narrative/)).toBeTruthy();
+    // 014 — 안내가 내부 식별자가 아니라 persona 이름을 쓴다(FR-005).
+    const movedFromName = personaOf("quiet").name;
+    const toName = personaOf("narrative").name;
+    expect(screen.getByText(new RegExp(`${movedFromName}.*쓸 수 없어.*${toName}`))).toBeTruthy();
   });
 
   it("옮기지 않았으면 알림이 없다", async () => {
@@ -392,9 +417,9 @@ describe("009 — 고르는 자리 (V1·V2)", () => {
     );
 
     // 고른 자리에만 표시가 붙는다 — 무엇을 쓰게 되는지가 눌러 보기 전에 보인다.
-    expect(screen.getByTestId("day-2026-08-18")).toHaveTextContent(/고름/);
-    expect(screen.getByTestId("day-2026-08-19")).not.toHaveTextContent(/고름/);
-    expect(screen.getByTestId("day-2026-08-17")).not.toHaveTextContent(/고름/);
+    expect(screen.getByTestId("day-2026-08-18")).toHaveTextContent(/선택/);
+    expect(screen.getByTestId("day-2026-08-19")).not.toHaveTextContent(/선택/);
+    expect(screen.getByTestId("day-2026-08-17")).not.toHaveTextContent(/선택/);
   });
 
   it("V2. 하루를 누르면 그 하루가 밖으로 전해진다 (FR-006)", async () => {

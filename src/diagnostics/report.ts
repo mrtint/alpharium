@@ -3,16 +3,33 @@
  *
  * 계약: specs/001-project-skeleton-setup/contracts/diagnostics.md
  *
- * 헌법 원칙 III — 모델 식별자를 싣지 않는다.
+ * 헌법 원칙 III — **사용자 화면에는** 모델 식별자를 싣지 않는다. 이 파일은 예외다 —
+ * local·dev 전용 진단 경로이며 배포 빌드에서 닿지 않는다(001 SC-013). 014가
+ * `characterModels`를 더해 캐릭터→모델 대응을 진단 리포트에 담는다.
  * 헌법 원칙 IV — 추론 속도·출력 점수·모델 비교를 여기에 넣지 않는다.
  *                이 파일은 상태를 모을 뿐 품질을 재지 않는다.
  */
 
 import { currentEnvironment, desktopInferenceUrl } from "../config/environment";
+import { CHARACTERS } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation } from "../inference/types";
+import { displayName } from "../models/roster";
 import { checkStorage } from "./storage-check";
 import type { DiagnosticReport, Failure } from "./types";
+
+/**
+ * 다섯 캐릭터의 모델 표시 이름 (014 FR-017).
+ *
+ * `roster.ts`의 `displayName()`을 부르는 유일한 자리다. `src/ui/`는 이 값을
+ * `DiagnosticReport`를 통해서만 받고, `roster.ts`를 직접 import할 수 없다
+ * (007 헌법 검사).
+ */
+function collectCharacterModels(): Readonly<Record<(typeof CHARACTERS)[number], string>> {
+  return Object.fromEntries(CHARACTERS.map((c) => [c, displayName(c)])) as Readonly<
+    Record<(typeof CHARACTERS)[number], string>
+  >;
+}
 
 export type ReportOptions = {
   requested?: InferenceLocation;
@@ -70,6 +87,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
         : { ok: false, reason: location.reason, requested: location.requested },
       moduleStatus: { kind: "unavailable", reason: "추론 위치를 고르지 못했다" },
       storage,
+      characterModels: collectCharacterModels(),
       failures,
     };
   }
@@ -87,6 +105,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
       : { ok: false, reason: location.reason, requested: location.requested },
     moduleStatus,
     storage,
+    characterModels: collectCharacterModels(),
     failures,
   };
 }

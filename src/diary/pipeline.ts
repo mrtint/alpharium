@@ -13,6 +13,7 @@ import { isGenerationFailure, type InferenceBackend } from "../inference/types";
 import type { DaySignals } from "../signals/types";
 import { buildRequest } from "./request";
 import type { DiaryStore } from "./store";
+import { extractTitle } from "./title";
 import type { Character, DiaryEntry, VisionSetting } from "./types";
 
 /** 어느 단계에서 멈췄는가. 실패 경로마다 정확히 하나가 붙는다(FR-019). */
@@ -191,9 +192,15 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
   }
 
   // 6. 저장한다. 생성에 성공한 경우에만 도달한다(FR-023b).
+  //
+  // 014 — **`judge()`가 이미 통과시킨 전체 텍스트에서 제목을 사후 분리한다.**
+  // `extractTitle()`은 판정을 다시 하지 않고, 실패해도 예외를 던지지 않는다
+  // (title.ts 계약 P1·P2) — 떼지 못하면 title 없이 전체가 본문이 된다(FR-009).
+  const { title, body } = extractTitle(generated.text);
   const entry: DiaryEntry = {
     date: input.day,
-    text: generated.text,
+    text: body,
+    ...(title !== undefined ? { title } : {}),
     character: request.request.character,
     signalsUsed: signals,
     createdAt: input.now,
