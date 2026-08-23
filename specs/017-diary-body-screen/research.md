@@ -111,6 +111,18 @@ EXIF를 읽는 데 썼던 `ACCESS_MEDIA_LOCATION` 권한과는 다른, 별도의
 권한을 거부한 채 `reverseGeocodeAsync()`를 불러 실제로 무엇이 오는지(예외인지 빈
 배열인지) 확인해야 `geocoding-port.ts`의 catch 경계를 정확히 그릴 수 있다.
 
+**실측 (2026-08-24, SM-S901N/Android 16, debug 빌드)**: 문서 기반 짐작이 확인됐다
+— 장소명 설정 토글을 켜자 `App.tsx`의 `requestForegroundPermissionsAsync()` 호출이
+실제로 시스템 `GrantPermissionsActivity`를 띄웠다(logcat의
+`WindowManagerShell` 전이 로그로 확인: `topActivity=...GrantPermissionsActivity`).
+승인 시 `{"android":{"accuracy":"fine"},"granted":true,"status":"granted"}`를
+돌려줬고, `adb shell dumpsys package`로 `ACCESS_FINE_LOCATION`·
+`ACCESS_COARSE_LOCATION` 둘 다 `granted=true`로 전환된 것을 확인했다. 권한을
+거부한 채 `reverseGeocodeAsync()`를 부르는 갈래(예외 vs 빈 배열)는 이번 확인에서
+승인 경로만 탔으므로 별도로 확인하지 않았다 — `geocoding-port.ts`의 `catch`가
+둘 다 `{ kind: "unknown" }`으로 접으므로 코드 경계 자체는 이미 안전하지만, 실제로
+어느 쪽이 오는지는 여전히 미확인으로 남는다.
+
 ## §4. `DiaryDraft`·`DiaryEntry`의 헌법 1.2.0 이전 주석 개정
 
 **결정**: `inference/types.ts:58-60`과 `diary/types.ts:73-75`의 "소요 시간·속도를

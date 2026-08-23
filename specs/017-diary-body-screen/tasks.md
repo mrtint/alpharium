@@ -482,19 +482,26 @@ Independent Test 그대로).
   파일이 있어도 실행기가 돌리지 않는다 — AGENTS.md 경고). quickstart.md
   D2~D6를 흐름으로 옮긴다(D3a는 사람 검수 절차라 자동화 흐름 대상이
   아니다 — T042가 별도로 다룬다).
-- [ ] T042 quickstart.md D1(`reverseGeocodeAsync`의 권한 요구 사실 확인)을
+- [X] T042 quickstart.md D1(`reverseGeocodeAsync`의 권한 요구 사실 확인)을
   실기기에서 수행하고 결과를 research.md §3에 실측으로 갱신한다(원칙
   V — 문서 기반 추정을 실측으로 바꾼다).
+  [2026-08-24: T040 검증과 함께 수행했다. SM-S901N(Android 16)에서 토글을
+  켜면 `requestForegroundPermissionsAsync()`가 실제로 시스템
+  `GrantPermissionsActivity`를 띄우고, 승인 시 `granted:true`를 돌려주는
+  것을 logcat으로 확인했다. research.md §3에 실측 결과를 반영했다.]
 - [ ] T043 quickstart.md D2·D3·D3a·D4~D6를 실기기(dev 빌드)에서 수행한다:
   사진 표시(원본 삭제 후에도 유지), 사진 0장 경계, **제목 헤드라인 사람
   검수(D3a — 자동 채점 없이 여러 하루의 제목을 나란히 읽는다, TL8)**,
   소요 시간 문장, 장소명 켜짐/꺼짐/unknown, 로스터 5인 조사 확인. 관측된
   것과 관측하지 못한 것을 구분해 AGENTS.md에 결과를 기록한다(원칙 V,
   016의 T024와 같은 방식).
-- [ ] T044 [P] `npm test` 전체(기기 불필요 스위트)와 `npm run lint`를
+- [X] T044 [P] `npm test` 전체(기기 불필요 스위트)와 `npm run lint`를
   돌려 기존 계약 테스트가 전부 그대로 통과하는지 최종 확인한다(옵셔널
   확장이 기존 계약을 깨지 않았는지의 최종 게이트) — `acceptance.test.ts`
   가 여전히 4갈래만 세는지 포함(TL1 최종 재확인).
+  [2026-08-24: `npm test` 76개 스위트 1529개 테스트 전부 통과.
+  `npm run lint`(eslint·tsc·헌법 검사·prettier) 클린 — 기존 무관 경고
+  2건(require-imports) 제외.]
 - [ ] T045 [P] 위반 주입으로 헌법 검사·계약을 재확인한다(개발 방식 관례):
   소요 시간 문장에 임시로 밀리초를 이어붙이거나 두 일기를 비교하는 코드를
   넣어 코드 리뷰/테스트가 잡는지 확인한 뒤 되돌린다(contracts/
