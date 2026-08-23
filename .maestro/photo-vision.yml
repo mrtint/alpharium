@@ -95,12 +95,12 @@ appId: com.anonymous.alpharium
 # ★ M2 / FR-015 — **고를 수 있고 고른 것이 표시된다.**
 - tapOn:
     id: "vision-quick"
-- assertVisible: "고름"
+- assertVisible: "선택"
 
 # 「자세히 봄」으로도 바꿔 본다 — 셋이 실제로 갈린다.
 - tapOn:
     id: "vision-detailed"
-- assertVisible: "고름"
+- assertVisible: "선택"
 
 # 다시 「보지 않음」으로 되돌린다 — 이 흐름이 기기 상태를 바꾼 채 끝나지 않게 한다.
 #

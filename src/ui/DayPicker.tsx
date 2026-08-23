@@ -115,7 +115,7 @@ export function DayPicker({
               {hasDiary && <Text style={styles.hint}>일기가 있다</Text>}
             </View>
 
-            {isSelected && <Text style={styles.mark}>고름</Text>}
+            {isSelected && <Text style={styles.mark}>선택</Text>}
           </Pressable>
         );
       })}

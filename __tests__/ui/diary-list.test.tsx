@@ -417,9 +417,9 @@ describe("009 — 고르는 자리 (V1·V2)", () => {
     );
 
     // 고른 자리에만 표시가 붙는다 — 무엇을 쓰게 되는지가 눌러 보기 전에 보인다.
-    expect(screen.getByTestId("day-2026-08-18")).toHaveTextContent(/고름/);
-    expect(screen.getByTestId("day-2026-08-19")).not.toHaveTextContent(/고름/);
-    expect(screen.getByTestId("day-2026-08-17")).not.toHaveTextContent(/고름/);
+    expect(screen.getByTestId("day-2026-08-18")).toHaveTextContent(/선택/);
+    expect(screen.getByTestId("day-2026-08-19")).not.toHaveTextContent(/선택/);
+    expect(screen.getByTestId("day-2026-08-17")).not.toHaveTextContent(/선택/);
   });
 
   it("V2. 하루를 누르면 그 하루가 밖으로 전해진다 (FR-006)", async () => {

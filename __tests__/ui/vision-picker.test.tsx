@@ -51,7 +51,7 @@ describe("셋이 보인다 (FR-015)", () => {
 });
 
 describe("고른 것이 표시된다", () => {
-  it.each(VISION_SETTINGS)("%s를 고르면 그 줄에 「고름」이 붙는다", async (setting) => {
+  it.each(VISION_SETTINGS)("%s를 고르면 그 줄에 「선택」이 붙는다", async (setting) => {
     await render(<VisionPicker onSelect={() => {}} selected={setting} />);
 
     const row = screen.getByTestId(`vision-${setting}`);
@@ -61,7 +61,7 @@ describe("고른 것이 표시된다", () => {
   it("고른 것은 하나뿐이다", async () => {
     await render(<VisionPicker onSelect={() => {}} selected="quick" />);
 
-    expect(screen.getAllByText("고름")).toHaveLength(1);
+    expect(screen.getAllByText("선택")).toHaveLength(1);
   });
 
   // FR-018 — 007이 「말없이 집지 않는다」로 정한 것과 같은 판단이다.

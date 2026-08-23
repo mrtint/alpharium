@@ -81,7 +81,7 @@ export function VisionPicker({ selected, onSelect }: VisionPickerProps) {
               <Text style={styles.hint}>{hint}</Text>
             </View>
 
-            {isSelected && <Text style={styles.mark}>고름</Text>}
+            {isSelected && <Text style={styles.mark}>선택</Text>}
           </Pressable>
         );
       })}

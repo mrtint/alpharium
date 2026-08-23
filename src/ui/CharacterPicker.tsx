@@ -43,15 +43,6 @@ export type CharacterPickerProps = {
   onSelect: (character: Character) => void;
 };
 
-/**
- * 헌법 로스터가 고지를 MUST로 요구한 캐릭터.
- *
- * **이것은 지어낸 성격 설명이 아니다**(FR-009 예외). 헌법 「로스터」가
- * "이 캐릭터는 상상을 섞는다는 것을 사용자에게 알린다(MUST)"고 적었고,
- * 006 실기기 실측이 그것을 뒷받침한다.
- */
-const IMAGINATIVE_NOTICE = "상상을 섞어 씁니다";
-
 export function CharacterPicker({ characters, selected, onSelect }: CharacterPickerProps) {
   const anyReady = characters.some((entry) => entry.ready);
 
@@ -78,17 +69,14 @@ export function CharacterPicker({ characters, selected, onSelect }: CharacterPic
             style={[styles.row, isSelected && styles.rowSelected, !ready && styles.rowDisabled]}
           >
             <View style={styles.info}>
-              {/* 014 — persona.ts의 이름·소개로 보인다(FR-001·004) */}
+              {/*
+                014 — persona.ts의 이름·소개로 보인다(FR-001·004). 오드의
+                tagline("상상력이 풍부해요")은 헌법 로스터 1.1.1이 요구한
+                「상상을 섞는다」 고지를 강점의 언어로 겸한다 — 별도 고지 줄을
+                더 두지 않는다(같은 사실의 중복 표시를 막는다).
+              */}
               <Text style={styles.name}>{personaOf(character).name}</Text>
               <Text style={styles.hint}>{personaOf(character).tagline}</Text>
-
-              {/*
-                **헌법 로스터가 MUST로 요구한 고지**. 소개 문구와는 별개다 — 소개는
-                강점의 언어로 쓴 사람이 지은 문구이고, 이 고지는 헌법 본문이 MUST로
-                요구한 사실 전달이다(둘을 하나로 합치면 고지가 소개에 묻혀 사라질
-                위험이 있다). 나머지 넷에는 이 줄이 붙지 않는다.
-              */}
-              {character === "imaginative" && <Text style={styles.hint}>{IMAGINATIVE_NOTICE}</Text>}
 
               {/*
                 **텍스트 안내를 두지 않는다.** `disabled`(accessibilityState·
@@ -97,7 +85,7 @@ export function CharacterPicker({ characters, selected, onSelect }: CharacterPic
               */}
             </View>
 
-            {isSelected && <Text style={styles.mark}>고름</Text>}
+            {isSelected && <Text style={styles.mark}>선택</Text>}
           </Pressable>
         );
       })}

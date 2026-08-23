@@ -120,17 +120,19 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
   });
 
   /**
-   * 7. **`imaginative`만 고지가 붙는다**(FR-009 예외).
+   * 7. **`imaginative`의 소개 문구 자체가 고지를 겸한다**(헌법 로스터 1.1.1).
    *
    * 헌법 로스터가 "이 캐릭터는 상상을 섞는다는 것을 사용자에게 알린다(MUST)"고
-   * 요구했다 — **지어낸 설명이 아니라 헌법 본문이 근거다.** 006 실측이 이를
-   * 뒷받침한다(같은 하루에 quiet 0건, imaginative 2건 지어냄).
+   * 요구했다 — **지어낸 설명이 아니라 헌법 본문이 근거다.** 1.1.1이 "소개
+   * 문구 자체가 강점의 언어로 그 사실을 담으면 별도 고지가 필요 없다"고
+   * 명시했고, "상상력이 풍부해요"가 헌법이 직접 든 그 예다. 006 실측이
+   * 「상상을 섞는다」는 사실 자체를 뒷받침한다(같은 하루에 quiet 0건,
+   * imaginative 2건 지어냄).
    */
-  it("7. imaginative에 「상상을 섞는다」 고지가 있다(헌법 로스터 MUST)", async () => {
+  it("7. imaginative의 소개가 「상상을 섞는다」 고지를 겸한다(헌법 로스터 1.1.1)", async () => {
     await renderPicker(["imaginative"], "imaginative");
 
-    // 014 — 헌법 MUST 고지 문구로 정확히 매칭한다.
-    expect(screen.getByText("상상을 섞어 씁니다")).toBeTruthy();
+    expect(screen.getByText(personaOf("imaginative").tagline)).toBeTruthy();
   });
 
   /**
@@ -147,11 +149,6 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
     for (const character of ["quiet", "narrative", "chinese", "english"] as const) {
       expect(screen.getByText(new RegExp(personaOf(character).tagline))).toBeTruthy();
     }
-
-    // 헌법 MUST 고지("상상을 섞어 씁니다")는 imaginative 자리에 **하나만** 있다 —
-    // 넷으로 번지지 않았다. 오드의 소개(tagline)는 고지와 겹치지 않는 문구로
-    // 바뀌었으므로("느낌으로 하루를 그려요") 이 검사의 대상이 아니다.
-    expect(screen.getAllByText("상상을 섞어 씁니다")).toHaveLength(1);
   });
 
   it("다섯 자리가 처음부터 전부 보인다(003 FR-005a를 이어받는다)", async () => {
