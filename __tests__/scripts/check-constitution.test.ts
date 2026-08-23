@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import {
   checkEnvFile,
+  checkMonologueFile,
   checkSeedFile,
   checkSourceFile,
   checkVisionFile,
@@ -399,6 +400,42 @@ describe("checkVisionFile", () => {
     const violations = files
       .filter((f) => /\.tsx?$/.test(f))
       .flatMap((f) => checkVisionFile(`src/vision/${f}`, readFileSync(join(dir, f), "utf8")));
+
+    expect(violations).toEqual([]);
+  });
+});
+
+/**
+ * 015 — 독백 문구 선택이 캐릭터 로스터에 닿지 않는다 (원칙 III).
+ *
+ * 계약: specs/015-writing-monologue/contracts/monologue.md 불변식 1
+ */
+describe("checkMonologueFile", () => {
+  it("src/diary/monologue.ts 밖은 보지 않는다", () => {
+    const line = 'import { personaFor } from "./persona";';
+    expect(checkMonologueFile("src/diary/persona.ts", line)).toEqual([]);
+    expect(checkMonologueFile("src/diary/title.ts", line)).toEqual([]);
+  });
+
+  it.each([
+    ['import { characterFor } from "../models/roster";', "roster를 import"],
+    ['import { personaFor } from "./persona";', "persona를 import"],
+    ["function f(c: Character) {", "Character 타입에 닿음"],
+  ])("%s — %s (원칙 III)", (line) => {
+    const violations = checkMonologueFile("src/diary/monologue.ts", line);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 III");
+  });
+
+  it("주석은 위반이 아니다", () => {
+    const line = " * roster.ts나 persona.ts, Character를 import하지 않는다";
+    expect(checkMonologueFile("src/diary/monologue.ts", line)).toEqual([]);
+  });
+
+  it("실제 src/diary/monologue.ts가 규칙을 지킨다", () => {
+    const path = join(__dirname, "../../src/diary/monologue.ts");
+    const violations = checkMonologueFile("src/diary/monologue.ts", readFileSync(path, "utf8"));
 
     expect(violations).toEqual([]);
   });

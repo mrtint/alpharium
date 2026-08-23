@@ -352,6 +352,44 @@ export function checkVisionFile(fileName: string, contents: string): Violation[]
   return violations;
 }
 
+/**
+ * 독백 문구 선택이 캐릭터 로스터에 닿는 것을 잡는다 (015, 원칙 III).
+ *
+ * `src/diary/monologue.ts`는 캐릭터를 인자로 받지 않는다(spec Assumptions —
+ * 캐릭터별 어조는 범위 밖). `roster.ts`·`persona.ts`·`Character`를 import하면
+ * "화면 진행 문구가 캐릭터 성격을 흉내 낸다"가 한 줄로 가능해지고, 그것이
+ * 원칙 III(모델은 캐릭터, 성격은 관측되지 않은 것을 지어내지 않는다) 위반이다.
+ */
+const MONOLOGUE_TOUCHES_ROSTER =
+  /\bfrom\s+["'][^"']*(?:models\/roster|\/persona)["']|\bCharacter\b/;
+
+/**
+ * 독백 문구 파일인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`src/diary/monologue.ts` 하나가 대상이다.**
+ */
+export function checkMonologueFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (normalized !== "src/diary/monologue.ts") return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (MONOLOGUE_TOUCHES_ROSTER.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "독백 문구가 캐릭터 로스터에 닿는다 — 진행 문구는 캐릭터를 모른다 (015, 원칙 III)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";

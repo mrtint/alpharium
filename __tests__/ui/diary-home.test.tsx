@@ -111,12 +111,16 @@ describe("쓰는 중 화면 (007 contracts/screens.md §1)", () => {
   });
 
   /**
-   * ★ 3. **진행률·시간·토큰·단계 이름이 0건이다**(FR-011·010b, SC-012).
+   * ★ 3. **진행률·시간·토큰이 0건이다**(FR-011·010b, SC-012).
    *
-   * 「하루를 살펴보는 중」 같은 단계 표시는 clarify에서 **명시적으로 거부됐다** —
-   * 진행 정보를 화면 상태에 담게 되기 때문이다.
+   * **015 갱신**: 007은 "단계 표시" 자체를 거부했지만, 015가 그 결정을 뒤집어
+   * `onProgress` 신호가 오면 독백 문구를 보여준다(spec 015). 이 테스트는
+   * `hangingPipeline()`을 쓰므로 `onProgress`가 한 번도 안 불리고, 그 경우
+   * 여전히 어떤 단계 표시도 없어야 한다는 것만 확인한다 — "단계 표시가 절대
+   * 없다"가 아니라 "신호가 없으면 아무것도 안 보인다"(FR-011)로 범위가
+   * 좁혀졌다. 실제로 문구가 보이는 것은 아래 「015 — 쓰는 중 독백」이 검증한다.
    */
-  it("3. 숫자·경과 시간·단계 이름이 화면에 없다(FR-011·010b, SC-012)", async () => {
+  it("3. 신호가 없으면 숫자·경과 시간·단계 이름이 화면에 없다(FR-011·010b, SC-012)", async () => {
     await startWriting(hangingPipeline());
 
     const rendered = JSON.stringify(screen.toJSON());
@@ -670,5 +674,121 @@ describe("011 US4 — 사진을 볼 수 없을 때", () => {
 
     expect(String(message.props.children)).toMatch(/캐릭터/);
     expect(String(message.props.children)).not.toMatch(/사진/);
+  });
+});
+
+/**
+ * 015 — 쓰는 중 독백.
+ *
+ * 계약: specs/015-writing-monologue/spec.md User Story 1·2
+ *       specs/015-writing-monologue/contracts/progress-signal.md
+ *
+ * `pipeline.run`이 받는 `onProgress`를 직접 붙잡아 화면 밖에서 호출한다 —
+ * `hangingPipeline()`처럼 결과를 미완으로 묶어 두되, `onProgress`를 밖으로
+ * 노출해 신호를 임의 시점에 보낼 수 있게 한다.
+ */
+describe("015 — 쓰는 중 독백", () => {
+  /** onProgress를 밖에서 호출할 수 있게 노출하는 파이프라인 대역 */
+  function progressPipeline(): Pipeline & {
+    onProgress: (stage: "signals" | "vision" | "generation") => void;
+    finish: (result: PipelineResult) => void;
+  } {
+    let release: (result: PipelineResult) => void = () => {};
+    let sendProgress: (stage: "signals" | "vision" | "generation") => void = () => {};
+    return {
+      run: (_input, onProgress) =>
+        new Promise<PipelineResult>((resolve) => {
+          release = resolve;
+          sendProgress = (stage) => onProgress?.(stage);
+        }),
+      onProgress: (stage) => sendProgress(stage),
+      finish: (result) => release(result),
+    };
+  }
+
+  it("pipeline.run이 onProgress와 함께 불린다", async () => {
+    let receivedOnProgress: unknown;
+    const pipeline: Pipeline = {
+      run: (_input, onProgress) => {
+        receivedOnProgress = onProgress;
+        return new Promise(() => {});
+      },
+    };
+
+    await startWriting(pipeline);
+
+    expect(typeof receivedOnProgress).toBe("function");
+  });
+
+  it("onProgress('vision')이 오면 「쓰고 있다」에서 다른 문구로 바뀐다", async () => {
+    const pipeline = progressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("vision"));
+
+    expect(screen.queryByText("쓰고 있다")).toBeNull();
+    expect(screen.getByText(/중…/)).toBeTruthy();
+  });
+
+  it("onProgress('vision')이 연달아 여러 번 오면 매번 직전과 다른 문구가 보인다 (FR-014)", async () => {
+    const pipeline = progressPipeline();
+    await startWriting(pipeline);
+
+    const seen: string[] = [];
+    for (let i = 0; i < 5; i++) {
+      await act(async () => pipeline.onProgress("vision"));
+      const rendered = JSON.stringify(screen.toJSON());
+      seen.push(rendered);
+      if (i > 0) expect(seen[i]).not.toBe(seen[i - 1]);
+    }
+  });
+
+  it("vision 신호가 한 번도 안 오면 사진 관련 문구가 렌더되지 않는다 (FR-003, SC-002)", async () => {
+    const pipeline = progressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("generation"));
+
+    const rendered = JSON.stringify(screen.toJSON());
+    expect(rendered).not.toMatch(/사진/);
+  });
+
+  it("렌더된 문구 어디에도 숫자가 없다 (FR-004, FR-013)", async () => {
+    const pipeline = progressPipeline();
+    await startWriting(pipeline);
+
+    // screen.toJSON() 전체(스타일 수치 포함)가 아니라 실제로 보이는 문구만 본다.
+    for (const stage of ["signals", "vision", "generation"] as const) {
+      await act(async () => pipeline.onProgress(stage));
+      const line = screen.getByText(/중…/);
+      expect(String(line.props.children)).not.toMatch(/\d/);
+    }
+  });
+
+  it("첫 신호가 오기 전에는 기존 「쓰고 있다」문구만 보인다 (FR-011)", async () => {
+    await startWriting(hangingPipeline());
+
+    expect(screen.getByText("쓰고 있다")).toBeTruthy();
+  });
+
+  it("onProgress가 한 번도 안 불려도(즉시 완료) 오류 없이 완료 상태로 전환된다", async () => {
+    const pipeline = progressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.finish({ ok: true, entry, overwrote: false }));
+
+    expect(await screen.findByText("조용한 하루였다.")).toBeTruthy();
+  });
+
+  it("마지막으로 받은 stage·line이 실패 화면 전환 후에는 남아있지 않다 (FR-009·011)", async () => {
+    const pipeline = progressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("vision"));
+    await act(async () => pipeline.finish({ ok: false, stage: "generation", reason: "실패" }));
+
+    await screen.findByText("← 목록");
+    const rendered = JSON.stringify(screen.toJSON());
+    expect(rendered).not.toMatch(/사진을 들여다보는|사진을 살펴보는|눈에 담는/);
   });
 });

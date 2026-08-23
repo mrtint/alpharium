@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import {
   checkEnvFile,
+  checkMonologueFile,
   checkSeedFile,
   checkSourceFile,
   checkVisionFile,
@@ -55,6 +56,8 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       violations.push(...checkSourceFile(child, contents));
       // 011 — 사진 읽는 자리. 어느 파일이 대상인지는 checkVisionFile이 경로로 정한다.
       violations.push(...checkVisionFile(child, contents));
+      // 015 — 독백 문구 선택 자리. checkMonologueFile이 경로로 대상을 정한다.
+      violations.push(...checkMonologueFile(child, contents));
     }
   }
 
