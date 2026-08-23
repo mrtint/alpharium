@@ -71,7 +71,8 @@ export default function App() {
 
 function AppFrame() {
   const environment = currentEnvironment();
-  const [tab, setTab] = useState<"diary" | "characters">("diary");
+  const showsDiagnostics = showsOnScreen(environment);
+  const [tab, setTab] = useState<"diary" | "characters" | "developer">("diary");
 
   /**
    * ★ **008이 내려받기 상태를 여기로 올린다**(FR-013·014).
@@ -106,13 +107,6 @@ function AppFrame() {
     // `edges`를 적어 둔다 — 기본값은 네 변 전부이며, 무엇을 피하는지가 코드에 보이는
     // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-      {/* 진단은 local·dev에서만. **사용자 경로는 세 환경 전부에서 돈다**(FR-024) */}
-      {showsOnScreen(environment) && (
-        <ScrollView style={styles.diagnostics}>
-          <DiagnosticsScreen />
-        </ScrollView>
-      )}
-
       <View style={styles.tabs}>
         <Pressable accessibilityRole="button" onPress={() => setTab("diary")} style={styles.tab}>
           <Text style={tab === "diary" ? styles.tabOn : styles.tabOff}>일기</Text>
@@ -124,11 +118,25 @@ function AppFrame() {
         >
           <Text style={tab === "characters" ? styles.tabOn : styles.tabOff}>캐릭터</Text>
         </Pressable>
+        {/*
+          **개발자 탭은 진단과 같은 조건으로 존재 자체가 사라진다**(FR-024·SC-013을
+          그대로 이어받는다). prod에서는 `showsDiagnostics`가 false이므로 이 자리에
+          아무것도 그려지지 않는다 — 조건부로 숨기는 것이 아니라 탭이 없다.
+        */}
+        {showsDiagnostics && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setTab("developer")}
+            style={styles.tab}
+          >
+            <Text style={tab === "developer" ? styles.tabOn : styles.tabOff}>개발자</Text>
+          </Pressable>
+        )}
       </View>
 
       {tab === "diary" ? (
         <DiarySection onGoToCharacters={() => setTab("characters")} />
-      ) : (
+      ) : tab === "characters" ? (
         // 003의 목록은 스스로 스크롤하지 않는다 — 다섯 자리가 화면을 넘길 수 있으므로
         // 여기서 감싼다.
         <ScrollView>
@@ -141,6 +149,15 @@ function AppFrame() {
             setRejection={setRejection}
           />
         </ScrollView>
+      ) : (
+        // **개발자 탭도 진단과 같은 조건에서만 그려진다** — 탭이 없으면 이 갈래에
+        // 닿을 수 없지만, `showsDiagnostics`가 false인데 `tab`이 남아 있는 경우를
+        // 대비해 한 번 더 지킨다(예: 실행 중 환경이 바뀌는 것은 없지만 방어적으로).
+        showsDiagnostics && (
+          <ScrollView style={styles.diagnostics}>
+            <DiagnosticsScreen />
+          </ScrollView>
+        )
       )}
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -546,7 +563,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  diagnostics: { maxHeight: 260 },
+  // 이전에는 탭 위에 얹힌 작은 창이라 `maxHeight`가 있었다(260). 이제 개발자
+  // 탭이 다른 두 탭과 같은 자격으로 화면 전체를 쓰므로 그 제약이 없다.
+  diagnostics: { flex: 1 },
   tabs: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
