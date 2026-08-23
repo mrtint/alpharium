@@ -105,6 +105,14 @@ export type PipelineDeps = {
   backend: InferenceBackend;
   /** 파일 구현 또는 메모리 대역 */
   store: DiaryStore;
+  /**
+   * 리사이즈 사본을 지운다 (017).
+   *
+   * `generated.usedPhotos`가 있는데 저장이 실패했을 때만 부른다 — 성공하면
+   * `entry.photos`로 그대로 남는다(research.md §1 흐름 4, contracts/
+   * photo-preservation.md P4). 주지 않으면 정리를 건너뛴다(옵셔널 확장).
+   */
+  cleanupResizedPhoto?: (path: string) => Promise<void>;
 };
 
 export interface Pipeline {
@@ -222,10 +230,21 @@ async function runStages(
     character: request.request.character,
     signalsUsed: signals,
     createdAt: input.now,
+    ...(generated.usedPhotos !== undefined ? { photos: generated.usedPhotos } : {}),
+    ...(generated.timing !== undefined ? { timing: generated.timing } : {}),
   };
 
   const saved = await deps.store.save(entry);
   if (!saved.ok) {
+    // 017 — **저장이 실패하면 usedPhotos의 사본을 정리한다**
+    // (contracts/photo-preservation.md P4). 저장이 성공해야만 그 일기가
+    // 존재하는 한 사본이 보존된다 — 실패하면 아무도 참조하지 않는다.
+    if (generated.usedPhotos !== undefined && deps.cleanupResizedPhoto !== undefined) {
+      const cleanup = deps.cleanupResizedPhoto;
+      await Promise.all(
+        generated.usedPhotos.map((p) => cleanup(p.resizedPath).catch(() => {})),
+      );
+    }
     // **만든 글을 버리지 않는다**(006 FR-012a). 30초를 들인 글이고 다시 생성해도
     // 같은 글이 나오지 않는다. 실패는 실패로 두되 읽을 기회를 빼앗지 않는다.
     return { ok: false, stage: "storage", reason: saved.reason, entry };

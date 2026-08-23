@@ -216,6 +216,37 @@ describe("직렬화 왕복 — unknown이 살아남는다 (SC-007, 원칙 V)", (
     }
   });
 
+  /**
+   * 017 — `entry.photos`의 `takenAt`도 `Date`로 복원되어야 한다
+   * (data-model.md §6 「직렬화」, `signalsUsed.photos`와 같은 패턴).
+   */
+  it("entry.photos의 takenAt이 왕복에서 Date로 복원된다 (017)", () => {
+    const entry: DiaryEntry = {
+      ...entryFor("2026-08-12"),
+      photos: [
+        { photoId: "a", takenAt: new Date("2026-08-12T08:00:00"), resizedPath: "/resized/a.jpg" },
+        { photoId: "b", takenAt: new Date("2026-08-12T14:00:00"), resizedPath: "/resized/b.jpg" },
+      ],
+    };
+
+    const restored = deserializeEntry(serializeEntry(entry));
+
+    expect(restored.photos).toHaveLength(2);
+    for (const [i, photo] of (restored.photos ?? []).entries()) {
+      expect(photo.takenAt).toBeInstanceOf(Date);
+      expect(photo.takenAt.getTime()).toBe(entry.photos?.[i].takenAt.getTime());
+      expect(photo.resizedPath).toBe(entry.photos?.[i].resizedPath);
+    }
+  });
+
+  it("photos 필드가 없는 옛 형식 JSON도 정상적으로 읽힌다 (017, 하위 호환)", () => {
+    // photos 필드 자체가 없던 시절(017 이전)의 저장분을 흉내낸다.
+    const legacy = entryFor("2026-08-12");
+    const restored = deserializeEntry(serializeEntry(legacy));
+
+    expect(restored.photos).toBeUndefined();
+  });
+
   it("저장소를 거친 왕복에서도 unknown이 살아 있다", async () => {
     // 직렬화를 실제로 거치는 저장소에서 확인한다.
     const store = memoryStore({ serialized: true });

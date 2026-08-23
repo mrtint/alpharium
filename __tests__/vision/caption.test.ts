@@ -19,14 +19,20 @@ const photo = (id: string, hour: number): Photo => ({
 
 const FIVE = [photo("a", 8), photo("b", 11), photo("c", 14), photo("d", 17), photo("e", 20)];
 
-/** 사진마다 다른 캡션을 주되, `fails`에 든 id는 빈 문자열을 준다 */
+/**
+ * 사진마다 다른 캡션을 주되, `fails`에 든 id는 빈 문자열을 준다.
+ *
+ * **파일명(basename)만으로 id를 판정한다** — 017부터 리사이즈 경로가
+ * `/resized/{id}.jpg`처럼 원본과 다른 디렉터리를 가질 수 있으므로, 전체
+ * 경로 문자열 치환이 아니라 마지막 경로 조각만 본다.
+ */
 function engineWith(fails: string[] = [], throwsOn: string[] = []): VisionEngine {
   return {
     async load() {
       return { ok: true };
     },
     async caption(path: string) {
-      const id = path.replace("/photo/", "").replace(".jpg", "");
+      const id = (path.split("/").pop() ?? path).replace(".jpg", "");
       if (throwsOn.includes(id)) throw new Error("읽다 무너졌다");
       if (fails.includes(id)) return { text: "" };
       return { text: `사진 ${id}의 내용` };
@@ -328,8 +334,13 @@ describe("013 US2 — 리사이즈 실패가 하루를 무너뜨리지 않는다
   });
 });
 
-describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-model.md 「생애」)", () => {
-  it("캡션이 성공한 장마다 지우기가 불린다", async () => {
+/**
+ * 017 이전(013 시절) — **모든 장을 즉시 지웠다.** 017부터는 캡션에 **성공한**
+ * 장만 삭제를 미룬다(contracts/photo-preservation.md P1·P2) — 아래
+ * "017 — 성공한 캡션은 즉시 지우지 않는다" 절이 새 계약이다.
+ */
+describe("017 — 성공한 캡션은 즉시 지우지 않는다 (contracts/photo-preservation.md P1)", () => {
+  it("캡션 성공한 장의 사본은 지우기가 불리지 않는다", async () => {
     const cleaned: string[] = [];
     const resize: ResizeExecutor = async (sourcePath) => ({
       ok: true,
@@ -340,11 +351,25 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
       cleaned.push(path);
     });
 
-    expect(cleaned).toHaveLength(5);
-    expect(cleaned).toEqual(FIVE.map((p) => `/resized/${p.id}.jpg`));
+    expect(cleaned).toHaveLength(0);
   });
 
-  it("캡션이 실패한 장도(빈 캡션) 지우기가 불린다", async () => {
+  it("캡션 성공한 장의 PhotoCaption.resizedPath가 실제 리사이즈 경로와 일치한다", async () => {
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
+
+    expect(vision?.captions.map((c) => c.resizedPath)).toEqual(
+      FIVE.map((p) => `/resized/${p.id}.jpg`),
+    );
+  });
+});
+
+describe("017 — 캡션이 실패한 장의 사본은 즉시 지운다 (contracts/photo-preservation.md P2)", () => {
+  it("캡션 결과가 빈 문자열인 장은 지우기가 불린다", async () => {
     const cleaned: string[] = [];
     const resize: ResizeExecutor = async (sourcePath) => ({
       ok: true,
@@ -355,8 +380,22 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
       cleaned.push(path);
     });
 
-    // c도 리사이즈에는 성공했으므로(캡션만 실패) 지우기는 5번 모두 불린다
-    expect(cleaned).toHaveLength(5);
+    // c만 캡션 실패 → c의 사본만 즉시 지워진다. 나머지 넷은 미뤄진다.
+    expect(cleaned).toEqual(["/resized/c.jpg"]);
+  });
+
+  it("엔진이 던진 장도 캡션 실패로 취급해 즉시 지운다", async () => {
+    const cleaned: string[] = [];
+    const resize: ResizeExecutor = async (sourcePath) => ({
+      ok: true,
+      path: sourcePath.replace("/photo/", "/resized/"),
+    });
+
+    await captionAll(engineWith([], ["b"]), FIVE, 5, resolve, undefined, resize, async (path) => {
+      cleaned.push(path);
+    });
+
+    expect(cleaned).toEqual(["/resized/b.jpg"]);
   });
 
   it("리사이즈에 실패한 장은 지우기를 부르지 않는다 — 지울 사본이 없다", async () => {
@@ -370,13 +409,13 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
       cleaned.push(path);
     });
 
-    expect(cleaned).toHaveLength(4);
+    expect(cleaned).toHaveLength(0);
     expect(cleaned).not.toContain("/resized/a.jpg");
   });
 
   /**
    * ★ C1·FR-006 — 원본과 같은 경로를 그대로 쓴 경우(이미 작아 리사이즈를 건너뜀)는
-   * 지우지 않는다. 원본을 지우는 경로가 있으면 안 된다.
+   * 지우지 않는다. 원본을 지우는 경로가 있으면 안 된다(회귀 확인).
    */
   it("이미 작아 원본 경로를 그대로 쓴 장은 지우지 않는다", async () => {
     const cleaned: string[] = [];
@@ -389,7 +428,17 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
     expect(cleaned).toHaveLength(0);
   });
 
-  it("cleanup을 안 주입하면 지우기 없이도 정상 동작한다", async () => {
+  it("이미 작아 원본 경로를 그대로 쓴 장은 resizedPath가 없다 (data-model.md §1)", async () => {
+    const resize: ResizeExecutor = async (sourcePath) => ({ ok: true, path: sourcePath });
+
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
+
+    for (const caption of vision?.captions ?? []) {
+      expect(caption.resizedPath).toBeUndefined();
+    }
+  });
+
+  it("cleanup을 안 주입해도 정상 동작한다", async () => {
     const resize: ResizeExecutor = async (sourcePath) => ({
       ok: true,
       path: sourcePath.replace("/photo/", "/resized/"),
@@ -400,7 +449,7 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
     expect(vision?.captions).toHaveLength(5);
   });
 
-  it("그만두어도(E5) 이미 처리한 장의 지우기는 그대로 불린다", async () => {
+  it("그만두어도(E5) 이미 실패로 확정된 장의 지우기는 그대로 불린다", async () => {
     const cleaned: string[] = [];
     const cancel = { cancelled: false };
     let count = 0;
@@ -411,7 +460,7 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
       async caption() {
         count += 1;
         if (count === 3) cancel.cancelled = true;
-        return { text: "읽은 것" };
+        return { text: "" }; // 실패로 확정되는 장들
       },
       async stop() {},
       async unload() {},
@@ -426,7 +475,7 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
     });
 
     expect(vision).toBeNull();
-    // 세 장을 처리했고 각각 지우기가 불렸다 — 결과는 버려도 정리는 남기지 않는다
+    // 세 장 모두 캡션 실패(빈 문자열)이므로 각각 즉시 지워진다.
     expect(cleaned).toHaveLength(3);
   });
 

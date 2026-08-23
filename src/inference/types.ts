@@ -51,14 +51,39 @@ export type ModuleStatus =
   { kind: "loaded" } | { kind: "unavailable"; reason: string } | { kind: "failed"; reason: string };
 
 /**
- * 생성에 성공했을 때 돌아오는 것. 본문 텍스트뿐이다.
+ * 생성에 성공했을 때 돌아오는 것.
  *
  * 계약: specs/002-diary-pipeline-contracts/contracts/diary.md
+ *       specs/017-diary-body-screen/contracts/elapsed-time.md
  *
- * 모델 이름·소요 시간·점수를 담지 않는다(원칙 III·IV). 담을 자리를 만들면 그것이 모델
- * 비교의 시작점이 된다.
+ * 모델 이름·점수는 여전히 담지 않는다(원칙 III·IV). **완료된 생성 1건의 소요
+ * 시간은 헌법 1.2.0이 허용한 사후 1회성 기록으로 담되(017), 비교·평균·모델
+ * 식별자 동반은 여전히 금지다** — 이 타입에 "평균"·"이전 대비" 같은 필드가
+ * 생기는 순간 그 경계를 어기는 것이다. 상위 계층(on-device.ts)이 직접 벽시계로
+ * 잰 값만 들어온다 — 네이티브 `timings`는 여기 흘러들 수 없다(`llama-port.ts`가
+ * 이미 그 값을 거른다, 원칙 IV 경계 유지).
  */
-export type DiaryDraft = { text: string };
+export type DiaryDraft = {
+  text: string;
+  /**
+   * 이번 생성이 실제로 캡션한 사진들 (017).
+   *
+   * `PhotoCaption`의 부분집합(`photoId`·`takenAt`·`resizedPath`)만 옮긴다 —
+   * 캡션 텍스트(`text`)는 옮기지 않는다. **여기 실린 사본은 아직 삭제되지
+   * 않은 상태다** — `pipeline.ts`가 저장 성공을 확인해야 최종적으로
+   * 지켜진다. 사진을 보지 않은 생성(vision === "none" 또는 그날 사진
+   * 0장)에는 이 필드 자체가 없다.
+   */
+  usedPhotos?: { photoId: string; takenAt: Date; resizedPath: string }[];
+  /**
+   * 이번 생성 한 번의 소요 시간 (017, 헌법 1.2.0).
+   *
+   * 사진을 보지 않은 생성(vision === "none" 또는 그날 사진 0장)에는
+   * `visionMs`가 없다 — 모르는 시간을 0으로 채우지 않는다(원칙 V의 확장
+   * 적용). `writingMs`는 모델 로드 시간을 포함하지 않는다.
+   */
+  timing?: { visionMs?: number; writingMs: number };
+};
 
 /**
  * 생성이 되지 않은 까닭.

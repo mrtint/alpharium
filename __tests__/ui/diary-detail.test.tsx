@@ -7,7 +7,7 @@
  * 보므로 부분 문자열은 정규식으로 준다.
  */
 
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import { DiaryDetailScreen } from "../../src/ui/DiaryDetailScreen";
 import type { DiaryEntry } from "../../src/diary/types";
@@ -167,6 +167,104 @@ describe("012 — 걸음·배터리·연결이 상세 화면에 없다 (contract
 
     expect(screen.getByText(/^사진: /)).toBeTruthy();
     expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+  });
+});
+
+/**
+ * 017 — 사진 표시 (User Story 1, FR-001~003).
+ *
+ * 계약: specs/017-diary-body-screen/contracts/photo-preservation.md P6
+ */
+describe("017 — 사진 표시 (FR-001~003)", () => {
+  const photos = [
+    { photoId: "a", takenAt: new Date("2026-08-16T08:00:00"), resizedPath: "/resized/a.jpg" },
+    { photoId: "b", takenAt: new Date("2026-08-16T14:00:00"), resizedPath: "/resized/b.jpg" },
+  ];
+
+  it("entry.photos가 있으면 그 사진들이 이미지로 렌더된다", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), photos }} />);
+
+    const images = screen.getAllByTestId("diary-photo");
+    const sources = images.map((img) => img.props.source.uri);
+
+    expect(sources).toContain("file:///resized/a.jpg");
+    expect(sources).toContain("file:///resized/b.jpg");
+  });
+
+  it("entry.photos가 없으면(옛 일기) 사진 표시 영역 없이 기존 텍스트만 렌더된다 (회귀)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.queryAllByTestId("diary-photo")).toHaveLength(0);
+    expect(screen.getByText(/^사진: /)).toBeTruthy();
+  });
+
+  it("사진을 못 불러오면(onError) 그 사진 자리에 '이제 없다' 문구가 뜨고 나머지는 정상 렌더된다 (P6)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), photos }} />);
+
+    const images = screen.getAllByTestId("diary-photo");
+    expect(images).toHaveLength(2);
+
+    fireEvent(images[0], "onError");
+
+    expect(await screen.findByText(/이 사진은 이제 없다/)).toBeTruthy();
+    // 나머지 한 장은 여전히 이미지로 남아 있다.
+    expect(screen.getAllByTestId("diary-photo")).toHaveLength(1);
+  });
+});
+
+/**
+ * 017 US3 — 소요 시간 사후 기록 (contracts/elapsed-time.md T5~T9).
+ */
+describe("017 — 소요 시간 문장 (contracts/elapsed-time.md)", () => {
+  it("visionMs·writingMs 둘 다 있으면 두 문장이 모두 렌더된다", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{ ...entryFor(), timing: { visionMs: 130_000, writingMs: 5_400 } }}
+      />,
+    );
+
+    expect(screen.getByText(/사진을.*분석하는 데/)).toBeTruthy();
+    expect(screen.getByText(/일기를 작성하는 데/)).toBeTruthy();
+  });
+
+  it("visionMs가 없으면(사진 0장) 사진 분석 문장은 없고 글쓰기 문장만 렌더된다 (FR-013)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 5_400 } }} />);
+
+    expect(screen.queryByText(/사진을.*분석하는 데/)).toBeNull();
+    expect(screen.getByText(/일기를 작성하는 데/)).toBeTruthy();
+  });
+
+  it("timing이 아예 없으면(옛 일기) 소요 시간 문장이 전혀 렌더되지 않는다 (FR-018, 회귀)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.queryByText(/작성하는 데/)).toBeNull();
+    expect(screen.queryByText(/분석하는 데/)).toBeNull();
+  });
+
+  it("문장 어디에도 모델 식별자·비교 표현이 없다 (T8, 원칙 III·헌법 1.2.0)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{ ...entryFor(), timing: { visionMs: 130_000, writingMs: 5_400 } }}
+      />,
+    );
+
+    for (const leaked of ["gguf", "GGUF", "hyperclovax", "kanana", "지난번", "평균", "보다 빠르", "보다 느리"]) {
+      expect(screen.queryByText(new RegExp(leaked))).toBeNull();
+    }
+  });
+
+  it("1분 미만은 'SS초', 그 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
+    await render(
+      <DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 45_000 } }} />,
+    );
+    expect(screen.getByText(/45초/)).toBeTruthy();
+  });
+
+  it("1분 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
+    await render(
+      <DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 130_000 } }} />,
+    );
+    expect(screen.getByText(/2분 10초/)).toBeTruthy();
   });
 });
 

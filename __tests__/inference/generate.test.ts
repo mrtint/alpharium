@@ -65,19 +65,19 @@ describe("005 — 온디바이스가 실제로 생성한다 (FR-001·004) ★", 
 
     const result = await backend.generate(requestFor());
 
-    expect(result).toEqual({ text: GOOD_KO });
+    expect(result).toEqual(expect.objectContaining({ text: GOOD_KO }));
   });
 
   it("신호가 비어도 생성한다 (002 FR-005a·b)", async () => {
     // 휴대폰이 아무것도 보지 못한 것 자체가 일기의 내용이 된다(원칙 II).
     const backend = createOnDeviceBackend(async () => ({}), goodEngine());
 
-    expect(await backend.generate(requestFor(emptyDay("2026-08-12")))).toEqual({
-      text: GOOD_KO,
-    });
-    expect(await backend.generate(requestFor(unknownDay("2026-08-12")))).toEqual({
-      text: GOOD_KO,
-    });
+    expect(await backend.generate(requestFor(emptyDay("2026-08-12")))).toEqual(
+      expect.objectContaining({ text: GOOD_KO }),
+    );
+    expect(await backend.generate(requestFor(unknownDay("2026-08-12")))).toEqual(
+      expect.objectContaining({ text: GOOD_KO }),
+    );
   });
 });
 
@@ -104,9 +104,9 @@ describe("005 — 시각 설정을 조용히 낮추지 않는다 (FR-022, SC-009
   it("none이면 생성이 진행된다", async () => {
     const backend = createOnDeviceBackend(async () => ({}), goodEngine());
 
-    expect(await backend.generate(requestFor(richDay("2026-08-12"), "none"))).toEqual({
-      text: GOOD_KO,
-    });
+    expect(await backend.generate(requestFor(richDay("2026-08-12"), "none"))).toEqual(
+      expect.objectContaining({ text: GOOD_KO }),
+    );
   });
 
   it.each(["quick", "detailed"] as const)(
@@ -573,7 +573,7 @@ describe("015 — onStage 진행 신호", () => {
 
     const result = await backend.generate(requestFor());
 
-    expect(result).toEqual({ text: GOOD_KO });
+    expect(result).toEqual(expect.objectContaining({ text: GOOD_KO }));
   });
 
   it("onStage를 안 넘겨도 실패 경로가 그대로 동작한다", async () => {
@@ -733,7 +733,7 @@ describe("016 — onStage 모델 로드 신호", () => {
 
     const result = await backend.generate(requestFor());
 
-    expect(result).toEqual({ text: GOOD_KO });
+    expect(result).toEqual(expect.objectContaining({ text: GOOD_KO }));
   });
 });
 
@@ -793,7 +793,7 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
 
     expect(signals).toContainEqual(["load", "cold"]);
     expect(signals).toContainEqual(["generation", undefined]);
-    expect(result).toEqual({ text: GOOD_KO });
+    expect(result).toEqual(expect.objectContaining({ text: GOOD_KO }));
   });
 });
 

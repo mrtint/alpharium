@@ -46,22 +46,22 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
 
 ### 캡션 사본 경로 (data-model.md §1, contracts/photo-preservation.md P1)
 
-- [ ] T001 [P] [F] `__tests__/vision/types.test.ts`에 `PhotoCaption`의 소스
+- [X] T001 [P] [F] `__tests__/vision/types.test.ts`에 `PhotoCaption`의 소스
   선언이 `resizedPath?: string`(옵셔널)을 갖는지 직접 읽어 검사하는 계약
   테스트를 추가한다(**먼저 작성해 실패를 확인**).
-- [ ] T002 [F] `src/vision/types.ts`의 `PhotoCaption`에 `resizedPath?: string`을
+- [X] T002 [F] `src/vision/types.ts`의 `PhotoCaption`에 `resizedPath?: string`을
   추가한다(data-model.md §1). T001의 테스트가 통과해야 한다.
 
 ### 대표 좌표 (data-model.md §4, research.md §2)
 
-- [ ] T003 [P] [F] `__tests__/signals/places.test.ts`에 다음을 추가한다
+- [X] T003 [P] [F] `__tests__/signals/places.test.ts`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**):
   - 좌표 여럿이 두 자리 이상으로 묶이는 입력에서 `tracePlaces()`가
     `representativeCoordinate`로 **첫 자리**(시각순 최초 좌표)를 돌려준다.
   - 자리가 하나뿐이면 그 하나가 `representativeCoordinate`로 나온다.
   - `points.length === 0`이면 `representativeCoordinate` 필드 자체가 없다
     (`in` 연산자로 키 부재 확인, `undefined` 대입과 구분).
-- [ ] T004 [F] `src/signals/places.ts`의 `PlaceTrace`에
+- [X] T004 [F] `src/signals/places.ts`의 `PlaceTrace`에
   `representativeCoordinate?: Coordinate`를 추가하고, `tracePlaces()`가
   `places[0]`을 그 필드로 함께 반환하도록 고친다(research.md §2 구현 스니펫).
   `points.length === 0`인 조기 반환 경로는 건드리지 않는다. T003의 테스트가
@@ -69,17 +69,17 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
 
 ### 은/는 조사 (contracts/particle.md, research.md §5)
 
-- [ ] T005 [P] [F] `__tests__/diary/particle.test.ts`를 확장한다(**먼저
+- [X] T005 [P] [F] `__tests__/diary/particle.test.ts`를 확장한다(**먼저
   작성해 실패를 확인**, 016의 기존 `particleFor` 테스트는 유지) —
   contracts/particle.md 검증 표 그대로:
   - 로스터 5인(금동이·루이·오드·샤오바이·모카) 전부 `topicParticleFor` →
     `"는"`을 돌려준다.
-  - 받침 있는 합성 이름(예: `"테스트"`, `"민준"`) 최소 1개에서
+  - 받침 있는 합성 이름(예: `"테스트인"`, `"민준"`) 최소 1개에서
     `topicParticleFor` → `"은"`, `particleFor` → `"이"`를 돌려준다.
   - 빈 문자열·비한글 문자에서도 예외 없이 `topicParticleFor` → `"는"`을
     돌려준다.
   - 016 시절 `particleFor` 테스트가 리팩터 후에도 그대로 통과한다(회귀 확인).
-- [ ] T006 [F] `src/diary/particle.ts`를 고친다: 배치임 판정을 공유 헬퍼
+- [X] T006 [F] `src/diary/particle.ts`를 고친다: 배치임 판정을 공유 헬퍼
   `hasBatchim(name): boolean | undefined`로 추출하고, `particleFor()`는 그
   헬퍼를 쓰도록 리팩터한 뒤 `topicParticleFor(name): "은" | "는"`을 새로
   추가한다(research.md §5 구현 스니펫, contracts/particle.md PT1~PT3).
@@ -88,7 +88,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
 
 ### 헌법 1.2.0 반영 — 낡은 주석 개정 (research.md §4)
 
-- [ ] T007 [P] [F] `src/inference/types.ts`의 `DiaryDraft` 주석과
+- [X] T007 [P] [F] `src/inference/types.ts`의 `DiaryDraft` 주석과
   `src/diary/types.ts`의 `DiaryEntry` 주석을 헌법 1.2.0 경계에 맞게 고쳐
   쓴다(research.md §4) — "소요 시간을 담지 않는다"를 "완료된 생성 1건의
   소요 시간은 헌법 1.2.0이 허용한 사후 1회성 기록으로 담되, 비교·평균·모델
@@ -113,7 +113,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] `__tests__/vision/caption.test.ts`에 다음을 추가한다
+- [X] T008 [P] [US1] `__tests__/vision/caption.test.ts`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**) — contracts/photo-preservation.md P1·P2 근거:
   - 리사이즈·캡션 둘 다 성공한 장의 사본이 `captionAll()` 반환 직후에도
     여전히 존재한다(cleanup이 그 장에서 호출되지 않았음을 대역으로 확인).
@@ -122,14 +122,14 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
   - 원본과 같은 경로(013 C1, 리사이즈 생략)인 장은 cleanup이 전혀 호출되지
     않는다(회귀 확인, FR-006 원본 보호).
   - 성공한 장의 `PhotoCaption.resizedPath`가 실제 리사이즈 경로와 일치한다.
-- [ ] T009 [US1] `src/vision/caption.ts`의 `captionAll()`을 고친다: 성공한
+- [X] T009 [US1] `src/vision/caption.ts`의 `captionAll()`을 고친다: 성공한
   캡션(`shouldCleanup === true`이고 `result.text !== ""`)의 `finally`에서
   즉시 `cleanup()` 호출을 제거하고, 대신 `captions.push()`에 `resizedPath:
   shouldCleanup ? captionPath : undefined`를 함께 싣는다. 실패한 캡션
   (`continue`로 빠지는 경로)은 기존처럼 `finally`에서 즉시 지운다 — 성공한
   캡션만 삭제를 미룬다(contracts/photo-preservation.md P1·P2). T008의
   테스트가 통과해야 한다.
-- [ ] T010 [P] [US1] `__tests__/inference/on-device.test.ts`에 다음을
+- [X] T010 [P] [US1] `__tests__/inference/on-device.test.ts`에 다음을
   추가한다(**먼저 작성해 실패를 확인**):
   - 성공한 생성에서 `DiaryDraft.usedPhotos`가 캡션 성공한 사진만(실패한
     장 제외) `photoId`·`takenAt`·`resizedPath`로 담는다.
@@ -138,7 +138,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
     확인) — `GenerationFailure`에는 `usedPhotos` 필드 자체가 없다.
   - 사진을 아예 읽지 않은 경우(vision `none`, 사진 0장) `usedPhotos`가
     없다.
-- [ ] T011 [P] [US1] `__tests__/diary/pipeline.test.ts`에 다음을 추가한다
+- [X] T011 [P] [US1] `__tests__/diary/pipeline.test.ts`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**) — contracts/photo-preservation.md P4 근거:
   - 저장 성공 시 `entry.photos`가 `generated.usedPhotos`를 그대로 담는다.
   - 저장 실패(`storage` 단계)에서 `usedPhotos`의 사본이 정리된다(대역
@@ -148,11 +148,11 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] `src/inference/types.ts`의 `DiaryDraft`에
+- [X] T012 [US1] `src/inference/types.ts`의 `DiaryDraft`에
   `usedPhotos?: { photoId: string; takenAt: Date; resizedPath: string }[]`을
   추가한다(data-model.md §5). `GenerationFailure` 쪽에는 이 필드를 추가하지
   않는다.
-- [ ] T013 [US1] `src/inference/on-device.ts`의 `readPhotos()`가
+- [X] T013 [US1] `src/inference/on-device.ts`의 `readPhotos()`가
   `captionAll()`의 결과(`PhotoVision`, 이미 `resizedPath`를 포함)를 그대로
   위로 전달하는지 확인한다(대개 이미 그렇다 — `PhotoVision.captions`를
   손대지 않았으므로). `generate()`의 성공 반환 직전에, `seen.captions`
@@ -162,24 +162,24 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
   `seen.captions`의 `resizedPath` 전부를
   `cleanupResizedPhoto()`(이미 있는 함수, `vision.cleanupResized`)로 정리한다
   (research.md §1 흐름 3). T010의 테스트가 통과해야 한다.
-- [ ] T014 [US1] `src/diary/types.ts`의 `DiaryEntry`에
+- [X] T014 [US1] `src/diary/types.ts`의 `DiaryEntry`에
   `photos?: { photoId: string; takenAt: Date; resizedPath: string }[]`을
   추가한다(data-model.md §6).
-- [ ] T015 [US1] `src/diary/pipeline.ts`의 `runStages()` 6단계(저장)를
+- [X] T015 [US1] `src/diary/pipeline.ts`의 `runStages()` 6단계(저장)를
   고친다: 저장 성공 시 `entry`에 `generated.usedPhotos`를 `photos`로 옮겨
   담는다. 저장 실패(`saved.ok === false`) 시 `generated.usedPhotos`가
   있으면 그 사본들을 정리한다(T013과 같은 cleanup 함수 재사용 — 의존성
   주입 경로는 `PipelineDeps`에 필요하면 추가). T011의 테스트가 통과해야
   한다.
-- [ ] T016 [US1] `src/diary/store.ts`의 `reviveDates()`가 `entry.photos`
+- [X] T016 [US1] `src/diary/store.ts`의 `reviveDates()`가 `entry.photos`
   배열의 `takenAt`도 `Date`로 복원하도록 고친다(data-model.md §6 「직렬화」
   — `signalsUsed.photos`에 하는 것과 같은 패턴). 빠뜨리면 왕복 후
   `takenAt`이 문자열로 남는다.
-- [ ] T017 [P] [US1] `__tests__/diary/store.test.ts`에 `entry.photos`가
+- [X] T017 [P] [US1] `__tests__/diary/store.test.ts`에 `entry.photos`가
   직렬화·역직렬화 왕복에서 `Date` 타입을 유지하는지, `photos` 필드가 없는
   옛 형식 JSON도 정상적으로 읽히는지(하위 호환) 검사하는 테스트를 추가한다
   (**먼저 작성해 실패를 확인**). T016의 대상이다.
-- [ ] T018 [P] [US1] `__tests__/ui/diary-detail.test.tsx`에 다음을 추가한다
+- [X] T018 [P] [US1] `__tests__/ui/diary-detail.test.tsx`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**):
   - `entry.photos`가 있으면 그 사진들이 이미지로 렌더된다(파일 경로가
     `resizedPath`와 일치).
@@ -188,7 +188,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
   - 사진 파일을 실제로 못 불러오는 경우(대역이 로드 실패를 흉내) "이 사진은
     이제 없다"류 문구가 그 사진 자리에 보이고, 나머지 사진은 정상 렌더된다
     (FR-002, contracts/photo-preservation.md P6).
-- [ ] T019 [US1] `src/ui/DiaryDetailScreen.tsx`에 사진 렌더링을 추가한다:
+- [X] T019 [US1] `src/ui/DiaryDetailScreen.tsx`에 사진 렌더링을 추가한다:
   "이 일기가 본 것" 절 상단(또는 본문 하단)에 `entry.photos`가 있으면
   각 사진을 `Image`로 그린다. 개별 사진 로드 실패는 그 사진 하나만 "이 사진은
   이제 없다"로 대체하고 나머지는 계속 렌더한다(011의 E4와 같은 원칙을 화면
@@ -222,7 +222,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
 
 ### Tests for User Story 2
 
-- [ ] T020 [P] [US2] `__tests__/diary/prompt.test.ts`에 다음을 추가한다
+- [X] T020 [P] [US2] `__tests__/diary/prompt.test.ts`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**) — contracts/title.md TL2·TL3·TL4·TL7·TL9·
   TL10·TL11 근거:
   - 지시문 문자열이 "{이름}의 오늘 일기"류 재조합 패턴을 금지하는 구체적
@@ -239,7 +239,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
     제목 문장)가 **없다**(TL3 역검증).
   - 제목 지시문이 여전히 `instructionLines()`에 포함되어 되뱉기 판정
     대상인지(기존 불변식 회귀 확인, `prompt.ts:101-103`).
-- [ ] T021 [US2] `src/diary/prompt.ts`의 `TITLE_INSTRUCTION`(필요하면 인근에
+- [X] T021 [US2] `src/diary/prompt.ts`의 `TITLE_INSTRUCTION`(필요하면 인근에
   서식 지시문을 추가로 분리)을 research.md §8·§9의 방향대로 보강한다:
   (1) 재조합 패턴 금지 예시, (2) 그날의 구체적 신호(사진 장면·자리 등)를
   담으라는 요구, (3) 짐작 어미 규칙이 제목에도 적용됨을 명시, (4) 마크다운
@@ -248,7 +248,7 @@ resizedPath`, `PlaceTrace.representativeCoordinate`, 은/는 조사 함수. US2(
   바로 시작하라는 지시. 완성된 긍정 예시 문장은 넣지 않는다(TL3). 캐릭터별
   다른 지시문을 만들지 않는다(TL5, `nameLine()`과 같은 구조를 만들지
   않는다). T020의 테스트가 통과해야 한다.
-- [ ] T022 [P] [US2] `__tests__/diary/acceptance.test.ts`에(기존 파일이면
+- [X] T022 [P] [US2] `__tests__/diary/acceptance.test.ts`에(기존 파일이면
   확장, 없으면 해당 계약 테스트 파일 위치 확인 후) `judge()`의 판정 갈래
   수가 여전히 4개(empty/echo/language/unfinished)인지 재확인하는 회귀
   테스트가 이미 있는지 확인하고, 없으면 추가한다(TL1, 005 FR-018b 재확인 —
@@ -280,7 +280,7 @@ Independent Test 그대로).
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] `__tests__/inference/on-device.test.ts`에 다음을
+- [X] T023 [P] [US3] `__tests__/inference/on-device.test.ts`에 다음을
   추가한다(**먼저 작성해 실패를 확인**) — contracts/elapsed-time.md T1~T4
   근거:
   - 사진을 실제로 읽은 성공 경로에서 `DiaryDraft.timing.visionMs`가
@@ -292,15 +292,15 @@ Independent Test 그대로).
   - `writingMs`가 모델 로드 시간을 포함하지 않는다(로드에 시간이 걸리는
     대역을 주입해, `writingMs`가 `runWithTimeout()` 구간만 반영하는지
     확인).
-- [ ] T024 [US3] `src/inference/on-device.ts`의 `generate()`를 고친다:
+- [X] T024 [US3] `src/inference/on-device.ts`의 `generate()`를 고친다:
   `readPhotos()` 호출 직전·직후에 `Date.now()`로 `visionMs`를 재고(호출한
   경우만), `runWithTimeout()` 호출 직전·직후에 `Date.now()`로 `writingMs`를
   잰다. 성공 시 `DiaryDraft.timing`에 담는다(T1~T4). 실패로 반환하는 모든
   경로에는 담지 않는다. T023의 테스트가 통과해야 한다.
-- [ ] T025 [P] [US3] `__tests__/diary/pipeline.test.ts`에 `generated.timing`
+- [X] T025 [P] [US3] `__tests__/diary/pipeline.test.ts`에 `generated.timing`
   이 있으면 `entry.timing`으로 그대로 옮겨지는지 검사하는 테스트를
   추가한다(**먼저 작성해 실패를 확인**).
-- [ ] T026 [P] [US3] `__tests__/ui/diary-detail.test.tsx`에 다음을 추가한다
+- [X] T026 [P] [US3] `__tests__/ui/diary-detail.test.tsx`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**) — contracts/elapsed-time.md T5~T9 근거:
   - `entry.timing`이 `visionMs`·`writingMs` 둘 다 있으면 두 문장(사진 분석
     + 글쓰기)이 모두 렌더된다.
@@ -315,7 +315,7 @@ Independent Test 그대로).
     (T8, 원칙 III·헌법 1.2.0).
   - `formatDuration()`이 1분 미만은 "SS초", 그 이상은 "M분 SS초"로
     포맷한다(T10).
-- [ ] T027 [US3] `src/ui/DiaryDetailScreen.tsx`에 소요 시간 문장 렌더링을
+- [X] T027 [US3] `src/ui/DiaryDetailScreen.tsx`에 소요 시간 문장 렌더링을
   추가한다: `personaOf(entry.character).name`으로 이름을 얻고,
   `topicParticleFor(name)`으로 조사를 고른 뒤, `entry.timing`이 있으면
   "이 일기가 본 것" 절 하단에 계약대로(contracts/elapsed-time.md T6) 문장을

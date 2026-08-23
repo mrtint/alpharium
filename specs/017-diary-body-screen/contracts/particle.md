@@ -25,7 +25,7 @@ research.md §5의 계약이다. 016이 만든 `particleFor()`(이/가)를 깨�
 ## 테스트로 확인해야 하는 것 (research.md §5)
 
 - 로스터 5인(금동이·루이·오드·샤오바이·모카) 전부 `topicParticleFor` → `"는"`.
-- 받침 있는 합성 이름(예: "민준", "테스트") 최소 1개 → `topicParticleFor` →
+- 받침 있는 합성 이름(예: "민준", "테스트인") 최소 1개 → `topicParticleFor` →
   `"은"`, `particleFor` → `"이"`.
 - 빈 문자열, 한글이 아닌 이름(예: "Mocha") → 각각의 기본값("는"/"가").
 - `particleFor()`의 016 시절 테스트가 리팩터 후에도 그대로 통과하는지(회귀

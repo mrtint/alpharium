@@ -81,6 +81,11 @@ function reviveDates(entry: DiaryEntry): DiaryEntry {
             }
           : photos,
     },
+    // 017 — `entry.photos`(VLM이 실제로 본 사진)도 같은 패턴으로 복원한다.
+    // 옵셔널 필드이므로 없으면(옛 일기) 건드리지 않는다 — 하위 호환.
+    ...(entry.photos !== undefined
+      ? { photos: entry.photos.map((p) => ({ ...p, takenAt: new Date(p.takenAt) })) }
+      : {}),
   };
 }
 

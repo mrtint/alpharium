@@ -46,6 +46,8 @@ function makePipeline(
     signals?: (day: DayDate) => Promise<DaySignals | null>;
     /** 003이 더한 단계. 주지 않으면 건너뛴다 — 002의 기존 테스트가 그대로 돈다 */
     isModelReady?: (character: Character) => Promise<boolean>;
+    /** 017 — 저장 실패 시 usedPhotos의 사본을 정리한다. 주지 않으면 건너뛴다 */
+    cleanupResizedPhoto?: (path: string) => Promise<void>;
   } = {},
 ) {
   const store = overrides.store ?? memoryStore();
@@ -54,6 +56,7 @@ function makePipeline(
     store,
     loadSignals: overrides.signals ?? (async (day) => partiallyUnknownDay(day)),
     isModelReady: overrides.isModelReady,
+    cleanupResizedPhoto: overrides.cleanupResizedPhoto,
   });
   return { pipeline, store };
 }
@@ -810,6 +813,114 @@ describe("014 — 제목이 사후 분리된다 (FR-006·007·009)", () => {
       expect(result.entry.title).toBeUndefined();
       expect(result.entry.text).toBe("오늘은 아무 일도 없었다. 그냥 하루가 지나갔다.");
     }
+  });
+});
+
+/**
+ * 017 — 사진 보존 판정 (contracts/photo-preservation.md P4).
+ *
+ * `generated.usedPhotos`가 있을 때, 저장 성공이면 `entry.photos`로 남고
+ * 저장 실패면 정리된다 — 최종 지킴/지움 판정은 파이프라인이 저장 결과를
+ * 확인한 뒤에만 일어난다(research.md §1).
+ */
+describe("017 — 사진 보존 판정 (contracts/photo-preservation.md P4)", () => {
+  const usedPhotos = [
+    { photoId: "a", takenAt: new Date("2026-08-12T08:00:00"), resizedPath: "/resized/a.jpg" },
+    { photoId: "b", takenAt: new Date("2026-08-12T14:00:00"), resizedPath: "/resized/b.jpg" },
+  ];
+
+  function backendWithPhotos(text: string): InferenceBackend {
+    return {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        return { text, usedPhotos };
+      },
+    };
+  }
+
+  it("저장 성공 시 entry.photos가 generated.usedPhotos를 그대로 담는다", async () => {
+    const { pipeline } = makePipeline({ backend: backendWithPhotos("오늘 사진을 찍었다.") });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.photos).toEqual(usedPhotos);
+    }
+  });
+
+  it("저장 실패 시 usedPhotos의 사본이 정리된다(cleanupResized 호출)", async () => {
+    const store = memoryStore({ failWith: "저장 공간이 없다" });
+    const cleaned: string[] = [];
+    const { pipeline } = makePipeline({
+      backend: backendWithPhotos("오늘 사진을 찍었다."),
+      store,
+      cleanupResizedPhoto: async (path) => {
+        cleaned.push(path);
+      },
+    });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("storage");
+    expect(cleaned.sort()).toEqual(["/resized/a.jpg", "/resized/b.jpg"]);
+  });
+
+  it("usedPhotos가 없으면(사진 안 본 생성) entry.photos도 없다", async () => {
+    const { pipeline } = makePipeline({ backend: generating("사진 없는 하루였다.") });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.entry.photos).toBeUndefined();
+  });
+
+  it("cleanupResizedPhoto를 주지 않아도 저장 실패가 정상 동작한다 (옵셔널)", async () => {
+    const store = memoryStore({ failWith: "저장 공간이 없다" });
+    const { pipeline } = makePipeline({ backend: backendWithPhotos("오늘 사진을 찍었다."), store });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.stage).toBe("storage");
+  });
+});
+
+/**
+ * 017 US3 — 소요 시간이 entry로 옮겨진다 (contracts/elapsed-time.md).
+ *
+ * `generated.timing`이 있으면 `entry.timing`으로 그대로 옮겨진다 — 파이프라인은
+ * 값을 가공하지 않는다.
+ */
+describe("017 — generated.timing이 entry.timing으로 옮겨진다", () => {
+  it("timing이 있으면 그대로 entry.timing에 담긴다", async () => {
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        return { text: "오늘 하루를 보냈다.", timing: { visionMs: 1200, writingMs: 5400 } };
+      },
+    };
+
+    const { pipeline } = makePipeline({ backend });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.timing).toEqual({ visionMs: 1200, writingMs: 5400 });
+    }
+  });
+
+  it("timing이 없으면(사진 안 본 생성이라도 writingMs는 있어야 하지만, 방어로) entry.timing도 없다", async () => {
+    const { pipeline } = makePipeline({ backend: generating("소요 시간 없는 생성.") });
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.entry.timing).toBeUndefined();
   });
 });
 

@@ -106,5 +106,9 @@ export function tracePlaces(points: TimedCoordinate[]): PlaceTrace {
     total += distanceMeters(places[i - 1], places[i]);
   }
 
-  return { visitCount: places.length, approximateDistanceMeters: Math.round(total) };
+  return {
+    visitCount: places.length,
+    approximateDistanceMeters: Math.round(total),
+    representativeCoordinate: places[0],
+  };
 }

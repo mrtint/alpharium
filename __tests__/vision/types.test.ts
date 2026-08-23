@@ -53,9 +53,13 @@ function declarationOf(name: string): string {
 describe("PhotoCaption — 원칙 IV의 첫 방어선", () => {
   const declaration = declarationOf("PhotoCaption");
 
-  it("자리가 셋뿐이다 — photoId·takenAt·text", () => {
+  it("자리가 넷이다 — photoId·takenAt·text·resizedPath (017)", () => {
     const fields = [...declaration.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1]);
-    expect(fields.sort()).toEqual(["photoId", "takenAt", "text"]);
+    expect(fields.sort()).toEqual(["photoId", "resizedPath", "takenAt", "text"]);
+  });
+
+  it("resizedPath는 옵셔널이다 (017 — 원본과 같은 경로면 없다)", () => {
+    expect(declaration).toMatch(/resizedPath\?:\s*string/);
   });
 
   // ★ 이것이 이 파일의 핵심이다. 자리가 없으면 담을 수 없다.
