@@ -58,6 +58,11 @@ const FLOWS = [
   // 모드 전환과 정확한 타이밍은 Maestro로 재현하기 어렵다. quickstart.md A3·A4를
   // 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/writing-monologue.yml",
+  // 016 — 쓰는 중 독백 확장. **모델 로드 구간(콜드/핫 스타트)에서 캐릭터
+  // 이름이 포함된 문구가 보이는가**를 본다. ⚠️ 장수 갈래(B3)·정직성 경계
+  // (B4)·로드 실패(B5)·로드 도중 취소(B6)는 여기 없다 — quickstart.md
+  // B3~B6를 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
+  ".maestro/writing-monologue-expansion.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

@@ -118,7 +118,11 @@ export function createLlamaEngine(
     async load(character: Character): Promise<LoadResult> {
       // 같은 캐릭터가 이미 열려 있으면 재사용한다. 닫았다 여는 것은 느리고, 같은 것이
       // 열려 있는 것은 E1을 어기지 않는다.
-      if (context !== null && openFor === character) return { ok: true };
+      //
+      // 016 — 이 분기가 "핫 스타트"의 정확한 정의다: loader()(네이티브 적재, 비용이
+      // 드는 호출)를 아예 부르지 않는다(research.md §1). warm은 새로 재는 값이 아니라
+      // 이 판정을 반환값에 실을 뿐이다.
+      if (context !== null && openFor === character) return { ok: true, warm: true };
 
       // **다른 것이 열려 있으면 먼저 닫는다**(E1). 두 모델이 동시에 열리면 GB 둘이
       // 되어 기기가 죽는다.
@@ -134,7 +138,7 @@ export function createLlamaEngine(
       try {
         context = await loader(path);
         openFor = character;
-        return { ok: true };
+        return { ok: true, warm: false };
       } catch (error) {
         context = null;
         openFor = null;

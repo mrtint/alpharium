@@ -366,11 +366,16 @@ const MONOLOGUE_TOUCHES_ROSTER =
 /**
  * 독백 문구 파일인지 보고, 맞으면 위 규칙을 적용한다.
  *
- * **`src/diary/monologue.ts` 하나가 대상이다.**
+ * **`src/diary/monologue.ts`와 `src/diary/particle.ts` 둘이 대상이다.**
+ * 016이 조사 선택을 별도 파일로 뺐지만, `monologue.ts`가 그 파일을
+ * import해 쓰는 이상 같은 격리(원칙 III)를 지켜야 한다 — 대상에서 빠지면
+ * `particle.ts`를 거쳐 로스터에 닿는 우회로가 생긴다.
  */
 export function checkMonologueFile(fileName: string, contents: string): Violation[] {
   const normalized = fileName.split("\\").join("/");
-  if (normalized !== "src/diary/monologue.ts") return [];
+  if (normalized !== "src/diary/monologue.ts" && normalized !== "src/diary/particle.ts") {
+    return [];
+  }
 
   const violations: Violation[] = [];
 

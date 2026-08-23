@@ -72,8 +72,14 @@ export type RunResult = {
  *
  * **`reason`이 둘인 이유**: 파일이 없는 것과 있는데 못 여는 것은 사용자가 할 일이
  * 다르다(FR-017d). 003이 `ModelReadiness`를 넷으로 가른 것과 같은 판단이다.
+ *
+ * **`warm`이 016에서 더해졌다.** 새로 재는 값이 아니다 — 이미 같은 캐릭터가
+ * 열려 있어 재사용했는지(E1 불변식이 이미 판정하는 사실)를 반환값에 실을
+ * 뿐이다(specs/016-writing-monologue-expansion/research.md §1). `{ ok: false }`
+ * 갈래에는 없다 — 실패에는 콜드/핫이 의미가 없다.
  */
-export type LoadResult = { ok: true } | { ok: false; reason: "not-found" | "load-failed" };
+export type LoadResult =
+  { ok: true; warm: boolean } | { ok: false; reason: "not-found" | "load-failed" };
 
 /** 생성에 걸리는 한도. **둘 다 짐작이며 실측이 아니다**(sampling.ts 참고) */
 export type RunLimits = {

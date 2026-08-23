@@ -49,7 +49,7 @@ function requestFor(
 /** 늘 통과할 글을 돌려주는 엔진 대역 */
 const goodEngine = (): GenerationEngine => ({
   async load() {
-    return { ok: true };
+    return { ok: true, warm: false };
   },
   async run() {
     return { text: GOOD_KO, ending: { kind: "eos" } };
@@ -129,7 +129,7 @@ describe("005 — 시각 설정을 조용히 낮추지 않는다 (FR-022, SC-009
       ...goodEngine(),
       async load() {
         loaded = true;
-        return { ok: true };
+        return { ok: true, warm: false };
       },
     };
 
@@ -271,7 +271,7 @@ describe("011 — 사진을 읽는다", () => {
   /** 엔진이 받은 프롬프트를 기록하는 대역 */
   const recordingEngine = (seen: string[]): GenerationEngine => ({
     async load() {
-      return { ok: true };
+      return { ok: true, warm: false };
     },
     async run(prompt: string) {
       seen.push(prompt);
@@ -367,7 +367,7 @@ describe("011 — 사진을 읽는다", () => {
     const engine: GenerationEngine = {
       async load() {
         order.push("character:load");
-        return { ok: true };
+        return { ok: true, warm: false };
       },
       async run() {
         order.push("character:run");
@@ -551,7 +551,7 @@ describe("015 — onStage 진행 신호", () => {
     const stages: string[] = [];
     const engine: GenerationEngine = {
       async load() {
-        return { ok: true };
+        return { ok: true, warm: false };
       },
       async run() {
         // run()이 불린 시점에는 이미 'generation'이 보내졌어야 한다.
@@ -584,21 +584,29 @@ describe("015 — onStage 진행 신호", () => {
     expect("kind" in result && result.kind).toBe("backend-unavailable");
   });
 
-  it("사진 N장 → onStage가 정확히 N번만 'vision'으로 불린다 (2배가 아니다, C1)", async () => {
-    const stages: string[] = [];
+  it("사진 N장 → onStage가 장 전환마다 정확히 N번만 'vision'(branch 없음)으로 불린다 (2배가 아니다, C1)", async () => {
+    const stages: [string, string | undefined][] = [];
     const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
 
     // richDay는 사진 3장을 준다 — generate()가 readPhotos() 앞에서 별도로
-    // "vision"을 보내면 3(진입) + 3(onPhotoStart) = 6이 되어 이 검사가 잡는다.
-    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage) =>
-      stages.push(stage),
+    // "vision"(장 전환용)을 보내면 3(진입) + 3(onPhotoStart) = 6이 되어 이
+    // 검사가 잡는다.
+    //
+    // 016 — `readPhotos()`가 `captionAll()` 호출 **전에** branch(많음/보통)를
+    // 실은 "vision" 신호를 한 번 더 보낸다(별도 계약, research.md §3) — 이
+    // 신호는 `branch`가 있다는 점으로 `onPhotoStart`(장 전환, branch 없음)와
+    // 구분된다. 여기서는 `branch`가 없는 장 전환 신호만 세어 015의 원래
+    // 의도(장 전환 신호가 이중 발화하지 않는다)를 그대로 검증한다.
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage, branch) =>
+      stages.push([stage, branch]),
     );
 
-    expect(stages.filter((s) => s === "vision")).toHaveLength(3);
+    const photoAdvanceSignals = stages.filter(([s, b]) => s === "vision" && b === undefined);
+    expect(photoAdvanceSignals).toHaveLength(3);
   });
 
-  it("generate()는 'vision'을 직접 보내지 않는다 — readPhotos() 호출 전에는 신호가 없다", async () => {
-    const stages: string[] = [];
+  it("generate()는 'vision'(branch 없음)을 직접 보내지 않는다 — readPhotos() 호출 전에는 장 전환 신호가 없다", async () => {
+    const stages: [string, string | undefined][] = [];
     let visionLoaded = false;
     const vision = {
       engine: {
@@ -607,9 +615,13 @@ describe("015 — onStage 진행 신호", () => {
           return { ok: true as const };
         },
         async caption() {
-          // 캡션이 시작된 시점에 이미 정확히 1번의 'vision'이 왔어야 한다
-          // (readPhotos() 호출 직전의 별도 발화가 없다는 것의 증거).
-          expect(stages.filter((s) => s === "vision")).toHaveLength(1);
+          // 캡션이 시작된 시점에는 016의 branch 신호(1회) + 첫 onPhotoStart
+          // (1회) = 2번의 'vision'이 왔어야 한다 — `readPhotos()` 호출 직전에
+          // `generate()`가 별도로 장 전환 신호를 만들어 보내지는 않는다는
+          // 것의 증거는 branch 없는 신호가 정확히 1개(첫 장 전환)라는 사실로
+          // 확인한다.
+          expect(stages.filter(([s]) => s === "vision")).toHaveLength(2);
+          expect(stages.filter(([s, b]) => s === "vision" && b === undefined)).toHaveLength(1);
           return { text: "창가에 놓인 커피잔" };
         },
         async stop() {},
@@ -619,10 +631,262 @@ describe("015 — onStage 진행 신호", () => {
     };
     const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, vision);
 
-    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage) =>
-      stages.push(stage),
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage, branch) =>
+      stages.push([stage, branch]),
     );
 
     expect(visionLoaded).toBe(true);
+  });
+});
+
+/* ═══════════ 016 — 모델 로드 신호 (콜드/핫) ═══════════ */
+
+/**
+ * 계약: specs/016-writing-monologue-expansion/contracts/load-signal.md
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **로드 신호는 두 단계다** — 로드 시작(branch 없음, 아직 콜드/핫 모름)과
+ * 로드 완료(branch 확정). 로드가 실패하면 확정 신호는 오지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("016 — onStage 모델 로드 신호", () => {
+  type Signal = [stage: string, branch: string | undefined];
+
+  it("engine.load() 직전에 onStage가 ('load')(branch 없음)로 불린다", async () => {
+    const signals: Signal[] = [];
+    const engine: GenerationEngine = {
+      async load() {
+        // load()가 불린 시점에는 이미 로드 시작 신호가 보내졌어야 한다.
+        expect(signals).toContainEqual(["load", undefined]);
+        return { ok: true, warm: false };
+      },
+      async run() {
+        return { text: GOOD_KO, ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const backend = createOnDeviceBackend(async () => ({}), engine);
+
+    await backend.generate(requestFor(), (stage, branch) => signals.push([stage, branch]));
+
+    expect(signals).toContainEqual(["load", undefined]);
+  });
+
+  it("로드 성공(warm: false)이면 그 직후 onStage가 ('load', 'cold')로 불린다", async () => {
+    const signals: Signal[] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+
+    await backend.generate(requestFor(), (stage, branch) => signals.push([stage, branch]));
+
+    expect(signals).toContainEqual(["load", "cold"]);
+    expect(signals).not.toContainEqual(["load", "hot"]);
+  });
+
+  it("로드 성공(warm: true)이면 그 직후 onStage가 ('load', 'hot')로 불린다", async () => {
+    const signals: Signal[] = [];
+    const engine: GenerationEngine = {
+      async load() {
+        return { ok: true, warm: true };
+      },
+      async run() {
+        return { text: GOOD_KO, ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const backend = createOnDeviceBackend(async () => ({}), engine);
+
+    await backend.generate(requestFor(), (stage, branch) => signals.push([stage, branch]));
+
+    expect(signals).toContainEqual(["load", "hot"]);
+    expect(signals).not.toContainEqual(["load", "cold"]);
+  });
+
+  it("로드 실패 시 확정 신호(cold/hot)도 generation도 오지 않는다 (FR-011)", async () => {
+    const signals: Signal[] = [];
+    const engine: GenerationEngine = {
+      async load() {
+        return { ok: false, reason: "not-found" };
+      },
+      async run() {
+        return { text: GOOD_KO, ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const backend = createOnDeviceBackend(async () => ({}), engine);
+
+    const result = await backend.generate(requestFor(), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["load", undefined]);
+    expect(signals).not.toContainEqual(["load", "cold"]);
+    expect(signals).not.toContainEqual(["load", "hot"]);
+    expect(signals).not.toContainEqual(["generation", undefined]);
+    expect("kind" in result && result.kind).toBe("model-load-failed");
+  });
+
+  it("onStage를 안 넘겨도 로드 경로가 그대로 동작한다 (옵셔널 확장)", async () => {
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+
+    const result = await backend.generate(requestFor());
+
+    expect(result).toEqual({ text: GOOD_KO });
+  });
+});
+
+/* ═══════════ 016 — 로드 도중 취소 (FR-013) ═══════════ */
+
+/**
+ * 계약: specs/016-writing-monologue-expansion/contracts/load-signal.md
+ *       「취소 — 로드 자체는 중단되지 않는다」
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **로드 자체를 멈출 수는 없다**(research.md §7 — `llama.rn`에 로드 취소
+ * API가 없다). 로드가 끝난 직후 취소 상태를 재확인해 결과를 버린다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("016 — 로드 도중 취소 (FR-013)", () => {
+  it("로드 완료 시점에 취소 상태면 확정 신호·generation을 보내지 않고 unload한다", async () => {
+    const signals: [string, string | undefined][] = [];
+    let unloaded = false;
+    const engine: GenerationEngine = {
+      async load() {
+        return { ok: true, warm: false };
+      },
+      async run() {
+        throw new Error("취소됐으면 run()이 불려서는 안 된다");
+      },
+      async stop() {
+        // stop()이 취소 신호를 세운다(007 기존 동작) — 다음 load() 완료 시점에
+        // 반영된다.
+      },
+      async unload() {
+        unloaded = true;
+      },
+    };
+    const backend = createOnDeviceBackend(async () => ({}), engine);
+
+    const generatePromise = backend.generate(requestFor(), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+    // 로드 시작 직후, 완료되기 전에 그만두기를 누른 것을 흉내낸다.
+    await backend.stop();
+    const result = await generatePromise;
+
+    expect(signals).not.toContainEqual(["load", "cold"]);
+    expect(signals).not.toContainEqual(["load", "hot"]);
+    expect(signals).not.toContainEqual(["generation", undefined]);
+    expect(unloaded).toBe(true);
+    expect(result).toEqual({ kind: "interrupted" });
+  });
+
+  it("취소하지 않으면 기존 시나리오와 동일하게 동작한다 (회귀 확인)", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+
+    const result = await backend.generate(requestFor(), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["load", "cold"]);
+    expect(signals).toContainEqual(["generation", undefined]);
+    expect(result).toEqual({ text: GOOD_KO });
+  });
+});
+
+/* ═══════════ 016 — 사진 보기 갈래(많음/보통) 신호 ═══════════ */
+
+/**
+ * 계약: specs/016-writing-monologue-expansion/research.md §3
+ *       specs/016-writing-monologue-expansion/contracts/load-signal.md
+ *
+ * `selectForVision()`이 고른 장수가 상한(VISION_PHOTO_LIMIT=5)에 닿았는지로
+ * many/normal을 가른다. `readPhotos()`가 `captionAll()` 호출 전에 이 신호를
+ * 한 번 보낸다 — 015의 `onPhotoStart`(장 전환, branch 없음) 계약은 그대로다.
+ */
+describe("016 — 사진 보기 갈래(많음/보통) 신호", () => {
+  const pathOf = async (photo: { id: string }) => `/photo/${photo.id}.jpg`;
+
+  function fakeVision() {
+    return {
+      engine: {
+        async load() {
+          return { ok: true as const };
+        },
+        async caption() {
+          return { text: "창가에 놓인 커피잔" };
+        },
+        async stop() {},
+        async unload() {},
+      },
+      resolvePath: pathOf,
+    };
+  }
+
+  function dayWithPhotos(count: number): DaySignals {
+    const base = richDay("2026-08-12");
+    if (base.photos.kind !== "known") throw new Error("테스트 준비 실패");
+    return {
+      ...base,
+      photos: {
+        kind: "known",
+        value: {
+          photos: Array.from({ length: count }, (_, i) => ({
+            id: `fake-photo-${i}`,
+            takenAt: new Date(`2026-08-12T${String(9 + i).padStart(2, "0")}:00:00`),
+          })),
+          complete: true,
+        },
+      },
+    };
+  }
+
+  it("사진이 상한(5장)에 닿으면 onStage가 ('vision', 'many')로 불린다", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(5), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["vision", "many"]);
+    expect(signals).not.toContainEqual(["vision", "normal"]);
+  });
+
+  it("사진이 상한보다 많아도(12장) 'many'다", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(12), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["vision", "many"]);
+  });
+
+  it("사진이 상한 미만이면(3장) onStage가 ('vision', 'normal')로 불린다", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(3), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals).toContainEqual(["vision", "normal"]);
+    expect(signals).not.toContainEqual(["vision", "many"]);
+  });
+
+  it("사진이 0장이거나 vision이 꺼져 있으면 vision 신호 자체가 없다 (015 계약 유지)", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    await backend.generate(requestFor(dayWithPhotos(3), "none"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals.filter(([s]) => s === "vision")).toHaveLength(0);
   });
 });

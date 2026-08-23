@@ -26,13 +26,19 @@ import { buildPrompt, instructionLines } from "../diary/prompt";
 import type { DiaryRequest } from "../diary/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
-import { selectForVision } from "../vision/select";
+import { reachedVisionLimit, selectForVision } from "../vision/select";
 import type { PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
 import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
-import type { GenerationResult, InferenceBackend, ModuleStatus, ProgressStage } from "./types";
+import type {
+  GenerationResult,
+  InferenceBackend,
+  ModuleStatus,
+  MonologueBranch,
+  ProgressStage,
+} from "./types";
 
 /** 네이티브 백엔드 장치 정보를 조회하는 함수. 테스트에서 주입한다. */
 export type BackendProbe = () => Promise<unknown>;
@@ -134,7 +140,7 @@ async function readPhotos(
   vision: VisionSupport,
   request: DiaryRequest,
   cancel: { cancelled: boolean },
-  onStage?: (stage: ProgressStage) => void,
+  onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
 ): Promise<VisionOutcome> {
   // 004가 사진을 못 봤으면(`none`·`unknown`) 읽을 것이 없다.
   //
@@ -158,6 +164,16 @@ async function readPhotos(
 
   try {
     const selected = selectForVision(photos.value.photos);
+
+    // 016 — 사진 보기 갈래(많음/보통, research.md §3). 그날 사진 수가 캡션
+    // 상한에 닿았는지로 가른다. `reachedVisionLimit()`이 011의 S1(상한
+    // 숫자를 export하지 않는다)을 지키면서 이 판정만 대신해 준다 — 숫자
+    // 자체는 select.ts 밖으로 나가지 않는다. `captionAll()`을 부르기 전에
+    // 딱 한 번 보낸다 — 015의 `onPhotoStart`(장 전환, branch 없음) 계약은
+    // 그대로 두고, 화면이 이 branch를 기억해 재사용한다(contracts/
+    // load-signal.md, data-model.md 「AppScreen 확장」).
+    onStage?.("vision", reachedVisionLimit(photos.value.photos.length) ? "many" : "normal");
+
     // 015 — 사진 전환 신호. `"vision"`이 나가는 유일한 자리다(C1, contracts/
     // photo-advance.md) — 이 함수를 부르기 전에는 `onStage("vision")`을 별도로
     // 보내지 않는다(generate()의 주석 참조).
@@ -250,7 +266,7 @@ export function createOnDeviceBackend(
      */
     async generate(
       request: DiaryRequest,
-      onStage?: (stage: ProgressStage) => void,
+      onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
     ): Promise<GenerationResult> {
       // 0. 시각 설정 — 사진을 보겠다고 했는데 보지 않은 일기를 주지 않는다(FR-022).
       //
@@ -303,10 +319,26 @@ export function createOnDeviceBackend(
       const prompt = buildPrompt(request, seen);
 
       // 2. 모델을 연다. 실패하면 **다른 캐릭터로 대신하지 않는다**(FR-010).
+      //
+      // 016 — 로드 신호 두 단계 (contracts/load-signal.md). 로드 시작 시점에는
+      // 아직 콜드/핫을 모르므로 branch 없이 보내고, 완료되면 warm 값으로 확정
+      // 신호를 보낸다. 실패하면 확정 신호를 보내지 않는다.
+      onStage?.("load");
       const loaded = await engine.load(request.character);
       if (!loaded.ok) {
         return { kind: "model-load-failed", reason: loaded.reason };
       }
+
+      // 016 FR-013 — 로드 자체는 중단할 수 없다(research.md §7, llama.rn에
+      // 로드 취소 API가 없다). 로드가 끝난 이 시점에 취소 상태를 재확인해
+      // 결과를 버린다 — 011의 captionAll()이 루프 종료 후 cancel을 다시
+      // 확인하는 것과 같은 패턴이다.
+      if (cancel.cancelled) {
+        await engine.unload().catch(() => {});
+        return { kind: "interrupted" };
+      }
+
+      onStage?.("load", loaded.warm ? "hot" : "cold");
 
       try {
         // 015 — 글쓰기 진행 신호 (contracts/progress-signal.md).

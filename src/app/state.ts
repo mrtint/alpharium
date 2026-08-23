@@ -24,7 +24,7 @@ import { selectableDays, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
 import type { DiaryEntry } from "../diary/types";
-import type { ProgressStage } from "../inference/types";
+import type { MonologueBranch, ProgressStage } from "../inference/types";
 import { describeStage } from "./failure-text";
 
 /**
@@ -85,11 +85,17 @@ export type AppScreen =
    * 015 — `stage`·`line` 둘 다 옵셔널이다. 화면이 뜬 직후, 첫 진행 신호가
    * 오기 전에는 둘 다 `undefined`일 수 있다(FR-011).
    *
-   * **타입 자체가 진행률·시간을 막는다** — `stage`는 `ProgressStage`(문자열
-   * 리터럴 유니온)뿐이고 `line`은 `string`뿐이다. 숫자·객체가 들어올 자리가
-   * 없다(data-model.md 「AppScreen 확장」, 원칙 IV).
+   * **016 — `branch`가 더해졌다.** 모델 로드(콜드/핫)·사진 보기(많음/보통)
+   * 단계에서 문구 풀을 다시 가르는 하위 갈래다 — `stage`가 바뀌지 않아도
+   * `branch`만 갱신될 수 있다(사진 전환 신호, data-model.md 「AppScreen
+   * 확장」 갱신 규칙).
+   *
+   * **타입 자체가 진행률·시간을 막는다** — `stage`는 `ProgressStage`,
+   * `branch`는 `MonologueBranch`(둘 다 문자열 리터럴 유니온)뿐이고 `line`은
+   * `string`뿐이다. 숫자·객체가 들어올 자리가 없다(data-model.md 「AppScreen
+   * 확장」, 원칙 IV).
    */
-  | { kind: "writing"; stage?: ProgressStage; line?: string }
+  | { kind: "writing"; stage?: ProgressStage; branch?: MonologueBranch; line?: string }
   | { kind: "written"; entry: DiaryEntry; saved: boolean; overwrote: boolean }
   | { kind: "failed"; message: string };
 
