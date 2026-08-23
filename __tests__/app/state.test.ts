@@ -733,8 +733,9 @@ describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)"
     expect(toWriting()).toEqual({ kind: "writing" });
   });
 
-  it("writing 갈래에 필드가 없다(FR-010a, SC-012, 원칙 IV)", () => {
-    // **진행률·경과 시간·단계 이름을 담을 자리가 없다.** 자리가 없으면 담을 수 없다.
+  it("writing 갈래가 kind 하나만으로도 유효하다 — stage·line은 옵셔널이다(015)", () => {
+    // toWriting()은 여전히 인자를 받지 않으므로 처음 값은 kind 하나뿐이다.
+    // 첫 onProgress 콜백 전에도 화면이 어색하지 않아야 한다(FR-011).
     expect(Object.keys(toWriting())).toEqual(["kind"]);
   });
 
@@ -748,16 +749,28 @@ describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)"
    * 통과했다** — 타입은 지워지므로 `Object.keys()`가 여전히 `["kind"]`였다.
    * 잡은 것은 `tsc`뿐이었고, 그것은 `npm test`가 아니라 `npm run lint`에 있다.
    *
-   * 그래서 **선언을 직접 읽는다.** 이제 어느 쪽으로 들어와도 걸린다.
+   * 그래서 **선언을 직접 읽는다.**
+   *
+   * ★ **015가 이 방어를 다시 연다.** `stage`·`line`이 새로 생겼지만 **둘 다
+   * 옵셔널이고 타입이 `ProgressStage | undefined`·`string | undefined`로
+   * 좁혀져 있다** — 숫자·시간·객체가 들어올 자리는 여전히 없다
+   * (data-model.md 「AppScreen 확장」). 그래서 이 테스트는 "필드가 없다"가
+   * 아니라 "허용된 두 필드 외에는 없고, 그 타입이 좁다"를 확인한다.
    * ─────────────────────────────────────────────────────────────────────────
    */
-  it("★ AppScreen 선언의 writing 갈래에 필드를 더할 수 없다(FR-010a)", () => {
+  it("★ AppScreen 선언의 writing 갈래가 stage·line 두 옵셔널 필드만 허용한다(FR-010a, 015)", () => {
     const source = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
     const writingBranch = source.match(/\|\s*\{\s*kind:\s*"writing"[^}]*\}/);
 
     expect(writingBranch).not.toBeNull();
-    // 진행률·단계·시간이 들어올 자리가 없다 — `kind` 하나뿐이다.
-    expect(writingBranch?.[0]).toBe('| { kind: "writing" }');
+    expect(writingBranch?.[0]).toBe('| { kind: "writing"; stage?: ProgressStage; line?: string }');
+  });
+
+  it("숫자·Date·객체를 가리키는 타입이 없다 (원칙 IV)", () => {
+    const source = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
+    const writingBranch = source.match(/\|\s*\{\s*kind:\s*"writing"[^}]*\}/)?.[0] ?? "";
+
+    expect(writingBranch).not.toMatch(/number|Date|percent|elapsed/i);
   });
 });
 
@@ -973,5 +986,72 @@ describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)"
   it("★ C3 — toWriting은 012 이후에도 여전히 인자를 받지 않는다", () => {
     expect(toWriting.length).toBe(0);
     expect(Object.keys(toWriting())).toEqual(["kind"]);
+  });
+});
+
+/**
+ * 015 — writing 화면이 진행 신호(stage)와 독백 문구(line)를 담을 수 있다.
+ *
+ * 계약: specs/015-writing-monologue/data-model.md 「AppScreen 확장」
+ */
+describe("015 — writing의 stage·line", () => {
+  it("stage·line 없이 시작할 수 있다 (초기값)", () => {
+    const screen = toWriting();
+    expect(screen).toEqual({ kind: "writing" });
+  });
+
+  it("stage·line을 가진 writing 값을 만들 수 있다 (타입 확인)", () => {
+    const screen: ReturnType<typeof toWriting> = {
+      kind: "writing",
+      stage: "vision",
+      line: "사진을 들여다보는 중…",
+    };
+    expect(screen.kind).toBe("writing");
+    if (screen.kind === "writing") {
+      expect(screen.stage).toBe("vision");
+      expect(screen.line).toBe("사진을 들여다보는 중…");
+    }
+  });
+});
+
+/**
+ * 015 US2 — writing의 stage·line이 다른 화면 갈래로 새지 않는다.
+ *
+ * 계약: specs/015-writing-monologue/tasks.md T019, FR-009·FR-011
+ *
+ * `afterGeneration()`이 만드는 `written`·`failed` 갈래에는 애초에 `stage`·
+ * `line` 자리가 없다 — 타입 선언을 직접 읽어 그 사실을 못박는다(007 이후
+ * 관례). 자리가 없으면 새는 경로 자체가 존재하지 않는다.
+ */
+describe("015 US2 — stage·line이 written·failed로 새지 않는다", () => {
+  const rawSource = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
+  const source = rawSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
+
+  it("written 갈래에 stage·line이 없다", () => {
+    const match = source.match(/\{\s*kind:\s*"written"[^}]*\}/);
+    expect(match).not.toBeNull();
+    expect(match?.[0]).not.toMatch(/\bstage\b|\bline\b/);
+  });
+
+  it("failed 갈래에 stage·line이 없다", () => {
+    const match = source.match(/\{\s*kind:\s*"failed"[^}]*\}/);
+    expect(match).not.toBeNull();
+    expect(match?.[0]).not.toMatch(/\bstage\b|\bline\b/);
+  });
+
+  it("afterGeneration()의 성공 결과에 stage·line 필드가 없다 (런타임 확인)", () => {
+    const screen = afterGeneration({
+      ok: true,
+      entry: entryFor(),
+      overwrote: false,
+    });
+    expect(Object.keys(screen)).not.toContain("stage");
+    expect(Object.keys(screen)).not.toContain("line");
+  });
+
+  it("afterGeneration()의 실패 결과에 stage·line 필드가 없다 (런타임 확인)", () => {
+    const screen = afterGeneration({ ok: false, stage: "generation", reason: "무언가" });
+    expect(Object.keys(screen)).not.toContain("stage");
+    expect(Object.keys(screen)).not.toContain("line");
   });
 });

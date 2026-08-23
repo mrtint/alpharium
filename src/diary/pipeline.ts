@@ -9,7 +9,7 @@
  */
 
 import { isDayWritable, type DayDate } from "../config/day-boundary";
-import { isGenerationFailure, type InferenceBackend } from "../inference/types";
+import { isGenerationFailure, type InferenceBackend, type ProgressStage } from "../inference/types";
 import type { DaySignals } from "../signals/types";
 import { buildRequest } from "./request";
 import type { DiaryStore } from "./store";
@@ -103,7 +103,7 @@ export type PipelineDeps = {
 };
 
 export interface Pipeline {
-  run(input: PipelineInput): Promise<PipelineResult>;
+  run(input: PipelineInput, onProgress?: (stage: ProgressStage) => void): Promise<PipelineResult>;
 }
 
 /** 실패를 만든다. stage 없이 실패하는 경로가 없도록 이 함수만 쓴다. */
@@ -124,7 +124,10 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
   const running = new Set<DayDate>();
 
   return {
-    async run(input: PipelineInput): Promise<PipelineResult> {
+    async run(
+      input: PipelineInput,
+      onProgress?: (stage: ProgressStage) => void,
+    ): Promise<PipelineResult> {
       // 1. 이 하루를 지금 쓸 수 있는가? — 닫혔거나(지난 하루), 오늘이면서
       //    정오를 지났으면 쓸 수 있다(012, 헌법 원칙 II 「하루의 끝」).
       //    ★ isDayClosed()만 보던 이전 게이트는 오늘을 언제나 거부했다
@@ -140,7 +143,7 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
 
       running.add(input.day);
       try {
-        return await runStages(deps, input);
+        return await runStages(deps, input, onProgress);
       } finally {
         // 성공·실패와 무관하게 빠진다. 빠지지 않으면 실패한 하루를 영영 다시 시도할 수 없다.
         running.delete(input.day);
@@ -155,8 +158,15 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
  * **앞 단계가 실패하면 뒤 단계를 시도하지 않는다.** 특히 5(생성)가 실패했는데 6(저장)이
  * 도는 일이 없어야 한다 — 그래야 기존 일기가 보존된다(FR-023b).
  */
-async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<PipelineResult> {
+async function runStages(
+  deps: PipelineDeps,
+  input: PipelineInput,
+  onProgress?: (stage: ProgressStage) => void,
+): Promise<PipelineResult> {
   // 3. 신호를 가져온다.
+  // 015 — 진행 신호. 파이프라인이 보내는 것은 이 한 곳뿐이며, 나머지는 그대로
+  // 백엔드까지 중계한다(data-model.md 「Pipeline.run() 확장」).
+  onProgress?.("signals");
   const signals = await deps.loadSignals(input.day);
   if (signals === null) {
     return stop("signals", `${input.day}의 신호를 가져오지 못했다`);
@@ -180,7 +190,7 @@ async function runStages(deps: PipelineDeps, input: PipelineInput): Promise<Pipe
   }
 
   // 5. 생성한다. 이 기능에서는 항상 여기서 멈춘다.
-  const generated = await deps.backend.generate(request.request);
+  const generated = await deps.backend.generate(request.request, onProgress);
   if (isGenerationFailure(generated)) {
     const detail = "reason" in generated ? `: ${generated.reason}` : "";
 

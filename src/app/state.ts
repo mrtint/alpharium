@@ -24,6 +24,7 @@ import { selectableDays, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
 import type { DiaryEntry } from "../diary/types";
+import type { ProgressStage } from "../inference/types";
 import { describeStage } from "./failure-text";
 
 /**
@@ -80,7 +81,15 @@ export type AppScreen =
    * 화면이 「확인 대신 미리 보기」로 미끄러질 수 있다.
    */
   | { kind: "confirm-overwrite"; day: DayDate }
-  | { kind: "writing" }
+  /**
+   * 015 — `stage`·`line` 둘 다 옵셔널이다. 화면이 뜬 직후, 첫 진행 신호가
+   * 오기 전에는 둘 다 `undefined`일 수 있다(FR-011).
+   *
+   * **타입 자체가 진행률·시간을 막는다** — `stage`는 `ProgressStage`(문자열
+   * 리터럴 유니온)뿐이고 `line`은 `string`뿐이다. 숫자·객체가 들어올 자리가
+   * 없다(data-model.md 「AppScreen 확장」, 원칙 IV).
+   */
+  | { kind: "writing"; stage?: ProgressStage; line?: string }
   | { kind: "written"; entry: DiaryEntry; saved: boolean; overwrote: boolean }
   | { kind: "failed"; message: string };
 

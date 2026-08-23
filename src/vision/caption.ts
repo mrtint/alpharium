@@ -43,6 +43,14 @@ export type ResizedPhotoCleaner = (path: string) => Promise<void>;
 export type CancelSignal = { cancelled: boolean };
 
 /**
+ * 사진 전환 신호 (015).
+ *
+ * 인자를 받지 않는다 — 순번·`Photo.id`·남은 장수 어느 것도 넘기지 않는다.
+ * "무언가 바뀌었다"는 사실만 전달한다(data-model.md 「사진 전환 신호」).
+ */
+export type PhotoAdvanceSignal = () => void;
+
+/**
  * 고른 사진들을 한 장씩 읽는다.
  *
  * @param engine 이미 `load()`된 엔진. **이 함수는 열지도 닫지도 않는다** — E1의 순서는
@@ -56,6 +64,9 @@ export type CancelSignal = { cancelled: boolean };
  *   그대로 재사용할 수 있게 하는 하위 호환이다(contracts/resize.md는 필수를 요구하지
  *   않는다 — 013이 새로 여는 것은 "리사이즈가 있으면 거친다"는 조건부 경로다)
  * @param cleanup 리사이즈 사본을 지운다(013). `resize`가 없으면 부르지 않는다
+ * @param onPhotoStart 사진 전환 신호(015). `for` 루프 매 반복 시작(취소 검사 직후)에
+ *   부른다 — 사진마다 정확히 1회, 그만둔 뒤 남은 장은 부르지 않는다
+ *   (contracts/photo-advance.md)
  * @returns 읽은 결과. **`captions`가 비어도 그것은 「사진이 없다」가 아니다**
  */
 export async function captionAll(
@@ -66,6 +77,7 @@ export async function captionAll(
   cancel?: CancelSignal,
   resize?: ResizeExecutor,
   cleanup?: ResizedPhotoCleaner,
+  onPhotoStart?: PhotoAdvanceSignal,
 ): Promise<PhotoVision | null> {
   const captions: PhotoCaption[] = [];
 
@@ -76,6 +88,9 @@ export async function captionAll(
     // 돌려주면 호출자가 그것을 쓸 수 있고, 그러면 「적게 본 일기」가 나온다 —
     // 그만둔 것은 취소이지 그것이 아니다.
     if (cancel?.cancelled === true) return null;
+
+    // 015 — 사진 전환 신호. 취소 검사 직후, 경로 해석 이전.
+    onPhotoStart?.();
 
     // 경로를 얻지 못하면 이 장은 읽지 못한 것이다. **나머지는 계속 읽는다**(E4).
     let path: string | null;

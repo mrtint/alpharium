@@ -13,7 +13,7 @@
 import { createPipeline } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
 import type { Character, DiaryEntry, VisionSetting } from "../../src/diary/types";
-import type { GenerationResult, InferenceBackend } from "../../src/inference/types";
+import type { GenerationResult, InferenceBackend, ProgressStage } from "../../src/inference/types";
 import { partiallyUnknownDay, richDay } from "../../src/signals/fake";
 import type { DaySignals } from "../../src/signals/types";
 import type { DayDate } from "../../src/config/day-boundary";
@@ -810,5 +810,61 @@ describe("014 — 제목이 사후 분리된다 (FR-006·007·009)", () => {
       expect(result.entry.title).toBeUndefined();
       expect(result.entry.text).toBe("오늘은 아무 일도 없었다. 그냥 하루가 지나갔다.");
     }
+  });
+});
+
+/**
+ * 015 — 쓰는 중 독백: onProgress 신호 중계.
+ *
+ * 계약: specs/015-writing-monologue/data-model.md 「Pipeline.run() 확장」
+ *
+ * **파이프라인은 신호의 내용을 해석·가공하지 않는다** — `loadSignals()` 호출
+ * 직전에 `"signals"`를 보내고, 나머지는 그대로 백엔드까지 중계한다(중계기
+ * 역할만 한다, plan.md 핵심 배선 위험).
+ */
+describe("015 — onProgress 신호 중계", () => {
+  it("loadSignals() 호출 전에 onProgress가 'signals'로 불린다", async () => {
+    const stages: string[] = [];
+    const { pipeline } = makePipeline({
+      signals: async (day) => {
+        // loadSignals가 불린 시점에는 이미 'signals'가 와 있어야 한다.
+        expect(stages).toContain("signals");
+        return partiallyUnknownDay(day);
+      },
+    });
+
+    await pipeline.run(inputFor(), (stage) => stages.push(stage));
+
+    expect(stages).toContain("signals");
+  });
+
+  it("onProgress가 백엔드까지 그대로 전달된다", async () => {
+    let receivedOnProgress: ((stage: ProgressStage) => void) | undefined;
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(_request, onStage) {
+        receivedOnProgress = onStage;
+        onStage?.("generation");
+        return { text: "글" };
+      },
+    };
+    const { pipeline } = makePipeline({ backend });
+
+    const stages: string[] = [];
+    await pipeline.run(inputFor(), (stage) => stages.push(stage));
+
+    expect(receivedOnProgress).toBeDefined();
+    expect(stages).toContain("generation");
+  });
+
+  it("onProgress를 안 넘겨도 기존 테스트가 그대로 통과한다 (옵셔널 확장)", async () => {
+    const { pipeline } = makePipeline({ backend: generating("오늘은 조용했다.") });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
   });
 });

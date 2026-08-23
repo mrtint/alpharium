@@ -32,7 +32,7 @@ import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
-import type { GenerationResult, InferenceBackend, ModuleStatus } from "./types";
+import type { GenerationResult, InferenceBackend, ModuleStatus, ProgressStage } from "./types";
 
 /** 네이티브 백엔드 장치 정보를 조회하는 함수. 테스트에서 주입한다. */
 export type BackendProbe = () => Promise<unknown>;
@@ -134,6 +134,7 @@ async function readPhotos(
   vision: VisionSupport,
   request: DiaryRequest,
   cancel: { cancelled: boolean },
+  onStage?: (stage: ProgressStage) => void,
 ): Promise<VisionOutcome> {
   // 004가 사진을 못 봤으면(`none`·`unknown`) 읽을 것이 없다.
   //
@@ -157,6 +158,10 @@ async function readPhotos(
 
   try {
     const selected = selectForVision(photos.value.photos);
+    // 015 — 사진 전환 신호. `"vision"`이 나가는 유일한 자리다(C1, contracts/
+    // photo-advance.md) — 이 함수를 부르기 전에는 `onStage("vision")`을 별도로
+    // 보내지 않는다(generate()의 주석 참조).
+    const onPhotoStart = onStage === undefined ? undefined : () => onStage("vision");
     const result = await captionAll(
       vision.engine,
       selected,
@@ -165,6 +170,7 @@ async function readPhotos(
       cancel,
       vision.resize,
       vision.cleanupResized,
+      onPhotoStart,
     );
 
     // `null`은 그만둔 것이다 — 거기까지 읽은 것을 버린다(FR-009).
@@ -242,7 +248,10 @@ export function createOnDeviceBackend(
      * **어느 실패 갈래에도 `text`가 없다**(002 FR-016). 거부된 글도, 끊긴 부분 출력도
      * 밖으로 나가지 않는다(FR-017c, FR-021c).
      */
-    async generate(request: DiaryRequest): Promise<GenerationResult> {
+    async generate(
+      request: DiaryRequest,
+      onStage?: (stage: ProgressStage) => void,
+    ): Promise<GenerationResult> {
       // 0. 시각 설정 — 사진을 보겠다고 했는데 보지 않은 일기를 주지 않는다(FR-022).
       //
       // **`none`으로 조용히 낮추지 않는다.** 낮추는 한 줄이 들어가면 다음 기능까지 남아
@@ -279,7 +288,7 @@ export function createOnDeviceBackend(
       // ─────────────────────────────────────────────────────────────────────
       let seen: PhotoVision | undefined;
       if (request.vision !== "none" && vision !== undefined) {
-        const outcome = await readPhotos(vision, request, cancel);
+        const outcome = await readPhotos(vision, request, cancel, onStage);
 
         // **「보지 않음」으로 낮추지 않는다**(FR-021). 실패는 실패로 돌려준다.
         if (outcome.kind === "not-ready") return { kind: "vision-failed", reason: "not-ready" };
@@ -300,6 +309,11 @@ export function createOnDeviceBackend(
       }
 
       try {
+        // 015 — 글쓰기 진행 신호 (contracts/progress-signal.md).
+        // **`readPhotos()` 호출부에는 별도로 "vision"을 보내지 않는다** — 그러면
+        // T007이 만드는 `onPhotoStart`와 이중 발화한다(C1, contracts/photo-advance.md).
+        onStage?.("generation");
+
         // 3. 생성한다. 시간 한도를 감시한다(FR-021).
         const run = await runWithTimeout(engine, prompt, timeoutMs);
         if (run.timedOut) {

@@ -15,6 +15,16 @@ import type { DiaryRequest } from "../diary/types";
 export type InferenceLocation = "on-device" | "desktop-server";
 
 /**
+ * 생성 진행 신호 (015 FR-001).
+ *
+ * "지금 무엇을 하는가"를 실시간으로 알린다 — `GenerationFailure`(어디서 실패로
+ * 멈췄는가)와는 이름·목적이 다른 독립 타입이다. 문자열 리터럴 유니온뿐이며
+ * 숫자·시간·객체 필드를 담지 않는다(원칙 IV) — 필드를 더하면 그 순간 진행률이
+ * 된다.
+ */
+export type ProgressStage = "signals" | "vision" | "generation";
+
+/**
  * 네이티브 모듈 적재 상태.
  *
  * `unavailable`과 `failed`를 뭉뚱그리지 않는다. 시뮬레이터에서 모듈이 없는 것은
@@ -120,7 +130,10 @@ export function isGenerationFailure(result: GenerationResult): result is Generat
 export interface InferenceBackend {
   readonly location: InferenceLocation;
   isAvailable(): Promise<ModuleStatus>;
-  generate(request: DiaryRequest): Promise<GenerationResult>;
+  generate(
+    request: DiaryRequest,
+    onStage?: (stage: ProgressStage) => void,
+  ): Promise<GenerationResult>;
 }
 
 /** 추론 위치 선택이 거부된 까닭. */

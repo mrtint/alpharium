@@ -44,6 +44,7 @@ import {
 import type { SelectionState } from "../app/selection";
 import { dayOf, isDayWritable, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
+import { pickMonologue } from "../diary/monologue";
 import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
@@ -200,12 +201,23 @@ export function DiaryHomeScreen({
       try {
         const at = now();
 
-        const result = await pipeline.run({
-          day,
-          now: at,
-          character: selection.character,
-          vision,
-        });
+        const result = await pipeline.run(
+          {
+            day,
+            now: at,
+            character: selection.character,
+            vision,
+          },
+          // 015 — 진행 신호가 오면 독백 문구를 고른다. 예외를 던지지 않는 얇은
+          // 콜백이다(contracts/progress-signal.md 불변식 3).
+          (stage) => {
+            setScreen((s) => {
+              if (s.kind !== "writing") return s;
+              const line = pickMonologue(stage, s.line);
+              return { ...s, stage, line };
+            });
+          },
+        );
 
         // ─────────────────────────────────────────────────────────────────────
         // **★ 그만두었으면 결과를 버린다**(FR-014a).
@@ -374,8 +386,10 @@ export function DiaryHomeScreen({
           */}
           <ActivityIndicator accessibilityLabel="쓰고 있다" size="large" />
 
-          {/* **수치도 단계 이름도 생성 중인 글도 없다**(FR-011·010b·012) */}
-          <Text style={styles.writing}>쓰고 있다</Text>
+          {/* **수치도 생성 중인 글도 없다**(FR-011·010b·012). 015 — 첫 진행
+              신호가 오기 전에는 screen.line이 undefined이므로 기존 문구를
+              그대로 보인다(FR-011). */}
+          <Text style={styles.writing}>{screen.line ?? "쓰고 있다"}</Text>
 
           {/* **그만둘 수 있다**(FR-013). 30초를 견디는 데 필요한 나머지 절반이다 */}
           <Pressable accessibilityRole="button" onPress={() => void cancel()} style={styles.link}>

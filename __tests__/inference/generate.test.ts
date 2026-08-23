@@ -512,3 +512,117 @@ describe("011 — 사진을 읽는다", () => {
     expect(prompts).toEqual([]);
   });
 });
+
+/* ═══════════════ 015 — 쓰는 중 독백: onStage 진행 신호 ═══════════════ */
+
+/**
+ * 계약: specs/015-writing-monologue/contracts/progress-signal.md
+ *       specs/015-writing-monologue/contracts/photo-advance.md
+ *       specs/015-writing-monologue/data-model.md 「onStage 콜백」
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **`"vision"`의 유일한 발생원은 `captionAll()`의 `onPhotoStart`다.**
+ *
+ * `generate()`가 `readPhotos()` 호출 직전에 별도로 `onStage("vision")`을 보내면
+ * 사진 1장에서 신호가 2번(진입 1회 + `onPhotoStart` 1회) 나가는 이중 발화가
+ * 재발한다(2026-08-23 `/speckit-analyze` C1) — 그 회귀를 여기서 못박는다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("015 — onStage 진행 신호", () => {
+  const pathOf = async (photo: { id: string }) => `/photo/${photo.id}.jpg`;
+
+  function fakeVision(captionText = "창가에 놓인 커피잔") {
+    return {
+      engine: {
+        async load() {
+          return { ok: true as const };
+        },
+        async caption() {
+          return { text: captionText };
+        },
+        async stop() {},
+        async unload() {},
+      },
+      resolvePath: pathOf,
+    };
+  }
+
+  it("engine.run() 직전에 onStage가 'generation'으로 불린다", async () => {
+    const stages: string[] = [];
+    const engine: GenerationEngine = {
+      async load() {
+        return { ok: true };
+      },
+      async run() {
+        // run()이 불린 시점에는 이미 'generation'이 보내졌어야 한다.
+        expect(stages).toContain("generation");
+        return { text: GOOD_KO, ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const backend = createOnDeviceBackend(async () => ({}), engine);
+
+    await backend.generate(requestFor(), (stage) => stages.push(stage));
+
+    expect(stages).toContain("generation");
+  });
+
+  it("onStage를 안 넘겨도 기존 성공 경로가 그대로 동작한다 (옵셔널 확장)", async () => {
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+
+    const result = await backend.generate(requestFor());
+
+    expect(result).toEqual({ text: GOOD_KO });
+  });
+
+  it("onStage를 안 넘겨도 실패 경로가 그대로 동작한다", async () => {
+    const backend = createOnDeviceBackend(async () => ({}));
+
+    const result = await backend.generate(requestFor());
+
+    expect("kind" in result && result.kind).toBe("backend-unavailable");
+  });
+
+  it("사진 N장 → onStage가 정확히 N번만 'vision'으로 불린다 (2배가 아니다, C1)", async () => {
+    const stages: string[] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+
+    // richDay는 사진 3장을 준다 — generate()가 readPhotos() 앞에서 별도로
+    // "vision"을 보내면 3(진입) + 3(onPhotoStart) = 6이 되어 이 검사가 잡는다.
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage) =>
+      stages.push(stage),
+    );
+
+    expect(stages.filter((s) => s === "vision")).toHaveLength(3);
+  });
+
+  it("generate()는 'vision'을 직접 보내지 않는다 — readPhotos() 호출 전에는 신호가 없다", async () => {
+    const stages: string[] = [];
+    let visionLoaded = false;
+    const vision = {
+      engine: {
+        async load() {
+          visionLoaded = true;
+          return { ok: true as const };
+        },
+        async caption() {
+          // 캡션이 시작된 시점에 이미 정확히 1번의 'vision'이 왔어야 한다
+          // (readPhotos() 호출 직전의 별도 발화가 없다는 것의 증거).
+          expect(stages.filter((s) => s === "vision")).toHaveLength(1);
+          return { text: "창가에 놓인 커피잔" };
+        },
+        async stop() {},
+        async unload() {},
+      },
+      resolvePath: pathOf,
+    };
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, vision);
+
+    await backend.generate(requestFor(richDay("2026-08-12"), "quick"), (stage) =>
+      stages.push(stage),
+    );
+
+    expect(visionLoaded).toBe(true);
+  });
+});

@@ -454,3 +454,111 @@ describe("013 US3 — 리사이즈 사본을 장별로 지운다 (FR-008, data-m
     expect(cleaned).toEqual(["/resized/a.jpg"]);
   });
 });
+
+/**
+ * 015 — 사진 전환 신호 (onPhotoStart).
+ *
+ * 계약: specs/015-writing-monologue/contracts/photo-advance.md
+ *       specs/015-writing-monologue/data-model.md 「사진 전환 신호」
+ *
+ * **`"vision"`이 나가는 유일한 경로다.** `on-device.ts`는 별도로 보내지
+ * 않는다(C1 정정) — 이 콜백의 호출 횟수가 그대로 진행 신호의 근거가 된다
+ * (SC-006).
+ */
+describe("015 — onPhotoStart (SC-006)", () => {
+  it("사진 1장 → 1번 불린다", async () => {
+    const calls: unknown[] = [];
+    await captionAll(
+      engineWith(),
+      FIVE.slice(0, 1),
+      1,
+      resolve,
+      undefined,
+      undefined,
+      undefined,
+      (...args) => calls.push(args),
+    );
+
+    expect(calls).toHaveLength(1);
+  });
+
+  it("사진 3장 → 3번 불린다", async () => {
+    const calls: unknown[] = [];
+    await captionAll(
+      engineWith(),
+      FIVE.slice(0, 3),
+      3,
+      resolve,
+      undefined,
+      undefined,
+      undefined,
+      (...args) => calls.push(args),
+    );
+
+    expect(calls).toHaveLength(3);
+  });
+
+  it("사진 0장 → 호출 자체가 안 일어난다", async () => {
+    const calls: unknown[] = [];
+    await captionAll(engineWith(), [], 0, resolve, undefined, undefined, undefined, (...args) =>
+      calls.push(args),
+    );
+
+    expect(calls).toHaveLength(0);
+  });
+
+  it("인자 없이 호출된다 — 순번을 넘기지 않는다", async () => {
+    let receivedArgs: unknown[] | undefined;
+    await captionAll(
+      engineWith(),
+      FIVE.slice(0, 1),
+      1,
+      resolve,
+      undefined,
+      undefined,
+      undefined,
+      (...args) => {
+        receivedArgs = args;
+      },
+    );
+
+    expect(receivedArgs).toEqual([]);
+  });
+
+  it("그만두기로 3장 중 2번째에서 중단되면 2번만 불린다", async () => {
+    const cancel = { cancelled: false };
+    let count = 0;
+    const engine: VisionEngine = {
+      async load() {
+        return { ok: true };
+      },
+      async caption() {
+        count += 1;
+        if (count === 2) cancel.cancelled = true;
+        return { text: "읽은 것" };
+      },
+      async stop() {},
+      async unload() {},
+    };
+
+    const calls: unknown[] = [];
+    const vision = await captionAll(
+      engine,
+      FIVE.slice(0, 3),
+      3,
+      resolve,
+      cancel,
+      undefined,
+      undefined,
+      (...args) => calls.push(args),
+    );
+
+    expect(vision).toBeNull();
+    expect(calls).toHaveLength(2);
+  });
+
+  it("onPhotoStart를 안 넘겨도 기존 동작이 그대로다 (옵셔널 확장)", async () => {
+    const vision = await captionAll(engineWith(), FIVE, 5, resolve);
+    expect(vision?.captions).toHaveLength(5);
+  });
+});
