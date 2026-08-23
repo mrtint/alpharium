@@ -441,11 +441,32 @@ Independent Test 그대로).
   `geocodingEnabled`를 추가했다 — 그러지 않으면 토글이 다음 생성에
   반영되지 않는다. `npm test`(1529개) 전부 통과, `npm run lint`
   클린(eslint·tsc·헌법 검사·prettier).]
-- [ ] T040 [US4] `npx expo prebuild --platform android --clean`을 실행하고
+  [2026-08-24 실기기 확인(quickstart.md D1 겸함, SM-S901N/Android 16):
+  토글을 켜자 시스템 `GrantPermissionsActivity`가 실제로 열렸고(logcat의
+  WindowManagerShell 전이 로그로 확인), 승인 후
+  `requestForegroundPermissionsAsync()`가
+  `{"android":{"accuracy":"fine"},"granted":true,"status":"granted"}`를
+  돌려줬다. `adb shell dumpsys package`로 `ACCESS_FINE_LOCATION`·
+  `ACCESS_COARSE_LOCATION` 둘 다 `granted=true`로 전환된 것을 확인했다 —
+  research.md §3이 "실기기 확인 필요"로 남겨 둔 지점(권한이 실제로
+  요구되는가)이 이것으로 확정됐다. 화면의 고지 문구("좌표를 기기의 지도
+  서비스에 물어봅니다.")도 토글을 켜는 즉시 정확히 나타났다. **설정
+  영속화도 함께 확인**(quickstart.md D5 겸함) — 앱을 강제 종료 후
+  재시작해도 토글이 "선택" 상태로 그대로 유지됐고,
+  `files/preferences/geocoding-setting.json`에 `{"enabled":true}`가
+  정확히 저장돼 있음을 `run-as`로 확인했다.]
+- [X] T040 [US4] `npx expo prebuild --platform android --clean`을 실행하고
   서명 키를 되돌린다(`cp ~/.alpharium-signing/alpharium.jks
   android/app/`, plan.md/quickstart.md 사전 준비). `adb shell dumpsys
   package <패키지>`로 위치 권한이 매니페스트에 실제로 들어갔는지 확인한다
   (AGENTS.md 004 교훈, quickstart.md 사전 준비 5).
+  [2026-08-24: `prebuild --clean` 실행 → 서명 키 복원 → debug APK 빌드·설치
+  (SM-... 아님, 실기기 R3CTB084WDP) → `adb shell dumpsys package
+  com.anonymous.alpharium`로 확인. `requested permissions`에
+  `ACCESS_FINE_LOCATION`·`ACCESS_COARSE_LOCATION`이 실제로 들어갔다(런타임
+  승인은 아직 `granted=false` — 앱에서 토글을 켜기 전이므로 정상). 새 네이티브
+  모듈이므로 debug 실기기 확인 1회로 충분하다(AGENTS.md 「테스트」 절 기준) —
+  release 재확인은 하지 않는다.]
 
 **Checkpoint**: User Story 1~4 모두 독립적으로 동작한다. 설정이 꺼진
 기본 상태에서는 이 기능 이전과 화면·일기 본문 모두 동일하다.
