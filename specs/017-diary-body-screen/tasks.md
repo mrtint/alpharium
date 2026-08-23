@@ -400,9 +400,13 @@ Independent Test 그대로).
 
 ### Implementation for User Story 4 — 화면 토글·의존성 추가
 
-- [ ] T037 [US4] `npx expo install expo-location --check`로 SDK 57 호환
+- [X] T037 [US4] `npx expo install expo-location --check`로 SDK 57 호환
   버전을 추가한다(plan.md Technical Context). `package.json`에 새 의존이
   반영됐는지 확인한다.
+  [2026-08-24: `npx expo install expo-location` 실행, `package.json`에
+  `expo-location@~57.0.12` 반영 확인. `expo-location`과 무관한 기존 패키지
+  3개(`@expo/metro-runtime`·`expo`·`expo-file-system`)의 patch 버전 드리프트가
+  `--check`에서 함께 나왔으나 이 기능 범위 밖이라 건드리지 않았다.]
 - [X] T038 [P] [US4] `__tests__/ui/diary-list.test.tsx`(또는 신설 토글
   전용 테스트 파일)에 장소명 설정 토글이 렌더되고, 켤 때 고지 문구가
   나타나는지 검사하는 테스트를 추가한다(**먼저 작성해 실패를 확인**,
@@ -423,6 +427,20 @@ Independent Test 그대로).
   런타임 권한 요청은 사용자 판단으로 보류** — `expo-location`이 아직
   `npm install`되지 않아(T037 대기 중) 권한 요청 코드를 지금 작성하면
   타입이 맞지 않는다. T037(패키지 설치) 이후 남은 배선을 마저 잇는다.]
+  [2026-08-24 완료: T037 이후 나머지 배선을 마쳤다. `wiring.ts`의
+  `WiringDeps`에 `geocodingEnabled?`를 더하고 `createAppPipeline()`이
+  `expoGeocodingPort()`(지연 import)를 `createPipeline()`에 항상 넘기되
+  `geocodingEnabled`는 호출자가 준 값을 그대로 전달한다.
+  `DiaryHomeScreen.tsx`가 `onToggleGeocoding?`·`geocodingEnabled?`를 받아
+  `DiaryListScreen`에 그대로 잇는다. `App.tsx`의 `DiarySection`이
+  `geocoding-setting-store.ts`로 설정을 로드·저장하고, 토글을 켤 때
+  `expo-location`의 `requestForegroundPermissionsAsync()`를 지연
+  import로 부른다 — 요청이 실패하거나 거부돼도 `catch`로 삼키고 토글
+  값은 그대로 둔다(L9, 사용자가 낸 값을 앱이 조용히 무르지 않는다).
+  설정이 바뀌면 `wiring`을 다시 만들도록 `useMemo` deps에
+  `geocodingEnabled`를 추가했다 — 그러지 않으면 토글이 다음 생성에
+  반영되지 않는다. `npm test`(1529개) 전부 통과, `npm run lint`
+  클린(eslint·tsc·헌법 검사·prettier).]
 - [ ] T040 [US4] `npx expo prebuild --platform android --clean`을 실행하고
   서명 키를 되돌린다(`cp ~/.alpharium-signing/alpharium.jks
   android/app/`, plan.md/quickstart.md 사전 준비). `adb shell dumpsys

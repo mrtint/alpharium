@@ -81,6 +81,14 @@ export type DiaryHomeScreenProps = {
    * 오류가 나지 않고 아무 일도 일어나지 않을 뿐이다.
    */
   onSelectVision?: (vision: VisionSetting) => void;
+  /**
+   * 장소명 설정을 켜고 끈다 (017 FR-004~006).
+   *
+   * **옵셔널이다** — `onSelectVision?`과 같은 방식으로 계약을 넓힌다.
+   */
+  onToggleGeocoding?: (enabled: boolean) => void;
+  /** 지금 장소명 설정. **기본값은 꺼짐이다**(FR-004) */
+  geocodingEnabled?: boolean;
   /** 생성을 끊는 통로(005 FR-014b). 앱이 앞을 벗어날 때 쓴다 */
   stop?: () => Promise<void>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
@@ -98,6 +106,8 @@ export function DiaryHomeScreen({
   onSelectCharacter,
   vision = "none",
   onSelectVision,
+  onToggleGeocoding,
+  geocodingEnabled,
   stop,
   now = () => new Date(),
   onGoToCharacters,
@@ -339,6 +349,8 @@ export function DiaryHomeScreen({
           onSelectCharacter={onSelectCharacter}
           onSelectDay={setChosenDay}
           onSelectVision={onSelectVision}
+          onToggleGeocoding={onToggleGeocoding}
+          geocodingEnabled={geocodingEnabled}
           onWrite={() => void write()}
           selection={selection}
           // **012 — 새 판정을 만들지 않고 isDayWritable()을 재사용한다**
