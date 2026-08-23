@@ -100,7 +100,10 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
     const support: VisionSupport = {
       engine,
       resolvePath: async (p) => `/photo/${p.id}.jpg`,
-      resize: async (sourcePath) => ({ ok: true, path: sourcePath.replace("/photo/", "/resized/") }),
+      resize: async (sourcePath) => ({
+        ok: true,
+        path: sourcePath.replace("/photo/", "/resized/"),
+      }),
       cleanupResized: async (path) => {
         cleaned.push(path);
       },
@@ -109,7 +112,10 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
     return { support, cleaned };
   }
 
-  function engineReturning(run: RunResult, load: LoadResult = { ok: true, warm: true }): GenerationEngine {
+  function engineReturning(
+    run: RunResult,
+    load: LoadResult = { ok: true, warm: true },
+  ): GenerationEngine {
     return {
       async load() {
         return load;
@@ -241,7 +247,10 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
     return {
       engine,
       resolvePath: async (p) => `/photo/${p.id}.jpg`,
-      resize: async (sourcePath) => ({ ok: true, path: sourcePath.replace("/photo/", "/resized/") }),
+      resize: async (sourcePath) => ({
+        ok: true,
+        path: sourcePath.replace("/photo/", "/resized/"),
+      }),
       cleanupResized: async () => {},
     };
   }

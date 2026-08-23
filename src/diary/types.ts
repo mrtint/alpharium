@@ -63,6 +63,14 @@ export type DiaryRequest = {
    * 오늘인지 여부는 이미 계산된 값으로 전달받을 뿐이다.
    */
   dayStillOpen: boolean;
+  /**
+   * 대표 장소의 사람이 읽는 이름 (017 FR-008, 장소명 설정이 켜진 경우만).
+   *
+   * **이미 `known`으로 확정된 문자열만 담는다** — `unknown`/좌표 없음이면
+   * 이 필드 자체가 없다. 화면(`entry.placeName`)과 같은 지오코딩 호출
+   * 결과에서 나온 값이어야 한다("두 개의 진실" 금지, 원칙 II).
+   */
+  placeName?: string;
 };
 
 /**
@@ -113,4 +121,13 @@ export type DiaryEntry = {
    * 옵셔널이며 옛 일기에는 없다.
    */
   timing?: { visionMs?: number; writingMs: number };
+  /**
+   * 대표 장소 이름 (017 FR-007, 장소명 설정이 켜진 경우만).
+   *
+   * `SignalValue`와 같은 성격의 구분을 갖는다 — 좌표 자체가 없으면(또는
+   * 설정이 꺼져 있으면) 이 필드가 아예 없고, 좌표는 있는데 이름을 못
+   * 얻었으면 `{ kind: "unknown" }`, 얻었으면 `{ kind: "known"; value:
+   * string }`이다.
+   */
+  placeName?: { kind: "known"; value: string } | { kind: "unknown" };
 };

@@ -67,17 +67,27 @@ function describe<T>(signal: SignalValue<T>, known: (value: T) => string): strin
  * **012 — 걸음·배터리·연결이 빠졌다**(`USER_VISIBLE_SIGNAL_AXES`, FR-006·007).
  * 이 화면에는 원래도 배터리·연결 줄이 없었다 — 여기서 새로 빠진 것은 걸음뿐이다.
  * 사진·다닌 자리는 실제로 수집되는 축이라 그대로 남는다(FR-008).
+ *
+ * **017 — `placeName`이 있으면 "다닌 자리" 줄이 "대표 장소 · N곳" 형태로
+ * 바뀐다**(contracts/place-name.md L2·L6·L7). 없으면(설정이 꺼져 있거나
+ * 좌표가 없음) 기존 그대로다 — 회귀가 없다.
  */
-function signalLines(signals: DaySignals): { label: string; value: string }[] {
+function signalLines(
+  signals: DaySignals,
+  placeName?: DiaryEntry["placeName"],
+): { label: string; value: string }[] {
+  const placesValue = describe(signals.places, (places) => {
+    if (placeName === undefined) return `${places.trace.visitCount}곳`;
+    const name = placeName.kind === "known" ? placeName.value : "모른다";
+    return `대표 장소 · ${name} · ${places.trace.visitCount}곳`;
+  });
+
   return [
     {
       label: "사진",
       value: describe(signals.photos, (observation) => `${observation.photos.length}장`),
     },
-    {
-      label: "다닌 자리",
-      value: describe(signals.places, (places) => `${places.trace.visitCount}곳`),
-    },
+    { label: "다닌 자리", value: placesValue },
   ];
 }
 
@@ -115,7 +125,8 @@ function TimingLines({ entry }: { entry: DiaryEntry }) {
   return (
     <>
       <Text style={styles.signal}>
-        {name}{particle} 이렇게 일기를 작성했어요.
+        {name}
+        {particle} 이렇게 일기를 작성했어요.
       </Text>
       {timing.visionMs !== undefined && (
         <Text style={styles.signal}>
@@ -199,7 +210,7 @@ export function DiaryDetailScreen({
       */}
       <View style={styles.signals}>
         <Text style={styles.signalsTitle}>이 일기가 본 것</Text>
-        {signalLines(entry.signalsUsed).map((line) => (
+        {signalLines(entry.signalsUsed, entry.placeName).map((line) => (
           <Text key={line.label} style={styles.signal}>
             {line.label}: {line.value}
           </Text>

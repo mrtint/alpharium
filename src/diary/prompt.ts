@@ -180,6 +180,18 @@ const TRUNCATED_WARNING =
 const PLACES_LIMITATION =
   "이 자리들은 하루의 궤적이 아니라 사진이 찍힌 지점들이다. 사진을 찍지 않은 곳은 여기 없다.";
 
+/**
+ * 대표 장소 이름 줄을 만든다 (017 FR-008, contracts/place-name.md L4).
+ *
+ * **관측 서술이지 단정이 아니다** — 원칙 II의 문체를 그대로 따른다("다녀온
+ * 곳은 ○○ 근처였다"). `request.placeName`이 이미 `known`으로 확정된
+ * 문자열이므로 여기서는 짐작 어미를 강제하지 않는다 — 좌표를 실제로 물어봐
+ * 얻은 이름이라는 점에서 사진 캡션과 같은 자격의 관측이다.
+ */
+function placeNameLine(placeName: string): string {
+  return `다녀온 곳은 ${placeName} 근처였다.`;
+}
+
 /* ──────────────────── 사진의 내용 (011) ──────────────────── */
 
 /**
@@ -431,6 +443,10 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
   // 012 — 사진 축과 무관하게, 신호 목록과 독립된 자리에 온다(FR-004).
   const dayStillOpenPart = request.dayStillOpen ? [DAY_STILL_OPEN, ""] : [];
 
+  // 017 — 장소명 설정이 켜져 있고 이름을 얻은 경우에만 붙는다(FR-008,
+  // contracts/place-name.md L4). 화면과 같은 지오코딩 호출 결과를 공유한다.
+  const placeNamePart = request.placeName !== undefined ? [placeNameLine(request.placeName)] : [];
+
   return [
     ...SPEAKER_RULES,
     nameLine(request.character),
@@ -441,6 +457,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
     ...dayStillOpenPart,
     `${request.signals.date}에 네가 본 것:`,
     ...signalLines(request.signals),
+    ...placeNamePart,
     ...visionPart,
     "",
     "이 기록으로 그 하루의 일기를 써라.",

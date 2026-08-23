@@ -248,23 +248,66 @@ describe("017 — 소요 시간 문장 (contracts/elapsed-time.md)", () => {
       />,
     );
 
-    for (const leaked of ["gguf", "GGUF", "hyperclovax", "kanana", "지난번", "평균", "보다 빠르", "보다 느리"]) {
+    for (const leaked of [
+      "gguf",
+      "GGUF",
+      "hyperclovax",
+      "kanana",
+      "지난번",
+      "평균",
+      "보다 빠르",
+      "보다 느리",
+    ]) {
       expect(screen.queryByText(new RegExp(leaked))).toBeNull();
     }
   });
 
   it("1분 미만은 'SS초', 그 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
-    await render(
-      <DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 45_000 } }} />,
-    );
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 45_000 } }} />);
     expect(screen.getByText(/45초/)).toBeTruthy();
   });
 
   it("1분 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
-    await render(
-      <DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 130_000 } }} />,
-    );
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 130_000 } }} />);
     expect(screen.getByText(/2분 10초/)).toBeTruthy();
+  });
+});
+
+/**
+ * 017 US4 — 장소명 표시 (contracts/place-name.md L2·L5·L6·L7).
+ */
+describe("017 — 장소명 표시 (contracts/place-name.md)", () => {
+  it("placeName이 없으면 기존 '다닌 자리: N곳' 텍스트만 렌더된다 (회귀, L2)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor("2026-08-16", richDay("2026-08-16"))} />);
+
+    expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+    expect(screen.queryByText(/대표 장소/)).toBeNull();
+  });
+
+  it("placeName이 known이면 '대표 장소 · N곳' 형태로 렌더된다 (L6·L7)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{
+          ...entryFor("2026-08-16", richDay("2026-08-16")),
+          placeName: { kind: "known", value: "서울 중구" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/대표 장소 · 서울 중구/)).toBeTruthy();
+  });
+
+  it("placeName이 unknown이면 이름 자리에 '모른다'류 문구가 렌더된다 (L5)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{
+          ...entryFor("2026-08-16", richDay("2026-08-16")),
+          placeName: { kind: "unknown" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/대표 장소.*모른다/)).toBeTruthy();
   });
 });
 

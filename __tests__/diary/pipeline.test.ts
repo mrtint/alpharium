@@ -925,6 +925,178 @@ describe("017 — generated.timing이 entry.timing으로 옮겨진다", () => {
 });
 
 /**
+ * 017 US4 — 장소명 지오코딩 (contracts/place-name.md L2·L3·L4).
+ *
+ * 설정이 꺼지거나 좌표가 없으면 지오코딩 포트를 부르지 않는다. 켜져 있고
+ * 좌표가 있으면 정확히 1회 호출되며, 결과가 화면(entry.placeName)과
+ * 프롬프트(request) 양쪽에 같은 값으로 반영된다("두 개의 진실" 금지).
+ */
+describe("017 — 장소명 지오코딩 (contracts/place-name.md L2·L3·L4)", () => {
+  function signalsWithPlace(): DaySignals {
+    return {
+      date: DAY,
+      photos: { kind: "none" },
+      places: {
+        kind: "known",
+        value: {
+          trace: {
+            visitCount: 1,
+            approximateDistanceMeters: 0,
+            representativeCoordinate: { latitude: 37.5665, longitude: 126.978 },
+          },
+          source: "photo-exif",
+          photosWithLocation: 1,
+          photosConsidered: 1,
+        },
+      },
+      steps: { kind: "unknown", reason: "no-channel" },
+      battery: { kind: "unknown", reason: "no-channel" },
+      connectivity: { kind: "unknown", reason: "no-channel" },
+    };
+  }
+
+  function signalsWithoutPlace(): DaySignals {
+    return {
+      date: DAY,
+      photos: { kind: "none" },
+      places: { kind: "none" },
+      steps: { kind: "unknown", reason: "no-channel" },
+      battery: { kind: "unknown", reason: "no-channel" },
+      connectivity: { kind: "unknown", reason: "no-channel" },
+    };
+  }
+
+  function makeGeocodingSpy(result: { kind: "known"; value: string } | { kind: "unknown" }) {
+    const calls: unknown[] = [];
+    return {
+      calls,
+      port: {
+        async reverseGeocode(coordinate: unknown) {
+          calls.push(coordinate);
+          return result;
+        },
+      },
+    };
+  }
+
+  it("설정 꺼짐이면 좌표가 있어도 지오코딩 포트가 호출되지 않는다", async () => {
+    const { calls, port } = makeGeocodingSpy({ kind: "known", value: "서울 중구" });
+    const pipeline = createPipeline({
+      backend: generating("오늘 하루."),
+      store: memoryStore(),
+      loadSignals: async () => signalsWithPlace(),
+      geocoding: port,
+      geocodingEnabled: false,
+    });
+
+    await pipeline.run(inputFor());
+    expect(calls).toHaveLength(0);
+  });
+
+  it("좌표가 없으면(none) 설정이 켜져 있어도 호출되지 않는다", async () => {
+    const { calls, port } = makeGeocodingSpy({ kind: "known", value: "서울 중구" });
+    const pipeline = createPipeline({
+      backend: generating("오늘 하루."),
+      store: memoryStore(),
+      loadSignals: async () => signalsWithoutPlace(),
+      geocoding: port,
+      geocodingEnabled: true,
+    });
+
+    await pipeline.run(inputFor());
+    expect(calls).toHaveLength(0);
+  });
+
+  it("설정 켜짐 + 좌표 있음이면 정확히 1회만 호출된다", async () => {
+    const { calls, port } = makeGeocodingSpy({ kind: "known", value: "서울 중구" });
+    const pipeline = createPipeline({
+      backend: generating("오늘 하루."),
+      store: memoryStore(),
+      loadSignals: async () => signalsWithPlace(),
+      geocoding: port,
+      geocodingEnabled: true,
+    });
+
+    await pipeline.run(inputFor());
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({ latitude: 37.5665, longitude: 126.978 });
+  });
+
+  it("known이면 entry.placeName과 프롬프트에 같은 문자열이 반영된다 (L4)", async () => {
+    const { port } = makeGeocodingSpy({ kind: "known", value: "서울 중구" });
+    let receivedRequest: unknown;
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(request) {
+        receivedRequest = request;
+        return { text: "오늘 하루." };
+      },
+    };
+
+    const pipeline = createPipeline({
+      backend,
+      store: memoryStore(),
+      loadSignals: async () => signalsWithPlace(),
+      geocoding: port,
+      geocodingEnabled: true,
+    });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.placeName).toEqual({ kind: "known", value: "서울 중구" });
+    }
+    expect((receivedRequest as { placeName?: string }).placeName).toBe("서울 중구");
+  });
+
+  it("unknown이면 entry.placeName이 unknown이고 프롬프트에는 장소 이름 문장이 없다", async () => {
+    const { port } = makeGeocodingSpy({ kind: "unknown" });
+    let receivedRequest: unknown;
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(request) {
+        receivedRequest = request;
+        return { text: "오늘 하루." };
+      },
+    };
+
+    const pipeline = createPipeline({
+      backend,
+      store: memoryStore(),
+      loadSignals: async () => signalsWithPlace(),
+      geocoding: port,
+      geocodingEnabled: true,
+    });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.entry.placeName).toEqual({ kind: "unknown" });
+    }
+    expect((receivedRequest as { placeName?: string }).placeName).toBeUndefined();
+  });
+
+  it("geocoding을 주지 않으면(옵셔널) 지오코딩 없이 정상 동작한다", async () => {
+    const { pipeline } = makePipeline({
+      backend: generating("오늘 하루."),
+      signals: async () => signalsWithPlace(),
+    });
+
+    const result = await pipeline.run(inputFor());
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.entry.placeName).toBeUndefined();
+  });
+});
+
+/**
  * 015 — 쓰는 중 독백: onProgress 신호 중계.
  *
  * 계약: specs/015-writing-monologue/data-model.md 「Pipeline.run() 확장」

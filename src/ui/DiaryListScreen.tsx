@@ -26,6 +26,7 @@ import type { Character, VisionSetting } from "../diary/types";
 import type { DayDate } from "../config/day-boundary";
 import { CharacterPicker } from "./CharacterPicker";
 import { DayPicker } from "./DayPicker";
+import { GeocodingSettingToggle } from "./GeocodingSettingToggle";
 import { VisionPicker } from "./VisionPicker";
 
 export type DiaryListScreenProps = {
@@ -70,6 +71,15 @@ export type DiaryListScreenProps = {
   onSelectVision?: (vision: VisionSetting) => void;
   /** 지금 고른 사진 설정. **고른 적이 없으면 「보지 않음」이다**(FR-018) */
   vision?: VisionSetting;
+  /**
+   * 장소명 설정을 켜고 끈다 (017 FR-004~006).
+   *
+   * **옵셔널이다** — 006~016의 기존 테스트가 그대로 통과해야 한다.
+   * `onSelectVision?`과 같은 방식으로 계약을 넓힌다.
+   */
+  onToggleGeocoding?: (enabled: boolean) => void;
+  /** 지금 장소명 설정. **기본값은 꺼짐이다**(FR-004) */
+  geocodingEnabled?: boolean;
 };
 
 /**
@@ -101,6 +111,8 @@ export function DiaryListScreen({
   todayNotYetWritable,
   onSelectVision,
   vision = "none",
+  onToggleGeocoding,
+  geocodingEnabled = false,
 }: DiaryListScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
@@ -196,6 +208,14 @@ export function DiaryListScreen({
         */}
         {onSelectVision !== undefined && (
           <VisionPicker onSelect={onSelectVision} selected={vision} />
+        )}
+
+        {/*
+          **장소명 설정 토글**(017, research.md §6) — `VisionPicker` 바로
+          아래에 온다. 둘 다 「쓰기 전에 고르는 것」이라는 같은 범주다.
+        */}
+        {onToggleGeocoding !== undefined && (
+          <GeocodingSettingToggle enabled={geocodingEnabled} onToggle={onToggleGeocoding} />
         )}
 
         {/* **오늘이 아니라 고른 하루다**(009 FR-008, 006 FR-030) */}

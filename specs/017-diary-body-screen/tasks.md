@@ -338,29 +338,29 @@ Independent Test 그대로).
 
 ### Tests for User Story 4
 
-- [ ] T028 [P] [US4] `__tests__/signals/geocoding-port.test.ts`를 새로
+- [X] T028 [P] [US4] `__tests__/signals/geocoding-port.test.ts`를 새로
   작성한다(**먼저 작성해 실패를 확인**) — contracts/place-name.md L5 근거:
   - 좌표를 주면 이름 문자열을 돌려주는 대역에서 `{ kind: "known"; value:
     string }`을 돌려준다.
   - 빈 결과를 돌려주는 대역에서 `{ kind: "unknown" }`을 돌려준다.
   - 예외를 던지는 대역에서도 `{ kind: "unknown" }`을 돌려준다(던지지
     않는다).
-- [ ] T029 [US4] `src/signals/geocoding-port.ts`를 새로 만든다:
+- [X] T029 [US4] `src/signals/geocoding-port.ts`를 새로 만든다:
   `GeocodingPort`·`GeocodingResult` 타입과 `expoGeocodingPort()`를
   구현한다(data-model.md §8) — `expo-location`의 `reverseGeocodeAsync`를
   지연 import로 감싸고, 성공/빈 응답/예외 세 입력을 `known`/`unknown`
   두 갈래로만 접는다(research.md §3, contracts/place-name.md L5). T028의
   테스트가 통과해야 한다.
-- [ ] T030 [P] [US4] `__tests__/app/geocoding-setting-store.test.ts`를 새로
+- [X] T030 [P] [US4] `__tests__/app/geocoding-setting-store.test.ts`를 새로
   작성한다(**먼저 작성해 실패를 확인**, `vision-setting-store.test.ts`와
   같은 모양) — 읽기 실패(파일 없음·깨짐) 시 꺼짐(`false`)으로 귀결되는지,
   쓰기 후 왕복이 보존되는지(data-model.md §7 L1).
-- [ ] T031 [US4] `src/app/geocoding-setting-store.ts`를 새로 만든다:
+- [X] T031 [US4] `src/app/geocoding-setting-store.ts`를 새로 만든다:
   `GeocodingSettingPort`·`loadGeocodingSetting`·`saveGeocodingSetting`·
   `expoGeocodingSettingPort`를 `vision-setting-store.ts`와 같은 패턴으로
   구현한다(`preferences/geocoding-setting.json`, 별도 파일). T030의
   테스트가 통과해야 한다.
-- [ ] T032 [P] [US4] `__tests__/diary/pipeline.test.ts`에 다음을 추가한다
+- [X] T032 [P] [US4] `__tests__/diary/pipeline.test.ts`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**) — contracts/place-name.md L2·L3·L4 근거:
   - 설정 꺼짐이면 좌표가 있어도 지오코딩 포트가 호출되지 않는다(대역
     스파이로 확인).
@@ -371,21 +371,21 @@ Independent Test 그대로).
     요청 양쪽에 **같은 문자열**이 반영된다(L4 — 같은 호출 결과를 공유).
   - 호출 결과가 `unknown`이면 `entry.placeName = { kind: "unknown" }`이고
     프롬프트에는 장소 이름 문장이 추가되지 않는다.
-- [ ] T033 [US4] `src/diary/pipeline.ts`의 `runStages()`를 고친다: 4단계
+- [X] T033 [US4] `src/diary/pipeline.ts`의 `runStages()`를 고친다: 4단계
   (요청 생성) 직후·5단계(생성) 직전에, 설정이 켜져 있고
   `signals.places`가 `known`이며 `representativeCoordinate`가 있으면
   `deps.geocoding.reverseGeocode()`를 1회 호출한다(contracts/place-name.md
   「흐름」의 순서 주의). 결과를 `request`(프롬프트가 읽을 값)와 저장할
   `placeName` 양쪽에 반영한다. `PipelineDeps`에
   `geocoding?: GeocodingPort`를 추가한다. T032의 테스트가 통과해야 한다.
-- [ ] T034 [US4] `src/diary/types.ts`의 `DiaryRequest`에 장소 이름을 실을
+- [X] T034 [US4] `src/diary/types.ts`의 `DiaryRequest`에 장소 이름을 실을
   자리(예: `placeName?: string`, 이미 `known`으로 확정된 문자열만)를
   추가하고, `src/diary/prompt.ts`의 `buildPrompt()`가 그 값이 있으면
   장소 이름을 문장에 반영하도록 고친다(원칙 II 문체 그대로 — 단정형이
   아니라 "다녀온 곳은 ○○ 근처였다" 류의 관측 서술). `src/diary/types.ts`
   의 `DiaryEntry`에 `placeName?: { kind: "known"; value: string } | {
   kind: "unknown" }`을 추가한다(data-model.md §6).
-- [ ] T035 [P] [US4] `__tests__/ui/diary-detail.test.tsx`에 다음을 추가한다
+- [X] T035 [P] [US4] `__tests__/ui/diary-detail.test.tsx`에 다음을 추가한다
   (**먼저 작성해 실패를 확인**):
   - `entry.placeName`이 없으면 기존 "다닌 자리: N곳" 텍스트만 렌더된다
     (문자열이 이 기능 이전과 정확히 동일한지, 회귀 확인 L2).
@@ -393,7 +393,7 @@ Independent Test 그대로).
     N곳" 형태로 렌더된다(L6·L7).
   - `entry.placeName = { kind: "unknown" }`이면 이름 자리에 "모른다"류
     문구가 렌더된다(L5).
-- [ ] T036 [US4] `src/ui/DiaryDetailScreen.tsx`의 `signalLines()`를
+- [X] T036 [US4] `src/ui/DiaryDetailScreen.tsx`의 `signalLines()`를
   고쳐 `entry.placeName`이 있으면 "다닌 자리" 줄을 "대표 장소 · N곳"
   형태로 바꾸고, 없으면 기존 그대로 둔다(L2·L6·L7). T035의 테스트가
   통과해야 한다.
@@ -403,11 +403,13 @@ Independent Test 그대로).
 - [ ] T037 [US4] `npx expo install expo-location --check`로 SDK 57 호환
   버전을 추가한다(plan.md Technical Context). `package.json`에 새 의존이
   반영됐는지 확인한다.
-- [ ] T038 [P] [US4] `__tests__/ui/diary-list.test.tsx`(또는 신설 토글
+- [X] T038 [P] [US4] `__tests__/ui/diary-list.test.tsx`(또는 신설 토글
   전용 테스트 파일)에 장소명 설정 토글이 렌더되고, 켤 때 고지 문구가
   나타나는지 검사하는 테스트를 추가한다(**먼저 작성해 실패를 확인**,
-  contracts/place-name.md L8).
-- [ ] T039 [US4] `src/ui/DiaryListScreen.tsx`의 `VisionPicker` 인근에
+  contracts/place-name.md L8). [2026-08-24 구현 메모: 별도 파일
+  `__tests__/ui/geocoding-setting-toggle.test.tsx`로 만들었다 — 토글
+  자체가 독립 컴포넌트(`GeocodingSettingToggle.tsx`)이므로.]
+- [X] T039 [US4] `src/ui/DiaryListScreen.tsx`의 `VisionPicker` 인근에
   장소명 설정 토글을 추가한다(research.md §6) — 켤 때 "좌표를 기기의
   지도 서비스에 물어봅니다" 류 고지 문구를 보이고, 위치 런타임 권한을
   요청한다(research.md §3 L8). 권한이 영구 거부된 상태에서 다시 켜도
@@ -415,6 +417,12 @@ Independent Test 그대로).
   끄지 않는다(L9 — 권한 대화상자가 안 떠도 토글 상태는 건드리지 않는다).
   `geocoding-setting-store.ts`(T031)로 설정을 영속화한다. T038의 테스트가
   통과해야 한다.
+  [2026-08-24 부분 완료: `DiaryListScreen.tsx`에 `GeocodingSettingToggle`
+  배선 완료(`onToggleGeocoding?`·`geocodingEnabled?` props, 고지 문구
+  포함). **`DiaryHomeScreen.tsx`→`App.tsx`로의 props relay와 실제 위치
+  런타임 권한 요청은 사용자 판단으로 보류** — `expo-location`이 아직
+  `npm install`되지 않아(T037 대기 중) 권한 요청 코드를 지금 작성하면
+  타입이 맞지 않는다. T037(패키지 설치) 이후 남은 배선을 마저 잇는다.]
 - [ ] T040 [US4] `npx expo prebuild --platform android --clean`을 실행하고
   서명 키를 되돌린다(`cp ~/.alpharium-signing/alpharium.jks
   android/app/`, plan.md/quickstart.md 사전 준비). `adb shell dumpsys
