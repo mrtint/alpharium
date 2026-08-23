@@ -168,7 +168,7 @@ specs/017-diary-body-screen/
 │                               #   대표 좌표 확정, expo-location 권한 실측 계획,
 │                               #   DiaryDraft·DiaryEntry 헌법 주석 개정 근거
 ├── data-model.md               # Phase 1 — PhotoCaption/PhotoVision 확장,
-│                               #   PhotoPlaces.representativeCoordinate,
+│                               #   PlaceTrace.representativeCoordinate,
 │                               #   DiaryEntry 확장 필드 셋, GeocodingSetting
 ├── quickstart.md               # Phase 1 — 검증 절차 (사진 있는 하루 생성 →
 │                               #   본문 사진·소요 시간 확인, 장소명 설정 온/오프)

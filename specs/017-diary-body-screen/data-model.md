@@ -31,24 +31,13 @@ export type PhotoCaption = {
 `captions: PhotoCaption[]`을 그대로 담으므로 위 확장이 자동으로 전파된다. 새 필드를
 추가하지 않는다.
 
-## 3. `PhotoPlaces` 확장 (`src/signals/types.ts`)
+## 3. `PhotoPlaces` — 최상위 필드 추가는 검토 후 취소 (§4 참조)
 
-```ts
-export type PhotoPlaces = {
-  trace: PlaceTrace;
-  source: "photo-exif";
-  photosWithLocation: number;
-  photosConsidered: number;
-  /**
-   * 대표 장소의 좌표 (017).
-   *
-   * **새로 재는 값이 아니다** — `tracePlaces()`가 자리를 묶으며 이미 계산하던
-   * 값(첫 자리의 대표 좌표) 중 하나를 반환 범위 밖으로 낸 것뿐이다
-   * (research.md §2). 좌표가 하나도 없던 하루(`points.length === 0`)에는 없다.
-   */
-  representativeCoordinate?: { latitude: number; longitude: number };
-};
-```
+처음엔 `PhotoPlaces`에 `representativeCoordinate`를 직접 추가하려 했으나,
+`PhotoPlaces.trace`가 이미 `PlaceTrace`를 통째로 안고 있어(`signals/types.ts:92`)
+`PlaceTrace`에만 추가하면 `PhotoPlaces.trace.representativeCoordinate`로 자동
+도달한다는 것을 확인해 취소했다 — 최종 결정은 §4다. `PhotoPlaces` 자체는 변경
+없음.
 
 ## 4. `tracePlaces()` 반환값 확장 (`src/signals/places.ts`)
 
@@ -61,12 +50,11 @@ export type PlaceTrace = {
 };
 ```
 
-**주의**: `PlaceTrace`(순수 계산 결과)와 `PhotoPlaces`(신호 계층이 담는 값) 둘 다
-같은 필드 이름을 갖는다 — `PhotoPlaces.trace`가 `PlaceTrace`를 그대로 안고 있으므로
-(`signals/types.ts:92`) `representativeCoordinate`는 사실 `PlaceTrace`에만 추가하면
-`PhotoPlaces.trace.representativeCoordinate`로 자동 도달한다. **위 3번 항목의
-`PhotoPlaces` 최상위 필드 추가는 취소한다** — `trace` 안에 이미 있으므로 중복이다.
-Phase 2(tasks)에서는 `PlaceTrace`만 고친다.
+**새로 재는 값이 아니다** — `tracePlaces()`가 자리를 묶으며 이미 계산하던 값
+(첫 자리의 대표 좌표) 중 하나를 반환 범위 밖으로 낸 것뿐이다(research.md §2).
+좌표가 하나도 없던 하루(`points.length === 0`)에는 이 필드 자체가 없다. Phase
+2(tasks)에서는 `PlaceTrace`만 고친다(T003·T004) — `PhotoPlaces`는 건드리지
+않는다.
 
 ## 5. `DiaryDraft` 확장 (`src/inference/types.ts`)
 

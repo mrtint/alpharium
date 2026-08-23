@@ -410,8 +410,11 @@ Independent Test 그대로).
 - [ ] T039 [US4] `src/ui/DiaryListScreen.tsx`의 `VisionPicker` 인근에
   장소명 설정 토글을 추가한다(research.md §6) — 켤 때 "좌표를 기기의
   지도 서비스에 물어봅니다" 류 고지 문구를 보이고, 위치 런타임 권한을
-  요청한다(research.md §3 L8). `geocoding-setting-store.ts`(T031)로
-  설정을 영속화한다. T038의 테스트가 통과해야 한다.
+  요청한다(research.md §3 L8). 권한이 영구 거부된 상태에서 다시 켜도
+  토글 자체는 사용자가 낸 값(켜짐)을 그대로 유지하고, 앱이 임의로 다시
+  끄지 않는다(L9 — 권한 대화상자가 안 떠도 토글 상태는 건드리지 않는다).
+  `geocoding-setting-store.ts`(T031)로 설정을 영속화한다. T038의 테스트가
+  통과해야 한다.
 - [ ] T040 [US4] `npx expo prebuild --platform android --clean`을 실행하고
   서명 키를 되돌린다(`cp ~/.alpharium-signing/alpharium.jks
   android/app/`, plan.md/quickstart.md 사전 준비). `adb shell dumpsys

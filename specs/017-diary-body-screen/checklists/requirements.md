@@ -58,3 +58,12 @@
   (본문 첫 줄 부제목 금지)를 추가했다. plan.md·research.md·contracts/title.md·
   quickstart.md·tasks.md도 이어서 갱신한다.
 - 모든 체크리스트 항목 통과. `/speckit-plan` 갱신으로 진행한다.
+- **2026-08-23, `/speckit-analyze` 결과 반영**: CRITICAL 이슈는 없었으나 사용자가
+  MEDIUM·LOW 항목 셋을 직접 정해 해소했다. (1) plan.md·data-model.md에 남아있던
+  `PhotoPlaces.representativeCoordinate` 잔여 표현을 실제 확정값인
+  `PlaceTrace.representativeCoordinate`로 정정(data-model.md §3을 "취소됨" 요약으로
+  축약). (2) 위치 권한을 영구 거부한 뒤 장소명 설정을 다시 켜는 경우의 동작을
+  명시(contracts/place-name.md L9 신설) — unknown으로 귀결되고 설정 토글은 사용자가
+  낸 값을 그대로 유지, 앱이 임의로 되돌리지 않는다. spec.md Edge Cases·quickstart.md
+  D5·tasks.md T039에 반영. (3) quickstart.md D3a에 제목 좋은 예/나쁜 예를 추가해
+  사람 검수 기준의 일관성을 높였다(자동 채점 코드는 추가하지 않음, 원칙 IV 유지).
