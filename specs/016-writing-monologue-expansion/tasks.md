@@ -351,7 +351,7 @@ T009·T010에서 완료됐다(FR-009는 태스크 생성 원칙상 문구가 실
 
 **Purpose**: 계약 문서가 요구한 마지막 확인들.
 
-- [ ] T023 [P] `.maestro/writing-monologue-expansion.yml`을 새로
+- [X] T023 [P] `.maestro/writing-monologue-expansion.yml`을 새로
   작성하거나 015의 `.maestro/writing-monologue.yml`을 확장하고
   `scripts/run-device-tests.mjs`의 `FLOWS`에 등록한다(등록하지 않으면
   파일이 있어도 실행기가 돌리지 않는다 — AGENTS.md 경고). 루이
@@ -362,11 +362,11 @@ T009·T010에서 완료됐다(FR-009는 태스크 생성 원칙상 문구가 실
   독백 미잔존(B5), 로드 도중 취소가 완료 직후 반영됨(B6, FR-013). 결과를
   커밋 메시지 또는 AGENTS.md 「016 핵심 결론」 절(기능 완료 후 추가)에
   남긴다.
-- [ ] T025 [P] `npm test` 전체(기기 불필요 스위트)와 `npm run lint`를
+- [X] T025 [P] `npm test` 전체(기기 불필요 스위트)와 `npm run lint`를
   돌려 기존 002/003/005/006/007/011/012/013/015 계약 테스트가 전부
   그대로 통과하는지 최종 확인한다(옵셔널 확장이 기존 계약을 깨지
   않았는지의 최종 게이트).
-- [ ] T026 [P] `npm run test:logic -- particle.test.ts`로 조사 선택
+- [X] T026 [P] `npm run test:logic -- particle.test.ts`로 조사 선택
   함수가 로스터 5인 전부에서 문법적으로 자연스러운 결과를 내는지 사람이
   직접 출력을 읽어 확인한다(quickstart.md A3 — 자동 테스트를 통과해도
   "문법적으로 자연스러운가"는 사람 판단이 최종 확인이다).
