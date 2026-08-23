@@ -1,5 +1,15 @@
 # Tasks: 쓰는 중 독백 확장 — 콜드/핫 스타트·사진 보기·문구 폭
 
+> **⚠️ [2026-08-23, 구현 완료 후 문구 검수 단계에서 변경됨]** 아래 태스크
+> 본문은 구현 당시 계획대로 "로드 단계 문구에 캐릭터 이름+조사를 넣는다"를
+> 전제로 쓰였다. 문구 검수 과정에서 사용자가 이 기능 자체를 "별 쓸모
+> 없어 보인다"며 철회했다 — 로드 단계 문구는 이름을 포함하지 않는다.
+> `characterName` 매개변수와 `particleFor()`는 코드에 남아 있지만 문구
+> 생성에 쓰이지 않는다. 또한 모든 문구 갈래(신호 확인 포함)를 "10개
+> 이상"에서 "정확히 10개"로 통일했다. 최신 상태는 spec.md·data-model.md·
+> contracts/monologue-branch.md·contracts/particle.md의 [2026-08-23] 표시를
+> 따른다 — 아래 태스크 서술의 "이름+조사" 관련 문장은 이력으로만 남긴다.
+
 **Input**: Design documents from `/specs/016-writing-monologue-expansion/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),

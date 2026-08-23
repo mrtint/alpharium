@@ -87,12 +87,14 @@ describe("pickMonologue — roster.ts·persona.ts·Character를 import하지 않
   });
 });
 
-describe("문구 갈래 — 신설·수정 대상 다섯이 각각 10개 이상 (FR-009, SC-006, 016)", () => {
-  const RICH_COMBOS: readonly [ProgressStage, MonologueBranch, string][] = [
+describe("문구 갈래 — 여섯 갈래 전부 10개 이상 (FR-009, SC-006, 016)", () => {
+  const RICH_COMBOS: readonly [ProgressStage, MonologueBranch | undefined, string][] = [
+    ["signals", undefined, ""],
     ["vision", "normal", ""],
     ["vision", "many", ""],
     ["load", "cold", "루이"],
     ["load", "hot", "루이"],
+    ["generation", undefined, ""],
   ];
 
   it.each(RICH_COMBOS)(
@@ -109,28 +111,6 @@ describe("문구 갈래 — 신설·수정 대상 다섯이 각각 10개 이상 
       expect(seen.size).toBeGreaterThanOrEqual(10);
     },
   );
-
-  it("generation 갈래에서 서로 다른 문구 10개 이상을 관측한다", () => {
-    const seen = new Set<string>();
-    let previous: string | undefined;
-    for (let i = 0; i < 200; i++) {
-      const line = pickMonologue("generation", undefined, previous, undefined, sequence(i / 200));
-      seen.add(line);
-      previous = line;
-    }
-    expect(seen.size).toBeGreaterThanOrEqual(10);
-  });
-
-  it("signals 갈래는 015의 3개를 유지한다 (확장 대상 아님)", () => {
-    const seen = new Set<string>();
-    let previous: string | undefined;
-    for (let i = 0; i < 50; i++) {
-      const line = pickMonologue("signals", undefined, previous, undefined, sequence(i / 50));
-      seen.add(line);
-      previous = line;
-    }
-    expect(seen.size).toBe(3);
-  });
 });
 
 describe("사진 보기 문구 — 정직성 경계 (FR-005, SC-003)", () => {
@@ -155,20 +135,20 @@ describe("사진 보기 문구 — 정직성 경계 (FR-005, SC-003)", () => {
   );
 });
 
-describe("모델 로드 문구 — 이름과 조사 (FR-003, FR-003a)", () => {
-  it("cold 갈래 문구에 캐릭터 이름이 포함된다", () => {
+describe("모델 로드 문구 — 이름을 넣지 않는다 (2026-08-23 철회)", () => {
+  it("cold 갈래 문구는 characterName을 받아도 문구에 이름을 넣지 않는다", () => {
     const line = pickMonologue("load", "cold", undefined, "루이", sequence(0));
-    expect(line).toContain("루이");
+    expect(line).not.toContain("루이");
   });
 
-  it("hot 갈래 문구에 캐릭터 이름이 포함된다", () => {
+  it("hot 갈래 문구는 characterName을 받아도 문구에 이름을 넣지 않는다", () => {
     const line = pickMonologue("load", "hot", undefined, "루이", sequence(0));
-    expect(line).toContain("루이");
+    expect(line).not.toContain("루이");
   });
 
-  it("받침 있는 이름에도 올바른 조사가 붙는다", () => {
-    // "테스트인"은 받침이 있어 "이"가 붙는다(particle.test.ts와 같은 기준).
-    const line = pickMonologue("load", "cold", undefined, "테스트인", sequence(0));
-    expect(line).toContain("테스트인이");
+  it("characterName을 넘기지 않아도 문구를 정상적으로 고른다", () => {
+    const line = pickMonologue("load", "cold", undefined, undefined, sequence(0));
+    expect(typeof line).toBe("string");
+    expect(line.length).toBeGreaterThan(0);
   });
 });

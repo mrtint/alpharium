@@ -823,8 +823,8 @@ describe("015 — 쓰는 중 독백", () => {
  * 계약: specs/016-writing-monologue-expansion/spec.md User Story 1
  *       specs/016-writing-monologue-expansion/contracts/load-signal.md
  *
- * `selected`(모듈 상수)의 캐릭터가 `"quiet"` → persona.ts `displayName`이
- * "금동이"다. 로드 단계 문구는 이 이름을 포함해야 한다.
+ * 캐릭터 이름은 화면 문구에 넣지 않는다(2026-08-23 철회) — 콜드/핫이 서로
+ * 다른 문구 풀에서 오는지만 확인한다.
  */
 describe("016 — 모델 로드 독백", () => {
   it("onProgress('load')(branch 없음)를 받아도 화면 문구가 갱신되지 않는다", async () => {
@@ -840,42 +840,30 @@ describe("016 — 모델 로드 독백", () => {
     expect(afterLoadStart).toBe(beforeLoad);
   });
 
-  it("onProgress('load', 'cold')를 받으면 캐릭터 이름이 포함된 콜드 스타트 문구가 보인다", async () => {
+  it("onProgress('load', 'cold')를 받으면 화면 문구가 갱신된다", async () => {
     const pipeline = loadProgressPipeline();
     await startWriting(pipeline);
+    const beforeLoad = JSON.stringify(screen.toJSON());
 
     await act(async () => pipeline.onProgress("load", "cold"));
 
     const rendered = JSON.stringify(screen.toJSON());
-    expect(rendered).toContain("금동이");
+    expect(rendered).not.toBe(beforeLoad);
   });
 
-  it("onProgress('load', 'hot')를 받으면 캐릭터 이름이 포함된 핫 스타트 문구가 보인다", async () => {
+  it("onProgress('load', 'hot')를 받으면 화면 문구가 갱신된다", async () => {
     const pipeline = loadProgressPipeline();
     await startWriting(pipeline);
+    const beforeLoad = JSON.stringify(screen.toJSON());
 
     await act(async () => pipeline.onProgress("load", "hot"));
 
     const rendered = JSON.stringify(screen.toJSON());
-    expect(rendered).toContain("금동이");
+    expect(rendered).not.toBe(beforeLoad);
   });
 
   it("콜드 스타트 문구와 핫 스타트 문구는 서로 다른 풀에서 온다", async () => {
-    const coldPipeline = loadProgressPipeline();
-    await startWriting(coldPipeline);
-    await act(async () => coldPipeline.onProgress("load", "cold"));
-    const coldRendered = JSON.stringify(screen.toJSON());
-
-    const hotPipeline = loadProgressPipeline();
-    await startWriting(hotPipeline);
-    await act(async () => hotPipeline.onProgress("load", "hot"));
-    const hotRendered = JSON.stringify(screen.toJSON());
-
-    // 둘 다 "금동이"를 포함하지만(공통 요구사항), 전체 렌더 결과는 각자
-    // 서로 다른 갈래의 풀에서 온 것이므로 우연히 완전히 같을 수 없다는 것을
-    // 여러 회 반복해 확률적으로 검증한다(무작위 선택이므로 결정론적 비교
-    // 대신 통계적 접근).
-    let sawDifference = coldRendered !== hotRendered;
+    let sawDifference = false;
     for (let i = 0; i < 10 && !sawDifference; i++) {
       const c = loadProgressPipeline();
       await startWriting(c);
@@ -897,10 +885,12 @@ describe("016 — 모델 로드 독백", () => {
     await startWriting(pipeline);
 
     await act(async () => pipeline.onProgress("load", "cold"));
-    await act(async () => pipeline.onProgress("generation"));
+    const loadRendered = JSON.stringify(screen.toJSON());
 
-    const rendered = JSON.stringify(screen.toJSON());
-    expect(rendered).not.toContain("금동이");
+    await act(async () => pipeline.onProgress("generation"));
+    const generationRendered = JSON.stringify(screen.toJSON());
+
+    expect(generationRendered).not.toBe(loadRendered);
   });
 });
 

@@ -167,42 +167,40 @@ export function pickMonologue(
 
 - **`branch` 매개변수가 새로 추가된다**(clarify 결정). `stage`가 "load"·
   "vision"이 아니면(또는 아직 확정 전이면) `undefined`다.
-- **`characterName`이 새로 추가된다.** `stage === "load"`이고 `branch`가
-  `"cold"`/`"hot"`로 확정된 경우에만 쓰인다 — 그 외 단계의 문구 풀은
-  이름을 요구하지 않으므로 `undefined`로 호출해도 된다(옵셔널). 이름이
-  필요한데 안 왔으면(방어적 기본값을 만들지 않는다 — 호출자가 항상 유효한
-  캐릭터 이름을 갖고 있다는 것이 spec Edge Cases의 전제) 계약 테스트가
-  이 조합을 요구한다.
-- **`monologue.ts`는 여전히 `Character`·`roster.ts`·`persona.ts`를
-  import하지 않는다**(research.md §4 — 현재 헌법 검사 규칙이 이미
-  허용함을 확인). `characterName`은 `string` 타입일 뿐이다.
+- **`characterName`이 시그니처에 있지만 사용되지 않는다.**(2026-08-23
+  철회) — 최초 설계는 `stage === "load"`이고 `branch`가 확정된 경우 이름을
+  문구에 끼워 넣을 계획이었으나, 문구 검수 과정에서 사용자가 "별 쓸모
+  없어 보인다"며 철회했다. 매개변수 자체는 호출자(화면)와의 시그니처
+  호환을 위해 남아 있다.
+- **`monologue.ts`·`particle.ts` 둘 다 여전히 `Character`·`roster.ts`·
+  `persona.ts`를 import하지 않는다**(research.md §4 — 현재 헌법 검사
+  규칙이 이미 허용함을 확인).
 - **문구 후보 테이블의 키가 `(stage, branch)` 조합이 된다.** 015의
   `Record<ProgressStage, [...]>` 단일 축 테이블에서, 016은 갈래가 있는
   두 단계(`load`·`vision`)에 대해 `branch`별로 분리된 풀을 갖는다:
 
   | stage | branch | 풀 이름 |
   | --- | --- | --- |
-  | `signals` | (없음) | signals (015 그대로, 3개 유지) |
-  | `vision` | `normal` | vision-normal (10개 이상) |
-  | `vision` | `many` | vision-many (10개 이상) |
-  | `load` | `cold` | load-cold (10개 이상, 이름+조사 템플릿) |
-  | `load` | `hot` | load-hot (10개 이상, 이름+조사 템플릿) |
-  | `generation` | (없음) | generation (10개 이상) |
+  | `signals` | (없음) | signals (10개, 2026-08-23 3→10 확장) |
+  | `vision` | `normal` | vision-normal (10개) |
+  | `vision` | `many` | vision-many (10개) |
+  | `load` | `cold` | load-cold (10개, 이름 없음) |
+  | `load` | `hot` | load-hot (10개, 이름 없음) |
+  | `generation` | (없음) | generation (10개) |
 
-  타입 표현은 015의 최소-길이 튜플 패턴을 유지하되 키가 복합된다 —
-  `Record<"signals" | "generation", readonly [string, string, ...string[]]>`와
-  `Record<"vision" | "load", Record<MonologueBranch, readonly [string, ...9 more]>>`
-  처럼 두 테이블로 나누거나, 하나의 판별 유니온으로 표현한다(구현
-  단계에서 최종 형태 결정 — 어느 쪽이든 "10개 미만이면 컴파일 에러"라는
-  타입 방어가 유지되어야 한다는 것이 계약이다).
-- **로드 단계 문구는 이름 자리를 비운 템플릿이다.** 예:
-  `"{name} 글을 쓸 준비를 하고 있어요"`에서 `{name}`이 `characterName +
-  particleFor(characterName)`(아래 「조사 선택」 참조)로 치환된다.
+  **모든 갈래가 정확히 10개다**(2026-08-23 검수 결과 — 각 갈래 11번째
+  문구를 제거했다). 타입은 015의 최소-길이 튜플 패턴(`AtLeast10`)을 그대로
+  쓴다 — "10개 미만이면 컴파일 에러"만 타입이 강제하고, "정확히 10개"는
+  배열을 직접 세는 관례로 지킨다.
+- **로드 단계 문구는 완성된 문장이다.** 이름 자리(`{name}`)가 없다
+  (2026-08-23 철회 — 원래는 `characterName + particleFor(characterName)`로
+  치환할 계획이었다).
 - **`previous`와 같은 문구를 고르지 않는 규칙은 그대로 유지된다**(015
-  FR-014) — 각 풀이 10개 이상이므로 이 제약이 015보다 훨씬 쉽게 지켜진다.
-- **순수 함수다.** 015와 동일하게 내부 상태를 갖지 않는다.
+  FR-014) — 각 풀이 10개이므로 이 제약이 015보다 훨씬 쉽게 지켜진다.
+- **순수 함수다.** 015와 동일하게 내부 상태·부수효과를 갖지 않는다 —
+  `characterName`을 받아도 로그를 남기지 않는다.
 
-## 조사 선택 (Particle Selection, 신설)
+## 조사 선택 (Particle Selection, 신설 — 2026-08-23 미사용)
 
 ```ts
 // src/diary/particle.ts
@@ -214,7 +212,10 @@ export function particleFor(name: string): "이" | "가"
   판정하고, 받침이 있으면 `"이"`, 없으면 `"가"`를 돌려준다(research.md
   §5).
 - **`Character`·`roster.ts`·`persona.ts`를 import하지 않는다.** 이름
-  문자열만 받는 범용 함수이며, `monologue.ts`가 이 함수를 import해
-  로드 단계 문구 템플릿을 완성한다.
+  문자열만 받는 범용 함수다.
+- **[2026-08-23] `monologue.ts`가 더 이상 이 함수를 import하지 않는다** —
+  로드 단계 문구에 이름 주입이 철회되면서 호출처가 사라졌다. 함수 자체는
+  코드에 남아 있다(향후 다른 화면이 조사 선택을 필요로 하면 재사용
+  가능) — `particle.test.ts`가 독립적으로 정확성을 계속 검증한다.
 - **로스터 5인 이름 전부(금동이·루이·오드·샤오바이·모카)에서 올바른
-  결과를 낸다**(research.md §5 표, SC-002a 근거).
+  결과를 낸다**(research.md §5 표).

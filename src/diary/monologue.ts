@@ -13,9 +13,9 @@
  * **캐릭터를 타입으로 받지 않는다** — `roster.ts`·`persona.ts`·`Character`를
  * import하지 않는다(원칙 III). 모델 로드 단계의 캐릭터 이름은 `string`
  * 매개변수로만 받는다 — 호출자(화면)가 `persona.ts`의 `displayName`을 읽어
- * 문자열만 넘긴다(016 clarify 결정). 화면에 보이는 진행 문구일 뿐 일기
- * 프롬프트에는 들어가지 않는다(`prompt.ts`가 여전히 화자 규칙의 유일한
- * 통과 지점이다).
+ * 문자열만 넘긴다(016 clarify 결정). **화면 문구에는 넣지 않는다**(사용자
+ * 요청으로 2026-08-23 철회) — 진단 로그에만 남긴다. 일기 프롬프트에도
+ * 들어가지 않는다(`prompt.ts`가 여전히 화자 규칙의 유일한 통과 지점이다).
  *
  * **사진 보기 문구는 011의 캡션 엔진이 실제로 하는 일(사진 한 장을 보고
  * 짧은 서술 하나를 만드는 것)에만 근거한다**(FR-005) — 인물 식별, 촬영
@@ -24,7 +24,6 @@
  */
 
 import type { MonologueBranch, ProgressStage } from "../inference/types";
-import { particleFor } from "./particle";
 
 /** 최소 10개 원소를 강제하는 튜플 — 후보 부족을 컴파일 타임에 막는다(FR-009) */
 type AtLeast10 = readonly [
@@ -41,14 +40,18 @@ type AtLeast10 = readonly [
   ...string[],
 ];
 
-/** 최소 2개 원소 튜플 — 015가 세운 하한 (signals 단계, 확장 대상 아님) */
-type AtLeast2 = readonly [string, string, ...string[]];
-
-/** 015 그대로 — 신호 확인 단계는 이번 확장 대상이 아니다(spec Assumptions) */
-const SIGNALS_CANDIDATES: AtLeast2 = [
+/** 신호 확인 단계 — 다른 신설 갈래와 동일하게 10개로 확장했다(사용자 요청) */
+const SIGNALS_CANDIDATES: AtLeast10 = [
   "그날의 기록을 확인하는 중…",
   "하루를 되짚어보는 중…",
   "무엇이 있었는지 헤아리는 중…",
+  "오늘 하루의 흔적을 찾아보는 중…",
+  "남겨진 기록들을 모으는 중…",
+  "하루가 어땠는지 가늠해보는 중…",
+  "오늘의 흔적을 하나씩 확인하는 중…",
+  "기록을 차근차근 살펴보는 중…",
+  "하루의 자취를 따라가보는 중…",
+  "무슨 일이 있었는지 짚어보는 중…",
 ];
 
 /**
@@ -69,7 +72,6 @@ const VISION_NORMAL_CANDIDATES: AtLeast10 = [
   "사진을 하나씩 넘겨보는 중…",
   "오늘 남긴 사진들을 훑어보는 중…",
   "사진에 담긴 모습을 살펴보는 중…",
-  "화면 속 장면을 들여다보는 중…",
 ];
 
 /**
@@ -87,25 +89,25 @@ const VISION_MANY_CANDIDATES: AtLeast10 = [
   "오늘 남긴 사진이 많아 흥미롭게 보는 중…",
   "한 장씩 부지런히 넘겨가며 보는 중…",
   "사진이 가득해서 살펴보는 중…",
-  "오늘따라 사진이 많아 유심히 보는 중…",
 ];
 
 /**
- * 모델 로드 — "콜드 스타트" 갈래. `{name}` 자리를 이름+조사로 채운다.
- * 실제로 하는 일(모델을 새로 올림)에 근거한 문구만 쓴다.
+ * 모델 로드 — "콜드 스타트" 갈래. 실제로 하는 일(모델을 새로 올림)에
+ * 근거한 문구만 쓴다. 캐릭터 이름은 화면 문구에 넣지 않는다(사용자 요청,
+ * 2026-08-23 — 굳이 필요하지 않다고 판단해 철회) — 이름은 진단 로그에만
+ * 쓰인다(`logCharacterForLoad()`).
  */
 const LOAD_COLD_TEMPLATES: AtLeast10 = [
-  "{name} 글을 쓸 준비를 하는 중…",
-  "{name} 연필과 지우개를 준비하는 중…",
-  "{name} 글쓸 준비를 위해 책상을 정리하는 중…",
-  "{name} 이제 막 자리에 앉는 중…",
-  "{name} 새로 글을 쓸 채비를 하는 중…",
-  "{name} 오늘의 이야기를 시작할 준비를 하는 중…",
-  "{name} 조용히 마음을 가다듬는 중…",
-  "{name} 처음부터 차근차근 준비하는 중…",
-  "{name} 글쓰기에 앞서 자리를 잡는 중…",
-  "{name} 오늘 쓸 이야기를 위해 준비하는 중…",
-  "{name} 이제 막 준비를 마쳐가는 중…",
+  "글을 쓸 준비를 하는 중…",
+  "연필과 지우개를 준비하는 중…",
+  "글쓸 준비를 위해 책상을 정리하는 중…",
+  "이제 막 자리에 앉는 중…",
+  "새로 글을 쓸 채비를 하는 중…",
+  "오늘의 이야기를 시작할 준비를 하는 중…",
+  "조용히 마음을 가다듬는 중…",
+  "처음부터 차근차근 준비하는 중…",
+  "글쓰기에 앞서 자리를 잡는 중…",
+  "오늘 쓸 이야기를 위해 준비하는 중…",
 ];
 
 /**
@@ -113,17 +115,16 @@ const LOAD_COLD_TEMPLATES: AtLeast10 = [
  * 근거한 문구만 쓴다(콜드와 다른 인상 — 처음 준비 vs 이어서 하기).
  */
 const LOAD_HOT_TEMPLATES: AtLeast10 = [
-  "{name} 이전에 썼던 글들을 정리하는 중…",
-  "{name} 지저분한 책상을 정돈하는 중…",
-  "{name} 다시 자리에 앉는 중…",
-  "{name} 이어서 쓸 준비를 하는 중…",
-  "{name} 잠깐 정리하고 다시 시작하는 중…",
-  "{name} 하던 일을 마저 정돈하는 중…",
-  "{name} 금방 다시 준비를 마치는 중…",
-  "{name} 익숙하게 자리를 잡는 중…",
-  "{name} 이어 쓸 채비를 하는 중…",
-  "{name} 잠시 정리한 뒤 다시 준비하는 중…",
-  "{name} 빠르게 다시 준비하는 중…",
+  "이전에 썼던 글들을 정리하는 중…",
+  "지저분한 책상을 정돈하는 중…",
+  "다시 자리에 앉는 중…",
+  "이어서 쓸 준비를 하는 중…",
+  "잠깐 정리하고 다시 시작하는 중…",
+  "하던 일을 마저 정돈하는 중…",
+  "금방 다시 준비를 마치는 중…",
+  "익숙하게 자리를 잡는 중…",
+  "이어 쓸 채비를 하는 중…",
+  "잠시 정리한 뒤 다시 준비하는 중…",
 ];
 
 /** 글쓰기 단계 — 015의 3개를 폐기하고 10개로 대체한다(spec Assumptions) */
@@ -138,7 +139,6 @@ const GENERATION_CANDIDATES: AtLeast10 = [
   "오늘 하루를 글로 옮기는 중…",
   "차근차근 이야기를 엮어가는 중…",
   "문장을 다듬어가며 적는 중…",
-  "오늘의 이야기를 써 내려가는 중…",
 ];
 
 /**
@@ -148,11 +148,12 @@ const GENERATION_CANDIDATES: AtLeast10 = [
  * 이상 원소를 갖도록 타입이 강제하므로, `previous`와 다른 후보가 항상
  * 최소 1개 존재한다. 안전판 분기를 따로 두지 않는다(015 계승).
  *
- * `characterName`은 `stage === "load"`이고 `branch`가 확정된 경우에만
- * 쓰인다 — 그 외 조합에서는 무시된다.
+ * `characterName`은 받기만 하고 쓰지 않는다(2026-08-23 철회) — 015 이후
+ * 호출자(화면)가 여전히 이름을 넘겨주므로 시그니처는 유지하되, 화면 문구에
+ * 이름을 넣는 기능 자체는 필요 없다고 판단해 뺐다.
  *
- * 순수 함수다 — 내부 상태를 갖지 않는다. "직전 문구"는 호출자(화면)가
- * 들고 있다가 매번 인자로 넘긴다.
+ * 순수 함수다 — 내부 상태·부수효과를 갖지 않는다. "직전 문구"는 호출자
+ * (화면)가 들고 있다가 매번 인자로 넘긴다.
  */
 export function pickMonologue(
   stage: ProgressStage,
@@ -162,28 +163,15 @@ export function pickMonologue(
   random: () => number = Math.random,
 ): string {
   const candidates = candidatesFor(stage, branch);
-  // ★ 이름 치환은 필터링보다 먼저 한다 — 그렇지 않으면 `previous`(치환된
-  // 문자열)가 템플릿 원문과 절대 같아지지 않아 "직전과 다른 후보" 필터가
-  // 아무 효과도 내지 못한다(2026-08-23 T009 테스트가 이 회귀를 잡았다).
-  const rendered = candidates.map((line) => renderName(line, stage, characterName));
-
-  const pool = rendered.filter((line) => line !== previous);
-  const usable = pool.length > 0 ? pool : rendered;
+  const pool = candidates.filter((line) => line !== previous);
+  const usable = pool.length > 0 ? pool : candidates;
 
   const index = Math.floor(random() * usable.length);
   const clamped = Math.min(index, usable.length - 1);
   return usable[clamped];
 }
 
-function renderName(line: string, stage: ProgressStage, characterName: string | undefined): string {
-  if (stage !== "load" || characterName === undefined) return line;
-  return line.replace("{name}", `${characterName}${particleFor(characterName)}`);
-}
-
-function candidatesFor(
-  stage: ProgressStage,
-  branch: MonologueBranch | undefined,
-): AtLeast2 | AtLeast10 {
+function candidatesFor(stage: ProgressStage, branch: MonologueBranch | undefined): AtLeast10 {
   if (stage === "signals") return SIGNALS_CANDIDATES;
   if (stage === "generation") return GENERATION_CANDIDATES;
 
