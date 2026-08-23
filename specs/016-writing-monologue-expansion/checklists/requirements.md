@@ -1,4 +1,4 @@
-# Specification Quality Checklist: 쓰는 중 독백 확장 — 콜드/핫 스타트·데일리 로그·문구 폭
+# Specification Quality Checklist: 쓰는 중 독백 확장 — 콜드/핫 스타트·사진 보기·문구 폭
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-08-23
@@ -49,3 +49,15 @@
   뒤 한국어 조사(이/가) 처리 — 받침 규칙 자동 선택으로 결정, FR-003a·
   SC-002a·조사 선택 엔티티 신설로 반영. 두 결정 모두 기존 요구사항과
   모순되지 않아 체크리스트 통과 상태에 변화 없음.
+- `/speckit-analyze` 세션(2026-08-23)이 CRITICAL·HIGH 발견 둘을 잡아
+  해소했다: (1) FR-013(모델 로드 구간 취소)이 태스크로 전혀 커버되지
+  않았고, 코드 확인 결과 `llama.rn`에 로드 취소 API 자체가 없어 기능이
+  설계되지 않은 상태였다 — research.md §7이 실측을 남기고, FR-013·Edge
+  Cases를 "로드는 즉시 멈추지 않고, 완료 직후 취소 상태를 재확인해
+  결과를 버린다"로 정직하게 재서술했다. tasks.md에 T013a·T013b를
+  추가해 커버리지를 메웠다. (2) spec.md가 "헌법 검사 규칙을 재정의한다"
+  고 두 번 적었으나 research.md §4·plan.md는 "규칙 변경 불필요, 이미
+  허용함"으로 결론지어 서술이 어긋났다 — spec.md의 Clarifications와
+  FR-014 문구를 research.md 결론에 맞춰 정정했다. 두 수정 모두 기존
+  체크리스트 항목의 통과 여부를 바꾸지 않는다(구조적 완성도 문제가
+  아니라 커버리지·서술 정확도 문제였다).

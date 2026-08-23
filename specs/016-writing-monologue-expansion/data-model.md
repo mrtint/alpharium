@@ -76,6 +76,10 @@ export interface InferenceBackend {
   실패(`!loaded.ok`)하면 두 번째 신호를 보내지 않고 그대로
   `model-load-failed`를 반환한다 — 015 FR-009의 연장(실패 시 독백은
   실패 화면으로 전환되고 남지 않는다).
+  **로드가 성공했더라도, 그 시점에 `cancel.cancelled === true`면 두 번째
+  신호를 보내지 않고 `engine.unload()` 후 `{ kind: "interrupted" }`를
+  반환한다**(FR-013, research.md §7 — 로드 자체는 중단할 수 없으므로
+  완료 직후 취소 상태를 재확인하는 방식이다).
 - **`"vision"` 신호에 사진 보기 갈래(many/normal)가 실린다**(research.md
   §3). `readPhotos()`가 `selectForVision()` 직후, `captionAll()`을 부르기
   전에 `onStage?.("vision", branch)`를 한 번 보낸다 — `branch`는

@@ -1,4 +1,4 @@
-# Tasks: 쓰는 중 독백 확장 — 콜드/핫 스타트·데일리 로그·문구 폭
+# Tasks: 쓰는 중 독백 확장 — 콜드/핫 스타트·사진 보기·문구 폭
 
 **Input**: Design documents from `/specs/016-writing-monologue-expansion/`
 
@@ -174,6 +174,24 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
   성공 시(`loaded.ok === true`) 그 직후에 `onStage?.("load", loaded.warm
   ? "hot" : "cold")`를 추가한다(contracts/load-signal.md 「신호 흐름」).
   T012의 테스트가 통과해야 한다.
+- [ ] T013a [P] [US1] `__tests__/inference/on-device.test.ts`에 취소
+  검증 테스트를 추가한다(**먼저 작성해 실패를 확인**) — contracts/
+  load-signal.md 「취소 — 로드 자체는 중단되지 않는다」 근거:
+  - `engine.load()`가 성공(`{ ok: true, warm: false | true }`)했지만
+    그 완료 시점에 `cancel.cancelled === true`이면, 확정 신호
+    (`("load", "cold")`\|`("load", "hot")`)와 `"generation"` 신호가
+    오지 않는다.
+  - 같은 상황에서 `engine.unload()`가 불린다(대역으로 호출 확인).
+  - 같은 상황에서 결과가 `{ kind: "interrupted" }`다.
+  - `cancel.cancelled === false`(취소 없음)면 기존 T012 시나리오와
+    동일하게 동작한다(회귀 확인).
+- [ ] T013b [US1] `src/inference/on-device.ts`의 `generate()`를 고친다:
+  `engine.load()` 성공 직후, 콜드/핫 확정 신호를 보내기 **전에**
+  `cancel.cancelled`를 확인한다. 취소 상태면 `engine.unload()`를 부른
+  뒤 `{ kind: "interrupted" }`를 즉시 반환하고, 확정 신호·`"generation"`
+  신호·이후 로직(`runWithTimeout` 등)을 실행하지 않는다(contracts/
+  load-signal.md 「취소 — 로드 자체는 중단되지 않는다」). T013a의
+  테스트가 통과해야 한다.
 - [ ] T014 [P] [US1] `__tests__/app/state.test.ts`에 `"writing"` 화면
   상태가 `branch?: MonologueBranch` 필드를 가질 수 있는지 검사하는
   테스트를 추가한다(**먼저 작성해 실패를 확인**, 015가 이미 둔
@@ -206,12 +224,16 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
   화면 쪽에서 지킨다 — `DiaryHomeScreen.tsx`는 이미 `persona.ts`를 import
   할 수 있는 자리다). `stage`가 `"generation"`으로 바뀌면 `branch`를
   `undefined`로 지운다(data-model.md 「AppScreen 확장」 갱신 규칙).
-  T015의 테스트가 통과해야 한다.
+  T015의 테스트가 통과해야 한다. 취소 시 `{ kind: "interrupted" }`가
+  돌아오는 것은 기존 007 취소 처리 경로(`generate()`의 결과 분기)가
+  이미 처리하므로 이 태스크에서 별도 분기를 추가하지 않는다 — T013b가
+  값을 정확히 반환하기만 하면 화면은 007이 이미 아는 방식으로 반응한다.
 
 **Checkpoint**: User Story 1이 독립적으로 완전히 동작한다 — 모델 로드
-구간에서 캐릭터 이름이 포함된 콜드/핫 스타트 문구가 실제로 보인다.
-여기서 멈춰도 배포 가능한 증분이다(로드맵이 지목한 015의 가장 큰
-공백이 메워진다).
+구간에서 캐릭터 이름이 포함된 콜드/핫 스타트 문구가 실제로 보이고,
+로드 도중 취소해도(로드 완료까지는 기다리지만) 콜드/핫 확정 문구
+없이 정확히 취소 처리로 전환된다(FR-013). 여기서 멈춰도 배포 가능한
+증분이다(로드맵이 지목한 015의 가장 큰 공백이 메워진다).
 
 ---
 
@@ -333,12 +355,13 @@ T009·T010에서 완료됐다(FR-009는 태스크 생성 원칙상 문구가 실
   작성하거나 015의 `.maestro/writing-monologue.yml`을 확장하고
   `scripts/run-device-tests.mjs`의 `FLOWS`에 등록한다(등록하지 않으면
   파일이 있어도 실행기가 돌리지 않는다 — AGENTS.md 경고). 루이
-  (narrative)로 quickstart.md B1~B5를 흐름으로 옮긴다.
-- [ ] T024 quickstart.md B1~B5를 실기기(debug 빌드, SM-G986N)에서 최소
+  (narrative)로 quickstart.md B1~B6를 흐름으로 옮긴다.
+- [ ] T024 quickstart.md B1~B6를 실기기(debug 빌드, SM-G986N)에서 최소
   1회 수행한다: 콜드 스타트 문구(B1), 핫 스타트 문구(B2), 많음 갈래
   문구(B3), 사진 보기 정직성 경계(B4, 코드 검사 위주), 로드 실패 시
-  독백 미잔존(B5). 결과를 커밋 메시지 또는 AGENTS.md 「016 핵심 결론」
-  절(기능 완료 후 추가)에 남긴다.
+  독백 미잔존(B5), 로드 도중 취소가 완료 직후 반영됨(B6, FR-013). 결과를
+  커밋 메시지 또는 AGENTS.md 「016 핵심 결론」 절(기능 완료 후 추가)에
+  남긴다.
 - [ ] T025 [P] `npm test` 전체(기기 불필요 스위트)와 `npm run lint`를
   돌려 기존 002/003/005/006/007/011/012/013/015 계약 테스트가 전부
   그대로 통과하는지 최종 확인한다(옵셔널 확장이 기존 계약을 깨지
@@ -387,8 +410,10 @@ T009·T010에서 완료됐다(FR-009는 태스크 생성 원칙상 문구가 실
   가능. T007~T008(particle.ts)은 T001~T006(types.ts·engine-port.ts·
   llama-port.ts)과 파일이 겹치지 않으므로 완전히 독립적으로 병행
   가능하다.
-- Phase 2의 T012·T014·T015는 서로 다른 파일이므로 병렬 작성 가능(단,
-  각각이 대응하는 구현 태스크보다 먼저 끝나야 함).
+- Phase 2의 T012·T013a·T014·T015는 서로 다른 파일이거나(T014·T015)
+  같은 파일의 다른 테스트 블록(T012·T013a는 둘 다
+  `on-device.test.ts`이지만 서로 다른 시나리오이므로 작성은 병렬 가능,
+  단 구현은 T013→T013b 순서를 지킨다).
 - Phase 4의 T020은 Phase 2·3과 파일(on-device.ts)이 겹치므로 순서
   주의 — 같은 파일의 다른 함수(`readPhotos()` vs `generate()`)를
   건드리므로 병합 충돌에 유의한다.
@@ -442,3 +467,12 @@ T009·T010에서 완료됐다(FR-009는 태스크 생성 원칙상 문구가 실
 - **`monologue.ts`·`particle.ts` 어느 쪽도 `roster.ts`·`persona.ts`·
   `Character`를 import하지 않는다** — 캐릭터 이름은 어느 태스크에서도
   `string` 매개변수로만 흐른다(T010·T017).
+- **모델 로드는 중단할 수 없다** — `llama.rn`에 로드 취소 API가 없다
+  (research.md §7). T013b가 구현하는 것은 "로드를 즉시 멈춘다"가
+  아니라 "로드가 끝나는 순간 취소 여부를 다시 확인해 결과를 버린다"이다
+  — 이 차이를 태스크 설명이나 커밋 메시지에서 "즉시 취소된다"처럼
+  과장하지 않는다(원칙 II·V).
+- **헌법 검사 규칙(`checkMonologueFile`)은 이 기능에서 변경하지
+  않는다** — 015가 만든 정규식이 이미 이름 문자열 매개변수를 위반으로
+  잡지 않는다(research.md §4). T011은 규칙을 고치는 태스크가 아니라
+  위반 주입으로 이 사실을 재확인하는 태스크다.
