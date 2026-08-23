@@ -52,7 +52,7 @@ function fakeEngine(
   const engine: GenerationEngine = {
     async load(character) {
       calls.push(`load:${character}`);
-      const result = options.load?.(character) ?? { ok: true };
+      const result = options.load?.(character) ?? { ok: true, warm: false };
       if (result.ok) {
         // 실제 구현은 이전 것을 먼저 닫아야 한다. 여기서는 세기만 한다.
         if (open !== null && open !== character) {
@@ -238,9 +238,9 @@ describe("E-4 지표가 경계를 넘지 못한다 (FR-011, 원칙 IV) ★", () 
 });
 
 describe("E-5 LoadResult에 모델 정보가 없다 (FR-010, 원칙 III)", () => {
-  it("성공 갈래가 ok만 담는다", () => {
-    const result: LoadResult = { ok: true };
-    expect(Object.keys(result)).toEqual(["ok"]);
+  it("성공 갈래가 ok·warm만 담는다 (warm은 016이 더한 콜드/핫 판정, 모델 정보가 아니다)", () => {
+    const result: LoadResult = { ok: true, warm: false };
+    expect(Object.keys(result).sort()).toEqual(["ok", "warm"]);
   });
 
   it("실패 갈래가 두 까닭만 담는다", () => {
@@ -265,7 +265,7 @@ describe("E-5 LoadResult에 모델 정보가 없다 (FR-010, 원칙 III)", () =>
     // 조용한 대체는 사용자가 고른 캐릭터를 배신하는 것이다.
     const fake = fakeEngine({
       load: (character) =>
-        character === "quiet" ? { ok: false, reason: "not-found" } : { ok: true },
+        character === "quiet" ? { ok: false, reason: "not-found" } : { ok: true, warm: false },
     });
     const result = await backendWith(fake.engine).generate(requestFor("quiet"));
 

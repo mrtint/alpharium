@@ -32,7 +32,13 @@ import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
-import type { GenerationResult, InferenceBackend, ModuleStatus, ProgressStage } from "./types";
+import type {
+  GenerationResult,
+  InferenceBackend,
+  ModuleStatus,
+  MonologueBranch,
+  ProgressStage,
+} from "./types";
 
 /** 네이티브 백엔드 장치 정보를 조회하는 함수. 테스트에서 주입한다. */
 export type BackendProbe = () => Promise<unknown>;
@@ -134,7 +140,7 @@ async function readPhotos(
   vision: VisionSupport,
   request: DiaryRequest,
   cancel: { cancelled: boolean },
-  onStage?: (stage: ProgressStage) => void,
+  onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
 ): Promise<VisionOutcome> {
   // 004가 사진을 못 봤으면(`none`·`unknown`) 읽을 것이 없다.
   //
@@ -250,7 +256,7 @@ export function createOnDeviceBackend(
      */
     async generate(
       request: DiaryRequest,
-      onStage?: (stage: ProgressStage) => void,
+      onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
     ): Promise<GenerationResult> {
       // 0. 시각 설정 — 사진을 보겠다고 했는데 보지 않은 일기를 주지 않는다(FR-022).
       //
@@ -303,10 +309,26 @@ export function createOnDeviceBackend(
       const prompt = buildPrompt(request, seen);
 
       // 2. 모델을 연다. 실패하면 **다른 캐릭터로 대신하지 않는다**(FR-010).
+      //
+      // 016 — 로드 신호 두 단계 (contracts/load-signal.md). 로드 시작 시점에는
+      // 아직 콜드/핫을 모르므로 branch 없이 보내고, 완료되면 warm 값으로 확정
+      // 신호를 보낸다. 실패하면 확정 신호를 보내지 않는다.
+      onStage?.("load");
       const loaded = await engine.load(request.character);
       if (!loaded.ok) {
         return { kind: "model-load-failed", reason: loaded.reason };
       }
+
+      // 016 FR-013 — 로드 자체는 중단할 수 없다(research.md §7, llama.rn에
+      // 로드 취소 API가 없다). 로드가 끝난 이 시점에 취소 상태를 재확인해
+      // 결과를 버린다 — 011의 captionAll()이 루프 종료 후 cancel을 다시
+      // 확인하는 것과 같은 패턴이다.
+      if (cancel.cancelled) {
+        await engine.unload().catch(() => {});
+        return { kind: "interrupted" };
+      }
+
+      onStage?.("load", loaded.warm ? "hot" : "cold");
 
       try {
         // 015 — 글쓰기 진행 신호 (contracts/progress-signal.md).

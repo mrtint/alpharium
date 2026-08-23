@@ -45,6 +45,7 @@ import type { SelectionState } from "../app/selection";
 import { dayOf, isDayWritable, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import { pickMonologue } from "../diary/monologue";
+import { personaOf } from "../diary/persona";
 import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
@@ -210,11 +211,19 @@ export function DiaryHomeScreen({
           },
           // 015 — 진행 신호가 오면 독백 문구를 고른다. 예외를 던지지 않는 얇은
           // 콜백이다(contracts/progress-signal.md 불변식 3).
-          (stage) => {
+          //
+          // 016 — 로드 시작 신호("load", branch 없음)에서는 상태를 갱신하지
+          // 않는다(research.md §2) — 아직 콜드/핫을 모르므로 보여줄 문구가
+          // 없다, 이전 단계 문구를 그대로 유지한다.
+          (stage, branch) => {
+            if (stage === "load" && branch === undefined) return;
+
             setScreen((s) => {
               if (s.kind !== "writing") return s;
-              const line = pickMonologue(stage, s.line);
-              return { ...s, stage, line };
+              const characterName =
+                stage === "load" ? personaOf(selection.character).name : undefined;
+              const line = pickMonologue(stage, branch, s.line, characterName);
+              return { ...s, stage, branch, line };
             });
           },
         );

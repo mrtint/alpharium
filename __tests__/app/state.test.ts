@@ -758,12 +758,14 @@ describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)"
    * 아니라 "허용된 두 필드 외에는 없고, 그 타입이 좁다"를 확인한다.
    * ─────────────────────────────────────────────────────────────────────────
    */
-  it("★ AppScreen 선언의 writing 갈래가 stage·line 두 옵셔널 필드만 허용한다(FR-010a, 015)", () => {
+  it("★ AppScreen 선언의 writing 갈래가 stage·branch·line 세 옵셔널 필드만 허용한다(016)", () => {
     const source = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
     const writingBranch = source.match(/\|\s*\{\s*kind:\s*"writing"[^}]*\}/);
 
     expect(writingBranch).not.toBeNull();
-    expect(writingBranch?.[0]).toBe('| { kind: "writing"; stage?: ProgressStage; line?: string }');
+    expect(writingBranch?.[0]).toBe(
+      '| { kind: "writing"; stage?: ProgressStage; branch?: MonologueBranch; line?: string }',
+    );
   });
 
   it("숫자·Date·객체를 가리키는 타입이 없다 (원칙 IV)", () => {

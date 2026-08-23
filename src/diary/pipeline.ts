@@ -9,7 +9,12 @@
  */
 
 import { isDayWritable, type DayDate } from "../config/day-boundary";
-import { isGenerationFailure, type InferenceBackend, type ProgressStage } from "../inference/types";
+import {
+  isGenerationFailure,
+  type InferenceBackend,
+  type MonologueBranch,
+  type ProgressStage,
+} from "../inference/types";
 import type { DaySignals } from "../signals/types";
 import { buildRequest } from "./request";
 import type { DiaryStore } from "./store";
@@ -103,7 +108,10 @@ export type PipelineDeps = {
 };
 
 export interface Pipeline {
-  run(input: PipelineInput, onProgress?: (stage: ProgressStage) => void): Promise<PipelineResult>;
+  run(
+    input: PipelineInput,
+    onProgress?: (stage: ProgressStage, branch?: MonologueBranch) => void,
+  ): Promise<PipelineResult>;
 }
 
 /** 실패를 만든다. stage 없이 실패하는 경로가 없도록 이 함수만 쓴다. */
@@ -126,7 +134,7 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
   return {
     async run(
       input: PipelineInput,
-      onProgress?: (stage: ProgressStage) => void,
+      onProgress?: (stage: ProgressStage, branch?: MonologueBranch) => void,
     ): Promise<PipelineResult> {
       // 1. 이 하루를 지금 쓸 수 있는가? — 닫혔거나(지난 하루), 오늘이면서
       //    정오를 지났으면 쓸 수 있다(012, 헌법 원칙 II 「하루의 끝」).
@@ -161,7 +169,7 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
 async function runStages(
   deps: PipelineDeps,
   input: PipelineInput,
-  onProgress?: (stage: ProgressStage) => void,
+  onProgress?: (stage: ProgressStage, branch?: MonologueBranch) => void,
 ): Promise<PipelineResult> {
   // 3. 신호를 가져온다.
   // 015 — 진행 신호. 파이프라인이 보내는 것은 이 한 곳뿐이며, 나머지는 그대로

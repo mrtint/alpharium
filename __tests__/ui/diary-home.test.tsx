@@ -792,3 +792,109 @@ describe("015 — 쓰는 중 독백", () => {
     expect(rendered).not.toMatch(/사진을 들여다보는|사진을 살펴보는|눈에 담는/);
   });
 });
+
+/**
+ * 016 — 모델 로드 독백(콜드/핫 스타트).
+ *
+ * 계약: specs/016-writing-monologue-expansion/spec.md User Story 1
+ *       specs/016-writing-monologue-expansion/contracts/load-signal.md
+ *
+ * `selected`(모듈 상수)의 캐릭터가 `"quiet"` → persona.ts `displayName`이
+ * "금동이"다. 로드 단계 문구는 이 이름을 포함해야 한다.
+ */
+describe("016 — 모델 로드 독백", () => {
+  /** onProgress를 밖에서 호출할 수 있게 노출하는 파이프라인 대역 (branch 포함) */
+  function loadProgressPipeline(): Pipeline & {
+    onProgress: (stage: string, branch?: string) => void;
+    finish: (result: PipelineResult) => void;
+  } {
+    let release: (result: PipelineResult) => void = () => {};
+    let sendProgress: (stage: string, branch?: string) => void = () => {};
+    return {
+      run: (_input, onProgress) =>
+        new Promise<PipelineResult>((resolve) => {
+          release = resolve;
+          sendProgress = (stage, branch) =>
+            (onProgress as unknown as (s: string, b?: string) => void)?.(stage, branch);
+        }),
+      onProgress: (stage, branch) => sendProgress(stage, branch),
+      finish: (result) => release(result),
+    };
+  }
+
+  it("onProgress('load')(branch 없음)를 받아도 화면 문구가 갱신되지 않는다", async () => {
+    const pipeline = loadProgressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("vision"));
+    const beforeLoad = JSON.stringify(screen.toJSON());
+
+    await act(async () => pipeline.onProgress("load"));
+    const afterLoadStart = JSON.stringify(screen.toJSON());
+
+    expect(afterLoadStart).toBe(beforeLoad);
+  });
+
+  it("onProgress('load', 'cold')를 받으면 캐릭터 이름이 포함된 콜드 스타트 문구가 보인다", async () => {
+    const pipeline = loadProgressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("load", "cold"));
+
+    const rendered = JSON.stringify(screen.toJSON());
+    expect(rendered).toContain("금동이");
+  });
+
+  it("onProgress('load', 'hot')를 받으면 캐릭터 이름이 포함된 핫 스타트 문구가 보인다", async () => {
+    const pipeline = loadProgressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("load", "hot"));
+
+    const rendered = JSON.stringify(screen.toJSON());
+    expect(rendered).toContain("금동이");
+  });
+
+  it("콜드 스타트 문구와 핫 스타트 문구는 서로 다른 풀에서 온다", async () => {
+    const coldPipeline = loadProgressPipeline();
+    await startWriting(coldPipeline);
+    await act(async () => coldPipeline.onProgress("load", "cold"));
+    const coldRendered = JSON.stringify(screen.toJSON());
+
+    const hotPipeline = loadProgressPipeline();
+    await startWriting(hotPipeline);
+    await act(async () => hotPipeline.onProgress("load", "hot"));
+    const hotRendered = JSON.stringify(screen.toJSON());
+
+    // 둘 다 "금동이"를 포함하지만(공통 요구사항), 전체 렌더 결과는 각자
+    // 서로 다른 갈래의 풀에서 온 것이므로 우연히 완전히 같을 수 없다는 것을
+    // 여러 회 반복해 확률적으로 검증한다(무작위 선택이므로 결정론적 비교
+    // 대신 통계적 접근).
+    let sawDifference = coldRendered !== hotRendered;
+    for (let i = 0; i < 10 && !sawDifference; i++) {
+      const c = loadProgressPipeline();
+      await startWriting(c);
+      await act(async () => c.onProgress("load", "cold"));
+      const cr = JSON.stringify(screen.toJSON());
+
+      const h = loadProgressPipeline();
+      await startWriting(h);
+      await act(async () => h.onProgress("load", "hot"));
+      const hr = JSON.stringify(screen.toJSON());
+
+      if (cr !== hr) sawDifference = true;
+    }
+    expect(sawDifference).toBe(true);
+  });
+
+  it("onProgress('generation')을 받으면(로드 단계 다음) 화면이 글쓰기 문구로 전환된다", async () => {
+    const pipeline = loadProgressPipeline();
+    await startWriting(pipeline);
+
+    await act(async () => pipeline.onProgress("load", "cold"));
+    await act(async () => pipeline.onProgress("generation"));
+
+    const rendered = JSON.stringify(screen.toJSON());
+    expect(rendered).not.toContain("금동이");
+  });
+});

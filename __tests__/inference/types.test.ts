@@ -36,9 +36,9 @@ function declarationOf(name: string): string {
 describe("ProgressStage — 문자열 리터럴 유니온뿐이다 (원칙 IV)", () => {
   const declaration = declarationOf("ProgressStage");
 
-  it("갈래가 signals·vision·generation 셋이다", () => {
+  it("갈래가 signals·vision·generation·load 넷이다 (016)", () => {
     const kinds = [...declaration.matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
-    expect(kinds.sort()).toEqual(["generation", "signals", "vision"]);
+    expect(kinds.sort()).toEqual(["generation", "load", "signals", "vision"]);
   });
 
   it("객체·필드를 담지 않는다 — 콜론이 없다", () => {
@@ -53,11 +53,31 @@ describe("ProgressStage — 문자열 리터럴 유니온뿐이다 (원칙 IV)",
   });
 });
 
-describe("InferenceBackend.generate — onStage는 옵셔널 두 번째 인자다", () => {
+describe("MonologueBranch — 문자열 리터럴 유니온뿐이다 (원칙 IV, 016 신설)", () => {
+  const declaration = declarationOf("MonologueBranch");
+
+  it("갈래가 cold·hot·normal·many 넷이다", () => {
+    const kinds = [...declaration.matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
+    expect(kinds.sort()).toEqual(["cold", "hot", "many", "normal"]);
+  });
+
+  it("객체·필드를 담지 않는다 — 콜론이 없다", () => {
+    expect(declaration).not.toMatch(/\{/);
+  });
+
+  it("숫자·Date를 가리키는 이름을 담지 않는다 (진행률 방지)", () => {
+    const body = declaration.replace(/export type MonologueBranch/, "");
+    expect(body).not.toMatch(/number|Date|percent|index/i);
+  });
+});
+
+describe("InferenceBackend.generate — onStage는 옵셔널 두 번째 인자이고 branch를 함께 받는다 (016)", () => {
   const declaration = declarationOf("InferenceBackend");
 
-  it("generate가 onStage?: (stage: ProgressStage) => void를 받는다", () => {
-    expect(declaration).toMatch(/onStage\?:\s*\(stage:\s*ProgressStage\)\s*=>\s*void/);
+  it("generate가 onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void를 받는다", () => {
+    expect(declaration).toMatch(
+      /onStage\?:\s*\(stage:\s*ProgressStage,\s*branch\?:\s*MonologueBranch\)\s*=>\s*void/,
+    );
   });
 
   it("onStage가 필수 인자가 아니다 — 물음표가 있다", () => {

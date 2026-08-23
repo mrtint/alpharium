@@ -300,6 +300,66 @@ describe("적재와 정리 (E1·E2)", () => {
   });
 });
 
+describe("콜드/핫 판정 — warm (016, research.md §1)", () => {
+  function countingLoader() {
+    const state = { opened: 0, released: 0 };
+    const loader = async () => {
+      state.opened += 1;
+      return {
+        async completion() {
+          return { content: "글", stopped_eos: true };
+        },
+        async stopCompletion() {},
+        async release() {
+          state.released += 1;
+        },
+      };
+    };
+    return { state, loader };
+  }
+
+  it("처음 여는 캐릭터는 warm: false다", async () => {
+    const { loader } = countingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    expect(await engine.load("quiet")).toEqual({ ok: true, warm: false });
+  });
+
+  it("같은 캐릭터를 다시 열면 warm: true다 — loader()가 다시 불리지 않는다", async () => {
+    const { state, loader } = countingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    await engine.load("quiet");
+    const second = await engine.load("quiet");
+
+    expect(second).toEqual({ ok: true, warm: true });
+    // **진짜 재사용 검증** — loader()(네이티브 적재, 비용이 드는 호출)가
+    // 두 번째 호출에서는 불리지 않는다(research.md §1).
+    expect(state.opened).toBe(1);
+  });
+
+  it("다른 캐릭터로 전환하면 warm: false다 (E1)", async () => {
+    const { loader } = countingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    await engine.load("quiet");
+    const second = await engine.load("narrative");
+
+    expect(second).toEqual({ ok: true, warm: false });
+  });
+
+  it("로드 실패 결과에는 warm 필드가 없다", async () => {
+    const engine = createLlamaEngine(async () => {
+      throw new Error("ENOENT: no such file or directory");
+    }, pathFor);
+
+    const result = await engine.load("quiet");
+
+    expect(result).toEqual({ ok: false, reason: "not-found" });
+    expect("warm" in result).toBe(false);
+  });
+});
+
 describe("실패는 값이다 (E5)", () => {
   it("적재 실패가 돌아온다 — 던지지 않는다", async () => {
     const engine = createLlamaEngine(async () => {

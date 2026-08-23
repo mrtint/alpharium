@@ -42,22 +42,22 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
 
 ### 타입 (data-model.md, contracts/load-signal.md, contracts/monologue-branch.md)
 
-- [ ] T001 [F] `src/inference/types.ts`의 `ProgressStage`에 `"load"`
+- [X] T001 [F] `src/inference/types.ts`의 `ProgressStage`에 `"load"`
   값을 추가하고(`"signals" | "vision" | "generation" | "load"`),
   `MonologueBranch = "cold" | "hot" | "normal" | "many"` 타입을 새로
   선언한다. `InferenceBackend.generate()` 시그니처를 `onStage?: (stage:
   ProgressStage, branch?: MonologueBranch) => void`로 넓힌다
   (data-model.md 「ProgressStage (확장)」「MonologueBranch (신설)」).
-- [ ] T002 [P] [F] `__tests__/inference/types.test.ts`에 `ProgressStage`가
+- [X] T002 [P] [F] `__tests__/inference/types.test.ts`에 `ProgressStage`가
   네 값(signals/vision/generation/load)의 문자열 리터럴 유니온뿐인지,
   `MonologueBranch`가 네 값의 문자열 리터럴 유니온뿐인지(숫자·객체 필드
   없음) 소스 선언을 직접 읽어 검사하는 계약 테스트를 추가한다. **먼저
   실패를 확인한 뒤** T001을 완성해 통과시킨다.
-- [ ] T003 [F] `src/inference/engine-port.ts`의 `LoadResult`를 `{ ok:
+- [X] T003 [F] `src/inference/engine-port.ts`의 `LoadResult`를 `{ ok:
   true; warm: boolean } | { ok: false; reason: "not-found" |
   "load-failed" }`로 확장한다(data-model.md 「LoadResult (확장)」).
   `{ ok: false }` 갈래는 변경하지 않는다.
-- [ ] T004 [P] [F] `__tests__/inference/engine-port.test.ts`에
+- [X] T004 [P] [F] `__tests__/inference/engine-port.test.ts`에
   `LoadResult`의 `{ ok: true }` 갈래가 `warm: boolean` 필드를 갖는지,
   `{ ok: false }` 갈래는 여전히 `reason`만 갖는지(시간·모델명 등 다른
   필드 없음, 원칙 III·IV 방어) 소스 선언을 직접 읽어 검사하는 계약
@@ -65,7 +65,7 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
 
 ### llama-port.ts 콜드/핫 판정 (research.md §1, contracts/load-signal.md)
 
-- [ ] T005 [F] `__tests__/inference/llama-port.test.ts`에 다음 테스트를
+- [X] T005 [F] `__tests__/inference/llama-port.test.ts`에 다음 테스트를
   추가한다(**먼저 작성해 실패를 확인**):
   - 캐릭터 A로 처음 `load()`를 부르면 `{ ok: true, warm: false }`를
     돌려준다.
@@ -77,7 +77,7 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
     false }`를 돌려준다(E1 — 다른 캐릭터면 콜드).
   - 로드 실패 시(`{ ok: false }`) `warm` 필드가 없다(타입 검사 겸 런타임
     검사).
-- [ ] T006 [F] `src/inference/llama-port.ts`의 `load()`를 고쳐, 121행의
+- [X] T006 [F] `src/inference/llama-port.ts`의 `load()`를 고쳐, 121행의
   재사용 분기(`context !== null && openFor === character`)에서
   `{ ok: true, warm: true }`를 돌려주고, 137행의 새 로드 성공 분기에서
   `{ ok: true, warm: false }`를 돌려준다(contracts/load-signal.md
@@ -85,13 +85,13 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
 
 ### 조사 선택 (contracts/particle.md, research.md §5)
 
-- [ ] T007 [P] [F] `__tests__/diary/particle.test.ts`를 작성한다(**먼저
+- [X] T007 [P] [F] `__tests__/diary/particle.test.ts`를 작성한다(**먼저
   작성해 실패를 확인**) — contracts/particle.md 검증 표 그대로:
   - 로스터 5인(금동이·루이·오드·샤오바이·모카) 전부 `"가"`를 돌려준다.
   - 받침 있는 가상 이름(예: `"테스트인"`)은 `"이"`를 돌려준다(받침 있음
     분기가 죽은 코드로 남지 않게 하는 케이스).
   - 빈 문자열·비한글 문자에서도 예외를 던지지 않고 `"가"`를 돌려준다.
-- [ ] T008 [F] `src/diary/particle.ts`를 새로 만든다:
+- [X] T008 [F] `src/diary/particle.ts`를 새로 만든다:
   `particleFor(name: string): "이" | "가"`를 유니코드 코드포인트 받침
   판정 공식(`(codePoint - 0xAC00) % 28`)으로 구현한다(contracts/
   particle.md 「판정 규칙」). `Character`·`../models/roster`·`./persona`를
@@ -99,7 +99,7 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
 
 ### 독백 문구 확장 — branch·이름·10개 이상 (contracts/monologue-branch.md)
 
-- [ ] T009 [F] `__tests__/diary/monologue.test.ts`를 확장한다(**먼저
+- [X] T009 [F] `__tests__/diary/monologue.test.ts`를 확장한다(**먼저
   작성해 실패를 확인**, 015의 기존 테스트는 유지하며 아래를 추가) —
   SC-003·SC-006·SC-007·SC-008·SC-002a 근거:
   - `(stage, branch)` 조합 중 신설·수정 대상 다섯(vision+normal,
@@ -121,7 +121,7 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
   - 반환된 모든 문구(이름 치환 전 템플릿 기준)에 숫자가 없다(FR-004).
   - `monologue.ts`의 소스가 `roster.ts`·`persona.ts`·`Character`를
     import하지 않는다(소스 텍스트 직접 검사).
-- [ ] T010 [F] `src/diary/monologue.ts`를 확장한다: `pickMonologue(stage,
+- [X] T010 [F] `src/diary/monologue.ts`를 확장한다: `pickMonologue(stage,
   branch, previous, characterName?, random?): string`으로 시그니처를
   넓히고, `(stage, branch)` 조합별 최소 10개 원소 튜플 문구 테이블을
   구성한다(data-model.md 「MonologueLine (문구 후보와 선택 — 확장)」).
@@ -131,7 +131,7 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
   monologue-branch.md 「사진 보기 문구 — 정직성 경계」 표 참조).
   `generation` 문구 10개로 015의 3개를 대체한다(spec Assumptions).
   T009의 테스트가 통과해야 한다.
-- [ ] T011 [F] `npm run lint`(헌법 검사 포함)를 돌려 `monologue.ts`·
+- [X] T011 [F] `npm run lint`(헌법 검사 포함)를 돌려 `monologue.ts`·
   `particle.ts`가 새 위반을 만들지 않는지 확인한다. quickstart.md의
   위반 주입 절차(일부러 `persona.ts`를 import했다 되돌리기, 두 파일
   모두)로 검사가 실제로 잡는지 1회 확인한다(research.md §4).
@@ -156,7 +156,7 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
 
 ### Tests for User Story 1
 
-- [ ] T012 [P] [US1] `__tests__/inference/on-device.test.ts`에 다음
+- [X] T012 [P] [US1] `__tests__/inference/on-device.test.ts`에 다음
   테스트를 추가한다(**먼저 작성해 실패를 확인**) — contracts/
   load-signal.md 검증 표 근거:
   - `engine.load()` 호출 직전에 `onStage`가 `("load")`(branch 없음)로
@@ -169,12 +169,12 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
     어느 것도 불리지 않고 `model-load-failed`를 반환한다(FR-011).
   - `onStage`를 안 넘겨도 기존 성공/실패 경로가 그대로 동작한다(옵셔널
     확장).
-- [ ] T013 [US1] `src/inference/on-device.ts`의 `generate()`를 고친다:
+- [X] T013 [US1] `src/inference/on-device.ts`의 `generate()`를 고친다:
   `engine.load(request.character)` 호출 직전에 `onStage?.("load")`를,
   성공 시(`loaded.ok === true`) 그 직후에 `onStage?.("load", loaded.warm
   ? "hot" : "cold")`를 추가한다(contracts/load-signal.md 「신호 흐름」).
   T012의 테스트가 통과해야 한다.
-- [ ] T013a [P] [US1] `__tests__/inference/on-device.test.ts`에 취소
+- [X] T013a [P] [US1] `__tests__/inference/on-device.test.ts`에 취소
   검증 테스트를 추가한다(**먼저 작성해 실패를 확인**) — contracts/
   load-signal.md 「취소 — 로드 자체는 중단되지 않는다」 근거:
   - `engine.load()`가 성공(`{ ok: true, warm: false | true }`)했지만
@@ -185,18 +185,18 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
   - 같은 상황에서 결과가 `{ kind: "interrupted" }`다.
   - `cancel.cancelled === false`(취소 없음)면 기존 T012 시나리오와
     동일하게 동작한다(회귀 확인).
-- [ ] T013b [US1] `src/inference/on-device.ts`의 `generate()`를 고친다:
+- [X] T013b [US1] `src/inference/on-device.ts`의 `generate()`를 고친다:
   `engine.load()` 성공 직후, 콜드/핫 확정 신호를 보내기 **전에**
   `cancel.cancelled`를 확인한다. 취소 상태면 `engine.unload()`를 부른
   뒤 `{ kind: "interrupted" }`를 즉시 반환하고, 확정 신호·`"generation"`
   신호·이후 로직(`runWithTimeout` 등)을 실행하지 않는다(contracts/
   load-signal.md 「취소 — 로드 자체는 중단되지 않는다」). T013a의
   테스트가 통과해야 한다.
-- [ ] T014 [P] [US1] `__tests__/app/state.test.ts`에 `"writing"` 화면
+- [X] T014 [P] [US1] `__tests__/app/state.test.ts`에 `"writing"` 화면
   상태가 `branch?: MonologueBranch` 필드를 가질 수 있는지 검사하는
   테스트를 추가한다(**먼저 작성해 실패를 확인**, 015가 이미 둔
   `stage`·`line`은 유지).
-- [ ] T015 [P] [US1] `__tests__/ui/diary-home.test.tsx`에 다음을 검사하는
+- [X] T015 [P] [US1] `__tests__/ui/diary-home.test.tsx`에 다음을 검사하는
   테스트를 추가한다(**먼저 작성해 실패를 확인**):
   - `onProgress("load")`(branch 없음)를 받아도 화면 상태(`stage`·
     `branch`·`line`)가 갱신되지 않는다(research.md §2 결정 — 이전 단계
@@ -210,11 +210,11 @@ Single project — `src/`, `__tests__/`, `.maestro/`가 저장소 루트에 있�
 
 ### Implementation for User Story 1
 
-- [ ] T016 [US1] `src/app/state.ts`의 `AppScreen`에서 `"writing"` 갈래를
+- [X] T016 [US1] `src/app/state.ts`의 `AppScreen`에서 `"writing"` 갈래를
   `{ kind: "writing"; stage?: ProgressStage; branch?: MonologueBranch;
   line?: string }`로 확장한다(data-model.md 「AppScreen 확장」). T014의
   테스트가 통과해야 한다.
-- [ ] T017 [US1] `src/ui/DiaryHomeScreen.tsx`의 `generate()` 콜백에서
+- [X] T017 [US1] `src/ui/DiaryHomeScreen.tsx`의 `generate()` 콜백에서
   `onProgress(stage, branch)` 처리 로직을 확장한다: `stage === "load"`
   이고 `branch`가 `undefined`이면 상태를 갱신하지 않는다(research.md
   §2). 그 외에는 `pickMonologue(stage, branch, s.line, stage === "load"

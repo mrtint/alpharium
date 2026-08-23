@@ -21,8 +21,25 @@ export type InferenceLocation = "on-device" | "desktop-server";
  * 멈췄는가)와는 이름·목적이 다른 독립 타입이다. 문자열 리터럴 유니온뿐이며
  * 숫자·시간·객체 필드를 담지 않는다(원칙 IV) — 필드를 더하면 그 순간 진행률이
  * 된다.
+ *
+ * **`"load"`가 016에서 더해졌다.** 실행 순서상 `"vision"`과 `"generation"`
+ * 사이다 — 캐릭터 모델은 사진 보기에 쓰인 VLM과 별개 엔진이라 사진을 다 본
+ * 뒤에만 열린다(engine-port.ts E1 불변식, specs/016 data-model.md).
  */
-export type ProgressStage = "signals" | "vision" | "generation";
+export type ProgressStage = "signals" | "vision" | "generation" | "load";
+
+/**
+ * 진행 단계 안의 하위 갈래 (016 신설).
+ *
+ * `stage`와 독립된 별개 타입이다 — `"load"` 단계는 `"cold"`/`"hot"`,
+ * `"vision"` 단계는 `"normal"`/`"many"`로 문구 풀을 다시 가른다. 그 외
+ * 단계(`"signals"`·`"generation"`)와 `"load"`의 로드-시작 신호(아직 콜드/핫
+ * 미확정)에서는 `undefined`다. 문자열 리터럴 유니온뿐이며 숫자·시간·객체
+ * 필드를 담지 않는다(원칙 IV, ProgressStage와 같은 방어).
+ *
+ * 계약: specs/016-writing-monologue-expansion/data-model.md「MonologueBranch」
+ */
+export type MonologueBranch = "cold" | "hot" | "normal" | "many";
 
 /**
  * 네이티브 모듈 적재 상태.
@@ -132,7 +149,7 @@ export interface InferenceBackend {
   isAvailable(): Promise<ModuleStatus>;
   generate(
     request: DiaryRequest,
-    onStage?: (stage: ProgressStage) => void,
+    onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
   ): Promise<GenerationResult>;
 }
 
