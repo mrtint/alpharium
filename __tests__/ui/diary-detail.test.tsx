@@ -289,6 +289,19 @@ describe("017 — 소요 시간 문장 (contracts/elapsed-time.md)", () => {
     expect(screen.getByText(/45초/)).toBeTruthy();
   });
 
+  it("문장 어디에도 밀리초 숫자가 그대로 노출되지 않는다 (T10, 위반 주입 방어)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{ ...entryFor(), timing: { visionMs: 20_000, writingMs: 45_000 } }}
+      />,
+    );
+
+    // "M분 SS초"·"SS초" 서식이 아닌, 밀리초 원값이 그대로 보이면 위반이다
+    // (예: "(45000ms)"). 정규식이 "초" 부분 문자열만 보는 것으로는 이 위반을
+    // 못 잡으므로 "ms" 표기 자체가 없는지 직접 확인한다.
+    expect(screen.queryByText(/\d+ms/)).toBeNull();
+  });
+
   it("1분 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
     await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 130_000 } }} />);
     expect(screen.getByText(/2분 10초/)).toBeTruthy();
