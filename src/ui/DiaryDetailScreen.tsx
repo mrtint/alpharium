@@ -106,28 +106,45 @@ function formatDuration(ms: number): string {
 }
 
 /**
+ * "이 일기가 본 것" 절의 제목 (017 US3, contracts/elapsed-time.md T5~T9, 헌법 1.2.0).
+ *
+ * **고정 타이틀 대신 캐릭터 문장이 그 자리를 대신한다** — `{이름}는 이렇게 일기를
+ * 작성했어요.`가 곧 절 제목이며, 소요 시간 문장(있으면)은 그 아래 본문에만 있다.
+ * `entry.timing`이 없으면(옛 일기) 원래 고정 타이틀로 되돌아간다(FR-018, 회귀 없음).
+ */
+function SignalsTitle({ entry }: { entry: DiaryEntry }) {
+  if (entry.timing === undefined) {
+    return <Text style={styles.signalsTitle}>이 일기가 본 것</Text>;
+  }
+
+  const name = personaOf(entry.character).name;
+  const particle = topicParticleFor(name);
+
+  return (
+    <Text style={styles.signalsTitle}>
+      {name}
+      {particle} 이렇게 일기를 작성했어요.
+    </Text>
+  );
+}
+
+/**
  * 소요 시간 문장 (017 US3, contracts/elapsed-time.md T5~T9, 헌법 1.2.0).
  *
  * **완료된 생성 1건의 사실만 담는다** — 비교·평균·모델 식별자는 문장 틀
- * 자체에 자리가 없다(T8). 이름은 `personaOf().name`에서만 얻는다(T7,
- * 007·016이 이미 세운 경계).
+ * 자체에 자리가 없다(T8). 캐릭터 이름 문장은 `SignalsTitle`이 타이틀 자리로
+ * 가져갔으므로 여기서는 되풀이하지 않는다.
  */
 function TimingLines({ entry }: { entry: DiaryEntry }) {
   const timing = entry.timing;
   if (timing === undefined) return null;
 
-  const name = personaOf(entry.character).name;
-  const particle = topicParticleFor(name);
   // T6 — `timing.visionMs`가 있을 때만 유의미한 장수이므로 `entry.photos?.length`
   // (캡션 성공한 사진 수, User Story 1과 공유하는 값)를 그대로 쓴다.
   const photoCount = entry.photos?.length ?? 0;
 
   return (
     <>
-      <Text style={styles.signal}>
-        {name}
-        {particle} 이렇게 일기를 작성했어요.
-      </Text>
       {timing.visionMs !== undefined && (
         <Text style={styles.signal}>
           사진을 {photoCount}장을 분석하는 데 {formatDuration(timing.visionMs)}가 걸렸어요.
@@ -209,7 +226,7 @@ export function DiaryDetailScreen({
         무엇을 보고 썼는가(002 FR-011). **모르는 것과 없는 것이 구분된다**(원칙 V).
       */}
       <View style={styles.signals}>
-        <Text style={styles.signalsTitle}>이 일기가 본 것</Text>
+        <SignalsTitle entry={entry} />
         {signalLines(entry.signalsUsed, entry.placeName).map((line) => (
           <Text key={line.label} style={styles.signal}>
             {line.label}: {line.value}

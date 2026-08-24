@@ -271,6 +271,20 @@ describe("017 — 소요 시간 문장 (contracts/elapsed-time.md)", () => {
     await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 130_000 } }} />);
     expect(screen.getByText(/2분 10초/)).toBeTruthy();
   });
+
+  it("timing이 있으면 절 제목이 캐릭터 문장으로 대체되고 고정 타이틀은 사라진다", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 5_400 } }} />);
+
+    expect(screen.getByText("금동이는 이렇게 일기를 작성했어요.")).toBeTruthy();
+    expect(screen.queryByText("이 일기가 본 것")).toBeNull();
+  });
+
+  it("timing이 없으면(옛 일기) 절 제목이 고정 타이틀 그대로다 (회귀)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.getByText("이 일기가 본 것")).toBeTruthy();
+    expect(screen.queryByText(/이렇게 일기를 작성했어요/)).toBeNull();
+  });
 });
 
 /**

@@ -321,6 +321,17 @@ Independent Test 그대로).
   "이 일기가 본 것" 절 하단에 계약대로(contracts/elapsed-time.md T6) 문장을
   그린다. `formatDuration(ms): string` 헬퍼를 같은 파일 또는
   `src/diary/`에 순수 함수로 둔다(T10). T026의 테스트가 통과해야 한다.
+  - **2026-08-24 사용자 실기기 피드백으로 수정**: 처음 구현은 캐릭터 문장
+    ("{이름}는 이렇게 일기를 작성했어요.")을 고정 타이틀("이 일기가 본 것")
+    **아래**에 추가만 해, 실기기 화면에 두 문구가 중복으로 남았다(사용자가
+    "대체를 했었어야 하는데 본문에 남았다"고 지적). `SignalsTitle` 컴포넌트를
+    새로 분리해 `entry.timing`이 있으면 절 제목 자리 자체가 캐릭터 문장이
+    되고, 고정 타이틀은 사라지도록 고쳤다(`entry.timing`이 없는 옛 일기는
+    회귀 없이 고정 타이틀 그대로). `TimingLines`에서는 중복되던 캐릭터 문장
+    줄을 제거했다. contracts/elapsed-time.md에 T6a로 명시, quickstart.md
+    D3·D4 문구도 함께 갱신. `diary-detail.test.tsx`에 대체·회귀 테스트 2건
+    추가, 실기기(debug, R3CTB084WDP)에서 timing 있는 일기·없는 일기 둘 다
+    확인(스크린샷 기준 중복 없음 확인).
 
 **Checkpoint**: User Story 1·2·3 모두 독립적으로 동작한다.
 
