@@ -234,6 +234,28 @@ describe("017 — 소요 시간 문장 (contracts/elapsed-time.md)", () => {
     expect(screen.getByText(/일기를 작성하는 데/)).toBeTruthy();
   });
 
+  it("visionMs가 있으면 신호 목록의 '사진: N장' 줄이 중복이라 사라진다", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{
+          ...entryFor("2026-08-16", richDay("2026-08-16")),
+          timing: { visionMs: 20_000, writingMs: 5_400 },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/사진을 \d+장을 분석하는 데/)).toBeTruthy();
+    expect(screen.queryByText(/^사진: \d+장$/)).toBeNull();
+    // "다닌 자리" 줄은 소요 시간 문장과 겹치지 않으므로 그대로 남는다.
+    expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+  });
+
+  it("visionMs가 없으면(사진 0장) 신호 목록의 '사진: 없었다' 줄은 그대로 남는다 (회귀)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 5_400 } }} />);
+
+    expect(screen.getByText(/^사진: /)).toBeTruthy();
+  });
+
   it("timing이 아예 없으면(옛 일기) 소요 시간 문장이 전혀 렌더되지 않는다 (FR-018, 회귀)", async () => {
     await render(<DiaryDetailScreen entry={entryFor()} />);
 

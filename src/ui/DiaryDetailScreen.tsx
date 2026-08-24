@@ -227,11 +227,17 @@ export function DiaryDetailScreen({
       */}
       <View style={styles.signals}>
         <SignalsTitle entry={entry} />
-        {signalLines(entry.signalsUsed, entry.placeName).map((line) => (
-          <Text key={line.label} style={styles.signal}>
-            {line.label}: {line.value}
-          </Text>
-        ))}
+        {signalLines(entry.signalsUsed, entry.placeName)
+          // 017 — `timing.visionMs`가 있으면 아래 TimingLines의 "사진을 N장을
+          // 분석하는 데 ..." 문장이 이미 장수를 말하므로 "사진: N장" 줄은
+          // 같은 사실의 중복이다(사용자 실기기 확인). visionMs가 없을 때만
+          // (사진 0장·옛 일기) 여기가 유일한 정보원이므로 남긴다.
+          .filter((line) => !(line.label === "사진" && entry.timing?.visionMs !== undefined))
+          .map((line) => (
+            <Text key={line.label} style={styles.signal}>
+              {line.label}: {line.value}
+            </Text>
+          ))}
         {/*
           017 US3 — 소요 시간 사후 기록(헌법 1.2.0). `entry.timing`이 없으면
           (옛 일기) 문장 자체가 없다(FR-018, 회귀 없음).
