@@ -130,6 +130,44 @@ describe("빈 입력", () => {
     expect(trace.visitCount).toBe(0);
     expect(trace.approximateDistanceMeters).toBe(0);
   });
+
+  it("좌표가 없으면 representativeCoordinate 필드 자체가 없다 (017, 원칙 IV)", () => {
+    const trace = tracePlaces([]);
+
+    expect("representativeCoordinate" in trace).toBe(false);
+  });
+});
+
+describe("representativeCoordinate — 대표 좌표 (017, research.md §2)", () => {
+  it("자리가 하나뿐이면 그 하나가 대표 좌표다", () => {
+    const trace = tracePlaces([
+      { ...BASE, takenAtMs: at("2026-08-12T09:00:00") },
+      { ...northOf(30), takenAtMs: at("2026-08-12T10:00:00") },
+    ]);
+
+    expect(trace.representativeCoordinate).toEqual(BASE);
+  });
+
+  it("자리가 여럿이면 시각순 첫 자리가 대표 좌표다", () => {
+    const trace = tracePlaces([
+      { ...northOf(1000), takenAtMs: at("2026-08-12T13:00:00") },
+      { ...BASE, takenAtMs: at("2026-08-12T09:00:00") },
+    ]);
+
+    // 09:00에 찍힌 BASE가 시각순 첫 자리다 — 입력 순서가 아니라 정렬 후 순서.
+    expect(trace.representativeCoordinate).toEqual(BASE);
+  });
+
+  it("새로 재는 값이 아니다 — 이미 계산되던 첫 자리를 그대로 낸다", () => {
+    const trace = tracePlaces([
+      { ...BASE, takenAtMs: at("2026-08-12T09:00:00") },
+      { ...northOf(500), takenAtMs: at("2026-08-12T14:00:00") },
+      { ...northOf(1000), takenAtMs: at("2026-08-12T19:00:00") },
+    ]);
+
+    expect(trace.visitCount).toBe(3);
+    expect(trace.representativeCoordinate).toEqual(BASE);
+  });
 });
 
 describe("상수", () => {

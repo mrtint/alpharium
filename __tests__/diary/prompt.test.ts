@@ -688,3 +688,83 @@ describe("011 — 캡션이 프롬프트에 들어간다", () => {
     expect(prompt).not.toMatch(/LFM|SmolVLM|mmproj|gguf|토큰|ms|초 걸/i);
   });
 });
+
+/**
+ * 017 — 제목·본문 서두 보강 (contracts/title.md TL2·TL3·TL4·TL7·TL9·TL10·TL11).
+ *
+ * **지시문 텍스트 자체만 검사한다**(TL6·TL7). 모델 출력을 채점하는 코드는
+ * 만들지 않는다 — "우리가 무엇을 요구했는가"이지 "모델이 무엇을 냈는가"가
+ * 아니다.
+ */
+describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", () => {
+  const request = requestFor(partiallyUnknownDay(DAY));
+
+  it("재조합 패턴을 금지하는 구체적 예시를 포함한다 (TL2)", () => {
+    const lines = instructionLines(request);
+    const titleLines = lines.join("\n");
+
+    // "{이름}의 오늘 일기" 류의 반례를 구체적으로 든다.
+    expect(titleLines).toMatch(/의 오늘 일기|의 하루/);
+  });
+
+  it("짐작 어미 규칙이 제목에도 적용됨을 언급한다 (TL4)", () => {
+    const lines = instructionLines(request);
+    const titleLines = lines.join("\n");
+
+    expect(titleLines).toMatch(/제목/);
+    // 짐작 어미(014 SPEAKER_RULES 마지막 항목)가 제목에도 적용된다는 언급.
+    expect(titleLines).toMatch(/제목.*짐작|짐작.*제목/s);
+  });
+
+  it("마크다운 서식 기호를 쓰지 말라는 구체적 예시를 포함한다 (TL9)", () => {
+    const lines = instructionLines(request);
+    const titleLines = lines.join("\n");
+
+    // "#"·"*"·"**"·"-" 같은 기호를 구체적으로 나열한다.
+    expect(titleLines).toContain("#");
+    expect(titleLines).toContain("*");
+  });
+
+  it("'빈 줄'이라는 낱말이 지시문 문자열에 없다 (TL10 역검증)", () => {
+    const lines = instructionLines(request);
+    const titleLines = lines.join("\n");
+
+    expect(titleLines).not.toContain("빈 줄");
+  });
+
+  it("본문이 날짜·제목을 반복하지 말고 바로 시작하라는 지시를 포함한다 (TL11)", () => {
+    const lines = instructionLines(request);
+    const titleLines = lines.join("\n");
+
+    expect(titleLines).toMatch(/반복하지|다시.*(쓰지|적지)|날짜.*시작하지/);
+  });
+
+  it("완성된 제목 형태의 긍정 예시가 없다 (TL3 역검증)", () => {
+    const lines = instructionLines(request);
+    const titleLines = lines.join("\n");
+
+    // "이렇게 써라: XXX" 같은 완결된 예시 문장을 담지 않는다 — 큰따옴표로
+    // 감싼 완성 문장이 없는지 확인한다.
+    expect(titleLines).not.toMatch(/["'『「].{2,20}["'』」]\s*(류로|처럼) 써라/);
+  });
+
+  it("제목 지시문이 여전히 instructionLines()에 포함되어 되뱉기 판정 대상이다 (회귀)", () => {
+    const prompt = buildPrompt(request);
+    for (const line of instructionLines(request)) {
+      expect(prompt).toContain(line);
+    }
+  });
+
+  it("캐릭터별로 다른 지시문을 만들지 않는다 (TL5) — 제목 지시문 자체는 모든 캐릭터가 같다", () => {
+    // 제목 지시문은 이름 줄(nameLine)과 분리된 별도 상수다 — 캐릭터별로 갈라지지 않는다.
+    const titleInstructions = CHARACTERS.map((character) => {
+      const lines = instructionLines(requestFor(partiallyUnknownDay(DAY), character));
+      return lines.find((line) => line.includes("제목") && line.startsWith("첫 줄에"));
+    });
+
+    for (const instruction of titleInstructions) {
+      expect(instruction).toBeDefined();
+      expect(instruction).toBe(titleInstructions[0]);
+    }
+  });
+});

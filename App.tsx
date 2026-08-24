@@ -6,6 +6,11 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { resolveSelection } from "./src/app/selection";
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
 import {
+  expoGeocodingSettingPort,
+  loadGeocodingSetting,
+  saveGeocodingSetting,
+} from "./src/app/geocoding-setting-store";
+import {
   expoVisionSettingPort,
   loadVisionSetting,
   saveVisionSetting,
@@ -177,7 +182,6 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
   // 화면이 다시 그려질 때마다 새로 만들지 않는다. 지연 import 하는 통로이므로
   // 여기서 만들어도 모듈이 즉시 해석되지 않는다.
   const store = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
-  const wiring = useMemo(() => createAppPipeline(environment, { store }), [environment, store]);
 
   /** 저장된 선택. 아직 읽지 않았으면 null이며 그것은 「고른 적 없음」과 다르다 */
   const [stored, setStored] = useState<Character | null>(null);
@@ -216,6 +220,67 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
       });
     },
     [visionPort],
+  );
+
+  /**
+   * 장소명 설정 (017 FR-004~006).
+   *
+   * **꺼짐이 기본값이다**(FR-004) — `vision`처럼 「고른 적 없음」을 따로
+   * 구분하지 않는다(geocoding-setting-store.ts 계약, `loadVisionSetting()`과
+   * 다른 판단).
+   */
+  const [geocodingEnabled, setGeocodingEnabled] = useState(false);
+  const geocodingSettingPort = useMemo(() => expoGeocodingSettingPort(), []);
+
+  useEffect(() => {
+    let alive = true;
+    void loadGeocodingSetting(geocodingSettingPort).then((saved) => {
+      if (alive) setGeocodingEnabled(saved);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [geocodingSettingPort]);
+
+  /**
+   * 사용자가 장소명 설정을 켜고 끈다.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **켤 때 위치 런타임 권한을 요청한다**(research.md §3 L8) — 안드로이드의
+   * `Geocoder`는 이 권한이 없으면 빈 결과 또는 예외를 준다. **요청 자체가
+   * 실패하거나 거부돼도 토글 값은 사용자가 낸 대로(켜짐) 유지한다**(L9) —
+   * 권한이 없으면 `geocoding-port.ts`가 이미 `unknown`으로 접으므로,
+   * 여기서 토글을 도로 끄면 사용자가 다시 켠 것을 앱이 조용히 무르는
+   * 꼴이 된다.
+   *
+   * **끌 때는 권한을 요청하지 않는다** — 끄는 것은 권한과 무관하다.
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  const onToggleGeocoding = useCallback(
+    async (enabled: boolean) => {
+      setGeocodingEnabled(enabled);
+      await saveGeocodingSetting(geocodingSettingPort, enabled).catch(() => {
+        // 저장하지 못해도 이번 실행 동안은 고른 대로 쓴다.
+      });
+
+      if (enabled) {
+        await import("expo-location")
+          .then((Location) => Location.requestForegroundPermissionsAsync())
+          .catch(() => {
+            // 권한 요청 자체가 실패해도 토글은 건드리지 않는다(L9) — 실제
+            // 지오코딩 시도는 geocoding-port.ts가 예외를 이미 삼킨다.
+          });
+      }
+    },
+    [geocodingSettingPort],
+  );
+
+  // **설정이 바뀌면 파이프라인을 다시 만든다** — `geocodingEnabled`는
+  // `createPipeline()` 구성 시점에 고정되는 값이라(파이프라인 인스턴스마다
+  // 하나), 토글이 바뀔 때 다시 만들지 않으면 다음 생성에 반영되지 않는다.
+  const wiring = useMemo(
+    () => createAppPipeline(environment, { store, geocodingEnabled }),
+    [environment, store, geocodingEnabled],
   );
 
   /**
@@ -278,6 +343,10 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
       // 007의 끊긴 `stop`, 009의 `day:` 한 줄과 같은 자리다.
       vision={vision ?? "none"}
       onSelectVision={(chosen) => void onSelectVision(chosen)}
+      // 017 — 이 두 줄이 없으면 화면에서 토글을 켜도 파이프라인은 언제나
+      // 꺼짐으로 만들어진다(011의 vision과 같은 자리).
+      geocodingEnabled={geocodingEnabled}
+      onToggleGeocoding={(enabled) => void onToggleGeocoding(enabled)}
       // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
       onGoToCharacters={onGoToCharacters}
     />

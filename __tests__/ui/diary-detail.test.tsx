@@ -7,7 +7,7 @@
  * 보므로 부분 문자열은 정규식으로 준다.
  */
 
-import { render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import { DiaryDetailScreen } from "../../src/ui/DiaryDetailScreen";
 import type { DiaryEntry } from "../../src/diary/types";
@@ -167,6 +167,196 @@ describe("012 — 걸음·배터리·연결이 상세 화면에 없다 (contract
 
     expect(screen.getByText(/^사진: /)).toBeTruthy();
     expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+  });
+});
+
+/**
+ * 017 — 사진 표시 (User Story 1, FR-001~003).
+ *
+ * 계약: specs/017-diary-body-screen/contracts/photo-preservation.md P6
+ */
+describe("017 — 사진 표시 (FR-001~003)", () => {
+  const photos = [
+    { photoId: "a", takenAt: new Date("2026-08-16T08:00:00"), resizedPath: "/resized/a.jpg" },
+    { photoId: "b", takenAt: new Date("2026-08-16T14:00:00"), resizedPath: "/resized/b.jpg" },
+  ];
+
+  it("entry.photos가 있으면 그 사진들이 이미지로 렌더된다", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), photos }} />);
+
+    const images = screen.getAllByTestId("diary-photo");
+    const sources = images.map((img) => img.props.source.uri);
+
+    expect(sources).toContain("file:///resized/a.jpg");
+    expect(sources).toContain("file:///resized/b.jpg");
+  });
+
+  it("entry.photos가 없으면(옛 일기) 사진 표시 영역 없이 기존 텍스트만 렌더된다 (회귀)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.queryAllByTestId("diary-photo")).toHaveLength(0);
+    expect(screen.getByText(/^사진: /)).toBeTruthy();
+  });
+
+  it("사진을 못 불러오면(onError) 그 사진 자리에 '이제 없다' 문구가 뜨고 나머지는 정상 렌더된다 (P6)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), photos }} />);
+
+    const images = screen.getAllByTestId("diary-photo");
+    expect(images).toHaveLength(2);
+
+    fireEvent(images[0], "onError");
+
+    expect(await screen.findByText(/이 사진은 이제 없다/)).toBeTruthy();
+    // 나머지 한 장은 여전히 이미지로 남아 있다.
+    expect(screen.getAllByTestId("diary-photo")).toHaveLength(1);
+  });
+});
+
+/**
+ * 017 US3 — 소요 시간 사후 기록 (contracts/elapsed-time.md T5~T9).
+ */
+describe("017 — 소요 시간 문장 (contracts/elapsed-time.md)", () => {
+  it("visionMs·writingMs 둘 다 있으면 두 문장이 모두 렌더된다", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{ ...entryFor(), timing: { visionMs: 130_000, writingMs: 5_400 } }}
+      />,
+    );
+
+    expect(screen.getByText(/사진을.*분석하는 데/)).toBeTruthy();
+    expect(screen.getByText(/일기를 작성하는 데/)).toBeTruthy();
+  });
+
+  it("visionMs가 없으면(사진 0장) 사진 분석 문장은 없고 글쓰기 문장만 렌더된다 (FR-013)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 5_400 } }} />);
+
+    expect(screen.queryByText(/사진을.*분석하는 데/)).toBeNull();
+    expect(screen.getByText(/일기를 작성하는 데/)).toBeTruthy();
+  });
+
+  it("visionMs가 있으면 신호 목록의 '사진: N장' 줄이 중복이라 사라진다", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{
+          ...entryFor("2026-08-16", richDay("2026-08-16")),
+          timing: { visionMs: 20_000, writingMs: 5_400 },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/사진을 \d+장을 분석하는 데/)).toBeTruthy();
+    expect(screen.queryByText(/^사진: \d+장$/)).toBeNull();
+    // "다닌 자리" 줄은 소요 시간 문장과 겹치지 않으므로 그대로 남는다.
+    expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+  });
+
+  it("visionMs가 없으면(사진 0장) 신호 목록의 '사진: 없었다' 줄은 그대로 남는다 (회귀)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 5_400 } }} />);
+
+    expect(screen.getByText(/^사진: /)).toBeTruthy();
+  });
+
+  it("timing이 아예 없으면(옛 일기) 소요 시간 문장이 전혀 렌더되지 않는다 (FR-018, 회귀)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.queryByText(/작성하는 데/)).toBeNull();
+    expect(screen.queryByText(/분석하는 데/)).toBeNull();
+  });
+
+  it("문장 어디에도 모델 식별자·비교 표현이 없다 (T8, 원칙 III·헌법 1.2.0)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{ ...entryFor(), timing: { visionMs: 130_000, writingMs: 5_400 } }}
+      />,
+    );
+
+    for (const leaked of [
+      "gguf",
+      "GGUF",
+      "hyperclovax",
+      "kanana",
+      "지난번",
+      "평균",
+      "보다 빠르",
+      "보다 느리",
+    ]) {
+      expect(screen.queryByText(new RegExp(leaked))).toBeNull();
+    }
+  });
+
+  it("1분 미만은 'SS초', 그 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 45_000 } }} />);
+    expect(screen.getByText(/45초/)).toBeTruthy();
+  });
+
+  it("문장 어디에도 밀리초 숫자가 그대로 노출되지 않는다 (T10, 위반 주입 방어)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{ ...entryFor(), timing: { visionMs: 20_000, writingMs: 45_000 } }}
+      />,
+    );
+
+    // "M분 SS초"·"SS초" 서식이 아닌, 밀리초 원값이 그대로 보이면 위반이다
+    // (예: "(45000ms)"). 정규식이 "초" 부분 문자열만 보는 것으로는 이 위반을
+    // 못 잡으므로 "ms" 표기 자체가 없는지 직접 확인한다.
+    expect(screen.queryByText(/\d+ms/)).toBeNull();
+  });
+
+  it("1분 이상은 'M분 SS초'로 포맷한다 (T10)", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 130_000 } }} />);
+    expect(screen.getByText(/2분 10초/)).toBeTruthy();
+  });
+
+  it("timing이 있으면 절 제목이 캐릭터 문장으로 대체되고 고정 타이틀은 사라진다", async () => {
+    await render(<DiaryDetailScreen entry={{ ...entryFor(), timing: { writingMs: 5_400 } }} />);
+
+    expect(screen.getByText("금동이는 이렇게 일기를 작성했어요.")).toBeTruthy();
+    expect(screen.queryByText("이 일기가 본 것")).toBeNull();
+  });
+
+  it("timing이 없으면(옛 일기) 절 제목이 고정 타이틀 그대로다 (회귀)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor()} />);
+
+    expect(screen.getByText("이 일기가 본 것")).toBeTruthy();
+    expect(screen.queryByText(/이렇게 일기를 작성했어요/)).toBeNull();
+  });
+});
+
+/**
+ * 017 US4 — 장소명 표시 (contracts/place-name.md L2·L5·L6·L7).
+ */
+describe("017 — 장소명 표시 (contracts/place-name.md)", () => {
+  it("placeName이 없으면 기존 '다닌 자리: N곳' 텍스트만 렌더된다 (회귀, L2)", async () => {
+    await render(<DiaryDetailScreen entry={entryFor("2026-08-16", richDay("2026-08-16"))} />);
+
+    expect(screen.getByText(/^다닌 자리: /)).toBeTruthy();
+    expect(screen.queryByText(/대표 장소/)).toBeNull();
+  });
+
+  it("placeName이 known이면 '대표 장소 · N곳' 형태로 렌더된다 (L6·L7)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{
+          ...entryFor("2026-08-16", richDay("2026-08-16")),
+          placeName: { kind: "known", value: "서울 중구" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/대표 장소 · 서울 중구/)).toBeTruthy();
+  });
+
+  it("placeName이 unknown이면 이름 자리에 '모른다'류 문구가 렌더된다 (L5)", async () => {
+    await render(
+      <DiaryDetailScreen
+        entry={{
+          ...entryFor("2026-08-16", richDay("2026-08-16")),
+          placeName: { kind: "unknown" },
+        }}
+      />,
+    );
+
+    expect(screen.getByText(/대표 장소.*모른다/)).toBeTruthy();
   });
 });
 

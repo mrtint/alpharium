@@ -63,16 +63,27 @@ export type DiaryRequest = {
    * 오늘인지 여부는 이미 계산된 값으로 전달받을 뿐이다.
    */
   dayStillOpen: boolean;
+  /**
+   * 대표 장소의 사람이 읽는 이름 (017 FR-008, 장소명 설정이 켜진 경우만).
+   *
+   * **이미 `known`으로 확정된 문자열만 담는다** — `unknown`/좌표 없음이면
+   * 이 필드 자체가 없다. 화면(`entry.placeName`)과 같은 지오코딩 호출
+   * 결과에서 나온 값이어야 한다("두 개의 진실" 금지, 원칙 II).
+   */
+  placeName?: string;
 };
 
 /**
  * 저장되고 사용자가 읽는 일기.
  *
+ * 계약: specs/017-diary-body-screen/contracts/elapsed-time.md
+ *
  * **불변식**:
  *  1. **모델 식별자를 담지 않는다**(FR-013, 원칙 III).
- *  2. **추론 속도·출력 점수·품질 지표를 담지 않는다**(원칙 IV). 이 타입이 원칙 IV를
- *     어기기 가장 쉬운 자리다 — "생성에 몇 초 걸렸는지" 정도는 무해해 보이지만, 그것이
- *     모델 비교의 시작점이 된다. 필요하면 별도 저장소에서 한다.
+ *  2. **출력 점수·품질 지표는 담지 않는다**(원칙 IV). **완료된 생성 1건의 소요
+ *     시간만은 헌법 1.2.0이 사후 1회성 기록으로 허용한다**(017) — 다른
+ *     일기·다른 실행과 비교하거나 평균 내는 필드를 만드는 순간 그 경계를 어기는
+ *     것이다. 필요하면 별도 저장소에서 한다.
  *  3. **실패는 DiaryEntry가 되지 않는다**(FR-012). 빈 본문이나 플레이스홀더 텍스트로
  *     일기를 만들지 않는다.
  *  4. `signalsUsed`가 있어야 "이 일기가 무엇을 보고 쓰였나"를 되짚을 수 있다(FR-011).
@@ -93,4 +104,30 @@ export type DiaryEntry = {
   character: Character;
   signalsUsed: DaySignals;
   createdAt: Date;
+  /**
+   * 이 일기가 실제로 분석한 사진들 (017 FR-001).
+   *
+   * `signalsUsed.photos`(그날 수집된 사진 전부)와 다르다 — 이것은 VLM이
+   * 실제로 캡션한 것만, 최대 5장(VISION_PHOTO_LIMIT)이다. 옵셔널이며 옛
+   * 일기에는 없다.
+   */
+  photos?: { photoId: string; takenAt: Date; resizedPath: string }[];
+  /**
+   * 소요 시간 (017, 헌법 1.2.0).
+   *
+   * **완료된 이 생성 1건의 사실이다.** 다른 일기·다른 실행과 비교하는
+   * 필드를 만들지 않는다 — 이 타입에 "평균"·"이전 대비" 같은 필드가 생기는
+   * 순간 헌법 1.2.0이 그은 경계(비교·평균·순위 금지)를 어기는 것이다.
+   * 옵셔널이며 옛 일기에는 없다.
+   */
+  timing?: { visionMs?: number; writingMs: number };
+  /**
+   * 대표 장소 이름 (017 FR-007, 장소명 설정이 켜진 경우만).
+   *
+   * `SignalValue`와 같은 성격의 구분을 갖는다 — 좌표 자체가 없으면(또는
+   * 설정이 꺼져 있으면) 이 필드가 아예 없고, 좌표는 있는데 이름을 못
+   * 얻었으면 `{ kind: "unknown" }`, 얻었으면 `{ kind: "known"; value:
+   * string }`이다.
+   */
+  placeName?: { kind: "known"; value: string } | { kind: "unknown" };
 };

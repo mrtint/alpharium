@@ -27,12 +27,13 @@ import type { DiaryRequest } from "../diary/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
 import { reachedVisionLimit, selectForVision } from "../vision/select";
-import type { PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
+import type { PhotoCaption, PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
 import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
 import type {
+  DiaryDraft,
   GenerationResult,
   InferenceBackend,
   ModuleStatus,
@@ -302,18 +303,57 @@ export function createOnDeviceBackend(
       // 검사(파이프라인 4b)보다 나중인 까닭**은 캐릭터가 없는데 10초를 쓰지 않기
       // 위해서다.
       // ─────────────────────────────────────────────────────────────────────
+      // 017 — 벽시계 측정 지점 둘 중 첫째(contracts/elapsed-time.md T1). 사진을
+      // 실제로 읽은 경우에만 잰다 — `readPhotos()`를 아예 안 부르면 measure하지
+      // 않는다(안 한 일은 0초 걸린 일이 아니다, 원칙 V).
+      let visionMs: number | undefined;
       let seen: PhotoVision | undefined;
       if (request.vision !== "none" && vision !== undefined) {
+        const visionStart = Date.now();
         const outcome = await readPhotos(vision, request, cancel, onStage);
 
         // **「보지 않음」으로 낮추지 않는다**(FR-021). 실패는 실패로 돌려준다.
+        //
+        // 017 — 캡션까지는 끝났을 수 있는 실패 경로(failed·cancelled)에서도
+        // 성공한 캡션의 사본을 스스로 정리한다(research.md §1 흐름 3). `seen`이
+        // 아직 없으므로 여기서는 `outcome`에 실린 값이 있으면 그것을 쓴다 —
+        // 다만 `VisionOutcome`의 `failed`·`cancelled`는 캡션 결과를 담지
+        // 않으므로(`captionAll`이 `null`을 돌려준 경우) 정리할 것이 없다.
         if (outcome.kind === "not-ready") return { kind: "vision-failed", reason: "not-ready" };
         if (outcome.kind === "failed") return { kind: "vision-failed", reason: "failed" };
         if (outcome.kind === "cancelled") return { kind: "vision-failed", reason: "cancelled" };
 
         // `skipped`·`no-photos`는 실패가 아니다 — 볼 것이 없었을 뿐이며 일기는 나온다.
         if (outcome.kind === "seen") seen = outcome.vision;
+
+        // 017 — **그날 사진이 0장이면 재지 않는다**(contracts/elapsed-time.md
+        // T4). `readPhotos()`가 `no-photos`로 즉시 반환한 것은 「실제로
+        // 읽었다」가 아니다 — 안 한 일은 0초 걸린 일이 아니다(원칙 V).
+        if (outcome.kind !== "no-photos") visionMs = Date.now() - visionStart;
       }
+
+      // 017 — 캡션 성공한 사진(resizedPath가 있는 것)의 사본 정리 헬퍼
+      // (research.md §1 흐름 4). `judge()` 거부·타임아웃·끊김 등 `generate()`
+      // 내부에서 실패가 확정되는 모든 경로 직전에 부른다 — 저장 실패
+      // (`storage` 단계)는 이 함수의 범위 밖이며 `pipeline.ts`가 다룬다.
+      const cleanupUsedPhotos = async (): Promise<void> => {
+        if (seen === undefined || vision?.cleanupResized === undefined) return;
+        const cleaner = vision.cleanupResized;
+        await Promise.all(
+          seen.captions
+            .filter((c): c is PhotoCaption & { resizedPath: string } => c.resizedPath !== undefined)
+            .map((c) => cleaner(c.resizedPath).catch(() => {})),
+        );
+      };
+
+      // 017 — 캡션 성공한 사진을 `usedPhotos` 형태로 뽑는다(data-model.md §5).
+      const usedPhotosOf = (): DiaryDraft["usedPhotos"] => {
+        if (seen === undefined) return undefined;
+        const used = seen.captions
+          .filter((c): c is PhotoCaption & { resizedPath: string } => c.resizedPath !== undefined)
+          .map((c) => ({ photoId: c.photoId, takenAt: c.takenAt, resizedPath: c.resizedPath }));
+        return used.length > 0 ? used : undefined;
+      };
 
       // 1. 프롬프트를 만든다. 순수 함수이며 기기를 모른다.
       const prompt = buildPrompt(request, seen);
@@ -326,6 +366,7 @@ export function createOnDeviceBackend(
       onStage?.("load");
       const loaded = await engine.load(request.character);
       if (!loaded.ok) {
+        await cleanupUsedPhotos();
         return { kind: "model-load-failed", reason: loaded.reason };
       }
 
@@ -335,6 +376,7 @@ export function createOnDeviceBackend(
       // 확인하는 것과 같은 패턴이다.
       if (cancel.cancelled) {
         await engine.unload().catch(() => {});
+        await cleanupUsedPhotos();
         return { kind: "interrupted" };
       }
 
@@ -347,8 +389,16 @@ export function createOnDeviceBackend(
         onStage?.("generation");
 
         // 3. 생성한다. 시간 한도를 감시한다(FR-021).
+        //
+        // 017 — 벽시계 측정 지점 둘째(contracts/elapsed-time.md T1). **모델 로드
+        // 시간은 포함하지 않는다** — `onStage?.("load")` 이후, 이 지점부터 잰다.
+        // `runWithTimeout()`의 기존 시간 측정(한도 감시용, 위 함수 주석 FR-011)과는
+        // 별개다 — 그 값은 여전히 버려지고, 이 값은 새로 독립적으로 잰다.
+        const writingStart = Date.now();
         const run = await runWithTimeout(engine, prompt, timeoutMs);
+        const writingMs = Date.now() - writingStart;
         if (run.timedOut) {
+          await cleanupUsedPhotos();
           return { kind: "timed-out" };
         }
 
@@ -363,14 +413,21 @@ export function createOnDeviceBackend(
         );
 
         if (!verdict.ok) {
+          await cleanupUsedPhotos();
           // 끊긴 것은 별도 갈래로 말한다 — 사용자가 할 일이 다르다(FR-017d).
           // 앱을 떠나서 끊긴 것이지 모델이 이상한 글을 쓴 것이 아니다.
           if (run.run.ending.kind === "interrupted") return { kind: "interrupted" };
           return { kind: "rejected", why: verdict.why };
         }
 
-        return { text: run.run.text };
+        const usedPhotos = usedPhotosOf();
+        return {
+          text: run.run.text,
+          ...(usedPhotos !== undefined ? { usedPhotos } : {}),
+          timing: { ...(visionMs !== undefined ? { visionMs } : {}), writingMs },
+        };
       } catch (error) {
+        await cleanupUsedPhotos();
         // 예외를 던지지 않는다(engine.md E5). 실패는 값이어야 파이프라인이 어느
         // 단계에서 멈췄는지 말할 수 있다(002 FR-019).
         const reason = error instanceof Error ? error.message : String(error);

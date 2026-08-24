@@ -33,6 +33,7 @@ import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
+import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
 
 /**
@@ -81,6 +82,8 @@ export type WiringDeps = {
   store?: DiaryStore;
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>;
   isModelReady?: (character: Character) => Promise<boolean>;
+  /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
+  geocodingEnabled?: boolean;
 };
 
 /**
@@ -128,6 +131,11 @@ export function createAppPipeline(
     store: deps.store ?? deviceStore(),
     loadSignals: deps.loadSignals ?? deviceSignals,
     isModelReady: deps.isModelReady,
+    // 017 — 설정이 켜져 있을 때만 지오코딩 포트를 만든다. `expoGeocodingPort()`가
+    // 스스로 지연 import하므로 여기서 만드는 것 자체는 비용이 없다(011의
+    // `expoModelPorts()`와 같은 판단).
+    geocoding: expoGeocodingPort(),
+    geocodingEnabled: deps.geocodingEnabled,
   });
 
   // **backend를 버리지 않는다**(007 §3). 006까지 여기서 버려서 화면이 끊을 길이 없었다.

@@ -50,17 +50,33 @@ appId: com.anonymous.alpharium
 #
 # **먼저 내려야 보인다**(007·009 실측). 캐릭터 다섯과 하루 셋 아래에 있으므로
 # 첫 화면에서는 보이지 않는다 — 계층에는 있지만 Maestro가 보지 못한다.
+#
+# ⚠️ **017 — 셋을 각각 스크롤해 확인한다.** 017이 장소명 토글을 더해
+# 화면이 길어지면서, 타이틀까지만 스크롤하면 `vision-none`이 아직 잘려
+# 있고, `vision-none`까지만 스크롤하면 이번엔 `vision-quick`이 화면
+# 아래로 밀린다(2026-08-24 실측) — 셋이 이제 한 화면에 다 들어오지
+# 않으므로 각각 스크롤해서 본다.
 - scrollUntilVisible:
     element:
-      text: "사진을 어떻게 볼까"
+      id: "vision-none"
     direction: DOWN
     timeout: 20000
-
-# 셋이 다 보인다.
 - assertVisible:
     id: "vision-none"
+
+- scrollUntilVisible:
+    element:
+      id: "vision-quick"
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: "vision-quick"
+
+- scrollUntilVisible:
+    element:
+      id: "vision-detailed"
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     id: "vision-detailed"
 

@@ -105,6 +105,28 @@ export type PipelineDeps = {
   backend: InferenceBackend;
   /** 파일 구현 또는 메모리 대역 */
   store: DiaryStore;
+  /**
+   * 리사이즈 사본을 지운다 (017).
+   *
+   * `generated.usedPhotos`가 있는데 저장이 실패했을 때만 부른다 — 성공하면
+   * `entry.photos`로 그대로 남는다(research.md §1 흐름 4, contracts/
+   * photo-preservation.md P4). 주지 않으면 정리를 건너뛴다(옵셔널 확장).
+   */
+  cleanupResizedPhoto?: (path: string) => Promise<void>;
+  /**
+   * 좌표를 장소 이름으로 바꾼다 (017, contracts/place-name.md).
+   *
+   * 설정이 켜져 있고 대표 좌표가 있을 때만 정확히 1회 호출된다. 주지
+   * 않으면 지오코딩을 시도하지 않는다(옵셔널 확장).
+   */
+  geocoding?: {
+    reverseGeocode(coordinate: {
+      latitude: number;
+      longitude: number;
+    }): Promise<{ kind: "known"; value: string } | { kind: "unknown" }>;
+  };
+  /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
+  geocodingEnabled?: boolean;
 };
 
 export interface Pipeline {
@@ -197,6 +219,29 @@ async function runStages(
     }
   }
 
+  // 4c. 장소명을 얻는다 (017, contracts/place-name.md).
+  //
+  // **`buildPrompt()`보다 먼저 일어나야 한다**(L4) — 화면과 프롬프트가 같은
+  // 호출 결과를 공유하려면, 그 값이 `request.request`에 실린 채로
+  // `backend.generate()`(안에서 buildPrompt를 부른다)에 들어가야 한다.
+  // 설정이 꺼져 있거나 대표 좌표가 없으면(L2) 시도하지 않는다.
+  let placeName: DiaryEntry["placeName"];
+  const representativeCoordinate =
+    signals.places.kind === "known"
+      ? signals.places.value.trace.representativeCoordinate
+      : undefined;
+  if (
+    deps.geocodingEnabled === true &&
+    deps.geocoding !== undefined &&
+    representativeCoordinate !== undefined
+  ) {
+    const geocoded = await deps.geocoding.reverseGeocode(representativeCoordinate);
+    placeName = geocoded;
+    if (geocoded.kind === "known") {
+      request.request = { ...request.request, placeName: geocoded.value };
+    }
+  }
+
   // 5. 생성한다. 이 기능에서는 항상 여기서 멈춘다.
   const generated = await deps.backend.generate(request.request, onProgress);
   if (isGenerationFailure(generated)) {
@@ -222,10 +267,20 @@ async function runStages(
     character: request.request.character,
     signalsUsed: signals,
     createdAt: input.now,
+    ...(generated.usedPhotos !== undefined ? { photos: generated.usedPhotos } : {}),
+    ...(generated.timing !== undefined ? { timing: generated.timing } : {}),
+    ...(placeName !== undefined ? { placeName } : {}),
   };
 
   const saved = await deps.store.save(entry);
   if (!saved.ok) {
+    // 017 — **저장이 실패하면 usedPhotos의 사본을 정리한다**
+    // (contracts/photo-preservation.md P4). 저장이 성공해야만 그 일기가
+    // 존재하는 한 사본이 보존된다 — 실패하면 아무도 참조하지 않는다.
+    if (generated.usedPhotos !== undefined && deps.cleanupResizedPhoto !== undefined) {
+      const cleanup = deps.cleanupResizedPhoto;
+      await Promise.all(generated.usedPhotos.map((p) => cleanup(p.resizedPath).catch(() => {})));
+    }
     // **만든 글을 버리지 않는다**(006 FR-012a). 30초를 들인 글이고 다시 생성해도
     // 같은 글이 나오지 않는다. 실패는 실패로 두되 읽을 기회를 빼앗지 않는다.
     return { ok: false, stage: "storage", reason: saved.reason, entry };

@@ -122,34 +122,48 @@ export async function captionAll(
       shouldCleanup = resized.path !== path;
     }
 
+    // **엔진이 던지지 않기로 되어 있지만**(vision-engine.md E3) 여기서도 감싼다.
+    //
+    // 계약을 믿고 감싸지 않으면, 엔진이 한 번 어겼을 때 **그 하루의 나머지 사진이
+    // 통째로 사라진다** — E4가 막으려던 바로 그 일이 계약 위반 한 번으로 일어난다.
+    // 방어가 둘이면 하나가 뚫려도 남는다.
+    let result: { text: string };
     try {
-      // **엔진이 던지지 않기로 되어 있지만**(vision-engine.md E3) 여기서도 감싼다.
-      //
-      // 계약을 믿고 감싸지 않으면, 엔진이 한 번 어겼을 때 **그 하루의 나머지 사진이
-      // 통째로 사라진다** — E4가 막으려던 바로 그 일이 계약 위반 한 번으로 일어난다.
-      // 방어가 둘이면 하나가 뚫려도 남는다.
-      let result: { text: string };
-      try {
-        result = await engine.caption(captionPath);
-      } catch {
-        result = { text: "" };
-      }
+      result = await engine.caption(captionPath);
+    } catch {
+      result = { text: "" };
+    }
 
-      // **빈 것은 담지 않는다.** 비었다는 것이 곧 실패이며(vision-engine.md V1),
-      // `considered`와 `captions.length`의 차이가 그 사실을 말한다.
-      //
-      // **지어내지 않는다** — 「사진을 보았으나 설명할 수 없다」 같은 문장을 만들어
-      // 넣으면 그것이 기록에 없는 것이 되고, 헌법 원칙 II 위반이다.
-      if (result.text === "") continue;
-
-      captions.push({ photoId: photo.id, takenAt: photo.takenAt, text: result.text });
-    } finally {
-      // 013 FR-008 — 그 장의 캡션이 끝나면(성공·실패 무관) 리사이즈 사본을 지운다.
-      // 그만두기(E5)로 이 장을 못 마쳐도 finally가 돈다.
+    // **빈 것은 담지 않는다.** 비었다는 것이 곧 실패이며(vision-engine.md V1),
+    // `considered`와 `captions.length`의 차이가 그 사실을 말한다.
+    //
+    // ─────────────────────────────────────────────────────────────────────
+    // 017 — **캡션이 실패한 장의 사본은 이 자리에서 즉시 지운다**
+    // (contracts/photo-preservation.md P2). 아무도 참조하지 못하므로 미룰
+    // 이유가 없다 — 성공한 장만 삭제를 미룬다(아래로 이어짐).
+    // ─────────────────────────────────────────────────────────────────────
+    if (result.text === "") {
       if (shouldCleanup && cleanup !== undefined) {
         await cleanup(captionPath).catch(() => {});
       }
+      // **지어내지 않는다** — 「사진을 보았으나 설명할 수 없다」 같은 문장을 만들어
+      // 넣으면 그것이 기록에 없는 것이 되고, 헌법 원칙 II 위반이다.
+      continue;
     }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // 017 — **성공한 캡션의 사본은 여기서 지우지 않는다**
+    // (contracts/photo-preservation.md P1). 013까지는 `finally`에서 장마다
+    // 즉시 지웠지만, 이 시점에는 이 일기가 결국 저장될지 아직 모른다 —
+    // 최종 보존/정리는 파이프라인이 저장 결과를 확인한 뒤에 정한다
+    // (research.md §1). `resizedPath`에 경로만 실어 올린다.
+    // ─────────────────────────────────────────────────────────────────────
+    captions.push({
+      photoId: photo.id,
+      takenAt: photo.takenAt,
+      text: result.text,
+      resizedPath: shouldCleanup ? captionPath : undefined,
+    });
   }
 
   // 마지막으로 한 번 더 본다 — 마지막 장을 읽는 동안 그만뒀을 수 있다.

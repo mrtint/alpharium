@@ -11,6 +11,7 @@
  */
 
 import type { DayDate } from "../config/day-boundary";
+import type { Coordinate } from "./places";
 
 /**
  * 신호 하나의 상태.
@@ -52,6 +53,14 @@ export type PlaceTrace = {
   visitCount: number;
   /** 하루 동안 움직인 대략의 거리(미터) */
   approximateDistanceMeters: number;
+  /**
+   * 대표 장소의 좌표 (017, research.md §2).
+   *
+   * **새로 재는 값이 아니다** — `tracePlaces()`가 자리를 묶으며 이미 계산하던
+   * 값(시각순 첫 자리) 중 하나를 반환 범위 밖으로 낸 것뿐이다. 좌표가 하나도
+   * 없던 하루(`points.length === 0`)에는 이 필드 자체가 없다.
+   */
+  representativeCoordinate?: Coordinate;
 };
 
 /**

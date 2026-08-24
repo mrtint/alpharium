@@ -36,6 +36,16 @@ appId: com.anonymous.alpharium
 - launchApp
 
 - assertVisible: "일기"
+
+# ⚠️ **017 — 스크롤해야 보인다.** 017이 사진 설정·장소명 토글을 더해
+# 화면이 길어지면서, "일기 쓰기" 버튼이 첫 화면 아래로 밀렸다
+# (2026-08-24 실측 — 007·009가 캐릭터·하루 목록에서 이미 겪은 것과
+# 같은 종류다).
+- scrollUntilVisible:
+    element:
+      text: "일기 쓰기"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "일기 쓰기"
 
 # 쓰기를 눌러 본다. 모델이 없으면 즉시 「준비해야 한다」로 끝나고 그것이
