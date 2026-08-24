@@ -1,0 +1,130 @@
+# 실기기 자동 테스트 — 일기 본문 화면 개선 (017)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **User Story 1~4가 화면에 실제로 배선됐는지 본다.** 사진·제목·소요 시간은
+# 이미 저장된 일기(생성은 사람이 quickstart.md D2~D6에서 한다)를 열어
+# 확인하고, 장소명은 목록 화면의 토글 렌더링·고지 문구·선택 표식을 본다.
+#
+# 검증 항목:
+#   FR-001   사진이 있는 저장된 일기를 열면 사진 영역이 보인다        (M1)
+#   FR-013   사진 0장인 저장된 일기에는 사진 분석 소요 시간이 없다    (M2)
+#   FR-018   소요 시간 문장이 "M분 SS초" 류 형태로 보인다            (M2)
+#   FR-004~006 장소명 설정 토글이 목록 화면에 있고 켤 때 고지가 뜬다  (M3)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **★ 여기서 자동화하지 않는 것 — quickstart.md D1~D6:**
+#
+#   D1  reverseGeocodeAsync의 권한 요구 사실   — 손으로 확인(완료, research.md §3
+#                                                실측 반영됨).
+#   D2  사진 표시(원본 삭제 후에도 유지)        — 갤러리 앱에서 원본을 지우는
+#                                                조작이 필요해 Maestro로 재현하기
+#                                                어렵다. 사람이 확인한다.
+#   D3a 제목 헤드라인 사람 검수                — 자동 채점 없이 여러 하루의
+#                                                제목을 나란히 읽는 절차라 애초에
+#                                                자동화 대상이 아니다(TL8).
+#   D4  콜드 스타트 체감 시간·진행 중 미노출    — 실제 생성이 필요해 시간이
+#                                                오래 걸린다. 사람이 확인한다.
+#   D5  장소명 실제 생성·본문 일치·영구 거부    — 위치 권한 다이얼로그 조작과
+#                                                실제 생성이 필요하다. 사람이
+#                                                확인한다(완료, T040에서 권한
+#                                                흐름까지 확인).
+#   D6  로스터 5인 조사 확인                   — 실제 생성 5회가 필요하다.
+#                                                사람이 확인한다.
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+#
+# ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다
+# (008 실측) — `testID`를 따로 준다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+- assertVisible: "일기"
+
+# ★ M1 — **사진이 있는 저장된 일기를 열면 사진 영역이 보인다**(FR-001).
+#
+# "사진 N장"이 붙은 줄이 있으면 그것을 열어 사진이 실제로 보이는지 확인한다.
+# 없으면(이 기기에 아직 사진 있는 일기가 저장되지 않았으면) 이 블록은
+# SKIPPED로 지나간다 — quickstart.md D2가 사람 확인으로 이 갈래를 메운다.
+- runFlow:
+    when:
+      visible:
+        text: "사진 [1-9][0-9]*장"
+    commands:
+      - tapOn:
+          text: "사진 [1-9][0-9]*장"
+      - scrollUntilVisible:
+          element:
+            id: "diary-photo"
+          direction: DOWN
+          timeout: 20000
+      - assertVisible:
+          id: "diary-photo"
+      - scrollUntilVisible:
+          element:
+            text: "← 목록"
+          direction: UP
+          timeout: 20000
+      - tapOn: "← 목록"
+
+# ★ M2 — **사진 0장인 저장된 일기에는 사진 분석 소요 시간이 없다**(FR-013).
+#
+# "사진 없음"이 붙은 줄이 있으면 그것을 열어 확인한다. 없으면 SKIPPED —
+# quickstart.md D3이 사람 확인으로 메운다.
+- runFlow:
+    when:
+      visible: "사진 없음"
+    commands:
+      - tapOn: "사진 없음"
+      - scrollUntilVisible:
+          element:
+            text: ".*이렇게 일기를 작성했어요.*"
+          direction: DOWN
+          timeout: 20000
+      # ★ FR-018 — 글쓰기 소요 시간 문장이 보인다.
+      - assertVisible:
+          text: ".*일기를 작성하는 데.*걸렸어요.*"
+      # ★ FR-013 — 사진이 없으니 사진 분석 소요 시간 문장은 없다.
+      - assertNotVisible:
+          text: ".*사진을.*분석하는 데.*"
+      - scrollUntilVisible:
+          element:
+            text: "← 목록"
+          direction: UP
+          timeout: 20000
+      - tapOn: "← 목록"
+
+# ★ M3 — **장소명 설정 토글이 목록 화면에 있다**(FR-004~006).
+- runFlow:
+    when:
+      notVisible: "언제를 쓸까"
+    commands:
+      - tapOn: "일기"
+
+- scrollUntilVisible:
+    element:
+      text: "장소 이름으로 보기"
+    direction: DOWN
+    timeout: 20000
+
+- assertVisible: "장소 이름으로 보기"
+
+# 지금 꺼져 있으면 켜서 고지 문구가 뜨는지 본다.
+- runFlow:
+    when:
+      notVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
+    commands:
+      - tapOn: "장소 이름으로 보기"
+      # ★ FR-006 — 켤 때 고지 문구가 그 자리에서 뜬다.
+      - assertVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
+      - assertVisible: "선택"
+
+# ★ 원칙 III·IV — 좌표·수치·모델 정보가 화면에 없다.
+- assertNotVisible: "latitude"
+- assertNotVisible: "longitude"
+- assertNotVisible: "expo-location"
+
+# 이 흐름이 기기 상태를 바꾼 채 끝나지 않게 다시 끈다.
+- tapOn: "장소 이름으로 보기"
+- assertNotVisible: "좌표를 기기의 지도 서비스에 물어봅니다."

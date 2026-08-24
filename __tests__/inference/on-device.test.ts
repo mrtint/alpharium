@@ -306,6 +306,23 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
     expect(timing?.writingMs).toBeGreaterThan(0);
   });
 
+  it("vision 설정은 켜져 있지만 그날 사진이 0장이면 timing.visionMs가 없다 (T4)", async () => {
+    const support = visionSupportWith();
+    const engine = engineReturning({ text: "오늘은 조용했다.", ending: { kind: "eos" } }, 5);
+
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, support);
+    // requestWith()의 기본 vision은 "quick"이다 — 설정은 켜져 있지만
+    // signalsWithPhotos([])라 그날 사진이 0장이다. readPhotos()가
+    // no-photos로 즉시 반환하므로, 「실제로 읽었다」고 볼 시간이 없다.
+    const result = await backend.generate(requestWith(signalsWithPhotos([])));
+
+    expect("text" in result).toBe(true);
+    const timing = (result as { timing?: { visionMs?: number; writingMs: number } }).timing;
+    expect(timing).toBeDefined();
+    expect(timing?.visionMs).toBeUndefined();
+    expect(timing?.writingMs).toBeGreaterThan(0);
+  });
+
   it("실패 경로 전부에서 timing 필드 자체가 없다", async () => {
     const support = visionSupportWith();
     // 빈 글 → judge()가 empty로 거부한다.

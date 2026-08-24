@@ -311,7 +311,6 @@ export function createOnDeviceBackend(
       if (request.vision !== "none" && vision !== undefined) {
         const visionStart = Date.now();
         const outcome = await readPhotos(vision, request, cancel, onStage);
-        visionMs = Date.now() - visionStart;
 
         // **「보지 않음」으로 낮추지 않는다**(FR-021). 실패는 실패로 돌려준다.
         //
@@ -326,6 +325,11 @@ export function createOnDeviceBackend(
 
         // `skipped`·`no-photos`는 실패가 아니다 — 볼 것이 없었을 뿐이며 일기는 나온다.
         if (outcome.kind === "seen") seen = outcome.vision;
+
+        // 017 — **그날 사진이 0장이면 재지 않는다**(contracts/elapsed-time.md
+        // T4). `readPhotos()`가 `no-photos`로 즉시 반환한 것은 「실제로
+        // 읽었다」가 아니다 — 안 한 일은 0초 걸린 일이 아니다(원칙 V).
+        if (outcome.kind !== "no-photos") visionMs = Date.now() - visionStart;
       }
 
       // 017 — 캡션 성공한 사진(resizedPath가 있는 것)의 사본 정리 헬퍼
