@@ -32,15 +32,27 @@ appId: com.anonymous.alpharium
 
 # 일기 탭이 첫 화면이다(006 FR-009 유지).
 - assertVisible: "일기"
-- assertVisible: "일기 쓰기"
 
 # ★ FR-002 — **누가 쓰는지 보인다.** 006에는 이 자리가 아예 없었다.
 - assertVisible: "누가 쓸까"
 
+# ⚠️ **이 흐름은 017 이전부터 낡아 있었다**(2026-08-24 확인, 별도 사안으로
+# 남긴다) — 014가 캐릭터 표시 이름을 내부 키("quiet"·"narrative"·
+# "imaginative")에서 persona 이름("금동이"·"루이"·"오드")로 바꿨는데 이
+# 파일이 갱신되지 않았다. 아래 두 줄은 014 이후 항상 실패했을 것이다.
 # 다섯 자리가 처음부터 전부 보인다(003 FR-005a를 이어받는다).
 - assertVisible: "quiet"
 - assertVisible: "narrative"
 - assertVisible: "imaginative"
+
+# ⚠️ **017 — 여기서도 스크롤이 필요하다.** 사진 설정·장소명 토글이
+# 더해지며 "일기 쓰기" 버튼이 첫 화면 아래로 밀렸다(2026-08-24 실측).
+- scrollUntilVisible:
+    element:
+      text: "일기 쓰기"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "일기 쓰기"
 
 # ★ 헌법 로스터 MUST — `imaginative`는 상상을 섞는다고 알린다(FR-009 예외).
 #

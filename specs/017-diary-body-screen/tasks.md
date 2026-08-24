@@ -495,6 +495,36 @@ Independent Test 그대로).
   때만 `visionMs`를 재도록 고쳤다. `npm test`(1530개) 전부 통과,
   실기기에서 재생성해 문장이 사라진 것을 확인했다. Maestro 흐름
   전체가 COMPLETED로 통과한다.]
+  [2026-08-24 회귀 확인 후속: 새 흐름 등록 후 전체 Maestro 스위트
+  (`npm run test:device`)를 돌려보니 017과 무관하게 있던 흐름 다섯
+  (`past-day-diary`·`photo-vision`·`today-diary`·`writing-monologue`·
+  `writing-monologue-expansion`)이 함께 깨져 있었다 — 원인은 전부
+  화면이 사진 설정·장소명 토글로 길어지며 기존 `scrollUntilVisible`이
+  목표 지점 전에서 멈춘 것(타이틀까지만 스크롤하고 그 아래 버튼은
+  아직 화면 밖). `past-day-diary.yml`에서는 추가로 012의 덮어쓰기
+  확인 화면("취소"/"확인")을 이 흐름이 애초부터 처리하지 않던 기존
+  결함도 함께 걸렸다(이번 세션에서 지난 하루 셋에 전부 일기를 채워
+  실제로 노출됨). 각 흐름의 스크롤 대상을 실제 목표 요소로 바꾸고
+  덮어쓰기 확인 처리를 추가해 다섯 모두 재실행으로 COMPLETED 확인.
+  `download-conflict.yml`(`english` 텍스트로 캐릭터를 찾음)은 014의
+  persona 표시 이름 변경 이후 갱신되지 않은 **017 이전부터의 기존
+  결함**으로 확인돼 이 세션에서는 건드리지 않았다 — 별도 사안으로
+  남긴다.
+  전체 `npm run test:device` 재확인에서 같은 스크롤 회귀가
+  `diary-user-path.yml`·`diary-character-select.yml`에도 있어 함께
+  고쳤다(둘 다 "일기 쓰기" 버튼을 스크롤 없이 바로 찾고 있었다).
+  `diary-character-select.yml`은 스크롤을 고친 뒤에도 "quiet" 같은
+  내부 키 표시 이름을 찾다가 실패하는데, 이건 014 이후 늘 그랬을
+  기존 결함이라 이 세션에서는 그대로 두고 주석으로 명시했다.
+  `skeleton.yml`("환경"을 진단 화면에서 바로 찾음)·
+  `model-acquisition.yml`("quiet")·`generate-diary.yml`("일기
+  생성")은 001~005 시절 진단 화면이 첫 화면이던 구조를 그대로
+  전제하고 있어 006(진단 화면을 개발자 탭으로 옮김) 이후 줄곧
+  깨져 있었을 것으로 보인다 — 017과 무관하며 이 세션에서는
+  건드리지 않았다. 이 셋과 `diary-character-select.yml`·
+  `download-conflict.yml`을 합쳐 **다섯 개의 기존 Maestro 흐름
+  결함**이 별도 사안으로 남는다(017이 만든 것은 스크롤 회귀 다섯
+  건뿐이며 전부 고쳤다).]
 - [X] T042 quickstart.md D1(`reverseGeocodeAsync`의 권한 요구 사실 확인)을
   실기기에서 수행하고 결과를 research.md §3에 실측으로 갱신한다(원칙
   V — 문서 기반 추정을 실측으로 바꾼다).

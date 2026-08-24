@@ -36,6 +36,14 @@ appId: com.anonymous.alpharium
     direction: DOWN
     timeout: 20000
 
+# ⚠️ **017 — "N를 쓴다"까지 다시 스크롤한다.** 017이 사진 설정·장소명
+# 토글을 더해 화면이 길어지면서, "언제를 쓸까" 타이틀까지만 스크롤하면
+# 아래의 "N를 쓴다" 문구가 아직 화면 밖에 있다(2026-08-24 실측).
+- scrollUntilVisible:
+    element:
+      text: ".*를 쓴다"
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
     text: ".*를 쓴다"
 - assertVisible: "선택"
