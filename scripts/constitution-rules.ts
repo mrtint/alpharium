@@ -395,6 +395,45 @@ export function checkMonologueFile(fileName: string, contents: string): Violatio
   return violations;
 }
 
+/**
+ * 백그라운드 검증 하네스가 제품 계층에 닿는 것을 잡는다
+ * (019, contracts/background-harness.md H1).
+ *
+ * `src/spike/`는 findings.md 작성 후 통째로 지워질 수 있는 검증 전용
+ * 디렉터리다(019 plan.md 「검증 종료 후 하네스의 운명」) — 제품 계층
+ * (`diary/store`·`models/roster`·`diary/prompt`·`diary/acceptance`)을
+ * import하면 그 경계가 흐려지고, 헌법 원칙 IV가 2026-08-12 되돌리기의
+ * 근거였던 "측정 장치와 제품이 뒤섞였다"가 반복된다.
+ */
+const SPIKE_TOUCHES_PRODUCT_LAYER =
+  /\bfrom\s+["'][^"']*(?:diary\/store|models\/roster|diary\/prompt|diary\/acceptance)["']/;
+
+/**
+ * 백그라운드 검증 하네스 파일인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`src/spike/`가 대상이다.**
+ */
+export function checkSpikeFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/spike/")) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (SPIKE_TOUCHES_PRODUCT_LAYER.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "검증 하네스가 제품 계층에 닿는다 — pipeline.run()만 거쳐야 한다 (019, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";
