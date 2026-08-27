@@ -10,6 +10,7 @@
  */
 
 import type { DiaryRequest } from "../diary/types";
+import type { PhotoVision } from "../vision/types";
 
 /** on-device: 기기의 네이티브 추론 모듈 / desktop-server: 개발자 기계의 추론 서버 */
 export type InferenceLocation = "on-device" | "desktop-server";
@@ -175,6 +176,16 @@ export interface InferenceBackend {
   generate(
     request: DiaryRequest,
     onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
+    /**
+     * 화면이 미리 읽어 둔 사진 결과 (018,
+     * specs/018-prompt-prefix-prewarm/data-model.md §5).
+     *
+     * **기존 `onStage?` 뒤에 세 번째로 온다** — 위치가 바뀌면 두 인자로
+     * 부르는 기존 모든 호출부(파이프라인 포함)가 깨진다. 주어지면
+     * `generate()`가 사진을 다시 읽지 않고 그대로 쓴다. 없으면 지금처럼
+     * 스스로 읽는다(회귀 없음).
+     */
+    seen?: PhotoVision,
   ): Promise<GenerationResult>;
 }
 

@@ -145,6 +145,28 @@ function nameLine(character: Character): string {
   return `너는 '${personaOf(character).name}'이라 불린다.`;
 }
 
+/**
+ * 날마다 바뀌지 않는 프롬프트의 앞부분 (018, contracts/prompt-prefix.md P9).
+ *
+ * `buildPrompt()`가 쓰는 것과 **같은 배열**이다 — 복제하면 언젠가 어긋나고,
+ * 어긋나면 프리워밍의 KV 캐시가 빗나가 018의 효과가 조용히 사라진다(성능
+ * 저하로만 나타나 오류가 없다).
+ */
+function fixedHead(character: Character): string[] {
+  const language = LANGUAGE[character];
+  return [...SPEAKER_RULES, nameLine(character), TITLE_INSTRUCTION, "", `${language}로 써라.`, ""];
+}
+
+/**
+ * 미리 프리필할 고정 접두사 (018, contracts/prompt-prefix.md).
+ *
+ * **`buildPrompt()`의 결과는 언제나 이 문자열로 시작한다**(P8) — 그 성질이
+ * 018 기능 전체의 안전장치이며 `prompt.test.ts`가 잠근다.
+ */
+export function promptPrefix(character: Character): string {
+  return fixedHead(character).join("\n");
+}
+
 /** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것과 이름뿐이다** */
 const LANGUAGE: Readonly<Record<Character, string>> = {
   quiet: "한국어",
@@ -431,8 +453,6 @@ function signalLines(signals: DaySignals): string[] {
  * 모델을 역추적할 수 있다.
  */
 export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string {
-  const language = LANGUAGE[request.character];
-
   // 011 — 사진을 읽었으면 그 내용과 한계가 신호 뒤에 붙는다.
   //
   // **`vision`이 없으면 005와 바이트 단위로 같은 문자열이 나온다**(P-1, SC-002) —
@@ -448,12 +468,8 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
   const placeNamePart = request.placeName !== undefined ? [placeNameLine(request.placeName)] : [];
 
   return [
-    ...SPEAKER_RULES,
-    nameLine(request.character),
-    TITLE_INSTRUCTION,
-    "",
-    `${language}로 써라.`,
-    "",
+    // 018 — promptPrefix()와 같은 배열에서 나온다(contracts/prompt-prefix.md P9).
+    ...fixedHead(request.character),
     ...dayStillOpenPart,
     `${request.signals.date}에 네가 본 것:`,
     ...signalLines(request.signals),

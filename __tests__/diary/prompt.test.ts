@@ -12,7 +12,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { buildPrompt, instructionLines } from "../../src/diary/prompt";
+import { buildPrompt, instructionLines, promptPrefix } from "../../src/diary/prompt";
 import { personaOf } from "../../src/diary/persona";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character, type DiaryRequest } from "../../src/diary/types";
@@ -765,6 +765,45 @@ describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", 
     for (const instruction of titleInstructions) {
       expect(instruction).toBeDefined();
       expect(instruction).toBe(titleInstructions[0]);
+    }
+  });
+});
+
+describe("018 — 고정 접두사 (contracts/prompt-prefix.md)", () => {
+  const days = [richDay(DAY), emptyDay(DAY), unknownDay(DAY), partiallyUnknownDay(DAY)];
+
+  it("P8: buildPrompt()의 결과는 언제나 promptPrefix()로 시작한다", () => {
+    for (const character of CHARACTERS) {
+      const prefix = promptPrefix(character);
+      for (const day of days) {
+        // vision 있음/없음, dayStillOpen 참/거짓 조합도 함께 확인한다.
+        const withoutVision = buildPrompt(requestFor(day, character));
+        expect(withoutVision.startsWith(prefix)).toBe(true);
+
+        const withDayOpen = buildPrompt({ ...requestFor(day, character), dayStillOpen: true });
+        expect(withDayOpen.startsWith(prefix)).toBe(true);
+      }
+    }
+  });
+
+  it("P10: 접두사에 날마다 바뀌는 것이 섞이지 않는다", () => {
+    const prefix = promptPrefix("narrative");
+    expect(prefix).not.toMatch(/\d{4}-\d{2}-\d{2}/); // 날짜
+    expect(prefix).not.toContain("에 네가 본 것"); // 신호 절 머리
+    expect(prefix).not.toContain("사진");
+    expect(prefix).not.toContain("다닌 자리");
+  });
+
+  it("P11: 캐릭터마다 접두사가 다르다", () => {
+    // 이름과 언어가 들어 있으므로 달라야 한다 — 같으면 캐릭터를 바꿔도
+    // 이전 캐릭터의 KV 캐시를 그대로 재사용해 버린다.
+    const all = CHARACTERS.map(promptPrefix);
+    expect(new Set(all).size).toBe(all.length);
+  });
+
+  it("P12: promptPrefix()는 순수 함수다 — 같은 캐릭터는 항상 같은 결과", () => {
+    for (const character of CHARACTERS) {
+      expect(promptPrefix(character)).toBe(promptPrefix(character));
     }
   });
 });

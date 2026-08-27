@@ -101,12 +101,32 @@ export type RunLimits = {
  *     불린다. 정리되지 않으면 다음 요청이 메모리 부족으로 죽는다
  *  3. **예외를 던지지 않는다**(E5). 실패는 값이어야 파이프라인이 어느 단계에서 멈췄는지
  *     말할 수 있다(002 FR-019). 001의 `ModuleStatus`와 같다
+ *  4. **`prewarm()`은 글을 남기지 않는다**(E6, 018). 생성된 토큰은 어느 경로로도
+ *     밖에 나가지 않는다 — `DiaryDraft`에도, 화면에도, 로그에도. 프리워밍의
+ *     산출물은 KV 캐시뿐이다.
  *
  * **`stop()`은 예외적으로 조용히 실패해도 된다** — 이미 끝난 생성을 멈추려는 것은
  * 정상이며, 그때의 오류는 알릴 것이 없다.
  */
 export interface GenerationEngine {
   load(character: Character): Promise<LoadResult>;
+  /**
+   * 고정 접두사를 미리 읽혀 둔다. **글을 만들지 않는다**(018,
+   * specs/018-prompt-prefix-prewarm/contracts/prewarm-engine.md).
+   *
+   * `load()`가 연 컨텍스트에 `promptPrefix(character)`만 넣어 한 번 돌린다.
+   * 그 결과 KV 캐시에 접두사가 남고, 뒤이은 `run()`이 그것을 재사용한다 —
+   * 실측 TTFT 20.6초 → 6.6초(Galaxy S22, my-ollama 저장소 실측).
+   *
+   * **반환값이 없다.** 성공·실패를 밖에서 알 필요가 없고, 알 수 있게 하면
+   * "얼마나 걸렸나"를 담고 싶어진다(원칙 IV). 실패해도 다음 `run()`이
+   * 그냥 느릴 뿐 틀리지 않는다 — **없는 것을 지어내지 않는다**는 것과 같은
+   * 자리에서, 여기서는 "실패해도 알릴 것이 없다"는 판단이다.
+   *
+   * **부르는 쪽 책임**: `load()` 없이 부르면 조용히 아무 일도 하지 않는다(E9).
+   * 이 뒤에 VLM을 열면 안 된다(E1) — 순서는 항상 호출자 책임이다.
+   */
+  prewarm(character: Character): Promise<void>;
   run(prompt: string, limits: RunLimits): Promise<RunResult>;
   stop(): Promise<void>;
   unload(): Promise<void>;

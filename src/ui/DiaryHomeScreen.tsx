@@ -50,6 +50,7 @@ import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
 import type { Character, VisionSetting } from "../diary/types";
+import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DiaryDetailScreen } from "./DiaryDetailScreen";
 import { DiaryListScreen } from "./DiaryListScreen";
@@ -91,6 +92,30 @@ export type DiaryHomeScreenProps = {
   geocodingEnabled?: boolean;
   /** 생성을 끊는 통로(005 FR-014b). 앱이 앞을 벗어날 때 쓴다 */
   stop?: () => Promise<void>;
+  /**
+   * 캐릭터·날짜가 정해지면 미리 준비를 시작하는 통로 (018,
+   * contracts/prewarm-engine.md). **읽을 사진이 없는 날에만 부른다**
+   * (FR-005) — `vision === "none"`이면 `generate()`가 VLM을 절대 열지
+   * 않으므로 E1을 어길 위험이 없다.
+   *
+   * **옵셔널이다** — `stop?`과 같은 방식으로 계약을 넓힌다. 배선이 끊겨도
+   * 앱이 죽지 않고 "느릴 뿐" 정상 동작한다(FR-007).
+   */
+  prepare?: (character: Character) => Promise<void>;
+  /** 준비해 둔 것을 놓아준다 (018, FR-008). 화면 이탈·백그라운드 전환 시 쓴다 */
+  release?: () => Promise<void>;
+  /**
+   * 사진만 미리 읽는 통로 (018 2단계, FR-006). 사진이 있는 날에는 이 결과가
+   * 끝난 뒤에만 `prepare()`를 부른다(E1·E15) — 두 엔진이 동시에 열리지
+   * 않게 순서를 이 화면이 지킨다.
+   *
+   * **옵셔널이다** — `prepare?`와 같은 방식으로 계약을 넓힌다.
+   */
+  captionDay?: (
+    day: DayDate,
+    character: Character,
+    vision: VisionSetting,
+  ) => Promise<VisionOutcome>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
   now?: () => Date;
   /** 캐릭터 준비 화면으로 가는 길 (FR-028). 없으면 안내만 하고 길은 주지 않는다 */
@@ -109,6 +134,9 @@ export function DiaryHomeScreen({
   onToggleGeocoding,
   geocodingEnabled,
   stop,
+  prepare,
+  release,
+  captionDay,
   now = () => new Date(),
   onGoToCharacters,
 }: DiaryHomeScreenProps) {
@@ -163,19 +191,82 @@ export function DiaryHomeScreen({
   }, [refresh, resolution]);
 
   /**
-   * 앱이 앞을 벗어나면 끊는다 (005 FR-014b).
+   * 앱이 앞을 벗어나면 끊는다 (005 FR-014b) / 준비를 놓아준다 (018 FR-008).
    *
    * **`stop()`이 생성을 거부시키지 않는다** — 끊김은 `interrupted: true`인 값으로
    * 돌아오고 판정이 거부한다. 여기서는 신호만 보낸다.
+   *
+   * **018 — 생성이 도는 중에는 release()를 부르지 않는다.** 방금 `prepare()`가
+   * 연 컨텍스트를 `generate()`의 `load()`가 재사용해야 하므로, 생성 중에
+   * 놓아주면 그 재사용이 무의미해진다 — `running.current`로 가른다.
    */
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state !== "active" && running.current) {
-        void stop?.().catch(() => {});
+      if (state !== "active") {
+        if (running.current) {
+          void stop?.().catch(() => {});
+        } else {
+          void release?.().catch(() => {});
+        }
       }
     });
     return () => subscription.remove();
-  }, [stop]);
+  }, [stop, release]);
+
+  /**
+   * 캐릭터·날짜가 정해지면 미리 준비를 시작한다 (018, FR-005).
+   *
+   * **읽을 사진이 없는 날에만 부른다** — `vision === "none"`이면
+   * `generate()`가 VLM을 절대 열지 않으므로(on-device.ts의 `request.vision
+   * !== "none"` 게이트) 이 준비가 사진 읽기와 겹칠 위험이 없다(E1). 사진이
+   * 있는 날의 준비는 2단계(User Story 2)가 사진 읽기 완료 후에 별도로
+   * 다룬다.
+   *
+   * **목록 화면에 있고, 캐릭터를 고른 상태일 때만** 부른다 — 쓰는 중이거나
+   * 다른 화면으로 전환된 뒤에는 새로 준비할 이유가 없다.
+   */
+  useEffect(() => {
+    if (screen.kind !== "list") return;
+    if (selection.kind === "none") return;
+    if (vision !== "none") return;
+
+    void prepare?.(selection.character).catch(() => {});
+  }, [screen.kind, selection, vision, chosenDay, prepare]);
+
+  /**
+   * 사진이 있는 날의 미리 읽기 (018 2단계, FR-006).
+   *
+   * **어떤 날짜를 위한 것인지와 함께 들고 있는다.** 진행 중이던 요청의
+   * 결과가 나중에 도착해도, 그사이 날짜가 바뀌었으면 버린다(FR-009) —
+   * 009가 「범위 밖이면 되돌린다」를 매 렌더 재판정으로 처리한 것과 같은
+   * 원리를 여기서는 "이 결과가 지금 day에 대한 것인가"로 재사용한다.
+   */
+  const captionRef = useRef<{ day: DayDate; promise: Promise<VisionOutcome> } | null>(null);
+
+  useEffect(() => {
+    if (screen.kind !== "list") return;
+    if (selection.kind === "none") return;
+    if (vision === "none") return;
+    if (captionDay === undefined) return;
+
+    const { day } = writePromptFor(screen.items, now(), chosenDay);
+    if (captionRef.current?.day === day) return; // 이미 이 날짜를 위해 돌고 있다
+
+    const character = selection.character;
+    const promise = captionDay(day, character, vision);
+    captionRef.current = { day, promise };
+
+    // 사진 읽기가 끝난 뒤에만 준비를 시작한다(E1·E15) — 두 엔진이 동시에
+    // 열리지 않게 이 화면이 순서를 지킨다.
+    void promise
+      .then(() => {
+        // 그사이 날짜가 바뀌었으면(이 요청이 stale해졌으면) 준비하지 않는다.
+        if (captionRef.current?.day !== day) return;
+        return prepare?.(character);
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- screen.items는 매 렌더 새 배열이라 넣으면 무한 루프가 된다. day 판정에 필요한 입력(now, chosenDay, screen.kind)만 의존성으로 둔다.
+  }, [screen.kind, selection, vision, chosenDay, captionDay, prepare, now]);
 
   const openItem = useCallback(
     async (item: DiaryListItem) => {
@@ -212,12 +303,22 @@ export function DiaryHomeScreen({
       try {
         const at = now();
 
+        // 018 — 이 날짜를 위해 미리 읽어 둔(또는 아직 읽는 중인) 사진이
+        // 있으면 다시 읽지 않고 그 결과를 기다린다(FR-006a, E16). 진행
+        // 중이던 읽기를 취소하거나 새로 시작하지 않는다.
+        let seen: VisionOutcome | undefined;
+        if (captionRef.current?.day === day) {
+          seen = await captionRef.current.promise.catch(() => undefined);
+        }
+        const seenVision = seen?.kind === "seen" ? seen.vision : undefined;
+
         const result = await pipeline.run(
           {
             day,
             now: at,
             character: selection.character,
             vision,
+            ...(seenVision !== undefined ? { seen: seenVision } : {}),
           },
           // 015 — 진행 신호가 오면 독백 문구를 고른다. 예외를 던지지 않는 얇은
           // 콜백이다(contracts/progress-signal.md 불변식 3).

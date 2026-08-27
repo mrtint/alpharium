@@ -12,7 +12,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { buildPrompt } from "../../src/diary/prompt";
+import { buildPrompt, promptPrefix } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character } from "../../src/diary/types";
 import { judgeServerOutput, serverRequestFor } from "../../src/inference/desktop-server";
@@ -557,5 +557,76 @@ describe("FR-005 — 두 경로가 같은 프롬프트·샘플링을 쓴다 ★"
     const result = judgeServerOutput(request, rejected, { kind: "length" });
 
     expect(JSON.stringify(result)).not.toContain(rejected);
+  });
+});
+
+describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
+  /** completion() 호출을 기록하는 로더. */
+  function recordingLoader() {
+    const calls: Record<string, unknown>[] = [];
+    const loader = async () => ({
+      async completion(params: Record<string, unknown>) {
+        calls.push(params);
+        return { content: "글", stopped_eos: true };
+      },
+      async stopCompletion() {},
+      async release() {},
+    });
+    return { calls, loader };
+  }
+
+  it("E7·E8: run()과 같은 모양(messages+jinja)으로 n_predict:1을 보낸다", async () => {
+    const { calls, loader } = recordingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    await engine.load("narrative");
+    await engine.prewarm("narrative");
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      messages: [{ role: "user", content: promptPrefix("narrative") }],
+      jinja: true,
+      n_predict: 1,
+    });
+  });
+
+  it("E11: prewarm()은 아무것도 반환하지 않는다", async () => {
+    const { loader } = recordingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    await engine.load("narrative");
+    expect(await engine.prewarm("narrative")).toBeUndefined();
+  });
+
+  it("E9: load() 없이 부르면 네이티브를 건드리지 않고 조용히 끝난다", async () => {
+    const { calls, loader } = recordingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    await expect(engine.prewarm("narrative")).resolves.toBeUndefined();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("E9: 다른 캐릭터가 열려 있으면 조용히 끝난다", async () => {
+    const { calls, loader } = recordingLoader();
+    const engine = createLlamaEngine(loader, pathFor);
+
+    await engine.load("quiet");
+    await expect(engine.prewarm("narrative")).resolves.toBeUndefined();
+    expect(calls).toHaveLength(0);
+  });
+
+  it("E10: completion()이 실패해도 던지지 않는다", async () => {
+    const engine = createLlamaEngine(async () => {
+      return {
+        async completion() {
+          throw new Error("boom");
+        },
+        async stopCompletion() {},
+        async release() {},
+      };
+    }, pathFor);
+
+    await engine.load("narrative");
+    await expect(engine.prewarm("narrative")).resolves.toBeUndefined();
   });
 });
