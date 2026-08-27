@@ -7,7 +7,9 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "appleTeamId": "S6B8RQH6YQ",
+      "bundleIdentifier": "com.anonymous.alpharium"
     },
     "android": {
       "adaptiveIcon": {
@@ -18,13 +20,27 @@
       },
       "versionCode": 8,
       "predictiveBackGestureEnabled": false,
-      "package": "com.anonymous.alpharium"
+      "package": "com.anonymous.alpharium",
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.ACCESS_MEDIA_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "llama.rn",
+      [
+        "llama.rn",
+        {
+          "enableEntitlements": false
+        }
+      ],
       [
         "./plugins/with-release-signing",
         {
@@ -39,6 +55,12 @@
             "photo"
           ],
           "isAccessMediaLocationEnabled": true
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "사진에 담긴 장소를 사람이 읽을 수 있는 이름으로 바꾸는 데 위치를 씁니다."
         }
       ]
     ]
