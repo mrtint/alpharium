@@ -51,6 +51,7 @@ const goodEngine = (): GenerationEngine => ({
   async load() {
     return { ok: true, warm: false };
   },
+  async prewarm() {},
   async run() {
     return { text: GOOD_KO, ending: { kind: "eos" } };
   },
@@ -273,6 +274,7 @@ describe("011 — 사진을 읽는다", () => {
     async load() {
       return { ok: true, warm: false };
     },
+    async prewarm() {},
     async run(prompt: string) {
       seen.push(prompt);
       return { text: GOOD_KO, ending: { kind: "eos" } };
@@ -369,6 +371,7 @@ describe("011 — 사진을 읽는다", () => {
         order.push("character:load");
         return { ok: true, warm: false };
       },
+      async prewarm() {},
       async run() {
         order.push("character:run");
         return { text: GOOD_KO, ending: { kind: "eos" } };
@@ -553,6 +556,7 @@ describe("015 — onStage 진행 신호", () => {
       async load() {
         return { ok: true, warm: false };
       },
+      async prewarm() {},
       async run() {
         // run()이 불린 시점에는 이미 'generation'이 보내졌어야 한다.
         expect(stages).toContain("generation");
@@ -660,6 +664,7 @@ describe("016 — onStage 모델 로드 신호", () => {
         expect(signals).toContainEqual(["load", undefined]);
         return { ok: true, warm: false };
       },
+      async prewarm() {},
       async run() {
         return { text: GOOD_KO, ending: { kind: "eos" } };
       },
@@ -689,6 +694,7 @@ describe("016 — onStage 모델 로드 신호", () => {
       async load() {
         return { ok: true, warm: true };
       },
+      async prewarm() {},
       async run() {
         return { text: GOOD_KO, ending: { kind: "eos" } };
       },
@@ -709,6 +715,7 @@ describe("016 — onStage 모델 로드 신호", () => {
       async load() {
         return { ok: false, reason: "not-found" };
       },
+      async prewarm() {},
       async run() {
         return { text: GOOD_KO, ending: { kind: "eos" } };
       },
@@ -756,6 +763,7 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
       async load() {
         return { ok: true, warm: false };
       },
+      async prewarm() {},
       async run() {
         throw new Error("취소됐으면 run()이 불려서는 안 된다");
       },

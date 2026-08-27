@@ -16,6 +16,7 @@ import {
   type ProgressStage,
 } from "../inference/types";
 import type { DaySignals } from "../signals/types";
+import type { PhotoVision } from "../vision/types";
 import { buildRequest } from "./request";
 import type { DiaryStore } from "./store";
 import { extractTitle } from "./title";
@@ -77,6 +78,15 @@ export type PipelineInput = {
   now: Date;
   character: Character | undefined;
   vision: VisionSetting;
+  /**
+   * 화면이 미리 읽어 둔 사진 결과 (018,
+   * specs/018-prompt-prefix-prewarm/data-model.md §5).
+   *
+   * **파이프라인은 이 값을 해석하지 않고 그대로 `backend.generate()`에
+   * 넘긴다.** `/speckit-analyze` F1이 발견한 문제(화면이 미리 읽은 것이
+   * 파이프라인을 거치지 않고는 실제 백엔드에 닿을 수 없다)의 해소다.
+   */
+  seen?: PhotoVision;
 };
 
 /**
@@ -243,7 +253,9 @@ async function runStages(
   }
 
   // 5. 생성한다. 이 기능에서는 항상 여기서 멈춘다.
-  const generated = await deps.backend.generate(request.request, onProgress);
+  // 018 — 화면이 미리 읽어 둔 것이 있으면 그대로 넘긴다. 파이프라인은
+  // 이 값을 해석하지 않는다(data-model.md §5).
+  const generated = await deps.backend.generate(request.request, onProgress, input.seen);
   if (isGenerationFailure(generated)) {
     const detail = "reason" in generated ? `: ${generated.reason}` : "";
 

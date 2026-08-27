@@ -28,13 +28,14 @@ import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createPipeline, type Pipeline } from "../diary/pipeline";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
-import type { Character } from "../diary/types";
+import type { Character, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
 import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
+import type { VisionOutcome } from "../vision/types";
 
 /**
  * 조립 결과.
@@ -68,6 +69,18 @@ export type AppPipelineResult =
        * ─────────────────────────────────────────────────────────────────────
        */
       stop?: () => Promise<void>;
+      /**
+       * 화면이 미리 준비를 부르는 통로 (018). `stop`과 같은 이유로 옵셔널이다 —
+       * 데스크톱 경로에는 준비할 것이 없다.
+       */
+      prepare?: (character: Character) => Promise<void>;
+      release?: () => Promise<void>;
+      /** 사진만 미리 읽는 통로 (018 2단계). 데스크톱 경로에는 없다 */
+      captionDay?: (
+        day: DayDate,
+        character: Character,
+        vision: VisionSetting,
+      ) => Promise<VisionOutcome>;
     }
   | {
       ok: false;
@@ -75,6 +88,9 @@ export type AppPipelineResult =
       detail: string;
       pipeline?: undefined;
       stop?: undefined;
+      prepare?: undefined;
+      release?: undefined;
+      captionDay?: undefined;
     };
 
 /** 조립에 필요한 통로. 테스트가 기기 없이 갈아끼운다 */
@@ -114,7 +130,13 @@ export function createAppPipeline(
   deps: WiringDeps = {},
 ): AppPipelineResult {
   // **여기서 규칙을 다시 판단하지 않는다.** select.ts가 policy.ts에 물어 정한다.
-  const selection = selectBackend(resolution, undefined, desktopInferenceUrl());
+  // 018 2단계 — captionDay()가 신호를 읽을 수 있도록 같은 loadSignals를 넘긴다.
+  const selection = selectBackend(
+    resolution,
+    undefined,
+    desktopInferenceUrl(),
+    deps.loadSignals ?? deviceSignals,
+  );
   if (!selection.ok) {
     return { ok: false, reason: selection.reason, detail: selection.detail };
   }
@@ -141,6 +163,11 @@ export function createAppPipeline(
   // **backend를 버리지 않는다**(007 §3). 006까지 여기서 버려서 화면이 끊을 길이 없었다.
   // 데스크톱에는 `stop`이 없으므로 그대로 undefined가 실린다 — 넓히지 않는다(005 FR-025).
   const stop = selection.backend.stop?.bind(selection.backend);
+  // 018 — 같은 방식으로 prepare/release/captionDay를 넘긴다. 데스크톱에는
+  // 없으므로 undefined.
+  const prepare = selection.backend.prepare?.bind(selection.backend);
+  const release = selection.backend.release?.bind(selection.backend);
+  const captionDay = selection.backend.captionDay?.bind(selection.backend);
 
-  return { ok: true, pipeline, location: located.location, stop };
+  return { ok: true, pipeline, location: located.location, stop, prepare, release, captionDay };
 }

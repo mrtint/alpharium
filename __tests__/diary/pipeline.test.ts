@@ -17,6 +17,7 @@ import type { GenerationResult, InferenceBackend, ProgressStage } from "../../sr
 import { partiallyUnknownDay, richDay } from "../../src/signals/fake";
 import type { DaySignals } from "../../src/signals/types";
 import type { DayDate } from "../../src/config/day-boundary";
+import type { PhotoVision } from "../../src/vision/types";
 
 /** 하루가 닫힌 뒤의 시각. 2026-08-12는 2026-08-13 04:00에 닫힌다. */
 const AFTER_CLOSE = new Date("2026-08-13T06:00:00");
@@ -62,13 +63,20 @@ function makePipeline(
 }
 
 function inputFor(
-  overrides: { day?: DayDate; now?: Date; character?: Character; vision?: VisionSetting } = {},
+  overrides: {
+    day?: DayDate;
+    now?: Date;
+    character?: Character;
+    vision?: VisionSetting;
+    seen?: PhotoVision;
+  } = {},
 ) {
   return {
     day: overrides.day ?? DAY,
     now: overrides.now ?? AFTER_CLOSE,
     character: "character" in overrides ? overrides.character : ("quiet" as Character),
     vision: overrides.vision ?? ("quick" as VisionSetting),
+    ...("seen" in overrides ? { seen: overrides.seen } : {}),
   };
 }
 
@@ -1149,5 +1157,84 @@ describe("015 — onProgress 신호 중계", () => {
     const result = await pipeline.run(inputFor());
 
     expect(result.ok).toBe(true);
+  });
+});
+
+/**
+ * 018 — PipelineInput.seen이 backend.generate()까지 전달된다.
+ *
+ * 계약: specs/018-prompt-prefix-prewarm/contracts/prewarm-engine.md
+ *       (pipeline.test.ts 테스트 항목), data-model.md §5
+ *
+ * `/speckit-analyze` F1이 발견한 구조적 문제("화면이 미리 읽은 seen이
+ * 파이프라인을 거치지 않고는 실제 백엔드에 닿을 수 없다")의 해소를 검증한다.
+ */
+describe("018 — PipelineInput.seen이 backend.generate()로 그대로 전달된다", () => {
+  const caption: PhotoVision = {
+    captions: [{ photoId: "a", takenAt: new Date("2026-08-12T08:00:00"), text: "커피잔" }],
+    considered: 1,
+    available: 1,
+  };
+
+  it("seen을 채워 run()을 부르면 backend.generate()가 세 번째 인자로 그 값을 받는다", async () => {
+    let receivedSeen: PhotoVision | undefined;
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(_request, _onStage, seen) {
+        receivedSeen = seen;
+        return { text: "글" };
+      },
+    };
+    const { pipeline } = makePipeline({ backend });
+
+    await pipeline.run(inputFor({ seen: caption }));
+
+    expect(receivedSeen).toEqual(caption);
+  });
+
+  it("seen을 안 주면 undefined로 불린다 (회귀 없음)", async () => {
+    let receivedSeen: PhotoVision | undefined = caption; // 미리 채워 덮어쓰이는지 확인
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(_request, _onStage, seen) {
+        receivedSeen = seen;
+        return { text: "글" };
+      },
+    };
+    const { pipeline } = makePipeline({ backend });
+
+    await pipeline.run(inputFor());
+
+    expect(receivedSeen).toBeUndefined();
+  });
+
+  it("파이프라인은 seen의 내용을 해석하지 않고 그대로 통과시킨다", async () => {
+    // request-build 실패 등 이른 단계에서 멈추면 seen이 backend까지 갈 이유가
+    // 없다 — 여기서는 정상 경로에서 값이 변형되지 않는지만 본다.
+    let receivedSeen: PhotoVision | undefined;
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(_request, _onStage, seen) {
+        receivedSeen = seen;
+        return { text: "글" };
+      },
+    };
+    const { pipeline } = makePipeline({ backend });
+
+    await pipeline.run(inputFor({ seen: caption }));
+
+    // 캡션 배열의 내용이 한 글자도 안 바뀐다.
+    expect(receivedSeen?.captions[0]?.text).toBe("커피잔");
+    expect(receivedSeen?.considered).toBe(1);
+    expect(receivedSeen?.available).toBe(1);
   });
 });

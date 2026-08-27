@@ -67,6 +67,9 @@ function fakeEngine(
       }
       return result;
     },
+    async prewarm(character) {
+      calls.push(`prewarm:${character}`);
+    },
     async run(prompt) {
       calls.push("run");
       return options.run?.(prompt) ?? { text: GOOD_KO, ending: { kind: "eos" } };

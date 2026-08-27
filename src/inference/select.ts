@@ -9,8 +9,12 @@
  * 모른 채로 남는다.
  */
 
+import type { DayDate } from "../config/day-boundary";
 import { defaultLocationFor, isLocationAllowed } from "../config/policy";
 import type { Environment, EnvironmentResolution } from "../config/types";
+import type { Character, VisionSetting } from "../diary/types";
+import type { DaySignals } from "../signals/types";
+import type { VisionOutcome } from "../vision/types";
 import { createDesktopServerBackend, httpProbe } from "./desktop-server";
 import { onDeviceBackend } from "./on-device";
 import type { InferenceBackend, InferenceLocation, SelectionFailure } from "./types";
@@ -75,7 +79,21 @@ export function selectLocation(
  * 없으므로 `InferenceBackend`를 넓히지 않는다 — 파이프라인은 여전히 이것을 모른다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export type SelectedBackend = InferenceBackend & { stop?: () => Promise<void> };
+export type SelectedBackend = InferenceBackend & {
+  stop?: () => Promise<void>;
+  /**
+   * 화면이 미리 준비를 부르는 통로 (018). `stop`과 같은 이유로 옵셔널이다 —
+   * 데스크톱 경로에는 준비할 것이 없다.
+   */
+  prepare?: (character: Character) => Promise<void>;
+  release?: () => Promise<void>;
+  /** 사진만 미리 읽는 통로 (018 2단계). 데스크톱 경로에는 없다 */
+  captionDay?: (
+    day: DayDate,
+    character: Character,
+    vision: VisionSetting,
+  ) => Promise<VisionOutcome>;
+};
 
 export type BackendSelection =
   { ok: true; backend: SelectedBackend } | { ok: false; reason: SelectionFailure; detail: string };
@@ -95,6 +113,8 @@ export function selectBackend(
   resolution: EnvironmentResolution,
   requested?: InferenceLocation,
   serverBaseUrl?: string,
+  /** 018 2단계 — 온디바이스 어댑터의 `captionDay()`가 쓴다. 데스크톱 경로는 무시한다 */
+  loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
 ): BackendSelection {
   const selection = selectLocation(resolution, requested);
 
@@ -109,7 +129,7 @@ export function selectBackend(
 
   const backend =
     selection.location === "on-device"
-      ? onDeviceBackend()
+      ? onDeviceBackend(loadSignals)
       : createDesktopServerBackend(serverBaseUrl, httpProbe);
 
   return { ok: true, backend };

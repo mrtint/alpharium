@@ -14,7 +14,7 @@
  */
 
 import { act, render, screen, userEvent, waitFor } from "@testing-library/react-native";
-import { BackHandler } from "react-native";
+import { AppState, BackHandler } from "react-native";
 
 import type { SelectionState } from "../../src/app/selection";
 import type { EnvironmentResolution } from "../../src/config/types";
@@ -931,5 +931,361 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
       const line = screen.getByText(/중…/);
       expect(String(line.props.children)).not.toMatch(/\d/);
     }
+  });
+});
+
+/**
+ * 018 — 사진 없는 날의 미리 준비 (FR-005, FR-007, FR-008).
+ *
+ * 계약: specs/018-prompt-prefix-prewarm/contracts/prewarm-engine.md
+ */
+describe("018 — prepare()/release() 트리거", () => {
+  it("사진 없는 날(vision: none)에서 캐릭터가 정해지면 prepare()를 부른다", async () => {
+    const prepared: string[] = [];
+    await render(
+      <DiaryHomeScreen
+        pipeline={hangingPipeline()}
+        prepare={async (character) => {
+          prepared.push(character);
+        }}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    await screen.findByText("일기 쓰기");
+    await waitFor(() => expect(prepared).toEqual(["quiet"]));
+  });
+
+  it("사진 있는 날(vision: quick/detailed)에서는 1단계 트리거가 prepare()를 부르지 않는다", async () => {
+    const prepared: string[] = [];
+    for (const vision of ["quick", "detailed"] as const) {
+      await render(
+        <DiaryHomeScreen
+          pipeline={hangingPipeline()}
+          prepare={async (character) => {
+            prepared.push(character);
+          }}
+          resolution={resolved}
+          selection={selected}
+          store={memoryStore()}
+          vision={vision}
+        />,
+      );
+      await screen.findByText("일기 쓰기");
+    }
+
+    // 잠시 기다려도(비동기 useEffect가 있다면 반영될 시간) 호출되지 않아야 한다.
+    await act(async () => {});
+    expect(prepared).toEqual([]);
+  });
+
+  it("캐릭터를 고른 적이 없으면 prepare()를 부르지 않는다", async () => {
+    const prepared: string[] = [];
+    await render(
+      <DiaryHomeScreen
+        pipeline={hangingPipeline()}
+        prepare={async (character) => {
+          prepared.push(character);
+        }}
+        resolution={resolved}
+        selection={{ kind: "none" }}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    await act(async () => {});
+    expect(prepared).toEqual([]);
+  });
+
+  it("prepare 통로가 없어도(옵셔널) 화면이 정상 동작한다 — 쓰기를 눌러도 죽지 않는다 (FR-007)", async () => {
+    const pipeline: Pipeline = {
+      run: async () => ({ ok: true, entry, overwrote: false }),
+    };
+    await render(
+      <DiaryHomeScreen
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await screen.findByText(/일기를 작성하는 데|조용한 하루였다/);
+  });
+
+  /**
+   * **`AppState`는 네이티브 이벤트 이미터라 jest 환경에서 직접 이벤트를 낼 수
+   * 없다**(005의 `stop()` 배선도 같은 이유로 실기기에서만 확인됐다,
+   * AGENTS.md). 여기서는 `addEventListener`에 등록된 핸들러를 직접 꺼내
+   * 불러 로직만(생성 중 여부에 따라 release/stop 중 무엇을 부르는가) 검증한다.
+   */
+  it("앱이 백그라운드로 가면 생성 중이 아닐 때 release()를 부른다 (FR-008)", async () => {
+    const addListenerSpy = jest.spyOn(AppState, "addEventListener");
+    let released = false;
+    await render(
+      <DiaryHomeScreen
+        pipeline={hangingPipeline()}
+        release={async () => {
+          released = true;
+        }}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+    await screen.findByText("일기 쓰기");
+
+    const handler = addListenerSpy.mock.calls
+      .filter(([event]) => event === "change")
+      .at(-1)?.[1] as (state: string) => void;
+    expect(handler).toBeDefined();
+
+    await act(async () => {
+      handler("background");
+      // 핸들러 안의 release()/stop() 호출이 fire-and-forget(void)이므로
+      // 마이크로태스크를 두 번 흘려보내 완료를 기다린다(핸들러 호출 자체와
+      // 그 안의 release?.().catch() 체이닝, 두 단계를 거친다).
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(released).toBe(true);
+  });
+
+  it("생성이 도는 중에는 release()를 부르지 않는다 (재사용 보존)", async () => {
+    const addListenerSpy = jest.spyOn(AppState, "addEventListener");
+    let released = false;
+    const pipeline = hangingPipeline();
+    await render(
+      <DiaryHomeScreen
+        pipeline={pipeline}
+        release={async () => {
+          released = true;
+        }}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="none"
+      />,
+    );
+
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await screen.findByText("쓰고 있다");
+
+    const handler = addListenerSpy.mock.calls
+      .filter(([event]) => event === "change")
+      .at(-1)?.[1] as (state: string) => void;
+    expect(handler).toBeDefined();
+
+    await act(async () => {
+      handler("background");
+      // 핸들러 안의 release()/stop() 호출이 fire-and-forget(void)이므로
+      // 마이크로태스크를 두 번 흘려보내 완료를 기다린다(핸들러 호출 자체와
+      // 그 안의 release?.().catch() 체이닝, 두 단계를 거친다).
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(released).toBe(false);
+  });
+});
+
+/**
+ * 018 2단계 — 사진 있는 날의 미리 읽기 (FR-006·006a·009).
+ *
+ * 계약: specs/018-prompt-prefix-prewarm/contracts/prewarm-engine.md E15·E16
+ */
+describe("018 — captionDay 순서·재사용·폐기", () => {
+  /** run()이 받은 입력을 기록하는 대역 */
+  function recordingPipeline(): Pipeline & { inputs: PipelineInput[] } {
+    const inputs: PipelineInput[] = [];
+    return {
+      inputs,
+      run: (input) => {
+        inputs.push(input);
+        return Promise.resolve<PipelineResult>({ ok: true, entry, overwrote: false });
+      },
+    };
+  }
+
+  const at = () => new Date("2026-08-20T10:00:00");
+
+  it("사진이 있는 날에서 캡션이 끝난 뒤에만 prepare()를 부른다 (E1·E15)", async () => {
+    const order: string[] = [];
+    let releaseCaption: (outcome: unknown) => void = () => {};
+    const captionDay = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          releaseCaption = resolve;
+        }),
+    );
+    const prepare = jest.fn(async () => {
+      order.push("prepare");
+    });
+
+    await render(
+      <DiaryHomeScreen
+        captionDay={captionDay as never}
+        now={at}
+        pipeline={recordingPipeline()}
+        prepare={prepare}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="quick"
+      />,
+    );
+    await screen.findByText("일기 쓰기");
+
+    await waitFor(() => expect(captionDay).toHaveBeenCalled());
+    expect(prepare).not.toHaveBeenCalled(); // 캡션이 아직 안 끝났다
+
+    await act(async () => {
+      releaseCaption({ kind: "no-photos" });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(prepare).toHaveBeenCalledWith("quiet");
+  });
+
+  it("캡션 결과(seen)가 pipeline.run()의 PipelineInput.seen으로 전달된다", async () => {
+    const seenResult = {
+      kind: "seen" as const,
+      vision: {
+        captions: [{ photoId: "a", takenAt: new Date("2026-08-19T08:00:00"), text: "커피잔" }],
+        considered: 1,
+        available: 1,
+      },
+    };
+    const captionDay = jest.fn(async () => seenResult);
+    const pipeline = recordingPipeline();
+
+    await render(
+      <DiaryHomeScreen
+        captionDay={captionDay as never}
+        now={at}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="quick"
+      />,
+    );
+
+    await waitFor(() => expect(captionDay).toHaveBeenCalled());
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await waitFor(() => expect(pipeline.inputs).toHaveLength(1));
+
+    expect(pipeline.inputs[0].seen).toEqual(seenResult.vision);
+  });
+
+  it("캡션이 아직 안 끝난 상태에서 쓰기를 누르면, 새로 읽지 않고 끝나기를 기다린다 (FR-006a)", async () => {
+    let releaseCaption: (outcome: unknown) => void = () => {};
+    const captionDay = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          releaseCaption = resolve;
+        }),
+    );
+    const pipeline = recordingPipeline();
+
+    await render(
+      <DiaryHomeScreen
+        captionDay={captionDay as never}
+        now={at}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="quick"
+      />,
+    );
+    await waitFor(() => expect(captionDay).toHaveBeenCalledTimes(1));
+
+    // 캡션이 안 끝난 상태에서 곧바로 쓰기를 누른다.
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+
+    // 새로 시작된 캡션 호출이 없다 — 여전히 1번뿐이다.
+    expect(captionDay).toHaveBeenCalledTimes(1);
+
+    const seenResult = {
+      kind: "seen" as const,
+      vision: { captions: [], considered: 0, available: 0 },
+    };
+    await act(async () => {
+      releaseCaption(seenResult);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(pipeline.inputs).toHaveLength(1));
+    expect(pipeline.inputs[0].seen).toEqual(seenResult.vision);
+  });
+
+  it("날짜를 바꾸면 이전 날짜의 캡션이 새 날짜의 일기에 섞이지 않는다 (FR-009)", async () => {
+    const calls: string[] = [];
+    let releaseFirst: (outcome: unknown) => void = () => {};
+    const captionDay = jest.fn((day: string) => {
+      calls.push(day);
+      if (calls.length === 1) {
+        return new Promise((resolve) => {
+          releaseFirst = resolve;
+        });
+      }
+      return Promise.resolve({
+        kind: "seen" as const,
+        vision: {
+          captions: [{ photoId: "b", takenAt: new Date(), text: "새 날짜 사진" }],
+          considered: 1,
+          available: 1,
+        },
+      });
+    });
+    const pipeline = recordingPipeline();
+
+    await render(
+      <DiaryHomeScreen
+        captionDay={captionDay as never}
+        now={at}
+        pipeline={pipeline}
+        resolution={resolved}
+        selection={selected}
+        store={memoryStore()}
+        vision="quick"
+      />,
+    );
+    await waitFor(() => expect(captionDay).toHaveBeenCalledTimes(1));
+
+    // 아직 첫 캡션이 안 끝난 상태에서 날짜를 바꾼다.
+    await userEvent.press(await screen.findByTestId("day-2026-08-18"));
+    await waitFor(() => expect(captionDay).toHaveBeenCalledTimes(2));
+
+    // 이제야 첫(이전 날짜) 캡션이 끝난다 — stale한 결과다.
+    await act(async () => {
+      releaseFirst({
+        kind: "seen",
+        vision: {
+          captions: [{ photoId: "a", takenAt: new Date(), text: "이전 날짜 사진" }],
+          considered: 1,
+          available: 1,
+        },
+      });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await waitFor(() => expect(pipeline.inputs).toHaveLength(1));
+
+    // 새 날짜의 캡션만 실린다 — 이전 날짜의 "이전 날짜 사진"이 섞이지 않는다.
+    expect(pipeline.inputs[0].seen?.captions[0]?.text).toBe("새 날짜 사진");
   });
 });

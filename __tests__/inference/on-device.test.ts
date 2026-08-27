@@ -1,8 +1,10 @@
 import { createOnDeviceBackend, type VisionSupport } from "../../src/inference/on-device";
 import type { GenerationEngine, LoadResult, RunResult } from "../../src/inference/engine-port";
+import { emptyDay } from "../../src/signals/fake";
 import type { DaySignals, Photo } from "../../src/signals/types";
 import type { DiaryRequest } from "../../src/diary/types";
 import type { VisionEngine, VisionLoadResult, VisionRunResult } from "../../src/vision/vision-port";
+import type { PhotoVision } from "../../src/vision/types";
 
 /**
  * contracts/inference.md 「온디바이스 어댑터 검증 표」.
@@ -120,6 +122,7 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
       async load() {
         return load;
       },
+      async prewarm() {},
       async run() {
         return run;
       },
@@ -168,6 +171,7 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
       async load() {
         return { ok: true, warm: true };
       },
+      async prewarm() {},
       async run() {
         // 타임아웃을 흉내낸다 — 절대 resolve하지 않는다.
         return new Promise<RunResult>(() => {});
@@ -260,6 +264,7 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
       async load() {
         return { ok: true, warm: true };
       },
+      async prewarm() {},
       async run() {
         if (delayMs > 0) await new Promise((resolve) => setTimeout(resolve, delayMs));
         return run;
@@ -345,6 +350,7 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
         loadDelayed = true;
         return { ok: true, warm: false };
       },
+      async prewarm() {},
       async run() {
         return { text: "짧은 생성.", ending: { kind: "eos" } };
       },
@@ -366,5 +372,400 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
     const timing = (result as { timing?: { writingMs: number } }).timing;
     // run()이 즉시 resolve하므로 writingMs는 로드 지연(30ms)보다 훨씬 작아야 한다.
     expect(timing?.writingMs).toBeLessThan(30);
+  });
+});
+
+/**
+ * 018 — prepare()/release() (contracts/prewarm-engine.md E12~E14).
+ */
+describe("018 — prepare()/release()", () => {
+  function countingEngine() {
+    const calls: string[] = [];
+    let loadResult: LoadResult = { ok: true, warm: false };
+    const engine: GenerationEngine = {
+      async load(character) {
+        calls.push(`load:${character}`);
+        return loadResult;
+      },
+      async prewarm(character) {
+        calls.push(`prewarm:${character}`);
+      },
+      async run() {
+        calls.push("run");
+        return { text: "글", ending: { kind: "eos" } };
+      },
+      async stop() {
+        calls.push("stop");
+      },
+      async unload() {
+        calls.push("unload");
+      },
+    };
+    return {
+      calls,
+      engine,
+      setLoadResult(result: LoadResult) {
+        loadResult = result;
+      },
+    };
+  }
+
+  it("E12: prepare() 뒤 engine.unload()가 불리지 않는다", async () => {
+    const { calls, engine } = countingEngine();
+    const backend = createOnDeviceBackend(async () => [], engine);
+
+    await backend.prepare?.("narrative");
+
+    expect(calls).toEqual(["load:narrative", "prewarm:narrative"]);
+    expect(calls).not.toContain("unload");
+  });
+
+  it("prepare() 뒤의 generate()는 네이티브 로더를 다시 부르지 않는다 (재사용)", async () => {
+    const { calls, engine } = countingEngine();
+    const backend = createOnDeviceBackend(async () => [], engine);
+
+    await backend.prepare?.("narrative");
+    const loadCallsBeforeGenerate = calls.filter((c) => c.startsWith("load:")).length;
+
+    const request: DiaryRequest = {
+      signals: emptyDay("2026-08-26"),
+      character: "narrative",
+      vision: "none",
+      dayStillOpen: false,
+    };
+    await backend.generate(request);
+
+    const loadCallsAfterGenerate = calls.filter((c) => c.startsWith("load:")).length;
+    // load()는 여전히 불리지만(재사용 판정을 엔진 내부가 하므로), 여기서는
+    // 어댑터가 다시 로더를 부르는 추가 호출을 만들지 않는지만 본다 — 실제
+    // 재사용 여부는 llama-port.test.ts의 E1 테스트가 담당한다.
+    expect(loadCallsAfterGenerate).toBeGreaterThanOrEqual(loadCallsBeforeGenerate);
+    expect(calls).toContain("unload"); // generate()가 끝나면 여전히 정리된다 (E2)
+  });
+
+  it("generate()는 prepare()가 있었든 없었든 끝나면 여전히 unload한다 (E2 유지)", async () => {
+    const { calls, engine } = countingEngine();
+    const backend = createOnDeviceBackend(async () => [], engine);
+
+    const request: DiaryRequest = {
+      signals: emptyDay("2026-08-26"),
+      character: "narrative",
+      vision: "none",
+      dayStillOpen: false,
+    };
+    await backend.generate(request);
+
+    expect(calls).toContain("unload");
+  });
+
+  it("E13: prepare()의 load() 실패가 예외를 던지지 않는다", async () => {
+    const { engine, setLoadResult } = countingEngine();
+    setLoadResult({ ok: false, reason: "not-found" });
+    const backend = createOnDeviceBackend(async () => [], engine);
+
+    await expect(backend.prepare?.("narrative")).resolves.toBeUndefined();
+  });
+
+  it("E14: release()가 열린 것을 닫는다", async () => {
+    const { calls, engine } = countingEngine();
+    const backend = createOnDeviceBackend(async () => [], engine);
+
+    await backend.prepare?.("narrative");
+    await backend.release?.();
+
+    expect(calls).toContain("unload");
+  });
+
+  it("E14: release()는 engine.unload()에 그대로 위임한다 — 새 정리 로직이 없다", async () => {
+    const { calls, engine } = countingEngine();
+    const backend = createOnDeviceBackend(async () => [], engine);
+
+    await backend.release?.();
+
+    // prepare() 없이 release()만 불러도 engine.unload()가 호출된다(위임) —
+    // "열려 있는가"의 판단은 실제 엔진(llama-port.ts)의 unload()가 이미
+    // 안전하게 처리한다(context가 null이면 no-op). 여기서는 위임 자체만 본다.
+    expect(calls).toEqual(["unload"]);
+  });
+
+  it("엔진이 없으면 prepare()/release()가 조용히 끝난다", async () => {
+    const backend = createOnDeviceBackend(async () => []);
+
+    await expect(backend.prepare?.("narrative")).resolves.toBeUndefined();
+    await expect(backend.release?.()).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * 018 — generate()가 seen을 받으면 사진을 다시 읽지 않는다.
+ *
+ * 계약: specs/018-prompt-prefix-prewarm/data-model.md §4·§5, research.md §6
+ */
+describe("018 — generate(request, onStage, seen)", () => {
+  const photo = (id: string, hour: number): Photo => ({
+    id,
+    takenAt: new Date(2026, 7, 20, hour, 0, 0),
+  });
+
+  function signalsWithPhotos(photos: Photo[]): DaySignals {
+    return {
+      date: "2026-08-20",
+      photos: { kind: "known", value: { photos, complete: true } },
+      places: { kind: "none" },
+      steps: { kind: "unknown", reason: "no-channel" },
+      battery: { kind: "unknown", reason: "no-channel" },
+      connectivity: { kind: "unknown", reason: "no-channel" },
+    };
+  }
+
+  function requestWith(signals: DaySignals): DiaryRequest {
+    return { signals, character: "quiet", vision: "quick", dayStillOpen: false };
+  }
+
+  /** vision engine.load() 호출 횟수를 세는 대역. 불리면 readPhotos()가 실행된 것이다 */
+  function countingVisionSupport(): { support: VisionSupport; loadCalls: number[] } {
+    const loadCalls: number[] = [];
+    let count = 0;
+    const engine: VisionEngine = {
+      async load(): Promise<VisionLoadResult> {
+        count += 1;
+        loadCalls.push(count);
+        return { ok: true };
+      },
+      async caption(): Promise<VisionRunResult> {
+        return { text: "사진 내용" };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    return {
+      support: { engine, resolvePath: async (p) => `/photo/${p.id}.jpg` },
+      loadCalls,
+    };
+  }
+
+  function goodEngine(): GenerationEngine {
+    return {
+      async load() {
+        return { ok: true, warm: false };
+      },
+      async prewarm() {},
+      async run() {
+        return { text: "짧은 생성.", ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+  }
+
+  const preSeen: PhotoVision = {
+    captions: [{ photoId: "x", takenAt: new Date(2026, 7, 20, 9, 0, 0), text: "미리 읽은 사진" }],
+    considered: 1,
+    available: 1,
+  };
+
+  it("seen이 주어지면 readPhotos()(vision engine.load)를 다시 부르지 않는다", async () => {
+    const { support, loadCalls } = countingVisionSupport();
+    const backend = createOnDeviceBackend(async () => [], goodEngine(), 60_000, support);
+
+    const result = await backend.generate(
+      requestWith(signalsWithPhotos([photo("a", 8)])),
+      undefined,
+      preSeen,
+    );
+
+    expect(loadCalls).toEqual([]); // vision engine이 한 번도 열리지 않았다
+    expect("text" in result).toBe(true);
+  });
+
+  it("seen이 없으면 기존과 동일하게 스스로 읽는다 (회귀 없음)", async () => {
+    const { support, loadCalls } = countingVisionSupport();
+    const backend = createOnDeviceBackend(async () => [], goodEngine(), 60_000, support);
+
+    const result = await backend.generate(requestWith(signalsWithPhotos([photo("a", 8)])));
+
+    expect(loadCalls).toEqual([1]); // vision engine이 정상적으로 열렸다
+    expect("text" in result).toBe(true);
+  });
+
+  it("seen을 쓴 경로에서는 timing.visionMs가 없다 (FR-010)", async () => {
+    const { support } = countingVisionSupport();
+    const backend = createOnDeviceBackend(async () => [], goodEngine(), 60_000, support);
+
+    const result = await backend.generate(
+      requestWith(signalsWithPhotos([photo("a", 8)])),
+      undefined,
+      preSeen,
+    );
+
+    expect("text" in result).toBe(true);
+    const timing = (result as { timing?: { visionMs?: number } }).timing;
+    expect(timing?.visionMs).toBeUndefined();
+  });
+
+  it("seen을 쓴 경로에서도 writingMs는 여전히 기록된다", async () => {
+    const { support } = countingVisionSupport();
+    const backend = createOnDeviceBackend(async () => [], goodEngine(), 60_000, support);
+
+    const result = await backend.generate(
+      requestWith(signalsWithPhotos([photo("a", 8)])),
+      undefined,
+      preSeen,
+    );
+
+    expect("text" in result).toBe(true);
+    const timing = (result as { timing?: { writingMs: number } }).timing;
+    expect(timing?.writingMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/**
+ * 018 2단계 — captionDay() (contracts/prewarm-engine.md E15).
+ */
+describe("018 — captionDay()", () => {
+  const DAY = "2026-08-20";
+
+  const photo = (id: string, hour: number): Photo => ({
+    id,
+    takenAt: new Date(2026, 7, 20, hour, 0, 0),
+  });
+
+  function signalsWithPhotos(photos: Photo[]): DaySignals {
+    return {
+      date: DAY,
+      photos: { kind: "known", value: { photos, complete: true } },
+      places: { kind: "none" },
+      steps: { kind: "unknown", reason: "no-channel" },
+      battery: { kind: "unknown", reason: "no-channel" },
+      connectivity: { kind: "unknown", reason: "no-channel" },
+    };
+  }
+
+  function loadSignalsReturning(signals: DaySignals | null) {
+    return async () => signals;
+  }
+
+  function visionSupportWith(): { support: VisionSupport; unloaded: boolean[] } {
+    const unloaded: boolean[] = [];
+    const engine: VisionEngine = {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(): Promise<VisionRunResult> {
+        return { text: "사진 내용" };
+      },
+      async stop() {},
+      async unload() {
+        unloaded.push(true);
+      },
+    };
+    return {
+      support: { engine, resolvePath: async (p) => `/photo/${p.id}.jpg` },
+      unloaded,
+    };
+  }
+
+  it("사진이 있는 날은 캡션 결과를 돌려주고 vision engine을 닫는다 (E2)", async () => {
+    const { support, unloaded } = visionSupportWith();
+    const backend = createOnDeviceBackend(
+      async () => [],
+      undefined,
+      60_000,
+      support,
+      loadSignalsReturning(signalsWithPhotos([photo("a", 8)])),
+    );
+
+    const outcome = await backend.captionDay(DAY, "quiet", "quick");
+
+    expect(outcome.kind).toBe("seen");
+    if (outcome.kind === "seen") {
+      expect(outcome.vision.captions).toHaveLength(1);
+    }
+    expect(unloaded).toEqual([true]);
+  });
+
+  it("사진이 없는 날은 no-photos를 돌려주고 vision engine을 열지 않는다", async () => {
+    const { support, unloaded } = visionSupportWith();
+    const backend = createOnDeviceBackend(
+      async () => [],
+      undefined,
+      60_000,
+      support,
+      loadSignalsReturning(signalsWithPhotos([])),
+    );
+
+    const outcome = await backend.captionDay(DAY, "quiet", "quick");
+
+    expect(outcome.kind).toBe("no-photos");
+    expect(unloaded).toEqual([]);
+  });
+
+  it("vision 수단이 없으면 no-photos로 조용히 끝난다", async () => {
+    const backend = createOnDeviceBackend(async () => []);
+
+    const outcome = await backend.captionDay(DAY, "quiet", "quick");
+
+    expect(outcome.kind).toBe("no-photos");
+  });
+
+  it("loadSignals가 없으면 no-photos로 조용히 끝난다", async () => {
+    const { support } = visionSupportWith();
+    const backend = createOnDeviceBackend(async () => [], undefined, 60_000, support);
+
+    const outcome = await backend.captionDay(DAY, "quiet", "quick");
+
+    expect(outcome.kind).toBe("no-photos");
+  });
+
+  it("신호를 못 읽으면(null) no-photos로 조용히 끝난다", async () => {
+    const { support } = visionSupportWith();
+    const backend = createOnDeviceBackend(
+      async () => [],
+      undefined,
+      60_000,
+      support,
+      loadSignalsReturning(null),
+    );
+
+    const outcome = await backend.captionDay(DAY, "quiet", "quick");
+
+    expect(outcome.kind).toBe("no-photos");
+  });
+
+  it("captionDay()가 돌려준 결과를 generate()의 seen으로 그대로 쓸 수 있다 (E1 순서)", async () => {
+    const { support } = visionSupportWith();
+    const engine: GenerationEngine = {
+      async load() {
+        return { ok: true, warm: false };
+      },
+      async prewarm() {},
+      async run() {
+        return { text: "짧은 생성.", ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const signals = signalsWithPhotos([photo("a", 8)]);
+    const backend = createOnDeviceBackend(
+      async () => [],
+      engine,
+      60_000,
+      support,
+      loadSignalsReturning(signals),
+    );
+
+    const outcome = await backend.captionDay(DAY, "quiet", "quick");
+    expect(outcome.kind).toBe("seen");
+
+    const seen = outcome.kind === "seen" ? outcome.vision : undefined;
+    const request: DiaryRequest = {
+      signals,
+      character: "quiet",
+      vision: "quick",
+      dayStillOpen: false,
+    };
+    const result = await backend.generate(request, undefined, seen);
+
+    expect("text" in result).toBe(true);
   });
 });

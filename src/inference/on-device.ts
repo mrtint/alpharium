@@ -21,9 +21,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import type { DayDate } from "../config/day-boundary";
 import { judge } from "../diary/acceptance";
 import { buildPrompt, instructionLines } from "../diary/prompt";
-import type { DiaryRequest } from "../diary/types";
+import { buildRequest } from "../diary/request";
+import type { Character, DiaryRequest, VisionSetting } from "../diary/types";
+import type { DaySignals } from "../signals/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
 import { reachedVisionLimit, selectForVision } from "../vision/select";
@@ -49,8 +52,38 @@ export type BackendProbe = () => Promise<unknown>;
  *
  * **002의 `InferenceBackend`를 넓히지 않는다**(FR-025). 데스크톱 경로에는 끊을 것이
  * 없고, 파이프라인도 이것을 알 필요가 없다 — 화면만 쓴다(FR-021b).
+ *
+ * **018 — `prepare()`/`release()`가 더해졌다.** 화면이 사용자가 "쓰기"를 누르기
+ * 전 대기 시점에 미리 준비를 시작하는 통로다
+ * (specs/018-prompt-prefix-prewarm/contracts/prewarm-engine.md). 이것도
+ * `InferenceBackend`를 넓히지 않는다 — 파이프라인은 이 존재를 몰라도 된다,
+ * 화면이 직접 부른다.
  */
-export type StoppableBackend = InferenceBackend & { stop(): Promise<void> };
+export type StoppableBackend = InferenceBackend & {
+  stop(): Promise<void>;
+  /** 캐릭터 모델을 열고 고정 접두사를 미리 프리필해 둔다. `unload()`하지 않는다(E12) */
+  prepare(character: Character): Promise<void>;
+  /** 준비해 둔 컨텍스트를 놓아준다(E14) */
+  release(): Promise<void>;
+  /**
+   * 사진만 미리 읽는다 (018 2단계, contracts/prewarm-engine.md E15).
+   *
+   * `generate()`가 하던 "0b. 사진을 읽는다" 블록을 독립적으로 부를 수 있게
+   * 노출한 것 — VLM을 열고 캡션하고 **반드시 닫는다**(E2, 기존 `readPhotos()`와
+   * 같은 정리 보장). 화면이 이 결과를 들고 있다가 `generate()`의 세 번째
+   * 인자(`seen`)로 넘기면 다시 읽지 않는다.
+   *
+   * **`day`·`character`·`vision`만 받는다 — `DiaryRequest`를 화면이 조립하지
+   * 않는다.** 화면은 신호(`DaySignals`)를 모른다(009부터 이어진 경계) — 이
+   * 함수가 안에서 신호를 읽고 `buildRequest()`로 요청을 만든다. `character`는
+   * 캡션 자체에 쓰이지 않지만(VLM은 캐릭터와 무관, 011) `buildRequest()`가
+   * 요구하는 값이라 화면이 이미 아는 것(선택된 캐릭터)을 그대로 전달한다.
+   *
+   * **부르는 쪽 책임**: 이 호출이 끝난(닫힌) 뒤에만 `prepare()`를 불러야
+   * 한다 — 두 엔진이 동시에 열리면 안 된다(E1·E15).
+   */
+  captionDay(day: DayDate, character: Character, vision: VisionSetting): Promise<VisionOutcome>;
+};
 
 /**
  * 네이티브 모듈 부재를 나타내는 오류인지 판정한다.
@@ -216,6 +249,13 @@ export function createOnDeviceBackend(
   engine?: GenerationEngine,
   timeoutMs: number = GENERATION_TIMEOUT_MS,
   vision?: VisionSupport,
+  /**
+   * 그 하루의 실제 신호를 읽는다 (018 2단계). `captionDay()`가 화면 대신
+   * `DiaryRequest`를 조립하려면 신호가 필요하고, 화면은 신호를 모르므로
+   * (009부터 이어진 경계) 여기서 대신 읽는다. `wiring.ts`의 `deviceSignals`와
+   * 같은 함수가 주입된다.
+   */
+  loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
 ): StoppableBackend {
   /**
    * 그만두라는 신호. **캡션 단계와 생성 단계가 함께 본다.**
@@ -245,6 +285,57 @@ export function createOnDeviceBackend(
       await engine?.stop().catch(() => {});
     },
 
+    /**
+     * 화면이 사용자가 기다리기 시작하기 전에 미리 부르는 준비 작업 (018,
+     * contracts/prewarm-engine.md E12·E13).
+     *
+     * **`generate()`와 달리 사용자가 기다리지 않는 시점에 불린다.** 그래서
+     * 실패해도 조용하고, 결과를 돌려주지 않는다.
+     *
+     * **★ 부르는 쪽이 지킬 것**: 이 호출 뒤에 사진 읽기(VLM)가 뒤따르면
+     * 안 된다. 두 모델이 동시에 열려 기기가 죽는다(E1·E15) — 판단은
+     * 화면이 한다.
+     */
+    async prepare(character: Character): Promise<void> {
+      if (engine === undefined) return;
+      const loaded = await engine.load(character);
+      if (!loaded.ok) return; // E13 — 조용히 끝난다. generate()가 다시 시도한다.
+      await engine.prewarm(character);
+      // **unload하지 않는다**(E12) — 열어 두어야 generate()의 load()가
+      // warm으로 재사용하고 KV 캐시가 살아 있다.
+    },
+
+    /** 준비해 둔 컨텍스트를 놓아준다 (018, E14) */
+    async release(): Promise<void> {
+      await engine?.unload().catch(() => {});
+    },
+
+    /**
+     * 사진만 미리 읽는다 (018 2단계, E15). `generate()`의 "0b. 사진을
+     * 읽는다" 블록과 같은 함수(`readPhotos()`)를 쓰며, 그 함수의 E2
+     * 보장(연 것을 반드시 닫는다)도 그대로 물려받는다.
+     *
+     * **신호를 스스로 읽는다** — 화면은 `DaySignals`를 모른다. `vision`이나
+     * `loadSignals`가 없으면(주입되지 않았거나 신호를 못 읽었으면) 조용히
+     * `no-photos`로 끝난다 — 실패가 아니라 "이 경로에서는 미리 읽을 수
+     * 없다"는 뜻이며, `generate()`가 필요하면 스스로 다시 읽는다.
+     */
+    async captionDay(
+      day: DayDate,
+      character: Character,
+      requestVision: VisionSetting,
+    ): Promise<VisionOutcome> {
+      if (vision === undefined || loadSignals === undefined) return { kind: "no-photos" };
+
+      const signals = await loadSignals(day).catch(() => null);
+      if (signals === null) return { kind: "no-photos" };
+
+      const built = buildRequest(signals, character, requestVision, day);
+      if (!built.ok) return { kind: "no-photos" };
+
+      return readPhotos(vision, built.request, cancel);
+    },
+
     async isAvailable(): Promise<ModuleStatus> {
       try {
         await probe();
@@ -268,6 +359,12 @@ export function createOnDeviceBackend(
     async generate(
       request: DiaryRequest,
       onStage?: (stage: ProgressStage, branch?: MonologueBranch) => void,
+      /**
+       * 화면이 미리 읽어 둔 사진 결과 (018, data-model.md §5). 주어지면
+       * 사진을 다시 읽지 않고 그대로 쓴다 — 없으면 지금처럼 스스로
+       * 읽는다(회귀 없음).
+       */
+      alreadySeen?: PhotoVision,
     ): Promise<GenerationResult> {
       // 0. 시각 설정 — 사진을 보겠다고 했는데 보지 않은 일기를 주지 않는다(FR-022).
       //
@@ -307,8 +404,11 @@ export function createOnDeviceBackend(
       // 실제로 읽은 경우에만 잰다 — `readPhotos()`를 아예 안 부르면 measure하지
       // 않는다(안 한 일은 0초 걸린 일이 아니다, 원칙 V).
       let visionMs: number | undefined;
-      let seen: PhotoVision | undefined;
-      if (request.vision !== "none" && vision !== undefined) {
+      let seen: PhotoVision | undefined = alreadySeen;
+      // 018 — 화면이 미리 읽어 둔 것이 있으면 다시 읽지 않는다. 이 호출에서는
+      // 사진을 읽지 않았으므로 visionMs를 대입하지 않는다(FR-010, 기존 T4
+      // 불변식의 자연스러운 결과 — "안 한 일은 0초 걸린 일이 아니다").
+      if (alreadySeen === undefined && request.vision !== "none" && vision !== undefined) {
         const visionStart = Date.now();
         const outcome = await readPhotos(vision, request, cancel, onStage);
 
@@ -446,7 +546,10 @@ export function createOnDeviceBackend(
  *
  * 모듈 해석 자체가 실패할 수 있으므로(시뮬레이터·웹) 지연 import 한다.
  */
-export function onDeviceBackend(): StoppableBackend {
+export function onDeviceBackend(
+  /** 018 2단계 — `captionDay()`가 신호를 읽는 데 쓴다. 주지 않으면 no-photos로 끝난다 */
+  loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
+): StoppableBackend {
   return createOnDeviceBackend(
     async () => {
       const llama = await import("llama.rn");
@@ -460,6 +563,7 @@ export function onDeviceBackend(): StoppableBackend {
     // `not-implemented`로 거부된다** — 006의 `GenerationProbe`, 007의 끊긴 `stop`
     // 배선과 같은 종류의 조용한 실패가 나는 자리다.
     visionSupport(),
+    loadSignals,
   );
 }
 
