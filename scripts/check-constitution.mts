@@ -19,6 +19,7 @@ import {
   checkMonologueFile,
   checkSeedFile,
   checkSourceFile,
+  checkSpikeFile,
   checkVisionFile,
   formatViolations,
   type Violation,
@@ -58,6 +59,8 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       violations.push(...checkVisionFile(child, contents));
       // 015 — 독백 문구 선택 자리. checkMonologueFile이 경로로 대상을 정한다.
       violations.push(...checkMonologueFile(child, contents));
+      // 019 — 백그라운드 검증 하네스. checkSpikeFile이 경로로 대상을 정한다.
+      violations.push(...checkSpikeFile(child, contents));
     }
   }
 
