@@ -230,13 +230,20 @@ test:logic`이 초록불이다. `npm run check:constitution`이 통과한다.
   (T012)과 실제 일기 쓰기 화면(별도 탭)을 수동으로 함께 조작하는
   것으로 충분하다(quickstart.md 4단계가 이미 "거의 동시에 누른다"는
   수동 절차로 기술함 — 새 UI 요소가 필수는 아니었다).
-- [ ] T014a [US2] FR-009(배터리 최적화 예외 대조)를 실제로 수행한다
+- [X] T014a [US2] FR-009(배터리 최적화 예외 대조)를 실제로 수행한다
   — quickstart.md 1~3단계를 배터리 최적화 기본값에서 이미 1회
   수행했다면(User Story 1 체크포인트), 설정에서 이 앱에 배터리
   최적화 예외를 부여한 뒤 **같은 quickstart.md 1~3단계를 다시
   수행**하고 그 결과를 별도로 기록한다(quickstart.md 「배터리
   최적화 예외를 줬을 때의 대조」 절). 이 대조 없이는 SC-002가 요구하는
   "조건부 결론의 재현 가능한 구체적 조건"을 findings.md에 쓸 수 없다.
+  **완료** — `adb shell dumpsys deviceidle whitelist
+  +com.anonymous.alpharium`로 예외를 부여(설정 앱 UI와 동등한
+  시스템 상태)한 뒤 화면을 끄고 잠근 채 대조 관측했다. 기본값에서는
+  15분 등록에도 실행 간격이 19시간 33분으로 벌어졌으나, 예외 적용
+  후에는 연속 2회가 각각 10분·31분 53초로 좁혀졌다(findings.md 실측
+  표). standby bucket이 예외 적용 직후 `EXEMPTED(5)`로 전환되는 것도
+  `adb shell am get-standby-bucket`으로 확인했다.
 
 **Checkpoint**: User Story 1과 2 모두 하네스 차원에서 완성됐다(코드
 구현 완료, `npm test`·`npm run lint` 전부 초록불). quickstart.md
@@ -257,7 +264,7 @@ test:logic`이 초록불이다. `npm run check:constitution`이 통과한다.
 
 ### Implementation for User Story 3
 
-- [ ] T015 [US3] `specs/019-background-diary-feasibility/findings.md`를
+- [X] T015 [US3] `specs/019-background-diary-feasibility/findings.md`를
   작성한다 — quickstart.md의 "기대 결과 기록란"에 채운 원시 관측값을
   근거로, SC-001(YES/NO/조건부 결론)·SC-002(조건부라면 재현 가능한
   구체적 조건 — T014a의 배터리 예외 대조 결과를 반드시 포함)·
@@ -267,12 +274,13 @@ test:logic`이 초록불이다. `npm run check:constitution`이 통과한다.
   설정을 모든 실측값에 함께 적는다(헌법 원칙 V). FR-003 판정에는
   T008a가 기록한 `appState` 값을 근거로 쓰되, 이것이 정확한
   화면-꺼짐·잠금 감지가 아니라 근사치라는 한계를 명시한다
-  (research.md §6a).
-- [ ] T016 [US3] findings.md에 "다음 스펙에서 고려할 사항" 절을
+  (research.md §6a). **완료** — findings.md 작성, SC-001~005 전부
+  명시적 절로 기록.
+- [X] T016 [US3] findings.md에 "다음 스펙에서 고려할 사항" 절을
   추가한다(spec.md Assumptions 마지막 항목) — 실제 기능화 여부는 이
   스펙이 결정하지 않으므로, 020+ 스펙을 쓸 때 참고할 조건(예: E1 잠금
   설계 필요 여부, 배터리 최적화 예외 요청 UI 필요 여부)만 나열하고
-  결정하지 않는다.
+  결정하지 않는다. **완료** — findings.md 마지막 절에 6개 항목 기록.
 
 **Checkpoint**: findings.md가 완성됐다. 이 검증에 참여하지 않은
 사람에게 findings.md만 보여주고 "다음에 뭘 해야 할지 알겠는가"를

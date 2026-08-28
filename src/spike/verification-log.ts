@@ -122,7 +122,10 @@ export async function readVerificationLog(port: VerificationLogPort): Promise<Ve
  * `expo-file-system` 57로 위 통로를 구현한다.
  *
  * `store.ts`의 `expoFileSystemPort()`와 같은 API 형태(`Directory`·`File`·
- * `Paths`, 동기 `.text()`)를 쓴다. 제품 `DiaryStore`가 쓰는
+ * `Paths`)를 쓴다. **`.text()`는 비동기다**(`Promise<string>`) —
+ * `write()`·`exists`는 동기이지만 `.text()`만 그렇지 않다는 것을 실기기
+ * 관측(2026-08-27)에서야 확인했다(메모리 노트 「expo-file-system 57
+ * API」와 일치). 제품 `DiaryStore`가 쓰는
  * `Paths.document/diary/` 디렉터리와 겹치지 않도록 별도 파일명을 쓴다.
  *
  * 지연 import 하는 이유: 001의 on-device 어댑터와 같다 — 모듈 해석 자체가
@@ -140,7 +143,12 @@ export function expoVerificationLogPort(fileName = "verification-log.jsonl"): Ve
     async append(line) {
       const { File, Paths } = await import("expo-file-system");
       const file = new File(Paths.document, fileName);
-      const existing = file.exists ? file.text() : "";
+      // **`file.text()`는 Promise를 돌려준다** — `await` 없이 문자열
+      // 결합에 쓰면 `[object Object]`가 로그에 섞여 들어간다(실기기
+      // 관측으로 발견, 2026-08-27). `readAll()`은 async 함수가 그 값을
+      // 그대로 반환해 자동으로 풀리므로 문제없었지만, 여기서는 `+`
+      // 연산자로 직접 이어붙이므로 명시적으로 기다려야 한다.
+      const existing = file.exists ? await file.text() : "";
       file.write(existing + line);
     },
   };
