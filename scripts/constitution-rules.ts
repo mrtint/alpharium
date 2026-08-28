@@ -396,37 +396,56 @@ export function checkMonologueFile(fileName: string, contents: string): Violatio
 }
 
 /**
- * 백그라운드 검증 하네스가 제품 계층에 닿는 것을 잡는다
- * (019, contracts/background-harness.md H1).
+ * 스케줄·알림·잠금의 순수 판정 코드가 제품 계층에 직접 닿는 것을 잡는다
+ * (020, contracts/background-generation.md B3·B8, 원칙 III·IV).
  *
- * `src/spike/`는 findings.md 작성 후 통째로 지워질 수 있는 검증 전용
- * 디렉터리다(019 plan.md 「검증 종료 후 하네스의 운명」) — 제품 계층
- * (`diary/store`·`models/roster`·`diary/prompt`·`diary/acceptance`)을
- * import하면 그 경계가 흐려지고, 헌법 원칙 IV가 2026-08-12 되돌리기의
- * 근거였던 "측정 장치와 제품이 뒤섞였다"가 반복된다.
+ * `src/schedule/`는 백그라운드 자동 생성의 순수 판정(`decision`·`retry`·
+ * `notify`·`lock`)과 기기 통로(`*-port`)를 모으는 자리다. 019의
+ * `checkSpikeFile`을 개명·재활용했다(그때는 `src/spike/`가 대상이었다).
+ *
+ * **막는 것**:
+ *  - `models/roster` — 캐릭터→모델 매핑. 스케줄 코드가 캐릭터 로스터를
+ *    알 이유가 없다(원칙 III). 자동 생성은 007이 저장한 선택을 읽기만
+ *    한다(`app/selection-store`를 통해서).
+ *  - `diary/prompt` — 화자 규칙. 자동 생성도 같은 프롬프트를 쓰지만
+ *    그것은 `pipeline.run()` 안에서 일어난다.
+ *  - `diary/acceptance` — 판정 4갈래. 자동이라고 갈래를 늘리거나
+ *    완화하지 않는다(FR-011) — `pipeline.run()`이 보장한다.
+ *  - `backend.generate()` 직접 호출 — 006의 실패(파이프라인을 건너뛰어
+ *    `store.save()`가 한 번도 안 돎)를 반복하지 않는다.
+ *
+ * **일부러 빼는 것**:
+ *  - `diary/store` — `src/schedule/task.ts`가 `wiring.ts`를 거쳐
+ *    `store.listDays()`를 읽어야 한다(background-generation.md B2 —
+ *    "지금 자동 생성을 돌려야 하는가"는 일기 존재 여부로 판정한다).
+ *    직접 import 금지는 과하다. 단 `task.ts`는 wiring 경유로만 store에
+ *    닿아야 하며, 순수 판정 파일(`decision`·`retry`·`notify`·`lock`)은
+ *    애초에 store를 import할 이유가 없다.
  */
-const SPIKE_TOUCHES_PRODUCT_LAYER =
-  /\bfrom\s+["'][^"']*(?:diary\/store|models\/roster|diary\/prompt|diary\/acceptance)["']/;
+const SCHEDULE_TOUCHES_PRODUCT_LAYER =
+  /\bfrom\s+["'][^"']*(?:models\/roster|diary\/prompt|diary\/acceptance)["']|\b(?:backend|adapter|engine)\s*\.\s*generate\s*\(/;
 
 /**
- * 백그라운드 검증 하네스 파일인지 보고, 맞으면 위 규칙을 적용한다.
+ * 스케줄 판정 파일인지 보고, 맞으면 위 규칙을 적용한다.
  *
- * **`src/spike/`가 대상이다.**
+ * **`src/schedule/`가 대상이다.** `src/app/notification-routing.ts`는
+ * 대상이 아니다 — 순수 라우팅 판정이며 `diary/*`를 import하지 않는다는
+ * 것을 그 파일의 계약 테스트가 검사한다(contracts/notification.md N5).
  */
-export function checkSpikeFile(fileName: string, contents: string): Violation[] {
+export function checkScheduleFile(fileName: string, contents: string): Violation[] {
   const normalized = fileName.split("\\").join("/");
-  if (!normalized.startsWith("src/spike/")) return [];
+  if (!normalized.startsWith("src/schedule/")) return [];
 
   const violations: Violation[] = [];
 
   for (const [index, line] of contents.split(/\r?\n/).entries()) {
     const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
 
-    if (SPIKE_TOUCHES_PRODUCT_LAYER.test(code)) {
+    if (SCHEDULE_TOUCHES_PRODUCT_LAYER.test(code)) {
       violations.push({
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
-        rule: "검증 하네스가 제품 계층에 닿는다 — pipeline.run()만 거쳐야 한다 (019, 원칙 IV)",
+        rule: "스케줄 판정이 제품 계층에 직접 닿는다 — wiring.ts → pipeline.run()만 거쳐야 한다 (020, 원칙 III·IV)",
       });
     }
   }

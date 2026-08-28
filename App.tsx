@@ -5,6 +5,25 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { resolveSelection } from "./src/app/selection";
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
+import { routeFromNotification } from "./src/app/notification-routing";
+import type { DayDate } from "./src/config/day-boundary";
+import {
+  ensureAutoDiaryTaskDefined,
+  // 부수 효과: 전역 스코프 TaskManager.defineTask 등록 경로를 모듈에 들인다.
+} from "./src/schedule/task";
+import { expoBackgroundSchedulePort } from "./src/schedule/background-port";
+import { expoBatteryExceptionPort } from "./src/schedule/battery-exception-port";
+import { expoNotificationPort } from "./src/schedule/notification-port";
+import { acknowledgeNotified, expoNotifiedStorePort } from "./src/schedule/notified-store";
+import { clearStaleLocksOnStart } from "./src/schedule/lock";
+import { expoLockPort } from "./src/schedule/lock-port";
+import {
+  expoAutoDiarySettingsPort,
+  loadAutoDiarySettings,
+  type AutoDiarySettings,
+} from "./src/schedule/settings";
+import { applyTargetHour, applyToggleOff, applyToggleOn } from "./src/schedule/settings-effects";
+import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
 import {
   expoGeocodingSettingPort,
   loadGeocodingSetting,
@@ -77,7 +96,78 @@ export default function App() {
 function AppFrame() {
   const environment = currentEnvironment();
   const showsDiagnostics = showsOnScreen(environment);
-  const [tab, setTab] = useState<"diary" | "characters" | "developer">("diary");
+  const [tab, setTab] = useState<"diary" | "characters" | "settings" | "developer">("diary");
+
+  /**
+   * 020 — 알림 라우팅.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * **웜**: `onResponse`가 탭 응답을 준다. **콜드**: 마운트 시 `lastResponse()`를
+   * 1회 await한다(앱을 연 마지막 알림). 둘 다 `routeFromNotification`(순수)을
+   * 거쳐 `pendingRoute`가 된다 — `DiaryHomeScreen`이 `initialDay`로 받아
+   * 목록을 건너뛰고 상세를 첫 화면으로 만든다(FR-006, SC-004).
+   *
+   * `ensureChannel()`도 여기서 1회 — 채널이 없으면 안드로이드에서 권한
+   * 프롬프트도 안 뜨고 알림도 안 보인다(notification.md N3).
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const notificationPort = useMemo(() => expoNotificationPort(), []);
+  const [pendingRoute, setPendingRoute] = useState<{ day: DayDate } | null>(null);
+
+  useEffect(() => {
+    // 전역 백그라운드 태스크를 등록한다(019 research §1 — 전역 스코프 요건).
+    ensureAutoDiaryTaskDefined();
+
+    // 020 — 앱이 방금 시작했으므로 이전 프로세스가 남긴 죽은 잠금을 청소한다
+    // (generation-lock.md L7 보강). `force-stop`·크래시로 `pipeline.run()`의
+    // `finally { release() }`가 안 돌면 잠금 파일이 5분까지 살아 화면 생성이
+    // 전부 `already-running`으로 막힌다. `clearStaleLocksOnStart`가 "screen"은
+    // 무조건, "background"는 stale일 때만 지운다(진행 중인 백그라운드 생성을
+    // 방해하지 않기 위해).
+    void clearStaleLocksOnStart(expoLockPort(), Date.now()).catch(() => {});
+
+    void notificationPort.ensureChannel().catch(() => {});
+
+    // 포그라운드에서도 배너를 띄운다(research.md §1).
+    void import("expo-notifications")
+      .then((Notifications) => {
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowBanner: true,
+            shouldShowList: true,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          }),
+        });
+      })
+      .catch(() => {});
+
+    let alive = true;
+    void notificationPort
+      .lastResponse()
+      .then((r) => {
+        const route = routeFromNotification(r);
+        if (alive && route !== null) setPendingRoute(route);
+      })
+      .catch(() => {});
+
+    const unsubscribe = notificationPort.onResponse((r) => {
+      const route = routeFromNotification(r);
+      if (route !== null) {
+        setPendingRoute(route);
+        setTab("diary");
+      }
+    });
+
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, [notificationPort]);
+
+  const onAcknowledge = useCallback((day: DayDate) => {
+    void acknowledgeNotified(expoNotifiedStorePort(), day);
+  }, []);
 
   /**
    * ★ **008이 내려받기 상태를 여기로 올린다**(FR-013·014).
@@ -124,6 +214,13 @@ function AppFrame() {
           <Text style={tab === "characters" ? styles.tabOn : styles.tabOff}>캐릭터</Text>
         </Pressable>
         {/*
+          020 — 자동 생성 설정 탭. **개발자 탭과 달리 prod에도 있다**(FR-001 —
+          엔드유저가 목표 시각을 고르고 자동 생성을 켠다). 진단 게이트와 무관.
+        */}
+        <Pressable accessibilityRole="button" onPress={() => setTab("settings")} style={styles.tab}>
+          <Text style={tab === "settings" ? styles.tabOn : styles.tabOff}>설정</Text>
+        </Pressable>
+        {/*
           **개발자 탭은 진단과 같은 조건으로 존재 자체가 사라진다**(FR-024·SC-013을
           그대로 이어받는다). prod에서는 `showsDiagnostics`가 false이므로 이 자리에
           아무것도 그려지지 않는다 — 조건부로 숨기는 것이 아니라 탭이 없다.
@@ -140,7 +237,13 @@ function AppFrame() {
       </View>
 
       {tab === "diary" ? (
-        <DiarySection onGoToCharacters={() => setTab("characters")} />
+        <DiarySection
+          onGoToCharacters={() => setTab("characters")}
+          // 020 — 알림을 눌러 열렸으면 그 하루의 상세로 바로 간다(FR-006).
+          initialDay={pendingRoute?.day ?? null}
+          onDayOpened={() => setPendingRoute(null)}
+          onAcknowledge={onAcknowledge}
+        />
       ) : tab === "characters" ? (
         // 003의 목록은 스스로 스크롤하지 않는다 — 다섯 자리가 화면을 넘길 수 있으므로
         // 여기서 감싼다.
@@ -154,6 +257,9 @@ function AppFrame() {
             setRejection={setRejection}
           />
         </ScrollView>
+      ) : tab === "settings" ? (
+        // 020 — 자동 생성 설정(FR-001). prod에도 있는 사용자 화면.
+        <AutoDiarySection />
       ) : (
         // **개발자 탭도 진단과 같은 조건에서만 그려진다** — 탭이 없으면 이 갈래에
         // 닿을 수 없지만, `showsDiagnostics`가 false인데 `tab`이 남아 있는 경우를
@@ -176,7 +282,20 @@ function AppFrame() {
  * 거쳐 고른다. 조립이 실패하면 파이프라인을 넘기지 않고, 그러면 화면이 `build-error`로
  * 간다(FR-035a).
  */
-function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
+function DiarySection({
+  onGoToCharacters,
+  initialDay,
+  onDayOpened,
+  onAcknowledge,
+}: {
+  onGoToCharacters?: () => void;
+  /** 020 — 알림을 눌러 열렸으면 그 하루 (FR-006) */
+  initialDay?: DayDate | null;
+  /** 020 — 상세를 실제로 연 뒤 pendingRoute를 비운다 */
+  onDayOpened?: () => void;
+  /** 020 — 상세 진입 시 그 하루의 알림을 확인 처리 (FR-007 (2)) */
+  onAcknowledge?: (day: DayDate) => void;
+}) {
   const environment = currentEnvironment();
 
   // 화면이 다시 그려질 때마다 새로 만들지 않는다. 지연 import 하는 통로이므로
@@ -349,6 +468,14 @@ function DiarySection({ onGoToCharacters }: { onGoToCharacters?: () => void }) {
       onToggleGeocoding={(enabled) => void onToggleGeocoding(enabled)}
       // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
       onGoToCharacters={onGoToCharacters}
+      // 020 — 알림을 눌러 열렸으면 그 하루의 상세로 바로 간다(FR-006, SC-004).
+      initialDay={initialDay}
+      onAcknowledge={(day) => {
+        onAcknowledge?.(day);
+        // 알림 경로로 상세를 연 것이면 pendingRoute를 비운다 — 목록으로
+        // 돌아갔다가 다시 이 탭에 와도 상세로 튕기지 않게.
+        if (initialDay != null && day === initialDay) onDayOpened?.();
+      }}
     />
   );
 }
@@ -624,6 +751,102 @@ function ModelSection(props: ModelSectionProps) {
       visionBytes={visionBytes}
       onPrepareVision={() => void onPrepareVision()}
       onRemoveVision={() => void onRemoveVision()}
+    />
+  );
+}
+
+/**
+ * 자동 생성 설정을 조립한다 (020).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **화면은 판정하지 않는다** — `AutoDiarySettingsScreen`은 props와 콜백만
+ * 받는다. 부수 효과 순서(S6)는 여기가 지킨다:
+ *
+ *   토글 켬:  알림 권한 요청 → (최초면) 배터리 예외 1회 → save → register
+ *   토글 끔:  save → unregister
+ *   시각 변경: save → reschedule
+ *
+ * **`saveAutoDiarySettings`는 파일만 쓴다**(S6) — 007의 `saveSelection`이
+ * 파일만 쓰고 화면이 나머지를 하는 것과 같다. `batteryExceptionPrompted`가
+ * true가 되면 **다시는 자동으로 `requestException()`을 부르지 않는다**
+ * (FR-010 MUST NOT).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function AutoDiarySection() {
+  const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
+  const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
+  const batteryPort = useMemo(() => expoBatteryExceptionPort(), []);
+  const notificationPort = useMemo(() => expoNotificationPort(), []);
+
+  const [settings, setSettings] = useState<AutoDiarySettings | null>(null);
+  const [notificationDenied, setNotificationDenied] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void loadAutoDiarySettings(settingsPort).then((loaded) => {
+      if (alive) setSettings(loaded);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [settingsPort]);
+
+  // `enabled: true`인 채 마운트되면 태스크를 재등록한다(B5 — 재부팅 후
+  // 재등록). `register()`는 idempotent다.
+  useEffect(() => {
+    if (settings?.enabled === true) void backgroundPort.register().catch(() => {});
+  }, [settings?.enabled, backgroundPort]);
+
+  // S6 순서는 `settings-effects.ts`의 순수 조합 함수가 지킨다(기기 없이 검증).
+  const effectDeps = useMemo(
+    () => ({ settingsPort, backgroundPort, batteryPort, notificationPort }),
+    [settingsPort, backgroundPort, batteryPort, notificationPort],
+  );
+
+  const onToggleEnabled = useCallback(
+    async (enabled: boolean) => {
+      if (settings === null) return;
+      if (!enabled) {
+        setSettings(await applyToggleOff(settings, effectDeps));
+        return;
+      }
+      const { settings: next, notificationDenied: denied } = await applyToggleOn(
+        settings,
+        effectDeps,
+      );
+      setSettings(next);
+      setNotificationDenied(denied);
+    },
+    [settings, effectDeps],
+  );
+
+  const onChangeTargetHour = useCallback(
+    async (hour: number) => {
+      if (settings === null) return;
+      setSettings(await applyTargetHour(settings, hour, effectDeps));
+    },
+    [settings, effectDeps],
+  );
+
+  const onOpenBatterySettings = useCallback(() => {
+    void batteryPort.openSettingsList().catch(() => {});
+  }, [batteryPort]);
+
+  if (settings === null) {
+    return (
+      <View style={styles.placeholder}>
+        <Text style={styles.title}>설정을 읽는 중…</Text>
+      </View>
+    );
+  }
+
+  return (
+    <AutoDiarySettingsScreen
+      settings={settings}
+      onToggleEnabled={(enabled) => void onToggleEnabled(enabled)}
+      onChangeTargetHour={(hour) => void onChangeTargetHour(hour)}
+      onOpenBatterySettings={onOpenBatterySettings}
+      notificationDenied={notificationDenied}
     />
   );
 }

@@ -87,6 +87,67 @@ describe("첫 화면 (FR-018, S7)", () => {
   });
 });
 
+describe("020 — 알림을 눌러 열렸으면 상세로 바로 (FR-006, SC-004)", () => {
+  it("initialDay가 목록에 있고 읽혔으면 첫 화면이 detail이다 — 목록을 안 거친다", () => {
+    const entry = entryFor(DAY);
+    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
+      initialDay: DAY,
+      entry,
+    });
+
+    expect(screen.kind).toBe("detail");
+    if (screen.kind === "detail") {
+      expect(screen.day).toBe(DAY);
+      expect(screen.entry).toBe(entry);
+    }
+  });
+
+  it("initialDay가 목록에 없으면 조용히 목록으로 (원칙 V)", () => {
+    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
+      initialDay: "2020-01-01",
+      entry: entryFor("2020-01-01"),
+    });
+
+    expect(screen.kind).toBe("list");
+  });
+
+  it("initialDay는 있으나 entry가 null이면(못 읽음) 목록으로", () => {
+    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
+      initialDay: DAY,
+      entry: null,
+    });
+
+    expect(screen.kind).toBe("list");
+  });
+
+  it("initialDay가 unreadable 항목이면 목록으로 (빈 일기를 지어내지 않는다)", () => {
+    const screen = initialScreen({ ok: true, environment: "prod" }, [unreadable(DAY)], {
+      initialDay: DAY,
+      entry: entryFor(DAY),
+    });
+
+    expect(screen.kind).toBe("list");
+  });
+
+  it("initialDay가 null이면 기존대로 목록이다 (회귀 없음)", () => {
+    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
+      initialDay: null,
+    });
+
+    expect(screen.kind).toBe("list");
+  });
+
+  it("환경 실패면 initialDay가 있어도 build-error다", () => {
+    const screen = initialScreen(
+      { ok: false, reason: "missing", received: undefined },
+      [readable(DAY)],
+      { initialDay: DAY, entry: entryFor(DAY) },
+    );
+
+    expect(screen.kind).toBe("build-error");
+  });
+});
+
 describe("목록 → 상세 (FR-019, S3)", () => {
   it("읽을 수 있는 항목을 누르면 전문이 열린다", () => {
     const screen = toDetail(readable(DAY), entryFor());

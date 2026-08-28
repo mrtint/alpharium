@@ -17,9 +17,9 @@ import { join } from "node:path";
 import {
   checkEnvFile,
   checkMonologueFile,
+  checkScheduleFile,
   checkSeedFile,
   checkSourceFile,
-  checkSpikeFile,
   checkVisionFile,
   formatViolations,
   type Violation,
@@ -59,8 +59,9 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       violations.push(...checkVisionFile(child, contents));
       // 015 — 독백 문구 선택 자리. checkMonologueFile이 경로로 대상을 정한다.
       violations.push(...checkMonologueFile(child, contents));
-      // 019 — 백그라운드 검증 하네스. checkSpikeFile이 경로로 대상을 정한다.
-      violations.push(...checkSpikeFile(child, contents));
+      // 020 — 스케줄·알림·잠금의 순수 판정 자리. checkScheduleFile이 경로로
+      // 대상(src/schedule/)을 정한다. 019의 checkSpikeFile을 개명·재활용했다.
+      violations.push(...checkScheduleFile(child, contents));
     }
   }
 

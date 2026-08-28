@@ -26,11 +26,13 @@
 import type { DayDate } from "../config/day-boundary";
 import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
-import { createPipeline, type Pipeline } from "../diary/pipeline";
+import { createPipeline, type LockHandle, type Pipeline } from "../diary/pipeline";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
 import type { Character, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
+import { acquireLock as acquireLockRecord, releaseLock, type LockPort } from "../schedule/lock";
+import { expoLockPort } from "../schedule/lock-port";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
 import { expoGeocodingPort } from "../signals/geocoding-port";
@@ -81,6 +83,17 @@ export type AppPipelineResult =
         character: Character,
         vision: VisionSetting,
       ) => Promise<VisionOutcome>;
+      /**
+       * 이 파이프라인이 쓰는 일기 저장소 (020).
+       *
+       * 백그라운드 자동 생성(`src/schedule/task.ts`)이 "지금 어느 하루를
+       * 써야 하는가"를 판정하려면 이미 저장된 일기 날짜를 알아야 한다
+       * (contracts/background-generation.md B2-2). 파이프라인을 만드는
+       * 자리가 여기 하나뿐이므로(001~006이 세운 경계), store도 여기서
+       * 함께 내보낸다 — task.ts가 `fileStore()`를 따로 만들면 store를
+       * 만드는 자리가 둘이 된다.
+       */
+      store: DiaryStore;
     }
   | {
       ok: false;
@@ -91,6 +104,7 @@ export type AppPipelineResult =
       prepare?: undefined;
       release?: undefined;
       captionDay?: undefined;
+      store?: undefined;
     };
 
 /** 조립에 필요한 통로. 테스트가 기기 없이 갈아끼운다 */
@@ -100,6 +114,19 @@ export type WiringDeps = {
   isModelReady?: (character: Character) => Promise<boolean>;
   /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
   geocodingEnabled?: boolean;
+  /**
+   * 이 파이프라인을 누가 조립하는가 (020, contracts/generation-lock.md L5).
+   *
+   * `"screen"`이면 화면 수동 생성, `"background"`면 자동 생성 태스크.
+   * 이 값으로 owner-bound `acquireLock` 클로저를 만든다. 주지 않으면
+   * `"screen"`(기존 유일 호출자).
+   */
+  lockOwner?: "screen" | "background";
+  /**
+   * 경합 잠금 파일 통로 (020). 테스트가 기기 없이 갈아끼운다. 주지 않으면
+   * `expoLockPort()`.
+   */
+  lockPort?: LockPort;
 };
 
 /**
@@ -148,9 +175,24 @@ export function createAppPipeline(
     return { ok: false, reason: located.reason, detail: "추론 위치를 고르지 못했다" };
   }
 
+  const store = deps.store ?? deviceStore();
+
+  // 020 — 경합 잠금. owner를 여기서 bind한다(L5) — `PipelineInput`은
+  // 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다. `Date.now()`를
+  // 여기서 부르는 것은 허용된다(L5) — 잠금 취득 시각은 테스트가 경계값을
+  // 볼 필요 없는 벽시계 사실이다. 순수 `decideAcquire`는 `nowMs`를 인자로
+  // 받으므로 그쪽이 테스트 대상이다.
+  const owner = deps.lockOwner ?? "screen";
+  const lockPort = deps.lockPort ?? expoLockPort();
+  const acquireLock = async (): Promise<LockHandle | null> => {
+    const record = await acquireLockRecord(lockPort, owner, Date.now());
+    if (record === null) return null;
+    return { release: () => releaseLock(lockPort, record) };
+  };
+
   const pipeline = createPipeline({
     backend: selection.backend,
-    store: deps.store ?? deviceStore(),
+    store,
     loadSignals: deps.loadSignals ?? deviceSignals,
     isModelReady: deps.isModelReady,
     // 017 — 설정이 켜져 있을 때만 지오코딩 포트를 만든다. `expoGeocodingPort()`가
@@ -158,6 +200,7 @@ export function createAppPipeline(
     // `expoModelPorts()`와 같은 판단).
     geocoding: expoGeocodingPort(),
     geocodingEnabled: deps.geocodingEnabled,
+    acquireLock,
   });
 
   // **backend를 버리지 않는다**(007 §3). 006까지 여기서 버려서 화면이 끊을 길이 없었다.
@@ -169,5 +212,14 @@ export function createAppPipeline(
   const release = selection.backend.release?.bind(selection.backend);
   const captionDay = selection.backend.captionDay?.bind(selection.backend);
 
-  return { ok: true, pipeline, location: located.location, stop, prepare, release, captionDay };
+  return {
+    ok: true,
+    pipeline,
+    location: located.location,
+    stop,
+    prepare,
+    release,
+    captionDay,
+    store,
+  };
 }

@@ -380,6 +380,48 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   사항": 배터리 예외 요청 온보딩 UX, E1 잠금 설계, narrative 완주
   확인, 좌표 권한 회수 시나리오 전부 미결).
 
+### 020 — 시간대 지정 자동 일기 작성과 완성 알림 (2026-08-28)
+
+019 스파이크의 결론("조건부 가능")을 제품 기능으로 만들었다. **019
+하네스(`src/spike/`)를 제거하고 제품 경로로 대체했다** —
+`checkSpikeFile`을 `checkScheduleFile`로 개명·재활용해 `src/schedule/`
+경계를 지킨다.
+
+- **스케줄·알림·잠금의 순수 판정은 `src/schedule/`에, 기기 통로는
+  `*-port.ts`에.** `decision.ts`(지금 돌릴까 + 어느 하루를),
+  `retry.ts`(놓친 하루 선정 — `selectableDays`만 보므로 009 범위가
+  자동으로 걸린다), `notify.ts`(보낼까/어떻게), `lock.ts`(경합 판정),
+  `settings-effects.ts`(토글 부수 효과 S6 순서). 전부 `now`/`nowMs`를
+  인자로 받고 `new Date()`를 안 부른다.
+- **경합은 `pipeline.run()`의 옵셔널 `acquireLock?` + 파일 잠금 + stale
+  5분.** `running: Set<DayDate>`는 인스턴스 로컬이라 화면 ↔ 백그라운드
+  태스크(다른 파이프라인 인스턴스)를 못 막는다. `wiring.ts`가
+  owner-bound(`"screen"`/`"background"`) `acquireLock` 클로저를 만들어
+  주입하고, `pipeline.ts`는 `isDayWritable` → `running.has` **다음**에
+  취득을 시도한다. 취득 실패는 `already-running` stage로 합류(화면
+  문구 "이미 쓰고 있다" 재사용, 태스크는 `"skipped"`). `finally`에서
+  `release`. `pipeline.ts`는 여전히 `expo-file-system`을 import하지
+  않는다 — 파일 통로는 주입.
+- **`STALE_LOCK_MS = 5분`의 근거**: 019 실측 최장 완주 2분 27초의 2배 +
+  여유. **narrative(exaone) 백그라운드 완주가 4분을 넘으면 이 상수를
+  재검토**한다(T053 게이트) — 019는 quiet만 백그라운드 검증했다.
+- **자동 생성 설정은 "설정" 탭에 있다** — 개발자 탭과 달리 **prod에도
+  있다**(FR-001, 엔드유저 화면). 목표 시각은 시 단위(0–23)만, 분은
+  두지 않는다(근사치, FR-002). 화면·소스 어디에도 "정각"·"매일 7시"
+  같은 정밀도 암시 문구를 두지 않는다(계약 테스트가 소스에서 검사).
+- **`notified.json`은 `DiaryEntry`와 분리**(`preferences/`, `diary/`
+  밖). `pruneNotified`는 **날짜 문자열 비교만**(값·시간 안 봄) —
+  `task.ts`가 알림 발송 직후 `day - 30일`을 `keepFrom`으로 호출한다.
+- **알림 라우팅**: `App.tsx`가 웜(`onResponse`)·콜드
+  (`getLastNotificationResponseAsync`)를 순수 `routeFromNotification`으로
+  통일 → `initialScreen(resolution, items, { initialDay, entry })`가
+  목록을 건너뛰고 상세를 첫 화면으로 만든다(FR-006, SC-004). 상세
+  진입 시 `acknowledgeNotified`로 확인 처리(FR-007 (2)).
+- 기기 없는 테스트 1752개 전부 통과, lint·헌법 검사·prettier 클린.
+- **실기기 검증에서 실제로 관측된 값**: (T053~T055 수행 후 여기 채운다
+  — SC-003 배터리 예외 라운드 간격, narrative 백그라운드 완주 시간,
+  배터리 인텐트가 실제 도착한 제조사 설정 화면, release R8 통과 여부.)
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

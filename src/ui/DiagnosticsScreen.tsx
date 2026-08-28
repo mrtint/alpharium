@@ -7,7 +7,7 @@ import { CHARACTERS, type Character } from "../diary/types";
 import { collectReport } from "../diagnostics/report";
 import type { DiagnosticReport } from "../diagnostics/types";
 import { expoPhotoPort } from "../signals/expo-port";
-import { DiagnosticsBackgroundPanel } from "../spike/DiagnosticsBackgroundPanel";
+import { AutoDiaryTriggerButton } from "./AutoDiaryTriggerButton";
 import { GenerationProbe } from "./GenerationProbe";
 import { PermissionPanel } from "./PermissionPanel";
 import { SignalProbe } from "./SignalProbe";
@@ -119,6 +119,10 @@ export function DiagnosticsScreen() {
         <Text style={styles.failure}>생성 준비 실패: {generation.detail}</Text>
       )}
 
+      {/* 020 — "지금 자동 생성 트리거"(quickstart.md §4). 경합 재현·백그라운드
+          완주 시간 측정용. `runAutoDiaryTask()`를 그대로 부른다(로직 재사용). */}
+      <AutoDiaryTriggerButton />
+
       {report.failures.length > 0 && (
         <View style={styles.failures}>
           <Text style={styles.sectionTitle}>실패</Text>
@@ -129,14 +133,6 @@ export function DiagnosticsScreen() {
           ))}
         </View>
       )}
-
-      {/*
-        019 — 백그라운드 자동 일기 생성 기술 검증 하네스. 이 컴포넌트가 속한
-        DiagnosticsScreen 자체가 이미 showsOnScreen()(local·dev 전용) 게이트
-        안에서만 렌더링되므로 별도 조건을 추가하지 않는다 — 검증 끝나면
-        src/spike/ 전체와 함께 이 한 줄만 지우면 된다.
-      */}
-      <DiagnosticsBackgroundPanel />
     </ScrollView>
   );
 }

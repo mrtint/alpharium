@@ -1,23 +1,47 @@
 # 다음 세션 시작 프롬프트
 
-016(쓰는 중 독백 확장) 완료·머지, 헌법 1.2.0 개정(소요 시간 사후 기록 허용)까지 끝났다.
-다음은 "일기 본문 화면 개선" 기능이다 — 아직 spec도 안 만들었다.
+아래를 그대로 새 세션에 붙여넣으세요.
 
-새 브랜치(예: 017-diary-body-screen)를 파고 `/speckit-specify`로 시작해라. 요구사항은 네 가지:
+---
 
-1. **사진 표시** — 일기에 쓰인 사진을 본문에 보여준다.
-2. **장소명** — 좌표를 사람이 읽는 장소명으로 바꿔 보여준다(`expo-location`의
-   `reverseGeocodeAsync` 후보로 검토됐음).
-3. **제목** — 014에서 만든 title 필드를 화면에 표시(아직 목록/상세 화면 반영 여부 확인 필요).
-4. **본문 하단부 — 소요 시간 기록** (헌법 1.2.0로 방금 허용됨): "이 일기가 본 것" 절에
-   VLM(사진 분석)·LLM(글쓰기) 소요 시간을 사후 1회성으로 기록한다. 사용자가 준 문구 예시:
-   > "금동이는 이렇게 일기를 작성했어요. 사진을 x장을 분석하는데 x분 xx초가 걸렸어요.
-   > 일기를 작성하는데 x분 xx초가 걸렸어요."
-   - 조사(은/는)는 016에서 만든 `particleFor()`(현재 미사용, "이"/"가"만 지원)로는
-     처리 못 한다 — 은/는 쌍을 추가하거나 별도 함수가 필요.
-   - 헌법 1.2.0 경계 준수: 진행 중 노출 금지, 여러 실행 비교/평균/순위 금지, 모델
-     식별자와 함께 노출 금지, 네이티브 `timings` 원본 노출 금지 — 상위 계층이 직접
-     벽시계로 잰 경과 시간만 사용.
+020 스펙(시간대 지정 자동 일기 작성과 완성 알림)을 이어서 진행해줘.
 
-진행 순서는 015·016과 동일한 관례: `/speckit-specify` → `/speckit-clarify` → `/speckit-plan`
-→ `/speckit-tasks` → `/speckit-analyze` → `/speckit-implement`, 각 단계 사용자 확인 거침.
+**먼저 할 것**: `020-scheduled-diary-notification` 브랜치로 체크아웃하고
+(`git checkout 020-scheduled-diary-notification`), `.specify/feature.json`이
+`specs/020-scheduled-diary-notification`을 가리키도록 바로잡아줘 — main
+브랜치에는 아직 020이 반영되지 않아서 그 파일이 `019`로 남아 있을 수
+있어. spec.md는 이미 이 브랜치에 커밋돼 있으니 잃어버린 건 없어, 다음
+speckit 명령이 올바른 디렉터리를 보게만 하면 돼.
+
+**그다음 진행 순서**: `/speckit-clarify` → `/speckit-plan` →
+`/speckit-tasks` → (필요하면 `/speckit-analyze`) → `/speckit-implement`
+순서로 계속 진행해줘. 각 단계 결과는 한글로 보고해줘.
+
+**배경(이전 세션에서 이미 정한 것 — 다시 묻지 말고 그대로 전제할 것)**:
+
+- 이 기능은 019(백그라운드 자동 일기 생성 기술 검증) 스파이크의 실측
+  결론 위에 짓는 첫 실제 배포 기능이다. 019는 스파이크였고 이번(020)은
+  스파이크가 아니라 실제 기능이다.
+- 019 결론: 화면 꺼짐·잠금 상태에서 WorkManager(`expo-background-task`)
+  기반 백그라운드 생성은 실제로 완주한다. 다만 정확한 시각을 보장하지
+  않는다 — 배터리 최적화 기본값에서는 15분 등록도 하루 1~2회로
+  억제됐고(최대 19시간 33분 지연 실측), 배터리 최적화 예외를 주면
+  10~32분 간격으로 좁혀진다(`specs/019-background-diary-feasibility/
+  findings.md` 참고).
+- alarm 계열(정확 시각 예약 API)은 019에서 의도적으로 배제했고, 020도
+  이 결정을 유지한다 — "대략적인 시각 선택"이라는 요청 자체가 이미
+  근사치를 전제하기 때문이다(spec.md Assumptions에 명시됨).
+- 020 spec.md는 이미 작성 완료됐고 체크리스트 전 항목 통과, 명확화
+  질문([NEEDS CLARIFICATION]) 없이 끝났다 — User Story 1(시각 선택,
+  P1) · User Story 2(완료 알림, P1) · User Story 3(화면 수동 생성과의
+  경합 방지, P2), FR-001~012, SC-001~006.
+- SC-003(배터리 예외 적용 시 1시간 이내 실행 비율)은 계획 단계에서
+  019의 실측 데이터(표본 2회, 10~32분)를 근거로 구체적 수치를 다듬을
+  필요가 있다고 체크리스트 Notes에 남겨뒀다 — `/speckit-clarify`에서
+  다룰 후보.
+
+**참고 파일**: `specs/020-scheduled-diary-notification/spec.md`,
+`specs/020-scheduled-diary-notification/checklists/requirements.md`,
+`specs/019-background-diary-feasibility/findings.md`,
+`specs/019-background-diary-feasibility/research.md`(§7~9, minimumInterval과
+공식 문서 근거).

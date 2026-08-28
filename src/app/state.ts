@@ -211,12 +211,34 @@ export function writePromptFor(
  * **환경을 모르면 일기 기능을 막는다**(FR-035a). 저장된 일기가 있어도 마찬가지다 —
  * 추론 위치를 고를 수 없으므로 새 일기를 쓸 수 없고, 그 상태를 감추면 사용자는
  * 빈 화면 앞에서 원인을 짐작하게 된다.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **020 — 알림을 눌러 열렸으면 목록을 건너뛰고 그 하루의 상세로 간다**(FR-006,
+ * SC-004). `opts.initialDay`가 그 하루이고, `opts.entry`는 화면이 미리 읽은
+ * 일기다(이 함수는 순수하므로 스스로 읽지 않는다 — 006의 `initialScreen`이
+ * `EnvironmentResolution`만 받는 성질을 지킨다).
+ *
+ * `initialDay`가 목록에 없거나(지워졌거나) 읽히지 않으면 조용히 목록으로
+ * 떨어진다 — `routeFromNotification`이 형식 불명 응답에 `null`을 주는 것과
+ * 같은 원칙(모르면 정상 시작).
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 export function initialScreen(
   resolution: EnvironmentResolution,
   items: DiaryListItem[],
+  opts: { initialDay?: DayDate | null; entry?: DiaryEntry | null } = {},
 ): AppScreen {
   if (!resolution.ok) return { kind: "build-error" };
+
+  const { initialDay, entry } = opts;
+  if (initialDay != null) {
+    const item = items.find((i) => i.day === initialDay);
+    if (item !== undefined && item.readable && entry != null) {
+      return { kind: "detail", day: initialDay, entry };
+    }
+    // 목록에 없거나 못 읽으면 목록으로 — 알림 라우팅이 조용히 실패한다(원칙 V).
+  }
+
   return { kind: "list", items };
 }
 
