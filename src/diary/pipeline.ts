@@ -137,7 +137,30 @@ export type PipelineDeps = {
   };
   /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
   geocodingEnabled?: boolean;
+  /**
+   * 프로세스 경계 경합 잠금 (020, contracts/generation-lock.md L5).
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **`running: Set<DayDate>`는 인스턴스 로컬이다.** 화면과 백그라운드
+   * 태스크는 각자 `createAppPipeline()`을 불러 다른 파이프라인 인스턴스를
+   * 만들므로, 둘이 동시에 살면 `running` 방어가 서로를 못 본다(L1). 이
+   * 통로가 주어지면 `run()`이 `day-writable` 판정 다음, instance-local
+   * `running` 판정과 함께 파일 잠금 취득을 시도한다. 취득 실패 시
+   * `{ ok: false, stage: "already-running" }`로 즉시 반환한다.
+   *
+   * **옵셔널 확장이다**(003의 `isModelReady?`, 017의 `geocoding?`과 같은
+   * 방식) — 주지 않으면 002~019 동작을 그대로 유지한다(회귀 없음).
+   *
+   * `owner`는 `run()` 호출자가 정하지 않는다 — `wiring.ts`가 화면/태스크
+   * 경로별로 owner-bound 클로저를 만들어 주입한다(`PipelineInput`은
+   * 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다).
+   * ─────────────────────────────────────────────────────────────────────────
+   */
+  acquireLock?: () => Promise<LockHandle | null>;
 };
+
+/** 취득한 잠금을 놓는 통로. `run()`이 `finally`에서 부른다. */
+export type LockHandle = { release: () => Promise<void> };
 
 export interface Pipeline {
   run(
@@ -177,8 +200,20 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
       }
 
       // 2. 이미 생성 중인가? — 사용자가 여러 번 눌러도 한 번만 돈다.
+      //    (instance-local. 프로세스를 가로지르는 경합은 3에서 막는다.)
       if (running.has(input.day)) {
         return stop("already-running", `${input.day}는 이미 생성 중이다`);
+      }
+
+      // 3. 프로세스 경계 잠금 (020, L5). 주어졌을 때만 시도한다 — 주지
+      //    않으면 002~019 동작 그대로(회귀 없음). 다른 파이프라인
+      //    인스턴스(화면 ↔ 백그라운드 태스크)가 이미 잡고 있으면 null.
+      let handle: LockHandle | null = null;
+      if (deps.acquireLock !== undefined) {
+        handle = await deps.acquireLock();
+        if (handle === null) {
+          return stop("already-running", `${input.day}는 다른 곳에서 생성 중이다`);
+        }
       }
 
       running.add(input.day);
@@ -187,6 +222,8 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
       } finally {
         // 성공·실패와 무관하게 빠진다. 빠지지 않으면 실패한 하루를 영영 다시 시도할 수 없다.
         running.delete(input.day);
+        // 잠금도 반드시 놓는다 — 안 놓으면 다음 실행이 stale 타임아웃(5분)까지 막힌다.
+        await handle?.release().catch(() => {});
       }
     },
   };

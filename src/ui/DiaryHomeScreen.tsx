@@ -120,6 +120,22 @@ export type DiaryHomeScreenProps = {
   now?: () => Date;
   /** 캐릭터 준비 화면으로 가는 길 (FR-028). 없으면 안내만 하고 길은 주지 않는다 */
   onGoToCharacters?: () => void;
+  /**
+   * 알림을 눌러 열렸으면 그 하루 (020, FR-006·SC-004).
+   *
+   * 주어지면 목록을 건너뛰고 그 하루의 상세를 첫 화면으로 만든다 — 탭 1회로
+   * 상세에 도달한다. 목록에 없거나 못 읽으면 조용히 목록으로 떨어진다
+   * (`initialScreen`이 판정, 원칙 V).
+   */
+  initialDay?: DayDate | null;
+  /**
+   * 그 하루의 일기를 사용자가 확인했음을 기록한다 (020, FR-007 (2)).
+   *
+   * 상세에 진입하면(알림 경로든 목록 탭이든) 그 날짜의 `notified` 엔트리를
+   * `acknowledged: true`로 만들어, 이후 재시도 재생성에도 알림이 뜨지 않게
+   * 한다. **옵셔널이다** — 배선이 없어도 앱은 동작한다.
+   */
+  onAcknowledge?: (day: DayDate) => void;
 };
 
 export function DiaryHomeScreen({
@@ -139,6 +155,8 @@ export function DiaryHomeScreen({
   captionDay,
   now = () => new Date(),
   onGoToCharacters,
+  initialDay,
+  onAcknowledge,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -180,15 +198,28 @@ export function DiaryHomeScreen({
   }, [store]);
 
   // 화면이 뜬 뒤 한 번 읽는다. 언마운트된 뒤에는 반영하지 않는다.
+  //
+  // 020 — `initialDay`가 있으면(알림을 눌러 열렸으면) 그 하루의 일기를 함께
+  // 읽어 `initialScreen`에 넘긴다. `initialScreen`이 목록에 그 하루가 있고
+  // 읽혔을 때만 상세를 첫 화면으로 만든다(FR-006). 상세로 갔으면
+  // `onAcknowledge`로 확인 처리한다(FR-007 (2)).
   useEffect(() => {
     let alive = true;
-    void refresh().then((items) => {
-      if (alive) setScreen(initialScreen(resolution, items));
-    });
+    void (async () => {
+      const items = await refresh();
+      const entry =
+        initialDay != null && items.some((i) => i.day === initialDay && i.readable)
+          ? await store.load(initialDay).catch(() => null)
+          : null;
+      if (!alive) return;
+      const next = initialScreen(resolution, items, { initialDay, entry });
+      setScreen(next);
+      if (next.kind === "detail") onAcknowledge?.(next.day);
+    })();
     return () => {
       alive = false;
     };
-  }, [refresh, resolution]);
+  }, [refresh, resolution, initialDay, store, onAcknowledge]);
 
   /**
    * 앱이 앞을 벗어나면 끊는다 (005 FR-014b) / 준비를 놓아준다 (018 FR-008).
@@ -272,9 +303,12 @@ export function DiaryHomeScreen({
     async (item: DiaryListItem) => {
       // **읽지 못하면 빈 일기를 지어내지 않는다**(FR-017a). 판단은 state.ts가 한다.
       const entry = item.readable ? await store.load(item.day).catch(() => null) : null;
-      setScreen(toDetail(item, entry));
+      const next = toDetail(item, entry);
+      setScreen(next);
+      // 020 — 상세를 실제로 열었으면 그 하루의 알림을 확인 처리한다(FR-007 (2)).
+      if (next.kind === "detail") onAcknowledge?.(next.day);
     },
-    [store],
+    [store, onAcknowledge],
   );
 
   const backToList = useCallback(async () => {

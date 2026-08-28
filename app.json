@@ -48,6 +48,7 @@
           "keyAlias": "alpharium"
         }
       ],
+      "./plugins/with-battery-exception",
       [
         "expo-media-library",
         {
