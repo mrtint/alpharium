@@ -1,6 +1,6 @@
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { resolveSelection } from "./src/app/selection";
@@ -23,7 +23,15 @@ import {
   type AutoDiarySettings,
 } from "./src/schedule/settings";
 import { applyTargetHour, applyToggleOff, applyToggleOn } from "./src/schedule/settings-effects";
+import { expoPhotoPort } from "./src/signals/expo-port";
+import { loadOnboardingFlag, saveOnboardingFlag, type OnboardingFlag } from "./src/onboarding/flag";
+import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
+import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
+import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
+import { PERMISSION_REQUIREMENTS } from "./src/onboarding/requirements";
 import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
+import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
+import { PermissionsSection } from "./src/ui/PermissionsSection";
 import {
   expoGeocodingSettingPort,
   loadGeocodingSetting,
@@ -198,6 +206,110 @@ function AppFrame() {
   const [progress, setProgress] = useState<DownloadProgress | null>(null);
   const [rejection, setRejection] = useState<DownloadRejection | null>(null);
 
+  /**
+   * 021 — 통합 권한 온보딩 진입 게이트.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * `onboarding.json`을 읽어 `completed !== true`이면 탭 UI 대신
+   * `OnboardingScreen`만 그린다(FR-005). 006이 세운 "화면이 둘뿐이므로 상태
+   * 하나로 가른다"와 같은 패턴 — 온보딩은 세 번째 최상위 상태다.
+   *
+   * `forceOnboarding`은 설정 "권한" 섹션의 [온보딩 다시 하기]가 켠다 — `completed`는
+   * 그대로 두고 화면만 다시 보여준다(FR-019).
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const onboardingFlagPort = useMemo(() => expoOnboardingFlagPort(), []);
+  const [onboardingFlag, setOnboardingFlag] = useState<OnboardingFlag | null>(null);
+  const [forceOnboarding, setForceOnboarding] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    void loadOnboardingFlag(onboardingFlagPort).then((flag) => {
+      if (alive) setOnboardingFlag(flag);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [onboardingFlagPort]);
+
+  /** 온보딩·설정 "권한" 섹션이 공유하는 통로 묶음. `expo-*`는 여기서만 만든다. */
+  const onboardingPorts: OnboardingPorts = useMemo(
+    () => ({
+      photo: expoPhotoPort(),
+      notification: expoNotificationPort(),
+      battery: expoBatteryExceptionPort(),
+      location: expoLocationPermissionPort(),
+      osSettings: expoOsSettingsPort(),
+    }),
+    [],
+  );
+
+  const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
+
+  /**
+   * 021 — 거부된 권한으로 제한되는 기능의 정직한 안내 (FR-014, SC-004).
+   *
+   * 사진·위치 권한 상태를 읽어 `PERMISSION_REQUIREMENTS[...].ifDenied`를 모은다.
+   * 문구 정의는 `requirements.ts` 한 곳뿐 — 화면은 계산하지 않는다. 포그라운드
+   * 복귀 시 다시 읽는다.
+   */
+  const [deniedNotices, setDeniedNotices] = useState<readonly string[]>([]);
+  useEffect(() => {
+    let live = true;
+    async function compute() {
+      const [photo, photoLoc] = await Promise.all([
+        onboardingPorts.photo.photoPermission().catch(() => "unknown" as const),
+        onboardingPorts.photo.locationPermission().catch(() => "unknown" as const),
+      ]);
+      const notices: string[] = [];
+      const isDenied = (s: string) => s === "denied" || s === "blocked";
+      const req = (key: string) => PERMISSION_REQUIREMENTS.find((r) => r.key === key);
+      if (isDenied(photo)) notices.push(req("photos")?.ifDenied ?? "");
+      const locReq = req("location");
+      if (isDenied(photoLoc) || (locReq?.platforms.includes(platform) && isDenied(photoLoc))) {
+        notices.push(req("photo-location")?.ifDenied ?? "");
+      }
+      if (live) setDeniedNotices(notices.filter(Boolean));
+    }
+    void compute();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void compute();
+    });
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, [onboardingPorts, platform]);
+
+  const onOnboardingComplete = useCallback(
+    (flag: OnboardingFlag) => {
+      setOnboardingFlag(flag);
+      setForceOnboarding(false);
+      void saveOnboardingFlag(onboardingFlagPort, flag).catch(() => {});
+    },
+    [onboardingFlagPort],
+  );
+
+  // 플래그를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
+  if (onboardingFlag === null) {
+    return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
+  }
+
+  if (onboardingFlag.completed !== true || forceOnboarding) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <OnboardingScreen
+          platform={platform}
+          requirements={PERMISSION_REQUIREMENTS}
+          flag={onboardingFlag}
+          ports={onboardingPorts}
+          onComplete={onOnboardingComplete}
+        />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
   return (
     // `edges`를 적어 둔다 — 기본값은 네 변 전부이며, 무엇을 피하는지가 코드에 보이는
     // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
@@ -243,6 +355,8 @@ function AppFrame() {
           initialDay={pendingRoute?.day ?? null}
           onDayOpened={() => setPendingRoute(null)}
           onAcknowledge={onAcknowledge}
+          // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014).
+          deniedNotices={deniedNotices}
         />
       ) : tab === "characters" ? (
         // 003의 목록은 스스로 스크롤하지 않는다 — 다섯 자리가 화면을 넘길 수 있으므로
@@ -258,8 +372,12 @@ function AppFrame() {
           />
         </ScrollView>
       ) : tab === "settings" ? (
-        // 020 — 자동 생성 설정(FR-001). prod에도 있는 사용자 화면.
-        <AutoDiarySection />
+        // 020 — 자동 생성 설정(FR-001). 021 — "권한" 섹션도 여기(FR-017~020).
+        <AutoDiarySection
+          platform={platform}
+          onboardingPorts={onboardingPorts}
+          onRestartOnboarding={() => setForceOnboarding(true)}
+        />
       ) : (
         // **개발자 탭도 진단과 같은 조건에서만 그려진다** — 탭이 없으면 이 갈래에
         // 닿을 수 없지만, `showsDiagnostics`가 false인데 `tab`이 남아 있는 경우를
@@ -287,6 +405,7 @@ function DiarySection({
   initialDay,
   onDayOpened,
   onAcknowledge,
+  deniedNotices,
 }: {
   onGoToCharacters?: () => void;
   /** 020 — 알림을 눌러 열렸으면 그 하루 (FR-006) */
@@ -295,6 +414,8 @@ function DiarySection({
   onDayOpened?: () => void;
   /** 020 — 상세 진입 시 그 하루의 알림을 확인 처리 (FR-007 (2)) */
   onAcknowledge?: (day: DayDate) => void;
+  /** 021 — 거부된 권한 안내 (FR-014). 부모가 계산 */
+  deniedNotices?: readonly string[];
 }) {
   const environment = currentEnvironment();
 
@@ -466,6 +587,8 @@ function DiarySection({
       // 꺼짐으로 만들어진다(011의 vision과 같은 자리).
       geocodingEnabled={geocodingEnabled}
       onToggleGeocoding={(enabled) => void onToggleGeocoding(enabled)}
+      // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014, SC-004).
+      deniedNotices={deniedNotices}
       // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
       onGoToCharacters={onGoToCharacters}
       // 020 — 알림을 눌러 열렸으면 그 하루의 상세로 바로 간다(FR-006, SC-004).
@@ -756,26 +879,32 @@ function ModelSection(props: ModelSectionProps) {
 }
 
 /**
- * 자동 생성 설정을 조립한다 (020).
+ * 자동 생성 설정을 조립한다 (020) + 권한 섹션 (021).
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **화면은 판정하지 않는다** — `AutoDiarySettingsScreen`은 props와 콜백만
  * 받는다. 부수 효과 순서(S6)는 여기가 지킨다:
  *
- *   토글 켬:  알림 권한 요청 → (최초면) 배터리 예외 1회 → save → register
+ *   토글 켬:  알림 권한 요청 → save → register
  *   토글 끔:  save → unregister
  *   시각 변경: save → reschedule
  *
- * **`saveAutoDiarySettings`는 파일만 쓴다**(S6) — 007의 `saveSelection`이
- * 파일만 쓰고 화면이 나머지를 하는 것과 같다. `batteryExceptionPrompted`가
- * true가 되면 **다시는 자동으로 `requestException()`을 부르지 않는다**
- * (FR-010 MUST NOT).
+ * **배터리 예외 요청은 021이 걷어냈다** — 자동 생성 토글은 더 이상 배터리
+ * 인텐트를 띄우지 않는다(FR-010). 배터리 안내는 아래 `PermissionsSection`의
+ * 상시 링크와 통합 온보딩이 맡는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-function AutoDiarySection() {
+function AutoDiarySection({
+  platform,
+  onboardingPorts,
+  onRestartOnboarding,
+}: {
+  platform: "android" | "ios";
+  onboardingPorts: OnboardingPorts;
+  onRestartOnboarding: () => void;
+}) {
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
-  const batteryPort = useMemo(() => expoBatteryExceptionPort(), []);
   const notificationPort = useMemo(() => expoNotificationPort(), []);
 
   const [settings, setSettings] = useState<AutoDiarySettings | null>(null);
@@ -799,8 +928,8 @@ function AutoDiarySection() {
 
   // S6 순서는 `settings-effects.ts`의 순수 조합 함수가 지킨다(기기 없이 검증).
   const effectDeps = useMemo(
-    () => ({ settingsPort, backgroundPort, batteryPort, notificationPort }),
-    [settingsPort, backgroundPort, batteryPort, notificationPort],
+    () => ({ settingsPort, backgroundPort, notificationPort }),
+    [settingsPort, backgroundPort, notificationPort],
   );
 
   const onToggleEnabled = useCallback(
@@ -829,8 +958,8 @@ function AutoDiarySection() {
   );
 
   const onOpenBatterySettings = useCallback(() => {
-    void batteryPort.openSettingsList().catch(() => {});
-  }, [batteryPort]);
+    void onboardingPorts.battery.openSettingsList().catch(() => {});
+  }, [onboardingPorts]);
 
   if (settings === null) {
     return (
@@ -841,13 +970,22 @@ function AutoDiarySection() {
   }
 
   return (
-    <AutoDiarySettingsScreen
-      settings={settings}
-      onToggleEnabled={(enabled) => void onToggleEnabled(enabled)}
-      onChangeTargetHour={(hour) => void onChangeTargetHour(hour)}
-      onOpenBatterySettings={onOpenBatterySettings}
-      notificationDenied={notificationDenied}
-    />
+    <ScrollView>
+      <AutoDiarySettingsScreen
+        settings={settings}
+        onToggleEnabled={(enabled) => void onToggleEnabled(enabled)}
+        onChangeTargetHour={(hour) => void onChangeTargetHour(hour)}
+        onOpenBatterySettings={onOpenBatterySettings}
+        notificationDenied={notificationDenied}
+      />
+      {/* 021 — 권한 상태·재요청·온보딩 재실행 (FR-017~020). prod에도 있다. */}
+      <PermissionsSection
+        platform={platform}
+        requirements={PERMISSION_REQUIREMENTS}
+        ports={onboardingPorts}
+        onRestartOnboarding={onRestartOnboarding}
+      />
+    </ScrollView>
   );
 }
 

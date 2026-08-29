@@ -90,6 +90,8 @@ export type DiaryHomeScreenProps = {
   onToggleGeocoding?: (enabled: boolean) => void;
   /** 지금 장소명 설정. **기본값은 꺼짐이다**(FR-004) */
   geocodingEnabled?: boolean;
+  /** 거부된 권한으로 제한되는 기능의 정직한 안내 (021 FR-014). 부모가 계산해 넘긴다 */
+  deniedNotices?: readonly string[];
   /** 생성을 끊는 통로(005 FR-014b). 앱이 앞을 벗어날 때 쓴다 */
   stop?: () => Promise<void>;
   /**
@@ -149,6 +151,7 @@ export function DiaryHomeScreen({
   onSelectVision,
   onToggleGeocoding,
   geocodingEnabled,
+  deniedNotices,
   stop,
   prepare,
   release,
@@ -486,6 +489,7 @@ export function DiaryHomeScreen({
           onSelectVision={onSelectVision}
           onToggleGeocoding={onToggleGeocoding}
           geocodingEnabled={geocodingEnabled}
+          deniedNotices={deniedNotices}
           onWrite={() => void write()}
           selection={selection}
           // **012 — 새 판정을 만들지 않고 isDayWritable()을 재사용한다**

@@ -80,6 +80,14 @@ export type DiaryListScreenProps = {
   onToggleGeocoding?: (enabled: boolean) => void;
   /** 지금 장소명 설정. **기본값은 꺼짐이다**(FR-004) */
   geocodingEnabled?: boolean;
+  /**
+   * 거부된 권한 때문에 제한되는 기능의 정직한 안내 문구들 (021 FR-014, SC-004).
+   *
+   * **이 화면은 권한을 판정하지 않는다** — 부모가 `PERMISSION_REQUIREMENTS[...].ifDenied`
+   * 로 계산해 넘긴 문자열만 그린다(중복 정의 금지, 006-era 화면이 온보딩 계층에
+   * 닿지 않게).
+   */
+  deniedNotices?: readonly string[];
 };
 
 /**
@@ -113,10 +121,22 @@ export function DiaryListScreen({
   vision = "none",
   onToggleGeocoding,
   geocodingEnabled = false,
+  deniedNotices,
 }: DiaryListScreenProps) {
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.title}>일기</Text>
+
+      {/* 021 — 거부된 권한으로 제한되는 기능을 정직하게 알린다(FR-014). */}
+      {deniedNotices !== undefined && deniedNotices.length > 0 && (
+        <View style={styles.notices} testID="denied-notices">
+          {deniedNotices.map((notice) => (
+            <Text key={notice} style={styles.noticeText}>
+              {notice}
+            </Text>
+          ))}
+        </View>
+      )}
 
       {/* **빈 화면을 보이지 않는다**(FR-018, S7) — 무엇을 하면 생기는지 말한다 */}
       {items.length === 0 && (
@@ -238,6 +258,8 @@ export function DiaryListScreen({
 const styles = StyleSheet.create({
   page: { padding: 20, gap: 12 },
   title: { fontSize: 20, fontWeight: "600" },
+  notices: { gap: 4, paddingVertical: 4 },
+  noticeText: { fontSize: 13, opacity: 0.7, lineHeight: 19 },
   empty: { paddingVertical: 24, gap: 8 },
   emptyTitle: { fontSize: 16 },
   emptyHint: { fontSize: 14, opacity: 0.7, lineHeight: 20 },

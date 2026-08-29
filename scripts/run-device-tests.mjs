@@ -79,6 +79,13 @@ const FLOWS = [
   // 생성 완료가 필요하다. quickstart.md §2·§3·§4·§6를 손으로 확인한다.
   // **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/scheduled-diary-notification.yml",
+  // 021 — 통합 권한 온보딩. **새 설치 시 온보딩이 일기 목록보다 먼저 뜨는가**,
+  // **전부 건너뛰어도 크래시 없이 진입하는가**, **재실행 시 다시 안 뜨는가**를 본다.
+  // ⚠️ **핵심 검증(D0 권한 실측, D2 has_media>0, D3 부분 허용, D5 OS 설정 링크·복귀
+  // 갱신, D6 020 배터리 로직 제거·시드, 문안 리뷰)은 여기 없다** — adb 조작·실제
+  // 생성·OS 화면 이동·사람의 눈이 필요하다. quickstart.md D0~D6를 손으로 확인한다.
+  // **건너뛴 것은 통과가 아니다**(원칙 V).
+  ".maestro/unified-permission-onboarding.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

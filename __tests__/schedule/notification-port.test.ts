@@ -17,10 +17,11 @@ const SOURCE = readFileSync(join(__dirname, "../../src/schedule/notification-por
 const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 describe("N3 — 인터페이스 시그니처", () => {
-  it("ensureChannel/requestPermission/present/dismiss/lastResponse/onResponse를 갖는다", () => {
+  it("ensureChannel/requestPermission/getPermission/present/dismiss/lastResponse/onResponse를 갖는다", () => {
     const port: NotificationPort = {
       ensureChannel: async () => {},
       requestPermission: async () => "granted",
+      getPermission: async () => "granted",
       present: async () => "id",
       dismiss: async () => {},
       lastResponse: async () => null,
@@ -29,6 +30,7 @@ describe("N3 — 인터페이스 시그니처", () => {
     expect(Object.keys(port).sort()).toEqual([
       "dismiss",
       "ensureChannel",
+      "getPermission",
       "lastResponse",
       "onResponse",
       "present",

@@ -422,6 +422,67 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   — SC-003 배터리 예외 라운드 간격, narrative 백그라운드 완주 시간,
   배터리 인텐트가 실제 도착한 제조사 설정 화면, release R8 통과 여부.)
 
+### 021 — 앱 요구 권한 실측 및 통합 신청 절차 (2026-08-29)
+
+020이 `POST_NOTIFICATIONS`·배터리 예외를 새로 도입하며 앱 권한이 여러
+기능에 흩어졌고, 새 release APK 설치 시 모든 권한이 꺼진 채로 사진 없는
+일기가 조용히 생성되는 문제가 실기기에서 관측됐다. 앱 최초 진입부에
+통합 온보딩을 두어 이를 고쳤다.
+
+- **`src/onboarding/`가 새 경계다** — 020의 `src/schedule/`처럼 순수 판정
+  (`requirements`·`decision`·`flag`)과 기기 통로(`*-port`)를 나눈다.
+  `checkOnboardingFile`(`constitution-rules.ts`)이 `diary/prompt`·
+  `diary/acceptance`·`models/roster`·`schedule/settings` 직접 import와
+  `flag.ts`의 `Date`·`count`·`history` 토큰을 막는다(위반 주입 3건 전부
+  잡히는 것을 확인).
+- **필수 권한 목록은 사람이 못 박은 상수**(`requirements.ts`,
+  `PERMISSION_REQUIREMENTS`) — 5갈래(`photos`·`photo-location`·`location`·
+  `notifications`·`battery-exception`), `order` 1..5, 고정 순서. 012의
+  `USER_VISIBLE_SIGNAL_AXES`가 선례다. **코드가 항목을 판정하지 않는다**
+  (원칙 V) — 계약 테스트가 소스를 `readFileSync`로 읽어 `readonly`·문안
+  토큰·플랫폼 메타를 잠근다.
+- **온보딩은 건너뛸 수 있다**(원칙 I) — 각 단계 [허용]/[건너뛰기], 마지막
+  [시작하기]가 `onboarding.json`에 `completed: true`를 쓴다. 뒤로 가기
+  없음. 단계 완료는 저장하지 않고 매번 실시간 권한 상태로 재판정
+  (`planOnboardingSteps`). `battery-exception`은 조회 통로가 없어
+  `batteryNoticeShown`(1회 제시)으로만 판정하되, 세션 내 건너뛰기도
+  존중한다(`skipped-eligible`).
+- **020의 `AutoDiarySettings.batteryExceptionPrompted`를 흡수·제거**했다.
+  `settings.ts`의 필드·파싱·직렬화 4곳, `settings-effects.ts`의
+  `applyToggleOn` 배터리 로직, `SettingsEffectDeps.batteryPort`를 전부
+  걷어냈다. 자동 생성 토글은 더 이상 배터리 인텐트를 띄우지 않는다 —
+  배터리 안내의 주체는 통합 온보딩과 설정 "권한" 섹션뿐이다. **옛
+  `auto-diary.json`의 그 값은 `loadAutoDiarySettings`가 무시하고**,
+  `flag.ts`가 최초 1회 읽어 `batteryNoticeShown`을 시드한다(FR-010a) —
+  `schedule/settings.ts`를 import하지 않고 `flag-port.ts`가 경로
+  하드코딩으로 `auto-diary.json`을 직접 읽는다.
+- **`NotificationPort`에 `getPermission()`을 더했다**(020의
+  `requestPermission()`은 창을 띄우므로 상태 표시에 못 씀). 020 테스트
+  mock 다수를 함께 손봤다.
+- **거부 안내는 문자열 주입으로 흐른다** — `App.tsx`가
+  `PERMISSION_REQUIREMENTS[...].ifDenied`를 모아 `deniedNotices`로
+  `DiaryHomeScreen` → `DiaryListScreen`에 넘긴다. 006-era 화면이 온보딩
+  계층에 닿지 않게 문자열만 넘긴다(중복 정의 없음).
+- **App.tsx 진입 게이트**: `AppFrame`이 `onboarding.json`을 읽어
+  `completed !== true`면 탭 UI 대신 `OnboardingScreen`만 그린다(006의
+  "화면이 둘뿐이므로 상태 하나로 가른다"에 세 번째 상태를 얹음).
+  설정 "권한" 섹션의 [권한 안내 다시 보기]가 `forceOnboarding`을 켠다 —
+  `completed`는 그대로.
+- **포그라운드 복귀 재조회**(SC-006): `OnboardingScreen`·
+  `PermissionsSection`·App.tsx의 `deniedNotices` 계산이 전부 `AppState`
+  `change` → `"active"`에서 권한을 다시 읽는다.
+- **새 네이티브 모듈 0개** — `expo-media-library`·`expo-location`·
+  `expo-notifications`·`expo-intent-launcher`의 기존 API만 재사용. 따라서
+  release 재확인 불필요, debug 1회로 충분(012 기준).
+- 기기 없는 테스트 1853개(+8 스위트) 통과, lint·헌법 검사·prettier 클린.
+- **실기기 검증(T030~T032·T037)은 사람이 수행한다** — 미결 둘이 여기서
+  확정된다: ①안드로이드에서 위치 권한이 장소명에 실제 영향을 주는가 →
+  `requirements.ts`의 `location.platforms` 값(`["android","ios"]` 유지 또는
+  `["ios"]`로 → 안드로이드 온보딩에서 자동 제외). ②Android 14에서
+  `accessPrivileges: "limited"`가 오는가 → `describePhotoAccessLimit`의
+  `visiblePhotoCount` 분기를 dead path로 둘지 실제 배선할지. 코드 구조는
+  두 결과를 모두 수용하도록 이미 잡혀 있다(데이터/분기만 확정).
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만
