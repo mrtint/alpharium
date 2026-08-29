@@ -475,13 +475,59 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   `expo-notifications`·`expo-intent-launcher`의 기존 API만 재사용. 따라서
   release 재확인 불필요, debug 1회로 충분(012 기준).
 - 기기 없는 테스트 1853개(+8 스위트) 통과, lint·헌법 검사·prettier 클린.
-- **실기기 검증(T030~T032·T037)은 사람이 수행한다** — 미결 둘이 여기서
-  확정된다: ①안드로이드에서 위치 권한이 장소명에 실제 영향을 주는가 →
-  `requirements.ts`의 `location.platforms` 값(`["android","ios"]` 유지 또는
-  `["ios"]`로 → 안드로이드 온보딩에서 자동 제외). ②Android 14에서
-  `accessPrivileges: "limited"`가 오는가 → `describePhotoAccessLimit`의
-  `visiblePhotoCount` 분기를 dead path로 둘지 실제 배선할지. 코드 구조는
-  두 결과를 모두 수용하도록 이미 잡혀 있다(데이터/분기만 확정).
+- **실기기 검증 완료(2026-08-29, SM-S901N/Galaxy S22, Android 16 / SDK 36,
+  debug)**. 관측:
+  - **진입 게이트**: 새 설치 첫 실행에서 일기 목록이 아니라 "시작하기 전에"
+    온보딩이 먼저 뜬다. `pm clear`로 `onboarding.json`이 지워지면 다시
+    "1 / 5"부터 재시작 — 게이트는 `completed` 플래그로만 판정.
+  - **부분 사진 허용(Android 14+ `limited`)이 실제로 온다.** OS 다이얼로그의
+    "제한된 액세스 허용" → 포토피커 2장 선택 시
+    `READ_MEDIA_VISUAL_USER_SELECTED: granted=true` /
+    `READ_MEDIA_IMAGES: granted=false`, `describePhotoAccessLimit`가
+    `"partial"`을 반환하고 설정 "권한" 행이 **"일부만 허용됨" + [전체 허용]**
+    로 렌더된다. 따라서 **`visiblePhotoCount` 분기는 이 기기에서 dead
+    path**(구형 안드로이드 대비로 유지, 비용 0). 온보딩은 부분 허용도
+    satisfied로 보고 다음 단계로 넘어간다.
+  - **설정 "권한" 섹션 + OS 링크 + 복귀 갱신(SC-006)**: 5개 행이 라이브
+    상태를 보인다. [전체 허용]/[허용] → `com.android.settings`
+    `InstalledAppDetails` 진입. OS에서 부여 후 앱 복귀 시 `AppState`
+    `change→active` 리스너가 행을 자동 갱신("일부만 허용됨"→"허용됨",
+    "거부됨"→"허용됨").
+  - **Maestro**: `.maestro/unified-permission-onboarding.yml` 전체 PASS.
+    ⚠️ 흐름의 M2가 원래 `id: "onboarding-step-photos"`를 박아 두어, 사진
+    권한이 이미(부분) 부여된 기기에서는 첫 단계가 사진이 아니라 실패했다 →
+    **권한 상태 무관하게** 수정(`id: "onboarding-step-.*"` + skip-all
+    루프). 어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다는 것이
+    교훈 — OS가 자동 부여하는 항목이 있으면 새 설치라도 첫 단계가 사진이
+    아닐 수 있다.
+  - **회귀 확인**: `.maestro/scheduled-diary-notification.yml`(020)도 함께
+    돌렸다 — **개발자 탭을 탭하던 stale 버그**(020 자동 생성 설정은
+    `settings` 탭에 있다)를 발견·수정 후 PASS. 021 회귀가 아니라 020 흐름의
+    잠재 결함이었다.
+  - **D2 (온보딩 후 실제 생성 `has_media>0`)**: 캐릭터 모델(`a1.bin` kanana)과
+    VLM(`v1.bin`+`v2.bin` LFM2.5-VL)을 개발 기계에서 받아 `run-as`로
+    `files/models/`에 배치 + `state.json`에 `passed:true` verdict 3개
+    (010 도구는 사진만 심으므로 모델은 수동). 사진 있는 하루(08-28, 3장) +
+    `빠르게 봄` → `adb logcat`에 **`loadPrompt:580 ... has_media=1`**(VLM이 사진을
+    IMAGE 청크로 디코드), 이어 캐릭터 모델 706토큰 프롬프트(캡션이 텍스트 재료로
+    들어감). 일기가 사진 내용을 정확히 반영 + 짐작 말투. **021 온보딩이 부여한
+    사진 권한으로 VLM→캐릭터 파이프라인이 실제로 사진을 읽었다**(011 "has_media=0"
+    결함의 반대).
+  - **D6 (020→021 업그레이드 시드)**: `onboarding.json` 삭제 + 구형
+    `auto-diary.json`(`batteryExceptionPrompted:true`) → 재시작 시 온보딩 재노출
+    (`completed:false` 시드), **배터리 단계는 온보딩 흐름에 안 나타남**
+    (`batteryNoticeShown:true` 시드 → satisfied). `loadAutoDiarySettings`는 구형
+    필드 무시, `flag.ts`만 raw로 읽어 시드 — 둘 다 확인.
+  - **T030 (위치 권한 ↔ 안드로이드 장소명)**: 같은 하루(08-27, 좌표 강남 일대)를
+    위치 권한 유무별로 두 번 생성. **부여**: `placeName={"kind":"known","value":"강남구"}`,
+    본문에 "강남구". **거부**(`pm revoke ACCESS_FINE/COARSE_LOCATION`):
+    `placeName={"kind":"unknown"}`, 본문에 지명 없음. → **안드로이드도
+    `reverseGeocodeAsync`는 위치 권한이 있어야 지명을 준다**(없으면 예외 →
+    `geocoding-port.ts`가 삼킴). `location.platforms`는 `["android","ios"]` 유지
+    확정, `requirements.ts`의 "T030 실측 대기" 주석을 이 결과로 교체했다.
+  - **미확인 잔여**: 없음. 새 네이티브 모듈 없어 release 재확인 생략(012 기준).
+    ※ 검증용 모델·합성 하루는 010 원칙대로 "경로가 도는가"만 봤고 품질 결론에
+    쓰지 않았다.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

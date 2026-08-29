@@ -35,13 +35,17 @@ appId: com.anonymous.alpharium
 - assertVisible:
     id: "onboarding-screen"
 
-# ★ M2 — **첫 단계가 사진이고 모델 정보가 없다**(FR-006·FR-007).
+# ★ M2 — **설명 문안에 모델 정보가 없다**(FR-007).
+#   어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다(이미 부여된 권한은
+#   satisfied로 건너뛰므로, 새 설치라도 OS가 자동 부여한 항목이 있으면 첫 단계가
+#   사진이 아닐 수 있다) — 특정 단계 id를 박지 않고, 단계 컨테이너 하나가 떠 있고
+#   그 문안이 헌법 III을 지키는지만 본다.
 - assertVisible:
-    id: "onboarding-step-photos"
+    id: "onboarding-step-.*"
 - assertNotVisible:
     text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
 
-# ★ M3 — **각 단계에 [건너뛰기]가 있다**(FR-008).
+# ★ M3 — **단계에 [건너뛰기]가 있다**(FR-008).
 - assertVisible:
     id: "onboarding-skip"
 

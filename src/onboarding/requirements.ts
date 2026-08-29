@@ -25,7 +25,7 @@
  *
  * - `photos` — `READ_MEDIA_IMAGES` (+`READ_MEDIA_VISUAL_USER_SELECTED`)
  * - `photo-location` — `ACCESS_MEDIA_LOCATION` (조회 API 없음, `getLocation()`으로 판정)
- * - `location` — `ACCESS_FINE_LOCATION` (장소명 지오코딩, §2 실측으로 platforms 확정)
+ * - `location` — `ACCESS_FINE_LOCATION` (장소명 지오코딩, T030 실측: 안드로이드도 권한 필요 → platforms ["android","ios"])
  * - `notifications` — `POST_NOTIFICATIONS` (Android 13+)
  * - `battery-exception` — `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (권한 아님, 시스템 설정)
  */
@@ -74,9 +74,13 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
   {
     key: "location",
     order: 3,
-    // ⚠️ T030 실측 대기 — 안드로이드 장소명에 실제 영향이 없으면 platforms를
-    //    ["ios"]로 바꾼다(research.md §2). 그러면 안드로이드 온보딩에서 자동 제외된다.
-    neededBy: "장소명(017) — 좌표를 지명으로 옮긴다 (주로 iOS 위주로 동작)",
+    // T030 실측 완료 (2026-08-29, SM-S901N/Galaxy S22, Android 16): 안드로이드에서도
+    // `expo-location`의 `reverseGeocodeAsync`는 ACCESS_FINE_LOCATION이 있어야 지명을
+    // 준다 — 권한을 거부하면 예외를 던지고(`geocoding-port.ts`가 삼켜 `unknown`),
+    // 같은 좌표(37.5172,127.0473)가 권한 있을 때 "강남구", 없을 때 `placeName: unknown`
+    // 으로 갈렸다. 따라서 platforms는 ["android","ios"] 유지 — 안드로이드에서도 이
+    // 단계가 실제로 의미가 있다.
+    neededBy: "장소명(017) — 좌표를 지명으로 옮긴다 (안드로이드·iOS 모두 권한 필요, T030 실측)",
     platforms: ["android", "ios"],
     rationale: "그날 머문 곳을 지명으로 적기 위해 위치를 씁니다.",
     ifDenied: "지명을 옮기지 못해, 장소는 좌표 없이 비워 둡니다.",

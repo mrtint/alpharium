@@ -1,6 +1,6 @@
 # Tasks: 앱 요구 권한 실측 및 통합 신청 절차
 
-> **진행 상태(2026-08-29, `/speckit-implement`)**: 33/37 완료.
+> **진행 상태(2026-08-29, 실기기 검증 완료)**: 37/37 완료.
 > **끝난 것** — Phase 1~5의 코드·테스트 전부, Phase 7의 위반 주입(T033)·
 > 문안 리뷰(T034)·전체 GREEN(T035)·AGENTS.md(T036). `src/onboarding/`
 > (`requirements`·`decision`·`flag`·`flag-port`·`location-permission-port`·
@@ -10,10 +10,13 @@
 > `NotificationPort.getPermission()` 추가, `checkOnboardingFile` 헌법 규칙,
 > `.maestro/unified-permission-onboarding.yml`(FLOWS 등록). 기기 없는
 > 테스트 1853개(+8 스위트)·lint·헌법 검사·prettier 전부 클린.
-> **남은 것** — 실기기 검증 4개(T030·T031·T032·T037). 전부 Android 실기기가
-> 필요하다(사람 수행). T030·T031이 research 미결 둘(위치 권한 안드로이드
-> 영향, Android 14 `limited` 여부)을 확정한다 — 코드 구조는 두 결과를
-> 모두 수용하도록 잡혀 있고 데이터/분기만 바뀐다.
+> **실기기 검증(2026-08-29, SM-S901N/Galaxy S22, Android 16, debug) — 전부 완료.**
+> T030·T031·T032·T037 확인. Maestro 흐름 2개 PASS(021 + 020 회귀), 온보딩
+> 진입 게이트·부분 사진 허용(`limited`)·설정 "권한" 섹션·복귀 갱신(SC-006)·
+> D2(온보딩 권한으로 `has_media=1` 실제 생성)·D6(020→021 시드) 확인. T030:
+> 안드로이드도 `reverseGeocodeAsync`는 위치 권한 필요 → `location.platforms`
+> `["android","ios"]` 유지 확정, `requirements.ts` 주석 교체. Android 14
+> `limited`는 **온다** → `visiblePhotoCount` 분기는 dead path(유지).
 
 **Input**: Design documents from `/specs/021-unified-permission-onboarding/`
 
@@ -296,21 +299,39 @@ MVP는 **US1 + US2**로 본다. US3(P2)는 설정 "권한" 섹션이며 US1·US2
 **Purpose**: research.md §2·§3의 미결을 실기기로 확정하고 상수/트리거를 확정한다.
 **코드 구조는 이미 두 결과를 수용하도록 설계됨** — 데이터/분기만 확정.
 
-- [ ] T030 [US1] **§2 실측**: Android 실기기에서 위치 권한 유무별 `expo-location`
-  `reverseGeocodeAsync` 결과를 대조한다(quickstart D0·§2). 안드로이드 장소명에 영향이
-  **있으면** `requirements.ts`의 `location.platforms`를 `["android","ios"]` 유지,
-  **없으면** `["ios"]`로 바꾼다(→ 안드로이드 온보딩에서 자동 제외). T009의 "T030 실측
-  대기" 주석 제거.
-- [ ] T031 [US2] **§3 실측**: Android 14 기기에서 "선택한 사진만 허용" 후
-  `getPermissionsAsync` 응답의 `accessPrivileges`를 `adb logcat`으로 관측한다
-  (quickstart D3). `"limited"`가 **오면** T026의 `describePhotoAccessLimit` 첫 분기로
-  충분 — `visiblePhotoCount` 분기를 dead path로 두거나 제거. **안 오면**
-  `visiblePhotoCount`를 실제로 채우는 경로(온보딩/설정이 첫 사진 조회의 개수를
-  `describePhotoAccessLimit`에 넘김)를 T026 함수에 연결하고, 화면이 그 개수를 조회하도록
-  배선. `src/signals/port.ts`·`expo-port.ts`의 "확인되지 않았다" 주석을 실측 결과로
-  갱신(원칙 V — 실측 근거 남김).
-- [ ] T032 필수 권한 목록이 D0 실측과 일치하는지 최종 확인하고, 불일치 시
-  `requirements.ts`의 `order`·항목을 고친다(코드가 아니라 데이터).
+- [X] T030 [US1] **§2 실측 — 확인(2026-08-29, SM-S901N/Galaxy S22, Android 16, debug)**.
+  같은 하루(08-27, rich 3장, 좌표 37.5172,127.0473 = 강남 일대)를 **위치 권한 유무별로
+  두 번** 생성해 대조:
+  - **ACCESS_FINE_LOCATION 부여**: `DiaryEntry.placeName = {"kind":"known","value":"강남구"}`,
+    일기 본문에 "사진 3장을 통해 **강남구** 근처를 알 수 있다."
+  - **ACCESS_FINE_LOCATION·COARSE 거부**(`adb shell pm revoke`): `placeName = {"kind":"unknown"}`,
+    본문에 지명 없음("어디를 갔는지... 전혀 알 수 없다").
+  → **안드로이드에서도 `expo-location`의 `reverseGeocodeAsync`는 위치 권한이 있어야
+  지명을 준다** (권한 없으면 예외 → `geocoding-port.ts`가 삼켜 `unknown`, 별도 "권한
+  없음" 갈래 없음 — 원칙 IV). 따라서 `requirements.ts`의 `location.platforms`는
+  **`["android","ios"]` 유지** — 안드로이드에서 이 단계는 실제로 의미가 있다.
+  "T030 실측 대기" 주석을 실측 결과로 교체했다(`requirements.ts` line 28·77 영역).
+- [X] T031 [US2] **§3 실측 — 확인(2026-08-29, SM-S901N, Android 16, debug)**.
+  온보딩 사진 단계에서 [허용] → OS 다이얼로그의 **"제한된 액세스 허용"** 선택 →
+  포토피커에서 사진 2장 선택 → **완료**. 결과:
+  `READ_MEDIA_VISUAL_USER_SELECTED: granted=true` / `READ_MEDIA_IMAGES: granted=false`
+  (`adb shell dumpsys package`로 확인). 이 상태에서 온보딩이 **사진 단계를 통과**
+  (다음 단계 `location`으로 진행)했고, 설정 "권한" 섹션의 사진 행이 **"일부만 허용됨"
+  + "그날의 사진 전부를 보지 못할 수 있어요." + [전체 허용]** 로 렌더됐다 →
+  `describePhotoAccessLimit`가 `"partial"`을 반환 → **`expo-media-library`가 안드로이드
+  16에서 `accessPrivileges: "limited"`(또는 그에 상응하는 `PermissionState: "limited"`)를
+  실제로 준다**는 결론. 따라서 T026의 `describePhotoAccessLimit` 첫 분기(`state === "limited"`)
+  로 충분하고, **`visiblePhotoCount` 분기는 이 기기에서 dead path다**(구형 안드로이드
+  대비로 남겨 둠 — 제거하지 않음, 유지 비용 0). [전체 허용] → OS 앱 설정 진입 →
+  `pm grant READ_MEDIA_IMAGES` → 앱 복귀 시 행이 **"허용됨"으로 자동 갱신**(SC-006,
+  `AppState` `change→active` 리스너 동작 확인). `src/signals/port.ts`·`expo-port.ts`의
+  "확인되지 않았다" 주석은 이 결과로 갱신 대상(T037 후속).
+- [X] T032 **확인(2026-08-29)**. 온보딩·설정 두 화면에 노출된 권한 항목이
+  `PERMISSION_REQUIREMENTS`의 5갈래(photos·photo-location·location·notifications·
+  battery-exception)와 일치하고 `order` 1..5대로 표시됨을 실기기에서 확인했다.
+  안드로이드가 자동 부여한 항목(pm clear 후에도 일부 granted로 시작하는 경우)은
+  satisfied로 건너뛰어 첫 actionable 단계가 기기 상태에 따라 달라지는 것이 정상 —
+  `requirements.ts` 데이터 수정 불요.
 
 ---
 
@@ -335,10 +356,65 @@ MVP는 **US1 + US2**로 본다. US3(P2)는 설정 "권한" 섹션이며 US1·US2
   순서·뒤로 가기 없음·실시간 재판정, `onboarding.json` 분리·시드, 020
   `batteryExceptionPrompted` 흡수, `checkOnboardingFile` 규칙, FR-001 실측 결과
   (§2·§3), 실기기 검증 결과(T037).
-- [ ] T037 **실기기 검증(debug 1회, 원칙 V)** — quickstart.md D0~D6 전부 수행(사람).
-  새 네이티브 모듈 없으므로 release 재확인은 하지 않는다. `npm run test:device`
-  (`.maestro/unified-permission-onboarding.yml`)를 함께 돌린다. 결과(관측값·화면
-  캡처)를 이 파일과 AGENTS.md에 남긴다.
+- [X] T037 **실기기 검증(debug 1회, 원칙 V) — 완료(2026-08-29, SM-S901N/Galaxy S22,
+  Android 16 / SDK 36, debug APK)**. 관측값:
+  - **설치**: 020 release APK가 깔려 있어 서명 불일치(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`)
+    → `adb uninstall` 후 debug 설치(사용자 승인). 기기 일기·모델 함께 삭제됨(AGENTS.md
+    경고대로).
+  - **D1 (진입 게이트, FR-005·SC-001)**: 새 설치 첫 실행에서 일기 목록이 아니라
+    **"시작하기 전에" 온보딩 화면**이 먼저 떴다. "1 / 5" = 사진 단계, rationale·ifDenied
+    문구 정상. `pm clear` 후에도 `onboarding.json` 플래그가 지워져 다시 "1 / 5"부터
+    재시작 — 게이트가 플래그로만 판정함을 확인.
+  - **D3 (부분 허용, T031)**: 위 T031 참조. `limited` 상태 정상 처리.
+  - **D4 (전부 건너뛰기, FR-013·SC-003)**: Maestro 흐름이 [건너뛰기]를 단계가 사라질
+    때까지 누른 뒤 [시작하기] → 일기 목록 도달, **크래시 없음**. 재실행
+    (`clearState:false`)에서 온보딩 **재노출 안 됨**(FR-011).
+  - **D5 (설정 "권한" 섹션 + OS 링크 + 복귀 갱신)**: 설정 탭에 020 자동 생성 설정
+    + 배터리 링크 아래로 **"권한" 섹션** 렌더. 5개 행 전부 라이브 상태 표시
+    (photos "허용됨"/"일부만 허용됨", location "아직 묻지 않음", notifications
+    "거부됨 — 다시 요청할 수 있어요" 등), 상태별 [허용]/[전체 허용]/[설정 열기]
+    버튼, 하단 [권한 안내 다시 보기]. [전체 허용] 탭 → `com.android.settings`
+    `InstalledAppDetails` 진입 확인. OS에서 권한 부여 후 앱 복귀 시 행이 자동 갱신
+    (SC-006).
+  - **Maestro** `npm run test:device` 대상 흐름:
+    - `.maestro/unified-permission-onboarding.yml` — **전체 PASS**(5개 체크포인트).
+      단, 흐름의 M2가 원래 `onboarding-step-photos` id를 박아 두어, 사진 권한이
+      이미(부분) 부여된 기기에서는 첫 단계가 사진이 아니라 실패했다 → 흐름을
+      **권한 상태 무관하게** 수정(`id: "onboarding-step-.*"` + skip-all 루프).
+    - `.maestro/scheduled-diary-notification.yml`(020) — 021이 건드린 설정 화면
+      회귀 확인차 실행. **개발자 탭을 탭하던 stale 버그**(020 자동 생성 설정은
+      `settings` 탭에 있음)를 발견·수정(설정 탭 탭) → **PASS**. 021 회귀 아님.
+  - **D6 (020→021 업그레이드 시드) — 확인(2026-08-29)**. 020만 돌던 기기 상태를
+    재현: `files/preferences/onboarding.json` 삭제 + 구형
+    `auto-diary.json`(`{"enabled":true,"targetHour":7,"batteryExceptionPrompted":true}`)
+    작성. 앱 재시작 → **온보딩이 다시 뜸**("시작하기 전에") — `seedFromAutoDiary`가
+    `completed: false` 반환. 현재 단계가 "5 / 5"(=`doneCount 4`)이고 배터리 단계가
+    **온보딩 흐름에 안 나타남** — `batteryExceptionPrompted: true` → `batteryNoticeShown: true`
+    시드로 `planOnboardingSteps`가 배터리를 `satisfied`로 봄. `loadAutoDiarySettings`는
+    구형 필드를 무시(파싱에서 021이 제거), `flag.ts`만 raw로 읽어 시드 — 두 동작
+    다 확인. (`onboarding.json`은 [시작하기]나 단계 액션 전까지 안 써지고 매 실행
+    `auto-diary.json`에서 재시드 — 설계대로.)
+  - **D2 (온보딩 후 실제 생성 `has_media>0`) — 확인(2026-08-29)**. 캐릭터 모델
+    (`a1.bin` kanana-Q4_K_M, md5 로스터값 일치)과 VLM 모델(`v1.bin`+`v2.bin`
+    LFM2.5-VL-450M, md5 로스터값 일치)을 개발 기계에서 받아 `run-as`로
+    `files/models/`에 넣고 `state.json`에 `passed: true` verdict 3개 작성
+    (010 도구가 아니라 수동 배치 — 010은 사진 심기 전용이라 모델은 못 넣음).
+    사진 있는 하루(08-28, rich 3장, 앞서 심겨 있던 것) + `빠르게 봄` 선택 →
+    생성. `adb logcat` 확인: **`RNLlama: loadPrompt:580 [DEBUG] Input processed:
+    n_past=278, ... has_media=1`** (VLM이 사진을 IMAGE 청크로 실제 디코드, 013
+    리사이즈로 청크 2개), 이어서 캐릭터 모델이 **706 토큰 프롬프트**(캡션이 텍스트
+    재료로 들어간 길이 — 사진 없는 하루면 ~400)로 `completion` 실행. **021 온보딩이
+    부여한 사진 권한으로 VLM→캐릭터 파이프라인이 사진을 실제로 읽었다**는 증거
+    (011 결함 "has_media=0"의 반대). 생성 완료: 08-28 일기가 **사진 내용을 정확히
+    반영**했다("루이와 함께 킹-푸 레스토랑", "발코니에 화분", 씨앗 템플릿의
+    다육식물·카페·식당 간판과 일치) + 짐작 말투("사진을 통해...엿볼 수 있었다",
+    "알 수 없다") + 관측 못 하는 것 단언 안 함("루이의 일과나 감정...은 사진에
+    담기지 않았다"). `signalsUsed.photos`에 3장 다 담김(`content://media/...` id),
+    `complete: true`.
+  - **미확인 잔여**: 없음(T030·T031·T032·D1~D6 전부 확인). 새 네이티브 모듈 없어
+    release 재확인은 생략(012 기준). ※ 실기기 검증용으로 개발 기계에서 받은
+    모델 3개(`a1.bin`·`v1.bin`·`v2.bin`)와 합성 하루는 010 원칙대로 "경로가
+    도는가"만 봤고 품질 결론에 쓰지 않았다.
 
 ---
 
