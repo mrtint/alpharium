@@ -5,11 +5,13 @@ import { createAppPipeline } from "../app/wiring";
 import { currentEnvironment } from "../config/environment";
 import { CHARACTERS, type Character } from "../diary/types";
 import { collectReport } from "../diagnostics/report";
+import { PRESET_LABELS } from "../diagnostics/prompt-preview";
 import type { DiagnosticReport } from "../diagnostics/types";
 import { expoPhotoPort } from "../signals/expo-port";
 import { AutoDiaryTriggerButton } from "./AutoDiaryTriggerButton";
 import { GenerationProbe } from "./GenerationProbe";
 import { PermissionPanel } from "./PermissionPanel";
+import { PromptPreviewPanel } from "./PromptPreviewPanel";
 import { SignalProbe } from "./SignalProbe";
 
 /**
@@ -102,6 +104,10 @@ export function DiagnosticsScreen() {
       {CHARACTERS.map((character) => (
         <Row key={character} label={character} value={report.characterModels[character]} />
       ))}
+
+      {/* 022 — 입력 프롬프트 미리보기. `report`가 이미 buildPrompt()의 출력을 담아 왔다
+          (이 파일이 diary/prompt를 import하지 않는다 — 헌법 검사가 잠근다). */}
+      <PromptPreviewPanel previews={report.promptPreviews} presetLabels={PRESET_LABELS} />
 
       {/* 004 — 권한 상태와 요청. 이것이 없으면 실기기에서 영원히 unknown이다 */}
       <PermissionPanel port={photoPort} />

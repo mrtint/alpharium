@@ -15,6 +15,7 @@ import { CHARACTERS } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation } from "../inference/types";
 import { displayName } from "../models/roster";
+import { collectPromptPreviews } from "./prompt-preview";
 import { checkStorage } from "./storage-check";
 import type { DiagnosticReport, Failure } from "./types";
 
@@ -88,6 +89,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
       moduleStatus: { kind: "unavailable", reason: "추론 위치를 고르지 못했다" },
       storage,
       characterModels: collectCharacterModels(),
+      promptPreviews: collectPromptPreviews(),
       failures,
     };
   }
@@ -106,6 +108,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
     moduleStatus,
     storage,
     characterModels: collectCharacterModels(),
+    promptPreviews: collectPromptPreviews(),
     failures,
   };
 }

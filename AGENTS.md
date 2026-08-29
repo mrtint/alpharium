@@ -529,6 +529,70 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
     ※ 검증용 모델·합성 하루는 010 원칙대로 "경로가 도는가"만 봤고 품질 결론에
     쓰지 않았다.
 
+### 022 — 개발자 탭 내 입력 프롬프트 모니터링 (2026-08-29)
+
+로드맵 6번. **원래 항목은 "토큰 지표 노출"까지 포함했으나 AI 이관 과정의
+왜곡이었고**, 사용자 확인 결과 의도는 **입력 프롬프트 원본을 개발자 탭에
+보여주는 것**뿐이었다. 토큰 지표를 건드리지 않으므로 `llama-port.ts`의 원칙 IV
+경계와 파이프라인·`RunResult`는 무변경이다.
+
+- **진단 계층이 `buildPrompt()`를 직접 부른다** — `src/diagnostics/prompt-preview.ts`가
+  사람이 못 박은 `SIGNAL_PRESETS`(`empty`·`photos`)로 `buildRequest()` →
+  `buildPrompt()`(실제 생성 경로가 부르는 바로 그 함수)를 불러
+  `DiagnosticReport.promptPreviews`에 문자열로 싣는다. 014의 `characterModels`와
+  동일한 경로. 계약 테스트 PP1이 "미리보기 문자열 == `buildPrompt()` 출력"을
+  바이트 단위로 잠근다 — 복제하면 즉시 깨진다.
+- **신호 프리셋은 사람이 정한 `readonly` 리터럴**(012의 `USER_VISIBLE_SIGNAL_AXES`
+  선례) — 코드가 신호 값을 보고 조합을 만들지 않는다(원칙 V). `fake.ts`·`collect.ts`에서
+  가져오지 않는다(경계 혼동 방지). `PREVIEW_DATE`는 과거 고정이라
+  `dayStillOpen: false`로 결정된다.
+- **화면은 `report.promptPreviews`의 문자열만 받는다** — `PromptPreviewPanel.tsx`가
+  `diary/prompt`·`signals`를 import하지 않는다. `checkSourceFile`에
+  `UI_TOUCHES_PROMPT`(`src/ui/` → `diary/prompt` 차단) 규칙을 추가했다.
+  **`signals/types`는 막지 않았다** — `DiaryDetailScreen`(저장된 `signalsUsed`
+  렌더)·`SignalProbe`(신호 수집)가 이미 정당하게 쓰고, 022가 그 경계를 새로
+  만들지 않는다. 위반 주입 3종(화면이 `diary/prompt` import / 자체 조립 /
+  `SIGNAL_PRESETS`를 `let`) 전부 잡히는 것을 확인했다.
+- **근사 크기는 `text.length`**이고 화면이 "조립 시점 근사치, 실측 토큰 아님"
+  라벨을 붙인다(원칙 IV). 소스에 `token` 어휘가 없다(계약 테스트 PP6).
+- 기기 없는 테스트 1882개(+29) 통과, lint·헌법 검사(위반 0)·prettier 클린.
+  `tsc`가 `DiagnosticReport` 생성 자리(early return 포함) 누락을 잡는다.
+- **실기기 검증 완료(2026-08-29, SM-S901N/Galaxy S22, Android 16 / SDK 36, dev,
+  무선 디버깅)**. 관측:
+  - **D1 (프롬프트 원본)**: "개발자" 탭(dev라 노출)에 "입력 프롬프트 미리보기"
+    패널이 뜨고, quiet "신호 없음" 프롬프트가 잘림 없이 전체 렌더 — 화자 규칙
+    8줄 + `너는 '금동이'이라 불린다.` + 제목 지시문 + `한국어로 써라.` +
+    `2026-01-15에 네가 본 것:` + `사진: 없었다.` + `다닌 자리: 없었다.` +
+    `이 기록으로 그 하루의 일기를 써라.`. `<Text selectable>`이라 길게 눌러
+    복사 가능(D4).
+  - **D2 (프리셋 비교, SC-002)**: "사진 있음" 프롬프트에만
+    `사진: 2장 (10시, 18시)`, `다닌 자리: 2곳, 대략 3400m 떨어져 있다.
+    (사진 2장 중 2장에서 얻었다)`, `이 자리들은 하루의 궤적이 아니라...` 문장이
+    들어감 — `buildPrompt()`가 프리셋 신호로 실제 조립한 결과(PP1 실기기 확인).
+  - **D3 (근사 크기, FR-011)**: "신호 없음" **867자**, "사진 있음" **964자**
+    (사진 프리셋이 더 큼, SC-003). 라벨은 `867자 (조립 시점 근사치, 실측 토큰
+    아님)` — 원칙 IV 표기 정확.
+  - **캐릭터 전환**: `prompt-preview-character-chinese` 칩 탭 → 프롬프트가 다시
+    조립되어 마지막 줄이 `중국어로 써라.`로 바뀜(캐릭터별 `buildPrompt()` 재호출).
+  - **D5 (사용자 화면 무노출, SC-005)**: 일기 상세 화면에 프롬프트·근사 크기·
+    "실측 토큰" 등 진단 정보가 하나도 없음. 목록·캐릭터·설정 탭은 021에서 이미
+    확인.
+  - **Maestro**: `.maestro/prompt-preview.yml` 전체 PASS(`run-device-tests.mjs`
+    `FLOWS`에 등록). ⚠️ 패널이 길어 각 프리셋·칩마다 `scrollUntilVisible`이
+    필요했다 — `scrollUntilVisible`이 패널 제목에서 멈추므로 그 아래 요소는
+    개별 스크롤로 올려야 한다(첫 작성 때 `assertVisible`만 써서 "사진 있음"에서
+    실패, 수정함).
+  - **회귀 — `skeleton.yml`의 stale 버그 발견·수정**: 014에서 진단 화면이
+    "개발자" 탭으로 옮겨졌는데 `skeleton.yml`(마지막 수정 002)이 launch 직후
+    `assertVisible: "환경"`을 하고 있어 실패했다 — 022 회귀가 아니라 기존 결함.
+    개발자 탭을 먼저 누르도록 고쳐 PASS(020 회귀 검증의 "개발자 탭 stale 버그"와
+    같은 성격). 진단 화면 기존 항목(환경·추론 위치·모듈 상태·저장 점검)은 022
+    패널 아래 그대로 있음.
+  - **미확인 잔여**: D6(prod 빌드에 개발자 탭 없음)은 이 세션에서 안 봤다 — 새
+    네이티브 모듈 없어 release 재확인 생략(012 기준)이나 prod 게이트 자체의
+    실측은 남아 있다. ※ 검증용 합성 프리셋은 사람이 못 박은 상수일 뿐 품질
+    결론에 쓰지 않았다.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

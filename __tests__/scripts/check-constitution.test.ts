@@ -261,6 +261,82 @@ describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)"
   });
 });
 
+/**
+ * 022 FR-008 — 화면이 프롬프트 조립에 닿는 것을 막는다 (원칙 II).
+ *
+ * 022가 진단 화면에 입력 프롬프트 원본을 보여준다. 그 문자열은 진단 계층이 `buildPrompt()`를
+ * 불러 `DiagnosticReport.promptPreviews`에 담고, 화면은 그 문자열만 받는다. 화면이
+ * `diary/prompt`를 직접 import하면 미리보기용 조립이 화면에 복제되어 프롬프트가 두 곳이 된다.
+ */
+describe("checkSourceFile — 화면이 프롬프트 조립에 닿는다 (022 FR-008)", () => {
+  it("src/ui가 diary/prompt를 import하면 잡는다", () => {
+    const violations = checkSourceFile(
+      "src/ui/DiagnosticsScreen.tsx",
+      'import { buildPrompt } from "../diary/prompt";',
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("022 FR-008");
+  });
+
+  it("윈도우 경로 구분자에서도 잡는다", () => {
+    const violations = checkSourceFile(
+      "src\\ui\\Foo.tsx",
+      'import { promptPrefix } from "../diary/prompt";',
+    );
+
+    expect(violations).toHaveLength(1);
+  });
+
+  it("signals/expo-port는 잡지 않는다 — PermissionPanel 배선은 정당하다", () => {
+    const violations = checkSourceFile(
+      "src/ui/DiagnosticsScreen.tsx",
+      'import { expoPhotoPort } from "../signals/expo-port";',
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("signals/types·collect는 잡지 않는다 — 기존 화면(DiaryDetailScreen·SignalProbe)의 정당한 사용", () => {
+    expect(
+      checkSourceFile(
+        "src/ui/DiaryDetailScreen.tsx",
+        'import type { DaySignals } from "../signals/types";',
+      ),
+    ).toEqual([]);
+    expect(
+      checkSourceFile(
+        "src/ui/SignalProbe.tsx",
+        'import { collectDaySignals } from "../signals/collect";',
+      ),
+    ).toEqual([]);
+  });
+
+  it("src/diagnostics는 diary/prompt를 import해도 된다 — 조립 계층이다", () => {
+    const violations = checkSourceFile(
+      "src/diagnostics/prompt-preview.ts",
+      'import { buildPrompt } from "../diary/prompt";',
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("주석에서 설명하는 것은 위반이 아니다", () => {
+    const violations = checkSourceFile("src/ui/Foo.tsx", "// diary/prompt를 import하지 않는다");
+
+    expect(violations).toEqual([]);
+  });
+
+  it("실제 DiagnosticsScreen은 통과한다", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "src", "ui", "DiagnosticsScreen.tsx"),
+      "utf8",
+    );
+
+    expect(checkSourceFile("src/ui/DiagnosticsScreen.tsx", source)).toEqual([]);
+  });
+});
+
 /* ─────────────────────── 심는 도구 검사 (010) ─────────────────────── */
 
 describe("심는 도구가 일기에 닿는 것을 잡는다 (010 FR-022, 원칙 IV)", () => {

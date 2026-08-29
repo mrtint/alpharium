@@ -1,0 +1,83 @@
+# 실기기 자동 테스트 — 개발자 탭 입력 프롬프트 미리보기 (022)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **개발자가 프롬프트를 줄이려면 지금 조립되는 최종 문자열을 봐야 한다.**
+#
+# 검증 항목 (quickstart.md D1~D3):
+#   FR-005  개발자 탭에서 캐릭터별 프롬프트 원본이 보인다              (D1)
+#   FR-007  "신호 없음" / "사진 있음" 두 프리셋이 렌더된다             (D2)
+#   FR-011  근사 크기가 "실측 토큰 아님" 라벨과 함께 보인다            (D3)
+#
+# **여기서 자동화하지 않는 것** — quickstart.md D4~D6:
+#   D4 스크롤·복사        — 긴 텍스트 스크롤·길게눌러 선택. 사람이 확인한다.
+#   D5 사용자 화면 무노출  — 일기 목록·상세·쓰기·설정·온보딩 훑기. 사람이 확인한다.
+#   D6 prod 게이트        — prod 빌드에 개발자 탭 자체가 없음. 사람이 확인한다.
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+#
+# ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다(008 실측).
+# ⚠️ 진단 화면은 local·dev 전용이다 — prod 빌드에서는 이 흐름 자체가 돌지 않는다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# 개발자 탭으로 간다 — 진단 화면은 014에서 "개발자" 탭으로 옮겨졌다(local·dev 전용).
+- runFlow:
+    when:
+      visible: "개발자"
+    commands:
+      - tapOn: "개발자"
+
+# ★ D1 — 프롬프트 미리보기 패널이 있다.
+#    ⚠️ 패널이 길어 각 요소마다 스크롤한다. `scrollUntilVisible`이 화면에 올린다.
+- scrollUntilVisible:
+    element:
+      text: "입력 프롬프트 미리보기"
+    direction: DOWN
+    timeout: 20000
+
+# ★ D2 — 첫 프리셋 "신호 없음"이 보인다.
+- scrollUntilVisible:
+    element:
+      text: "신호 없음"
+    direction: DOWN
+    timeout: 20000
+
+# ★ D1 — 첫 캐릭터(quiet)의 프롬프트 원본에 화자 규칙이 들어 있다.
+#    buildPrompt()가 실제로 불렸다는 증거 — SPEAKER_RULES 첫 줄.
+- assertVisible:
+    text: ".*너는 주인의 휴대폰이다.*"
+
+# ★ D3 — 근사 크기가 "실측 토큰 아님" 라벨과 함께 보인다(원칙 IV).
+- assertVisible:
+    text: ".*조립 시점 근사치, 실측 토큰 아님.*"
+
+# ★ D2 — 두 번째 프리셋 "사진 있음"으로 스크롤하면 사진 문장이 들어간
+#    다른 프롬프트가 보인다.
+- scrollUntilVisible:
+    element:
+      text: "사진 있음"
+    direction: DOWN
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: ".*사진: 2장.*"
+    direction: DOWN
+    timeout: 20000
+
+# ★ D1 — 캐릭터를 바꾸면 프롬프트가 다시 조립된다.
+#    위로 올라가 chinese 칩을 누른다. chinese는 마지막 줄이 "중국어로 써라."다
+#    (prompt.ts LANGUAGE).
+- scrollUntilVisible:
+    element:
+      id: "prompt-preview-character-chinese"
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: "prompt-preview-character-chinese"
+- scrollUntilVisible:
+    element:
+      text: ".*중국어로 써라.*"
+    direction: DOWN
+    timeout: 20000

@@ -138,6 +138,26 @@ const UI_TOUCHES_MODEL = /\bfrom\s+["'][^"']*models\/(?:roster|assets|expo-port|
 const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets)\b/;
 
 /**
+ * 화면이 프롬프트 조립에 직접 닿는 것 (022 FR-008, 원칙 II).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **022가 진단 화면에 입력 프롬프트 원본을 보여준다.** 그 문자열은 진단 계층이
+ * `buildPrompt()`를 불러 조립해 `DiagnosticReport.promptPreviews`에 담고, 화면은
+ * 그 문자열만 받는다 — 014의 `characterModels`와 같은 경로다.
+ *
+ * 화면이 `diary/prompt`를 직접 import하면 미리보기용 조립 로직이 화면에 생기고,
+ * 그 순간 프롬프트가 두 곳이 되어(005 FR-013b — 프롬프트는 `prompt.ts` 한 곳)
+ * 원칙 II가 조용히 깨진다. **조심해서 안 부르는 것이 아니라 부를 수 없게 한다.**
+ *
+ * **신호 타입(`signals/*`)은 여기서 막지 않는다** — `DiaryDetailScreen`이 저장된
+ * `signalsUsed`를 그리고 `SignalProbe`가 신호를 수집하는 것은 이미 정당한 기존
+ * 동작이며, 022는 그 경계를 건드리지 않는다. 022가 새로 더하는 위험은 "프롬프트
+ * 조립이 화면에 복제되는 것" 하나뿐이다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const UI_TOUCHES_PROMPT = /\bfrom\s+["'][^"']*diary\/prompt["']/;
+
+/**
  * 진단 경로가 사용자 화면의 축 제외 상수를 보는 것 (012, 헌법 원칙 V).
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -204,6 +224,16 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "진단 화면이 축 제외 상수를 본다 — 다섯 축을 전부 보여야 한다 (012 FR-009, 원칙 V)",
+      });
+    }
+
+    // 022 — 화면은 진단 리포트의 프롬프트 문자열만 받는다. `diary/prompt`를 직접
+    // import하면 미리보기용 조립이 화면에 생겨 프롬프트가 두 곳이 된다(원칙 II).
+    if (normalized.startsWith("src/ui/") && UI_TOUCHES_PROMPT.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "화면이 프롬프트 조립에 닿는다 — 진단 리포트의 문자열만 받아야 한다 (022 FR-008, 원칙 II)",
       });
     }
   }

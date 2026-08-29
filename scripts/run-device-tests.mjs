@@ -86,6 +86,13 @@ const FLOWS = [
   // 생성·OS 화면 이동·사람의 눈이 필요하다. quickstart.md D0~D6를 손으로 확인한다.
   // **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/unified-permission-onboarding.yml",
+  // 022 — 개발자 탭 입력 프롬프트 미리보기. **캐릭터별 프롬프트 원본이 buildPrompt()의
+  // 출력 그대로 렌더되는가**(화자 규칙 첫 줄·언어 지시 줄), **두 프리셋이 보이는가**,
+  // **근사 크기가 "실측 토큰 아님" 라벨과 함께 보이는가**(원칙 IV)를 본다.
+  // ⚠️ D4(스크롤·복사)·D5(사용자 화면 무노출)·D6(prod 게이트)는 여기 없다 —
+  // 사람의 눈·prod 빌드가 필요하다. quickstart.md D1~D6를 손으로 확인한다.
+  // **건너뛴 것은 통과가 아니다**(원칙 V).
+  ".maestro/prompt-preview.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */
