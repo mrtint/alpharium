@@ -1,0 +1,23 @@
+#!/bin/sh
+# main/master를 직접 push하는 것을 막는다.
+#
+# pre-commit과 짝이다 — 커밋을 막아도 --no-verify로 뚫으면 push에서 한 번 더
+# 걸린다. PR로 머지하는 저장소이므로 로컬 main -> origin/main 직접 push는
+# 사고일 가능성이 높다.
+#
+# 우회가 정말 필요하면: git push --no-verify
+
+remote="$1"
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+	case "$remote_ref" in
+	refs/heads/main | refs/heads/master)
+		echo "✋ '$remote_ref'를 직접 push하려 합니다 ($remote)."
+		echo "   기능은 브랜치를 파고 PR로 머지합니다(AGENTS.md 「작업 습관」)."
+		echo "   의도한 직접 push면: git push --no-verify"
+		exit 1
+		;;
+	esac
+done
+
+exit 0

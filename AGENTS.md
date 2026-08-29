@@ -840,6 +840,13 @@ context7(`/expo/expo`)로 확인하고 `npx expo install --check`로 검증한�
 
 - 커밋 메시지는 한국어로 쓴다(헌법 「개발 방식」).
 - 계약을 먼저 정하고 테스트를 먼저 쓴다(헌법 「개발 방식」).
+- **`main`에서 직접 작업하지 않는다.** 기능마다 브랜치를 파고 PR로 머지한다
+  (021은 #31로 머지). **작업을 시작하기 전에 `git branch --show-current`로 지금
+  브랜치를 눈으로 확인한다** — 스펙킷(`setup-plan.ps1` 등)이 출력하는 `BRANCH:`
+  필드는 스펙 디렉터리 이름이지 체크아웃된 브랜치가 아니다. 2026-08-29에 이것을
+  믿고 022를 통째로 `main`에서 작업·커밋한 사고가 있었다. `.githooks/pre-commit`·
+  `pre-push`가 `main`/`master` 직접 커밋·push를 막는다(`core.hooksPath=.githooks`,
+  clone 후 `git config core.hooksPath .githooks` 한 번 필요). 우회는 `--no-verify`.
 - **한 축을 깊게 파고들고 싶어지면 그것이 실패 신호다.** 이 프로젝트에서 반복된
   실패는 코딩 에이전트가 여러 축 중 하나를 붙잡고 지나치게 파고든 것이었다.
 - **계약 테스트는 소스 선언을 직접 읽는다.** jest는 타입을 지우므로 `tsc`만
