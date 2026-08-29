@@ -29,6 +29,13 @@ import { GenerationProbe } from "../../src/ui/GenerationProbe";
 import type { GenerationResult, InferenceBackend } from "../../src/inference/types";
 import { richDay } from "../../src/signals/fake";
 
+// `jest-expo`는 워커마다 RN 런타임을 세우고, CI 러너는 2코어라 첫 `render()`가
+// 기본 5초 타임아웃을 넘길 수 있다(2026-08-29 CI 실측 — 이 파일의
+// "생성에 성공하면 본문이 화면에 있다"가 39초 스위트에서 5초를 넘겨 실패).
+// `diary-home.test.tsx`·`onboarding-screen.test.tsx`의 선례를 따른다 — 코드
+// 결함이 아니라 워커 경합이다(AGENTS.md).
+jest.setTimeout(30000);
+
 const DIARY = "오늘 주인은 어딘가로 나섰다. 사진 세 장이 남았고 나는 그것만 안다.";
 
 /** 하루가 닫힌 뒤의 시각. 2026-08-16은 2026-08-17 04:00에 닫힌다 */
