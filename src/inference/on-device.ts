@@ -26,7 +26,7 @@ import { judge } from "../diary/acceptance";
 import { buildPrompt, instructionLines } from "../diary/prompt";
 import { buildRequest } from "../diary/request";
 import type { Character, DiaryRequest, VisionSetting } from "../diary/types";
-import type { DaySignals } from "../signals/types";
+import type { DaySignals, Photo } from "../signals/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
 import { reachedVisionLimit, selectForVision } from "../vision/select";
@@ -157,6 +157,14 @@ export type VisionSupport = {
   resize?: ResizeExecutor;
   /** 리사이즈 사본을 지운다(013). `resize`가 없으면 쓰이지 않는다 */
   cleanupResized?: ResizedPhotoCleaner;
+  /**
+   * 023 — 사진 id들의 상위 폴더 이름을 얻는다(잡사진 분류의 재료).
+   *
+   * **옵셔널이며, 상한 초과인 하루에만 불린다** — 상한 이하면 `selectForVision`이
+   * R1으로 전부 고르므로 분류가 필요 없다. 주입하지 않으면 폴더 이름 없이
+   * 선별한다(전부 "분류 불가" = 카메라 원본 취급 — 잡사진 필터링이 no-op).
+   */
+  resolveFolders?: (photoIds: readonly string[]) => Promise<Map<string, string | undefined>>;
 };
 
 /**
@@ -197,7 +205,17 @@ async function readPhotos(
   }
 
   try {
-    const selected = selectForVision(photos.value.photos);
+    // 023 — 상한에 닿은 하루만 잡사진 분류가 필요하다(상한 이하면 `selectForVision`이
+    // R1으로 전부 고른다). 그때만 폴더 이름을 해석한다 — 장수만 세는 004 경로와
+    // 상한 이하인 하루는 `getUri()` 왕복을 치르지 않는다(port.ts `folderNamesFor`
+    // 주석). `reachedVisionLimit()`은 011 S1을 지키며 상한 숫자를 노출하지 않는다.
+    const dayPhotos = photos.value.photos;
+    const withFolders =
+      vision.resolveFolders !== undefined && reachedVisionLimit(dayPhotos.length)
+        ? await attachFolderNames(dayPhotos, vision.resolveFolders)
+        : dayPhotos;
+
+    const selected = selectForVision(withFolders);
 
     // 016 — 사진 보기 갈래(많음/보통, research.md §3). 그날 사진 수가 캡션
     // 상한에 닿았는지로 가른다. `reachedVisionLimit()`이 011의 S1(상한
@@ -231,6 +249,24 @@ async function readPhotos(
     // ★ **성공·실패·예외 어느 경로로도 닫는다.** 닫지 않으면 바로 아래에서 캐릭터
     // 모델을 열 때 메모리가 모자라 죽는다.
     await vision.engine.unload().catch(() => {});
+  }
+}
+
+/**
+ * 023 — 사진 목록에 상위 폴더 이름을 붙인다(잡사진 분류의 재료).
+ *
+ * **던지지 않는다** — `resolve`가 무너지면 폴더 이름 없이 원래 목록을
+ * 돌려준다(잡사진 필터링이 no-op가 될 뿐 하루가 무너지지 않는다).
+ */
+async function attachFolderNames(
+  photos: readonly Photo[],
+  resolve: (ids: readonly string[]) => Promise<Map<string, string | undefined>>,
+): Promise<Photo[]> {
+  try {
+    const folders = await resolve(photos.map((p) => p.id));
+    return photos.map((p) => ({ ...p, folderName: folders.get(p.id) ?? p.folderName }));
+  } catch {
+    return [...photos];
   }
 }
 
@@ -596,6 +632,15 @@ function visionSupport(): VisionSupport {
     resolvePath: async (photo) => {
       const { expoPhotoPort } = await import("../signals/expo-port");
       return expoPhotoPort().filePathOf(photo.id);
+    },
+    /**
+     * 023 — 상한 초과인 하루의 사진들에 대해서만 불린다(`readPhotos()`가
+     * `reachedVisionLimit()`으로 가른다). 장수만 세는 004 경로는 이 자리에
+     * 닿지 않는다.
+     */
+    resolveFolders: async (ids) => {
+      const { expoPhotoPort } = await import("../signals/expo-port");
+      return expoPhotoPort().folderNamesFor(ids);
     },
     resize: resizeExecutor,
     cleanupResized: cleanupResizedPhoto,

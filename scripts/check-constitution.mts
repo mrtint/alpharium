@@ -18,6 +18,7 @@ import {
   checkEnvFile,
   checkMonologueFile,
   checkOnboardingFile,
+  checkPhotoPortFile,
   checkScheduleFile,
   checkSeedFile,
   checkSourceFile,
@@ -66,6 +67,9 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 021 — 통합 권한 온보딩의 순수 판정 자리. checkOnboardingFile이 경로로
       // 대상(src/onboarding/)을 정한다.
       violations.push(...checkOnboardingFile(child, contents));
+      // 023 — 사진 통로가 잡사진을 판정하지 못하게. checkPhotoPortFile이
+      // 경로로 대상(src/signals/expo-port.ts)을 정한다.
+      violations.push(...checkPhotoPortFile(child, contents));
     }
   }
 

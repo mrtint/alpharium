@@ -33,10 +33,24 @@ describe("모양의 이름이 계약이다 (FR-008)", () => {
   /**
    * **이 목록이 바뀌면 에이전트의 호출이 깨진다.** 늘리는 것은 괜찮지만 이름을
    * 바꾸거나 지우는 것은 계약 위반이며, 여기서 걸린다.
+   *
+   * 023 Phase 8이 네 개를 더했다 — burst 조합으로 만든 `mixed-clutter`·
+   * `screenshots-only`·`morning-heavy`·`many-camera`. 기존 여섯은 그대로다.
    */
-  it("정해 둔 여섯 모양이 있다", () => {
+  it("정해 둔 열 개 모양이 있다", () => {
     expect(shapeNames().sort()).toEqual(
-      ["empty", "one-place", "over-limit", "partial-location", "rich", "spread-day"].sort(),
+      [
+        "empty",
+        "many-camera",
+        "mixed-clutter",
+        "morning-heavy",
+        "one-place",
+        "over-limit",
+        "partial-location",
+        "rich",
+        "screenshots-only",
+        "spread-day",
+      ].sort(),
     );
   });
 
@@ -221,5 +235,76 @@ describe("spread-day — 5장을 넘어 하루에 흩어진 하루 (011 D5, FR-0
 
   it("서로 다른 시각을 가진다 — 같은 밀리초로 뭉치지 않는다", () => {
     expect(new Set(photos.map((p) => p.takenAtMs)).size).toBe(photos.length);
+  });
+});
+
+// ───────────────────── 023 Phase 8 — burst 조합 모양 ─────────────────────
+
+describe("mixed-clutter — 카메라 + 잡사진이 섞인 하루 (023 D1)", () => {
+  const photos = shapeNamed("mixed-clutter")!.build(DAY);
+
+  it("사진이 10장이다 (카메라 6 + 스크린샷 3 + 다운로드 1)", () => {
+    expect(photos).toHaveLength(10);
+  });
+
+  it("folder 세 종류를 전부 포함한다", () => {
+    const folders = new Set(photos.map((p) => p.folder));
+    expect(folders.has("Camera")).toBe(true);
+    expect(folders.has("Screenshots")).toBe(true);
+    expect(folders.has("Download")).toBe(true);
+  });
+
+  it("카메라 원본이 상한(5)을 넘어 선별이 실제로 돈다", () => {
+    expect(photos.filter((p) => p.folder === "Camera").length).toBeGreaterThan(5);
+  });
+
+  it("스크린샷·다운로드는 좌표가 없다 (잡사진은 위치를 안 박는다)", () => {
+    for (const p of photos) {
+      if (p.folder === "Screenshots" || p.folder === "Download") {
+        expect(p.location).toBeNull();
+      }
+    }
+  });
+});
+
+describe("screenshots-only — 전부 잡사진인 하루 (023 D1 되돌림)", () => {
+  const photos = shapeNamed("screenshots-only")!.build(DAY);
+
+  it("스크린샷만 5장이다 — 카메라 원본이 0장", () => {
+    expect(photos).toHaveLength(5);
+    expect(photos.every((p) => p.folder === "Screenshots")).toBe(true);
+  });
+});
+
+describe("morning-heavy — 오전에 몰린 하루 (023 D2 시간 분포)", () => {
+  const photos = shapeNamed("morning-heavy")!.build(DAY);
+  const bounds = dayBounds(DAY);
+
+  it("사진이 19장이다 (오전 15 + 낮 2 + 저녁 2)", () => {
+    expect(photos).toHaveLength(19);
+  });
+
+  it("한 시간 칸(023 BUCKET_COUNT=6 기준 4시간)에 그날 사진의 절반 이상이 몰린다", () => {
+    const firstBucketEnd = bounds.startMs + 4 * 3_600_000;
+    const inFirst = photos.filter((p) => p.takenAtMs < firstBucketEnd).length;
+    expect(inFirst).toBeGreaterThanOrEqual(Math.ceil(photos.length / 2));
+  });
+
+  it("낮·저녁 시간대에도 사진이 있다 — 다른 칸이 대표될 수 있다", () => {
+    const noon = bounds.startMs + 10 * 3_600_000;
+    expect(photos.some((p) => p.takenAtMs >= noon)).toBe(true);
+  });
+});
+
+describe("many-camera — 상한을 넘는 카메라 사진 (023 D3 상한 확장)", () => {
+  const photos = shapeNamed("many-camera")!.build(DAY);
+
+  it("카메라 12장이다 — over-limit(201장, 색인 밀림)의 실용 대체", () => {
+    expect(photos).toHaveLength(12);
+    expect(photos.every((p) => p.folder === undefined || p.folder === "Camera")).toBe(true);
+  });
+
+  it("상한(5)을 넘어 선별·분포가 돈다", () => {
+    expect(photos.length).toBeGreaterThan(5);
   });
 });

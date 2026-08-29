@@ -4,6 +4,7 @@ import { join } from "node:path";
 import {
   checkEnvFile,
   checkMonologueFile,
+  checkPhotoPortFile,
   checkSeedFile,
   checkSourceFile,
   checkVisionFile,
@@ -478,6 +479,88 @@ describe("checkVisionFile", () => {
       .flatMap((f) => checkVisionFile(`src/vision/${f}`, readFileSync(join(dir, f), "utf8")));
 
     expect(violations).toEqual([]);
+  });
+
+  /**
+   * 023 — 분류가 픽셀·이미지 채점에 닿지 못한다 (FR-023, 원칙 IV).
+   *
+   * 계약: specs/023-photo-selection-algorithm/contracts/constitution-guard.md G1
+   */
+  it.each([
+    ["const b = getImageData(photo);", "픽셀 데이터 읽기"],
+    ["const s = blurScore(buf);", "흐림 채점"],
+    ["if (isBlackImage(pixels)) return;", "검은 이미지 판정"],
+    ['import sharp from "sharp";', "이미지 처리 라이브러리"],
+    ["const e = imageEntropy(data);", "엔트로피 측정"],
+  ])("%s — %s → 위반 (023 FR-023, 원칙 IV)", (line) => {
+    const violations = checkVisionFile("src/vision/select.ts", line);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("023 FR-023");
+  });
+
+  it("리사이즈 계약의 정당한 어휘는 잡지 않는다 (resize.ts 오탐 방지)", () => {
+    const normal = [
+      "const RESIZE_TARGET = { maxLongEdge: 1024 };",
+      "export type ResizeExecutor = (sourcePath: string, target: ResizeTarget) => Promise<ResizeResult>;",
+      "return await execute(sourcePath, RESIZE_TARGET);",
+      "const NON_CAMERA_FOLDERS = [] as const;",
+      "if (photo.folderName === undefined) return 'unclassifiable';",
+    ].join("\n");
+
+    expect(checkVisionFile("src/vision/select.ts", normal)).toEqual([]);
+    expect(checkVisionFile("src/vision/resize.ts", normal)).toEqual([]);
+  });
+});
+
+/**
+ * 023 — 사진 통로가 잡사진을 판정하지 못한다 (spec Clarification).
+ *
+ * 계약: specs/023-photo-selection-algorithm/contracts/constitution-guard.md G2
+ */
+describe("checkPhotoPortFile", () => {
+  it("src/signals/expo-port.ts 밖은 보지 않는다", () => {
+    const line = 'import { NON_CAMERA_FOLDERS } from "../vision/select";';
+    expect(checkPhotoPortFile("src/vision/select.ts", line)).toEqual([]);
+    expect(checkPhotoPortFile("src/signals/collect.ts", line)).toEqual([]);
+  });
+
+  it.each([
+    ['import { NON_CAMERA_FOLDERS } from "../vision/select";', "폴더 목록 import"],
+    ['import { classifyPhotos } from "../vision/select";', "분류 함수 import"],
+    ['import { foo } from "../vision/classify";', "분류 모듈 import"],
+    ["const nc = isScreenshot(folderName);", "스크린샷 판정"],
+    ["if (isNonCamera(name)) skip();", "잡사진 판정"],
+  ])("%s — %s → 위반 (023)", (line) => {
+    const violations = checkPhotoPortFile("src/signals/expo-port.ts", line);
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("폴더 이름 추출까지만");
+  });
+
+  it("폴더 이름을 뽑는 정상적인 코드는 잡지 않는다", () => {
+    const normal = [
+      "const uri = await new lib.Asset(photoId).getUri();",
+      "const parts = path.split('/').filter(Boolean);",
+      "return parts.length >= 2 ? parts[parts.length - 2] : undefined;",
+      "return { id: asset.id, takenAtMs: asset.creationTime, folderName };",
+    ].join("\n");
+
+    expect(checkPhotoPortFile("src/signals/expo-port.ts", normal)).toEqual([]);
+  });
+
+  it("주석은 위반이 아니다", () => {
+    expect(
+      checkPhotoPortFile(
+        "src/signals/expo-port.ts",
+        " * NON_CAMERA_FOLDERS를 참조하지 않는다 — 판정은 select.ts",
+      ),
+    ).toEqual([]);
+  });
+
+  it("실제 expo-port.ts가 규칙을 지킨다", () => {
+    const path = join(__dirname, "../../src/signals/expo-port.ts");
+    expect(checkPhotoPortFile("src/signals/expo-port.ts", readFileSync(path, "utf8"))).toEqual([]);
   });
 });
 

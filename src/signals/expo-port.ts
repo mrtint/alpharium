@@ -55,6 +55,31 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * 023 — 파일 경로/URI에서 상위 폴더 이름 하나를 뽑는다.
+ *
+ * **문자열 처리만 한다.** 그 이름이 스크린샷·다운로드 폴더인지 대조하는 것은
+ * `src/vision/select.ts`의 몫이다 — 여기서 `NON_CAMERA_FOLDERS`를 알면 분류가
+ * 기기 계층으로 샌 것이다(spec Clarification, 헌법 검사 `checkPhotoPortFile`).
+ *
+ * - `file:///storage/emulated/0/DCIM/Camera/IMG_1.jpg` → `"Camera"`
+ * - `content://media/external/images/media/123` → `undefined` (폴더 구간 없음)
+ * - `""` / `null` / `undefined` / 슬래시 없는 문자열 → `undefined`
+ *
+ * 풀 수 없으면 `undefined`이며 그것이 "분류 불가"다(023 FR-004).
+ *
+ * **export하지만 이 파일의 순수 헬퍼다** — 계약 테스트(`expo-port.test.ts`)가
+ * 문자열 파싱을 직접 검사한다. `getUri()` 호출부는 기기에서만 확인한다(004).
+ */
+export function folderNameOf(pathOrUri: string | null | undefined): string | undefined {
+  if (typeof pathOrUri !== "string" || pathOrUri === "") return undefined;
+  if (pathOrUri.startsWith("content://")) return undefined;
+
+  const path = pathOrUri.startsWith("file://") ? pathOrUri.slice("file://".length) : pathOrUri;
+  const parts = path.split("/").filter(Boolean);
+  return parts.length >= 2 ? parts[parts.length - 2] : undefined;
+}
+
 /** 실제 `expo-media-library`를 쓰는 통로 */
 export function expoPhotoPort(): PhotoPort {
   return {
@@ -123,7 +148,33 @@ export function expoPhotoPort(): PhotoPort {
         .orderBy(AssetField.CREATION_TIME)
         .exeForMetadata();
 
+      // 023 — 폴더 이름을 여기서 채우지 않는다. `filePathOf()`의 경계를 잇는다
+      // (그 주석: "PhotoFacts에 담지 않고 함수로 둔다"). 폴더 이름이 필요한
+      // 자리(사진 선별을 실제로 하는 on-device.ts, 상한 초과인 하루)만
+      // `folderNamesFor()`를 부른다 — 장수만 세는 004 경로는 `getUri()`를
+      // 치르지 않는다.
       return metadata.map((asset) => ({ id: asset.id, takenAtMs: asset.creationTime }));
+    },
+
+    /**
+     * 023 — 여러 사진의 상위 폴더 이름. `filePathOf()`가 이미 하는
+     * `getUri()`를 재사용하되 여러 장을 병렬로 처리한다.
+     *
+     * **던지지 않는다** — 한 장이 실패하면 그 id는 맵에 `undefined`이고
+     * 나머지는 채운다(004 FR-005a).
+     */
+    async folderNamesFor(photoIds: readonly string[]): Promise<Map<string, string | undefined>> {
+      const lib = await import("expo-media-library");
+      const entries = await Promise.all(
+        photoIds.map(async (id): Promise<[string, string | undefined]> => {
+          try {
+            return [id, folderNameOf(await new lib.Asset(id).getUri())];
+          } catch {
+            return [id, undefined];
+          }
+        }),
+      );
+      return new Map(entries);
     },
 
     /**

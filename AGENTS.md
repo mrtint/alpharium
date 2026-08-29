@@ -593,6 +593,62 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
     실측은 남아 있다. ※ 검증용 합성 프리셋은 사람이 못 박은 상수일 뿐 품질
     결론에 쓰지 않았다.
 
+### 023 — 사진 선별 알고리즘 고도화 (2026-08-29)
+
+로드맵 2·8번을 하나로. 011의 인덱스 균등 선별을 두 단계로 바꿨다 —
+(1) 파일 경로 상위 폴더 이름으로 잡사진(스크린샷·다운로드·메신저)을
+걸러내고(전부 걸러지면 원본 유지), (2) 남은 것을 찍힌 **시각** 분포로
+배분(칸마다 최소 1장 + 남은 예산을 사진 수에 비례한 최대 잔여법).
+`src/vision/select.ts` 한 파일이 핵심이며 여전히 순수 함수(인자 하나,
+`Date`·난수·파일 안 씀).
+
+- **`VISION_PHOTO_LIMIT`을 5 → 8로 올렸다**(실기기 실측). `many-camera`
+  (12장) 하루로 「빠르게 봄」 `quiet` 생성을 상한 5·8 두 번 걸었다:
+  캡션 8장 46초(`DiaryEntry.timing.visionMs`), 생성 92초, **총 ~138초 /
+  생성 시간 한도 180초**(`on-device.ts` `runWithTimeout()`) — 여유 42초.
+  **걸린 제약은 시간**이고 컨텍스트는 여유(캡션 5장 프롬프트 852토큰 /
+  캐릭터 `n_ctx` 2048). **`narrative`(exaone 콜드 최대 242초)는 미확인이라
+  8에서 멈췄다** — 019·020이 남긴 위험 계열. 상한을 더 올리려면 narrative
+  완주를 먼저 재고 `select.ts` 주석을 갱신한다.
+- **`BUCKET_COUNT` = 6(4시간 칸)은 사람이 정한 값**(012의
+  `USER_VISIBLE_SIGNAL_AXES`, 021의 `PERMISSION_REQUIREMENTS` 선례). 코드가
+  사진 분포를 보고 칸 수를 정하지 않는다(원칙 V). `BUCKET_COUNT` < 상한이라
+  spec FR-011의 `>=` 경계(칸 수 == 예산)는 현재 상한에서 **dead path** —
+  6칸이 다 차도 `nonEmpty(6) < budget(8)`이라 언제나 D3·D4로 간다.
+- **`NON_CAMERA_FOLDERS`는 사람이 못 박은 상수** — `Screenshots`·`Download`·
+  `KakaoTalk`·`WhatsApp Images`·`Telegram`. seed 하위폴더(`AlphariumSeed/
+  Screenshots` 등)로 격리·분류는 실기기에서 확인했으나(`mixed-clutter` 10장
+  중 Camera 6장만 캡션), **실촬 경로 확정은 미완** — 실제 스크린샷이
+  `Pictures/Screenshots`인지 `DCIM/Screenshots`인지 등은 안 쟀다.
+- **`Asset.getUri()`는 `file://` 경로를 반환한다**(T035 실측) — `content://`가
+  아니다. `folderNameOf()`의 `file://` 분기가 유효하고 `content://` 분기는
+  이 기기에서 dead path. `photosBetween()`은 여전히 `getUri()`를 부르지 않고
+  (`AssetMetadata`에 경로 필드 없음), `folderNamesFor()`가 **상한에 닿은
+  하루에서만** asset별로 부른다(T041 — 004 장수 세기 경로·R1 빠른 경로는
+  비용을 안 치른다).
+- **seed 도구 결함을 함께 고쳤다**: `scripts/samples/no-gps/`의 실사 샘플
+  (2017년 Galaxy)이 이 기기(Android 16) 미디어 스캐너에서 `datetaken`을
+  NULL로 둔다 — **patch 여부·EXIF 날짜 태그 일치 여부와 무관**, 원본
+  그대로도 그렇다. `with-gps/` 샘플은 온전해 `patchDate`만으로 정상.
+  `pickNoGpsSample()`이 `with-gps/`를 먼저 쓰도록 바꿨고(`patchLocation`은
+  안 부름 → 좌표 안 심김), `patchDate()`가 IFD0 `DateTime`(0x0132)도
+  덮어쓰도록 강화했다.
+- **Maestro stale 둘을 함께 고쳤다**(023 회귀 아님, 014 이후 깨져 있던 것):
+  `generate-diary.yml`(진단 화면 생성 패널 → 일기 탭 "일기 쓰기"),
+  `diary-character-select.yml`(내부 키 "quiet"·"narrative" → 페르소나 이름
+  "금동이"·"루이"·"오드", `IMAGINATIVE_NOTICE` 제거 반영). 신규
+  `photo-selection-over-limit.yml`을 `run-device-tests.mjs` `FLOWS`에 등록.
+- 헌법 검사 둘 추가: `checkVisionFile`에 `VISION_SCORES_IMAGE`(픽셀 채점
+  헬퍼 차단), `checkPhotoPortFile`(`src/signals/expo-port.ts`가
+  `vision/select`·`NON_CAMERA_FOLDERS`를 import하거나 분류 함수를 두는 것
+  차단). 위반 주입 3종으로 검증.
+- 기기 없는 테스트 1959개 통과, lint·헌법 검사(위반 0)·prettier 클린.
+- **실기기 검증 완료**(2026-08-29, SM-S901N/Galaxy S22, debug): 상한 8
+  실측, 시간 분포(12장 → 8장 균등, 첫·마지막 포함), 잡사진 필터링
+  (Screenshots·Download 제외), Maestro 회귀 8흐름 + 신규 1흐름 PASS.
+  **미확인**: `narrative` 완주 시간(180초 초과 여부), `NON_CAMERA_FOLDERS`
+  실촬 경로 확정, prod 게이트.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

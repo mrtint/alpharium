@@ -349,6 +349,23 @@ const VISION_TOUCHES_DIARY_FILES = /files\/diary|listDiaries|readDiary|loadDiary
 const VISION_SHARES_SAMPLING = /\bfrom\s+["'][^"']*inference\/sampling["']/;
 
 /**
+ * 사진 분류·선별이 픽셀·이미지 채점에 닿는 것을 잡는다 (023 FR-023, 헌법 원칙 IV).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **왜 이 검사가 필요한가**: 023의 분류는 파일 경로의 폴더 이름 문자열 대조뿐이다.
+ * 그 자리에서 **「스크린샷 말고 검은 화면·흐린 사진도 걸러 보자」가 아주 자연스럽게
+ * 떠오른다** — 픽셀을 디코드해 밝기·엔트로피·선명도를 재면 그것이 이미지 채점이며,
+ * 이 저장소가 되돌리기의 이유로 삼은 「측정 장치」(원칙 IV)다.
+ *
+ * **`resize.ts`를 오탐하지 않는다**: 리사이즈는 `ResizeExecutor` 주입으로 격리돼
+ * 순수 계약에 픽셀 어휘가 없다. 아래 토큰은 디코드·채점에 특정된 것만 골랐다 —
+ * "resize"·"maxLongEdge"는 포함하지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const VISION_SCORES_IMAGE =
+  /\b(?:decodePixels|getImageData|pixelData|imageEntropy|blurScore|qualityScore|sharpness|isBlankImage|isBlackImage|Jimp|canvas\.getContext)\b|\bfrom\s+["']sharp["']/;
+
+/**
  * 소스 파일 하나가 사진 읽는 자리인지 보고, 맞으면 위 규칙을 적용한다.
  *
  * **`src/vision/`이 대상이다.**
@@ -375,6 +392,56 @@ export function checkVisionFile(fileName: string, contents: string): Violation[]
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "캡션이 일기의 샘플링을 함께 쓴다 — 고치면 일기가 함께 바뀐다 (011 research §7, 원칙 I)",
+      });
+    }
+    if (VISION_SCORES_IMAGE.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "사진 분류가 픽셀·이미지 채점에 닿는다 — 폴더 이름 대조로 끝나야 한다 (023 FR-023, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
+/* ─────────────────── 사진 통로가 분류를 하는 것 (023) ─────────────────── */
+
+/**
+ * 기기 통로(`expo-port.ts`)가 잡사진 판정을 하는 것을 잡는다
+ * (023, spec Clarification 2026-08-29).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **경계**: 폴더 이름을 뽑는 것(마지막 "/" 앞 세그먼트)까지가 `expo-port.ts`의
+ * 몫이다. 그 이름이 스크린샷·다운로드 폴더인지 대조하는 것은 `select.ts`만
+ * 한다 — `NON_CAMERA_FOLDERS`를 import하거나 "잡사진/스크린샷 판정" 어휘가
+ * 여기 나오면 분류가 기기 계층으로 샌 것이다. 분류를 화면 쪽에 두면 다음
+ * 화면이 그 틈으로 들어온다는 015·022의 교훈이 한 겹 아래에서 반복되는 자리다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const PORT_CLASSIFIES_PHOTO =
+  /\bNON_CAMERA_FOLDERS\b|\bfrom\s+["'][^"']*vision\/(?:select|classify)["']|\b(?:isScreenshot|isNonCamera|classifyPhoto)\b/;
+
+/**
+ * 소스 파일 하나가 사진 통로인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`src/signals/expo-port.ts` 한 파일이 대상이다.**
+ */
+export function checkPhotoPortFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (normalized !== "src/signals/expo-port.ts") return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (PORT_CLASSIFIES_PHOTO.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "기기 통로가 잡사진을 판정한다 — 폴더 이름 추출까지만, 대조는 select.ts (023, spec Clarification)",
       });
     }
   }

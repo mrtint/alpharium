@@ -68,6 +68,8 @@ function fakePort(overrides: PortOverrides = {}): { port: PhotoPort; counters: C
     // 011이 넓힌 계약. **004의 신호 수집은 이것을 부르지 않는다** — 부르면 사진을
     // 세기만 하는 경로가 파일 경로를 들고 다니게 된다.
     filePathOf: async () => null,
+    // 023이 넓힌 계약. 004의 신호 수집은 이것도 부르지 않는다(같은 이유).
+    folderNamesFor: async () => new Map(),
   };
 
   return { port, counters };
@@ -343,6 +345,53 @@ describe("C4 — 사진 목록이 찍힌 시각 순이다 (FR-004)", () => {
 
     if (signals.photos.kind === "known") {
       expect(signals.photos.value.photos.map((p) => p.id)).toEqual(["morning", "noon", "evening"]);
+    }
+  });
+});
+
+/**
+ * 023 — `PhotoFacts.folderName`을 `Photo`로 이월한다 (SC-009).
+ *
+ * 계약: specs/023-photo-selection-algorithm/data-model.md §2
+ *
+ * 004의 판정은 이 필드를 읽지 않는다 — 위 모든 describe가 `folderName` 없이도
+ * 그대로 통과하는 것이 SC-009다. 여기서는 있으면 옮겨지는 것만 확인한다.
+ */
+describe("023 — folderName 이월 (SC-009)", () => {
+  it("PhotoFacts.folderName이 있으면 Photo에 그대로 실린다", async () => {
+    const { port } = fakePort({
+      photos: [
+        { id: "cam", takenAtMs: at("2026-08-12T08:00:00"), folderName: "Camera" },
+        { id: "shot", takenAtMs: at("2026-08-12T12:00:00"), folderName: "Screenshots" },
+        { id: "unknown-folder", takenAtMs: at("2026-08-12T19:00:00") },
+      ],
+    });
+
+    const signals = await collectDaySignals(port, DAY);
+
+    expect(signals.photos.kind).toBe("known");
+    if (signals.photos.kind === "known") {
+      expect(signals.photos.value.photos.map((p) => [p.id, p.folderName])).toEqual([
+        ["cam", "Camera"],
+        ["shot", "Screenshots"],
+        ["unknown-folder", undefined],
+      ]);
+    }
+  });
+
+  it("folderName이 하나도 없어도 004 판정은 known 그대로다", async () => {
+    const { port } = fakePort({
+      photos: [
+        { id: "a", takenAtMs: at("2026-08-12T09:00:00") },
+        { id: "b", takenAtMs: at("2026-08-12T10:00:00") },
+      ],
+    });
+
+    const signals = await collectDaySignals(port, DAY);
+
+    expect(signals.photos.kind).toBe("known");
+    if (signals.photos.kind === "known") {
+      expect(signals.photos.value.photos.every((p) => p.folderName === undefined)).toBe(true);
     }
   });
 });
