@@ -22,7 +22,6 @@ import type { AutoDiarySettings } from "../../src/schedule/settings";
 const OFF: AutoDiarySettings = {
   enabled: false,
   targetHour: 7,
-  batteryExceptionPrompted: false,
 };
 
 function mockDeps() {
@@ -48,20 +47,13 @@ function mockDeps() {
         calls.push("reschedule");
       },
     },
-    batteryPort: {
-      requestException: async () => {
-        calls.push("requestException");
-      },
-      openSettingsList: async () => {
-        calls.push("openSettingsList");
-      },
-    },
     notificationPort: {
       ensureChannel: async () => {},
       requestPermission: async () => {
         calls.push("requestPermission");
         return "granted" as const;
       },
+      getPermission: async () => "granted" as const,
       present: async () => "id",
       dismiss: async () => {},
       lastResponse: async () => null,
@@ -72,27 +64,26 @@ function mockDeps() {
   return { deps, written, calls };
 }
 
-describe("applyToggleOn — S6 순서 (최초 켬)", () => {
-  it("권한 → 배터리 예외 1회 → save → register 순서로 부른다", async () => {
+describe("applyToggleOn — S6 순서 (021: 배터리 예외 요청 제거)", () => {
+  it("권한 → save → register 순서로 부른다 (배터리 인텐트 없음)", async () => {
     const { deps, calls } = mockDeps();
     await applyToggleOn(OFF, deps);
-    expect(calls).toEqual(["requestPermission", "requestException", "save", "register"]);
+    expect(calls).toEqual(["requestPermission", "save", "register"]);
   });
 
-  it("batteryExceptionPrompted를 true로 만들어 저장한다", async () => {
+  it("enabled만 켜서 저장한다 (batteryExceptionPrompted 필드 없음)", async () => {
     const { deps, written } = mockDeps();
     const { settings } = await applyToggleOn(OFF, deps);
-    expect(settings).toEqual({ enabled: true, targetHour: 7, batteryExceptionPrompted: true });
-    expect(JSON.parse(written[0])).toMatchObject({ batteryExceptionPrompted: true });
+    expect(settings).toEqual({ enabled: true, targetHour: 7 });
+    expect(JSON.parse(written[0])).toEqual({ enabled: true, targetHour: 7 });
   });
-});
 
-describe("applyToggleOn — FR-010 MUST NOT (재차 켬)", () => {
-  it("batteryExceptionPrompted: true면 requestException을 부르지 않는다", async () => {
+  it("자동 생성 토글은 배터리 인텐트를 절대 띄우지 않는다 (021 FR-010)", async () => {
     const { deps, calls } = mockDeps();
-    await applyToggleOn({ ...OFF, batteryExceptionPrompted: true }, deps);
+    await applyToggleOn(OFF, deps);
+    await applyToggleOn({ ...OFF, enabled: true }, deps);
     expect(calls).not.toContain("requestException");
-    expect(calls).toEqual(["requestPermission", "save", "register"]);
+    expect(calls).not.toContain("openSettingsList");
   });
 });
 

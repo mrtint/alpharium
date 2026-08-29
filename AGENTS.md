@@ -422,6 +422,113 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   — SC-003 배터리 예외 라운드 간격, narrative 백그라운드 완주 시간,
   배터리 인텐트가 실제 도착한 제조사 설정 화면, release R8 통과 여부.)
 
+### 021 — 앱 요구 권한 실측 및 통합 신청 절차 (2026-08-29)
+
+020이 `POST_NOTIFICATIONS`·배터리 예외를 새로 도입하며 앱 권한이 여러
+기능에 흩어졌고, 새 release APK 설치 시 모든 권한이 꺼진 채로 사진 없는
+일기가 조용히 생성되는 문제가 실기기에서 관측됐다. 앱 최초 진입부에
+통합 온보딩을 두어 이를 고쳤다.
+
+- **`src/onboarding/`가 새 경계다** — 020의 `src/schedule/`처럼 순수 판정
+  (`requirements`·`decision`·`flag`)과 기기 통로(`*-port`)를 나눈다.
+  `checkOnboardingFile`(`constitution-rules.ts`)이 `diary/prompt`·
+  `diary/acceptance`·`models/roster`·`schedule/settings` 직접 import와
+  `flag.ts`의 `Date`·`count`·`history` 토큰을 막는다(위반 주입 3건 전부
+  잡히는 것을 확인).
+- **필수 권한 목록은 사람이 못 박은 상수**(`requirements.ts`,
+  `PERMISSION_REQUIREMENTS`) — 5갈래(`photos`·`photo-location`·`location`·
+  `notifications`·`battery-exception`), `order` 1..5, 고정 순서. 012의
+  `USER_VISIBLE_SIGNAL_AXES`가 선례다. **코드가 항목을 판정하지 않는다**
+  (원칙 V) — 계약 테스트가 소스를 `readFileSync`로 읽어 `readonly`·문안
+  토큰·플랫폼 메타를 잠근다.
+- **온보딩은 건너뛸 수 있다**(원칙 I) — 각 단계 [허용]/[건너뛰기], 마지막
+  [시작하기]가 `onboarding.json`에 `completed: true`를 쓴다. 뒤로 가기
+  없음. 단계 완료는 저장하지 않고 매번 실시간 권한 상태로 재판정
+  (`planOnboardingSteps`). `battery-exception`은 조회 통로가 없어
+  `batteryNoticeShown`(1회 제시)으로만 판정하되, 세션 내 건너뛰기도
+  존중한다(`skipped-eligible`).
+- **020의 `AutoDiarySettings.batteryExceptionPrompted`를 흡수·제거**했다.
+  `settings.ts`의 필드·파싱·직렬화 4곳, `settings-effects.ts`의
+  `applyToggleOn` 배터리 로직, `SettingsEffectDeps.batteryPort`를 전부
+  걷어냈다. 자동 생성 토글은 더 이상 배터리 인텐트를 띄우지 않는다 —
+  배터리 안내의 주체는 통합 온보딩과 설정 "권한" 섹션뿐이다. **옛
+  `auto-diary.json`의 그 값은 `loadAutoDiarySettings`가 무시하고**,
+  `flag.ts`가 최초 1회 읽어 `batteryNoticeShown`을 시드한다(FR-010a) —
+  `schedule/settings.ts`를 import하지 않고 `flag-port.ts`가 경로
+  하드코딩으로 `auto-diary.json`을 직접 읽는다.
+- **`NotificationPort`에 `getPermission()`을 더했다**(020의
+  `requestPermission()`은 창을 띄우므로 상태 표시에 못 씀). 020 테스트
+  mock 다수를 함께 손봤다.
+- **거부 안내는 문자열 주입으로 흐른다** — `App.tsx`가
+  `PERMISSION_REQUIREMENTS[...].ifDenied`를 모아 `deniedNotices`로
+  `DiaryHomeScreen` → `DiaryListScreen`에 넘긴다. 006-era 화면이 온보딩
+  계층에 닿지 않게 문자열만 넘긴다(중복 정의 없음).
+- **App.tsx 진입 게이트**: `AppFrame`이 `onboarding.json`을 읽어
+  `completed !== true`면 탭 UI 대신 `OnboardingScreen`만 그린다(006의
+  "화면이 둘뿐이므로 상태 하나로 가른다"에 세 번째 상태를 얹음).
+  설정 "권한" 섹션의 [권한 안내 다시 보기]가 `forceOnboarding`을 켠다 —
+  `completed`는 그대로.
+- **포그라운드 복귀 재조회**(SC-006): `OnboardingScreen`·
+  `PermissionsSection`·App.tsx의 `deniedNotices` 계산이 전부 `AppState`
+  `change` → `"active"`에서 권한을 다시 읽는다.
+- **새 네이티브 모듈 0개** — `expo-media-library`·`expo-location`·
+  `expo-notifications`·`expo-intent-launcher`의 기존 API만 재사용. 따라서
+  release 재확인 불필요, debug 1회로 충분(012 기준).
+- 기기 없는 테스트 1853개(+8 스위트) 통과, lint·헌법 검사·prettier 클린.
+- **실기기 검증 완료(2026-08-29, SM-S901N/Galaxy S22, Android 16 / SDK 36,
+  debug)**. 관측:
+  - **진입 게이트**: 새 설치 첫 실행에서 일기 목록이 아니라 "시작하기 전에"
+    온보딩이 먼저 뜬다. `pm clear`로 `onboarding.json`이 지워지면 다시
+    "1 / 5"부터 재시작 — 게이트는 `completed` 플래그로만 판정.
+  - **부분 사진 허용(Android 14+ `limited`)이 실제로 온다.** OS 다이얼로그의
+    "제한된 액세스 허용" → 포토피커 2장 선택 시
+    `READ_MEDIA_VISUAL_USER_SELECTED: granted=true` /
+    `READ_MEDIA_IMAGES: granted=false`, `describePhotoAccessLimit`가
+    `"partial"`을 반환하고 설정 "권한" 행이 **"일부만 허용됨" + [전체 허용]**
+    로 렌더된다. 따라서 **`visiblePhotoCount` 분기는 이 기기에서 dead
+    path**(구형 안드로이드 대비로 유지, 비용 0). 온보딩은 부분 허용도
+    satisfied로 보고 다음 단계로 넘어간다.
+  - **설정 "권한" 섹션 + OS 링크 + 복귀 갱신(SC-006)**: 5개 행이 라이브
+    상태를 보인다. [전체 허용]/[허용] → `com.android.settings`
+    `InstalledAppDetails` 진입. OS에서 부여 후 앱 복귀 시 `AppState`
+    `change→active` 리스너가 행을 자동 갱신("일부만 허용됨"→"허용됨",
+    "거부됨"→"허용됨").
+  - **Maestro**: `.maestro/unified-permission-onboarding.yml` 전체 PASS.
+    ⚠️ 흐름의 M2가 원래 `id: "onboarding-step-photos"`를 박아 두어, 사진
+    권한이 이미(부분) 부여된 기기에서는 첫 단계가 사진이 아니라 실패했다 →
+    **권한 상태 무관하게** 수정(`id: "onboarding-step-.*"` + skip-all
+    루프). 어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다는 것이
+    교훈 — OS가 자동 부여하는 항목이 있으면 새 설치라도 첫 단계가 사진이
+    아닐 수 있다.
+  - **회귀 확인**: `.maestro/scheduled-diary-notification.yml`(020)도 함께
+    돌렸다 — **개발자 탭을 탭하던 stale 버그**(020 자동 생성 설정은
+    `settings` 탭에 있다)를 발견·수정 후 PASS. 021 회귀가 아니라 020 흐름의
+    잠재 결함이었다.
+  - **D2 (온보딩 후 실제 생성 `has_media>0`)**: 캐릭터 모델(`a1.bin` kanana)과
+    VLM(`v1.bin`+`v2.bin` LFM2.5-VL)을 개발 기계에서 받아 `run-as`로
+    `files/models/`에 배치 + `state.json`에 `passed:true` verdict 3개
+    (010 도구는 사진만 심으므로 모델은 수동). 사진 있는 하루(08-28, 3장) +
+    `빠르게 봄` → `adb logcat`에 **`loadPrompt:580 ... has_media=1`**(VLM이 사진을
+    IMAGE 청크로 디코드), 이어 캐릭터 모델 706토큰 프롬프트(캡션이 텍스트 재료로
+    들어감). 일기가 사진 내용을 정확히 반영 + 짐작 말투. **021 온보딩이 부여한
+    사진 권한으로 VLM→캐릭터 파이프라인이 실제로 사진을 읽었다**(011 "has_media=0"
+    결함의 반대).
+  - **D6 (020→021 업그레이드 시드)**: `onboarding.json` 삭제 + 구형
+    `auto-diary.json`(`batteryExceptionPrompted:true`) → 재시작 시 온보딩 재노출
+    (`completed:false` 시드), **배터리 단계는 온보딩 흐름에 안 나타남**
+    (`batteryNoticeShown:true` 시드 → satisfied). `loadAutoDiarySettings`는 구형
+    필드 무시, `flag.ts`만 raw로 읽어 시드 — 둘 다 확인.
+  - **T030 (위치 권한 ↔ 안드로이드 장소명)**: 같은 하루(08-27, 좌표 강남 일대)를
+    위치 권한 유무별로 두 번 생성. **부여**: `placeName={"kind":"known","value":"강남구"}`,
+    본문에 "강남구". **거부**(`pm revoke ACCESS_FINE/COARSE_LOCATION`):
+    `placeName={"kind":"unknown"}`, 본문에 지명 없음. → **안드로이드도
+    `reverseGeocodeAsync`는 위치 권한이 있어야 지명을 준다**(없으면 예외 →
+    `geocoding-port.ts`가 삼킴). `location.platforms`는 `["android","ios"]` 유지
+    확정, `requirements.ts`의 "T030 실측 대기" 주석을 이 결과로 교체했다.
+  - **미확인 잔여**: 없음. 새 네이티브 모듈 없어 release 재확인 생략(012 기준).
+    ※ 검증용 모델·합성 하루는 010 원칙대로 "경로가 도는가"만 봤고 품질 결론에
+    쓰지 않았다.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

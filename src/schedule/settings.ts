@@ -23,9 +23,15 @@
 /**
  * 자동 생성 설정.
  *
- * **필드는 셋뿐이다**(S7, 원칙 IV) — "마지막 실행 시각" 같은 필드를 넣으면
+ * **필드는 둘뿐이다**(S7, 원칙 IV) — "마지막 실행 시각" 같은 필드를 넣으면
  * 실행 이력 로그로 자란다. 스케줄 판정은 매번 `store.listDays()`(일기 존재
  * 여부)로 충분하다.
+ *
+ * **`batteryExceptionPrompted`는 021이 제거했다** — 배터리 예외 안내의 주체가
+ * 통합 온보딩 흐름(`src/onboarding/`)과 설정 "권한" 섹션으로 옮겨졌다(021 FR-010).
+ * "1회 안내했다"의 판정은 `onboarding.json`의 `batteryNoticeShown`이 갖는다.
+ * 옛 파일에 이 필드가 남아 있어도 `loadAutoDiarySettings`가 알 수 없는 필드로
+ * 무시하며, 021의 `flag.ts`가 최초 1회 그 값을 읽어 시드한다(021 FR-010a).
  */
 export type AutoDiarySettings = {
   /** 자동 생성 켜짐 여부 (FR-009). 기본값 false — 사용자가 명시적으로 켠다. */
@@ -35,18 +41,12 @@ export type AutoDiarySettings = {
    * 분은 두지 않는다 — 근사치(FR-002)이므로 분 단위 정밀도를 암시하지 않는다.
    */
   targetHour: number;
-  /**
-   * 배터리 최적화 예외 요청을 이미 1회 띄웠는가 (FR-010).
-   * true가 되면 다시는 자동으로 요청 인텐트를 띄우지 않는다(MUST NOT).
-   */
-  batteryExceptionPrompted: boolean;
 };
 
 /** 파일 없음·손상 시의 값. geocoding 설정처럼 명시적 기본값이 있다(S3). */
 export const DEFAULT_AUTO_DIARY_SETTINGS: AutoDiarySettings = {
   enabled: false,
   targetHour: 7,
-  batteryExceptionPrompted: false,
 };
 
 /** 설정이 담기는 통로. 테스트가 기기 없이 갈아끼운다. */
@@ -88,8 +88,7 @@ export async function loadAutoDiarySettings(
       targetHour: validHour(obj.targetHour)
         ? obj.targetHour
         : DEFAULT_AUTO_DIARY_SETTINGS.targetHour,
-      batteryExceptionPrompted:
-        typeof obj.batteryExceptionPrompted === "boolean" ? obj.batteryExceptionPrompted : false,
+      // `batteryExceptionPrompted`가 남아 있어도 무시한다(021이 필드를 제거).
     };
   } catch {
     return { ...DEFAULT_AUTO_DIARY_SETTINGS };
@@ -110,7 +109,6 @@ export async function saveAutoDiarySettings(
     JSON.stringify({
       enabled: settings.enabled,
       targetHour: settings.targetHour,
-      batteryExceptionPrompted: settings.batteryExceptionPrompted,
     }),
   );
 }

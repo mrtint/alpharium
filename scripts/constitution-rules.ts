@@ -453,6 +453,70 @@ export function checkScheduleFile(fileName: string, contents: string): Violation
   return violations;
 }
 
+/**
+ * 온보딩 판정이 제품 계층에 닿는 것 (021, plan.md Constitution Check, 원칙 III·IV).
+ *
+ * `src/onboarding/`은 통합 권한 온보딩의 순수 판정(`requirements`·`decision`·`flag`)과
+ * 기기 통로(`*-port`)를 모으는 자리다. `checkScheduleFile`을 본떴다.
+ *
+ * **막는 것**:
+ *  - `models/roster` — 캐릭터→모델 매핑. 권한 온보딩이 로스터를 알 이유가 없다(원칙 III).
+ *  - `diary/prompt` — 화자 규칙.
+ *  - `diary/acceptance` — 판정 4갈래.
+ *  - `schedule/settings` — 020의 자동 생성 설정. `flag.ts`는 `auto-diary.json`을
+ *    경로 하드코딩으로 직접 읽지(F2·§7), `settings.ts`를 import하지 않는다 —
+ *    `onboarding/`이 `schedule/`에 의존하면 두 기능이 얽힌다.
+ *  - `backend.generate()` 직접 호출 — 온보딩은 생성을 트리거하지 않는다(research §5).
+ */
+const ONBOARDING_TOUCHES_PRODUCT_LAYER =
+  /\bfrom\s+["'][^"']*(?:models\/roster|diary\/prompt|diary\/acceptance|schedule\/settings)["']|\b(?:backend|adapter|engine)\s*\.\s*generate\s*\(/;
+
+/**
+ * `flag.ts`가 이력 로그로 자라는 것 (021, data-model.md §3, 원칙 IV).
+ *
+ * 020의 `AutoDiarySettings`가 "필드는 셋뿐"을 못 박은 것과 같은 이유 — 온보딩 플래그는
+ * boolean 2개(`completed`·`batteryNoticeShown`)뿐이다. 타임스탬프·시도 횟수·마지막
+ * 실행을 넣으면 "언제 온보딩을 봤나"를 재는 측정 장치가 된다.
+ */
+const FLAG_GROWS_HISTORY = /\b(?:Date|timestamp|history|attemptCount|lastRun|count)\b/;
+
+/**
+ * 온보딩 판정 파일인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`src/onboarding/`가 대상이다.** `FLAG_GROWS_HISTORY`는 `flag.ts`에만 적용한다 —
+ * `decision.ts`나 통로가 `Date`를 쓸 일은 없지만, 이력 금지의 취지는 플래그가
+ * 자라는 것을 막는 것이다.
+ */
+export function checkOnboardingFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/onboarding/")) return [];
+
+  const isFlag = normalized === "src/onboarding/flag.ts";
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (ONBOARDING_TOUCHES_PRODUCT_LAYER.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "온보딩 판정이 제품 계층·schedule 설정에 직접 닿는다 (021, 원칙 III·IV)",
+      });
+    }
+
+    if (isFlag && FLAG_GROWS_HISTORY.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "온보딩 플래그가 이력·타임스탬프를 갖는다 — boolean 2개뿐이어야 한다 (021, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";

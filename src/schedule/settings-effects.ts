@@ -13,16 +13,16 @@
  * 쓰고 화면이 나머지를 하는 것과 같다).
  *
  * 그 "나머지"의 **순서**를 화면 밖 순수 조합 함수로 뗀다 — `App.tsx`의
- * `useCallback` 안에 두면 순서(권한 → 배터리 1회 → save → register)가
- * 기기 없이 검증되지 않는다. 여기 두면 mock 통로로 검증된다.
+ * `useCallback` 안에 두면 순서(권한 → save → register)가 기기 없이 검증되지
+ * 않는다. 여기 두면 mock 통로로 검증된다.
  *
- * **`batteryExceptionPrompted`가 true면 `requestException()`을 부르지
- * 않는다**(FR-010 MUST NOT) — 이 판정이 이 함수의 핵심이다.
+ * **배터리 예외 요청은 021이 여기서 걷어냈다** — 배터리 예외 안내의 주체가
+ * 통합 온보딩 흐름(`src/onboarding/`)과 설정 "권한" 섹션으로 옮겨졌다(021 FR-010).
+ * 자동 생성 토글은 더 이상 배터리 인텐트를 띄우지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import type { BackgroundSchedulePort } from "./background-port";
-import type { BatteryExceptionPort } from "./battery-exception-port";
 import type { NotificationPort } from "./notification-port";
 import {
   saveAutoDiarySettings,
@@ -33,7 +33,6 @@ import {
 export type SettingsEffectDeps = {
   settingsPort: AutoDiarySettingsPort;
   backgroundPort: BackgroundSchedulePort;
-  batteryPort: BatteryExceptionPort;
   notificationPort: NotificationPort;
 };
 
@@ -47,10 +46,10 @@ export type ToggleOnResult = {
  * 자동 생성을 **켠다** (S6 순서).
  *
  *   1. 알림 권한 요청 → denied면 그대로 진행(생성은 알림과 무관하게 완주, N8).
- *   2·3. `batteryExceptionPrompted === false`일 때만 배터리 예외를 1회 요청하고
- *        플래그를 세운다(FR-010 MUST / MUST NOT).
- *   4. `saveAutoDiarySettings`.
- *   5. `backgroundPort.register()`.
+ *   2. `saveAutoDiarySettings`.
+ *   3. `backgroundPort.register()`.
+ *
+ * 배터리 예외 요청은 하지 않는다 — 021이 통합 온보딩·설정 "권한" 섹션으로 옮겼다.
  */
 export async function applyToggleOn(
   current: AutoDiarySettings,
@@ -58,12 +57,7 @@ export async function applyToggleOn(
 ): Promise<ToggleOnResult> {
   const permission = await deps.notificationPort.requestPermission().catch(() => "denied" as const);
 
-  let next: AutoDiarySettings = { ...current, enabled: true };
-
-  if (!current.batteryExceptionPrompted) {
-    await deps.batteryPort.requestException().catch(() => {});
-    next = { ...next, batteryExceptionPrompted: true };
-  }
+  const next: AutoDiarySettings = { ...current, enabled: true };
 
   await saveAutoDiarySettings(deps.settingsPort, next).catch(() => {});
   await deps.backgroundPort.register().catch(() => {});

@@ -16,7 +16,7 @@ import type { AutoDiarySettings } from "../../src/schedule/settings";
  * wrap을 기기 없이 검증한다.
  */
 
-const ENABLED: AutoDiarySettings = { enabled: true, targetHour: 7, batteryExceptionPrompted: true };
+const ENABLED: AutoDiarySettings = { enabled: true, targetHour: 7 };
 
 /** 기기 현지 시각으로 특정 시(hour)를 만든다. */
 function at(hour: number): Date {

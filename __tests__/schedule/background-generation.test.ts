@@ -16,7 +16,7 @@ import type { AutoDiarySettings } from "../../src/schedule/settings";
  * (007~019가 순수 함수를 밖에서 테스트한 것과 같은 구조).
  */
 
-const ENABLED: AutoDiarySettings = { enabled: true, targetHour: 7, batteryExceptionPrompted: true };
+const ENABLED: AutoDiarySettings = { enabled: true, targetHour: 7 };
 
 function at(hour: number): Date {
   return new Date(2026, 7, 28, hour, 30, 0, 0);
@@ -48,6 +48,7 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
       notificationPort: {
         ensureChannel: async () => {},
         requestPermission: async () => "granted" as const,
+        getPermission: async () => "granted" as const,
         present,
         dismiss,
         lastResponse: async () => null,

@@ -37,6 +37,11 @@ export interface NotificationPort {
   /** POST_NOTIFICATIONS 런타임 권한 요청 (Android 13+). 자동 생성 켤 때. */
   requestPermission(): Promise<"granted" | "denied">;
   /**
+   * 현재 권한 상태만 조회한다 (요청하지 않는다). 021 온보딩이 단계 완료 여부를
+   * 판정할 때 쓴다 — `requestPermission`은 창을 띄우므로 상태 표시에는 쓸 수 없다.
+   */
+  getPermission(): Promise<"granted" | "denied" | "undetermined" | "blocked">;
+  /**
    * 즉시 로컬 알림. trigger: null. data에 { day }를 싣는다.
    * 반환값은 notification identifier (notified.json에 저장).
    */
@@ -68,6 +73,18 @@ export function expoNotificationPort(): NotificationPort {
       if (existing.granted) return "granted";
       const requested = await Notifications.requestPermissionsAsync();
       return requested.granted ? "granted" : "denied";
+    },
+
+    async getPermission() {
+      try {
+        const Notifications = await import("expo-notifications");
+        const existing = await Notifications.getPermissionsAsync();
+        if (existing.granted) return "granted";
+        if (existing.status === "undetermined") return "undetermined";
+        return existing.canAskAgain ? "denied" : "blocked";
+      } catch {
+        return "undetermined";
+      }
     },
 
     async present(day) {

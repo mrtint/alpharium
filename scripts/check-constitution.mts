@@ -17,6 +17,7 @@ import { join } from "node:path";
 import {
   checkEnvFile,
   checkMonologueFile,
+  checkOnboardingFile,
   checkScheduleFile,
   checkSeedFile,
   checkSourceFile,
@@ -62,6 +63,9 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 020 — 스케줄·알림·잠금의 순수 판정 자리. checkScheduleFile이 경로로
       // 대상(src/schedule/)을 정한다. 019의 checkSpikeFile을 개명·재활용했다.
       violations.push(...checkScheduleFile(child, contents));
+      // 021 — 통합 권한 온보딩의 순수 판정 자리. checkOnboardingFile이 경로로
+      // 대상(src/onboarding/)을 정한다.
+      violations.push(...checkOnboardingFile(child, contents));
     }
   }
 

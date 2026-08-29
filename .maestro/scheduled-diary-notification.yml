@@ -28,12 +28,13 @@ appId: com.anonymous.alpharium
 ---
 - launchApp
 
-# 개발자 탭(local·dev 전용)으로 간다 — 자동 생성 설정 진입점이 거기 있다.
+# 설정 탭으로 간다 — 자동 생성 설정은 prod에도 있는 사용자 화면이라 개발자 탭이
+# 아니라 설정 탭에 있다(020 App.tsx `AutoDiarySection`이 `settings` 갈래에서 그려짐).
 - runFlow:
     when:
-      visible: "개발자"
+      visible: "설정"
     commands:
-      - tapOn: "개발자"
+      - tapOn: "설정"
 
 # ★ M1 — **자동 생성 설정 화면이 있고, 목표 시각·토글이 보인다.**
 - scrollUntilVisible:

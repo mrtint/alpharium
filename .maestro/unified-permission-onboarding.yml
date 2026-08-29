@@ -1,0 +1,74 @@
+# 실기기 자동 테스트 — 앱 요구 권한 실측 및 통합 신청 절차 (021)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **새 설치 시 온보딩이 일기 목록보다 먼저 뜨고, 건너뛰어도 앱이 죽지 않으며,
+# 재실행 시 다시 뜨지 않는가**를 본다.
+#
+# 검증 항목:
+#   FR-005·SC-001  온보딩이 일기 목록보다 먼저 뜬다                     (M1)
+#   FR-006·FR-007  첫 단계가 사진이고, 설명 문안에 모델 정보가 없다     (M2)
+#   FR-008         각 단계에 [건너뛰기]가 있다                          (M3)
+#   FR-013·SC-003  전부 건너뛰어도 크래시 없이 일기 목록에 도달한다     (M4)
+#   FR-011·SC-003  재실행 시 온보딩이 다시 뜨지 않는다                  (M5)
+#
+# **여기서 자동화하지 않는 것** — quickstart.md D0·D2·D3·D5·D6:
+#   D0(필수 권한 실측)           — adb pm revoke + logcat 관측. 사람이 한다.
+#   D2(온보딩 후 has_media>0)    — 실제 생성 + 010 합성 하루. 사람이 한다.
+#   D3(Android 14 부분 허용)     — "선택한 사진만" 선택 + accessPrivileges 관측.
+#   D5(OS 설정 링크·복귀 갱신)   — OS 설정 화면 이동·복귀. 사람이 한다.
+#   D6(020 배터리 로직 제거·시드) — 업그레이드 시나리오. 사람이 한다.
+#   문안 리뷰(SC-008)            — 의미를 읽어야 한다. 기계로 채점하지 않는다(원칙 IV).
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V). 새 설치 상태(앱 데이터
+# 삭제)에서 돌려야 M1·M5가 의미를 갖는다 — run-device-tests.mjs가 clearState로
+# 보장하거나, 사람이 `adb shell pm clear` 후 돌린다.
+#
+# ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다(008 실측).
+# ⚠️ 단계·버튼은 testID로 짚는다(R8·ProGuard 생존, 007 실측).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp:
+    clearState: true
+
+# ★ M1 — **온보딩이 일기 목록보다 먼저 뜬다**(FR-005·SC-001).
+- assertVisible:
+    id: "onboarding-screen"
+
+# ★ M2 — **설명 문안에 모델 정보가 없다**(FR-007).
+#   어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다(이미 부여된 권한은
+#   satisfied로 건너뛰므로, 새 설치라도 OS가 자동 부여한 항목이 있으면 첫 단계가
+#   사진이 아닐 수 있다) — 특정 단계 id를 박지 않고, 단계 컨테이너 하나가 떠 있고
+#   그 문안이 헌법 III을 지키는지만 본다.
+- assertVisible:
+    id: "onboarding-step-.*"
+- assertNotVisible:
+    text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
+
+# ★ M3 — **단계에 [건너뛰기]가 있다**(FR-008).
+- assertVisible:
+    id: "onboarding-skip"
+
+# ★ M4 — **전부 건너뛰어도 크래시 없이 일기 목록에 도달한다**(FR-013·SC-003).
+#   단계 수(4~5)는 실측(§2)에 달렸으므로 [건너뛰기]가 사라질 때까지 반복한다.
+- repeat:
+    while:
+      visible:
+        id: "onboarding-skip"
+    commands:
+      - tapOn:
+          id: "onboarding-skip"
+- assertVisible:
+    id: "onboarding-start"
+- tapOn:
+    id: "onboarding-start"
+
+# 일기 목록(또는 캐릭터 준비 안내)에 도달했다 — 온보딩 화면이 사라졌다.
+- assertNotVisible:
+    id: "onboarding-screen"
+
+# ★ M5 — **재실행 시 온보딩이 다시 뜨지 않는다**(FR-011·SC-003).
+- launchApp:
+    clearState: false
+- assertNotVisible:
+    id: "onboarding-screen"

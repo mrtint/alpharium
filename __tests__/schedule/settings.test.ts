@@ -42,7 +42,6 @@ describe("왕복 — 담고 꺼낸다 (S3)", () => {
     const settings: AutoDiarySettings = {
       enabled: true,
       targetHour: 9,
-      batteryExceptionPrompted: true,
     };
     await saveAutoDiarySettings(port, settings);
 
@@ -54,19 +53,22 @@ describe("왕복 — 담고 꺼낸다 (S3)", () => {
     await saveAutoDiarySettings(port, {
       enabled: true,
       targetHour: 7,
-      batteryExceptionPrompted: false,
     });
     await saveAutoDiarySettings(port, {
       enabled: false,
       targetHour: 22,
-      batteryExceptionPrompted: true,
     });
 
     expect(await loadAutoDiarySettings(port)).toEqual({
       enabled: false,
       targetHour: 22,
-      batteryExceptionPrompted: true,
     });
+  });
+
+  it("옛 batteryExceptionPrompted 필드가 있어도 무시하고 읽는다 (021 FR-010)", async () => {
+    const raw = JSON.stringify({ enabled: true, targetHour: 8, batteryExceptionPrompted: true });
+    const loaded = await loadAutoDiarySettings(memoryPort(raw));
+    expect(loaded).toEqual({ enabled: true, targetHour: 8 });
   });
 });
 
@@ -77,11 +79,10 @@ describe("왕복 — 담고 꺼낸다 (S3)", () => {
  * 명시적 기본값이 있는 설정이다.
  */
 describe("읽기 실패는 기본값이다 (S3)", () => {
-  it("기본값이 { enabled: false, targetHour: 7, batteryExceptionPrompted: false }", () => {
+  it("기본값이 { enabled: false, targetHour: 7 }", () => {
     expect(DEFAULT_AUTO_DIARY_SETTINGS).toEqual({
       enabled: false,
       targetHour: 7,
-      batteryExceptionPrompted: false,
     });
   });
 
@@ -113,7 +114,7 @@ describe("읽기 실패는 기본값이다 (S3)", () => {
  * ★ 부분 손상에 관대하다 (S3).
  *
  * `targetHour`가 0–23 정수가 아니면 그 필드만 7로, 나머지는 살린다.
- * `enabled`/`batteryExceptionPrompted`가 boolean이 아니면 false.
+ * `enabled`가 boolean이 아니면 false.
  */
 describe("부분 손상 — 나쁜 필드만 대체하고 나머지는 살린다 (S3)", () => {
   it.each([
@@ -126,12 +127,10 @@ describe("부분 손상 — 나쁜 필드만 대체하고 나머지는 살린다
     const raw = JSON.stringify({
       enabled: true,
       targetHour: badHour,
-      batteryExceptionPrompted: true,
     });
     const loaded = await loadAutoDiarySettings(memoryPort(raw));
     expect(loaded.targetHour).toBe(7);
     expect(loaded.enabled).toBe(true);
-    expect(loaded.batteryExceptionPrompted).toBe(true);
   });
 
   it.each([
@@ -142,17 +141,10 @@ describe("부분 손상 — 나쁜 필드만 대체하고 나머지는 살린다
     const raw = JSON.stringify({
       enabled: badEnabled,
       targetHour: 9,
-      batteryExceptionPrompted: true,
     });
     const loaded = await loadAutoDiarySettings(memoryPort(raw));
     expect(loaded.enabled).toBe(false);
     expect(loaded.targetHour).toBe(9);
-  });
-
-  it("batteryExceptionPrompted가 boolean이 아니면 false", async () => {
-    const raw = JSON.stringify({ enabled: true, targetHour: 8, batteryExceptionPrompted: "yes" });
-    const loaded = await loadAutoDiarySettings(memoryPort(raw));
-    expect(loaded.batteryExceptionPrompted).toBe(false);
   });
 
   it("targetHour 경계값 0과 23은 그대로 유지된다", async () => {
@@ -160,7 +152,6 @@ describe("부분 손상 — 나쁜 필드만 대체하고 나머지는 살린다
       const raw = JSON.stringify({
         enabled: true,
         targetHour: hour,
-        batteryExceptionPrompted: false,
       });
       expect((await loadAutoDiarySettings(memoryPort(raw))).targetHour).toBe(hour);
     }
@@ -180,19 +171,14 @@ describe("실행 이력을 담지 않는다 (S7, 원칙 IV)", () => {
     expect(SOURCE).not.toMatch(/lastRunAt|lastRun\b|ranAt|lastTriggeredAt|runHistory/i);
   });
 
-  it("저장된 설정에 필드가 셋뿐이다", async () => {
+  it("저장된 설정에 필드가 둘뿐이다 (021이 batteryExceptionPrompted 제거)", async () => {
     const port = memoryPort();
     await saveAutoDiarySettings(port, {
       enabled: true,
       targetHour: 7,
-      batteryExceptionPrompted: false,
     });
     const parsed = JSON.parse(port.stored ?? "{}");
-    expect(Object.keys(parsed).sort()).toEqual([
-      "batteryExceptionPrompted",
-      "enabled",
-      "targetHour",
-    ]);
+    expect(Object.keys(parsed).sort()).toEqual(["enabled", "targetHour"]);
   });
 
   it("캐릭터·모델 정보가 담기지 않는다 (원칙 III)", async () => {
@@ -200,7 +186,6 @@ describe("실행 이력을 담지 않는다 (S7, 원칙 IV)", () => {
     await saveAutoDiarySettings(port, {
       enabled: true,
       targetHour: 7,
-      batteryExceptionPrompted: false,
     });
     expect(port.stored).not.toMatch(/character|model|gguf|kanana|exaone/i);
   });

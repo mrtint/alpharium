@@ -97,10 +97,10 @@ describe("AutoDiarySettingsScreen — 배터리 상시 링크 (E4, FR-010)", () 
     expect(onOpenBatterySettings).toHaveBeenCalledTimes(1);
   });
 
-  it("batteryExceptionPrompted가 true여도 링크가 보인다", async () => {
+  it("자동 생성이 켜져 있어도 배터리 설정 링크가 보인다 (E4 상시)", async () => {
     await render(
       <AutoDiarySettingsScreen
-        settings={{ ...DEFAULT_AUTO_DIARY_SETTINGS, batteryExceptionPrompted: true }}
+        settings={{ ...DEFAULT_AUTO_DIARY_SETTINGS, enabled: true }}
         onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
         onOpenBatterySettings={() => {}}
