@@ -76,6 +76,9 @@
         "testMatch": [
           "<rootDir>/__tests__/**/*.test.tsx",
           "<rootDir>/__tests__/jest-projects.test.ts"
+        ],
+        "setupFilesAfterEnv": [
+          "<rootDir>/jest/setup-ui.ts"
         ]
       }
     ]

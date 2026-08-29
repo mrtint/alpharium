@@ -1,0 +1,23 @@
+#!/bin/sh
+# main/master에 직접 커밋하는 것을 막는다.
+#
+# 이 저장소는 기능마다 브랜치를 파고 PR로 머지한다(021 #31 등). 2026-08-29에
+# 코딩 에이전트가 스펙킷 훅 출력의 `BRANCH:` 필드를 믿고 브랜치를 안 판 채
+# main에서 022를 통째로 작업·커밋한 일이 있어 이 훅을 세운다.
+#
+# 우회가 정말 필요하면(핫픽스 등): git commit --no-verify
+
+branch="$(git symbolic-ref --short -q HEAD)"
+
+case "$branch" in
+main | master)
+	echo "✋ '$branch' 브랜치에 직접 커밋하려 합니다."
+	echo "   기능 작업은 브랜치를 파고 PR로 머지합니다(AGENTS.md 「작업 습관」)."
+	echo "   지금 변경을 새 브랜치로 옮기려면:"
+	echo "       git branch <feature-branch> && git reset --hard @{u} && git switch <feature-branch>"
+	echo "   의도한 직접 커밋이면: git commit --no-verify"
+	exit 1
+	;;
+esac
+
+exit 0
