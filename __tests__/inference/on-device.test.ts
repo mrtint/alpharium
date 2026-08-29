@@ -769,3 +769,165 @@ describe("018 — captionDay()", () => {
     expect("text" in result).toBe(true);
   });
 });
+
+/**
+ * 023 T041 — `readPhotos()`가 상한 초과인 하루에만 폴더 이름을 해석하고,
+ * 잡사진(스크린샷 폴더)을 캡션 대상에서 뺀다.
+ *
+ * 계약: specs/023-photo-selection-algorithm/tasks.md T053
+ *       specs/023-photo-selection-algorithm/contracts/classification.md
+ *
+ * `select.ts`·`expo-port.ts` 단위 테스트는 각 조각을 잠근다. 여기서는
+ * `on-device.ts`의 통합 경로 — `reachedVisionLimit` 게이트 → `resolveFolders`
+ * → `attachFolderNames` → `selectForVision` — 가 실제로 도는지 본다.
+ */
+describe("023 T041 — 잡사진 필터링 통합 경로", () => {
+  const cameraPhoto = (id: string, hour: number): Photo => ({
+    id,
+    takenAt: new Date(2026, 7, 20, hour, 0, 0),
+  });
+
+  function signalsWithPhotos(photos: Photo[]): DaySignals {
+    return {
+      date: "2026-08-20",
+      photos: { kind: "known", value: { photos, complete: true } },
+      places: { kind: "none" },
+      steps: { kind: "unknown", reason: "no-channel" },
+      battery: { kind: "unknown", reason: "no-channel" },
+      connectivity: { kind: "unknown", reason: "no-channel" },
+    };
+  }
+
+  function requestWith(signals: DaySignals): DiaryRequest {
+    return { signals, character: "quiet", vision: "quick", dayStillOpen: false };
+  }
+
+  /** 캡션된 사진 id를 모은다. `resolveFolders`는 옵션으로 주입. */
+  function visionCapturing(resolveFolders?: VisionSupport["resolveFolders"]): {
+    support: VisionSupport;
+    captioned: string[];
+  } {
+    const captioned: string[] = [];
+    const engine: VisionEngine = {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(path: string): Promise<VisionRunResult> {
+        const id = (path.split("/").pop() ?? path).replace(".jpg", "");
+        captioned.push(id);
+        return { text: `사진 ${id}` };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    return {
+      support: {
+        engine,
+        resolvePath: async (p) => `/photo/${p.id}.jpg`,
+        resolveFolders,
+      },
+      captioned,
+    };
+  }
+
+  function passingEngine(): GenerationEngine {
+    return {
+      async load(): Promise<LoadResult> {
+        return { ok: true, warm: true };
+      },
+      async prewarm() {},
+      async run(): Promise<RunResult> {
+        return {
+          text: "2026년 8월 20일. 오늘은 공원에 갔다. 사진을 여러 장 찍었다.",
+          ending: { kind: "eos" },
+        };
+      },
+      async stop() {},
+      async unload() {},
+    };
+  }
+
+  // 12장(상한 8 초과). s1~s4는 스크린샷 폴더, 나머지는 카메라.
+  const OVER_LIMIT = [
+    cameraPhoto("c1", 5),
+    cameraPhoto("s1", 6),
+    cameraPhoto("c2", 8),
+    cameraPhoto("s2", 10),
+    cameraPhoto("c3", 12),
+    cameraPhoto("s3", 13),
+    cameraPhoto("c4", 15),
+    cameraPhoto("c5", 16),
+    cameraPhoto("s4", 18),
+    cameraPhoto("c6", 19),
+    cameraPhoto("c7", 21),
+    cameraPhoto("c8", 23),
+  ];
+
+  it("(a) 상한 초과 + resolveFolders 스텁 → 스크린샷이 캡션 대상에서 빠진다", async () => {
+    const folders = new Map<string, string | undefined>([
+      ["s1", "Screenshots"],
+      ["s2", "Screenshots"],
+      ["s3", "Screenshots"],
+      ["s4", "Screenshots"],
+    ]);
+    const { support, captioned } = visionCapturing(async () => folders);
+    const backend = createOnDeviceBackend(async () => [], passingEngine(), 60_000, support);
+
+    const result = await backend.generate(requestWith(signalsWithPhotos(OVER_LIMIT)));
+
+    expect("text" in result).toBe(true);
+    // s1~s4는 잡사진으로 걸러져 캡션되지 않는다.
+    expect(captioned).not.toContain("s1");
+    expect(captioned).not.toContain("s2");
+    expect(captioned).not.toContain("s3");
+    expect(captioned).not.toContain("s4");
+    // 카메라 원본에서 상한(8)만큼 골라 캡션한다.
+    expect(captioned.length).toBeLessThanOrEqual(8);
+    expect(captioned.every((id) => id.startsWith("c"))).toBe(true);
+  });
+
+  it("(b) resolveFolders가 throw → readPhotos()가 여전히 완성한다(폴더 태깅 없음)", async () => {
+    const { support, captioned } = visionCapturing(async () => {
+      throw new Error("미디어 라이브러리 접근 실패");
+    });
+    const backend = createOnDeviceBackend(async () => [], passingEngine(), 60_000, support);
+
+    const result = await backend.generate(requestWith(signalsWithPhotos(OVER_LIMIT)));
+
+    // 예외를 삼키고 폴더 없이 선별 — 잡사진 필터링이 no-op, 하루는 안 무너진다.
+    expect("text" in result).toBe(true);
+    expect(captioned.length).toBeLessThanOrEqual(8);
+  });
+
+  it("(c) resolveFolders 미주입 → 폴더 없이 선별(필터링 no-op)", async () => {
+    const { support, captioned } = visionCapturing(undefined);
+    const backend = createOnDeviceBackend(async () => [], passingEngine(), 60_000, support);
+
+    const result = await backend.generate(requestWith(signalsWithPhotos(OVER_LIMIT)));
+
+    expect("text" in result).toBe(true);
+    // 전부 "분류 불가" → 카메라 원본 취급 → s1~s4도 후보에 남는다(필터링 안 함).
+    expect(captioned.length).toBeLessThanOrEqual(8);
+  });
+
+  it("사진 ≤ 상한이면 resolveFolders를 부르지 않는다 (reachedVisionLimit 게이트)", async () => {
+    let called = false;
+    const { support } = visionCapturing(async () => {
+      called = true;
+      return new Map();
+    });
+    const backend = createOnDeviceBackend(async () => [], passingEngine(), 60_000, support);
+
+    // 4장 — 상한(8) 이하. R1 빠른 경로라 분류가 필요 없다.
+    const four = [
+      cameraPhoto("a", 8),
+      cameraPhoto("b", 12),
+      cameraPhoto("c", 16),
+      cameraPhoto("d", 20),
+    ];
+    const result = await backend.generate(requestWith(signalsWithPhotos(four)));
+
+    expect("text" in result).toBe(true);
+    expect(called).toBe(false);
+  });
+});

@@ -24,6 +24,13 @@ import { dayBounds, type DayDate } from "../../src/config/day-boundary.ts";
 export type PlannedPhoto = {
   takenAtMs: number;
   location: { latitude: number; longitude: number } | null;
+  /**
+   * 023 — 이 사진을 어느 하위 폴더에 심을지. 없으면 `SEED_FOLDER` 바로 아래
+   * (기존 동작). `"Screenshots"`·`"Download"`면 `SEED_FOLDER/<그 이름>/` 아래로
+   * 가고, 023의 `folderNameOf()`가 그 이름을 뽑아 잡사진으로 분류한다.
+   * `"Camera"`는 명시적으로 카메라 원본임을 나타낸다(생략과 결과는 같다).
+   */
+  folder?: "Camera" | "Screenshots" | "Download";
 };
 
 export type DayShape = {
@@ -32,6 +39,78 @@ export type DayShape = {
   description: string;
   build: (day: DayDate) => PlannedPhoto[];
 };
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **burst — "언제·어디서·무슨 종류·몇 장"의 원자** (023 Phase 8).
+ *
+ * 010의 `build: (day) => PlannedPhoto[]`는 시각·위치·장수를 통으로 하드코딩해
+ * 새 상황마다 함수를 새로 써야 했다. burst는 그 셋을 파라미터로 빼, 하루를
+ * **burst들의 조합**으로 기술한다. 다채로움 = burst를 어떻게 쌓느냐다.
+ *
+ * **순수 함수다.** 기기에 닿지 않고, 결정적이다(같은 입력 → 같은 출력).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export type BurstSpec = {
+  /** 하루 시작(04:00) 기준 시작 시각 (h) */
+  fromHour: number;
+  /** 시작~끝 시간 폭 (h). 이 안에 `count`장을 균등 분포. 0이면 전부 같은 시각 */
+  spanHours: number;
+  count: number;
+  /**
+   * 심볼릭 위치. `"near-a"`는 `NEAR_A`를 순환, `"b"`는 `PLACE_B`, `null`은 좌표
+   * 없음. 좌표를 직접 주려면 `{ latitude, longitude }`.
+   */
+  location: "near-a" | "b" | null | { latitude: number; longitude: number };
+  folder?: PlannedPhoto["folder"];
+};
+
+/**
+ * 마지막 사진이 하루 시작 + 이 시간을 넘지 않게 clamp한다.
+ *
+ * **자정을 넘으면 EXIF/GPSDateStamp의 로컬 날짜가 다음날로 바뀌어** 미디어
+ * 스캐너가 그 사진을 `day`가 아닌 다음날로 색인한다(011 실측, `spread-day`
+ * 주석). 하루는 04:00~익일04:00(24시간)이지만, 04:00 + 20시간 = 로컬 24:00
+ * 직전까지만 안전하다.
+ */
+const MAX_HOURS_INTO_DAY = 19.9;
+
+function coordOf(
+  location: BurstSpec["location"],
+  index: number,
+): { latitude: number; longitude: number } | null {
+  if (location === null) return null;
+  if (location === "b") return PLACE_B;
+  if (location === "near-a") return NEAR_A[index % NEAR_A.length];
+  return location;
+}
+
+/** burst 하나를 사진들로 편다. */
+export function burst(day: DayDate, spec: BurstSpec): PlannedPhoto[] {
+  const { count } = spec;
+  if (count <= 0) return [];
+
+  // 시작~끝을 자정 앞으로 clamp한다.
+  const from = Math.max(0, spec.fromHour);
+  const rawEnd = from + Math.max(0, spec.spanHours);
+  const end = Math.min(rawEnd, MAX_HOURS_INTO_DAY);
+  const span = Math.max(0, end - from);
+
+  return Array.from({ length: count }, (_, i) => {
+    // count가 1이면 시작 시각에. 아니면 [from, from+span]에 균등.
+    const hour = count === 1 ? from : from + (span * i) / (count - 1);
+    return {
+      takenAtMs: hoursIntoDay(day, hour),
+      location: coordOf(spec.location, i),
+      ...(spec.folder !== undefined ? { folder: spec.folder } : {}),
+    };
+  });
+}
+
+/** burst들을 이어붙여 하루를 만든다. 결과는 찍힌 시각 순. */
+export function composeDay(day: DayDate, specs: readonly BurstSpec[]): PlannedPhoto[] {
+  return specs.flatMap((s) => burst(day, s)).sort((a, b) => a.takenAtMs - b.takenAtMs);
+}
 
 /**
  * 좌표 둘. **서로 6km쯤 떨어져 있어 004가 다른 자리로 센다**(`SAME_PLACE_METERS` 100m).
@@ -167,6 +246,62 @@ const SHAPES: DayShape[] = [
         location: i % 2 === 0 ? PLACE_A : null,
       }));
     },
+  },
+  // ───────────────────── 023 Phase 8 — burst 조합으로 만든 모양 ─────────────────────
+  {
+    name: "mixed-clutter",
+    description: "카메라 6장 + 스크린샷 3장 + 다운로드 1장 — 잡사진 필터링을 보는 하루",
+    /**
+     * 023의 잡사진 필터링(D1)을 실기기에서 본다. 카메라 원본은 하루에 흩어지고
+     * (near-a), 스크린샷·다운로드는 좌표 없이 섞인다. `folderNameOf()`가 각
+     * 폴더 이름을 뽑아 스크린샷·다운로드를 캡션 대상에서 뺀다.
+     */
+    build: (day) =>
+      composeDay(day, [
+        { fromHour: 1, spanHours: 18, count: 6, location: "near-a", folder: "Camera" },
+        { fromHour: 3, spanHours: 14, count: 3, location: null, folder: "Screenshots" },
+        { fromHour: 9, spanHours: 0, count: 1, location: null, folder: "Download" },
+      ]),
+  },
+  {
+    name: "screenshots-only",
+    description: "스크린샷만 5장 — 전부 잡사진일 때 되돌리는지 보는 하루",
+    /**
+     * 023의 되돌림(D1). 카메라 원본이 0장이면 필터가 아무것도 안 걸러내고
+     * 원본(스크린샷들)으로 선별한다 — "사진 없음"이 아니다.
+     */
+    build: (day) =>
+      composeDay(day, [
+        { fromHour: 2, spanHours: 15, count: 5, location: null, folder: "Screenshots" },
+      ]),
+  },
+  {
+    name: "morning-heavy",
+    description: "오전에 15장 몰림 + 낮·저녁 각 2장 — 시간 분포 배분을 보는 하루",
+    /**
+     * 023의 시간 분포 배분(D2). 오전(04–06시, 023 `BUCKET_COUNT=6` 기준 첫
+     * 시간 칸)에 그날 사진의 절반 이상이 몰린다. 선별이 그 칸에서 여러 장을
+     * 고르되 낮·저녁 칸도 각각 대표하는지 본다. 전부 Camera(폴더 미지정).
+     */
+    build: (day) =>
+      composeDay(day, [
+        { fromHour: 0, spanHours: 2, count: 15, location: "near-a" },
+        { fromHour: 6, spanHours: 0, count: 2, location: "b" },
+        { fromHour: 12, spanHours: 0, count: 2, location: "b" },
+      ]),
+  },
+  {
+    name: "many-camera",
+    description: "카메라 12장, 하루에 고르게 — 상한 확장을 보는 하루",
+    /**
+     * 023의 상한 확장(D3). `over-limit`(201장, 010 실측에서 색인 밀림으로
+     * 사망)의 실용 대체. 12장이면 스캐너가 감당하고, 상한(현재 5)을 넘어
+     * 선별·분포가 실제로 돈다. 전부 Camera(폴더 미지정).
+     */
+    build: (day) =>
+      composeDay(day, [
+        { fromHour: 0, spanHours: MAX_HOURS_INTO_DAY, count: 12, location: "near-a" },
+      ]),
   },
 ];
 

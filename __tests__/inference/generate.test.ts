@@ -811,9 +811,10 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
  * 계약: specs/016-writing-monologue-expansion/research.md §3
  *       specs/016-writing-monologue-expansion/contracts/load-signal.md
  *
- * `selectForVision()`이 고른 장수가 상한(VISION_PHOTO_LIMIT=5)에 닿았는지로
- * many/normal을 가른다. `readPhotos()`가 `captionAll()` 호출 전에 이 신호를
- * 한 번 보낸다 — 015의 `onPhotoStart`(장 전환, branch 없음) 계약은 그대로다.
+ * `selectForVision()`이 고른 장수가 상한(VISION_PHOTO_LIMIT, 023 quickstart D3
+ * 실측으로 5→8)에 닿았는지로 many/normal을 가른다. `readPhotos()`가
+ * `captionAll()` 호출 전에 이 신호를 한 번 보낸다 — 015의 `onPhotoStart`
+ * (장 전환, branch 없음) 계약은 그대로다.
  */
 describe("016 — 사진 보기 갈래(많음/보통) 신호", () => {
   const pathOf = async (photo: { id: string }) => `/photo/${photo.id}.jpg`;
@@ -852,11 +853,11 @@ describe("016 — 사진 보기 갈래(많음/보통) 신호", () => {
     };
   }
 
-  it("사진이 상한(5장)에 닿으면 onStage가 ('vision', 'many')로 불린다", async () => {
+  it("사진이 상한(8장)에 닿으면 onStage가 ('vision', 'many')로 불린다", async () => {
     const signals: [string, string | undefined][] = [];
     const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
 
-    await backend.generate(requestFor(dayWithPhotos(5), "quick"), (stage, branch) =>
+    await backend.generate(requestFor(dayWithPhotos(8), "quick"), (stage, branch) =>
       signals.push([stage, branch]),
     );
 

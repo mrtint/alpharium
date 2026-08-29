@@ -1,0 +1,98 @@
+# 실기기 자동 테스트 — 023 상한 초과 하루의 사진 선별·캡션 (T031·T036)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **023의 quickstart D2·D3을 실기기에서 트리거하는 흐름이다.**
+#
+# `many-camera`(12장, `folder` 미지정 → 카메라 원본으로 분류)를 심은 하루를
+# 골라 「빠르게 봄」으로 `quiet`(금동이) 생성을 건다. 목적은:
+#   D3(T031) — 캡션 장당·누적 시간, VLM 적재 + 캐릭터 모델 로드 시간,
+#              캡션 N장이 들어간 캐릭터 프롬프트 토큰 수 대 n_ctx
+#   D2(T036) — 캡션된 사진의 시각 분포가 하루에 걸치는가(몰린 칸 독점 안 함)
+#
+# **이 흐름은 「생성이 무너지지 않고 완주하는가」까지만 자동으로 본다.** 캡션 시간·
+# 토큰 수·시각 분포는 `adb logcat`을 사람이 읽어 판단한다(원칙 IV·V) — 흐름은
+# 관찰의 무대를 세울 뿐 값을 채점하지 않는다.
+#
+# 선행: `npm run seed:day -- many-camera <날짜>` (Phase 8 도구). 그 날짜를
+#        `SEED_DAY` env로 넘긴다 — 기기의 오늘에 따라 고를 수 있는 하루가 달라
+#        흐름에 날짜를 박지 않는다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+env:
+  SEED_DAY: "2026-08-28"
+---
+- launchApp
+- assertVisible: "일기"
+
+# ── 캐릭터: quiet(금동이)를 고른다 ──
+# 금동이는 kanana 2.1B이라 웜 2~3초로 가장 빠르다(AGENTS.md) — 상한 실측에서
+# 캐릭터 모델 자체의 시간을 최소화해 캡션·프롬프트 구간을 도드라지게 한다.
+- scrollUntilVisible:
+    element:
+      text: "누가 쓸까"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "금동이"
+
+# ── 사진 설정: 「빠르게 봄」(vision-quick) ──
+- scrollUntilVisible:
+    element:
+      id: "vision-quick"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "vision-quick"
+- assertVisible: "선택"
+
+# ── 하루: many-camera를 심은 날 ──
+# `vision-quick` 탭 후 화면이 이미 "언제를 쓸까"·"사진을 어떻게 볼까"
+# 구간에 있다(2026-08-29 실측 — 두 섹션이 같은 스크롤 위치). day- testID를
+# 바로 찾아 탭한다.
+- scrollUntilVisible:
+    element:
+      id: "day-${SEED_DAY}"
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: "day-${SEED_DAY}"
+
+# ── 생성 ──
+- scrollUntilVisible:
+    element:
+      text: "일기 쓰기"
+    direction: DOWN
+    timeout: 20000
+- tapOn: "일기 쓰기"
+
+# 이미 일기가 있으면 덮어쓰기 확인 — 확인을 눌러 진행한다(012).
+- runFlow:
+    when:
+      visible: ".*덮어쓸지 확인.*"
+    commands:
+      - tapOn: "확인"
+
+# ★ 원칙 IV — 생성 중에 지표가 없다.
+- assertNotVisible: "%"
+- assertNotVisible: "토큰"
+- assertNotVisible: "초 남"
+- assertNotVisible: "단계"
+
+# ★ 완주한다 — 12장 캡션 + 캐릭터 생성은 몇 분 걸릴 수 있다(019 실측 최장
+#   2분 27초, 상한이 12로 오르면 더 길다). 넉넉히 기다린다.
+- extendedWaitUntil:
+    notVisible: "쓰고 있다"
+    timeout: 420000
+
+# ★ 원칙 III — 실패가 모델 용어로 새지 않는다.
+- assertNotVisible: "되뱉"
+- assertNotVisible: "echo"
+- assertNotVisible: "unfinished"
+- assertNotVisible: "rejected"
+
+# 상세 화면이 떴으면 일기가 나온 것이다 — 제목이 보인다(014).
+# 「← 목록」으로 돌아가 흐름이 상태를 바꾼 채 끝나지 않게 한다.
+- runFlow:
+    when:
+      visible: "← 목록"
+    commands:
+      - tapOn: "← 목록"

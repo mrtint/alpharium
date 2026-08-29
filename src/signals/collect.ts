@@ -55,11 +55,16 @@ function permissionReason(what: string, state: PermissionState): string {
  * 배정하면 거짓이 된다. **미래 시각도 버린다**(Edge Cases) — 기기 시계가 어긋났던 흔적이다.
  */
 function usablePhotos(facts: PhotoFacts[], endMs: number): Photo[] {
-  return facts
-    .filter((f): f is PhotoFacts & { takenAtMs: number } => f.takenAtMs !== null)
-    .filter((f) => f.takenAtMs < endMs)
-    .map((f) => ({ id: f.id, takenAt: new Date(f.takenAtMs) }))
-    .sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime());
+  return (
+    facts
+      .filter((f): f is PhotoFacts & { takenAtMs: number } => f.takenAtMs !== null)
+      .filter((f) => f.takenAtMs < endMs)
+      // 023 — `folderName`을 이월한다. `PhotoFacts`가 안 채웠으면 `undefined`로
+      // 넘어가며 그것이 "분류 불가"다(select.ts가 판정). 004의 판정은 이 필드를
+      // 읽지 않으므로 여기서 옮기는 것만으로 충분하다.
+      .map((f) => ({ id: f.id, takenAt: new Date(f.takenAtMs), folderName: f.folderName }))
+      .sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime())
+  );
 }
 
 /**

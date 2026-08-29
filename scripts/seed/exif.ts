@@ -60,6 +60,7 @@ const DATE_LENGTH = 20;
 
 const TAG_EXIF_IFD = 0x8769;
 const TAG_GPS_IFD = 0x8825;
+const TAG_DATE_TIME = 0x0132; // IFD0의 DateTime — ExifIFD가 아니라 IFD0에 있다
 const TAG_DATE_ORIGINAL = 0x9003;
 const TAG_DATE_DIGITIZED = 0x9004;
 const TAG_GPS_LAT_REF = 0x0001;
@@ -142,10 +143,20 @@ function formatExifDate(at: Date): string {
 }
 
 /**
- * 찍힌 시각을 덮어쓴다. **`DateTimeOriginal`과 `DateTimeDigitized` 둘 다 쓴다.**
+ * 찍힌 시각을 덮어쓴다. **`DateTime`(IFD0)·`DateTimeOriginal`·`DateTimeDigitized`
+ * 셋 다 쓴다.**
  *
- * 어느 쪽을 스캐너가 보는지 확실하지 않고(원칙 V), 진짜 사진에는 둘 다 있으므로
- * 둘 다 맞춘다. 하나만 고치면 어긋난 사진이 된다.
+ * 어느 쪽을 스캐너가 보는지 확실하지 않고(원칙 V), 진짜 사진에는 셋 다 있다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **⚠️ 2026-08-29 실측(023 T035, SM-S901N)**: `DateTimeOriginal`·
+ * `DateTimeDigitized`만 고치고 IFD0의 `DateTime`(0x0132)을 2017년인 채로 두면,
+ * GPS IFD가 없는 사진(`scripts/samples/no-gps/`)에서 안드로이드 미디어
+ * 스캐너가 `datetaken`을 **NULL**로 둔다 — 오류 없이. `mixed-clutter`·
+ * `screenshots-only`(Phase 8 신규, 좌표 없는 잡사진) seed가 "10장 심었는데
+ * 색인 6장"으로 실패했다. GPS가 있는 사진은 스캐너가 `GPSDateStamp`(patchDate가
+ * 맞춤) 경로로도 시각을 얻어 우회됐던 것. **세 태그를 다 일치시켜야 GPS 유무와
+ * 무관하게 `datetaken`이 들어간다.**
+ * ─────────────────────────────────────────────────────────────────────────────
  *
  * **길이가 고정(20바이트)이라 오프셋이 움직이지 않는다.**
  */
@@ -162,6 +173,16 @@ export function patchDate(template: Buffer, at: Date): Buffer {
   }
 
   let written = 0;
+  // IFD0의 DateTime(0x0132) — ExifIFD가 아니라 IFD0에 있다. 있으면 맞춘다
+  // (템플릿엔 없을 수 있으므로 없다고 던지지 않는다).
+  for (const e of entriesOf(buf, r, r.u32(r.tiffOffset + 4))) {
+    if (e.tag !== TAG_DATE_TIME) continue;
+    if (e.count !== DATE_LENGTH) {
+      throw new Error(`DateTime 자리가 ${DATE_LENGTH}바이트가 아니다: ${e.count}`);
+    }
+    buf.write(text, valueOffset(buf, r, e.at, e.count), "ascii");
+    written++;
+  }
   for (const e of entriesOf(buf, r, exifIfd)) {
     if (e.tag !== TAG_DATE_ORIGINAL && e.tag !== TAG_DATE_DIGITIZED) continue;
     if (e.count !== DATE_LENGTH) {

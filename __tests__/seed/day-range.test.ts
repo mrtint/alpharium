@@ -19,7 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { dayOf, selectableDays } from "../../src/config/day-boundary";
-import { planSeeding } from "../../scripts/seed/plan";
+import { parseSeedArgs, planFromBursts, planSeeding } from "../../scripts/seed/plan";
 
 const sourceOf = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), "utf8");
 
@@ -134,4 +134,100 @@ describe("심을 사진이 그 하루 안에 있다", () => {
       }
     },
   );
+});
+
+/**
+ * 023 Phase 8 — burst 조합을 직접 받는 경로.
+ *
+ * `SHAPES`에 없는 상황을 에이전트가 그때그때 만든다. 잘못된 JSON은 되묻지
+ * 않고 `unknown-shape`로 거부한다(FR-018).
+ */
+describe("planFromBursts — burst 조합 직접 지정 (023)", () => {
+  const now = new Date(2026, 7, 22, 10, 0, 0);
+  const day = selectableDays(now)[0];
+
+  it("올바른 BurstSpec 배열이면 SyntheticDay를 만든다", () => {
+    const json = JSON.stringify([
+      { fromHour: 4, spanHours: 6, count: 8, location: "near-a", folder: "Camera" },
+      { fromHour: 5, spanHours: 3, count: 3, location: null, folder: "Screenshots" },
+    ]);
+    const result = planFromBursts(json, day, now);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.day.shape).toBe("adhoc-bursts");
+    expect(result.day.photos).toHaveLength(11);
+    for (const photo of result.day.photos) {
+      expect(dayOf(new Date(photo.takenAtMs))).toBe(day);
+    }
+  });
+
+  it("잘못된 JSON은 unknown-shape로 거부한다 (되묻지 않음)", () => {
+    const result = planFromBursts("{not json", day, now);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("unknown-shape");
+  });
+
+  it("배열이 아니면 거부한다", () => {
+    const result = planFromBursts(JSON.stringify({ fromHour: 4 }), day, now);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("unknown-shape");
+  });
+
+  it("범위 밖 하루는 거부한다 — 이름표 경로와 같다", () => {
+    const json = JSON.stringify([{ fromHour: 4, spanHours: 0, count: 1, location: null }]);
+    const result = planFromBursts(json, "2030-01-01", now);
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("day-out-of-range");
+  });
+});
+
+/**
+ * 023 Phase 8 T055 — `--bursts` argv 해석은 순수 헬퍼로 뽑았다.
+ *
+ * `--bursts`가 인자 위치를 밀므로(날짜가 `argv[burstsIdx+2]`) 이 시프트
+ * 로직을 한 자리에서 테스트한다. 값이 유효한지는 planSeeding/planFromBursts의
+ * 몫 — 여기서는 자리별로 뽑기만 확인한다.
+ */
+describe("parseSeedArgs — CLI 인자 해석 (023)", () => {
+  it("`<모양> <날짜>` → usingBursts=false", () => {
+    expect(parseSeedArgs(["rich", "2026-08-20"])).toEqual({
+      ok: true,
+      usingBursts: false,
+      shapeName: "rich",
+      day: "2026-08-20",
+    });
+  });
+
+  it("`--bursts <json> <날짜>` → usingBursts=true, 날짜는 +2 위치", () => {
+    expect(parseSeedArgs(["--bursts", "[]", "2026-08-20"])).toEqual({
+      ok: true,
+      usingBursts: true,
+      burstsJson: "[]",
+      day: "2026-08-20",
+    });
+  });
+
+  it("`--bursts`가 마지막 인자면(날짜 없음) ok:false", () => {
+    expect(parseSeedArgs(["--bursts", "[]"])).toEqual({ ok: false });
+    expect(parseSeedArgs(["--bursts"])).toEqual({ ok: false });
+  });
+
+  it("`--bursts` 없이 인자가 부족하면 ok:false", () => {
+    expect(parseSeedArgs([])).toEqual({ ok: false });
+    expect(parseSeedArgs(["rich"])).toEqual({ ok: false });
+  });
+
+  it("`--bursts`가 앞이 아니어도 위치를 찾아 시프트한다", () => {
+    // 실제로는 첫 인자로 오지만, indexOf가 위치를 찾으므로 방어적으로 확인
+    expect(parseSeedArgs(["ignored", "--bursts", "[{}]", "2026-08-20"])).toEqual({
+      ok: true,
+      usingBursts: true,
+      burstsJson: "[{}]",
+      day: "2026-08-20",
+    });
+  });
 });

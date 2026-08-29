@@ -26,6 +26,30 @@ import { spawnSync } from "node:child_process";
  */
 export const SEED_FOLDER = "/sdcard/Pictures/AlphariumSeed";
 
+/**
+ * 023 — 하위 폴더 이름을 붙인 심을 자리.
+ *
+ * `folder`가 있으면 `SEED_FOLDER/<folder>/` 아래로 간다. 023의
+ * `folderNameOf()`가 "마지막 `/` 앞 세그먼트"를 뽑으므로 그 사진의 폴더
+ * 이름이 `folder`가 되어 스크린샷·다운로드로 분류된다.
+ *
+ * **`SEED_FOLDER` 밖으로 나가지 않는다** — `queryFolder()`의 `%AlphariumSeed%`
+ * LIKE와 `removeSeedFolder()`의 `rm -rf SEED_FOLDER`가 하위 폴더까지 그대로
+ * 잡으므로 FR-016a(폴더 밖을 못 지운다)가 유지된다. 실제 시스템
+ * 폴더(`DCIM/Camera` 등)에 흩뿌리지 않는다.
+ */
+export function seedPathFor(fileName: string, folder?: string): string {
+  return folder === undefined
+    ? `${SEED_FOLDER}/${fileName}`
+    : `${SEED_FOLDER}/${folder}/${fileName}`;
+}
+
+/** 하위 폴더를 만든다. 이미 있으면 아무 일도 안 한다(`mkdir -p`). */
+export function makeSeedSubfolder(folder: string): Outcome<void> {
+  const made = run(["shell", `mkdir -p ${SEED_FOLDER}/${folder}`]);
+  return made.ok ? { ok: true, value: undefined } : made;
+}
+
 export type Outcome<T> = { ok: true; value: T } | { ok: false; detail: string };
 
 /** MediaStore에서 읽은 행 하나 */
@@ -170,7 +194,9 @@ export function removeSeedFolder(): Outcome<void> {
  * **「폴더가 없다」와 구분되지 않았다.** 폴더가 없을 때의 처리는 아래 `filter`가 한다.
  */
 export function listSeedFolder(): Outcome<string[]> {
-  const listed = run(["shell", `ls ${SEED_FOLDER}`]);
+  // 023 — `-R`로 하위 폴더(Camera/·Screenshots/·Download/)까지 센다. `ls -R`은
+  // "디렉터리:" 헤더와 빈 줄을 섞어 내므로 `.jpg`로 끝나는 줄만 남긴다.
+  const listed = run(["shell", `ls -R ${SEED_FOLDER}`]);
   // 폴더가 없으면 adb가 non-zero로 끝난다. 그것은 「0장」이지 오류가 아니다.
   if (!listed.ok) return { ok: true, value: [] };
 
@@ -179,6 +205,6 @@ export function listSeedFolder(): Outcome<string[]> {
     value: listed.value
       .split(/\r?\n/)
       .map((line) => line.replace(/\r/g, "").trim())
-      .filter((line) => line.length > 0 && !/No such file/.test(line)),
+      .filter((line) => line.length > 0 && /\.jpg$/i.test(line) && !/No such file/.test(line)),
   };
 }

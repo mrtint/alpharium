@@ -17,6 +17,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  *
  * 쓰는 법: `npm run seed:day -- <모양> <YYYY-MM-DD>`
+ *          `npm run seed:day -- --bursts '<BurstSpec[] JSON>' <YYYY-MM-DD>`  (023)
  */
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -24,7 +25,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { patchDate, patchLocation } from "./seed/exif.ts";
-import { planSeeding } from "./seed/plan.ts";
+import { parseSeedArgs, planFromBursts, planSeeding } from "./seed/plan.ts";
 import { pickNoGpsSample, pickWithGpsSample } from "./seed/samples.ts";
 import { shapeNames } from "./seed/shapes.ts";
 import { recordSeeding, type SeededPhoto } from "./seed/ledger.ts";
@@ -32,11 +33,13 @@ import { verifySeeded } from "./seed/verify.ts";
 import {
   connectedDevices,
   listSeedFolder,
+  makeSeedSubfolder,
   pushFile,
   queryFolder,
   removeFile,
   scanFile,
   scanVolume,
+  seedPathFor,
   SEED_FOLDER,
 } from "./seed/device.ts";
 import {
@@ -77,19 +80,23 @@ function cleanup(pushed: string[]): boolean {
 }
 
 async function main(): Promise<never> {
-  const [shapeName, day] = process.argv.slice(2);
-
-  // ── 0단계: 심기 전 확인. 아무것도 안 만진다 ──────────────────────────────
-  if (!shapeName || !day) {
+  // ── 0단계: 인자 해석 (순수, plan.ts). `--bursts <json> <날짜>` 또는 `<모양> <날짜>` ──
+  const parsed = parseSeedArgs(process.argv.slice(2));
+  if (!parsed.ok) {
     // **되묻지 않는다**(FR-018). 에이전트가 부르므로 대화형 자리를 두지 않는다.
     finish(
       failure(
         "unknown-shape",
-        `쓰는 법: npm run seed:day -- <모양> <YYYY-MM-DD>. 모양: ${shapeNames().join(", ")}`,
+        `쓰는 법: npm run seed:day -- <모양> <YYYY-MM-DD>` +
+          ` | npm run seed:day -- --bursts '<BurstSpec[] JSON>' <YYYY-MM-DD>. ` +
+          `모양: ${shapeNames().join(", ")}`,
       ),
       EXIT_FAILED,
     );
   }
+
+  const day = parsed.day;
+  const shapeName = parsed.usingBursts ? "adhoc-bursts" : parsed.shapeName;
 
   const devices = connectedDevices();
   if (!devices.ok) finish(failure("no-device", devices.detail), EXIT_FAILED);
@@ -107,7 +114,9 @@ async function main(): Promise<never> {
     );
   }
 
-  const planned = planSeeding(shapeName, day, new Date());
+  const planned = parsed.usingBursts
+    ? planFromBursts(parsed.burstsJson, day, new Date())
+    : planSeeding(shapeName, day, new Date());
   if (!planned.ok) finish(failure(planned.reason, planned.detail), EXIT_FAILED);
 
   // ── 1단계: 이미 있는 것 세기 (FR-011b) ────────────────────────────────────
@@ -142,8 +151,22 @@ async function main(): Promise<never> {
       // 파일명이 어느 하루의 몇 번째인지 말한다 — 하루별 되돌리기가 이것을 쓴다
       const name = `${day}-${String(index).padStart(3, "0")}.jpg`;
       const localPath = join(workDir, name);
-      const devicePath = `${SEED_FOLDER}/${name}`;
+      // 023 — `folder`가 있으면 `SEED_FOLDER/<folder>/` 아래로 간다. 023의
+      // `folderNameOf()`가 그 폴더 이름을 뽑아 스크린샷·다운로드로 분류한다.
+      const devicePath = seedPathFor(name, photo.folder);
       writeFileSync(localPath, buffer);
+
+      // 하위 폴더가 필요하면 먼저 만든다(`mkdir -p`, 이미 있으면 무해).
+      if (photo.folder !== undefined) {
+        const made = makeSeedSubfolder(photo.folder);
+        if (!made.ok) {
+          const clean = cleanup(pushed);
+          finish(
+            failure(clean ? "push-failed" : "cleanup-failed", made.detail),
+            clean ? EXIT_FAILED : EXIT_DIRTY,
+          );
+        }
+      }
 
       // ── 3단계: 밀어 넣기 ────────────────────────────────────────────────
       const push = pushFile(localPath, devicePath);

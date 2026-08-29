@@ -43,6 +43,7 @@ function stubPort(
     locationOf: async () => ({ kind: "absent" }),
     // 011이 넓힌 계약. 대역은 경로를 모른다 — 캡션을 돌리지 않는 스위트다
     filePathOf: async () => null,
+    folderNamesFor: async () => new Map(),
   };
 
   return { port, counters };

@@ -27,6 +27,7 @@ function fakePort(): PhotoPort {
     photosBetween: async () => [],
     locationOf: async () => ({ kind: "absent" }),
     filePathOf: async () => null,
+    folderNamesFor: async () => new Map(),
   };
 }
 

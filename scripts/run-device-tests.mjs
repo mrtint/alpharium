@@ -93,6 +93,16 @@ const FLOWS = [
   // 사람의 눈·prod 빌드가 필요하다. quickstart.md D1~D6를 손으로 확인한다.
   // **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/prompt-preview.yml",
+  // 023 — 사진 선별 알고리즘 고도화. `many-camera`(12장, `folder` 미지정) 하루로
+  // 「빠르게 봄」 `quiet` 생성을 걸어 **상한 초과 하루의 캡션+생성이 무너지지 않고
+  // 완주하는가**를 본다(SEED_DAY로 심은 날짜를 넘긴다 — 선행: `npm run seed:day --
+  // many-camera <날짜>`).
+  // ⚠️ **핵심 검증은 여기 없다** — 상한 값 실측(T031, `adb logcat`의 캡션·토큰),
+  // 시간 분포가 하루에 걸치는가(T036, 캡션된 `takenAt` 읽기), 잡사진 필터링
+  // (D1, `mixed-clutter`로 Screenshots·Download 제외 확인)은 사람이 logcat과
+  // 저장된 일기를 읽어 판단한다. quickstart.md D1~D4를 손으로 확인한다.
+  // **건너뛴 것은 통과가 아니다**(원칙 V).
+  ".maestro/photo-selection-over-limit.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

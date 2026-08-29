@@ -19,7 +19,7 @@
  */
 
 import { selectableDays, type DayDate } from "../../src/config/day-boundary.ts";
-import { shapeNamed, shapeNames, type PlannedPhoto } from "./shapes.ts";
+import { composeDay, shapeNamed, shapeNames, type BurstSpec, type PlannedPhoto } from "./shapes.ts";
 
 /** 어느 하루에 무엇을 심을지의 명세 */
 export type SyntheticDay = {
@@ -27,6 +27,36 @@ export type SyntheticDay = {
   shape: string;
   photos: PlannedPhoto[];
 };
+
+/**
+ * 023 Phase 8 — `seed-day.mts`의 argv를 해석한다. **순수 함수다.**
+ *
+ * `--bursts <json> <날짜>`면 조합 직접 지정, 없으면 `<모양> <날짜>`.
+ * `--bursts`가 인자 위치를 밀므로 이 시프트 로직을 한 자리에 두고 테스트한다
+ * (인라인이면 CLI 전체 실행으로만 도달 가능).
+ *
+ * **검증하지 않는다** — 값이 유효한지(모양이 있는지, 날짜가 범위 안인지)는
+ * `planSeeding`/`planFromBursts`의 몫이다. 여기서는 인자를 자리별로 뽑기만 한다.
+ */
+export type ParsedArgs =
+  | { ok: true; usingBursts: false; shapeName: string; day: string }
+  | { ok: true; usingBursts: true; burstsJson: string; day: string }
+  | { ok: false };
+
+export function parseSeedArgs(argv: readonly string[]): ParsedArgs {
+  const burstsIdx = argv.indexOf("--bursts");
+
+  if (burstsIdx !== -1) {
+    const burstsJson = argv[burstsIdx + 1];
+    const day = argv[burstsIdx + 2];
+    if (!burstsJson || !day) return { ok: false };
+    return { ok: true, usingBursts: true, burstsJson, day };
+  }
+
+  const [shapeName, day] = argv;
+  if (!shapeName || !day) return { ok: false };
+  return { ok: true, usingBursts: false, shapeName, day };
+}
 
 /**
  * 실패의 갈래.
@@ -74,4 +104,39 @@ export function planSeeding(shapeName: string, day: DayDate, now: Date): PlanRes
   }
 
   return { ok: true, day: { day, shape: shapeName, photos: shape.build(day) } };
+}
+
+/**
+ * 023 Phase 8 — 정해 둔 이름표 대신 burst 조합을 직접 받아 심을 것을 정한다.
+ *
+ * `SHAPES`에 없는 상황을 에이전트가 그때그때 만든다. 010의 원칙
+ * V("코드가 값을 보고 조합을 만들지 않는다")는 **정해 둔 이름표**에만 적용되고,
+ * 여기서는 사람(에이전트)이 명시적으로 조합을 지정하는 것이라 위반이 아니다.
+ *
+ * **잘못된 JSON은 되묻지 않고 `unknown-shape`로 거부한다**(FR-018).
+ */
+export function planFromBursts(burstsJson: string, day: DayDate, now: Date): PlanResult {
+  let specs: BurstSpec[];
+  try {
+    const parsed = JSON.parse(burstsJson);
+    if (!Array.isArray(parsed)) throw new Error("배열이 아니다");
+    specs = parsed as BurstSpec[];
+  } catch (error) {
+    return {
+      ok: false,
+      reason: "unknown-shape",
+      detail: `--bursts는 BurstSpec 배열 JSON이어야 한다: ${String(error)}`,
+    };
+  }
+
+  const usable = selectableDays(now);
+  if (!usable.includes(day)) {
+    return {
+      ok: false,
+      reason: "day-out-of-range",
+      detail: `고를 수 있는 하루: ${usable.join(", ")}`,
+    };
+  }
+
+  return { ok: true, day: { day, shape: "adhoc-bursts", photos: composeDay(day, specs) } };
 }
