@@ -16,6 +16,9 @@ import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
  * `PERMISSION_REQUIREMENTS[...].ifDenied`에서 온다**(중복 정의 없음).
  */
 
+// CI 러너(2코어)에서 `jest-expo` 첫 `render()`가 기본 5초를 넘길 수 있다.
+jest.setTimeout(30000);
+
 describe("AutoDiarySettingsScreen — 알림·배터리 안내 (FR-014)", () => {
   it("notificationDenied면 알림 권한 안내가 보인다 (020 N8 유지)", async () => {
     await render(

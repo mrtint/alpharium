@@ -16,6 +16,10 @@ import type { PermissionState } from "../../src/signals/port";
  *       spec.md FR-015·FR-016·FR-017·FR-018·FR-019·FR-020, SC-005·SC-006
  */
 
+// CI 러너(2코어)에서 `jest-expo` 첫 `render()`가 기본 5초를 넘길 수 있다 —
+// `onboarding-screen.test.tsx`·`diary-home.test.tsx`의 선례를 따른다.
+jest.setTimeout(30000);
+
 function makePorts(overrides?: { photo?: PermissionState; location?: PermissionState }) {
   const calls: string[] = [];
   return {

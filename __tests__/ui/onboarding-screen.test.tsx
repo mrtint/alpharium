@@ -15,6 +15,11 @@ import type { PermissionState } from "../../src/signals/port";
  *       spec.md FR-005~FR-008·FR-013·FR-016, SC-003·SC-008
  */
 
+// `jest-expo`는 워커마다 RN 런타임을 세우고, CI 러너는 2코어라 첫 `render()`가
+// 기본 5초 타임아웃을 넘길 수 있다(AGENTS.md "Windows에서 느린 것은 Defender"와
+// 같은 계열). `diary-home.test.tsx`·`diary-home-notification.test.tsx`의 선례를 따른다.
+jest.setTimeout(30000);
+
 /** 모든 권한 상태를 원하는 값으로 돌려주는 mock 통로 묶음. */
 function makePorts(overrides?: {
   photo?: PermissionState;
