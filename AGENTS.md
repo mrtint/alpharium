@@ -655,18 +655,41 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
 안정성 부채를 검증·보강한다. **새 사용자 기능·새 저장 계층·새 네이티브
 모듈·검증 전용 로그 모듈·새 진단 패널을 만들지 않는다** — 020이 만든
 `src/schedule/` 경계와 004가 만든 `src/signals/collect.ts` 경계를 재사용·
-검증한다. 코드 변경은 두 곳뿐이다(하나는 주석만).
+검증한다. **실기기 세션에서 020의 CRITICAL 버그를 발견해 고쳤다**(아래).
 
-- **`STALE_LOCK_MS`의 근거를 `narrative` 실측 종속으로 바꿨다** —
-  `src/schedule/lock.ts`의 근거 주석을 "019 `quiet` 최장 2분 27초 × 2 +
-  여유"에서 "**`narrative`(로스터에서 가장 느림) 백그라운드 완주 실측
-  최댓값 M초 × 2, 분 단위 올림**; M과 확정 근거는
-  `specs/024-.../findings.md` §1"로 교체했다. 020의 `lock.ts` 주석이 명시한
-  게이트("narrative 완주가 4분을 넘으면 재검토")를 024가 수행하는 것이다.
-  **값은 아직 5분 그대로** — 실기기에서 `narrative` M을 재기 전까지는 규칙만
-  박아 두고 값은 안 바꾼다(`narrative`는 `quiet`보다 느리므로 5분 아래로는
-  안 내려간다). 값은 여전히 `lock.ts` 한 곳에만 있고 `pipeline.ts`·`task.ts`는
-  import만 한다(020 L8, 계약 테스트 SL1이 `task.ts`까지 확장 검사).
+- **★ 020 백그라운드 자동 생성이 헤드리스에서 동작하지 않았다 — 고쳤다**
+  (2026-08-30 실기기 SM-S901N). `cmd jobscheduler run -f`로 화면 꺼진 채
+  강제 실행하니 `W/ReactNativeJS: No task registered for key
+  expo-task-manager` → `expo-task-manager`가 태스크를 **자동 해제**했다.
+  근본 원인: 020이 `task.ts`의 `TaskManager.defineTask()` 호출을 **모듈
+  최상단**(019 스파이크 방식)에서 **`App.tsx`의 `useEffect`**로 옮겼고,
+  헤드리스 배경 실행은 컴포넌트를 렌더 안 해 `useEffect`가 안 돈다. 020이
+  이렇게 바꾼 이유는 `logic` jest 프로젝트의 `transformIgnorePatterns`가
+  `expo-task-manager`를 변환에서 빼 최상단 정적 `import`가 `.ts` 테스트를
+  깨뜨리기 때문. **수정**: `defineTask`를 모듈 최상단 부수 효과로 되돌리되
+  **동기 `require("expo-task-manager")`를 try/catch로 감쌌다** — 프로덕션
+  RN(Metro가 전부 변환)에서는 `require` 성공 → 등록(헤드리스 포함), Jest
+  `logic`에서는 `SyntaxError` → catch → 등록 생략(테스트는 주입 의존 사용).
+  계약 테스트 `background-generation.test.ts` B1a(3케이스)가 이 회귀를
+  잠근다. **⚠️ 수정 후 헤드리스 완주는 실기기 재확인 미완**(Metro 불안정 +
+  Samsung 절전이 강제 실행을 막음) — findings.md §9, 이 스펙의 남은 최우선
+  검증 항목.
+- **`STALE_LOCK_MS`를 5분 → 6분으로 상향했다** — 실기기 §1 실측
+  (2026-08-30, SM-S901N): `narrative` 사진 있는 날(08-28, 캡션 8장) 완주
+  벽시계 **≈ 170초**(`visionMs` 73.0s + `writingMs` 89.8s + 적재). 사진
+  없는 날은 콜드 `writingMs` 54.1s(벽시계 ~60s), 웜 37.6s. 규칙(SL4):
+  `ceil(M × 2 / 60) × 60 = ceil(170×2/60)×60 = 360s = 6분` > 현재 5분
+  이므로 상향. `src/schedule/lock.ts`의 근거 주석도 이 실측으로 교체.
+  값은 여전히 `lock.ts` 한 곳에만, `pipeline.ts`·`task.ts`는 import만
+  (020 L8, SL1이 `task.ts`까지 확장 검사).
+- **FR-014 — `narrative`가 180초 한도에 대해 어디 있는지**: `GENERATION_TIMEOUT_MS
+  = 180_000`은 `engine.run()`(= `writingMs`) 구간만 감시한다. `narrative`
+  사진 있는 날 `writingMs` = 89.8초 < 180초 — **한도에 안 걸린다**
+  (`timeout` 0회). 다만 vision(73s) + writing(90s) = 163초 `engine.run()`
+  총합 + 적재 = 벽시계 ~170초(3분 근접). `VISION_PHOTO_LIMIT`을 8보다
+  올리면 `visionMs`가 비례해 늘어 `STALE_LOCK_MS` 재검토가 필요하다 —
+  **이 스펙은 상한 8을 유지한다**(023 결정 존중, FR-014 MUST NOT). 023의
+  "narrative 미확인"에 답: 상한 8에서 완주하나 느리고 여유가 좁다.
 - **권한 회수 시 `collect.ts`가 이미 `unknown`으로 감싼다 — 코드 무변경.**
   004 FR-007·FR-012·FR-016 설계상 사진 권한이 `granted`가 아닌 모든 상태,
   그리고 조회는 `granted`인데 `photosBetween()`이 던지는 실행 중 회수
@@ -694,23 +717,32 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   `verification-log.ts`를 020이 제거한 전례를 잇는다(헌법 원칙 IV) — 검증
   전용 로그 모듈이나 진단 패널을 되살리지 않는다. 개발자 탭의 "지금 자동
   생성 트리거" 버튼(020)으로 백그라운드 경로를 재현한다.
-- 기기 없는 테스트 1984개(+25, 신규 `signal-revocation` 18 + `lock.test`
-  확장 7) 통과. lint 0 error, 헌법 검사 위반 0, prettier 클린.
-- **실기기 검증 미수행** — SM-S901N(무선)에서 quickstart.md §1~§5 5라운드가
-  이 과제의 핵심 실측이다. 채워야 할 것:
-  - **§1** `narrative` 백그라운드 완주 시간(사진 있는 날/없는 날, cold/warm)
-    → cold `wallClockMs` 최댓값 M으로 `STALE_LOCK_MS` 확정(무변경 or 상향).
-    M이 `GENERATION_TIMEOUT_MS`(180초) + 적재에 근접/초과하면 그 사실과
-    `timeout` 빈도 기록(**180초 한도·`VISION_PHOTO_LIMIT`은 이 스펙에서
-    안 바꾼다** — 023의 "narrative 미확인"에 답만 준다).
-  - **§2** 배터리 최적화 예외 부여 시 목표 시각으로부터 첫 시도 ≤ 60분
-    (020 SC-003, 019가 약 32분 단기 대조만 했던 자리).
-  - **§3** 무예외 24시간+ 소크 — 24시간 안 최소 1회 시도(020 SC-002,
-    019 최악 19시간 33분 재확인).
-  - **§4** 실행 창 안에서 `pm revoke` — 저장된 일기 신호 `unknown`·본문
-    단정 없음.
+- **권한 회수 시 `collect.ts`가 이미 `unknown`으로 감싼다 — 코드 무변경.**
+  신규 계약 테스트 `signal-revocation.test.ts`(SR1~SR6, 18개)가 004 설계의
+  방어를 백그라운드·실행 중 회수 각도에서 명시적으로 잠갔다(위반 주입 4종
+  확인). 실기기 §4 재현은 미수행.
+- **재부팅 복구·`AppState` 한계**: `App.tsx:923-927`이 마운트 시 idempotent
+  `register()`(020 B5). `src/schedule/`·`src/signals/`에 `AppState` 참조
+  0건. 실기기 §5 미수행.
+- 기기 없는 테스트 `test:logic` 1680개 통과(신규 `signal-revocation` 18 +
+  `lock.test` SL1~5 + `background-generation` B1a). lint 0 error, 헌법 검사
+  위반 0, prettier 클린.
+- **EXAONE(narrative) 출력 mojibake 관측**(§1 실기기): 3회 전부 저장된 일기
+  본문이 깨진 UTF-8 surrogate로 나왔고 `title`에 금지된 `###`·`**`가 섞였다.
+  `judge()`는 통과시켰다. `llama.rn` + EXAONE-3.5 Q4_K_M 인코딩 문제로 보인다
+  — **스펙 024 범위 밖, 별도 스펙에서 EXAONE GGUF/`llama.rn` 버전/로스터
+  재검토 필요**(findings.md §10). 019·020·023이 narrative 실기기 검증을
+  미룬 것과 무관하지 않을 수 있다.
+- **실기기 검증 미완** — 이 스펙의 핵심 실측 중 §1(narrative 완주)만
+  포그라운드로 완료. 남은 것(findings.md "미확인 잔여"):
+  - **§9 수정의 헤드리스 재확인**(최우선) — `task.ts` 수정 후 화면 꺼진
+    배경 실행이 실제로 완주하는지. 안정된 Metro 또는 release 빌드 필요.
+  - **§2** 배터리 예외/무예외 소크 — Samsung 절전이 `cmd jobscheduler run`을
+    막아 미완. 자연 15분+ 주기 대기 필요(020 SC-002·SC-003).
   - **§5** 재부팅 후 앱 한 번 열면 `dumpsys jobscheduler`에 재등록.
-  - 배터리 인텐트가 실제 도착한 삼성 One UI 설정 화면 경로도 기록(021 관행).
+  - **§4** 실행 창 안 `pm revoke` — 저장 신호 `unknown`·본문 단정 없음.
+  - **§7** `npm run test:device` Maestro 회귀.
+  - 배터리 인텐트가 실제 도착한 삼성 One UI 설정 화면 경로.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
