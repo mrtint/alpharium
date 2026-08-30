@@ -123,24 +123,62 @@ _(미기록)_
 | true | before-reboot | **true** (`JOB #u0a569/78`) | `enabled:true`, 설정 탭 방문으로 등록됨 |
 | true | after-reboot-app-closed | **false** | 한계 확인 — `BOOT_COMPLETED` 리시버 없음(FR-010). 앱 프로세스 미기동, `deviceidle whitelist`는 재부팅 후에도 유지 |
 | true | after-reboot-app-opened (**홈 화면만**) | **true** (`JOB #u0a569/78`) | `21:21:00.108 I/TaskService: Registered task` → `didRegister: alpharium-auto-diary` → `BackgroundTaskScheduler: Worker is already scheduled, skipping`. **설정 탭 진입 불필요** |
-| false | after-reboot-app-opened | _(미측정 — 세션 종료, 아래 분석 참조)_ | 기대: `didRegister`는 `enabled` 무관하게 잡을 등록하나 `decideSchedule`이 `disabled` 반환 |
+| **false** | **after-reboot-app-opened** (홈 화면 + 설정 탭) | **false** | T035(2026-08-30 3차 세션). `auto-diary.json`=`enabled:false`로 재부팅 → 앱 열고 설정 탭까지 진입해도 `JOB #u0a569 …/androidx.work…SystemJobService` 미등록. `TaskService: Registered task`·`didRegister` 로그도 안 나옴(WorkManager 초기화 로그 `WM-WrkMgrInitializer`만) |
 
-**메커니즘 확정** (SC-006): 재부팅 후 앱 첫 실행 시 **`src/schedule/task.ts`의
-모듈 최상단 `registerAutoDiaryTask()` 부수 효과**(§9 수정으로 되살아난 것)가
-`TaskManager.defineTask()`를 호출 → `expo-task-manager`가
-`BackgroundTaskConsumer.didRegister()` 콜백 → `BackgroundTaskScheduler.registerTask()`
-→ `scheduleWorker()`. 즉 **§9 CRITICAL 수정이 재부팅 복구도 함께 성립시킨다** —
-020이 `App.tsx`의 `AutoDiarySettingsScreen` `useEffect`에 둔 `backgroundPort.register()`
-(설정 탭을 열어야 도는 경로, `App.tsx:925-927`)에 의존하지 않는다.
-
-실측 로그: 앱을 홈 화면으로 여니 `21:21:00`에 잡이 **즉시 한 번 실행**되고
-`-17s390ms STOP: #u0a569/78 … app called jobFinished`(약 57ms 만에 종료 —
-`decideSchedule`이 `all-written`으로 skip, 정상). 이후 15분 주기로 재예약.
+**메커니즘 확정** (SC-006): 재부팅 후 자동 생성 예약이 살아나는 조건은
+**`enabled:true` + 이전에 잡이 예약돼 있었을 것**이다. `enabled:true` 재부팅
+후 앱을 홈 화면으로 여니 `21:21:00.108 I/TaskService: Registered task` →
+`didRegister: alpharium-auto-diary` → `BackgroundTaskScheduler: Worker is
+already scheduled, skipping`이 나왔다 — **잡이 이미 스케줄돼 있었고**(재부팅
+전 `JOB #u0a569/78`), WorkManager가 재부팅을 넘겨 그것을 유지한 것으로
+보인다(WorkManager는 재부팅 시 `RescheduleReceiver`로 예약된 잡을 자체
+복원한다). `enabled:false` 대조군(T035)에서는 **재부팅 전 잡이 없었고**
+(이전에 `enabled:false`였음), 앱을 열어도 `didRegister`/`Registered task`
+로그가 안 나왔다 — `App.tsx:925-927`의 `backgroundPort.register()`는
+`settings.enabled === true`일 때만 도므로 잡이 만들어지지 않는다.
 
 **020 clarify 답 갱신**: spec.md Clarifications의 "020이 배선한 앱 마운트 시
-`register()` 경로가 재부팅 복구를 겸한다"는 **부분적으로만 맞다** — 그 경로는
-설정 탭 마운트 시에만 도므로, 홈 화면만 여는 사용자에게는 §9 수정의 최상단
-`defineTask` → `didRegister` 경로가 실질적 복구 트리거다.
+`register()` 경로가 재부팅 복구를 겸한다"는 **맞다** — 그 경로(`App.tsx:925-927`,
+설정 탭 마운트 시 `enabled:true`면 `register()`)가 재부팅 후 잡을 (재)등록하는
+공식 트리거다. `enabled:true` 세션에서 홈 화면만으로도 잡이 살아 있던 것은
+그 경로가 아니라 **WorkManager의 재부팅 자체 복원** + 지난 세션에 설정 탭을
+방문해 이미 예약해 둔 잡 덕분이다. `§9 수정`의 `task.ts` 최상단 `defineTask`는
+**핸들러 등록**(헤드리스 실행이 태스크를 찾을 수 있게)에 필수이나, **잡
+스케줄링 자체**는 `enabled:true` + `register()` 경로가 담당한다. 두 역할을
+분리해 이해해야 한다.
+
+**⚠️ 미확인 잔여** (§3 재검증): `enabled:true`이나 **재부팅 전 잡이 없는**
+상태(예: 방금 `enabled:true`로 켜고 설정 탭을 안 연 채 재부팅)에서 앱을 홈
+화면으로만 열었을 때 잡이 (재)등록되는지 — 이 세션에서는 `enabled:true`
+재부팅 케이스가 "잡이 이미 있던" 조건이라 이 갈래는 미분리. `App.tsx:925-927`이
+설정 탭 마운트에 있으므로 **홈 화면만 열면 등록 안 될 가능성**이 있다(그러면
+FR-009의 "앱을 한 번 연 시점" 재등록이 설정 탭 방문을 전제하게 됨). 다음
+세션에서 `enabled:true` + `pm clear` 후 설정 탭 미방문 → 재부팅 → 홈 화면만
+열기로 분리 확인 필요.
+
+**★ 3차 세션 추가 관측 — `expo-task-manager`가 자체 `BOOT_COMPLETED` 리시버를
+갖는다**: T034 준비 중 `enabled:true`로 앱을 재시작하니 logcat에:
+```
+21:58:57.635 I/TaskService: Handling intent with action 'android.intent.action.BOOT_COMPLETED'.
+21:59:07.336 I/TaskService: Registered task with name 'alpharium-auto-diary' …
+21:59:07.336 D/BackgroundTaskConsumer: didRegister: alpharium-auto-diary
+21:59:07.342 D/BackgroundTaskScheduler: Enqueuing worker with identifier EXPO_BACKGROUND_WORKER and '15' minutes delay.
+```
+→ `expo-task-manager`는 `AndroidManifest`에 **`BOOT_COMPLETED` 리시버를
+자동 등록**하고, 재부팅 후 앱 프로세스가 처음 뜰 때 이 인텐트를 처리해
+`defineTask`로 등록된(= §9 수정의 모듈 최상단 부수 효과가 등록한) 태스크를
+`didRegister` → `scheduleWorker()`로 **재예약**한다. `Enqueuing worker …
+15 minutes delay`로 `JOB #u0a569/0`이 새로 생겼다(이전 잡 없이).
+
+**FR-010 한계 문서의 정정**: "재부팅 후 앱을 한 번도 열지 않으면 재등록
+안 됨"은 맞지만(앱 프로세스가 떠야 `BOOT_COMPLETED` 인텐트가 처리됨), **앱을
+열기만 하면 홈 화면이든 설정 탭이든 상관없이** `expo-task-manager`의
+`BOOT_COMPLETED` 처리로 재예약된다 — `App.tsx:925-927`의 `backgroundPort.register()`
+(설정 탭 전용)에 의존하지 않는다. 이로써 위 "⚠️ 미확인 잔여"의 우려("홈
+화면만 열면 등록 안 될 가능성")는 **해소**된다: `enabled:true`면 앱을 여는
+것만으로 재등록된다. 단 이 경로는 `expo-task-manager`가 태스크를 이미
+알고 있어야(= `defineTask` 등록) 동작하므로, §9 CRITICAL 수정(모듈 최상단
+`defineTask`)이 이 재부팅 복구의 **전제**다.
 
 **한계 문서화** (FR-010, US4 Scenario 2): 재부팅 후 앱을 한 번도 열지 않은
 구간에는 자동 생성 예약이 되살아나지 않는다(위 표 `after-reboot-app-closed`
@@ -402,8 +440,101 @@ WorkManager 잡이 예약되지 않는다.** 1차 세션에서 `#reg=0`이었던
 73초였으므로, 헤드리스에서는 `GENERATION_TIMEOUT_MS`(180초, `writingMs`
 구간만 감시)에 걸릴 위험이 실재한다 — **`narrative` 헤드리스 완주는 이
 세션에서도 미확인**(quiet만 완주 확인). §1의 FR-014 결론("상한 8에서
-narrative는 완주하나 느리고 여유가 좁다")에 "헤드리스에서는 더 좁다"를
-추가한다.
+narrative는 완주하나 느리고 여유가 좁다")에 아래 T034를 추가한다.
+
+### ★★ T034 — `narrative` 헤드리스 생성은 이 기기에서 완주하지 않는다 (2026-08-30 3차 세션)
+
+**목적** (FR-001·SC-001·US1/AC2): 배터리 예외 부여 상태에서 `narrative`
+(exaone `a2.bin`)를 화면 꺼진 잠긴 헤드리스로 완주시키고 `writingMs` 실측.
+
+**설정**: `enabled:true`·`targetHour:21`(현재 21:56, 창 안), 캐릭터
+`narrative`, `deviceidle whitelist +`(standby bucket `5` EXEMPTED), 화면
+끔·`deviceLocked=1`, `cmd jobscheduler run -f com.anonymous.alpharium 0`.
+모델 4개(`a1`·`a2`·`v1`·`v2`) + `state.json` verdict를 개발 기계에서
+재배치(T037, 021 D2 방식).
+
+**관측 — 26분+ CPU 292% 점유, 산출물 없음**:
+- `21:59:37` `Executing task 'alpharium-auto-diary'` → `Started headless
+  task 1` → RNLlama HTP 추출 → `a2` 모델 로드(`loadModel:473`→`:530`,
+  ~18초) → `loadPrompt:580 num_prompt_tokens=547, has_media=0`(`21:59:57`).
+- **그 이후 RNLlama 로그가 완전 정지**. `top` 확인: 앱 프로세스(pid
+  13378)가 **CPU 292%**(4 스레드 풀가동), `TIME+`가 6분 만에 `21:47`→
+  `25:58`로 누적 — 추론이 멈춘 게 아니라 극도로 느리게 돌거나 루프.
+- WorkManager 잡은 `jobFinished`로 이미 종료(`0 running bg jobs`)됐으나
+  `runAutoDiaryTask()`의 `pipeline.run()` → `engine.run()` Promise가
+  미해결, `BackgroundTaskScheduler.runTasks()`의 `awaitAll()`도 안 끝남.
+- `diary-generation.lock` 파일이 남음(`{"owner":"background",
+  "acquiredAtMs":1788094777344}` = 태스크 진입 시각) — `finally { release() }`에
+  도달 못 함. 다음 콜백은 `STALE_LOCK_MS`(6분) 후 stale 판정으로 회복
+  가능(설계상 정상).
+- 화면을 `KEYCODE_WAKEUP` + `svc power stayon true`로 강제로 켜 Doze를
+  풀어도(`mWakefulness=Awake`, `deviceidle mState=ACTIVE`) 추론이 완주하지
+  않음 — Doze/절전만의 문제가 아니다.
+- `has_media=0`: `many-camera 2026-08-29` 시드가 실제로는 08-29 날짜를
+  안 심었다(미디어스토어 `datetaken`이 08-21~08-28에만 분포). `decideSchedule`이
+  사진 없는 날을 골라 VLM 캡션은 아예 안 돎 — 그런데도 `narrative`
+  텍스트 생성만으로 완주 불가. 사진 있는 날이면 `visionMs`까지 더해져
+  더 나쁠 것.
+
+**§1 포그라운드와의 대조**: §1에서 `narrative` `writingMs`는 콜드 54초·
+사진 있는 날 89.8초로 완주했다(개발자 탭 "지금 트리거" = 포그라운드
+직접 호출). **같은 `engine.run()` 코드가 헤드리스에서는 완주하지 않는다** —
+스케줄링만 다르다는 §1의 가정이 `narrative`에서는 성립하지 않는다.
+
+**FR-014에 대한 답 (갱신)**:
+- `GENERATION_TIMEOUT_MS`(180초)는 `engine.run()`을 `setTimeout` 기반
+  `runWithTimeout()`으로 감시하는데, 헤드리스/Doze에서는 JS 타이머가
+  억제돼 이 timeout 자체가 제때 발동하지 않는다 — `result: "timeout"`이
+  나오지 않고 그냥 무한 대기. 023이 세운 180초 가드가 헤드리스 경로에서는
+  무력함을 뜻한다.
+- `VISION_PHOTO_LIMIT`·180초 한도는 바꾸지 않는다(FR-014 MUST NOT).
+- **결론**: `narrative`(exaone)는 이 기기(SM-S901N)의 헤드리스 자동
+  생성에서 사실상 쓸 수 없다. `quiet`(kanana)만 헤드리스 완주가 확인됐다
+  (§9, `writingMs` 52.5초). 이는 §10의 EXAONE mojibake와 무관하지 않을
+  수 있다 — exaone GGUF/`llama.rn` 조합이 이 기기에서 근본적으로 문제.
+  로스터에서 `narrative`를 자동 생성 대상으로 둘지, exaone GGUF를
+  교체할지는 별도 스펙의 결정(§10과 함께).
+
+**미확인으로 남음**: `narrative` 헤드리스가 "느리지만 언젠가 완주"하는지
+vs "영영 안 끝나는 루프"인지 — 26분에서 관측을 중단했다. 포그라운드
+`writingMs` 90초의 3배(헤드리스 배율)면 ~270초여야 하는데 26분(1560초)째
+미완주이므로 정상 저속이 아닌 병리적 상태로 판단한다.
+
+---
+
+## §11 T036 — release 빌드 재확인 판단 (2026-08-30 3차 세션)
+
+**배경**: §9 수정이 `src/schedule/task.ts`에 `require("expo-task-manager")`·
+`require("expo-background-task")`를 **모듈 최상단 동기 호출**로 추가했다.
+012 기준("새 네이티브 모듈이나 빌드 설정 — 동적 `import`, R8·ProGuard 대상,
+JNI 심볼 — 을 건드릴 때만 release 재확인")에 이 변경이 해당하는지 판단.
+
+**분석**:
+- 이 `require`는 **Metro의 `require`**(번들 시점에 정적 문자열 리터럴을
+  모듈 참조로 해석)이지 Node CommonJS `require`가 아니다. **동적 `import()`가
+  아니라 정적 require**라 R8이 "코드 경로를 못 찾는" 동적 로딩 문제에
+  해당하지 않는다.
+- `expo-task-manager`·`expo-background-task`는 **표준 Expo autolinking
+  모듈**(005·011처럼 손으로 짠 JNI 브릿지가 아님). 013이 `expo-image-manipulator`를
+  "표준 Expo autolinking이라 debug 1회로 충분"이라고 판단한 것과 같은 계열.
+  Expo autolinking이 각 모듈의 consumer ProGuard rules를 자동 반영한다.
+- `android/app/proguard-rules.pro`에 `expo` 관련 커스텀 rule이 없고,
+  이 변경으로 추가할 필요도 없다(autolinking이 처리).
+- **새 JNI 심볼·새 네이티브 모듈·빌드 설정 변경 0** — `task.ts`의
+  `defineTask` 호출 위치를 `useEffect` → 모듈 최상단으로 옮기고 `require`로
+  감쌌을 뿐, `llama.rn`·동적 `import`·gradle 설정은 무변경.
+
+**판단**: **012 기준의 "release 재확인 필요" 경계에 해당하지 않는다.**
+§9의 debug 헤드리스 확인(등록 성립 + `quiet` 완주)으로 충분하다.
+
+**남긴 잔여 위험(작음)**: R8이 `AUTO_DIARY_TASK_REGISTERED = registerAutoDiaryTask()`
+모듈 최상단 실행문을 "결과를 안 쓰는 부수 효과"로 보고 제거할 이론적
+가능성. 다만 (a) `ensureAutoDiaryTaskDefined()`가 `AUTO_DIARY_TASK_REGISTERED`를
+읽어 export하므로 상수가 살아 있어야 하고, (b) `registerAutoDiaryTask()`
+안에 `TaskManager.defineTask(...)` 부수 효과가 있어 R8의 side-effect 분석이
+보수적으로 유지할 것이다. **release APK를 손에 넣는 다음 세션에서 설정 탭
+진입 → 화면 끈 헤드리스 강제 실행으로 `No task registered` 부재를 한 번
+확인하면 이 위험도 닫힌다** — 그때까지는 debug 확인을 근거로 진행.
 
 ---
 
@@ -431,32 +562,47 @@ pair**(`\udcec삤\udceb뒛...` 꼴)로 나왔다. `title`에는 프롬프트가
 
 ## 미확인 잔여
 
-**2차 세션(2026-08-30)에서 해소된 것**: §9 헤드리스 수정 재확인(완료),
-§3 재부팅 복구(완료), §4 권한 회수 실기기 재현(완료), §7 Maestro 회귀(완료).
+**2차 세션(2026-08-30)에서 해소**: §9 헤드리스 수정 재확인, §3 재부팅
+복구, §4 권한 회수 실기기 재현, §7 Maestro 회귀.
+
+**3차 세션(2026-08-30, `/speckit-implement` Phase 8)에서 해소·판정**:
+- **T037 검증용 모델 재배치** — 완료. `a1`·`a2`·`v1`·`v2`를 개발 기계에서
+  다시 받아(크기·`a1`/`v1` md5 로스터와 일치) `run-as`로 `files/models/`에
+  배치 + `state.json` verdict 4개 수동 작성.
+- **T035 `enabled:false` 재부팅 대조군** — 완료. `enabled:false`로 재부팅
+  → 앱 열고 설정 탭까지 진입해도 `JOB #u0a569` 미등록, `didRegister`/
+  `Registered task` 로그도 안 나옴. **US4 Scenario 3 = SC-006 충족**
+  (꺼진 상태를 재부팅이 되살리지 않는다). findings §3 표.
+- **§3 재부팅 복구 메커니즘 정정** — `expo-task-manager`가 자체
+  `BOOT_COMPLETED` 리시버를 가지며, `enabled:true`면 재부팅 후 앱을
+  (홈 화면이든 설정 탭이든) 한 번 열기만 하면 그 리시버가 `defineTask`
+  등록 태스크를 `scheduleWorker()`로 재예약한다. §9 수정(모듈 최상단
+  `defineTask`)이 이 복구의 전제. findings §3.
+- **T034 `narrative` 헤드리스 완주** — 판정 완료: **완주하지 않는다.**
+  배터리 예외 부여·화면 켜기까지 해도 `a2`(exaone) 로드 후 `loadPrompt`
+  단계에서 CPU 292%를 26분+ 태우며 산출물 없음. `GENERATION_TIMEOUT_MS`
+  180초 가드는 헤드리스/Doze에서 JS 타이머 억제로 무력. **`narrative`는
+  이 기기 헤드리스 자동 생성에서 사실상 불가** — `quiet`만 완주(§9).
+  findings §9의 T034 절.
+- **T036 release 빌드 재확인** — 판정 완료: **debug 1회로 충분**(012
+  기준). `require("expo-task-manager")`는 Metro의 정적 require이고
+  표준 Expo autolinking 모듈이라 빌드 설정 경계에 해당 안 됨. 작은
+  잔여 위험(R8 side-effect 트리셰이킹)은 다음 release 세션에서 1회
+  확인 시 닫힘. findings §11.
 
 **남은 것:**
 
-- **§2 배터리 예외/무예외 소크** — 사용자 결정으로 건너뜀. 자연 15분+
-  주기 대기(예외: 목표 시각 후 1시간 안 1회 / 무예외: 24시간 안 1회)가
-  필요하고 시간이 오래 걸린다. `cmd jobscheduler run -f`는 삼성 절전이
-  앱 도즈 시 거부하므로 자연 주기 대기만 유효.
-- **`narrative` 헤드리스 완주** — 2차 세션도 `quiet`만 헤드리스 완주
-  확인. `narrative` 사진 있는 날(포그라운드 `writingMs` 89.8초 +
-  `visionMs` 73초)이 헤드리스에서 `GENERATION_TIMEOUT_MS` 180초 안에
-  완주하는지 미확인. 헤드리스가 포그라운드의 ~3배로 느려지는 관측(§9
-  부수)을 고려하면 위험이 실재.
-- **`enabled:false` 재부팅 대조군**(US4 Scenario 3) — 2차 세션이
-  `unified-permission-onboarding.yml`의 `clearState`로 앱 데이터를 날려
-  수행 못 함. `didRegister`가 `enabled` 무관하게 잡을 등록하나
-  `decideSchedule`이 `disabled` 반환하는 것으로 코드상 예상되나 미실측.
+- **T012·T013·T014 / T032·T033 — §2 배터리 예외/무예외 소크** — 사용자
+  결정으로 건너뜀(2·3차 세션 모두). 자연 15분+ 주기 대기(예외: 목표
+  시각 후 1시간 안 1회 / 무예외: 24시간 안 1회)가 필요하고 시간이 오래
+  걸린다. `cmd jobscheduler run -f`는 삼성 절전이 앱 도즈 시 거부하므로
+  자연 주기 대기만 유효. **SC-003·SC-004는 미판정 상태로 남는다.**
 - **배터리 인텐트가 도착한 삼성 One UI 설정 화면 경로** — 미기록(설정
   탭 "배터리 설정 열기" 버튼의 실제 도착지).
-- **release 빌드 재확인** — 024는 새 네이티브 모듈이 없으나 `task.ts`가
-  `require("expo-task-manager")`를 모듈 최상단 동기 호출로 바꿨다.
-  debug에서 헤드리스 등록·완주를 확인했으나 R8·ProGuard가 `require`
-  경로를 어떻게 다루는지는 미확인(012 기준으로는 "빌드 설정 경계"에
-  해당할 수 있음 — 판단 필요).
-- **검증용 모델 재배치** — 2차 세션 `clearState`로 `files/models/`의
-  `a1`·`a2`·`v1`·`v2`·`state.json`이 삭제됐다. 다음 실기기 세션 전
-  개발 기계에서 재다운로드 + `run-as` 배치 필요(021 D2 방식).
-- **EXAONE mojibake** (§10) — 별도 스펙.
+- **release APK로 §9 헤드리스 1회 확인** — §11의 잔여 위험(R8 트리셰이킹)
+  을 닫기 위한 것. debug 확인으로 진행 근거는 섰다.
+- **`narrative` 헤드리스가 "느린 완주"인지 "무한 루프"인지** — 26분에서
+  관측 중단. 실용상 무의미(어느 쪽이든 자동 생성 불가)하나 §10 mojibake
+  원인 규명에는 관계될 수 있다.
+- **EXAONE mojibake** (§10) — 별도 스펙. T034가 "narrative 헤드리스
+  완주 불가"까지 밝혔으므로 별도 스펙의 우선순위가 올라간다.

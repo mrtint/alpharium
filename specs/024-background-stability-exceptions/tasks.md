@@ -130,14 +130,14 @@ US를 바로 시작할 수 있다. (US1의 `STALE_LOCK_MS` 값 확정만 실기�
 
 ### 실기기 실측 (quickstart.md §1 — 사람 수행, SM-S901N 무선)
 
-- [ ] T007 [US1] quickstart.md §1을 수행한다 — 개발자 탭에서 오드(narrative)
+- [X] T007 [US1] quickstart.md §1을 수행한다 — 개발자 탭에서 오드(narrative)
   선택, `npm run seed:day -- rich 2026-08-27`(사진 3장) + 빈 하루, 자동
   생성 ON·목표 시각 현재 시. **cold 라운드**: `am force-stop` 후 재실행 →
   개발자 탭 "지금 자동 생성 트리거" → 즉시 화면 끄고 잠금 확인 →
   `adb logcat -v time | grep -E "pipeline-stage|task-|Success|Failed"`로
   진입~완주 벽시계(`wallClockMs`), `engine.run()` 구간(`engineRunMs`).
   **warm 라운드**: 연속 2번째 트리거. 사진 있는 날/없는 날 각각.
-- [ ] T008 [US1] 각 실행 후 저장된 일기를 확인한다 —
+- [X] T008 [US1] 각 실행 후 저장된 일기를 확인한다 —
   `adb shell run-as com.anonymous.alpharium ls files/diary/` → 그 날짜
   파일 1개(`finalDiaryCount: 1`), 열어서 판정 통과·본문 정상
   (`verdictPassed: true`). data-model.md §1 표 각 행을 `findings.md`에
@@ -146,7 +146,7 @@ US를 바로 시작할 수 있다. (US1의 `STALE_LOCK_MS` 값 확정만 실기�
 
 ### `STALE_LOCK_MS` 확정 (contracts/stale-lock-basis.md SL4)
 
-- [~] T009 [US1] `findings.md` §1의 cold `wallClockMs` 최댓값 `M`으로
+- [X] T009 [US1] `findings.md` §1의 cold `wallClockMs` 최댓값 `M`으로
   규칙(data-model.md §5)을 적용한다 —
   `새값 = ceil(M × 2 / 60000) × 60000`:
   - `새값 <= 300000`: `src/schedule/lock.ts`의 `STALE_LOCK_MS` **값
@@ -156,10 +156,10 @@ US를 바로 시작할 수 있다. (US1의 `STALE_LOCK_MS` 값 확정만 실기�
     분 단위 올림 = N분. (측정: specs/024-.../findings.md §1)".
   - `새값 > 300000`: `STALE_LOCK_MS`를 `새값`으로 상향 + 주석 교체.
     `pipeline.ts`·`task.ts`는 여전히 import만(SL1).
-- [~] T010 [US1] T005의 SL1~SL5가 이제 **통과하는지** 확인한다
+- [X] T010 [US1] T005의 SL1~SL5가 이제 **통과하는지** 확인한다
   (`npm run test:logic`). SL2가 초록불(주석이 `narrative` 참조), SL4가
   값 규칙 충족. `npm run lint`(헌법 검사 — `checkScheduleFile` 위반 0).
-- [ ] T011 [US1] `M`이 `GENERATION_TIMEOUT_MS`(180초, `src/inference/sampling.ts`)
+- [X] T011 [US1] `M`이 `GENERATION_TIMEOUT_MS`(180초, `src/inference/sampling.ts`)
   + 적재 시간에 근접/초과하는지 판정한다 — 초과 시 `result: "timeout"`
   빈도(트리거 대비 몇 회)와 실측값을 `findings.md`에 기록(FR-014).
   **180초 한도·`VISION_PHOTO_LIMIT`은 바꾸지 않는다**(FR-014 MUST NOT) —
@@ -204,7 +204,7 @@ US를 바로 시작할 수 있다. (US1의 `STALE_LOCK_MS` 값 확정만 실기�
   ≤ 60분(SC-003), 무예외 24시간 안 ≥ 1회(SC-002·SC-004). **SHOULD**:
   예외 시 3회 이상 표본의 과반 ≤ 40분 — 3회 미만이면 "원시값만,
   best-effort"로 표기(Clarifications).
-- [ ] T015 [P] [US2] 020 FR-010 회귀 확인 — 자동 생성 설정 화면(설정 탭)에
+- [X] T015 [P] [US2] 020 FR-010 회귀 확인 — 자동 생성 설정 화면(설정 탭)에
   배터리 예외 안내 상시 링크가 여전히 있고, 예외를 안 준 채로도 기능이
   "고장이 아니라 지연이 크다"는 상태로 동작하는지(US2 Scenario 4).
   코드 변경 없음(회귀만).
@@ -258,7 +258,7 @@ quickstart.md §4, `narrative` 실행 창 안에서 `pm revoke`.
 
 ### 실기기 재현 (quickstart.md §4 — 사람 수행)
 
-- [ ] T019 [US3] quickstart.md §4를 수행한다 — 사진·위치 권한 부여 상태로
+- [X] T019 [US3] quickstart.md §4를 수행한다 — 사진·위치 권한 부여 상태로
   §1의 `narrative` 사진 있는 날 cold 트리거 → `adb logcat`으로 신호 수집
   단계 진입 직후
   `adb shell pm revoke com.anonymous.alpharium android.permission.READ_MEDIA_IMAGES`
@@ -267,13 +267,13 @@ quickstart.md §4, `narrative` 실행 창 안에서 `pm revoke`.
   별도로 위치만 회수(`ACCESS_FINE_LOCATION`·`ACCESS_COARSE_LOCATION`) →
   자리 신호 `unknown`, 사진 신호 생존(FR-007). 신호 빈약으로 거부되면
   기존 파일 보존 확인(원칙 I).
-- [~] T020 [US3] **T019에서 `unknown`이 아닌 값(특히 `none`)이 나오는
+- [X] T020 [US3] **T019에서 `unknown`이 아닌 값(특히 `none`)이 나오는
   갈래가 발견될 때만** `src/signals/collect.ts`의 그 한 분기를 기존
   `unknown` 반환으로 유도한다 — **새 `SignalValue` 갈래를 만들지 않는다**
   (SR6, 헌법 원칙 V). 보강했으면 T016의 SR1~SR4에 그 케이스를 추가해
   회귀를 잠근다. 발견 없으면 이 태스크는 "무변경 — collect.ts는 004
   설계대로 모든 갈래를 unknown으로 감쌌다"로 findings.md에 기록.
-- [ ] T021 [US3] data-model.md §4 표를 `findings.md`에 기록한다 —
+- [X] T021 [US3] data-model.md §4 표를 `findings.md`에 기록한다 —
   저장된 일기는 `adb shell run-as com.anonymous.alpharium cat
   files/diary/<날짜>.json`으로 읽고 `signalsUsed.photos.kind`·
   `signalsUsed.places.kind`(`DiaryEntry.signalsUsed: DaySignals` —
@@ -304,16 +304,16 @@ quickstart.md §4, `narrative` 실행 창 안에서 `pm revoke`.
   `backgroundPort.register()`를 idempotent 호출하는 자리(020
   contracts/background-generation.md B5). 이 스펙은 **이 코드를 바꾸지
   않는다** — 경로가 존재함을 확인만.
-- [ ] T023 [US4] quickstart.md §5를 수행한다 — 자동 생성 ON,
+- [X] T023 [US4] quickstart.md §5를 수행한다 — 자동 생성 ON,
   `adb shell dumpsys jobscheduler | grep alpharium`로 등록 확인
   (`phase: "before-reboot"`) → `adb reboot` → 재연결 후 앱 열기 전 조회
   (`phase: "after-reboot-app-closed"` — 사라져 있어도 정상) → 기기 잠금
   해제(사람 PIN) + 앱 한 번 열기 → 몇 초 뒤 조회
   (`phase: "after-reboot-app-opened"` — `registered: true` 기대). §5 후
   `adb reverse tcp:8081 tcp:8081` 다시 건다.
-- [ ] T024 [US4] 꺼진 상태 대조 — 자동 생성 OFF → 재부팅 → 앱 열기 →
+- [X] T024 [US4] 꺼진 상태 대조 — 자동 생성 OFF → 재부팅 → 앱 열기 →
   어느 phase에서도 `registered: false`(US4 Scenario 3).
-- [ ] T025 [US4] data-model.md §3 표를 `findings.md`에 기록하고, **한계를
+- [X] T025 [US4] data-model.md §3 표를 `findings.md`에 기록하고, **한계를
   문서화한다**(FR-010, US4 Scenario 2) — "재부팅 후 앱을 한 번도 열지
   않은 구간에는 재등록이 보장되지 않는다. `BOOT_COMPLETED` 브로드캐스트
   수신 같은 새 네이티브 경로는 만들지 않는다(범위 밖)." Direct Boot
@@ -334,7 +334,7 @@ quickstart.md §4, `narrative` 실행 창 안에서 `pm revoke`.
   소스에 `AppState` 참조가 없는지 확인, `findings.md`와 AGENTS.md 024
   절에 "이 값은 '앱 UI가 전경에 없음'의 근사치이지 '화면이 꺼져 있음'의
   증거가 아니다" 문장 추가.
-- [ ] T027 [P] quickstart.md §6 회귀 — `npm run test:device`로 020·021·023
+- [X] T027 [P] quickstart.md §6 회귀 — `npm run test:device`로 020·021·023
   `FLOWS` 흐름이 통과하는지. 실패 시 024 회귀인지 기존 stale인지 분리
   (020·022·023이 반복 관측한 "개발자 탭 stale 버그" 패턴 주의).
 - [X] T028 quickstart.md §7 기기 없는 게이트(SC-007) — `npm run test:logic`
@@ -358,7 +358,7 @@ quickstart.md §4, `narrative` 실행 창 안에서 `pm revoke`.
   이미 `unknown`으로 감싸는 것을 백그라운드 타이밍에서 확인(무변경/한
   분기 보강)", 재부팅 복구 관측과 한계, `AppState` 한계, `narrative`가
   180초 한도에 대해 어디에 위치하는지(FR-014 근거).
-- [ ] T031 커밋을 논리 묶음으로 나눈다(헌법 「개발 방식」 — 한국어 메시지):
+- [X] T031 커밋을 논리 묶음으로 나눈다(헌법 「개발 방식」 — 한국어 메시지):
   (1) 계약 테스트 추가(T005·T016), (2) `lock.ts` `STALE_LOCK_MS` 근거·값
   (T009), (3) (있으면) `collect.ts` 보강(T020), (4) `findings.md`·AGENTS.md
   (T029·T030). `main` 직접 커밋 금지(`.githooks/pre-commit` — 브랜치
@@ -501,7 +501,7 @@ spec.md가 셋을 P1로 뒀다 — narrative 완주(US1), 배터리 소크(US2),
   뒤 `task-entered` 흔적 확인. **MUST**: 목표 시각 지난 뒤 24시간 안 ≥ 1회.
   `Minimum latency`가 15분으로 정확히 전달됐는지도 확인(억제 원인이 OS임).
   findings.md §2 표(`batteryException: false` 행) 기록.
-- [ ] T034 [US1] `narrative` 헤드리스 완주를 실측한다 per FR-001 / SC-001 /
+- [X] T034 [US1] `narrative` 헤드리스 완주를 실측한다 per FR-001 / SC-001 /
   US1/AC2 (partial) — 지금까지 §1은 포그라운드만, §9 헤드리스는 `quiet`만
   완주 확인(158초, 포그라운드의 ~3배). 배터리 예외 부여 상태에서 캐릭터를
   `narrative`로, 사진 있는 날(시드 8장)을 대상으로 화면 끈 잠긴 상태
@@ -510,13 +510,13 @@ spec.md가 셋을 P1로 뒀다 — narrative 완주(US1), 배터리 소크(US2),
   "timeout"` 빈도 기록(FR-014). **180초 한도·`VISION_PHOTO_LIMIT`은 바꾸지
   않는다**. findings.md §1·§9 갱신. EXAONE mojibake(§10)가 재현되면 함께
   기록하되 이 스펙 범위 밖으로 유지.
-- [ ] T035 [US4] `enabled:false` 재부팅 대조군을 수행한다 per US4/AC3 / SC-006
+- [X] T035 [US4] `enabled:false` 재부팅 대조군을 수행한다 per US4/AC3 / SC-006
   (missing) — quickstart.md §5 절차 6. `auto-diary.json`을 `enabled:false`로
   → `adb reboot` → 재연결 후 앱 열기 → 어느 phase에서도 `dumpsys jobscheduler`에
   `JOB #u0a569 …/androidx.work…SystemJobService`가 **없는지** 확인(꺼진 상태를
   재부팅이 되살리지 않는다). findings.md §3 표의 `false / after-reboot-app-opened`
   행을 채운다.
-- [ ] T036 release 빌드로 §9 헤드리스 경로를 재확인한다 per plan: 코드 변경 범위
+- [X] T036 release 빌드로 §9 헤드리스 경로를 재확인한다 per plan: 코드 변경 범위
   / SC-007 (partial) — `task.ts`가 `require("expo-task-manager")`를 **모듈
   최상단 동기 호출**로 바꿨다(§9 수정). debug 헤드리스 등록·완주는 확인됐으나
   R8·ProGuard가 이 `require` 경로를 어떻게 다루는지 미확인. AGENTS.md "release
@@ -526,7 +526,7 @@ spec.md가 셋을 P1로 뒀다 — narrative 완주(US1), 배터리 소크(US2),
   release 재확인")에 이 `require` 변경이 해당하는지 판단해 findings.md에 근거와
   함께 기록. **해당 안 하면 "debug 1회로 충분" 근거를 명시**하고 이 태스크를
   그대로 종료 처리.
-- [ ] T037 검증용 모델·합성 하루를 기기에 재배치한다 per quickstart §1 전제
+- [X] T037 검증용 모델·합성 하루를 기기에 재배치한다 per quickstart §1 전제
   (missing) — 2차 세션 Maestro `unified-permission-onboarding.yml`의
   `clearState`(=`pm clear`)가 `files/models/`의 `a1.bin`(kanana)·`a2.bin`
   (exaone)·`v1.bin`+`v2.bin`(VLM)·`state.json`과 일기·`preferences/*`를 전부

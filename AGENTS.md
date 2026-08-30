@@ -760,20 +760,35 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   — **스펙 024 범위 밖, 별도 스펙에서 EXAONE GGUF/`llama.rn` 버전/로스터
   재검토 필요**(findings.md §10). 019·020·023이 narrative 실기기 검증을
   미룬 것과 무관하지 않을 수 있다.
-- **실기기 검증 — 2차 세션에서 §9·§3·§4·§7 완료**. 남은 것(findings.md
-  "미확인 잔여"):
-  - **§2** 배터리 예외/무예외 소크 — 사용자 결정으로 건너뜀. 자연 15분+
-    주기 대기 필요(020 SC-002·SC-003).
-  - **`narrative` 헤드리스 완주** — quiet만 확인. narrative 사진 있는
-    날이 헤드리스에서 180초 안에 완주하는지 미확인.
-  - **`enabled:false` 재부팅 대조군**(US4 Scenario 3) — 2차 세션 `clearState`로
-    수행 못 함.
-  - 배터리 인텐트가 실제 도착한 삼성 One UI 설정 화면 경로.
-  - **release 빌드 재확인** — `task.ts`가 `require("expo-task-manager")`를
-    모듈 최상단 동기 호출로 바꿈. debug에서 헤드리스 등록·완주 확인했으나
-    R8·ProGuard의 `require` 처리는 미확인(빌드 설정 경계 해당 여부 판단
-    필요).
-  - **검증용 모델 재배치** — 2차 세션 `clearState`로 `files/models/` 삭제됨.
+- **실기기 검증 — 2차 세션 §9·§3·§4·§7 완료, 3차 세션(`/speckit-implement`
+  Phase 8) §3 정정·T034·T035·T036·T037 완료**.
+  - **★ `narrative` 헤드리스 완주 불가 확정**(T034, 3차 세션): 배터리
+    예외 부여·화면 강제 켜기까지 해도 `a2`(exaone) 로드 후 `loadPrompt`
+    단계에서 CPU 292%를 26분+ 태우며 산출물 없음. `GENERATION_TIMEOUT_MS`
+    180초 가드는 헤드리스/Doze에서 JS 타이머 억제로 무력(`result:"timeout"`
+    안 나옴). **`narrative`는 이 기기(SM-S901N) 헤드리스 자동 생성에서
+    사실상 쓸 수 없다** — `quiet`만 완주(§9, `writingMs` 52.5초). §10
+    EXAONE mojibake와 같은 뿌리로 보인다. **로스터에서 narrative를 자동
+    생성 대상으로 둘지 / exaone GGUF 교체는 별도 스펙**(findings §9 T034절).
+  - **§3 재부팅 복구 메커니즘 정정**(3차 세션): `expo-task-manager`가
+    자체 `BOOT_COMPLETED` 리시버를 가진다(`I/TaskService: Handling intent
+    with action 'android.intent.action.BOOT_COMPLETED'`). `enabled:true`면
+    재부팅 후 앱을 **홈 화면이든 설정 탭이든** 한 번 열기만 하면 그
+    리시버가 `defineTask` 등록 태스크를 `scheduleWorker()`로 재예약한다 —
+    `App.tsx:925-927`의 설정 탭 전용 `register()`에 의존하지 않는다. §9
+    수정(모듈 최상단 `defineTask`)이 이 복구의 **전제**. `enabled:false`
+    대조군(T035): 재부팅 후 앱 열어도 잡 미등록, `didRegister` 로그 없음
+    → SC-006 충족.
+  - **T036 release 재확인 판정**: **debug 1회로 충분**(012 기준).
+    `require("expo-task-manager")`는 Metro 정적 require이고 표준 Expo
+    autolinking 모듈이라 빌드 설정 경계 아님. 잔여 위험(R8 side-effect
+    트리셰이킹)은 다음 release 세션 1회 확인으로 닫힘. findings §11.
+  - **T037**: 검증용 모델 4개 재배치 완료(개발 기계 재다운로드 + `run-as`
+    + `state.json` verdict 수동).
+  - **남은 것**: §2 배터리 예외/무예외 소크(T012~T014 / T032·T033 —
+    사용자가 2·3차 세션 모두 건너뜀, **SC-003·SC-004 미판정**), 배터리
+    인텐트 삼성 One UI 도착 경로, release APK로 §9 헤드리스 1회 확인,
+    EXAONE mojibake(§10 별도 스펙).
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
