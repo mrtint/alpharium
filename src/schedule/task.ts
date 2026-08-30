@@ -202,38 +202,73 @@ function oldestToKeep(day: DayDate): DayDate {
 }
 
 /**
- * 전역 스코프에서 태스크를 정의한다(019 research.md §1 — 전역 스코프 요건).
+ * 태스크 콜백 본체. `defineTask`가 이것을 감싼다.
  *
- * `TaskManager.defineTask()`는 모듈 최상단에서 호출해야 백그라운드 런타임이
- * JS 번들을 다시 읽어 태스크를 찾을 수 있다. `App.tsx`가 이 모듈을 부수
- * 효과로 import한다.
- *
- * **테스트 환경에서는 `expo-task-manager`가 없으므로 지연 import로 감싸
- * 최상단 실행을 피한다** — 019 하네스는 정적 import였으나, 이 저장소의
- * `.ts` 테스트는 node 환경이라 네이티브 모듈 해석이 실패한다.
+ * `runAutoDiaryTask()`의 반환을 `BackgroundTaskResult`로 옮긴다(B6 —
+ * "skipped"·"ran" 둘 다 Success, Failed는 실제로 뭔가 깨졌을 때만).
+ * `BackgroundTask` 모듈을 인자로 받아 테스트가 대역을 넣을 수 있게 한다.
  */
-async function defineAutoDiaryTask(): Promise<void> {
-  const TaskManager = await import("expo-task-manager");
-  const BackgroundTask = await import("expo-background-task");
-
-  if (TaskManager.isTaskDefined(AUTO_DIARY_TASK_NAME)) return;
-
-  TaskManager.defineTask(AUTO_DIARY_TASK_NAME, async () => {
-    const result = await runAutoDiaryTask();
-    // B6 — "skipped"도 "ran"도 Success. Failed는 실제로 뭔가 깨졌을 때만.
-    return result === "failed"
-      ? BackgroundTask.BackgroundTaskResult.Failed
-      : BackgroundTask.BackgroundTaskResult.Success;
-  });
+async function autoDiaryTaskCallback(BackgroundTask: {
+  BackgroundTaskResult: { Failed: unknown; Success: unknown };
+}): Promise<unknown> {
+  const result = await runAutoDiaryTask();
+  return result === "failed"
+    ? BackgroundTask.BackgroundTaskResult.Failed
+    : BackgroundTask.BackgroundTaskResult.Success;
 }
 
 /**
- * `App.tsx`가 마운트 시 1회 부른다 — 전역 태스크를 등록한다.
+ * ★ 024 — `defineTask`를 **모듈 최상단 부수 효과**로 등록한다.
  *
- * 019는 모듈 로드 시점에 `defineTask`를 불렀지만, 그 방식은 이 저장소의
- * 테스트(node 환경)에서 네이티브 모듈 해석 실패를 일으킨다. `App.tsx`에서
- * 명시적으로 부르되, 실패해도 앱이 죽지 않게 감싼다(느릴 뿐).
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **왜 최상단이어야 하는가**: WorkManager가 화면 꺼진 채 태스크를 깨우면 RN
+ * 헤드리스 런타임이 번들을 로드하지만 `App.tsx`의 컴포넌트 트리는 렌더되지
+ * 않는다 — `useEffect`가 안 돈다. 020은 `defineTask` 호출을 `App.tsx`의
+ * `useEffect`(`ensureAutoDiaryTaskDefined`)에 뒀고, 그래서 헤드리스 배경
+ * 실행에서 "No task registered for key expo-task-manager" → `expo-task-manager`가
+ * 태스크를 **자동 해제**했다(2026-08-30 실기기 SM-S901N 확인, spec 024).
+ * 019 스파이크는 `TaskManager.defineTask()`를 모듈 최상단에서 불렀고
+ * (`src/spike/background-diary-task.ts:209`), 그래서 모듈을 import하는 어떤 JS
+ * 컨텍스트(헤드리스 포함)에서도 등록됐다.
+ *
+ * **왜 `require`를 try/catch로 감싸는가**: `logic` jest 프로젝트의
+ * `transformIgnorePatterns`가 `expo-task-manager`를 변환 대상에서 빼므로
+ * (`node_modules/(?!(expo|expo-modules-core|@expo)/)` — 이름이 `expo-task-manager`),
+ * 최상단 정적 `import`나 변환 안 된 `require`는 `SyntaxError`를 던진다.
+ * 프로덕션 RN(Metro가 전부 변환)에서는 `require`가 실제 모듈을 주고
+ * `defineTask`가 부수 효과로 등록된다. 테스트에서는 `require`가 던지고 →
+ * catch → 등록 생략(테스트는 `runAutoDiaryTask`를 주입 의존으로 직접 부른다).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function registerAutoDiaryTask(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const TaskManager = require("expo-task-manager");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const BackgroundTask = require("expo-background-task");
+    if (typeof TaskManager?.defineTask !== "function") return false;
+    if (TaskManager.isTaskDefined?.(AUTO_DIARY_TASK_NAME)) return true;
+    TaskManager.defineTask(AUTO_DIARY_TASK_NAME, () => autoDiaryTaskCallback(BackgroundTask));
+    return true;
+  } catch {
+    // 테스트(node 환경) 또는 네이티브 모듈 부재 — 등록을 건너뛴다.
+    return false;
+  }
+}
+
+// 모듈 부수 효과: 이 파일을 import하는 어떤 JS 컨텍스트에서도(헤드리스 배경
+// 실행 포함) 태스크가 등록된다. `App.tsx`가 이 모듈을 import하므로 포그라운드
+// 시작에서도 자동으로 걸린다.
+const AUTO_DIARY_TASK_REGISTERED = registerAutoDiaryTask();
+
+/**
+ * `App.tsx`가 마운트 시 1회 부른다 — 최상단 등록이 이미 됐으면 no-op,
+ * 안 됐으면(첫 import보다 네이티브 모듈이 늦게 준비된 드문 경우) 다시 시도한다.
+ *
+ * **더 이상 유일한 등록 경로가 아니다**(024) — 최상단 부수 효과가 주 경로이고,
+ * 이것은 포그라운드에서의 재확인일 뿐이다.
  */
 export function ensureAutoDiaryTaskDefined(): void {
-  void defineAutoDiaryTask().catch(() => {});
+  if (AUTO_DIARY_TASK_REGISTERED) return;
+  registerAutoDiaryTask();
 }

@@ -227,3 +227,69 @@ describe("L8 — 위반 주입 (소스 검사)", () => {
     expect(CODE).not.toMatch(/expo-file-system/);
   });
 });
+
+/**
+ * ★ 024 — contracts/stale-lock-basis.md SL1·SL2·SL4.
+ *
+ * `narrative`(exaone) 백그라운드 완주 실측이 `STALE_LOCK_MS`의 근거가 된다.
+ * 020의 `lock.ts` 주석이 명시한 게이트("narrative 백그라운드 완주가 4분을
+ * 넘으면 이 상수를 재검토")를 이 스펙이 실제로 수행했음을 소스가 드러내야
+ * 한다.
+ */
+describe("SL1 — STALE_LOCK_MS 단일 정의 (024, stale-lock-basis.md)", () => {
+  const LOCK_TS = readFileSync(join(__dirname, "../../src/schedule/lock.ts"), "utf8");
+  const TASK_TS = readFileSync(join(__dirname, "../../src/schedule/task.ts"), "utf8");
+  const PIPELINE_TS = readFileSync(join(__dirname, "../../src/diary/pipeline.ts"), "utf8");
+
+  const stripComments = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+  it("lock.ts에 STALE_LOCK_MS가 정확히 한 번 정의된다", () => {
+    const defs = stripComments(LOCK_TS).match(/\bconst\s+STALE_LOCK_MS\b/g) ?? [];
+    expect(defs).toHaveLength(1);
+  });
+
+  it("task.ts는 잠금 만료 시간 리터럴을 하드코딩하지 않는다 (lock.ts에만)", () => {
+    const code = stripComments(TASK_TS);
+    // 5분/4분 밀리초 리터럴, 또는 명시적 상수. STALE_LOCK_MS import는 허용.
+    expect(code).not.toMatch(/\b300000\b|\b240000\b|[45]\s*\*\s*60\s*\*\s*1000/);
+    expect(code).not.toMatch(/\bconst\s+STALE_LOCK_MS\b/);
+  });
+
+  it("pipeline.ts도 잠금 만료 시간 리터럴을 하드코딩하지 않는다 (기존 검사 재확인)", () => {
+    const code = stripComments(PIPELINE_TS);
+    expect(code).not.toMatch(/STALE_LOCK_MS\s*=|\b300000\b|[45]\s*\*\s*60\s*\*\s*1000/);
+  });
+});
+
+describe("SL2 — STALE_LOCK_MS 근거 주석이 narrative 실측을 참조 (024)", () => {
+  const LOCK_TS = readFileSync(join(__dirname, "../../src/schedule/lock.ts"), "utf8");
+  // STALE_LOCK_MS 선언 바로 위의 블록 주석.
+  const commentBlock = LOCK_TS.match(/\/\*\*[\s\S]*?\*\/\s*export const STALE_LOCK_MS/)?.[0] ?? "";
+
+  it("근거 주석에 narrative 백그라운드 완주 실측 참조가 있다", () => {
+    // "narrative"와 "완주"(또는 "024 실측")가 함께 언급돼야 한다.
+    const mentionsNarrative = /narrative/i.test(commentBlock);
+    const mentionsMeasurement = /완주.*(?:최댓값|최대|측정)|024\s*실측|specs\/024/i.test(
+      commentBlock,
+    );
+    expect(mentionsNarrative && mentionsMeasurement).toBe(true);
+  });
+
+  it("근거가 019 quiet 실측 문구만으로 남아 있지 않다", () => {
+    const onlyQuietBasis =
+      /quiet|2분\s*27초|147초/.test(commentBlock) && !/narrative/i.test(commentBlock);
+    expect(onlyQuietBasis).toBe(false);
+  });
+});
+
+describe("SL4 — STALE_LOCK_MS 값 규칙 (024, stale-lock-basis.md)", () => {
+  it("값은 분 단위(60000의 배수)다", () => {
+    expect(STALE_LOCK_MS % 60_000).toBe(0);
+  });
+
+  it("값은 최소 5분 이상이다 (narrative는 quiet보다 느리므로 하향 없음)", () => {
+    // 규칙: 새값 = ceil(M × 2 / 60000) × 60000. narrative M >= quiet M이므로
+    // 새값 >= 현재 5분. 상향은 가능하되 하향은 규칙상 불가.
+    expect(STALE_LOCK_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
+  });
+});
