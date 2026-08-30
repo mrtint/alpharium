@@ -671,9 +671,13 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   RN(Metro가 전부 변환)에서는 `require` 성공 → 등록(헤드리스 포함), Jest
   `logic`에서는 `SyntaxError` → catch → 등록 생략(테스트는 주입 의존 사용).
   계약 테스트 `background-generation.test.ts` B1a(3케이스)가 이 회귀를
-  잠근다. **⚠️ 수정 후 헤드리스 완주는 실기기 재확인 미완**(Metro 불안정 +
-  Samsung 절전이 강제 실행을 막음) — findings.md §9, 이 스펙의 남은 최우선
-  검증 항목.
+  잠근다. **✅ 수정 후 헤드리스 재확인 완료**(2026-08-30 2차 세션, clean
+  Metro): 화면 꺼진 잠긴 상태 `cmd jobscheduler run -f`에서 `No task
+  registered` 에러 소멸, `TaskService: Registered task` 확인, 배터리
+  예외를 주면 헤드리스 생성이 실제로 완주(`2026-08-30.json` 저장,
+  `writingMs` 52.5초, `Worker result SUCCESS`). **배터리 예외 없이는
+  토큰 생성 단계에서 억제돼 미완주**(5분+ 정지) — 019의 "예외 없이는
+  억제"가 생성 경로에서도 성립. findings.md §9.
 - **`STALE_LOCK_MS`를 5분 → 6분으로 상향했다** — 실기기 §1 실측
   (2026-08-30, SM-S901N): `narrative` 사진 있는 날(08-28, 캡션 8장) 완주
   벽시계 **≈ 170초**(`visionMs` 73.0s + `writingMs` 89.8s + 적재). 사진
@@ -699,15 +703,28 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   `__tests__/signals/signal-revocation.test.ts`(SR1~SR6, 18개)가 이 방어를
   백그라운드·실행 중 회수 각도에서 명시적으로 잠갔고, 위반 주입 4종(각
   분기가 `none`을 반환하도록 / catch가 재던지도록)이 전부 잡히는 것을
-  확인했다. **`collect.ts`는 이 스펙에서 한 줄도 안 고쳤다** — 실기기
-  재현(§4)에서 `unknown`이 아닌 갈래가 나오면 그때 그 한 분기만 보강한다.
-- **재부팅 복구는 020이 이미 배선했다 — 코드 무변경.** `App.tsx:923-927`이
-  마운트 시 `settings.enabled === true`면 `backgroundPort.register()`를
-  idempotent 호출한다(020 B5, 주석이 이미 "재부팅 후 재등록"을 명시).
-  이 스펙은 이 경로가 재부팅 복구를 실제로 성립시키는지 실기기로
-  확인하고(§5), 재부팅 후 앱을 한 번도 안 연 구간에는 재등록이 보장되지
-  않는다는 한계를 문서화한다. `BOOT_COMPLETED` 리시버 같은 새 네이티브
-  경로는 만들지 않는다(범위 밖).
+  확인했다. **`collect.ts`는 이 스펙에서 한 줄도 안 고쳤다.**
+  **✅ 실기기 재현 완료**(2026-08-30 2차 세션): `adb pm revoke`는 앱
+  프로세스를 즉시 kill(`ActivityManager: Killing … permissions revoked`)
+  하므로 "실행 정확히 그 순간의 회수"는 재현 불가 — 대신 권한 회수 상태
+  그대로 헤드리스 태스크를 강제 실행. `2026-08-28.json` 저장,
+  `signalsUsed.photos.kind === "unknown"`(`reason: "사진 접근 권한이 없다"`,
+  **`none` 아님**), `places.kind === "unknown"`, `has_media=0`(VLM 캡션
+  안 돎), 본문 사진 단정 없음("아마 산책했을 것이다"), 판정 통과, 잠금
+  해제됨. findings.md §4.
+- **재부팅 복구 — 코드 무변경, 그런데 성립 경로가 020 예상과 다르다.**
+  020이 배선한 `App.tsx:923-927`(마운트 시 `settings.enabled === true`면
+  `backgroundPort.register()` idempotent 호출)은 **`AutoDiarySettingsScreen`
+  마운트 시에만 돈다** — 설정 탭을 열어야 한다. **✅ 실기기 확인**
+  (2026-08-30 2차 세션): `adb reboot` 후 앱을 **홈 화면으로만** 한 번
+  열어도 `JOB #u0a569` 재등록됨 — `§9 수정`의 `task.ts` 모듈 최상단
+  `defineTask` 부수 효과가 `BackgroundTaskConsumer.didRegister()` →
+  `BackgroundTaskScheduler.registerTask()` → `scheduleWorker()`를 유발하기
+  때문(`21:21:00.108 I/TaskService: Registered task` → `didRegister` →
+  `Worker is already scheduled, skipping`). **즉 §9 CRITICAL 수정이
+  재부팅 복구도 함께 성립시킨다.** 재부팅 후 앱 열기 전에는 미등록
+  (`BOOT_COMPLETED` 리시버 없음, 문서화된 한계 FR-010). `BOOT_COMPLETED`
+  리시버 같은 새 네이티브 경로는 만들지 않는다(범위 밖). findings.md §3.
 - **`AppState.currentState`를 판정에 쓰지 않는다.** `src/schedule/`·
   `src/signals/` 소스에 `AppState` 참조 0건(확인). 이 값은 **"앱 UI가
   전경에 없음"의 근사치이지 "이 순간 화면이 물리적으로 꺼져 있음"의 증거가
@@ -717,32 +734,46 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   `verification-log.ts`를 020이 제거한 전례를 잇는다(헌법 원칙 IV) — 검증
   전용 로그 모듈이나 진단 패널을 되살리지 않는다. 개발자 탭의 "지금 자동
   생성 트리거" 버튼(020)으로 백그라운드 경로를 재현한다.
-- **권한 회수 시 `collect.ts`가 이미 `unknown`으로 감싼다 — 코드 무변경.**
-  신규 계약 테스트 `signal-revocation.test.ts`(SR1~SR6, 18개)가 004 설계의
-  방어를 백그라운드·실행 중 회수 각도에서 명시적으로 잠갔다(위반 주입 4종
-  확인). 실기기 §4 재현은 미수행.
-- **재부팅 복구·`AppState` 한계**: `App.tsx:923-927`이 마운트 시 idempotent
-  `register()`(020 B5). `src/schedule/`·`src/signals/`에 `AppState` 참조
-  0건. 실기기 §5 미수행.
+- **`AppState.currentState` 한계**: `src/schedule/`·`src/signals/`에
+  `AppState` 참조 0건(확인). "앱 UI가 전경에 없음"의 근사치이지 "화면이
+  물리적으로 꺼져 있음"의 증거가 아니다(019 §6a).
 - 기기 없는 테스트 `test:logic` 1680개 통과(신규 `signal-revocation` 18 +
   `lock.test` SL1~5 + `background-generation` B1a). lint 0 error, 헌법 검사
   위반 0, prettier 클린.
+- **✅ §7 Maestro 회귀 완료**(2026-08-30 2차 세션): 020
+  (`scheduled-diary-notification.yml`)·021(`unified-permission-onboarding.yml`)·
+  023(`photo-selection-over-limit.yml`) 3흐름 전부 PASS. 회귀 없음.
+  **⚠️ 021 흐름은 `Launch app … with clear state`(=`pm clear`)로 앱
+  데이터를 전부 날린다** — 2차 세션이 §3·§4 뒤에 §7을 돌려 검증용 모델
+  (`a1`·`a2`·`v1`·`v2`)·일기·설정이 삭제됐다. **다음 세션 전 §7을 먼저
+  돌리거나, 모델을 다시 배치**해야 한다.
+- **부수 관측 — 헤드리스 생성이 포그라운드의 ~3배 느리다**: §4 권한 회수
+  라운드에서 `quiet` 콜드 헤드리스 `writingMs` = 158.5초(§1 포그라운드
+  콜드 54초의 ~3배, 배터리 예외 있어도). `narrative` 사진 있는 날은
+  포그라운드에서 이미 `writingMs` 89.8초 + `visionMs` 73초였으므로
+  헤드리스에서 `GENERATION_TIMEOUT_MS`(180초, `writingMs` 구간) 초과
+  위험이 실재 — **`narrative` 헤드리스 완주는 2차 세션에서도 미확인**
+  (quiet만 완주). FR-014 결론에 "헤드리스에서는 여유가 더 좁다" 추가.
 - **EXAONE(narrative) 출력 mojibake 관측**(§1 실기기): 3회 전부 저장된 일기
   본문이 깨진 UTF-8 surrogate로 나왔고 `title`에 금지된 `###`·`**`가 섞였다.
   `judge()`는 통과시켰다. `llama.rn` + EXAONE-3.5 Q4_K_M 인코딩 문제로 보인다
   — **스펙 024 범위 밖, 별도 스펙에서 EXAONE GGUF/`llama.rn` 버전/로스터
   재검토 필요**(findings.md §10). 019·020·023이 narrative 실기기 검증을
   미룬 것과 무관하지 않을 수 있다.
-- **실기기 검증 미완** — 이 스펙의 핵심 실측 중 §1(narrative 완주)만
-  포그라운드로 완료. 남은 것(findings.md "미확인 잔여"):
-  - **§9 수정의 헤드리스 재확인**(최우선) — `task.ts` 수정 후 화면 꺼진
-    배경 실행이 실제로 완주하는지. 안정된 Metro 또는 release 빌드 필요.
-  - **§2** 배터리 예외/무예외 소크 — Samsung 절전이 `cmd jobscheduler run`을
-    막아 미완. 자연 15분+ 주기 대기 필요(020 SC-002·SC-003).
-  - **§5** 재부팅 후 앱 한 번 열면 `dumpsys jobscheduler`에 재등록.
-  - **§4** 실행 창 안 `pm revoke` — 저장 신호 `unknown`·본문 단정 없음.
-  - **§7** `npm run test:device` Maestro 회귀.
+- **실기기 검증 — 2차 세션에서 §9·§3·§4·§7 완료**. 남은 것(findings.md
+  "미확인 잔여"):
+  - **§2** 배터리 예외/무예외 소크 — 사용자 결정으로 건너뜀. 자연 15분+
+    주기 대기 필요(020 SC-002·SC-003).
+  - **`narrative` 헤드리스 완주** — quiet만 확인. narrative 사진 있는
+    날이 헤드리스에서 180초 안에 완주하는지 미확인.
+  - **`enabled:false` 재부팅 대조군**(US4 Scenario 3) — 2차 세션 `clearState`로
+    수행 못 함.
   - 배터리 인텐트가 실제 도착한 삼성 One UI 설정 화면 경로.
+  - **release 빌드 재확인** — `task.ts`가 `require("expo-task-manager")`를
+    모듈 최상단 동기 호출로 바꿈. debug에서 헤드리스 등록·완주 확인했으나
+    R8·ProGuard의 `require` 처리는 미확인(빌드 설정 경계 해당 여부 판단
+    필요).
+  - **검증용 모델 재배치** — 2차 세션 `clearState`로 `files/models/` 삭제됨.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
