@@ -475,3 +475,63 @@ spec.md가 셋을 P1로 뒀다 — narrative 완주(US1), 배터리 소크(US2),
 - 피할 것: 검증 전용 로그 모듈 되살리기, 개발자 탭 소요 시간 패널 추가,
   `src/schedule/`가 신호를 알게 하기, 새 `SignalValue` 갈래, `AppState`를
   판정에 쓰기, `BOOT_COMPLETED` 리시버 추가.
+
+---
+
+## Phase 8: Convergence
+
+> **근거**: `/speckit-converge`(2026-08-30, 실기기 2차 세션 이후). §9 헤드리스
+> 수정 재확인·§3 재부팅 복구·§4 권한 회수·§7 Maestro 회귀는 완료(findings.md
+> §3·§4·§7·§9, 커밋 `99d6df1`). 아래는 spec의 MUST 요구사항 중 아직 실측이
+> 비어 있거나 부분만 확인된 것. **§2 배터리 소크(T032·T033)는 사용자가 이번
+> 회차에 건너뛰기로 명시**했으므로 `/speckit-implement`가 이를 자동 수행하지
+> 않는다 — 스펙 완전 충족을 위해 남겨 둔 추적 항목이다.
+
+- [ ] T032 [US2] 배터리 예외 라운드 소크를 수행한다 per FR-004 / SC-003 (missing)
+  — quickstart.md §2. `adb shell dumpsys deviceidle whitelist
+  +com.anonymous.alpharium` → `am get-standby-bucket` `5` 확인 → 목표 시각
+  현재+몇 분 → 화면 끄고 잠금 → **자연 15분+ 주기로** `task-entered` 시각을
+  최소 1회(SHOULD 3회) 수집. `cmd jobscheduler run -f`는 삼성 절전이 도즈 시
+  거부하므로 강제 실행 불가 — 자연 대기만 유효. **MUST**: 목표 시각으로부터
+  첫 시도 ≤ 60분. findings.md §2 표(`batteryException: true` 행) 기록.
+- [ ] T033 [US2] 무예외 24시간 소크를 수행한다 per FR-005 / SC-004 (missing) —
+  quickstart.md §3. `deviceidle whitelist -com.anonymous.alpharium` →
+  `am get-standby-bucket` `10` 이상 → 목표 시각 설정 → 화면 끄고 **24시간+
+  조작 금지** → 2~4시간마다 `adb logcat -d -b all > dump_<ts>.txt` → 24시간+
+  뒤 `task-entered` 흔적 확인. **MUST**: 목표 시각 지난 뒤 24시간 안 ≥ 1회.
+  `Minimum latency`가 15분으로 정확히 전달됐는지도 확인(억제 원인이 OS임).
+  findings.md §2 표(`batteryException: false` 행) 기록.
+- [ ] T034 [US1] `narrative` 헤드리스 완주를 실측한다 per FR-001 / SC-001 /
+  US1/AC2 (partial) — 지금까지 §1은 포그라운드만, §9 헤드리스는 `quiet`만
+  완주 확인(158초, 포그라운드의 ~3배). 배터리 예외 부여 상태에서 캐릭터를
+  `narrative`로, 사진 있는 날(시드 8장)을 대상으로 화면 끈 잠긴 상태
+  `cmd jobscheduler run -f` → `writingMs`·`visionMs`·완주 벽시계 실측 →
+  `GENERATION_TIMEOUT_MS`(180초, `writingMs` 구간) 초과 여부와 `result:
+  "timeout"` 빈도 기록(FR-014). **180초 한도·`VISION_PHOTO_LIMIT`은 바꾸지
+  않는다**. findings.md §1·§9 갱신. EXAONE mojibake(§10)가 재현되면 함께
+  기록하되 이 스펙 범위 밖으로 유지.
+- [ ] T035 [US4] `enabled:false` 재부팅 대조군을 수행한다 per US4/AC3 / SC-006
+  (missing) — quickstart.md §5 절차 6. `auto-diary.json`을 `enabled:false`로
+  → `adb reboot` → 재연결 후 앱 열기 → 어느 phase에서도 `dumpsys jobscheduler`에
+  `JOB #u0a569 …/androidx.work…SystemJobService`가 **없는지** 확인(꺼진 상태를
+  재부팅이 되살리지 않는다). findings.md §3 표의 `false / after-reboot-app-opened`
+  행을 채운다.
+- [ ] T036 release 빌드로 §9 헤드리스 경로를 재확인한다 per plan: 코드 변경 범위
+  / SC-007 (partial) — `task.ts`가 `require("expo-task-manager")`를 **모듈
+  최상단 동기 호출**로 바꿨다(§9 수정). debug 헤드리스 등록·완주는 확인됐으나
+  R8·ProGuard가 이 `require` 경로를 어떻게 다루는지 미확인. AGENTS.md "release
+  빌드와 서명" 절차로 release APK 빌드 → Metro 없이 설치 → 설정 탭 진입으로
+  잡 등록 확인 → 화면 끈 잠긴 상태 강제 실행 → `No task registered` 에러
+  부재·완주 확인. 012 기준("새 네이티브 모듈이나 빌드 설정을 건드릴 때만
+  release 재확인")에 이 `require` 변경이 해당하는지 판단해 findings.md에 근거와
+  함께 기록. **해당 안 하면 "debug 1회로 충분" 근거를 명시**하고 이 태스크를
+  그대로 종료 처리.
+- [ ] T037 검증용 모델·합성 하루를 기기에 재배치한다 per quickstart §1 전제
+  (missing) — 2차 세션 Maestro `unified-permission-onboarding.yml`의
+  `clearState`(=`pm clear`)가 `files/models/`의 `a1.bin`(kanana)·`a2.bin`
+  (exaone)·`v1.bin`+`v2.bin`(VLM)·`state.json`과 일기·`preferences/*`를 전부
+  삭제했다. 개발 기계에서 모델을 받아 `run-as com.anonymous.alpharium`로
+  `files/models/`에 배치 + `state.json`에 `passed:true` verdict 추가(021 D2
+  방식). `npm run seed:day`로 사진 있는/없는 하루 준비. **이후 T032·T034·T035가
+  이 환경에 의존**한다. (환경 복구 태스크 — 스펙 요구사항이 아니라 후속 실측의
+  전제.)
