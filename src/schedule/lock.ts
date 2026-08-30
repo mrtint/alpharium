@@ -27,11 +27,17 @@ export type LockRecord = {
 /**
  * 이 시간을 넘긴 잠금은 죽은 것으로 본다.
  *
- * **값 `5분`의 근거**: 019 실측 최장 완주 2분 27초의 2배 + 여유(L7).
- * narrative(exaone) 백그라운드 완주가 4분을 넘으면 이 상수를 재검토한다 —
+ * **값 `5분`의 근거** (024, specs/024-background-stability-exceptions):
+ * 규칙은 `narrative`(exaone, 로스터에서 가장 느린 캐릭터) 백그라운드 완주
+ * 실측 최댓값 M초 × 2, 분 단위 올림이다(contracts/stale-lock-basis.md SL4,
+ * data-model.md §5). 019가 `quiet` 최장 완주 2분 27초(147초) × 2 = 294초를
+ * 5분(300초)으로 올린 것과 같은 방식이며, 020의 `lock.ts` 주석이 명시한
+ * 게이트("narrative 완주가 4분을 넘으면 재검토")를 024가 실제로 수행했다.
+ * `narrative` 실측 M과 이 값의 확정 근거는 findings.md §1에 있다.
+ * `narrative`는 `quiet`보다 느리므로 이 값은 5분 아래로 내려가지 않는다 —
  * 너무 크게 잡으면 진짜 죽은 잠금이 오래 살아 다음 실행을 막는다.
  *
- * **export하지만 `pipeline.ts`·`task.ts`가 하드코딩하지 않는다**(L8) —
+ * **export하지만 `pipeline.ts`·`task.ts`가 하드코딩하지 않는다**(L8, SL1) —
  * 계약 테스트가 상수를 확인하되, 값이 두 곳에 생기지 않게 소스를 검사한다.
  */
 export const STALE_LOCK_MS = 5 * 60 * 1000;
