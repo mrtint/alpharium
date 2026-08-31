@@ -14,8 +14,19 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState } from "react";
-import { Image, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Image,
+  Modal,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 
 import { topicParticleFor } from "../diary/particle";
 import { personaOf } from "../diary/persona";
@@ -157,21 +168,49 @@ function TimingLines({ entry }: { entry: DiaryEntry }) {
   );
 }
 
+/** 이 일기가 실제로 분석한 사진 하나의 참조 (017, `DiaryEntry.photos[]`의 항목). */
+type PhotoRef = { photoId: string; takenAt: Date; resizedPath: string };
+
+/** 사본을 못 불러왔을 때 그 자리에 남기는 문구 (017 FR-002). 두 곳이 공유한다. */
+const PHOTO_MISSING = "이 사진은 이제 없다";
+
 /**
- * 사진 한 장 — 리사이즈 사본이 놓인 로컬 파일을 그린다 (017 FR-001).
+ * 가로 페이저의 스크롤 위치에서 현재 페이지 인덱스를 낸다 (025, contracts/
+ * photo-gallery.md C3·C14).
+ *
+ * `contentOffset.x`를 컨테이너 폭으로 나눠 반올림한다 — 스크롤 도중 값이 흘러도
+ * 가장 가까운 페이지로 수렴하고, `pagingEnabled` 스냅이 끝나면 정확히 맞는다.
+ * `width`가 아직 0이면(첫 `onLayout` 전) 0을 돌려준다. `count`로 범위를 클램프해
+ * 마지막 다음으로 넘어가지 않는다(C13).
+ */
+function pageIndexFromScroll(e: NativeSyntheticEvent<NativeScrollEvent>, count: number): number {
+  const { contentOffset, layoutMeasurement } = e.nativeEvent;
+  const width = layoutMeasurement.width;
+  if (width <= 0) return 0;
+  const raw = Math.round(contentOffset.x / width);
+  return Math.max(0, Math.min(count - 1, raw));
+}
+
+/**
+ * 사진 한 장 — 리사이즈 사본이 놓인 로컬 파일을 그린다 (017 FR-001, 025 FR-004).
  *
  * **개별 실패가 나머지를 무너뜨리지 않는다**(FR-002, contracts/
  * photo-preservation.md P6, 011의 E4와 같은 원칙이 화면 레벨에서 반복). 보존된
  * 사본 자체를 못 불러오면(드문 경우 — 저장소 손상 등) 그 사진 하나만 "이제
  * 없다"로 대체한다.
+ *
+ * **025 — 슬라이더·갤러리가 공유한다.** `style`로 크기를 주입받고
+ * `resizeMode="contain"`으로 세로/가로 긴 사진도 잘리지 않게 한다(025 Edge
+ * Cases). 실패 대체 뷰에 `testID="diary-photo-missing"`을 새로 달았다 — 기존
+ * `testID="diary-photo"`와 문구는 그대로다(017 회귀).
  */
-function DiaryPhoto({ resizedPath }: { resizedPath: string }) {
+function DiaryPhoto({ resizedPath, style }: { resizedPath: string; style?: object }) {
   const [failed, setFailed] = useState(false);
 
   if (failed) {
     return (
-      <View style={[styles.photo, styles.photoMissing]}>
-        <Text style={styles.photoMissingText}>이 사진은 이제 없다</Text>
+      <View testID="diary-photo-missing" style={[style ?? styles.photo, styles.photoMissing]}>
+        <Text style={styles.photoMissingText}>{PHOTO_MISSING}</Text>
       </View>
     );
   }
@@ -180,17 +219,163 @@ function DiaryPhoto({ resizedPath }: { resizedPath: string }) {
     <Image
       testID="diary-photo"
       source={{ uri: `file://${resizedPath}` }}
-      style={styles.photo}
+      style={style ?? styles.photo}
+      resizeMode="contain"
       onError={() => setFailed(true)}
     />
   );
 }
+
+/**
+ * 본문 가로 사진 슬라이더 (025 User Story 1, contracts/photo-gallery.md §A).
+ *
+ * 017의 `flexWrap` 격자를 대체한다 — 한 번에 한 장이 화면 폭에 맞춰 보이고,
+ * 좌우 스와이프로 넘긴다. 사진을 탭하면 `onOpen(index)`로 풀스크린 갤러리를
+ * 연다. 위치 표시는 `{현재} / {전체}` 순번이며 성능 지표가 아니다(FR-018).
+ */
+function PhotoSlider({ photos, onOpen }: { photos: PhotoRef[]; onOpen: (index: number) => void }) {
+  const window = useWindowDimensions();
+  const [layoutWidth, setLayoutWidth] = useState(0);
+  const [current, setCurrent] = useState(0);
+
+  // `onLayout` 전에는 창 폭을 폴백으로 쓴다 — 셀 폭이 0이면 사진이 안 보인다(C7).
+  const width = layoutWidth > 0 ? layoutWidth : window.width;
+
+  return (
+    <View style={styles.sliderFrame} onLayout={(e) => setLayoutWidth(e.nativeEvent.layout.width)}>
+      <ScrollView
+        testID="photo-slider-pager"
+        horizontal
+        pagingEnabled
+        disableIntervalMomentum
+        scrollEventThrottle={16}
+        showsHorizontalScrollIndicator={false}
+        onScroll={(e) => setCurrent(pageIndexFromScroll(e, photos.length))}
+        onMomentumScrollEnd={(e) => setCurrent(pageIndexFromScroll(e, photos.length))}
+      >
+        {photos.map((photo, index) => (
+          <Pressable
+            key={photo.photoId}
+            testID={`photo-slider-cell-${index}`}
+            accessibilityRole="imagebutton"
+            onPress={() => onOpen(index)}
+            style={{ width }}
+          >
+            <DiaryPhoto resizedPath={photo.resizedPath} style={[styles.sliderPhoto, { width }]} />
+          </Pressable>
+        ))}
+      </ScrollView>
+
+      <Text
+        testID="photo-slider-position"
+        accessibilityLabel={`${current + 1} / ${photos.length}`}
+        style={styles.photoPosition}
+      >
+        {`${current + 1} / ${photos.length}`}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * 풀스크린 사진 갤러리 (025 User Story 2, contracts/photo-gallery.md §B).
+ *
+ * 코어 `Modal` 위에 슬라이더와 같은 가로 페이저를 얹는다. `onRequestClose`가
+ * 안드로이드 뒤로 가기를, `testID="photo-gallery-close"` 버튼이 명시적 닫기를
+ * 받는다 — 아래로 쓸어 닫기·배경 탭 닫기는 넣지 않는다(FR-013).
+ *
+ * **부모가 `gallery.open`으로 마운트를 제어한다** — 이 컴포넌트가 살아 있는
+ * 동안은 항상 열린 상태다. 부모가 리렌더돼도(회전·백그라운드) `gallery.open`이
+ * 유지되므로 이 컴포넌트와 `current` 상태가 언마운트되지 않는다(FR-015a, C18a).
+ * `initialIndex`로의 첫 스크롤은 `layoutWidth`가 정해진 뒤에만 한다(C11 타이밍
+ * 함정 — `layoutWidth`는 첫 `onLayout` 전엔 0이라 `x = index * 0 = 0`으로 잘못
+ * 스크롤된다).
+ */
+function PhotoGalleryModal({
+  photos,
+  initialIndex,
+  onClose,
+}: {
+  photos: PhotoRef[];
+  initialIndex: number;
+  onClose: () => void;
+}) {
+  const window = useWindowDimensions();
+  const scrollRef = useRef<ScrollView>(null);
+  const [layoutWidth, setLayoutWidth] = useState(0);
+  const [current, setCurrent] = useState(initialIndex);
+  const scrolledTo = useRef<number | null>(null);
+
+  const width = layoutWidth > 0 ? layoutWidth : window.width;
+
+  // `layoutWidth`가 정해진 뒤에만 초기 위치로 스크롤한다(C11).
+  useEffect(() => {
+    if (layoutWidth <= 0) return;
+    if (scrolledTo.current === initialIndex) return;
+    scrollRef.current?.scrollTo({ x: initialIndex * layoutWidth, animated: false });
+    scrolledTo.current = initialIndex;
+  }, [layoutWidth, initialIndex]);
+
+  return (
+    <Modal testID="photo-gallery" visible animationType="fade" onRequestClose={onClose}>
+      <View
+        style={styles.galleryFrame}
+        onLayout={(e) => setLayoutWidth(e.nativeEvent.layout.width)}
+      >
+        <ScrollView
+          testID="photo-gallery-pager"
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          disableIntervalMomentum
+          scrollEventThrottle={16}
+          showsHorizontalScrollIndicator={false}
+          onScroll={(e) => setCurrent(pageIndexFromScroll(e, photos.length))}
+          onMomentumScrollEnd={(e) => setCurrent(pageIndexFromScroll(e, photos.length))}
+        >
+          {photos.map((photo) => (
+            <View key={photo.photoId} style={[styles.galleryPage, { width }]}>
+              <DiaryPhoto resizedPath={photo.resizedPath} style={styles.galleryPhoto} />
+            </View>
+          ))}
+        </ScrollView>
+
+        <Text
+          testID="photo-gallery-position"
+          accessibilityLabel={`${current + 1} / ${photos.length}`}
+          style={styles.galleryPosition}
+        >
+          {`${current + 1} / ${photos.length}`}
+        </Text>
+
+        <Pressable
+          testID="photo-gallery-close"
+          accessibilityRole="button"
+          onPress={onClose}
+          style={styles.galleryClose}
+        >
+          <Text style={styles.galleryCloseText}>닫기</Text>
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+/** 갤러리 표시 상태 (025, data-model.md §2). 화면 로컬 — 파일에 저장하지 않는다. */
+type GalleryState = { open: false } | { open: true; index: number };
 
 export function DiaryDetailScreen({
   entry,
   saved = true,
   overwrote = false,
 }: DiaryDetailScreenProps) {
+  // 025 — 갤러리 표시 상태. 화면 로컬이며 파일·스토리지에 저장하지 않는다(SC-006).
+  // 회전·백그라운드 전환에서 React state가 유지되므로 갤러리가 같은 사진에서
+  // 살아남는다(FR-015a) — 별도 복원 로직 없음.
+  const [gallery, setGallery] = useState<GalleryState>({ open: false });
+  const photos = entry.photos;
+  const hasPhotos = photos !== undefined && photos.length > 0;
+
   return (
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.day}>{entry.date}</Text>
@@ -210,16 +395,30 @@ export function DiaryDetailScreen({
       <Text style={styles.text}>{entry.text}</Text>
 
       {/*
-        017 — VLM이 실제로 분석한 사진들(FR-001). `entry.photos`가 없으면(옛
-        일기, 또는 사진을 안 본 생성) 이 영역 자체가 없다 — 기존 "사진: N장"
-        텍스트만 남는다(FR-003, 회귀 없음).
+        025 — VLM이 실제로 분석한 사진들을 가로 슬라이더로 보인다(FR-001).
+        017의 `flexWrap` 격자를 대체한다. `entry.photos`가 없으면(옛 일기,
+        또는 사진을 안 본 생성) 이 영역 자체가 없다 — 기존 "사진: N장" 텍스트만
+        남는다(FR-006·FR-007, 회귀 없음).
+
+        `screen.kind === "writing"`(생성 중)은 `DiaryHomeScreen`의 별도 `View`라
+        이 화면(따라서 슬라이더·갤러리)을 거치지 않는다 — 생성 중 미노출은
+        구조적으로 성립한다(FR-017, SC-005).
       */}
-      {entry.photos !== undefined && entry.photos.length > 0 && (
-        <View style={styles.photos}>
-          {entry.photos.map((photo) => (
-            <DiaryPhoto key={photo.photoId} resizedPath={photo.resizedPath} />
-          ))}
-        </View>
+      {hasPhotos && (
+        <PhotoSlider photos={photos} onOpen={(index) => setGallery({ open: true, index })} />
+      )}
+
+      {/* 025 — 슬라이더의 사진을 탭하면 풀스크린 갤러리가 그 사진에서 열린다
+          (FR-008·FR-009). 사진이 없거나 갤러리가 닫혀 있으면 모달을 마운트하지
+          않는다 — 닫으면 상세 화면으로 돌아온다(FR-013). 갤러리가 열린 채
+          부모가 리렌더돼도(회전·백그라운드) `gallery.open`이 유지되므로 모달과
+          그 내부 상태가 살아남는다(FR-015a, C18a). */}
+      {hasPhotos && gallery.open && (
+        <PhotoGalleryModal
+          photos={photos}
+          initialIndex={gallery.index}
+          onClose={() => setGallery({ open: false })}
+        />
       )}
 
       {/*
@@ -255,10 +454,34 @@ const styles = StyleSheet.create({
   unsaved: { fontSize: 14 },
   overwrote: { fontSize: 13, opacity: 0.7 },
   text: { fontSize: 16, lineHeight: 26 },
-  photos: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  // 017 격자 잔재. `DiaryPhoto`가 style 미주입 시 폴백으로 쓴다(회귀 안전).
   photo: { width: 96, height: 96, borderRadius: 8, backgroundColor: "#eee" },
   photoMissing: { alignItems: "center", justifyContent: "center", padding: 4 },
   photoMissingText: { fontSize: 11, opacity: 0.6, textAlign: "center" },
+  // 025 — 본문 슬라이더.
+  sliderFrame: { gap: 6 },
+  sliderPhoto: { height: 240, borderRadius: 8, backgroundColor: "#eee" },
+  photoPosition: { fontSize: 13, opacity: 0.6, textAlign: "center" },
+  // 025 — 풀스크린 갤러리.
+  galleryFrame: { flex: 1, backgroundColor: "#000" },
+  galleryPage: { flex: 1, alignItems: "center", justifyContent: "center" },
+  galleryPhoto: { flex: 1, width: "100%" },
+  galleryPosition: {
+    position: "absolute",
+    top: 16,
+    alignSelf: "center",
+    color: "#fff",
+    fontSize: 14,
+    opacity: 0.85,
+  },
+  galleryClose: {
+    position: "absolute",
+    top: 8,
+    right: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  galleryCloseText: { color: "#fff", fontSize: 15 },
   signals: {
     marginTop: 8,
     paddingTop: 16,

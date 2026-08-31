@@ -790,6 +790,97 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
     인텐트 삼성 One UI 도착 경로, release APK로 §9 헤드리스 1회 확인,
     EXAONE mojibake(§10 별도 스펙).
 
+### 025 — 일기 본문 사진 슬라이드 및 갤러리 뷰 (2026-08-31)
+
+로드맵 9번. 017이 만든 정적 96×96 썸네일 격자(`flexWrap`)를
+`DiaryDetailScreen`의 가로 페이징 슬라이더 + 풀스크린 갤러리 모달로 교체한다.
+**`src/ui/` 안에서 완결되는 순수 표시 기능** — `diary/`·`vision/`·`signals/`·
+`models/`·`inference/` 무수정, 새 헌법 검사 규칙 없음.
+
+- **새 의존성 0.** RN 코어 `ScrollView`(`horizontal` + `pagingEnabled` +
+  `disableIntervalMomentum`)로 슬라이더를, 코어 `Modal`(`onRequestClose`로
+  안드로이드 뒤로 가기)로 갤러리를 만든다. `react-native-pager-view`·
+  `react-native-gesture-handler`는 네이티브 링크를 동반해 release 재확인이
+  필요하므로(012) 배제했다 — 범위 밖 제스처(핀치 줌·아래로 쓸어 닫기·배경 탭
+  닫기)가 없으니 제스처 라이브러리가 필요 없다.
+- **저장된 `DiaryEntry.photos[]`를 읽기 전용으로 소비.** 새 신호·새 저장
+  필드 없음(SC-006). `photoId`가 페이저 `key`이자 Maestro `testID` 접미사
+  (`photo-slider-cell-<i>`), `takenAt`은 화면에 표시 안 함(순서는 배열 순서 =
+  023 `select.ts`가 정한 시각순).
+- **갤러리 상태는 화면 로컬 `useState<{ open, index }>`** — 파일에 저장하지
+  않는다(009의 "고른 하루를 파일에 남기지 않는다"와 같은 성격). 부모가
+  `{hasPhotos && gallery.open && <PhotoGalleryModal>}`로 마운트를 제어하고,
+  `PhotoGalleryModal`은 항상 `visible`이며 `current`를 `useState`로만 관리한다
+  (prop 파생 금지) — 같은 Activity 안의 회전·백그라운드에서 React state가
+  유지되므로 갤러리가 같은 사진에서 살아남는다(FR-015a). 콜드 스타트 시
+  상태가 없는 것은 정상.
+- **위치 표시는 `{current + 1} / {total}` 텍스트**(예 `2 / 3`) — 순번이지
+  성능 지표가 아니다(FR-018). 단위("장")·비교·평균 없음. Maestro가 문자열로
+  검증 가능.
+- **`DiaryPhoto`(017의 사본 실패 → "이 사진은 이제 없다")를 슬라이더·갤러리가
+  공유**한다. `style`로 크기를 주입받고 `resizeMode="contain"`으로 세로/가로
+  긴 사진도 잘리지 않는다. 실패 대체 뷰에 `testID="diary-photo-missing"`을
+  새로 달았다 — 기존 `testID="diary-photo"`와 문구는 그대로(017 회귀).
+- **`i8mm` 없는 기기와 무관** — 추론 경로를 안 건드린다. 생성 중 화면
+  (`DiaryHomeScreen`의 `screen.kind === "writing"`, 별도 `View`)은
+  `DiaryDetailScreen`을 거치지 않아 슬라이더·갤러리가 구조적으로 도달 불가
+  (FR-017, SC-005).
+- **jest-expo 테스트 함정 둘**(이번에 실측): (1) `ScrollView`의
+  `onMomentumScrollEnd`는 테스트에서 전달되지 않는다 — `onScroll` +
+  `fireEvent.scroll`은 지원한다(RNTL 14 `native-state` 추적). 제품이 두
+  핸들러를 같은 계산(`pageIndexFromScroll`, `count`로 클램프)에 연결해 이
+  경로로 위치 표시 갱신을 검증한다. (2) **RNTL 14의 `fireEvent`는 Promise를
+  반환하며 `await` 없이는 상태 갱신이 flush되지 않는다** — `await
+  fireEvent.press(...)`. 계약 테스트 `photo-gallery.test.tsx`(C1~C29 + C18a,
+  17개)가 이 둘을 반영한다.
+- 위반 주입으로 방어 확인: 인덱스 클램프 제거 → C12·C13 FAIL(순환), `current`
+  seed를 `initialIndex`→`0` → C10·C11 FAIL. 둘 다 잡힌다.
+- 기기 없는 테스트 2004개 통과, lint(eslint 0 error, `tsc`, 헌법 검사 위반 0,
+  prettier) 클린.
+- **★ 위치 표시 `<Text>`에 `accessibilityLabel`이 필요하다**(실기기 실측,
+  2026-08-31). `<Text testID="photo-slider-position">{current+1} / {photos.length}`
+  는 화면에 멀쩡히 렌더되지만 **uiautomator 접근성 트리에 노출되지 않았다** —
+  여러 텍스트 조각(`{n}` + `" / "` + `{m}`)이 한 `<Text>`에 있으면 `testID`가
+  자식 텍스트 노드로 전파되지 않는 것으로 보인다. `accessibilityLabel={`${n} /
+  ${m}`}` + 자식도 템플릿 리터럴 하나로 합치니 Maestro `id:` 조회가 통했다.
+  `photo-gallery-position`도 같이 고쳤다.
+- **실기기 검증 완료**(2026-08-31, SM-S901N/Galaxy S22, dev, `EXPO_PUBLIC_APP_ENV=dev`).
+  `many-camera`(12장) 하루로 「빠르게 봄」 `quiet`(금동이) 생성(캡션 8장 52초 +
+  작성 56초). 관측:
+  - **슬라이더**(FR-001·002): 격자가 아니라 한 장이 화면 폭으로 크게, 아래에
+    `1 / 8`(8장 = 023 상한). `resizeMode="contain"`으로 세로 사진이 잘리지 않고
+    좌우 회색 여백. 가로 스와이프 → `1 / 8` → `2 / 8` 갱신, 다음 사진 스냅
+    (`pagingEnabled` + `onScroll`/`onMomentumScrollEnd`).
+  - **풀스크린 갤러리**(FR-008·009·010·012): 슬라이더 2번째 사진 탭 → 갤러리가
+    **`2 / 8`에서 시작**(첫 장 아님). 검은 배경 모달, 우상단 "닫기". 좌우
+    스와이프 `2 / 8` → `4 / 8` 갱신, 사진 바뀜.
+  - **순환 없음**(FR-011): 마지막에서 6번 더 스와이프해도 `8 / 8`에 멈춤,
+    `1`로 안 돌아감.
+  - **닫기 + 스크롤 위치 유지**(FR-013): "닫기" 버튼·안드로이드 뒤로 가기 둘 다
+    갤러리 닫고 상세 화면 복귀 — 갤러리 진입 전 스크롤 위치가 픽셀 단위로 유지
+    (`Modal`이 형제로 겹쳤다 사라져 상세 `ScrollView` 언마운트 안 됨). 앱 종료
+    안 됨.
+  - **생성 중 미노출**(FR-017·SC-005): "사진들을 훑어보는 중…"·"이야기를
+    엮어가는 중…" 화면에 슬라이더·갤러리·위치 표시 없음(회전 표시 + "그만두기"만).
+    2회 관측.
+  - **옛 일기/0장 회귀**(FR-006·007·SC-004): 「사진을 보지 않음」으로 08-31
+    생성 → 본문 아래 슬라이더 영역 자체가 없고 "사진: 없었다"·"다닌 자리:
+    모른다" 텍스트만(017 표시 유지). 사진 분석 소요 시간 문장 없음.
+  - **Maestro**: `.maestro/diary-photo-gallery.yml` 전체 PASS
+    (`run-device-tests.mjs` `FLOWS` 등록). ⚠️ 첫 흐름은 세 곳이 어긋나 실패 후
+    수정: (1) 정규식 `[2-9][0-9]*장`이 "12장"을 놓침 → `[1-9][0-9]*장` +
+    `.*…*`. (2) `scrollUntilVisible DOWN id: photo-slider-pager`가 페이저 상단만
+    화면에 넣고 멈춰 그 아래 위치 표시가 화면 밖 → 스크롤 타겟을
+    `photo-slider-position`으로. (3) 위 `accessibilityLabel` 이슈. `.maestro/
+    diary-body-screen.yml`(017)도 함께 돌려 `diary-photo` testID가 슬라이더
+    문맥에서 정상 조회됨을 확인(회귀 없음).
+  - **미확인 잔여**: 회전 시 갤러리 유지(FR-015a)는 앱이 `orientation: "portrait"`
+    고정이라 이 기기에서 회전을 재현할 수 없다(016의 "기기 시각을 바꿀 수 없어
+    미확인"과 같은 계열) — C18a 계약 테스트가 부모 리렌더 각도에서 잠갔다.
+    콜드 스타트 시 갤러리 상태 없이 목록으로 복귀는 spec 명시 정상 동작이며
+    관측됐다. 새 네이티브 모듈 없어 release 재확인 생략(012).
+- 상세: `specs/025-diary-photo-gallery/`.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만
