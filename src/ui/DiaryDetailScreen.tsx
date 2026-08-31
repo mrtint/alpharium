@@ -266,8 +266,12 @@ function PhotoSlider({ photos, onOpen }: { photos: PhotoRef[]; onOpen: (index: n
         ))}
       </ScrollView>
 
-      <Text testID="photo-slider-position" style={styles.photoPosition}>
-        {current + 1} / {photos.length}
+      <Text
+        testID="photo-slider-position"
+        accessibilityLabel={`${current + 1} / ${photos.length}`}
+        style={styles.photoPosition}
+      >
+        {`${current + 1} / ${photos.length}`}
       </Text>
     </View>
   );
@@ -336,8 +340,12 @@ function PhotoGalleryModal({
           ))}
         </ScrollView>
 
-        <Text testID="photo-gallery-position" style={styles.galleryPosition}>
-          {current + 1} / {photos.length}
+        <Text
+          testID="photo-gallery-position"
+          accessibilityLabel={`${current + 1} / ${photos.length}`}
+          style={styles.galleryPosition}
+        >
+          {`${current + 1} / ${photos.length}`}
         </Text>
 
         <Pressable

@@ -44,52 +44,60 @@ appId: com.anonymous.alpharium
 # ★ M1·M2 — **사진이 여러 장 있는 저장된 일기를 열면 슬라이더가, 탭하면
 #   갤러리가 뜬다**(FR-001·002·008·009·012·013).
 #
-# "사진 N장"(N>=2)이 붙은 줄이 있으면 그것을 열어 확인한다. 없으면(이 기기에
-# 아직 사진 여러 장인 일기가 저장되지 않았으면) 이 블록은 SKIPPED로 지나간다 —
-# quickstart.md §2가 사람 확인으로 이 갈래를 메운다.
-- runFlow:
-    when:
-      visible:
-        text: "사진 [2-9][0-9]*장"
-    commands:
-      - tapOn:
-          text: "사진 [2-9][0-9]*장"
+# 목록 맨 위에 "사진 N장"(N>=1)이 붙은 일기 카드가 launch 직후 보인다 — 그것을
+# 탭해 상세로 들어간다. 카드가 없으면(이 기기에 아직 사진 있는 일기가 저장되지
+# 않았으면) `assertVisible`이 그 자리에서 실패한다 — 그때는 quickstart.md §2대로
+# 사진 있는 하루를 seed로 심고 「빠르게 봄」으로 생성한 뒤 다시 돌린다(원칙 V —
+# 건너뛴 것은 통과가 아니다).
+#
+# ⚠️ 정규식은 `[1-9][0-9]*장` — "12장"은 `[2-9]`로 시작하지 않는다(첫 작성 때
+# `[2-9]`로 박아 "12장"을 놓쳤다). `scrollUntilVisible DOWN`도 쓰지 않는다 —
+# 카드가 이미 화면 맨 위에 보이는데 아래로 스크롤하면 오히려 밀려난다.
+- assertVisible:
+    text: ".*사진 [1-9][0-9]*장.*"
+- tapOn:
+    text: ".*사진 [1-9][0-9]*장.*"
 
-      # ★ M1 — 슬라이더 페이저와 위치 표시가 보인다(FR-001·002).
-      - scrollUntilVisible:
-          element:
-            id: "photo-slider-pager"
-          direction: DOWN
-          timeout: 20000
-      - assertVisible:
-          id: "photo-slider-pager"
-      - assertVisible:
-          id: "photo-slider-position"
+# ★ M1 — 슬라이더 페이저와 위치 표시가 보인다(FR-001·002).
+#
+# ⚠️ 022 실측 — 패널이 길어 요소마다 개별 스크롤이 필요하다. 위치 표시
+# (`photo-slider-position`)까지 스크롤해야 그 아래 페이저·셀이 다 화면에 든다.
+# `photo-slider-position`은 `<Text>`에 `accessibilityLabel`을 명시해 접근성
+# 트리에 노출된다(첫 실기기 검증에서 `id`가 안 잡혀 추가).
+- scrollUntilVisible:
+    element:
+      id: "photo-slider-position"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "photo-slider-pager"
+- assertVisible:
+    id: "photo-slider-position"
 
-      # ★ M2 — 슬라이더의 첫 사진을 탭하면 풀스크린 갤러리가 열린다(FR-008·009).
-      - tapOn:
-          id: "photo-slider-cell-0"
-      - assertVisible:
-          id: "photo-gallery"
-      # ★ FR-012 — 갤러리에도 위치 표시가 있다.
-      - assertVisible:
-          id: "photo-gallery-position"
+# ★ M2 — 슬라이더의 첫 사진을 탭하면 풀스크린 갤러리가 열린다(FR-008·009).
+- tapOn:
+    id: "photo-slider-cell-0"
+- assertVisible:
+    id: "photo-gallery"
+# ★ FR-012 — 갤러리에도 위치 표시가 있다.
+- assertVisible:
+    id: "photo-gallery-position"
 
-      # ★ FR-013 — 닫기 버튼으로 갤러리가 닫히고 상세 화면으로 돌아온다.
-      - tapOn:
-          id: "photo-gallery-close"
-      - assertNotVisible:
-          id: "photo-gallery"
-      # 상세 화면으로 돌아왔다.
-      - assertVisible:
-          id: "photo-slider-pager"
+# ★ FR-013 — 닫기 버튼으로 갤러리가 닫히고 상세 화면으로 돌아온다.
+- tapOn:
+    id: "photo-gallery-close"
+- assertNotVisible:
+    id: "photo-gallery"
+# 상세 화면으로 돌아왔다 — 슬라이더가 다시 보인다.
+- assertVisible:
+    id: "photo-slider-position"
 
-      - scrollUntilVisible:
-          element:
-            text: "← 목록"
-          direction: UP
-          timeout: 20000
-      - tapOn: "← 목록"
+- scrollUntilVisible:
+    element:
+      text: "← 목록"
+    direction: UP
+    timeout: 20000
+- tapOn: "← 목록"
 
 # ★ M3 — 원칙 III·IV — 좌표·수치·모델 정보가 화면에 없다(FR-018).
 - assertNotVisible: "gguf"
