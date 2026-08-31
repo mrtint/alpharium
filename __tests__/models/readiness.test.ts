@@ -42,6 +42,38 @@ describe("준비 상태 판정", () => {
     if (state.kind === "partial") expect(state.resumable).toBe(true);
   });
 
+  // 026 — 세그먼트 재개 상태가 있으면 이어받을 수 있다 (FR-023)
+  it("세그먼트 재개 상태가 있으면 '받다 말았음'이고 이어받을 수 있다", () => {
+    const state = readinessOf({
+      ...READY,
+      file: { exists: false, bytes: null },
+      verdict: null,
+      paused: null,
+      segmentedResume: {
+        assetKey: "a1",
+        totalBytes: 1000,
+        segmentCount: 4,
+        receivedBytes: [250, 0, 0, 0],
+      },
+    });
+    expect(state.kind).toBe("partial");
+    if (state.kind === "partial") expect(state.resumable).toBe(true);
+  });
+
+  // 026 — 재개 상태 없이 부분 파일만이면 resumable: false (FR-026)
+  it("세그먼트 재개 상태 없이 부분 파일만이면 이어받을 수 없다", () => {
+    const state = readinessOf({
+      ...READY,
+      file: { exists: false, bytes: null },
+      verdict: null,
+      paused: null,
+      segmentedResume: null,
+      hasPartialFile: true,
+    });
+    expect(state.kind).toBe("partial");
+    if (state.kind === "partial") expect(state.resumable).toBe(false);
+  });
+
   // D2 — 앱이 갑자기 죽어 savable()을 부르지 못한 경우 (research.md §1)
   it("부분 파일만 있으면 '받다 말았음'이되 이어받을 수 없다", () => {
     const state = readinessOf({

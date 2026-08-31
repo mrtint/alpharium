@@ -236,7 +236,12 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
 function isSegmentedResume(
   state: unknown,
   assetKey: string,
-): state is { assetKey: string; totalBytes: number; segmentCount: number; receivedBytes: number[] } {
+): state is {
+  assetKey: string;
+  totalBytes: number;
+  segmentCount: number;
+  receivedBytes: number[];
+} {
   return (
     typeof state === "object" &&
     state !== null &&

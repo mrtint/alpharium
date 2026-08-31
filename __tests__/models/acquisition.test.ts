@@ -407,7 +407,12 @@ describe("내려받기", () => {
   // A9 — 026: 세그먼트 재개 상태가 있으면 그것을 resume에 넘긴다 (FR-022).
   it("세그먼트 재개 상태가 있으면 이어받으며 그 상태를 넘긴다", async () => {
     const key = assetFor("quiet").key;
-    const resume = { assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [250, 0, 0, 0] };
+    const resume = {
+      assetKey: key,
+      totalBytes: 1000,
+      segmentCount: 4,
+      receivedBytes: [250, 0, 0, 0],
+    };
     const h = harness({
       metadata: JSON.stringify({ verdicts: [], paused: [], segmented: [resume] }),
     });
@@ -453,7 +458,12 @@ describe("내려받기", () => {
           async wait(): Promise<TransferOutcome> {
             return {
               kind: "paused",
-              state: { assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [500, 0, 0, 0] },
+              state: {
+                assetKey: key,
+                totalBytes: 1000,
+                segmentCount: 4,
+                receivedBytes: [500, 0, 0, 0],
+              },
             };
           },
           async pause() {},

@@ -12,6 +12,7 @@
 기록한다 — 코드가 이 사실에 의존하지 않게 만든다.
 
 **Rationale**:
+
 - 로스터의 모델은 전부 `huggingface.co/.../resolve/main/...`이고, HF는 302로
   CDN(cloudfront/S3)에 넘긴다. 리다이렉트 후 `Accept-Ranges: bytes`와 `Content-Length`가
   유지되는지는 003이 관측하지 않았다(003은 `Content-Length` 없으면 `-1`만 다뤘다).
@@ -21,9 +22,10 @@
 - 원칙 V — 모르는 상태(헤더가 애매함)를 "지원한다"로 지어내지 않는다. 애매하면 폴백.
 
 **Alternatives considered**:
-- *세그먼트 전용, 폴백 없음* (brainstorming Q3=B) — 기각. HF CDN이 특정 순간 Range를
+
+- _세그먼트 전용, 폴백 없음_ (brainstorming Q3=B) — 기각. HF CDN이 특정 순간 Range를
   거부하면 모델을 아예 못 받게 되는 회귀. 사용자가 A(폴백 필수) 선택.
-- *로스터에 `rangeSupported: boolean` 상수를 미리 박기* — 기각. 어디서 왔든 짐작이며
+- _로스터에 `rangeSupported: boolean` 상수를 미리 박기_ — 기각. 어디서 왔든 짐작이며
   (원칙 V), CDN 동작은 시간에 따라 변할 수 있다. 실행 시점 탐지가 정직하다.
 
 ---
@@ -36,6 +38,7 @@
 (`expoRangeFetchPort()`).
 
 **Rationale**:
+
 - `createDownloadTask`는 단일 스트림 전용이고 Range 분할 API를 노출하지 않는다.
 - 방식 3+1 조합(brainstorming 확정): 계산은 순수 함수(기기 없이 검증), 기기에 닿는 것은
   `RangeFetchPort` 하나. `acquisition.ts`는 전송 방식을 모른다(003 경계 유지).
@@ -48,10 +51,11 @@
   실기기로 "한 구간을 오프셋에 쓰고 되읽어 일치"를 확인한다(quickstart Q0).
 
 **Alternatives considered**:
-- *별도 `SegmentedDownloadPort` + `acquisition.ts`가 선택* (방식 2) — 기각.
+
+- _별도 `SegmentedDownloadPort` + `acquisition.ts`가 선택_ (방식 2) — 기각.
   `acquisition.ts`가 전송 방식을 알게 되어 003의 "판정·규칙은 순수, 기기 통로는 포트 하나"
   경계를 침범. 폴백 판정이 비즈니스 로직에 샌다.
-- *`DownloadPort`를 확장하지 않고 `acquisition.ts`에서 직접 fetch* — 기각. 011의
+- _`DownloadPort`를 확장하지 않고 `acquisition.ts`에서 직접 fetch_ — 기각. 011의
   `vision/acquisition.ts`가 `DownloadPort`를 재사용하는 구조가 깨진다(FR-027 위반).
 
 ---
@@ -63,6 +67,7 @@
 소스를 `readFileSync`로 읽어 잠근다(FR-030). 실기기 실측으로 확정한다.
 
 **Rationale**:
+
 - **4**: 모바일 네트워크에서 4~8 병렬이 처리량 이득의 대부분을 준다는 것이 일반적 관측이다
   (HTTP/1.1 커넥션 오버헤드 상쇄 + TCP 슬로스타트 병렬화). 동시 다운로드 상한이 없으므로
   (FR-002) 6모델 × 4 = 24 커넥션이 상한 — 안드로이드/OkHttp 기본 커넥션 풀(호스트당 5,
@@ -79,10 +84,11 @@
   명시한다.
 
 **Alternatives considered**:
-- *`SEGMENT_COUNT`를 파일 크기로 계산* (예: `min(8, ceil(bytes / 256MB))`) — 기각. 원칙 V,
+
+- _`SEGMENT_COUNT`를 파일 크기로 계산_ (예: `min(8, ceil(bytes / 256MB))`) — 기각. 원칙 V,
   FR-012 — "코드가 파일 크기를 보고 개수를 정하지 않는다". 012·021·023이 "사람이 상수로
   못박는다"를 확립.
-- *동시성 상한을 두어 곱을 통제* (brainstorming Q2=B) — 기각. 사용자가 A(무제한) 선택.
+- _동시성 상한을 두어 곱을 통제_ (brainstorming Q2=B) — 기각. 사용자가 A(무제한) 선택.
   대신 `SEGMENT_COUNT`를 낮게(4) 잡아 곱을 통제.
 
 ---
@@ -96,6 +102,7 @@
 Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
 
 **Rationale**:
+
 - brainstorming Q4=B — 세그먼트 이어받기를 직접 구현한다.
 - 003이 "메타데이터를 한 파일에 모은다"(캐릭터 5 고정, 늘 전부 조회)를 확립. `segmented`도
   같은 파일에 둔다. `withVerdict`/`withPaused`/`withoutAsset` 옆에 `withSegmentedResume`/
@@ -110,12 +117,13 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
   이미 가르는 갈래). 그 부분 파일은 처음부터 다시 받는다.
 
 **Alternatives considered**:
-- *구간별 오프셋까지 저장* — 기각. `planSegments()`가 결정론적이므로 중복. 저장 값이
+
+- _구간별 오프셋까지 저장_ — 기각. `planSegments()`가 결정론적이므로 중복. 저장 값이
   많을수록 스키마 마이그레이션 위험.
-- *`PausedDownload`를 재사용해 `state: unknown`에 세그먼트 정보를 넣기* — 기각. 003의
+- _`PausedDownload`를 재사용해 `state: unknown`에 세그먼트 정보를 넣기_ — 기각. 003의
   `PausedDownload.state`는 `DownloadTask.savable()`의 불투명 값이고 "안을 해석하지 않는다"가
   계약. 세그먼트 재개는 우리가 만든 구조라 명시적 타입이 맞다. 상호배타로 두어 혼동 방지.
-- *별도 파일 `segmented-resume.json`* — 기각. 003의 "한 파일에 모은다" 판단과 어긋난다.
+- _별도 파일 `segmented-resume.json`_ — 기각. 003의 "한 파일에 모은다" 판단과 어긋난다.
 
 ---
 
@@ -127,6 +135,7 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
 **같은 캐릭터 중복 요청**만 막는다. 다른 캐릭터는 무제한 병행.
 
 **Rationale**:
+
 - FR-001·002·003. `busy` 갈래를 제거하지 않고(FR-028 — 003 계약의 갈래는 확장만) 의미를
   좁힌다: "다른 것을 받는 중" → "같은 것을 이미 받는 중". `DownloadFailure`·
   `DownloadRejection` 타입은 그대로(`busyWith: Character`).
@@ -139,9 +148,10 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
 - 003의 "진행 중은 메모리에만"(FR-009)은 `Map`도 메모리이므로 유지.
 
 **Alternatives considered**:
-- *`busy` 갈래를 완전히 제거하고 같은 캐릭터 중복도 허용* — 기각. 같은 파일을 두 다운로드가
+
+- _`busy` 갈래를 완전히 제거하고 같은 캐릭터 중복도 허용_ — 기각. 같은 파일을 두 다운로드가
   동시에 쓰면 파일이 손상된다. 중복 방지는 필요하다.
-- *동시성 상한 N개 슬롯 + 큐* (brainstorming Q2=B/C) — 기각. 사용자가 A(무제한) 선택.
+- _동시성 상한 N개 슬롯 + 큐_ (brainstorming Q2=B/C) — 기각. 사용자가 A(무제한) 선택.
 
 ---
 
@@ -153,6 +163,7 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
 `expectedBytes - 지금까지 받은 바이트`로 계산한다.
 
 **Rationale**:
+
 - FR-007. 003의 시작 시점 1회 판정은 동시 다운로드에서 여러 개가 나란히 통과해 공간을 다
   써 버릴 수 있다.
 - 근사임을 spec Assumptions에 명시 — 진행 중 서버 실제 크기가 예상과 다를 수 있고, 그
@@ -163,8 +174,9 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
   공간 판정용 최신 바이트). 밖으로 나가지 않으므로 원칙 III 위반 아님.
 
 **Alternatives considered**:
-- *003 그대로(개별 시작 시점 판정)* — 기각. FR-007이 명시적으로 합산을 요구.
-- *예상 크기 총합을 미리 예약(reserve)* — 과설계. 근사 판정으로 충분하고, 실패 시 격리됨.
+
+- _003 그대로(개별 시작 시점 판정)_ — 기각. FR-007이 명시적으로 합산을 요구.
+- _예상 크기 총합을 미리 예약(reserve)_ — 과설계. 근사 판정으로 충분하고, 실패 시 격리됨.
 
 ---
 
@@ -176,6 +188,7 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
 분기를 배열 대응으로).
 
 **Rationale**:
+
 - FR-005·010. 008의 불변식(안내는 하나뿐, 자동 소멸, `active`와 `notice.requested`가 같은
   경우 없음)은 전부 유지 — `active`가 배열이 되어도 "그 캐릭터가 받는 중 목록에 있으면
   `requested`로 그리지 않는다"는 판정은 동일.
@@ -183,7 +196,8 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
   확장한다(FR-029).
 
 **Alternatives considered**:
-- *`active`를 `Map`으로* — 기각. 화면이 `.map()`으로 순회하므로 배열이 자연스럽고, 008의
+
+- _`active`를 `Map`으로_ — 기각. 화면이 `.map()`으로 순회하므로 배열이 자연스럽고, 008의
   기존 테스트 변경 폭이 작다.
 
 ---
@@ -195,6 +209,7 @@ Range(`start + receivedBytes[i]` ~ `end`)를 순수 함수로 계산한다.
 스펙에서 한 줄도 안 고쳤다" 검증 방식).
 
 **Rationale**:
+
 - 011이 `DownloadPort`(`start(key, url, onProgress)`)를 캐릭터를 모른 채 재사용하는 구조.
   `expoDownloadPort()`가 세그먼트/폴백을 그 계약 뒤에서 고르므로, `vision`은 자동으로
   세그먼트 병렬을 얻는다.

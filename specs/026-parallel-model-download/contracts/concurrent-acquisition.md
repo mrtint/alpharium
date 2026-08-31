@@ -20,14 +20,14 @@
 
 ## 003에서 바뀌는 것
 
-| 항목 | 003 | 026 |
-| --- | --- | --- |
-| 진행 슬롯 | `let running: Character \| null` | `const running = new Map<Character, { pause(): Promise<void> }>()` |
-| `busy` 거부 조건 | `running !== null && running !== character` | `running.has(character)` (같은 캐릭터만) |
-| `prepare` | `prepare(character, onProgress?)` | (동일 시그니처) |
-| `pause` | `pause(): Promise<void>` (전부 멈춤 — 하나뿐이라) | `pause(character?: Character): Promise<void>` — 인자 없으면 전부, 있으면 그 캐릭터만 |
-| `busyWith` | `busyWith(): Character \| null` | `busyWith(): Character[]` |
-| 공간 판정 | `available < asset.expectedBytes * HEADROOM` | `available - Σ(받는 중인 것들의 remainingCapacity) < asset.expectedBytes * HEADROOM` |
+| 항목             | 003                                               | 026                                                                                  |
+| ---------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 진행 슬롯        | `let running: Character \| null`                  | `const running = new Map<Character, { pause(): Promise<void> }>()`                   |
+| `busy` 거부 조건 | `running !== null && running !== character`       | `running.has(character)` (같은 캐릭터만)                                             |
+| `prepare`        | `prepare(character, onProgress?)`                 | (동일 시그니처)                                                                      |
+| `pause`          | `pause(): Promise<void>` (전부 멈춤 — 하나뿐이라) | `pause(character?: Character): Promise<void>` — 인자 없으면 전부, 있으면 그 캐릭터만 |
+| `busyWith`       | `busyWith(): Character \| null`                   | `busyWith(): Character[]`                                                            |
+| 공간 판정        | `available < asset.expectedBytes * HEADROOM`      | `available - Σ(받는 중인 것들의 remainingCapacity) < asset.expectedBytes * HEADROOM` |
 
 **`SPACE_HEADROOM`은 003 상수 재사용** — 새 상수 아님.
 
@@ -35,12 +35,12 @@
 
 ## 시작하기 전에 보는 것 — 순서 (003 표 + 변경점)
 
-| 순서 | 확인 | 실패하면 | 026 변경 |
-| --- | --- | --- | --- |
-| 1 | **같은 캐릭터**를 이미 받는 중인가 | `busy` (그 캐릭터 자신을 알린다) | 「다른 캐릭터」→「같은 캐릭터」 |
-| 2 | 이미 `ready`인가 | 시작하지 않는다 | 무변경 |
-| 3 | 공간이 (남은 것들 제외하고) 여유까지 있는가 | `insufficient-space` | 합산 판정 (FR-007) |
-| 4 | 이어받을 것이 있는가 (`paused` **또는** `segmentedResume`) | 있으면 이어받고 없으면 처음부터 | 세그먼트 재개 추가 |
+| 순서 | 확인                                                       | 실패하면                         | 026 변경                        |
+| ---- | ---------------------------------------------------------- | -------------------------------- | ------------------------------- |
+| 1    | **같은 캐릭터**를 이미 받는 중인가                         | `busy` (그 캐릭터 자신을 알린다) | 「다른 캐릭터」→「같은 캐릭터」 |
+| 2    | 이미 `ready`인가                                           | 시작하지 않는다                  | 무변경                          |
+| 3    | 공간이 (남은 것들 제외하고) 여유까지 있는가                | `insufficient-space`             | 합산 판정 (FR-007)              |
+| 4    | 이어받을 것이 있는가 (`paused` **또는** `segmentedResume`) | 있으면 이어받고 없으면 처음부터  | 세그먼트 재개 추가              |
 
 **1번의 자리 선점** (003의 「`await` 사이 끼어듦」 방어): `running.set(character, handle)`을
 첫 `await` 전에. 003과 동일한 이유 — JS가 단일 스레드여도 `await` 사이에 다른 `prepare`가
@@ -110,21 +110,21 @@ pause(character?):
 
 ## 검증 표 (기기 없이)
 
-| # | 확인 | 방법 |
-| --- | --- | --- |
-| A1 | 서로 다른 캐릭터 `prepare` 두 번 → 둘 다 시작 | 대역 `DownloadPort`, `running.size === 2` |
-| A2 | 같은 캐릭터 `prepare` 두 번 → 두 번째 `{ busy, busyWith: 그 캐릭터 }` | — |
-| A3 | `busyWith()`가 받는 중인 전부를 배열로 | 셋 시작 후 `busyWith().sort()` |
-| A4 | `pause(A)` → A만 멈춤, B 계속 | 대역 `pause` 호출 여부 확인 |
-| A5 | `pause()` (인자 없음) → 전부 멈춤 | — |
-| A6 | 공간 판정이 받는 중인 것들의 남은 용량을 뺀다 | `disk.availableBytes` 대역 + `running`에 항목 주입 → 세 번째가 `insufficient-space` (FR-007) |
-| A7 | `prepare` 완료 후 `running.delete` (finally) | 완료·실패·거부 세 경로 |
-| A8 | 자리 선점: `await` 사이 두 번째 `prepare` → `busy` | 003 T0xx와 동형, 같은 캐릭터로 |
-| A9 | 세그먼트 재개: `segmentedFor`가 non-null → `download.resume`에 그 값 전달 | 대역 `resume` 인자 확인 |
-| A10 | pause 시 `outcome.state`에 `segmentCount` 있으면 `withSegmentedResume`, 없으면 `withPaused` | `storage` 왕복 |
-| A11 | `withoutAsset`이 `segmented`도 비운다 | 검증 통과 후 `segmentedFor === null` |
-| A12 | 003 기존 테스트: `insufficient-space`/`network`/`verification-failed` 갈래 유지 | 003 `acquisition.test.ts` 회귀 |
-| A13 | 003 기존 테스트 중 "다른 캐릭터 받는 중 → busy"는 **"이제 둘 다 시작"으로 갱신** | 003 테스트 수정, 갈래 자체는 안 지움 |
+| #   | 확인                                                                                        | 방법                                                                                         |
+| --- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| A1  | 서로 다른 캐릭터 `prepare` 두 번 → 둘 다 시작                                               | 대역 `DownloadPort`, `running.size === 2`                                                    |
+| A2  | 같은 캐릭터 `prepare` 두 번 → 두 번째 `{ busy, busyWith: 그 캐릭터 }`                       | —                                                                                            |
+| A3  | `busyWith()`가 받는 중인 전부를 배열로                                                      | 셋 시작 후 `busyWith().sort()`                                                               |
+| A4  | `pause(A)` → A만 멈춤, B 계속                                                               | 대역 `pause` 호출 여부 확인                                                                  |
+| A5  | `pause()` (인자 없음) → 전부 멈춤                                                           | —                                                                                            |
+| A6  | 공간 판정이 받는 중인 것들의 남은 용량을 뺀다                                               | `disk.availableBytes` 대역 + `running`에 항목 주입 → 세 번째가 `insufficient-space` (FR-007) |
+| A7  | `prepare` 완료 후 `running.delete` (finally)                                                | 완료·실패·거부 세 경로                                                                       |
+| A8  | 자리 선점: `await` 사이 두 번째 `prepare` → `busy`                                          | 003 T0xx와 동형, 같은 캐릭터로                                                               |
+| A9  | 세그먼트 재개: `segmentedFor`가 non-null → `download.resume`에 그 값 전달                   | 대역 `resume` 인자 확인                                                                      |
+| A10 | pause 시 `outcome.state`에 `segmentCount` 있으면 `withSegmentedResume`, 없으면 `withPaused` | `storage` 왕복                                                                               |
+| A11 | `withoutAsset`이 `segmented`도 비운다                                                       | 검증 통과 후 `segmentedFor === null`                                                         |
+| A12 | 003 기존 테스트: `insufficient-space`/`network`/`verification-failed` 갈래 유지             | 003 `acquisition.test.ts` 회귀                                                               |
+| A13 | 003 기존 테스트 중 "다른 캐릭터 받는 중 → busy"는 **"이제 둘 다 시작"으로 갱신**            | 003 테스트 수정, 갈래 자체는 안 지움                                                         |
 
 ---
 

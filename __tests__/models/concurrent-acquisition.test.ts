@@ -128,7 +128,9 @@ it("A9 — resume에 로스터 url이 함께 넘어간다 (port.ts resume 시그
     JSON.stringify({
       verdicts: [],
       paused: [],
-      segmented: [{ assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [1, 0, 0, 0] }],
+      segmented: [
+        { assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [1, 0, 0, 0] },
+      ],
     }),
   );
 
@@ -179,7 +181,9 @@ it("A11 — 다 받아 검증되면 segmented 재개 상태가 사라진다", as
     JSON.stringify({
       verdicts: [],
       paused: [],
-      segmented: [{ assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [1, 0, 0, 0] }],
+      segmented: [
+        { assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [1, 0, 0, 0] },
+      ],
     }),
   );
 

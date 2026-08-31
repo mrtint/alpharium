@@ -76,6 +76,4 @@ export type SegmentedResume = {
  * **애매하면 `unsupported`다** (원칙 V) — `Accept-Ranges` 헤더가 없거나,
  * `Content-Length`가 없거나, 리다이렉트 후 헤더가 불분명하면 폴백한다.
  */
-export type RangeSupport =
-  | { kind: "supported"; totalBytes: number }
-  | { kind: "unsupported" };
+export type RangeSupport = { kind: "supported"; totalBytes: number } | { kind: "unsupported" };

@@ -41,13 +41,14 @@ runSegmented(deps, key, url, opts) → Promise<SegmentedTransferResult>  (transf
 
 ### `planSegments(totalBytes, count = SEGMENT_COUNT): SegmentPlan`
 
-| 입력 | 출력 |
-| --- | --- |
-| `totalBytes <= 0` | `{ totalBytes, segments: [] }` (호출자가 폴백) |
+| 입력                                 | 출력                                                             |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| `totalBytes <= 0`                    | `{ totalBytes, segments: [] }` (호출자가 폴백)                   |
 | `totalBytes < MIN_SEGMENT_BYTES * 2` | `count = 1` — 단일 구간 `{ index:0, start:0, end:totalBytes-1 }` |
-| 그 외 | `count` 구간, 균등 분할, 나머지 바이트는 마지막 구간에 |
+| 그 외                                | `count` 구간, 균등 분할, 나머지 바이트는 마지막 구간에           |
 
 **불변식** (계약 테스트가 검사):
+
 - `segments[0].start === 0`
 - `segments[last].end === totalBytes - 1`
 - 인접 구간: `segments[i].end + 1 === segments[i+1].start` (빈틈·겹침 없음)
@@ -56,6 +57,7 @@ runSegmented(deps, key, url, opts) → Promise<SegmentedTransferResult>  (transf
 ### `remainingSegments(resume: SegmentedResume): Segment[]`
 
 `planSegments(resume.totalBytes, resume.segmentCount)`로 계획 복원. 각 구간 i에 대해:
+
 - `segmentSize = plan.segments[i].end - plan.segments[i].start + 1`
 - `resume.receivedBytes[i] >= segmentSize` → **제외** (완료)
 - 아니면 `{ ...plan.segments[i], start: plan.segments[i].start + resume.receivedBytes[i] }`
@@ -185,7 +187,7 @@ runSegmented(
    - **`runSegmented`는 `fraction`(`number | null`)만 낸다** — 구간 바이트를 콜백 밖으로
      내보내지 않는다(원칙 III). `TransferProgress` 변환은 **`expo-port.ts`가 소유한다**:
      `wrapToTransferProgress`가 `fraction`을 `{ bytesWritten: Math.round(fraction * total),
-     totalBytes: total }`로 되돌려(`total`은 `probeRange`가 준 `totalBytes`)
+totalBytes: total }`로 되돌려(`total`은 `probeRange`가 준 `totalBytes`)
      **`acquisition.ts`의 `fractionOf`가 그대로 동작**하게 한다. `runSegmented`의
      시그니처는 `onProgress: (fraction: number | null) => void`로 고정 — `TransferProgress`를
      직접 받지 않는다(그러면 세그먼트 코어가 바이트를 알게 됨).
@@ -197,6 +199,7 @@ runSegmented(
 5. `{ kind: "failed", reason }` → `{ kind: "failed", reason }`.
 
 `resume(key, state, onProgress)`:
+
 - `state`가 `SegmentedResume` 모양이면(`"segmentCount" in state`) `runSegmented(deps, key, url, { resume: state, ... })`.
 - 아니면(003의 `DownloadPauseState`) 기존 `DownloadTask.fromSavable` 경로.
 - **`url`은 로스터가 준다** — `acquisition.ts`가 `assetFor(character).url`을 넘긴다(003과
@@ -207,24 +210,24 @@ runSegmented(
 
 ## 검증 표 (기기 없이 도는 것)
 
-| # | 확인 | 방법 |
-| --- | --- | --- |
-| C1 | `planSegments` 균등 분할·경계 불변식 | 순수, 여러 `totalBytes` |
-| C2 | `planSegments` 작은 파일 → `count = 1` | `totalBytes = MIN_SEGMENT_BYTES` |
-| C3 | `planSegments` 나머지 바이트가 마지막 구간에 | `totalBytes % count !== 0` |
-| C4 | `remainingSegments` 완료 구간 제외 | `receivedBytes[i] = segmentSize` |
-| C5 | `remainingSegments` 부분 구간의 `start` 이동 | `receivedBytes[i] = segmentSize / 2` |
-| C6 | `mergeProgress` `totalBytes <= 0` → `null` | 003 `fractionOf` 동형 |
-| C7 | `mergeProgress` `[0,1]` 클램프 | `sum > totalBytes` |
-| C8 | `isComplete` 전부 채워야 true | 한 구간만 부족 |
-| C9 | `runSegmented` Range 미지원 → `{ fallback: true }` | `probeRange` 대역이 `unsupported` |
-| C10 | `runSegmented` 정상 완주 → `{ completed }` + `onProgress(1)` | `fetchRange` 대역 전부 `completed` |
-| C11 | `runSegmented` 한 구간 실패 → 나머지 abort + `{ failed }` | 대역 하나가 `failed`, 나머지 `signal.aborted` 확인 |
-| C12 | `runSegmented` pause → `{ paused, resume }`, `receivedBytes` 정확 | `pauseSignal` 발동, 부분 `onBytes` 후 |
-| C13 | `runSegmented` 재개 → 남은 구간만 `fetchRange` 호출 | `resume` 주입, 호출된 `segment.start` 확인 |
-| C14 | `SEGMENT_COUNT`·`MIN_SEGMENT_BYTES`가 `readonly` 리터럴 | `readFileSync`로 소스 검사 (FR-030) |
-| C15 | 값을 바꾸면 C14 실패 | 위반 주입 (SC-011) |
-| C16 | `segmented/*`가 `Character`·`diary/*`·`models/roster` 미import | `checkSegmentedFile` (research §9) |
-| C17 | `segmented/*` 소스에 속도 어휘(`elapsed`·`speed` 등) 없음 | 〃 |
+| #   | 확인                                                              | 방법                                               |
+| --- | ----------------------------------------------------------------- | -------------------------------------------------- |
+| C1  | `planSegments` 균등 분할·경계 불변식                              | 순수, 여러 `totalBytes`                            |
+| C2  | `planSegments` 작은 파일 → `count = 1`                            | `totalBytes = MIN_SEGMENT_BYTES`                   |
+| C3  | `planSegments` 나머지 바이트가 마지막 구간에                      | `totalBytes % count !== 0`                         |
+| C4  | `remainingSegments` 완료 구간 제외                                | `receivedBytes[i] = segmentSize`                   |
+| C5  | `remainingSegments` 부분 구간의 `start` 이동                      | `receivedBytes[i] = segmentSize / 2`               |
+| C6  | `mergeProgress` `totalBytes <= 0` → `null`                        | 003 `fractionOf` 동형                              |
+| C7  | `mergeProgress` `[0,1]` 클램프                                    | `sum > totalBytes`                                 |
+| C8  | `isComplete` 전부 채워야 true                                     | 한 구간만 부족                                     |
+| C9  | `runSegmented` Range 미지원 → `{ fallback: true }`                | `probeRange` 대역이 `unsupported`                  |
+| C10 | `runSegmented` 정상 완주 → `{ completed }` + `onProgress(1)`      | `fetchRange` 대역 전부 `completed`                 |
+| C11 | `runSegmented` 한 구간 실패 → 나머지 abort + `{ failed }`         | 대역 하나가 `failed`, 나머지 `signal.aborted` 확인 |
+| C12 | `runSegmented` pause → `{ paused, resume }`, `receivedBytes` 정확 | `pauseSignal` 발동, 부분 `onBytes` 후              |
+| C13 | `runSegmented` 재개 → 남은 구간만 `fetchRange` 호출               | `resume` 주입, 호출된 `segment.start` 확인         |
+| C14 | `SEGMENT_COUNT`·`MIN_SEGMENT_BYTES`가 `readonly` 리터럴           | `readFileSync`로 소스 검사 (FR-030)                |
+| C15 | 값을 바꾸면 C14 실패                                              | 위반 주입 (SC-011)                                 |
+| C16 | `segmented/*`가 `Character`·`diary/*`·`models/roster` 미import    | `checkSegmentedFile` (research §9)                 |
+| C17 | `segmented/*` 소스에 속도 어휘(`elapsed`·`speed` 등) 없음         | 〃                                                 |
 
 **기기 필요** (Maestro / 실기기): quickstart.md 참조.

@@ -50,6 +50,7 @@ Maestro (`run-device-tests.mjs` `FLOWS` 등록 필요).
 비교·저장하지 않는다)와 부딪히지 않도록, 이 대조는 실기기 1회 관찰이며 코드에 남기지 않는다.
 
 **Constraints**:
+
 - 진행 상태 타입(`DownloadProgress`)은 `{ character, fraction }` 둘로 고정 — 세그먼트
   정보가 들어갈 자리 없음(원칙 III·IV).
 - 열리는 동시 연결 ≤ (동시 모델 수 × `SEGMENT_COUNT` 상수).
@@ -62,17 +63,17 @@ Maestro (`run-device-tests.mjs` `FLOWS` 등록 필요).
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
-| 원칙 | 게이트 | 이 기능에서 |
-| --- | --- | --- |
-| **I. 온디바이스가 제품이다** | 추론 위치·미리 만든 응답 저장 여부 | 해당 없음 — 모델 **파일 전송**만 다룬다. 추론 경로·GGUF·프롬프트·샘플링 무변경. ✅ |
-| **II. 화자는 휴대폰** | 프롬프트·판정 갈래 | 해당 없음 — `diary/` 미변경. ✅ |
-| **III. 모델은 캐릭터다** | 모델 식별자·크기·구성이 사용자 화면에 노출되는가 | **위험 지점.** 세그먼트 계획은 자산키·바이트만 다루고 `Character`를 import하지 않는다(FR-019). 진행률은 `fraction` 하나로만 밖에 나간다(FR-016). 전송 방식은 `expo-port.ts`에 격리되어 화면·판정 계층이 모른다(FR-017). 계약 테스트가 타입·화면 문자열에서 구간 정보 부재를 검사(SC-008). ✅ |
-| **IV. 측정 장치를 제품에 들이지 않는다** | 속도·처리량을 재서 비교·채점·저장하는 코드 | **위험 지점.** 세그먼트 속도·구간별 처리량을 재는 코드를 넣지 않는다. SC-004의 켬/끔 대조는 실기기 1회 관찰이며 `quickstart.md`에만 있고 코드에 없다. `DownloadProgress`에 `elapsed`·`bytesPerSecond`가 들어갈 자리 없음(003 불변식 유지). 네이티브 fetch가 주는 헤더(`Content-Length` 등)는 세그먼트 계획 계산에만 쓰고 밖으로 내보내지 않는다. ✅ |
-| **V. 관측된 사실과 추측을 구분** | 모르는 값을 지어내는가 / 임계값을 코드가 정하는가 | `SEGMENT_COUNT`·`MIN_SEGMENT_BYTES`는 **사람이 정한 `readonly` 상수**로 못박는다(FR-012·013, 012·021·023 전례). 코드가 파일 크기·네트워크로 개수를 정하지 않는다. Range 지원 여부는 실측으로 확인하고 모르면 폴백(지어내지 않음). 상수 초기값은 잠정이며 실기기로 확정(003 `SPACE_HEADROOM` 전례). 탭 복귀 시 백분율을 0%로 채우지 않는다(FR-006). ✅ |
-| **로스터** | "사용자가 고른 캐릭터의 모델만 내려받는 구조" | `prepareAll()`·`allAssets()` 같은 일괄 경로를 만들지 않는다(FR-008). 동시 다운로드는 사용자가 각각 누른 캐릭터만. ✅ |
-| **개발 방식** | 계약 먼저, 테스트 먼저, 커밋 메시지 한국어 | Phase 1에서 계약 3개 작성. 계약 테스트를 구현 전에 쓴다. ✅ |
+| 원칙                                     | 게이트                                            | 이 기능에서                                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **I. 온디바이스가 제품이다**             | 추론 위치·미리 만든 응답 저장 여부                | 해당 없음 — 모델 **파일 전송**만 다룬다. 추론 경로·GGUF·프롬프트·샘플링 무변경. ✅                                                                                                                                                                                                                                                                    |
+| **II. 화자는 휴대폰**                    | 프롬프트·판정 갈래                                | 해당 없음 — `diary/` 미변경. ✅                                                                                                                                                                                                                                                                                                                       |
+| **III. 모델은 캐릭터다**                 | 모델 식별자·크기·구성이 사용자 화면에 노출되는가  | **위험 지점.** 세그먼트 계획은 자산키·바이트만 다루고 `Character`를 import하지 않는다(FR-019). 진행률은 `fraction` 하나로만 밖에 나간다(FR-016). 전송 방식은 `expo-port.ts`에 격리되어 화면·판정 계층이 모른다(FR-017). 계약 테스트가 타입·화면 문자열에서 구간 정보 부재를 검사(SC-008). ✅                                                          |
+| **IV. 측정 장치를 제품에 들이지 않는다** | 속도·처리량을 재서 비교·채점·저장하는 코드        | **위험 지점.** 세그먼트 속도·구간별 처리량을 재는 코드를 넣지 않는다. SC-004의 켬/끔 대조는 실기기 1회 관찰이며 `quickstart.md`에만 있고 코드에 없다. `DownloadProgress`에 `elapsed`·`bytesPerSecond`가 들어갈 자리 없음(003 불변식 유지). 네이티브 fetch가 주는 헤더(`Content-Length` 등)는 세그먼트 계획 계산에만 쓰고 밖으로 내보내지 않는다. ✅   |
+| **V. 관측된 사실과 추측을 구분**         | 모르는 값을 지어내는가 / 임계값을 코드가 정하는가 | `SEGMENT_COUNT`·`MIN_SEGMENT_BYTES`는 **사람이 정한 `readonly` 상수**로 못박는다(FR-012·013, 012·021·023 전례). 코드가 파일 크기·네트워크로 개수를 정하지 않는다. Range 지원 여부는 실측으로 확인하고 모르면 폴백(지어내지 않음). 상수 초기값은 잠정이며 실기기로 확정(003 `SPACE_HEADROOM` 전례). 탭 복귀 시 백분율을 0%로 채우지 않는다(FR-006). ✅ |
+| **로스터**                               | "사용자가 고른 캐릭터의 모델만 내려받는 구조"     | `prepareAll()`·`allAssets()` 같은 일괄 경로를 만들지 않는다(FR-008). 동시 다운로드는 사용자가 각각 누른 캐릭터만. ✅                                                                                                                                                                                                                                  |
+| **개발 방식**                            | 계약 먼저, 테스트 먼저, 커밋 메시지 한국어        | Phase 1에서 계약 3개 작성. 계약 테스트를 구현 전에 쓴다. ✅                                                                                                                                                                                                                                                                                           |
 
 **게이트 결과: 통과.** 위험 지점(III·IV)은 설계로 방어되며 Complexity Tracking에 justify할
 위반이 없다.
@@ -81,14 +82,14 @@ Maestro (`run-device-tests.mjs` `FLOWS` 등록 필요).
 
 Phase 1 산출물(data-model.md, contracts/, quickstart.md) 작성 후 다시 본다.
 
-| 원칙 | Phase 1에서 확인된 것 |
-| --- | --- |
-| **III** | `Segment`·`SegmentPlan`·`SegmentedResume`·`RangeSupport`가 전부 data-model.md의 「안쪽 값」 표에 있고 화면에 안 나간다. `RangeFetchPort`는 `AssetKey`만 받는다(`Character` 없음). `checkSegmentedFile`(research §9)가 `segmented/*`의 `Character`·`roster` import를 차단. ✅ |
-| **IV** | `DownloadProgress` 무변경 확인(data-model.md). `mergeProgress`가 `fraction` 하나만 낸다. SC-004 벽시계 대조는 quickstart.md에만 있고 코드에 없다. `checkSegmentedFile`이 속도 어휘(`elapsed`·`speed` 등) 차단. 계약 테스트 C17이 이를 검사. ✅ |
-| **V** | `SEGMENT_COUNT=4`·`MIN_SEGMENT_BYTES=8MiB`가 `readonly` 리터럴, 계약 테스트 C14가 소스에서 잠금(C15 위반 주입). `planSegments`가 파일 크기로 개수를 정하지 않는다 — `count` 인자는 상수에서 온다. `probeRange`가 애매하면 `unsupported`(폴백). `plan.ts` 주석에 "잠정, 실기기 확정" 명시. ✅ |
-| **로스터** | `segmented/plan.ts`·`transfer.ts`에 `planAll()` 없음(segmented-transfer.md 명시). `acquisition.ts`는 여전히 캐릭터별 `prepare`. ✅ |
-| **008 계약** | contracts/download-view.md가 008의 네 불변식을 표로 대조하며 전부 유지. ✅ |
-| **003 계약** | contracts/concurrent-acquisition.md가 003의 실패 갈래를 안 지우고 `busy` 의미만 좁힘을 명시(A12·A13). ✅ |
+| 원칙         | Phase 1에서 확인된 것                                                                                                                                                                                                                                                                        |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **III**      | `Segment`·`SegmentPlan`·`SegmentedResume`·`RangeSupport`가 전부 data-model.md의 「안쪽 값」 표에 있고 화면에 안 나간다. `RangeFetchPort`는 `AssetKey`만 받는다(`Character` 없음). `checkSegmentedFile`(research §9)가 `segmented/*`의 `Character`·`roster` import를 차단. ✅                 |
+| **IV**       | `DownloadProgress` 무변경 확인(data-model.md). `mergeProgress`가 `fraction` 하나만 낸다. SC-004 벽시계 대조는 quickstart.md에만 있고 코드에 없다. `checkSegmentedFile`이 속도 어휘(`elapsed`·`speed` 등) 차단. 계약 테스트 C17이 이를 검사. ✅                                               |
+| **V**        | `SEGMENT_COUNT=4`·`MIN_SEGMENT_BYTES=8MiB`가 `readonly` 리터럴, 계약 테스트 C14가 소스에서 잠금(C15 위반 주입). `planSegments`가 파일 크기로 개수를 정하지 않는다 — `count` 인자는 상수에서 온다. `probeRange`가 애매하면 `unsupported`(폴백). `plan.ts` 주석에 "잠정, 실기기 확정" 명시. ✅ |
+| **로스터**   | `segmented/plan.ts`·`transfer.ts`에 `planAll()` 없음(segmented-transfer.md 명시). `acquisition.ts`는 여전히 캐릭터별 `prepare`. ✅                                                                                                                                                           |
+| **008 계약** | contracts/download-view.md가 008의 네 불변식을 표로 대조하며 전부 유지. ✅                                                                                                                                                                                                                   |
+| **003 계약** | contracts/concurrent-acquisition.md가 003의 실패 갈래를 안 지우고 `busy` 의미만 좁힘을 명시(A12·A13). ✅                                                                                                                                                                                     |
 
 **재점검 결과: 통과.** 설계가 게이트를 흔들지 않았다.
 

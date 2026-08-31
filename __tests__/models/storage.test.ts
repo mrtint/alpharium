@@ -247,9 +247,7 @@ describe("세그먼트 재개 상태 (026)", () => {
   });
 
   it("segmented가 깨진 값이어도 빈 배열", async () => {
-    const meta = metadataPort(
-      JSON.stringify({ verdicts: [], paused: [], segmented: "깨짐" }),
-    );
+    const meta = metadataPort(JSON.stringify({ verdicts: [], paused: [], segmented: "깨짐" }));
 
     const state = await readState(meta.port);
 

@@ -52,7 +52,7 @@ import { resolveDownloadView } from "./src/models/download-view";
 import { expoModelPorts } from "./src/models/expo-port";
 import { readinessOf } from "./src/models/readiness";
 import { assetFor } from "./src/models/roster";
-import { pausedFor, readState, removeAsset, verdictFor } from "./src/models/storage";
+import { pausedFor, readState, removeAsset, segmentedFor, verdictFor } from "./src/models/storage";
 import type { DownloadProgress, DownloadRejection, ModelReadiness } from "./src/models/types";
 import {
   prepareVision,
@@ -703,6 +703,8 @@ function ModelSection(props: ModelSectionProps) {
               file: facts,
               verdict: verdictFor(state, asset.key),
               paused: pausedFor(state, asset.key),
+              // 026 — 세그먼트 재개 상태가 있으면 partial + resumable: true (FR-023).
+              segmentedResume: segmentedFor(state, asset.key),
               // 부분 파일 판정은 파일 통로가 아직 구분해 주지 않는다.
               // 중단 정보가 있으면 그쪽으로 잡히므로 지금은 false로 둔다.
               hasPartialFile: false,

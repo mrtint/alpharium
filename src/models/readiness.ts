@@ -15,6 +15,7 @@
  */
 
 import type { FileFacts } from "./port";
+import type { SegmentedResume } from "./segmented/types";
 import type { AssetKey, ModelReadiness, PausedDownload, VerificationVerdict } from "./types";
 
 /**
@@ -36,6 +37,13 @@ export type ReadinessInput = {
   verdict: VerificationVerdict | null;
   /** 중단된 내려받기. 없으면 null */
   paused: PausedDownload | null;
+  /**
+   * 세그먼트 재개 상태. 없으면 null (026).
+   *
+   * `paused`와 상호배타 — 한 자산은 둘 중 하나만 갖는다. 있으면 `partial` +
+   * `resumable: true`로 판정된다(FR-023).
+   */
+  segmentedResume?: SegmentedResume | null;
   /** 부분 파일이 남아 있는가. 앱이 갑자기 죽으면 중단 정보 없이 이것만 남는다 */
   hasPartialFile: boolean;
 };
@@ -68,6 +76,11 @@ export function readinessOf(input: ReadinessInput): ModelReadiness {
   // 부분 파일이 공간을 먹고 있다는 사실도 가려진다(FR-029).
   if (!file.exists) {
     if (paused !== null) {
+      return { kind: "partial", reason: REASON.interrupted, resumable: true };
+    }
+    // 026 — 세그먼트 재개 상태가 있으면 이어받을 수 있다(FR-023). `paused`와 상호배타라
+    // 순서는 무관하지만 방어적으로 `paused`를 먼저 본다.
+    if (input.segmentedResume != null) {
       return { kind: "partial", reason: REASON.interrupted, resumable: true };
     }
     if (hasPartialFile) {

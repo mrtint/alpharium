@@ -638,7 +638,7 @@ export function checkOnboardingFile(fileName: string, contents: string): Violati
  * ─────────────────────────────────────────────────────────────────────────
  */
 const SEGMENTED_TOUCHES_CHARACTER =
-  /\bfrom\s+["'][^"']*(?:models\/roster|diary\/(?:store|pipeline|acceptance|prompt|persona|types))["']|\bCharacter\b/;
+  /\bfrom\s+["'][^"']*(?:(?:models\/|\.\.?\/)roster|diary\/(?:store|pipeline|acceptance|prompt|persona|types)|\braw-?roster)["']|\bassetFor\b|\bCharacter\b/;
 
 /** 속도·처리량을 재는 어휘 (원칙 IV). `fraction`·`bytesWritten`은 003 진행률 계약이라 제외 */
 const SEGMENTED_MEASURES_SPEED =

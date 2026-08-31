@@ -40,7 +40,7 @@
 
 ---
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - 여러 캐릭터를 동시에 준비한다 (Priority: P1)
 
@@ -170,7 +170,7 @@ Story 1 없이도, Story 1 있이도 각각 독립적으로 가치가 있어 P2�
 
 ---
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements — 동시 내려받기
 
@@ -249,7 +249,7 @@ Story 1 없이도, Story 1 있이도 각각 독립적으로 가치가 있어 P2�
   비전 모델은 `DownloadPort` 계약 뒤에서 세그먼트 병렬과 폴백을 얻는다.
 - **FR-028**: 003의 계약 파일(`contracts/acquisition.md`, `contracts/storage.md`)이 정의한
   기존 갈래(`busy`/`insufficient-space`/`network`/`verification-failed`, `ready`/`not-
-  downloaded`/`partial`/`unusable`)는 제거되지 않는다. 확장만 한다.
+downloaded`/`partial`/`unusable`)는 제거되지 않는다. 확장만 한다.
 - **FR-029**: 008의 계약(`contracts/download-view.md`)이 정의한 "거부 안내는 하나뿐, 자동
   소멸" 불변식은 유지된다.
 - **FR-030**: 새로 도입하는 사람이 정한 상수(구간 수, 최소 구간 크기)는 소스에서 `readonly`
@@ -270,7 +270,7 @@ Story 1 없이도, Story 1 있이도 각각 독립적으로 가치가 있어 P2�
 
 ---
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

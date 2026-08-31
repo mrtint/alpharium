@@ -186,10 +186,7 @@ describe("remainingCapacity", () => {
 /* ───────────────────── C14·C15 — 상수가 readonly 리터럴 ───────────────────── */
 
 describe("상수는 사람이 못박은 readonly 리터럴이다 (C14·C15, FR-030·SC-011)", () => {
-  const source = readFileSync(
-    join(__dirname, "../../src/models/segmented/plan.ts"),
-    "utf8",
-  );
+  const source = readFileSync(join(__dirname, "../../src/models/segmented/plan.ts"), "utf8");
 
   it("C14 — SEGMENT_COUNT가 리터럴로 선언된다", () => {
     expect(source).toMatch(/export const SEGMENT_COUNT\s*=\s*4\b/);

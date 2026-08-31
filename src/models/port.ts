@@ -142,9 +142,7 @@ export interface DownloadPort {
  * `aborted`는 다른 구간 실패로 취소됐거나 사용자가 멈춘 것 — 실패가 아니다.
  */
 export type RangeOutcome =
-  | { kind: "completed" }
-  | { kind: "failed"; reason: string }
-  | { kind: "aborted" };
+  { kind: "completed" } | { kind: "failed"; reason: string } | { kind: "aborted" };
 
 /**
  * HTTP 구간 요청으로 파일 하나를 여러 조각으로 받는 통로 (026).

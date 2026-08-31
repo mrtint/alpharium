@@ -12,12 +12,12 @@
 
 008의 네 불변식을 **전부 유지**하고, `active`가 단수에서 복수로 바뀌는 것만 반영한다.
 
-| 008 불변식 | 026에서 |
-| --- | --- |
-| 1. `notice`가 하나다(배열 아님) — 쌓이지 않는다 | **유지** |
+| 008 불변식                                          | 026에서                                                                                 |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| 1. `notice`가 하나다(배열 아님) — 쌓이지 않는다     | **유지**                                                                                |
 | 2. `active`와 `notice.requested`가 같은 경우가 없다 | **유지** — `active[]`의 어느 원소도 `notice.requested`와 같은 `character`를 갖지 않는다 |
-| 3. 시간·속도·바이트가 없다 | **유지** — `DownloadProgress` 무변경, 세그먼트 정보도 없음 |
-| 4. 모델 정보가 없다 | **유지** — `Character`만 흐른다 |
+| 3. 시간·속도·바이트가 없다                          | **유지** — `DownloadProgress` 무변경, 세그먼트 정보도 없음                              |
+| 4. 모델 정보가 없다                                 | **유지** — `Character`만 흐른다                                                         |
 
 ---
 
@@ -82,17 +82,17 @@ type DownloadView = { active: DownloadProgress[]; notice: DownloadRejection | nu
 
 ## 검증 표 (기기 없이 — `__tests__/models/download-view.test.ts`)
 
-| # | 입력 | 기대 |
-| --- | --- | --- |
-| V1 | `active=[]`, `rejection=null` | `{ active: [], notice: null }` |
-| V2 | `active=[A,B]`, `rejection=null` | `{ active: [A,B], notice: null }` |
-| V3 | `active=[]`, `rejection={requested:A, busyWith:A}` | `notice: null` (받는 게 없으니 거부는 거짓) |
-| V4 | `active=[A]`, `rejection={requested:A, busyWith:A}` | `notice: null` (재시도 성공 — 008 I2, 026의 3번) |
-| V5 | `active=[B]`, `rejection={requested:A, busyWith:A}` | `notice: null` (busyWith A가 목록에 없음 — 026의 2번) |
-| V6 | `active=[A]`, `rejection={requested:B, busyWith:A}` | `notice: {requested:B, busyWith:A}` (008의 원형 케이스 — A 받는 중, B 거부됨) |
-| V7 | `active=[A,C]`, `rejection={requested:B, busyWith:A}` | `notice` 실림 (A가 목록에 있고 B는 없음) |
-| V8 | `active`에 같은 `character`가 두 번 | (상위에서 보장 — 불변식 4) 계약 테스트가 `acquisition`이 그런 배열을 안 만드는 것을 A3에서 검사 |
-| V9 | `DownloadView` 타입에 시간·속도·바이트·구간 필드 없음 | `readFileSync`로 `types.ts` 검사 (008 불변식 3 + FR-016) |
+| #   | 입력                                                  | 기대                                                                                            |
+| --- | ----------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| V1  | `active=[]`, `rejection=null`                         | `{ active: [], notice: null }`                                                                  |
+| V2  | `active=[A,B]`, `rejection=null`                      | `{ active: [A,B], notice: null }`                                                               |
+| V3  | `active=[]`, `rejection={requested:A, busyWith:A}`    | `notice: null` (받는 게 없으니 거부는 거짓)                                                     |
+| V4  | `active=[A]`, `rejection={requested:A, busyWith:A}`   | `notice: null` (재시도 성공 — 008 I2, 026의 3번)                                                |
+| V5  | `active=[B]`, `rejection={requested:A, busyWith:A}`   | `notice: null` (busyWith A가 목록에 없음 — 026의 2번)                                           |
+| V6  | `active=[A]`, `rejection={requested:B, busyWith:A}`   | `notice: {requested:B, busyWith:A}` (008의 원형 케이스 — A 받는 중, B 거부됨)                   |
+| V7  | `active=[A,C]`, `rejection={requested:B, busyWith:A}` | `notice` 실림 (A가 목록에 있고 B는 없음)                                                        |
+| V8  | `active`에 같은 `character`가 두 번                   | (상위에서 보장 — 불변식 4) 계약 테스트가 `acquisition`이 그런 배열을 안 만드는 것을 A3에서 검사 |
+| V9  | `DownloadView` 타입에 시간·속도·바이트·구간 필드 없음 | `readFileSync`로 `types.ts` 검사 (008 불변식 3 + FR-016)                                        |
 
 ---
 
