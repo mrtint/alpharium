@@ -124,7 +124,7 @@ description: "Task list for 025-diary-photo-gallery implementation"
 - [x] T031 `.maestro/`의 기존 흐름 중 일기 상세 화면을 여는 것(있으면 `generate-diary.yml` 등)을 함께 돌려 격자→슬라이더 교체가 회귀를 내지 않는지 확인한다. stale 흐름 발견 시 함께 고친다(023·022 선례).
 - [x] T032 `docs/roadmap/README.md`의 9번 항목을 `[x]`로 바꾸고 "구현 결과 (025, 2026-08-31)" 요약을 추가한다 (021·023 선례 형식).
 - [x] T033 `AGENTS.md`에 "### 025 — 일기 본문 사진 슬라이드 및 갤러리 뷰" 절을 추가한다 — 핵심 결론(코어 `ScrollView`/`Modal`만, 새 의존성 0, 갤러리 상태 화면 로컬, `src/ui/` 안에서 완결)과 실기기 실측(T030 결과)과 미확인 잔여(핀치 줌·iOS·release는 범위 밖).
-- [ ] T034 `npm test`(전체) + `npm run lint` 최종 클린 확인. 커밋(한국어 메시지, 헌법 「개발 방식」).
+- [x] T034 `npm test`(전체) + `npm run lint` 최종 클린 확인. 커밋(한국어 메시지, 헌법 「개발 방식」).
 
 ---
 
