@@ -15,13 +15,17 @@ import {
   pausedFor,
   readState,
   removeAsset,
+  segmentedFor,
   verdictFor,
+  withoutSegmented,
   withPaused,
+  withSegmentedResume,
   withVerdict,
   withoutAsset,
   writeState,
   type ModelState,
 } from "../../src/models/storage";
+import type { SegmentedResume } from "../../src/models/segmented/types";
 
 /**
  * 주석을 걷어낸 소스. 금지 규칙을 **설명하는 것**과 **코드로 쓰는 것**은 다르다 —
@@ -102,6 +106,7 @@ describe("보관과 삭제", () => {
   it("지우면 검증 결과와 중단 상태도 사라진다", async () => {
     const state: ModelState = {
       verdicts: [VERDICT],
+      segmented: [],
       paused: [{ assetKey: "a1", state: {} }],
     };
     const { port } = filePort({ a1: 1000 });
@@ -118,6 +123,7 @@ describe("보관과 삭제", () => {
   it("다른 캐릭터의 것은 그대로 남는다", async () => {
     const state: ModelState = {
       verdicts: [VERDICT, { ...VERDICT, assetKey: "a2" }],
+      segmented: [],
       paused: [],
     };
     const { port, files } = filePort({ a1: 1000, a2: 2000 });
@@ -146,11 +152,13 @@ describe("보관과 삭제", () => {
 
   // S12 — 쓰다 죽으면 검증 결과 전체를 잃는다
   it("메타 쓰기가 실패해도 기존 것이 남는다", async () => {
-    const original: ModelState = { verdicts: [VERDICT], paused: [] };
+    const original: ModelState = { verdicts: [VERDICT], paused: [], segmented: [] };
     const meta = metadataPort(JSON.stringify(original));
     meta.failNext();
 
-    await expect(writeState(meta.port, { verdicts: [], paused: [] })).rejects.toThrow();
+    await expect(
+      writeState(meta.port, { verdicts: [], paused: [], segmented: [] }),
+    ).rejects.toThrow();
 
     const after = await readState(meta.port);
     expect(verdictFor(after, "a1")).not.toBeNull();
@@ -175,7 +183,7 @@ describe("보관과 삭제", () => {
   });
 
   it("한 자산에 검증 결과는 하나다", () => {
-    let state: ModelState = { verdicts: [], paused: [] };
+    let state: ModelState = { verdicts: [], paused: [], segmented: [] };
     state = withVerdict(state, VERDICT);
     state = withVerdict(state, { ...VERDICT, verifiedMd5: "new" });
 
@@ -184,7 +192,7 @@ describe("보관과 삭제", () => {
   });
 
   it("한 자산에 중단 상태는 하나다", () => {
-    let state: ModelState = { verdicts: [], paused: [] };
+    let state: ModelState = { verdicts: [], paused: [], segmented: [] };
     state = withPaused(state, { assetKey: "a1", state: { at: 1 } });
     state = withPaused(state, { assetKey: "a1", state: { at: 2 } });
 
@@ -194,6 +202,7 @@ describe("보관과 삭제", () => {
   it("자산 하나만 걷어낼 수 있다", () => {
     const state: ModelState = {
       verdicts: [VERDICT, { ...VERDICT, assetKey: "a2" }],
+      segmented: [],
       paused: [{ assetKey: "a1", state: {} }],
     };
 
@@ -208,6 +217,7 @@ describe("보관과 삭제", () => {
     const meta = metadataPort();
     const state: ModelState = {
       verdicts: [VERDICT],
+      segmented: [],
       paused: [{ assetKey: "a2", state: { opaque: "value" } }],
     };
 
@@ -215,5 +225,106 @@ describe("보관과 삭제", () => {
     const after = await readState(meta.port);
 
     expect(after).toEqual(state);
+  });
+});
+
+/* ─────────────────── 026 — 세그먼트 재개 상태 (data-model.md 「ModelState」) ─────────────────── */
+
+const RESUME: SegmentedResume = {
+  assetKey: "a2",
+  totalBytes: 1_644_918_272,
+  segmentCount: 4,
+  receivedBytes: [411_229_568, 411_229_568, 200_000_000, 0],
+};
+
+describe("세그먼트 재개 상태 (026)", () => {
+  it("segmented 없는 옛 파일도 빈 배열로 읽힌다 (마이그레이션 불필요)", async () => {
+    const meta = metadataPort(JSON.stringify({ verdicts: [], paused: [] }));
+
+    const state = await readState(meta.port);
+
+    expect(state.segmented).toEqual([]);
+  });
+
+  it("segmented가 깨진 값이어도 빈 배열", async () => {
+    const meta = metadataPort(
+      JSON.stringify({ verdicts: [], paused: [], segmented: "깨짐" }),
+    );
+
+    const state = await readState(meta.port);
+
+    expect(state.segmented).toEqual([]);
+  });
+
+  it("segmentedFor가 해당 자산의 재개 상태를 준다", () => {
+    const state: ModelState = { verdicts: [], paused: [], segmented: [RESUME] };
+
+    expect(segmentedFor(state, "a2")).toEqual(RESUME);
+    expect(segmentedFor(state, "a1")).toBeNull();
+  });
+
+  it("withSegmentedResume는 한 자산에 하나만 둔다", () => {
+    let state: ModelState = { verdicts: [], paused: [], segmented: [] };
+    state = withSegmentedResume(state, RESUME);
+    state = withSegmentedResume(state, { ...RESUME, receivedBytes: [1, 2, 3, 4] });
+
+    expect(state.segmented).toHaveLength(1);
+    expect(segmentedFor(state, "a2")?.receivedBytes).toEqual([1, 2, 3, 4]);
+  });
+
+  it("withSegmentedResume는 같은 자산을 paused에서 제거한다 (상호배타)", () => {
+    let state: ModelState = {
+      verdicts: [],
+      paused: [{ assetKey: "a2", state: { opaque: "x" } }],
+      segmented: [],
+    };
+
+    state = withSegmentedResume(state, RESUME);
+
+    expect(pausedFor(state, "a2")).toBeNull();
+    expect(segmentedFor(state, "a2")).not.toBeNull();
+  });
+
+  it("withPaused는 같은 자산을 segmented에서 제거한다 (상호배타)", () => {
+    let state: ModelState = { verdicts: [], paused: [], segmented: [RESUME] };
+
+    state = withPaused(state, { assetKey: "a2", state: { opaque: "x" } });
+
+    expect(segmentedFor(state, "a2")).toBeNull();
+    expect(pausedFor(state, "a2")).not.toBeNull();
+  });
+
+  it("withoutSegmented는 segmented에서만 제거한다", () => {
+    const state: ModelState = {
+      verdicts: [VERDICT],
+      paused: [],
+      segmented: [RESUME, { ...RESUME, assetKey: "a3" }],
+    };
+
+    const after = withoutSegmented(state, "a2");
+
+    expect(after.segmented).toHaveLength(1);
+    expect(after.verdicts).toHaveLength(1);
+  });
+
+  it("withoutAsset도 segmented를 비운다", () => {
+    const state: ModelState = {
+      verdicts: [VERDICT],
+      paused: [],
+      segmented: [RESUME],
+    };
+
+    const after = withoutAsset(state, "a2");
+
+    expect(after.segmented).toHaveLength(0);
+  });
+
+  it("segmented 왕복에서 값이 변하지 않는다", async () => {
+    const meta = metadataPort();
+    const state: ModelState = { verdicts: [], paused: [], segmented: [RESUME] };
+
+    await writeState(meta.port, state);
+
+    expect(await readState(meta.port)).toEqual(state);
   });
 });

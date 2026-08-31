@@ -614,6 +614,71 @@ export function checkOnboardingFile(fileName: string, contents: string): Violati
   return violations;
 }
 
+/**
+ * 세그먼트 병렬 내려받기의 순수 코어가 캐릭터·모델 매핑에 닿거나 속도를 재는 것을 잡는다
+ * (026, plan.md Constitution Check, 원칙 III·IV).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `src/models/segmented/`는 파일 하나를 여러 구간으로 나눠 병렬 수신하는 순수 계획
+ * (`plan.ts`)과 조립(`transfer.ts`, `RangeFetchPort` 주입)을 모으는 자리다.
+ * 020의 `checkScheduleFile`, 021의 `checkOnboardingFile`, 023의 `VISION_SCORES_IMAGE`와
+ * 같은 성격의 경계 검사다.
+ *
+ * **막는 것**:
+ *  - `models/roster`·`Character`·`diary/*` — 세그먼트 계획은 자산키·바이트·구간만
+ *    다룬다(FR-019). 캐릭터를 알면 "이 캐릭터가 이만큼 걸린다"는 사양으로 읽히는
+ *    누출 경로가 생긴다(원칙 III).
+ *  - 속도·처리량 어휘(`elapsed`·`bytesPerSecond`·`throughput`·`\bspeed\b`·`\bMbps\b`) —
+ *    세그먼트 병렬은 속도를 재서 비교·저장하지 않는다(원칙 IV). 진행률은
+ *    `mergeProgress`가 낸 `fraction` 하나뿐이며, 구간별 처리량이 콜백 밖으로 나가는
+ *    경로가 있으면 여기서 걸린다(FR-016, SC-008).
+ *
+ * **경계는 다른 소스 검사와 같다**: 소스에 어떤 import·어휘가 있는지만 본다. 코드를
+ * 돌리지도, 출력을 만들지도, 품질을 재지도 않는다.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const SEGMENTED_TOUCHES_CHARACTER =
+  /\bfrom\s+["'][^"']*(?:models\/roster|diary\/(?:store|pipeline|acceptance|prompt|persona|types))["']|\bCharacter\b/;
+
+/** 속도·처리량을 재는 어휘 (원칙 IV). `fraction`·`bytesWritten`은 003 진행률 계약이라 제외 */
+const SEGMENTED_MEASURES_SPEED =
+  /\b(?:elapsed|bytesPerSecond|throughput|speed|Mbps|kbps|transferRate|downloadSpeed)\b/;
+
+/**
+ * 세그먼트 코어 파일인지 보고, 맞으면 위 규칙을 적용한다.
+ *
+ * **`src/models/segmented/`가 대상이다.** `expo-port.ts`는 대상이 아니다 — 전송 방식
+ * 선택과 `RangeFetchPort` 구현이 거기 있고, 그것은 기기 통로이지 순수 코어가 아니다.
+ */
+export function checkSegmentedFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/models/segmented/")) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (SEGMENTED_TOUCHES_CHARACTER.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "세그먼트 코어가 캐릭터·모델 매핑에 닿는다 — 자산키·바이트·구간만 다뤄야 한다 (026 FR-019, 원칙 III)",
+      });
+    }
+    if (SEGMENTED_MEASURES_SPEED.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "세그먼트 코어가 속도·처리량을 잰다 — 진행률은 fraction 하나뿐이다 (026 FR-016, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";

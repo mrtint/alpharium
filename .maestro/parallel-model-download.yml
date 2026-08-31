@@ -1,0 +1,38 @@
+# 026 — 모델 병렬·동시 내려받기
+#
+# **캐릭터 두 개를 동시에 받을 수 있는가**와 **하나를 멈춰도 나머지가 계속되는가**,
+# **탭 복귀 시 받는 중인 것 전부의 표시가 복원되는가**를 본다.
+#
+# ⚠️ **이 기능의 핵심 검증은 여기 없다** — 세그먼트 병렬 속도 대조(Q3, adb logcat의
+# Range 요청·벽시계 시간), HF CDN Range 유지 여부(Q3), 세그먼트 이어받기(Q5,
+# state.json의 receivedBytes·재개 시 남은 Range 요청), 폴백 완주(Q4, probeRange
+# 강제 unsupported)는 사람이 logcat과 state.json을 읽어 판단한다.
+# quickstart.md Q0~Q6를 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
+#
+# ⚠️ 실제 내려받기가 없으면 동시 진행 블록이 SKIPPED로 지나간다 — **건너뛴 것은
+# 통과가 아니므로**(원칙 V) 그때는 quickstart.md Q1·Q2를 손으로 확인한다.
+
+appId: com.alpharium.app
+---
+- launchApp
+# 캐릭터 탭으로 이동 (앱 구조에 맞춰 조정 — 온보딩이 뜨면 전부 건너뛴다)
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-.*"
+    commands:
+      - repeat:
+          times: 6
+          commands:
+            - tapOn:
+                text: "건너뛰기"
+                optional: true
+      - tapOn:
+          text: "시작하기"
+          optional: true
+
+# TODO(T038): 캐릭터 A·B 동시 "준비하기" → 두 줄에 진행 표시, A "멈추기" → B 계속,
+#             탭 이동/복귀 후 표시 복원. scrollUntilVisible·accessibilityLabel 함정
+#             주의(025 교훈 — 여러 텍스트 조각이 한 <Text>면 testID가 접근성 트리에
+#             안 뜬다).
+- assertVisible: "캐릭터"

@@ -203,7 +203,14 @@ function AppFrame() {
    */
   const [ports] = useState(() => expoModelPorts());
   const [acquisition] = useState(() => createAcquisition(ports));
-  const [progress, setProgress] = useState<DownloadProgress | null>(null);
+  /**
+   * 026 — 받는 중인 캐릭터들의 진행 상태.
+   *
+   * **단수 → `Map`으로 바꿨다** — 서로 다른 캐릭터를 동시에 받을 수 있으므로
+   * (026 FR-005). 각 캐릭터의 진행 콜백이 자기 항목만 갱신하고, 탭 복귀 시
+   * `busyWith()` 배열 전부를 복원한다.
+   */
+  const [progress, setProgress] = useState<ReadonlyMap<Character, DownloadProgress>>(new Map());
   const [rejection, setRejection] = useState<DownloadRejection | null>(null);
 
   /**
@@ -653,8 +660,9 @@ type Readiness = Record<Character, ModelReadiness> | null;
 type ModelSectionProps = {
   ports: ReturnType<typeof expoModelPorts>;
   acquisition: Acquisition;
-  progress: DownloadProgress | null;
-  setProgress: (progress: DownloadProgress | null) => void;
+  /** 026 — 받는 중인 캐릭터별 진행 상태 */
+  progress: ReadonlyMap<Character, DownloadProgress>;
+  setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
   rejection: DownloadRejection | null;
   setRejection: (rejection: DownloadRejection | null) => void;
 };
@@ -721,9 +729,10 @@ function ModelSection(props: ModelSectionProps) {
   }, [read]);
 
   /**
-   * 탭에서 돌아왔을 때 받는 중인 것을 되찾는다 (008 FR-013).
+   * 탭에서 돌아왔을 때 받는 중인 것을 **전부** 되찾는다 (008 FR-013, 026 FR-006).
    *
-   * **`Acquisition`이 이제 탭보다 오래 살므로 물어볼 대상이 남아 있다.**
+   * **`Acquisition`이 이제 탭보다 오래 살므로 물어볼 대상이 남아 있다.** 026에서
+   * 여러 캐릭터가 동시에 받는 중일 수 있으므로 `busyWith()` 배열 전부를 순회한다.
    *
    * ⚠️ **백분율은 되찾을 수 없다.** `Acquisition`은 마지막 진행률을 들고 있지 않고
    * 콜백으로 흘려보낼 뿐이다. 그래서 `fraction: null`로 시작하고 **다음 진행 콜백이
@@ -731,9 +740,14 @@ function ModelSection(props: ModelSectionProps) {
    */
   useEffect(() => {
     const running = acquisition.busyWith();
-    if (running !== null && progress === null) {
-      setProgress({ character: running, fraction: null });
-    }
+    if (running.length === 0) return;
+    setProgress((prev) => {
+      const next = new Map(prev);
+      for (const character of running) {
+        if (!next.has(character)) next.set(character, { character, fraction: null });
+      }
+      return next;
+    });
     // 화면이 뜰 때 한 번만 본다. `progress`가 바뀔 때마다 되돌리면 안 된다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [acquisition]);
@@ -768,7 +782,11 @@ function ModelSection(props: ModelSectionProps) {
    */
   const onPrepare = useCallback(
     async (character: Character) => {
-      const result = await acquisition.prepare(character, setProgress);
+      // 026 — 이 캐릭터의 진행만 갱신하는 콜백. 다른 캐릭터의 항목은 건드리지 않는다.
+      const reportOne = (p: DownloadProgress) =>
+        setProgress((prev) => new Map(prev).set(p.character, p));
+
+      const result = await acquisition.prepare(character, reportOne);
 
       // ★ 거부는 **받던 것을 건드리지 않는다**(FR-008). 진행률도 멈추기 버튼도 그대로
       //   남아야 사용자가 빠져나갈 수 있다(FR-009, 003 FR-020a).
@@ -777,11 +795,14 @@ function ModelSection(props: ModelSectionProps) {
         return;
       }
 
-      // 그 외(완료·멈춤·실패)는 **내 요청이 끝난 것이므로** 진행 표시를 거둔다(FR-012).
-      // 거부 통지도 함께 비운다 — 받던 것이 끝났으면 「받는 중이라 거부했다」가
-      // 더 이상 참이 아니다(FR-005). `resolveDownloadView()`도 같은 판정을 하므로
-      // 이것은 **이중 방어**이지 유일한 방어가 아니다.
-      setProgress(null);
+      // 그 외(완료·멈춤·실패)는 **내 요청이 끝난 것이므로** 이 캐릭터의 진행 표시만
+      // 거둔다(FR-012) — 026에서 다른 캐릭터가 동시에 받는 중일 수 있으므로 `Map`
+      // 전체를 비우지 않는다. 거부 통지도 함께 비운다(008 FR-005).
+      setProgress((prev) => {
+        const next = new Map(prev);
+        next.delete(character);
+        return next;
+      });
       setRejection(null);
       await refresh();
     },
@@ -863,9 +884,9 @@ function ModelSection(props: ModelSectionProps) {
       readiness={readiness}
       // **판정은 순수 함수가 하고 화면은 그린다**(008). 「거부 안내가 아직 참인가」가
       // 시간에 따라 거짓이 되므로, 지우는 코드를 두지 않고 **매번 다시 묻는다.**
-      view={resolveDownloadView(progress, rejection)}
+      view={resolveDownloadView([...progress.values()], rejection)}
       onPrepare={(character) => void onPrepare(character)}
-      onPause={() => void acquisition.pause()}
+      onPause={(character) => void acquisition.pause(character)}
       onRemove={(character) => void onRemove(character)}
       onDismissNotice={() => setRejection(null)}
       // ★ 011 — **이 줄들이 없으면 사진 보는 모델을 받을 길이 없다.**

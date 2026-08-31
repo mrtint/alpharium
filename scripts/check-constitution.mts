@@ -21,6 +21,7 @@ import {
   checkPhotoPortFile,
   checkScheduleFile,
   checkSeedFile,
+  checkSegmentedFile,
   checkSourceFile,
   checkVisionFile,
   formatViolations,
@@ -70,6 +71,9 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 023 — 사진 통로가 잡사진을 판정하지 못하게. checkPhotoPortFile이
       // 경로로 대상(src/signals/expo-port.ts)을 정한다.
       violations.push(...checkPhotoPortFile(child, contents));
+      // 026 — 세그먼트 병렬 코어가 캐릭터·속도에 닿지 못하게. checkSegmentedFile이
+      // 경로로 대상(src/models/segmented/)을 정한다.
+      violations.push(...checkSegmentedFile(child, contents));
     }
   }
 

@@ -30,15 +30,15 @@ Mobile 단일 저장소: `src/`, `App.tsx`, `__tests__/`, `.maestro/`, `scripts/
 
 **Purpose**: 새 경계 디렉터리와 헌법 검사 규칙 자리를 만든다.
 
-- [ ] T001 `src/models/segmented/` 디렉터리 생성. `src/models/segmented/types.ts`에
+- [X] T001 `src/models/segmented/` 디렉터리 생성. `src/models/segmented/types.ts`에
   `Segment`·`SegmentPlan`·`SegmentedResume`·`RangeSupport` 타입 선언 (data-model.md
   「신규 타입」 표 그대로, 아직 로직 없음, 전부 `export type`).
-- [ ] T002 [P] `scripts/constitution-rules.ts`에 `checkSegmentedFile` 추가 —
+- [X] T002 [P] `scripts/constitution-rules.ts`에 `checkSegmentedFile` 추가 —
   `src/models/segmented/` 파일이 `../diary/`·`Character`·`models/roster`를 import하거나
   소스에 속도 어휘(`elapsed`·`bytesPerSecond`·`throughput`·`\bspeed\b`)를 두면 위반.
   `scripts/check-constitution.mts`가 이 규칙을 호출하도록 등록 (020 `checkScheduleFile`,
   023 `VISION_SCORES_IMAGE` 전례).
-- [ ] T003 [P] `.maestro/parallel-model-download.yml` 빈 파일 생성 + `scripts/run-device-tests.mjs`의
+- [X] T003 [P] `.maestro/parallel-model-download.yml` 빈 파일 생성 + `scripts/run-device-tests.mjs`의
   `FLOWS` 배열에 등록 (AGENTS.md 「⚠️ 새 Maestro 흐름은 FLOWS에 등록해야 돈다」).
 
 ---
@@ -51,12 +51,12 @@ Mobile 단일 저장소: `src/`, `App.tsx`, `__tests__/`, `.maestro/`, `scripts/
 
 ### 순수 계획 함수 (segmented/plan.ts)
 
-- [ ] T004 [P] `__tests__/models/segmented-plan.test.ts` 작성 (구현 전, FAIL 확인) —
+- [X] T004 [P] `__tests__/models/segmented-plan.test.ts` 작성 (구현 전, FAIL 확인) —
   contracts/segmented-transfer.md 검증 표 C1~C8·C14·C15 (`planSegments` 경계 불변식,
   작은 파일 `count=1`, 나머지 바이트, `remainingSegments` 완료 구간 제외·`start` 이동,
   `mergeProgress` null·클램프, `isComplete`, `SEGMENT_COUNT`/`MIN_SEGMENT_BYTES`가
   `readonly` 리터럴 — `readFileSync` 검사, 값 변경 시 실패).
-- [ ] T005 `src/models/segmented/plan.ts` 구현 — `SEGMENT_COUNT = 4`,
+- [X] T005 `src/models/segmented/plan.ts` 구현 — `SEGMENT_COUNT = 4`,
   `MIN_SEGMENT_BYTES = 8 * 1024 * 1024` (`as const`, 주석에 "잠정 — 실기기 T037(Q3)에서
   확정, 근거 research.md §3"). 순수 함수 `planSegments`·`remainingSegments`·`mergeProgress`·
   `isComplete`·`remainingCapacity` (data-model.md 「순수 함수 시그니처」 표). `Date`·난수·
@@ -64,11 +64,11 @@ Mobile 단일 저장소: `src/`, `App.tsx`, `__tests__/`, `.maestro/`, `scripts/
 
 ### 스토리지 확장 (state.json 스키마)
 
-- [ ] T006 [P] `__tests__/models/storage.test.ts`에 `segmented` 필드 왕복 케이스 추가
+- [X] T006 [P] `__tests__/models/storage.test.ts`에 `segmented` 필드 왕복 케이스 추가
   (구현 전, FAIL) — `readState`가 `segmented` 없는 옛 파일을 빈 배열로, 깨진 값도 빈 배열로;
   `withSegmentedResume`가 같은 `assetKey`를 `paused`에서 제거; `withPaused`가 `segmented`에서
   제거; `withoutAsset`이 `segmented`도 비움 (data-model.md 「ModelState」).
-- [ ] T007 `src/models/storage.ts` 확장 — `ModelState`에 `segmented: SegmentedResume[]`,
+- [X] T007 `src/models/storage.ts` 확장 — `ModelState`에 `segmented: SegmentedResume[]`,
   `readState` 파싱에 `Array.isArray(parsed.segmented) ? … : []`, 헬퍼 `segmentedFor`·
   `withSegmentedResume`·`withoutSegmented` 추가, `withPaused`·`withoutAsset` 상호배타
   처리. `src/models/types.ts`에서 `SegmentedResume`를 re-export 하거나 `segmented/types.ts`
@@ -77,7 +77,7 @@ Mobile 단일 저장소: `src/`, `App.tsx`, `__tests__/`, `.maestro/`, `scripts/
 
 ### 포트 계약 확장 (port.ts)
 
-- [ ] T008 `src/models/port.ts` 확장 — `RangeFetchPort` 인터페이스 추가 (`probeRange(url)`,
+- [X] T008 `src/models/port.ts` 확장 — `RangeFetchPort` 인터페이스 추가 (`probeRange(url)`,
   `fetchRange(key, url, segment, onBytes, signal?)`, `RangeOutcome` 타입), contracts/
   segmented-transfer.md 「기기 포트」 그대로. `DownloadPort.resume` 시그니처를
   `resume(key, url, state, onProgress)`로 확장 (url 추가 — segmented-transfer.md
@@ -99,47 +99,47 @@ Mobile 단일 저장소: `src/`, `App.tsx`, `__tests__/`, `.maestro/`, `scripts/
 
 ### Tests for User Story 1 (먼저 작성, FAIL 확인) ⚠️
 
-- [ ] T009 [P] [US1] `__tests__/models/concurrent-acquisition.test.ts` 작성 —
+- [X] T009 [P] [US1] `__tests__/models/concurrent-acquisition.test.ts` 작성 —
   contracts/concurrent-acquisition.md 검증 표 A1~A11 (서로 다른 캐릭터 동시 `prepare`,
   같은 캐릭터 `busy` 거부, `busyWith()` 배열, `pause(character)` 격리, `pause()` 전부,
   동시 공간 합산 판정 A6, `finally` 정리 A7, 자리 선점 A8, 세그먼트 재개 전달 A9·A10·A11).
   대역 `DownloadPort`·`DiskSpacePort`·`MetadataPort` 사용.
-- [ ] T010 [P] [US1] `__tests__/models/acquisition.test.ts` 수정 — 003의 "다른 캐릭터
+- [X] T010 [P] [US1] `__tests__/models/acquisition.test.ts` 수정 — 003의 "다른 캐릭터
   받는 중 → busy" 케이스를 "이제 둘 다 시작"으로 갱신 (A13). `insufficient-space`·
   `network`·`verification-failed` 갈래 회귀 케이스는 유지 (A12). 구현 전이므로 이 수정은
   FAIL이어야 한다.
-- [ ] T011 [P] [US1] `__tests__/models/download-view.test.ts` 수정 — contracts/
+- [X] T011 [P] [US1] `__tests__/models/download-view.test.ts` 수정 — contracts/
   download-view.md 검증 표 V1~V9 (`active` 배열화, `noticeFor` 배열 대응, 타입에 시간·
   속도·바이트·구간 필드 없음 `readFileSync` 검사). 구현 전 FAIL.
-- [ ] T012 [P] [US1] `__tests__/ui/character-list.test.tsx` 수정 — 여러 줄이 동시에
+- [X] T012 [P] [US1] `__tests__/ui/character-list.test.tsx` 수정 — 여러 줄이 동시에
   진행 표시 + "멈추기"를 그리는 케이스, `onPause(character)` 인자 전달. 구현 전 FAIL.
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] `src/models/types.ts` 수정 — `DownloadView.active`를
+- [X] T013 [US1] `src/models/types.ts` 수정 — `DownloadView.active`를
   `DownloadProgress | null` → `DownloadProgress[]`. `DownloadProgress`·`DownloadFailure`·
   `DownloadRejection`은 무변경 (data-model.md 확인). T011의 타입 검사 부분 GREEN.
-- [ ] T014 [US1] `src/models/download-view.ts` 수정 — `resolveDownloadView(active: DownloadProgress[], rejection)`.
+- [X] T014 [US1] `src/models/download-view.ts` 수정 — `resolveDownloadView(active: DownloadProgress[], rejection)`.
   `noticeFor`를 contracts/download-view.md 「noticeFor 배열로」 로직으로 (008의 4단계를
   배열 대응 3단계로). T011 전부 GREEN.
-- [ ] T015 [US1] `src/models/acquisition.ts` 수정 — `running`을
+- [X] T015 [US1] `src/models/acquisition.ts` 수정 — `running`을
   `Map<Character, { pause(): Promise<void> }>`로. `prepare`: `running.has(character)`만
   `busy`, 자리 선점을 첫 `await` 전에, 공간 판정에 `remainingCapacity` 합산 (§6,
   `lastBytesOf` 최신 바이트 기록), 세그먼트/일반 재개 분기 (`segmentedFor`), pause 시
   `withSegmentedResume`/`withPaused` 분기, `finally`에서 `running.delete`. `pause(character?)`.
   `busyWith(): Character[]`. contracts/concurrent-acquisition.md 「prepare 흐름」 그대로.
   T009·T010 GREEN.
-- [ ] T016 [US1] `src/ui/CharacterListScreen.tsx` 수정 — `busy` 판정을
+- [X] T016 [US1] `src/ui/CharacterListScreen.tsx` 수정 — `busy` 판정을
   `view.active.find(p => p.character === character)`로, 여러 줄에 동시 진행 표시 + "멈추기",
   "멈추기" `onPress` → `props.onPause(character)`. `CharacterListProps.onPause`를
   `(character: Character) => void`로. T012 GREEN.
-- [ ] T017 [US1] `App.tsx` 수정 — `progress` 상태를 `Map<Character, DownloadProgress>`로
+- [X] T017 [US1] `App.tsx` 수정 — `progress` 상태를 `Map<Character, DownloadProgress>`로
   (또는 배열). `resolveDownloadView([...progress.values()], rejection)`. `onPrepare`가
   자기 요청 결과로만 자기 캐릭터의 progress를 거둠 (008 버그 ② 방어를 맵 대응으로).
   탭 복귀 `useEffect`: `acquisition.busyWith()` 배열을 순회해 없는 것마다
   `progress.set(c, { character: c, fraction: null })` (0%로 안 채움, FR-006).
   `onPause={(character) => void acquisition.pause(character)}`.
-- [ ] T018 [US1] `src/vision/acquisition.ts` **무변경 확인** — `git diff --stat main -- src/vision/acquisition.ts`
+- [X] T018 [US1] `src/vision/acquisition.ts` **무변경 확인** — `git diff --stat main -- src/vision/acquisition.ts`
   가 0줄임을 확인. `prepareVision`이 `App.tsx`에서 캐릭터와 동시에 호출돼도 동작하는지
   `__tests__/vision/acquisition.test.ts` 회귀 실행 (FR-027, SC-009).
 
