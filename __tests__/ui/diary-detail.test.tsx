@@ -174,14 +174,20 @@ describe("012 — 걸음·배터리·연결이 상세 화면에 없다 (contract
  * 017 — 사진 표시 (User Story 1, FR-001~003).
  *
  * 계약: specs/017-diary-body-screen/contracts/photo-preservation.md P6
+ *
+ * **025 — 격자에서 가로 슬라이더로 바뀌었다**(025 FR-001, contracts/
+ * photo-gallery.md C19·C26~C28). 아래 케이스의 의도(사진이 이미지로 뜬다 /
+ * 옛 일기는 영역이 없다 / 사본 실패는 그 한 장만 대체)는 그대로이며, 슬라이더
+ * 문맥에서도 성립함을 확인한다. 슬라이더·갤러리 자체의 상세 계약은
+ * `photo-gallery.test.tsx`에 있다.
  */
-describe("017 — 사진 표시 (FR-001~003)", () => {
+describe("017 — 사진 표시 (FR-001~003, 025 슬라이더 문맥)", () => {
   const photos = [
     { photoId: "a", takenAt: new Date("2026-08-16T08:00:00"), resizedPath: "/resized/a.jpg" },
     { photoId: "b", takenAt: new Date("2026-08-16T14:00:00"), resizedPath: "/resized/b.jpg" },
   ];
 
-  it("entry.photos가 있으면 그 사진들이 이미지로 렌더된다", async () => {
+  it("C26 — entry.photos가 있으면 그 사진들이 이미지로 렌더된다", async () => {
     await render(<DiaryDetailScreen entry={{ ...entryFor(), photos }} />);
 
     const images = screen.getAllByTestId("diary-photo");
@@ -191,20 +197,21 @@ describe("017 — 사진 표시 (FR-001~003)", () => {
     expect(sources).toContain("file:///resized/b.jpg");
   });
 
-  it("entry.photos가 없으면(옛 일기) 사진 표시 영역 없이 기존 텍스트만 렌더된다 (회귀)", async () => {
+  it("C27 — entry.photos가 없으면(옛 일기) 슬라이더 영역 없이 기존 텍스트만 렌더된다 (회귀)", async () => {
     await render(<DiaryDetailScreen entry={entryFor()} />);
 
     expect(screen.queryAllByTestId("diary-photo")).toHaveLength(0);
+    expect(screen.queryByTestId("photo-slider-position")).toBeNull();
     expect(screen.getByText(/^사진: /)).toBeTruthy();
   });
 
-  it("사진을 못 불러오면(onError) 그 사진 자리에 '이제 없다' 문구가 뜨고 나머지는 정상 렌더된다 (P6)", async () => {
+  it("C28 — 사진을 못 불러오면(onError) 그 자리에 '이제 없다', 나머지는 정상 (P6)", async () => {
     await render(<DiaryDetailScreen entry={{ ...entryFor(), photos }} />);
 
     const images = screen.getAllByTestId("diary-photo");
     expect(images).toHaveLength(2);
 
-    fireEvent(images[0], "onError");
+    await fireEvent(images[0], "error");
 
     expect(await screen.findByText(/이 사진은 이제 없다/)).toBeTruthy();
     // 나머지 한 장은 여전히 이미지로 남아 있다.
