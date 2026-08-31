@@ -42,14 +42,17 @@ function readinessWith(
 }
 
 async function renderList(options: {
-  active?: DownloadProgress | null;
+  /** 단수·복수·null 다 받는다 — 026에서 active가 배열이 됐다 */
+  active?: DownloadProgress | DownloadProgress[] | null;
   rejection?: DownloadRejection | null;
   readiness?: Record<Character, ModelReadiness>;
-  onPause?: () => void;
+  onPause?: (character: Character) => void;
   onPrepare?: (character: Character) => void;
   onDismissNotice?: () => void;
 }) {
-  const view = resolveDownloadView(options.active ?? null, options.rejection ?? null);
+  const activeArray =
+    options.active == null ? [] : Array.isArray(options.active) ? options.active : [options.active];
+  const view = resolveDownloadView(activeArray, options.rejection ?? null);
 
   await render(
     <CharacterListScreen
@@ -193,6 +196,51 @@ describe("진행 표시 (FR-008·009·017)", () => {
   });
 });
 
+/* ─────────────── 026 — 여러 캐릭터 동시 진행 표시 (US1) ─────────────── */
+
+describe("동시 다운로드 표시 (026 FR-005)", () => {
+  it("여러 줄에 동시에 진행률과 멈추기가 보인다", async () => {
+    await renderList({
+      active: [
+        { character: "quiet", fraction: 0.3 },
+        { character: "narrative", fraction: 0.7 },
+      ],
+    });
+
+    expect(screen.getByTestId("character-row-quiet")).toHaveTextContent(/30%/);
+    expect(screen.getByTestId("character-row-narrative")).toHaveTextContent(/70%/);
+    expect(screen.getByTestId("pause-quiet")).toBeTruthy();
+    expect(screen.getByTestId("pause-narrative")).toBeTruthy();
+  });
+
+  it("멈추기가 어느 캐릭터인지 인자로 넘긴다", async () => {
+    const onPause = jest.fn();
+    await renderList({
+      active: [
+        { character: "quiet", fraction: 0.3 },
+        { character: "narrative", fraction: 0.7 },
+      ],
+      onPause,
+    });
+
+    await userEvent.press(screen.getByTestId("pause-narrative"));
+
+    expect(onPause).toHaveBeenCalledWith("narrative");
+  });
+
+  it("받는 중이 아닌 줄에는 멈추기가 없다 (동시 다운로드 중에도)", async () => {
+    await renderList({
+      active: [
+        { character: "quiet", fraction: 0.3 },
+        { character: "narrative", fraction: 0.7 },
+      ],
+    });
+
+    expect(screen.queryByTestId("pause-english")).toBeNull();
+    expect(screen.getByTestId("character-row-english")).toHaveTextContent(/받아야 함/);
+  });
+});
+
 /* ─────────────── 탭에서 돌아왔을 때 (US3, FR-013) ─────────────── */
 
 describe("되찾은 진행 상태 (FR-013)", () => {
@@ -276,7 +324,7 @@ describe("011 — 사진 보는 모델 줄", () => {
     readiness: Object.fromEntries(
       CHARACTERS.map((c) => [c, { kind: "not-downloaded" } as ModelReadiness]),
     ) as Record<Character, ModelReadiness>,
-    view: { active: null, notice: null },
+    view: { active: [], notice: null },
     onPrepare: () => {},
     onPause: () => {},
     onRemove: () => {},

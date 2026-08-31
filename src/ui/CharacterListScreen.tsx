@@ -46,7 +46,8 @@ export type CharacterListProps = {
   /** 캐릭터별 저장 공간. 비어 있으면 표시하지 않는다 */
   usage?: StorageUsage[];
   onPrepare: (character: Character) => void;
-  onPause: () => void;
+  /** 멈춘다. **026 — 어느 캐릭터를 멈출지 인자로 받는다** (동시 다운로드) */
+  onPause: (character: Character) => void;
   onRemove: (character: Character) => void;
   /** 거부 안내를 닫는다 (008 FR-005) */
   onDismissNotice: () => void;
@@ -179,7 +180,10 @@ export function CharacterListScreen(props: CharacterListProps) {
         // **`view.active`만 본다**(008 FR-010). `view.notice`는 이 판정에 관여하지
         // 않으므로, **거부당한 줄이 받는 중으로 보이는 일도 받는 중인 줄이 거부로
         // 지워지는 일도 없다.**
-        const busy = view.active?.character === character;
+        //
+        // **026 — `active`가 배열이다.** 여러 줄이 동시에 받는 중일 수 있다.
+        const inFlight = view.active.find((p) => p.character === character);
+        const busy = inFlight !== undefined;
         const bytes = usage?.find((u) => u.character === character)?.bytes ?? 0;
 
         return (
@@ -196,19 +200,19 @@ export function CharacterListScreen(props: CharacterListProps) {
                 상태를 바꾸지 않았으므로 「받아야 함」이던 것은 그대로 「받아야 함」이다.
               */}
               <Text style={styles.status}>
-                {busy && view.active ? progressText(view.active.fraction) : statusText(state)}
+                {inFlight ? progressText(inFlight.fraction) : statusText(state)}
               </Text>
               {/* 저장 공간은 **캐릭터 단위**로만 보인다(FR-028a) */}
               {bytes > 0 && <Text style={styles.usage}>{formatBytes(bytes)}</Text>}
             </View>
 
             {busy ? (
-              // **멈추기는 받는 중인 줄에만 있다**(008 FR-011). 한 번에 하나뿐이므로
-              // (003 FR-020) 무엇이 멈추는지 사용자에게도 분명하다.
+              // **멈추기는 받는 중인 줄에만 있다**(008 FR-011). 026 — 여러 줄이 동시에
+              // 이 버튼을 가질 수 있으므로, **어느 캐릭터를 멈출지 인자로 넘긴다**.
               <TouchableOpacity
                 accessibilityRole="button"
                 testID={`pause-${character}`}
-                onPress={onPause}
+                onPress={() => onPause(character)}
                 style={styles.button}
               >
                 <Text>멈추기</Text>

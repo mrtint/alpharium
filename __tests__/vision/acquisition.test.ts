@@ -93,7 +93,7 @@ function makePorts(options: Options = {}) {
           async pause() {},
         };
       },
-      resume(key, _state, onProgress) {
+      resume(key, _url, _state, onProgress) {
         return this.start(key, "", onProgress);
       },
     },

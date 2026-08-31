@@ -107,8 +107,8 @@ function harness(
       created.push(key);
       return makeTask(onProgress);
     },
-    resume(key, _state, onProgress) {
-      requested.push({ key, url: "", resumed: true });
+    resume(key, url, _state, onProgress) {
+      requested.push({ key, url, resumed: true });
       return makeTask(onProgress);
     },
   };
@@ -241,11 +241,10 @@ describe("내려받기", () => {
     });
   });
 
-  // A15~A17 — 한 번에 하나 (FR-020, FR-020a, SC-013)
-  //
-  // 첫 요청을 문(gate)으로 붙잡아 "받는 중"을 만든 뒤 둘째를 넣는다. 문을 열기 전에는
-  // 첫 요청이 끝나지 않으므로 둘이 실제로 겹친다.
-  describe("한 번에 하나", () => {
+  // A13 — 026: "한 번에 하나"가 해제됐다. `busy` 갈래는 유지되나(FR-028) 의미가
+  // "같은 캐릭터 중복"으로 좁아진다(FR-003). 003의 옛 "다른 캐릭터 → busy"는
+  // "이제 둘 다 시작"으로 갱신한다.
+  describe("동시 내려받기 (026, A13)", () => {
     function gated(h: ReturnType<typeof harness>) {
       let open: () => void = () => {};
       const gate = new Promise<void>((resolve) => (open = resolve));
@@ -265,16 +264,31 @@ describe("내려받기", () => {
       return { acq: createAcquisition({ ...h.ports, download }), open: () => open() };
     }
 
-    it("받는 중에 다른 캐릭터를 요청하면 거부되고 무엇을 받는 중인지 알려준다", async () => {
+    it("서로 다른 캐릭터는 동시에 받는다 (더 이상 busy 거부가 아니다)", async () => {
       const h = harness();
       const { acq, open } = gated(h);
 
       const first = acq.prepare("quiet");
-      const second = await acq.prepare("narrative");
+      const second = acq.prepare("narrative");
 
-      expect(second.ok).toBe(false);
-      if (!second.ok && second.failure.kind === "busy") {
-        expect(second.failure.busyWith).toBe("quiet");
+      // 둘 다 시작한다 — 두 번째가 즉시 거부되지 않는다.
+      expect(acq.busyWith().sort()).toEqual(["narrative", "quiet"]);
+
+      open();
+      expect((await first).ok).toBe(true);
+      expect((await second).ok).toBe(true);
+    });
+
+    it("같은 캐릭터를 다시 요청하면 거부되고 그 캐릭터 자신을 알려준다 (FR-003)", async () => {
+      const h = harness();
+      const { acq, open } = gated(h);
+
+      const first = acq.prepare("quiet");
+      const dup = await acq.prepare("quiet");
+
+      expect(dup.ok).toBe(false);
+      if (!dup.ok && dup.failure.kind === "busy") {
+        expect(dup.failure.busyWith).toBe("quiet");
       } else {
         throw new Error("busy 실패가 아니다");
       }
@@ -283,30 +297,100 @@ describe("내려받기", () => {
       await first;
     });
 
-    // A16 — 앞의 것이 조용히 취소되지 않는다
-    it("거부되어도 받던 것은 계속된다", async () => {
+    it("한 캐릭터를 멈춰도 다른 캐릭터는 계속된다 (FR-004)", async () => {
       const h = harness();
       const { acq, open } = gated(h);
 
       const first = acq.prepare("quiet");
-      await acq.prepare("narrative");
-      expect(acq.busyWith()).toBe("quiet");
+      const second = acq.prepare("narrative");
+      expect(acq.busyWith().sort()).toEqual(["narrative", "quiet"]);
+
+      await acq.pause("quiet");
+      // narrative는 여전히 받는 중
+      expect(acq.busyWith()).toContain("narrative");
 
       open();
-      expect((await first).ok).toBe(true);
+      await first;
+      expect((await second).ok).toBe(true);
     });
 
-    // A17 — 거부만 있고 빠져나갈 길이 없으면 사용자가 갇힌다
-    it("받던 것이 끝나면 새 요청이 통한다", async () => {
+    it("busyWith()가 받는 중인 전부를 배열로 준다 (A3)", async () => {
+      const h = harness();
+      const { acq, open } = gated(h);
+
+      acq.prepare("quiet");
+      acq.prepare("narrative");
+      acq.prepare("english");
+
+      expect(acq.busyWith().sort()).toEqual(["english", "narrative", "quiet"]);
+      open();
+    });
+
+    it("받던 것이 끝나면 그 캐릭터가 busyWith에서 빠진다 (finally, A7)", async () => {
       const h = harness();
       const acq = createAcquisition(h.ports);
 
       await acq.prepare("quiet");
-      expect(acq.busyWith()).toBeNull();
+      expect(acq.busyWith()).toEqual([]);
+    });
 
-      expect((await acq.prepare("narrative")).ok).toBe(true);
+    it("같은 캐릭터도 끝난 뒤에는 다시 받을 수 있다", async () => {
+      const h = harness();
+      const acq = createAcquisition(h.ports);
+
+      await acq.prepare("quiet");
+      expect((await acq.prepare("quiet")).ok).toBe(true);
     });
   });
+
+  // A6 — 026: 동시 공간 판정은 이미 받는 중인 것들의 남은 용량을 여유에서 뺀다 (FR-007).
+  it("동시 다운로드에서 공간 판정이 받는 중인 것들의 남은 용량을 뺀다", async () => {
+    const asset1 = assetFor("quiet");
+    const asset2 = assetFor("narrative");
+    const orig1 = asset1.expectedBytes;
+    const orig2 = asset2.expectedBytes;
+    Object.assign(asset1, { expectedBytes: 1000 });
+    Object.assign(asset2, { expectedBytes: 1000 });
+    try {
+      // 여유는 1500 * HEADROOM 만큼 — quiet 하나는 되지만, quiet가 받는 중이면
+      // 그 남은 1000을 빼고 나면 narrative가 안 된다.
+      let releaseQuiet: () => void = () => {};
+      const quietDone = new Promise<void>((r) => (releaseQuiet = r));
+      const h = harness({ available: Math.ceil(1500 * SPACE_HEADROOM) });
+      const download: DownloadPort = {
+        start(key, _url, _onProgress) {
+          return {
+            async wait(): Promise<TransferOutcome> {
+              // quiet는 붙잡아 둔다(받는 중). narrative는 여기 오지 않는다
+              // (공간 판정에서 거부되므로) — 오면 그 자체가 실패 증거다.
+              if (key === assetFor("quiet").key) await quietDone;
+              return { kind: "completed" };
+            },
+            async pause() {},
+          };
+        },
+        resume: h.ports.download.resume,
+      };
+      const acq = createAcquisition({ ...h.ports, download });
+
+      // quiet를 시작해 "받는 중"으로 만든다. prepare의 동기 구간이 running.set을
+      // 먼저 실행하므로, 그 뒤 이벤트 루프를 한 바퀴 돌려 space check까지 진행시킨다.
+      const quiet = acq.prepare("quiet");
+      await new Promise((r) => setTimeout(r, 0));
+      expect(acq.busyWith()).toContain("quiet");
+
+      const second = await acq.prepare("narrative");
+
+      expect(second.ok).toBe(false);
+      if (!second.ok) expect(second.failure.kind).toBe("insufficient-space");
+
+      releaseQuiet();
+      await quiet;
+    } finally {
+      Object.assign(asset1, { expectedBytes: orig1 });
+      Object.assign(asset2, { expectedBytes: orig2 });
+    }
+  }, 10000);
 
   // A8 / A9 — 처음부터 다시 받지 않는다 (FR-015, SC-006)
   it("중단 정보가 있으면 이어받는다", async () => {
@@ -320,6 +404,33 @@ describe("내려받기", () => {
     expect(h.requested[0].resumed).toBe(true);
   });
 
+  // A9 — 026: 세그먼트 재개 상태가 있으면 그것을 resume에 넘긴다 (FR-022).
+  it("세그먼트 재개 상태가 있으면 이어받으며 그 상태를 넘긴다", async () => {
+    const key = assetFor("quiet").key;
+    const resume = {
+      assetKey: key,
+      totalBytes: 1000,
+      segmentCount: 4,
+      receivedBytes: [250, 0, 0, 0],
+    };
+    const h = harness({
+      metadata: JSON.stringify({ verdicts: [], paused: [], segmented: [resume] }),
+    });
+    const passed: unknown[] = [];
+    const download: DownloadPort = {
+      start: h.ports.download.start,
+      resume(k, url, state, onProgress) {
+        passed.push(state);
+        return h.ports.download.resume(k, url, state, onProgress);
+      },
+    };
+
+    await createAcquisition({ ...h.ports, download }).prepare("quiet");
+
+    expect(h.requested[0].resumed).toBe(true);
+    expect(passed[0]).toMatchObject({ segmentCount: 4 });
+  });
+
   // A7 — 멈추면 이어받을 수 있는 상태로 남는다 (FR-014)
   it("멈추면 중단 상태가 기기에 남는다", async () => {
     const h = harness();
@@ -329,6 +440,43 @@ describe("내려받기", () => {
 
     const state = await readState(h.metadataPort);
     expect(state.paused).toHaveLength(1);
+  });
+
+  // A10 — 026: pause 시 outcome.state에 segmentCount가 있으면 withSegmentedResume,
+  // 없으면 withPaused (data-model.md 상태 전이).
+  it("멈춘 것이 세그먼트면 segmented에, 아니면 paused에 남는다", async () => {
+    // 세그먼트 outcome
+    const hSeg = harness({
+      outcome: undefined,
+    });
+    // makeTask는 paused 시 { at: 1 }을 준다 — 세그먼트를 흉내 내려면 별도 download 대역
+    const key = assetFor("quiet").key;
+    const download: DownloadPort = {
+      start(k, url, onProgress) {
+        hSeg.ports.download.start(k, url, onProgress);
+        return {
+          async wait(): Promise<TransferOutcome> {
+            return {
+              kind: "paused",
+              state: {
+                assetKey: key,
+                totalBytes: 1000,
+                segmentCount: 4,
+                receivedBytes: [500, 0, 0, 0],
+              },
+            };
+          },
+          async pause() {},
+        };
+      },
+      resume: hSeg.ports.download.resume,
+    };
+
+    await createAcquisition({ ...hSeg.ports, download }).prepare("quiet");
+
+    const state = await readState(hSeg.metadataPort);
+    expect(state.segmented).toHaveLength(1);
+    expect(state.paused).toHaveLength(0);
   });
 
   // A10 / A11 — 실패가 "받았음"이 아니다 (FR-017, FR-018)

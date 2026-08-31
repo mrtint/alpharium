@@ -15,6 +15,7 @@
  */
 
 import type { FileFacts } from "./port";
+import type { SegmentedResume } from "./segmented/types";
 import type { AssetKey, ModelReadiness, PausedDownload, VerificationVerdict } from "./types";
 
 /**
@@ -36,6 +37,13 @@ export type ReadinessInput = {
   verdict: VerificationVerdict | null;
   /** 중단된 내려받기. 없으면 null */
   paused: PausedDownload | null;
+  /**
+   * 세그먼트 재개 상태. 없으면 null (026).
+   *
+   * `paused`와 상호배타 — 한 자산은 둘 중 하나만 갖는다. 있으면 `partial` +
+   * `resumable: true`로 판정된다(FR-023).
+   */
+  segmentedResume?: SegmentedResume | null;
   /** 부분 파일이 남아 있는가. 앱이 갑자기 죽으면 중단 정보 없이 이것만 남는다 */
   hasPartialFile: boolean;
 };
@@ -70,6 +78,11 @@ export function readinessOf(input: ReadinessInput): ModelReadiness {
     if (paused !== null) {
       return { kind: "partial", reason: REASON.interrupted, resumable: true };
     }
+    // 026 — 세그먼트 재개 상태가 있으면 이어받을 수 있다(FR-023). `paused`와 상호배타라
+    // 순서는 무관하지만 방어적으로 `paused`를 먼저 본다.
+    if (input.segmentedResume != null) {
+      return { kind: "partial", reason: REASON.interrupted, resumable: true };
+    }
     if (hasPartialFile) {
       // 앱이 갑자기 죽어 savable()을 부르지 못한 경우(research.md §1).
       // 이어받을 수는 없지만 '받지 않음'도 아니다 — 지울 것이 남아 있다.
@@ -85,7 +98,14 @@ export function readinessOf(input: ReadinessInput): ModelReadiness {
   // 견주면 모든 파일이 영원히 '받다 말았음'이 된다 — 없는 기준으로 판정하지 않는다.
   const hasSizeBaseline = input.expectedBytes > 0;
   if (hasSizeBaseline && file.bytes !== input.expectedBytes) {
-    return { kind: "partial", reason: REASON.incomplete, resumable: paused !== null };
+    // 026 — 세그먼트 병렬 다운로드는 각 구간을 파일 오프셋에 흩어 쓰므로, 절반쯤
+    // 받았어도 파일 크기가 이미 기준 근처일 수 있다(가장 높은 오프셋까지 늘어난다).
+    // 그래서 `paused`뿐 아니라 `segmentedResume`가 있어도 이어받을 수 있다(FR-023).
+    return {
+      kind: "partial",
+      reason: REASON.incomplete,
+      resumable: paused !== null || input.segmentedResume != null,
+    };
   }
 
   // 4. 검증한 기록이 없다 (FR-021c).

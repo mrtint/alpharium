@@ -11,6 +11,7 @@
  * 낫다 — 상태를 물을 때 한 번만 읽으면 되고, 그것이 SC-016에 맞는다.
  */
 
+import type { SegmentedResume } from "./segmented/types";
 import type { MetadataPort, ModelFilePort } from "./port";
 import type { AssetKey, PausedDownload, VerificationVerdict } from "./types";
 
@@ -18,13 +19,22 @@ import type { AssetKey, PausedDownload, VerificationVerdict } from "./types";
  * 기기에 남는 것 전부.
  *
  * **모델 파일 자체는 여기 없다** — 이것은 그 파일들에 대해 아는 것이다.
+ *
+ * **`segmented`는 026이 더한 자리다** (data-model.md 「ModelState」). 세그먼트 병렬
+ * 다운로드가 멈추면 각 구간의 받은 바이트가 여기 남아 재개의 근거가 된다. `paused`
+ * (단일 스트림 재개)와 **한 자산당 상호배타** — `withSegmentedResume`가 같은 키를
+ * `paused`에서 빼고, `withPaused`가 `segmented`에서 뺀다.
+ *
+ * **`storage.ts`는 `segmented/plan.ts`를 import하지 않는다** — 타입만 가져온다.
+ * 재개 계획 계산은 `acquisition.ts`·`expo-port.ts`가 `plan.ts`를 불러 한다.
  */
 export type ModelState = {
   verdicts: VerificationVerdict[];
   paused: PausedDownload[];
+  segmented: SegmentedResume[];
 };
 
-const EMPTY: ModelState = { verdicts: [], paused: [] };
+const EMPTY: ModelState = { verdicts: [], paused: [], segmented: [] };
 
 /**
  * 메타데이터를 읽는다.
@@ -43,6 +53,9 @@ export async function readState(metadata: MetadataPort): Promise<ModelState> {
     return {
       verdicts: Array.isArray(parsed.verdicts) ? parsed.verdicts : [],
       paused: Array.isArray(parsed.paused) ? parsed.paused : [],
+      // **옛 `state.json`에 `segmented` 키가 없어도 안전** — 없거나 깨지면 빈 배열.
+      // 003의 다른 필드와 동형이며 마이그레이션이 필요 없다(data-model.md).
+      segmented: Array.isArray(parsed.segmented) ? parsed.segmented : [],
     };
   } catch {
     return EMPTY;
@@ -70,6 +83,11 @@ export function pausedFor(state: ModelState, key: AssetKey): PausedDownload | nu
   return state.paused.find((entry) => entry.assetKey === key) ?? null;
 }
 
+/** 이 자산의 세그먼트 재개 상태. 없으면 null (026) */
+export function segmentedFor(state: ModelState, key: AssetKey): SegmentedResume | null {
+  return state.segmented.find((entry) => entry.assetKey === key) ?? null;
+}
+
 /** 검증 결과를 갈아 끼운다. 한 자산에 결과는 하나다. */
 export function withVerdict(state: ModelState, verdict: VerificationVerdict): ModelState {
   return {
@@ -78,11 +96,38 @@ export function withVerdict(state: ModelState, verdict: VerificationVerdict): Mo
   };
 }
 
-/** 중단 상태를 갈아 끼운다. 한 자산에 하나다. */
+/**
+ * 중단 상태를 갈아 끼운다. 한 자산에 하나다.
+ *
+ * **같은 자산의 세그먼트 재개 상태를 함께 제거한다** (026, 상호배타) — 한 자산은
+ * `paused`나 `segmented` 중 한 곳에만 있는다.
+ */
 export function withPaused(state: ModelState, entry: PausedDownload): ModelState {
   return {
     ...state,
     paused: [...state.paused.filter((p) => p.assetKey !== entry.assetKey), entry],
+    segmented: state.segmented.filter((s) => s.assetKey !== entry.assetKey),
+  };
+}
+
+/**
+ * 세그먼트 재개 상태를 갈아 끼운다. 한 자산에 하나다 (026).
+ *
+ * **같은 자산의 단일 스트림 중단 상태를 함께 제거한다** (상호배타).
+ */
+export function withSegmentedResume(state: ModelState, entry: SegmentedResume): ModelState {
+  return {
+    ...state,
+    segmented: [...state.segmented.filter((s) => s.assetKey !== entry.assetKey), entry],
+    paused: state.paused.filter((p) => p.assetKey !== entry.assetKey),
+  };
+}
+
+/** 세그먼트 재개 상태만 걷어낸다 (026). */
+export function withoutSegmented(state: ModelState, key: AssetKey): ModelState {
+  return {
+    ...state,
+    segmented: state.segmented.filter((s) => s.assetKey !== key),
   };
 }
 
@@ -96,6 +141,8 @@ export function withoutAsset(state: ModelState, key: AssetKey): ModelState {
   return {
     verdicts: state.verdicts.filter((verdict) => verdict.assetKey !== key),
     paused: state.paused.filter((entry) => entry.assetKey !== key),
+    // 026 — 세그먼트 재개 상태도 함께 지운다. 다 받았거나 다시 시작하면 유효하지 않다.
+    segmented: state.segmented.filter((entry) => entry.assetKey !== key),
   };
 }
 

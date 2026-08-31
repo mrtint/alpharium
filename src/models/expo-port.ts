@@ -21,10 +21,14 @@ import type {
   MetadataPort,
   ModelFilePort,
   ModelPorts,
+  RangeFetchPort,
+  RangeOutcome,
   TransferHandle,
   TransferOutcome,
   TransferProgress,
 } from "./port";
+import { runSegmented } from "./segmented/transfer";
+import type { RangeSupport, Segment, SegmentedResume } from "./segmented/types";
 import type { AssetKey } from "./types";
 
 /** 모델이 놓이는 디렉터리 이름. 002의 `diary/`와 나란한 자리다 */
@@ -43,10 +47,10 @@ const fileNameFor = (key: AssetKey) => `${key}.bin`;
 const partialNameFor = (key: AssetKey) => `${key}.bin.part`;
 
 async function openDirectory() {
-  const { Directory, File, Paths } = await import("expo-file-system");
+  const { Directory, File, FileMode, Paths } = await import("expo-file-system");
   const dir = new Directory(Paths.document, DIRECTORY);
   if (!dir.exists) dir.create({ intermediates: true });
-  return { dir, File, Paths };
+  return { dir, File, FileMode, Paths };
 }
 
 export function expoModelFilePort(): ModelFilePort {
@@ -143,7 +147,118 @@ export function expoDiskSpacePort(): DiskSpacePort {
  * 부를 기회가 없고, 그때는 부분 파일만 남아 `partial`이되 이어받을 수 없는 상태가 된다 —
  * 그것도 판정이 구분한다.
  */
-export function expoDownloadPort(): DownloadPort {
+/**
+ * 개발 전용 강제 폴백 스위치 (026 SC-004, quickstart Q3·Q4).
+ *
+ * `__DEV__ && globalThis.__FORCE_DOWNLOAD_FALLBACK__`가 참이면 `probeRange`를 부르지
+ * 않고 곧바로 `unsupported`로 취급해 단일 스트림 경로를 탄다. 프로덕션 번들에서는
+ * `__DEV__`가 거짓이라 이 분기가 트리셰이킹된다. 개발자 탭이나 콘솔에서 플래그를
+ * 토글해 세그먼트 켬/끔 대조(Q3)와 폴백 완주(Q4)를 같은 앱에서 확인한다.
+ *
+ * **이 스위치는 `probeRange` 결과만 가로챈다** — 세그먼트 코어(`runSegmented`)와 순수
+ * 함수는 이 플래그를 모른다.
+ */
+function forcedFallback(): boolean {
+  return (
+    typeof __DEV__ !== "undefined" &&
+    __DEV__ &&
+    (globalThis as { __FORCE_DOWNLOAD_FALLBACK__?: boolean }).__FORCE_DOWNLOAD_FALLBACK__ === true
+  );
+}
+
+/**
+ * 세그먼트 병렬 수신 통로 (026).
+ *
+ * **`Character`를 모른다** — `AssetKey`만. `fileNameFor(key)`로 파일 이름을 만든다(003과 동일).
+ *
+ * **부분 쓰기는 멱등이다** — 받은 청크를 `segment.start` 오프셋부터 이어 쓰고, 앱이 죽으면
+ * 이미 쓰인 바이트는 남는다. 재개 시 `receivedBytes`가 저장돼 있으면 그 지점부터, 없으면
+ * 다시 받아 덮어쓴다.
+ */
+export function expoRangeFetchPort(): RangeFetchPort {
+  return {
+    async probeRange(url: string): Promise<RangeSupport> {
+      if (forcedFallback()) return { kind: "unsupported" };
+      try {
+        // `Range: bytes=0-0`으로 한 바이트만 요청해 서버 지원을 본다. `fetch`가
+        // 리다이렉트를 따라가므로 최종 응답 헤더를 본다.
+        const res = await fetch(url, { headers: { Range: "bytes=0-0" } });
+        const acceptRanges = res.headers.get("accept-ranges");
+        const contentRange = res.headers.get("content-range");
+        // 206 + Content-Range: bytes 0-0/<total> 이면 확실히 지원.
+        if (res.status === 206 && contentRange) {
+          const match = /\/(\d+)\s*$/.exec(contentRange);
+          const total = match ? Number(match[1]) : NaN;
+          if (Number.isFinite(total) && total > 0) return { kind: "supported", totalBytes: total };
+        }
+        // 200이지만 Accept-Ranges: bytes + Content-Length가 있으면 지원으로 본다.
+        if (acceptRanges === "bytes") {
+          const len = Number(res.headers.get("content-length"));
+          if (Number.isFinite(len) && len > 0) return { kind: "supported", totalBytes: len };
+        }
+        // 애매하면 지어내지 않는다 (원칙 V).
+        return { kind: "unsupported" };
+      } catch {
+        return { kind: "unsupported" };
+      }
+    },
+
+    async fetchRange(
+      key: AssetKey,
+      url: string,
+      segment: Segment,
+      onBytes: (delta: number) => void,
+      signal?: AbortSignal,
+    ): Promise<RangeOutcome> {
+      const { dir, File, FileMode } = await openDirectory();
+      const target = new File(dir, fileNameFor(key));
+      if (!target.exists) target.create();
+
+      // 파일 핸들을 열어 `offset`을 이 구간의 시작으로 옮긴 뒤 받은 청크를 이어 쓴다
+      // (expo-file-system 57 `File.open()` → `FileHandle`, T-Q0 실측 확인 대상).
+      const handle = target.open(FileMode.ReadWrite);
+      handle.offset = segment.start;
+      try {
+        const res = await fetch(url, {
+          headers: { Range: `bytes=${segment.start}-${segment.end}` },
+          signal,
+        });
+        if (!res.ok && res.status !== 206) {
+          return { kind: "failed", reason: `HTTP ${res.status}` };
+        }
+        if (!res.body) {
+          const buf = new Uint8Array(await res.arrayBuffer());
+          handle.writeBytes(buf);
+          onBytes(buf.byteLength);
+          return { kind: "completed" };
+        }
+
+        // 스트림으로 받아 이어 쓴다 — 구간 전체를 메모리에 담지 않는다.
+        const reader = res.body.getReader();
+        for (;;) {
+          if (signal?.aborted) {
+            await reader.cancel().catch(() => {});
+            return { kind: "aborted" };
+          }
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value && value.byteLength > 0) {
+            handle.writeBytes(value);
+            onBytes(value.byteLength);
+          }
+        }
+        return { kind: "completed" };
+      } catch (error) {
+        if (signal?.aborted) return { kind: "aborted" };
+        return { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
+      } finally {
+        handle.close();
+      }
+    },
+  };
+}
+
+export function expoDownloadPort(range: RangeFetchPort = expoRangeFetchPort()): DownloadPort {
   const wrap = (
     createTask: () => Promise<{
       task: {
@@ -186,19 +301,106 @@ export function expoDownloadPort(): DownloadPort {
     };
   };
 
+  /**
+   * `runSegmented`의 `fraction`을 003 `TransferProgress` 모양으로 되돌린다.
+   *
+   * `acquisition.ts`의 `fractionOf`가 그대로 동작하도록 — `totalBytes`를 그대로 넘기고
+   * `bytesWritten`을 `fraction * total`로 재구성한다. **세그먼트 코어는 바이트를 모른
+   * 채 `fraction`만 냈고**(원칙 III), 이 어댑터가 경계에서 다시 바이트로 바꾼다.
+   */
+  const wrapProgress =
+    (total: number, onProgress: (p: TransferProgress) => void) => (fraction: number | null) => {
+      if (fraction === null) {
+        onProgress({ bytesWritten: 0, totalBytes: -1 });
+        return;
+      }
+      onProgress({ bytesWritten: Math.round(fraction * total), totalBytes: total });
+    };
+
+  /**
+   * 세그먼트/폴백 어느 쪽이든 하나의 `TransferHandle`로 감싼다.
+   *
+   * 세그먼트를 먼저 시도하고, `{ fallback }`이면 003의 `createDownloadTask` 경로로.
+   */
+  const segmentedOrFallback = (
+    key: AssetKey,
+    url: string,
+    onProgress: (p: TransferProgress) => void,
+    resume?: SegmentedResume,
+  ): TransferHandle => {
+    let pending: Promise<TransferOutcome> | null = null;
+    const pauseCtl = new AbortController();
+    let fallbackHandle: TransferHandle | null = null;
+
+    const run = async (): Promise<TransferOutcome> => {
+      // `runSegmented`가 `onSizeResolved`로 전체 크기를 알려주면 그때부터 003의
+      // `TransferProgress { bytesWritten, totalBytes }` 모양을 정확히 복원한다.
+      // 그 전까지는 `fraction`을 그대로 흘려보낸다(003의 `fractionOf`가 total<=0을
+      // "모름"으로 다루므로 안전).
+      let total = resume?.totalBytes ?? 0;
+      const result = await runSegmented({ range }, key, url, {
+        onProgress: (f) => {
+          if (total > 0) {
+            wrapProgress(total, onProgress)(f);
+          } else {
+            onProgress({ bytesWritten: 0, totalBytes: -1 });
+          }
+        },
+        onSizeResolved: (t) => {
+          total = t;
+        },
+        pauseSignal: pauseCtl.signal,
+        resume,
+      });
+
+      if (result.kind === "fallback") {
+        // 003의 단일 스트림 경로.
+        fallbackHandle = plainDownload(key, url, onProgress);
+        return fallbackHandle.wait();
+      }
+      if (result.kind === "completed") return { kind: "completed" };
+      if (result.kind === "failed") return { kind: "failed", reason: result.reason };
+      // paused — SegmentedResume를 003의 unknown state 자리에 담는다.
+      return { kind: "paused", state: result.resume };
+    };
+
+    return {
+      wait() {
+        pending ??= run();
+        return pending;
+      },
+      async pause() {
+        if (fallbackHandle) {
+          await fallbackHandle.pause();
+          return;
+        }
+        pauseCtl.abort();
+      },
+    };
+  };
+
+  /** 003의 단일 스트림 다운로드 (폴백 경로). */
+  const plainDownload = (key: AssetKey, url: string, onProgress: (p: TransferProgress) => void) =>
+    wrap(async () => {
+      const { dir, File } = await openDirectory();
+      const target = new File(dir, fileNameFor(key));
+      const task = File.createDownloadTask(url, target, {
+        onProgress: (p: TransferProgress) => onProgress(p),
+      });
+      return { task: task as never, run: () => task.downloadAsync() };
+    });
+
   return {
     start(key, url, onProgress) {
-      return wrap(async () => {
-        const { dir, File } = await openDirectory();
-        const target = new File(dir, fileNameFor(key));
-        const task = File.createDownloadTask(url, target, {
-          onProgress: (p: TransferProgress) => onProgress(p),
-        });
-        return { task: task as never, run: () => task.downloadAsync() };
-      });
+      return segmentedOrFallback(key, url, onProgress);
     },
 
-    resume(key, state, onProgress) {
+    resume(key, url, state, onProgress) {
+      // 026 — 세그먼트 재개 상태면 세그먼트 경로로, 003의 불투명 값이면 단일 스트림
+      // 이어받기로 (contracts/segmented-transfer.md 「resume」).
+      if (isSegmentedResume(state)) {
+        return segmentedOrFallback(key, url, onProgress, state);
+      }
       return wrap(async () => {
         const { DownloadTask } = await import("expo-file-system");
         void key;
@@ -209,6 +411,17 @@ export function expoDownloadPort(): DownloadPort {
       });
     },
   };
+}
+
+/** `resume`의 `state`가 026의 `SegmentedResume`인지 본다 (003의 불투명 값과 구분). */
+function isSegmentedResume(state: unknown): state is SegmentedResume {
+  return (
+    typeof state === "object" &&
+    state !== null &&
+    "segmentCount" in state &&
+    "receivedBytes" in state &&
+    Array.isArray((state as { receivedBytes: unknown }).receivedBytes)
+  );
 }
 
 /** 실기기에서 쓰는 통로 묶음. 테스트는 이것을 쓰지 않고 대역을 넣는다. */
@@ -233,10 +446,12 @@ export async function modelFilePath(key: AssetKey): Promise<string> {
 }
 
 export function expoModelPorts(): ModelPorts {
+  const range = expoRangeFetchPort();
   return {
     files: expoModelFilePort(),
     metadata: expoMetadataPort(),
     disk: expoDiskSpacePort(),
-    download: expoDownloadPort(),
+    download: expoDownloadPort(range),
+    range,
   };
 }

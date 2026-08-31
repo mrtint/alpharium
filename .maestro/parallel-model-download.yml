@@ -1,0 +1,128 @@
+# 실기기 자동 테스트 — 모델 병렬·동시 내려받기 (026)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **이 흐름이 026의 US1(P1)을 본다.** 003 FR-020의 "한 번에 하나"가 해제됐으므로,
+# 서로 다른 캐릭터 둘을 연달아 눌러 **둘 다 받는 중**이 되고, 하나를 멈춰도 다른
+# 하나가 계속되며, 탭을 왕복해도 둘 다 복원되는지 본다.
+#
+# 검증 항목 (quickstart.md Q1·Q2):
+#   FR-001·002   서로 다른 캐릭터를 동시에 받는다 (거부 안내가 안 뜬다)
+#   FR-004       ★ 하나를 멈춰도 다른 하나는 계속된다
+#   FR-005       여러 줄에 동시에 진행 표시·멈추기가 보인다
+#   FR-006       탭 왕복 후 받는 중인 것 전부의 표시가 복원된다
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **⚠️ 실제 내려받기가 있어야 의미가 있다.** 아래 조건부 블록은 「받는 중」이 화면에
+# 있을 때만 안쪽이 돈다 — **받는 중이 아니면 SKIPPED로 지나가며, 건너뛴 것은 통과가
+# 아니다**(원칙 V). 그때는 quickstart.md Q1·Q2를 손으로 확인한다.
+#
+# **여기서 자동화하지 않는 것** — quickstart.md Q3·Q4·Q5:
+#   세그먼트 병렬 속도 대조     — adb logcat의 Range 요청·벽시계 시간. 사람이 확인
+#   HF CDN이 Range를 유지하나  — 리다이렉트 후 헤더. 사람이 확인
+#   세그먼트 이어받기          — state.json의 receivedBytes·재개 시 남은 Range. 사람이 확인
+#   폴백 완주                  — probeRange 강제 unsupported. 사람이 확인
+#
+# ⚠️ **부분 문자열은 정규식으로 준다** — Maestro 기본 매칭은 텍스트 노드 전체와
+# 맞춰 본다(007 실측). ⚠️ **`childOf`로 줄 안 버튼을 좁힐 수 없다** — 버튼마다
+# `action-*`·`pause-*` testID를 따로 준다(008 실측). ⚠️ **여러 텍스트 조각이 한
+# `<Text>`면 testID가 접근성 트리에 안 뜬다** — 위치 표시류는 `accessibilityLabel`
+# 필요(025 실측).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# 온보딩이 뜨면 전부 건너뛴다 (021 — 새 설치 시 온보딩이 먼저).
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-.*"
+    commands:
+      - repeat:
+          times: 8
+          commands:
+            - tapOn:
+                text: "건너뛰기"
+                optional: true
+      - tapOn:
+          text: "시작하기"
+          optional: true
+
+# 캐릭터 탭으로. 첫 화면은 일기다(006 FR-009).
+- tapOn: "캐릭터"
+
+# **스크롤해서 찾는다**: dev 빌드에서는 목록이 아래로 밀린다.
+- scrollUntilVisible:
+    element: "english"
+    direction: DOWN
+
+# ─────────────────────────────────────────────────────────────────────────────
+# **아직 받지 않은 둘**(`english`·`chinese`)을 쓴다. 「쓸 수 있음」인 줄의 버튼은
+# 「지우기」이므로 받는 중으로 만들 수 없다(008 실측). 이 둘이 이미 준비돼 있으면
+# 이 흐름은 SKIPPED가 아니라 FAILED로 드러나며 — quickstart Q1·Q2를 손으로
+# 확인한다(원칙 V).
+# ─────────────────────────────────────────────────────────────────────────────
+- tapOn:
+    id: "action-english"
+
+# 곧바로 **다른 캐릭터**도 누른다 — 026에서는 이것이 거부되지 않아야 한다.
+- scrollUntilVisible:
+    element: "chinese"
+    direction: DOWN
+- tapOn:
+    id: "action-chinese"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 여기서부터는 **둘 다 받는 중일 때만** 참이다.
+# ─────────────────────────────────────────────────────────────────────────────
+- runFlow:
+    when:
+      visible: ".*받는 중.*"
+    commands:
+      # ── FR-001 — 거부 안내가 뜨지 않는다 (003의 옛 동작과 반대) ──
+      - assertNotVisible:
+          id: "download-notice"
+
+      # ── FR-005 — 두 줄에 동시에 멈추기가 보인다 ──
+      - scrollUntilVisible:
+          element: "english"
+          direction: UP
+      - assertVisible:
+          id: "pause-english"
+      - scrollUntilVisible:
+          element: "chinese"
+          direction: DOWN
+      - assertVisible:
+          id: "pause-chinese"
+
+      # ── ★ FR-004 — english만 멈춘다. chinese는 계속. ──
+      - scrollUntilVisible:
+          element: "english"
+          direction: UP
+      - tapOn:
+          id: "pause-english"
+      # chinese는 여전히 받는 중 (멈추기 버튼이 남아 있다).
+      - scrollUntilVisible:
+          element: "chinese"
+          direction: DOWN
+      - assertVisible:
+          id: "pause-chinese"
+
+      # ── FR-006 — 탭을 왕복해도 chinese가 여전히 받는 중으로 보인다 ──
+      - tapOn: "일기"
+      - tapOn: "캐릭터"
+      - scrollUntilVisible:
+          element: "chinese"
+          direction: DOWN
+      - assertVisible:
+          id: "pause-chinese"
+
+      # ── 원칙 III — 안내·목록에 모델 정보가 없다 ──
+      - assertNotVisible: "kanana"
+      - assertNotVisible: "exaone"
+      - assertNotVisible: "gguf"
+      - assertNotVisible: "Q4"
+
+      # 멈춰 둔다 — 다음 실행에 GB 내려받기가 이어지지 않게.
+      - tapOn:
+          id: "pause-chinese"

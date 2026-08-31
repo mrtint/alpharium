@@ -109,6 +109,13 @@ const FLOWS = [
   // ⚠️ **가로 스와이프 갱신·순환 없음·회전 유지(FR-015a)·집합 일치(SC-003)는
   // 여기 없다** — 사람이 quickstart.md §2에서 확인한다(원칙 V).
   ".maestro/diary-photo-gallery.yml",
+  // 026 — 모델 병렬·동시 내려받기. **캐릭터 두 개를 동시에 받을 수 있는가**,
+  // **하나를 멈춰도 나머지가 계속되는가**, **탭 복귀 시 전부 복원되는가**를 본다.
+  // ⚠️ **핵심 검증(세그먼트 병렬 속도 대조, HF CDN Range 유지, 세그먼트 이어받기,
+  // 폴백 완주)은 여기 없다** — adb logcat·state.json·probeRange 강제 조작이
+  // 필요하다. quickstart.md Q0~Q6를 손으로 확인한다. **건너뛴 것은 통과가
+  // 아니다**(원칙 V).
+  ".maestro/parallel-model-download.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

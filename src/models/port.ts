@@ -12,6 +12,7 @@
  * 놓았다.
  */
 
+import type { RangeSupport, Segment } from "./segmented/types";
 import type { AssetKey } from "./types";
 
 /* ──────────────────────────── 파일 ──────────────────────────── */
@@ -112,12 +113,72 @@ export interface DownloadPort {
     onProgress: (progress: TransferProgress) => void,
   ): TransferHandle;
 
-  /** 보관해 둔 상태에서 이어받는다(FR-015, FR-016) */
+  /**
+   * 보관해 둔 상태에서 이어받는다(FR-015, FR-016).
+   *
+   * **026이 `url`을 인자에 더했다** — 세그먼트 재개는 로스터 주소를 다시 필요로 한다
+   * (단일 스트림 재개는 `savable()` 안에 주소가 있었지만, 세그먼트는 우리가 만든
+   * `SegmentedResume`이고 주소를 담지 않는다). `acquisition.ts`가 `assetFor(character).url`을
+   * 넘긴다. **`src/vision/acquisition.ts`는 `resume()`을 부르지 않으므로 FR-027 무영향**
+   * (`start()`만 쓴다).
+   *
+   * `state`에는 003의 `DownloadPauseState`(직렬화된 불투명 값) 또는 026의
+   * `SegmentedResume`가 담긴다 — 타입이 `unknown`이라 안 깨진다. `expo-port.ts`가
+   * `"segmentCount" in state`로 갈라 알맞은 경로를 탄다.
+   */
   resume(
     key: AssetKey,
+    url: string,
     state: unknown,
     onProgress: (progress: TransferProgress) => void,
   ): TransferHandle;
+}
+
+/* ─────────────────────────── 구간 요청 (026) ─────────────────────────── */
+
+/**
+ * 한 구간의 수신 결과.
+ *
+ * `aborted`는 다른 구간 실패로 취소됐거나 사용자가 멈춘 것 — 실패가 아니다.
+ */
+export type RangeOutcome =
+  { kind: "completed" } | { kind: "failed"; reason: string } | { kind: "aborted" };
+
+/**
+ * HTTP 구간 요청으로 파일 하나를 여러 조각으로 받는 통로 (026).
+ *
+ * **`Character`를 모른다** — `AssetKey`만 받는다. `expo-port.ts`가 파일 이름을
+ * `fileNameFor(key)`로 만든다(003과 동일).
+ *
+ * 순수 계획(`segmented/plan.ts`)과 조립(`segmented/transfer.ts`)이 이 통로를 주입받아
+ * 쓴다. 기기에 닿는 것은 이 인터페이스의 구현 하나뿐이다.
+ */
+export interface RangeFetchPort {
+  /**
+   * 서버가 구간 요청을 지원하는지 본다.
+   *
+   * HEAD 또는 `Range: bytes=0-0` 요청 → `Accept-Ranges: bytes` + 유효한 크기.
+   * 리다이렉트를 따라간 최종 응답을 본다. **애매하면 `{ kind: "unsupported" }`**
+   * (원칙 V — 모르는 것을 "지원함"으로 지어내지 않는다).
+   */
+  probeRange(url: string): Promise<RangeSupport>;
+
+  /**
+   * 한 구간을 받아 파일의 `segment.start` 오프셋에 쓴다.
+   *
+   * `onBytes(delta)`로 이 구간이 방금 받은 바이트 **증분**을 보고한다. `AbortSignal`로
+   * 취소 가능(다른 구간 실패 시 호출자가 취소).
+   *
+   * **부분 쓰기는 멱등이다** — 받은 만큼을 오프셋에 쓰고, 앱이 죽으면 이미 쓰인
+   * 바이트는 남는다. `receivedBytes`가 저장 안 됐으면 재개 시 다시 받아 덮어쓴다.
+   */
+  fetchRange(
+    key: AssetKey,
+    url: string,
+    segment: Segment,
+    onBytes: (delta: number) => void,
+    signal?: AbortSignal,
+  ): Promise<RangeOutcome>;
 }
 
 /* ──────────────────────────── 묶음 ──────────────────────────── */
@@ -128,4 +189,6 @@ export type ModelPorts = {
   metadata: MetadataPort;
   disk: DiskSpacePort;
   download: DownloadPort;
+  /** 026 — 세그먼트 병렬 수신. `expo-port.ts`가 `download` 뒤에서 이 통로를 쓴다 */
+  range: RangeFetchPort;
 };
