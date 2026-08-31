@@ -98,7 +98,14 @@ export function readinessOf(input: ReadinessInput): ModelReadiness {
   // 견주면 모든 파일이 영원히 '받다 말았음'이 된다 — 없는 기준으로 판정하지 않는다.
   const hasSizeBaseline = input.expectedBytes > 0;
   if (hasSizeBaseline && file.bytes !== input.expectedBytes) {
-    return { kind: "partial", reason: REASON.incomplete, resumable: paused !== null };
+    // 026 — 세그먼트 병렬 다운로드는 각 구간을 파일 오프셋에 흩어 쓰므로, 절반쯤
+    // 받았어도 파일 크기가 이미 기준 근처일 수 있다(가장 높은 오프셋까지 늘어난다).
+    // 그래서 `paused`뿐 아니라 `segmentedResume`가 있어도 이어받을 수 있다(FR-023).
+    return {
+      kind: "partial",
+      reason: REASON.incomplete,
+      resumable: paused !== null || input.segmentedResume != null,
+    };
   }
 
   // 4. 검증한 기록이 없다 (FR-021c).

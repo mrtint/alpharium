@@ -60,6 +60,25 @@ describe("준비 상태 판정", () => {
     if (state.kind === "partial") expect(state.resumable).toBe(true);
   });
 
+  // 026 — 세그먼트 병렬은 오프셋에 흩어 쓰므로 파일 크기가 이미 기준 근처일 수 있다.
+  // 그때도 segmentedResume가 있으면 이어받을 수 있어야 한다 (FR-023, 실기기에서 발견).
+  it("파일이 존재하고 크기가 어긋나도 세그먼트 재개 상태가 있으면 이어받을 수 있다", () => {
+    const state = readinessOf({
+      ...READY,
+      file: { exists: true, bytes: 800 }, // expectedBytes 1000과 다름
+      verdict: null,
+      paused: null,
+      segmentedResume: {
+        assetKey: "a1",
+        totalBytes: 1000,
+        segmentCount: 4,
+        receivedBytes: [200, 200, 200, 0],
+      },
+    });
+    expect(state.kind).toBe("partial");
+    if (state.kind === "partial") expect(state.resumable).toBe(true);
+  });
+
   // 026 — 재개 상태 없이 부분 파일만이면 resumable: false (FR-026)
   it("세그먼트 재개 상태 없이 부분 파일만이면 이어받을 수 없다", () => {
     const state = readinessOf({

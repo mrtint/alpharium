@@ -35,6 +35,16 @@ export type SegmentedOptions = {
   resume?: SegmentedResume;
   /** 구간별 바이트를 합친 진행률 하나. 모르면 null (003 fractionOf와 동형) */
   onProgress: (fraction: number | null) => void;
+  /**
+   * 전체 크기가 정해진 순간 1회 호출된다 (`probeRange` 성공 또는 `resume`에서).
+   *
+   * **기기 통로(`expo-port.ts`)가 003의 `TransferProgress { bytesWritten, totalBytes }`
+   * 모양을 복원하는 데 쓴다** — 003의 `fractionOf`가 그대로 동작하려면 실제 total이
+   * 필요하다. 순수 코어 자체는 이 값을 진행률 계산에만 쓰고 밖으로 흘리지 않는다
+   * (원칙 III — `onProgress`는 여전히 `fraction` 하나뿐). 폴백 경로에서는 호출되지
+   * 않는다(호출자가 003 `createDownloadTask`의 진행 보고를 그대로 받는다).
+   */
+  onSizeResolved?: (totalBytes: number) => void;
   /** 사용자 "멈추기" */
   pauseSignal: AbortSignal;
 };
@@ -74,6 +84,9 @@ export async function runSegmented(
     segmentsToFetch = plan.segments;
     receivedBytes = plan.segments.map(() => 0);
   }
+
+  // 전체 크기가 정해졌다 — 기기 통로가 003 진행 보고 모양을 복원하는 데 쓴다.
+  opts.onSizeResolved?.(totalBytes);
 
   // 재개인데 남은 구간이 없다 — 이미 다 받았다. 호출자가 곧바로 지문 검증으로.
   if (segmentsToFetch.length === 0) {

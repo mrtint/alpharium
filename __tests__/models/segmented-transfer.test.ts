@@ -194,6 +194,55 @@ it("C13 — resume 주입 시 남은 구간만 fetchRange 호출", async () => {
   expect(seg2.start).toBe(segmentSize * 2 + segmentSize / 2);
 });
 
+/* ───────────────────── onSizeResolved — 기기 통로가 total을 얻는다 (F1 fix) ───────────────────── */
+
+it("onSizeResolved가 probeRange 성공 후 전체 크기로 1회 호출된다", async () => {
+  const total = MIN_SEGMENT_BYTES * 8;
+  const r = fakeRange({ support: "supported", totalBytes: total });
+  const sizes: number[] = [];
+
+  await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: () => {},
+    onSizeResolved: (t) => sizes.push(t),
+    pauseSignal: noAbort,
+  });
+
+  expect(sizes).toEqual([total]);
+});
+
+it("onSizeResolved가 재개 시 저장된 totalBytes로 호출된다", async () => {
+  const total = MIN_SEGMENT_BYTES * 8;
+  const r = fakeRange({ support: "supported", totalBytes: total });
+  const sizes: number[] = [];
+
+  await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: () => {},
+    onSizeResolved: (t) => sizes.push(t),
+    pauseSignal: noAbort,
+    resume: {
+      assetKey: "a1",
+      totalBytes: total,
+      segmentCount: 4,
+      receivedBytes: [0, 0, 0, 0],
+    },
+  });
+
+  expect(sizes).toEqual([total]);
+});
+
+it("폴백일 때는 onSizeResolved가 호출되지 않는다", async () => {
+  const r = fakeRange({ support: "unsupported" });
+  const sizes: number[] = [];
+
+  await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: () => {},
+    onSizeResolved: (t) => sizes.push(t),
+    pauseSignal: noAbort,
+  });
+
+  expect(sizes).toEqual([]);
+});
+
 /* ───────────────────── C24 — 병렬 수신 (US2) ───────────────────── */
 
 it("C24 — 모든 구간을 동시에 fetch한다 (순차 아님)", async () => {

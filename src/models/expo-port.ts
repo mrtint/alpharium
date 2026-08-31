@@ -333,15 +333,25 @@ export function expoDownloadPort(range: RangeFetchPort = expoRangeFetchPort()): 
     let fallbackHandle: TransferHandle | null = null;
 
     const run = async (): Promise<TransferOutcome> => {
-      // 폴백일 때 total을 아직 모르므로, probe 결과를 재사용하기 위해 runSegmented가
-      // 내부에서 probe한다. 여기서는 fraction만 받는다.
-      let lastTotal = resume?.totalBytes ?? 0;
+      // `runSegmented`가 `onSizeResolved`로 전체 크기를 알려주면 그때부터 003의
+      // `TransferProgress { bytesWritten, totalBytes }` 모양을 정확히 복원한다.
+      // 그 전까지는 `fraction`을 그대로 흘려보낸다(003의 `fractionOf`가 total<=0을
+      // "모름"으로 다루므로 안전).
+      let total = resume?.totalBytes ?? 0;
       const result = await runSegmented({ range }, key, url, {
-        onProgress: (f) => wrapProgress(lastTotal || 1, onProgress)(f),
+        onProgress: (f) => {
+          if (total > 0) {
+            wrapProgress(total, onProgress)(f);
+          } else {
+            onProgress({ bytesWritten: 0, totalBytes: -1 });
+          }
+        },
+        onSizeResolved: (t) => {
+          total = t;
+        },
         pauseSignal: pauseCtl.signal,
         resume,
       });
-      void lastTotal;
 
       if (result.kind === "fallback") {
         // 003의 단일 스트림 경로.

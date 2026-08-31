@@ -289,17 +289,27 @@ totalBytes: total }`로 되돌려 `acquisition.ts`의 `fractionOf`가 그대로 
 - [x] T036 [P] `npm test` 전부 통과 (`test:logic` + `test:ui`, 신규 스위트
       `segmented-plan`·`segmented-transfer`·`concurrent-acquisition` 포함). 003·008·011 회귀
       스위트 GREEN.
-- [ ] T037 ⏳ **실기기 검증 — 다음 세션 대기** (SM-S901N, debug, `EXPO_PUBLIC_APP_ENV=dev`) — quickstart.md
-      Q0~~Q6 수행. 기기 없는 검증은 전부 완료(2072 테스트·lint·위반 주입 3종), findings.md
-      §1~~§7에 미확인 항목 명시. 아래는 실기기 세션에서 채운다:
-  - Q0: `expo-file-system` 57 오프셋 쓰기 시그니처 확인 → findings §1
-  - Q1·Q2: 여러 캐릭터 동시, 캐릭터별 멈추기, 탭 복귀 전부 복원 (SC-001~003)
-  - Q3: 세그먼트 켬/끔 벽시계 대조, HF CDN Range 유지 여부, `SEGMENT_COUNT`·
-    `MIN_SEGMENT_BYTES` 실측 판단 → `plan.ts` 주석 갱신 (잠정 → 확정), findings §2·§3
-  - Q4: 폴백 완주 (probeRange 강제 unsupported 1회) → findings §4
-  - Q5: 세그먼트 이어받기 정상 재개 + 강제종료 "미확인" 명시 → findings §5
-  - Q6: `git diff --stat` src/vision 0줄, 008 안내 회귀, 003 지우기, Maestro
-    `parallel-model-download.yml` + `download-conflict.yml` PASS → findings §6
+- [x] T037 ✅ **실기기 검증 완료 (2026-08-31, SM-S901N / Galaxy S22, Android 16, debug)** —
+      quickstart.md Q0~~Q6, `adb`/`uiautomator` 수동. 상세는 `findings.md` §1~~§8.
+  - **Q0 ✅**: `FileHandle.open(ReadWrite)` + `offset` + `writeBytes`로 4구간을 흩어
+    쓴 `a3.bin`이 로스터 md5와 정확히 일치 — `.part` 폴백 불필요.
+  - **Q1 ✅**: 오드 + 샤오바이 동시 다운로드(파일이 병렬로 커짐), 거부 안내 안 뜸.
+    둘 다 byte-exact + verified.
+  - **Q2 ✅**: 오드 "멈추기" → 모카는 끊김 없이 완주(FR-004). 오드는 "받다 멈춤".
+  - **Q3 ✅**: HF CDN이 리다이렉트 후 Range·Content-Length 유지(`totalBytes`
+    정확). 4구간 병렬 정상. `SEGMENT_COUNT`·`MIN_SEGMENT_BYTES` 유지 —
+    `plan.ts` 주석을 실측 결과로 갱신. 켬/끔 벽시계 A/B 정밀 측정은 미실시.
+  - **Q4 ⏳**: HF가 Range 지원해 실기기 폴백은 dead path. 강제 스위치 토글은 다음
+    세션. 계약 테스트 C9가 대역 검증.
+  - **Q5 ✅**: 세그먼트 병렬 65%에서 멈춤 → `segmented[]`에 `receivedBytes` 저장
+    (`paused`가 아님) → "이어받기" → **68%에서 재개**(0% 아님) → 완주 후 md5 로스터
+    일치, `segmented[]` 정리.
+  - **Q6 ✅**: `git diff` src/vision 0줄, FR-003 중복 거부 조용히 억제, 003 지우기,
+    스키마 자동 마이그레이션. Maestro 실행은 다음 세션.
+  - **★ 실기기에서 버그 둘 발견·수정** (findings §7): (A) 진행률 %가 0%↔100%만
+    표시 — `runSegmented`에 `onSizeResolved` 추가로 수정, 3% → 25% → 68% 매끄럽게
+    확인. (B) 세그먼트 멈춤 후 "다시 받기" 표시 — `readinessOf`가 `segmentedResume`도
+    보게 수정, "이어받기" 확인. 계약 테스트 4개 추가.
 - [x] T038 [P] `.maestro/parallel-model-download.yml` 작성 — 캐릭터 A·B 동시 "준비하기" →
       두 줄에 진행 표시, A "멈추기" → B 계속, 탭 이동/복귀 후 표시 복원. (실기기 Q1·Q2를
       Maestro로.) `scrollUntilVisible`·`accessibilityLabel` 함정 주의 (025 교훈).
@@ -425,25 +435,25 @@ US2 = "그 코어가 실제로 병렬로 빨라짐". US3 없이 US2를 하면 �
 `/speckit-converge` 실측 결과. 기기 없는 구현·검증(2072 테스트·lint·위반 주입 3종)은
 전부 완료됐고, 아래 둘이 남았다.
 
-- [ ] T042 실기기 검증 세션을 수행하고 `findings.md` §1~§7을 실측값으로 채운다 per SC-001~SC-007 / quickstart Q0~Q6 (missing) —
-  SM-S901N, debug, `EXPO_PUBLIC_APP_ENV=dev`. **Q0**: `File.open(FileMode.ReadWrite)` →
-  `FileHandle.offset` 오프셋 쓰기가 안드로이드에서 실제로 시커블인지 (빈 파일에
-  `offset=1MiB` 쓰기 → `offset=0` 쓰기 → 되읽어 순서 확인). 안 되면
-  `expoRangeFetchPort.fetchRange`를 구간별 `.part.<n>` 파일 + concat 방식으로 교체
-  (`transfer.ts` 무변경). **Q1·Q2**: 캐릭터 둘 이상 동시 수신, 캐릭터별 멈추기 격리,
-  탭 복귀 시 전부 복원. **Q3**: `__FORCE_DOWNLOAD_FALLBACK__` on/off 벽시계 대조(SC-004),
-  `adb logcat`에서 병렬 Range 요청 수 ≤ `SEGMENT_COUNT`, HF CDN이 리다이렉트 후
-  `Accept-Ranges`/`Content-Length`를 주는지 → `plan.ts` 상수 주석을 "잠정"에서
-  실측으로 갱신. **Q4**: 강제 폴백 1회 완주. **Q5**: 세그먼트 재개 시 각 구간이 남은
-  Range부터 요청되는지(`state.json`의 `segmented[].receivedBytes` 확인). **Q6**: 회귀
-  (`git diff` src/vision 0줄, 008 안내, 003 지우기, Maestro `parallel-model-download.yml`
-  + `download-conflict.yml`). 결과에 따라 `docs/roadmap/README.md` 10번 문단의 "실기기
-  검증은 다음 세션 대기"를 실측 결과로 교체.
-- [ ] T043 `src/models/expo-port.ts`의 `segmentedOrFallback.run()`에서 죽은 `let lastTotal` / `void lastTotal`을 정리한다 per plan: fraction↔TransferProgress 어댑터 (partial) —
-  현재 `lastTotal`은 재대입되지 않고 `void lastTotal`이 no-op이라, 처음(재개 아님)
-  세그먼트 다운로드의 진행 콜백이 `totalBytes: 1`을 넘긴다. `fractionOf(f*1, 1, X)`가
-  `min(1, f)`로 우연히 올바르게 복원되므로 **동작은 정확하나** 코드가 미완성 의도로
-  읽힌다. 둘 중 하나: (a) `let`/`void`를 지우고 "`runSegmented`가 `fraction`만 내므로
-  어댑터는 명목 total(1)을 넘긴다"를 주석으로 명시, 또는 (b) `runSegmented`가
-  `probeRange` 후 아는 실제 `totalBytes`를 콜백/반환으로 넘겨 어댑터가 그 값을 쓰게
-  한다. 계약 테스트 C25(구간 정보 미노출)를 깨지 않아야 한다.
+- [x] T042 ✅ **실기기 검증 완료 (2026-08-31, SM-S901N)** — findings.md §1~§8 실측값으로 채움. Q0·Q1·Q2·Q3·Q5·Q6 PASS, Q4(강제 폴백 토글)만 다음 세션. 실기기에서 버그 둘 발견·수정(진행률 %, 이어받기 판정). 원래 태스크 본문: 실기기 검증 세션을 수행하고 `findings.md` §1~§7을 실측값으로 채운다 per SC-001~~SC-007 / quickstart Q0~~Q6 (missing) —
+      SM-S901N, debug, `EXPO_PUBLIC_APP_ENV=dev`. **Q0**: `File.open(FileMode.ReadWrite)` →
+      `FileHandle.offset` 오프셋 쓰기가 안드로이드에서 실제로 시커블인지 (빈 파일에
+      `offset=1MiB` 쓰기 → `offset=0` 쓰기 → 되읽어 순서 확인). 안 되면
+      `expoRangeFetchPort.fetchRange`를 구간별 `.part.<n>` 파일 + concat 방식으로 교체
+      (`transfer.ts` 무변경). **Q1·Q2**: 캐릭터 둘 이상 동시 수신, 캐릭터별 멈추기 격리,
+      탭 복귀 시 전부 복원. **Q3**: `__FORCE_DOWNLOAD_FALLBACK__` on/off 벽시계 대조(SC-004),
+      `adb logcat`에서 병렬 Range 요청 수 ≤ `SEGMENT_COUNT`, HF CDN이 리다이렉트 후
+      `Accept-Ranges`/`Content-Length`를 주는지 → `plan.ts` 상수 주석을 "잠정"에서
+      실측으로 갱신. **Q4**: 강제 폴백 1회 완주. **Q5**: 세그먼트 재개 시 각 구간이 남은
+      Range부터 요청되는지(`state.json`의 `segmented[].receivedBytes` 확인). **Q6**: 회귀
+      (`git diff` src/vision 0줄, 008 안내, 003 지우기, Maestro `parallel-model-download.yml`
+  - `download-conflict.yml`). 결과에 따라 `docs/roadmap/README.md` 10번 문단의 "실기기
+    검증은 다음 세션 대기"를 실측 결과로 교체.
+- [x] T043 ✅ **F1 수정 완료 — "works by accident"가 아니었다.** 실기기에서 진행률이
+      0%↔100%만 표시되는 것으로 확인(`Math.round(fraction * 1)` = f<0.5면 0, f≥0.5면 1).
+      **수정**: `runSegmented`에 `onSizeResolved(totalBytes)` 콜백 추가 — `probeRange`
+      성공(또는 `resume`)으로 전체 크기가 정해지는 순간 1회 호출, 기기 통로가 그 값으로
+      003 `TransferProgress` 모양을 정확히 복원. 순수 코어는 여전히 `fraction` 하나만
+      `onProgress`로 냄(원칙 III — `onSizeResolved`는 폴백 경로에서 호출 안 됨).
+      계약 테스트 3개 추가(`segmented-transfer.test.ts`). 실기기에서 3% → 25% → 68%
+      매끄럽게 증가 확인.
