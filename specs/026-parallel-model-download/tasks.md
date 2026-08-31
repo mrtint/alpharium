@@ -417,3 +417,33 @@ US2 = "그 코어가 실제로 병렬로 빨라짐". US3 없이 US2를 하면 �
 - 새 네이티브 모듈 없음 → debug 실기기 1회로 충분, release 재확인 불필요 (012 기준).
 - `expo-file-system` 57 `File` 오프셋 쓰기 시그니처는 T-Q0(실기기)에서 먼저 확인 — 순수
   코어(T004·T005)는 이것과 무관하게 진행 가능, `expoRangeFetchPort`(T022) 전에 확정.
+
+---
+
+## Phase 8: Convergence
+
+`/speckit-converge` 실측 결과. 기기 없는 구현·검증(2072 테스트·lint·위반 주입 3종)은
+전부 완료됐고, 아래 둘이 남았다.
+
+- [ ] T042 실기기 검증 세션을 수행하고 `findings.md` §1~§7을 실측값으로 채운다 per SC-001~SC-007 / quickstart Q0~Q6 (missing) —
+  SM-S901N, debug, `EXPO_PUBLIC_APP_ENV=dev`. **Q0**: `File.open(FileMode.ReadWrite)` →
+  `FileHandle.offset` 오프셋 쓰기가 안드로이드에서 실제로 시커블인지 (빈 파일에
+  `offset=1MiB` 쓰기 → `offset=0` 쓰기 → 되읽어 순서 확인). 안 되면
+  `expoRangeFetchPort.fetchRange`를 구간별 `.part.<n>` 파일 + concat 방식으로 교체
+  (`transfer.ts` 무변경). **Q1·Q2**: 캐릭터 둘 이상 동시 수신, 캐릭터별 멈추기 격리,
+  탭 복귀 시 전부 복원. **Q3**: `__FORCE_DOWNLOAD_FALLBACK__` on/off 벽시계 대조(SC-004),
+  `adb logcat`에서 병렬 Range 요청 수 ≤ `SEGMENT_COUNT`, HF CDN이 리다이렉트 후
+  `Accept-Ranges`/`Content-Length`를 주는지 → `plan.ts` 상수 주석을 "잠정"에서
+  실측으로 갱신. **Q4**: 강제 폴백 1회 완주. **Q5**: 세그먼트 재개 시 각 구간이 남은
+  Range부터 요청되는지(`state.json`의 `segmented[].receivedBytes` 확인). **Q6**: 회귀
+  (`git diff` src/vision 0줄, 008 안내, 003 지우기, Maestro `parallel-model-download.yml`
+  + `download-conflict.yml`). 결과에 따라 `docs/roadmap/README.md` 10번 문단의 "실기기
+  검증은 다음 세션 대기"를 실측 결과로 교체.
+- [ ] T043 `src/models/expo-port.ts`의 `segmentedOrFallback.run()`에서 죽은 `let lastTotal` / `void lastTotal`을 정리한다 per plan: fraction↔TransferProgress 어댑터 (partial) —
+  현재 `lastTotal`은 재대입되지 않고 `void lastTotal`이 no-op이라, 처음(재개 아님)
+  세그먼트 다운로드의 진행 콜백이 `totalBytes: 1`을 넘긴다. `fractionOf(f*1, 1, X)`가
+  `min(1, f)`로 우연히 올바르게 복원되므로 **동작은 정확하나** 코드가 미완성 의도로
+  읽힌다. 둘 중 하나: (a) `let`/`void`를 지우고 "`runSegmented`가 `fraction`만 내므로
+  어댑터는 명목 total(1)을 넘긴다"를 주석으로 명시, 또는 (b) `runSegmented`가
+  `probeRange` 후 아는 실제 `totalBytes`를 콜백/반환으로 넘겨 어댑터가 그 값을 쓰게
+  한다. 계약 테스트 C25(구간 정보 미노출)를 깨지 않아야 한다.
