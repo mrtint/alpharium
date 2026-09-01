@@ -12,11 +12,17 @@
 >     → Metro 없이 실행 → 자동 생성 토글 ON → 잡 등록 → 헤드리스 강제 실행
 >     `No task registered` **부재** + `Worker result SUCCESS`. **SC-004 충족,
 >     코드 0줄** (RH4·RH5 발동 안 함). 024 §9 수정이 release에서도 성립.
-> **남은 것** — T007(합성 하루 — US1·US2용), US1(T010~T013 배터리 예외 소크 —
-> 15분+ 주기), US2(T014~T018 무예외 24h 소크 — **비동기**), T029~T033. SM-S901N,
-> 14번·17번 세션과 함께. **⚠️ 실기기가 release 빌드로 바뀜**(`findings.md`
-> "실기기 상태 정리 메모"). US1·US2는 dev 빌드 재설치가 필요할 수 있음(개발자
-> 탭·`run-as` 필요 시).
+>   - **T025~T027 미발동** — RH3 통과로 조건부 코드 수정 불필요(`git diff
+>     src/` = 0줄). **T030 회귀 불필요** — 코드 0줄, 024 §7이 이미 돌림.
+>   - **T028·T029** 완료(기기 없는 게이트·코드 대조 0줄).
+>   - **T031·T032 부분** — 024 `findings.md` §2·§11 + AGENTS.md 027 절에
+>     US3·US4분 반영 완료. 배터리 소크 문단만 US1·US2 대기.
+> **남은 것 (US1·US2 세션)** — T007(합성 하루), US1(T010~T013 배터리 예외
+> 소크 — 15분+ 주기), US2(T014~T018 무예외 24h 소크 — **비동기**), T031·T032
+> 소크 문단 갱신, T033 최종 커밋. SM-S901N, 로드맵 14·17번 세션과 함께.
+> **⚠️ 실기기가 release 빌드로 바뀜** — dev 빌드 재설치(`npx expo
+> run:android`) + 모델 재배치부터(`a1.bin`만 백업됨). `findings.md` "실기기
+> 상태 정리 메모" 참조.
 
 **Input**: Design documents from `/specs/027-024-residual-verification/`
 
@@ -105,6 +111,8 @@ findings 뼈대 준비.
   14번 세션이 배치.
 - [ ] T007 [P] 사진 없는 합성 하루를 준비한다 — `npm run seed:day -- empty
   <날짜>`(사진 0장이면 `quiet`로 충분, 사진 있는 하루는 027에 불필요).
+  **US1·US2 전용** — US3·US4는 필요 없었다. US1·US2 실기기 세션에서 dev
+  빌드 재설치와 함께.
 - [X] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
   선택(개발자 탭 또는 `adb`로 `preferences/selection.json` 주입).
   **FR-009 — `narrative`는 선택하지 않는다**(로드맵 14번 몫).
@@ -260,18 +268,13 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   (minify OFF)에서 §9 헤드리스 등록·완주 확인 완료. R8 트리셰이킹은 minify가
   켜질 때(로드맵 4번) 재검토"로 갱신(data-model §3, `dceTrimReproduced:
   false`).
-- [ ] T025 [US4] **RH3 실패 시에만(FR-007, RH4)**: `src/schedule/task.ts`에
-  `AUTO_DIARY_TASK_REGISTERED` 명시적 참조 1~3줄 + "제거 불가" 주석을
-  추가한다(research §4 옵션 A). `proguard-rules.pro`·`gradle.properties`·
-  `metro.config.js`는 건드리지 않는다(FR-008).
-- [ ] T026 [US4] **T025 수행 시에만(RH5)**: `__tests__/schedule/background-generation.test.ts`
-  B1a를 확장한다 — R-DCE 방어 구문이 `src/schedule/task.ts` 소스에 있는지
-  `readFileSync` 검사(007·009·012 관례). **위반 주입**: 그 참조 구문을
-  지우면 테스트가 실패함을 실제로 확인 후 되돌린다. `npm run test:logic`·
-  `npm run lint` 통과.
-- [ ] T027 [US4] **T025 수행 시에만**: release를 재빌드하고 T022~T023을
-  재실행해 `No task registered` 부재를 확인한다. `findings.md` §11에
-  `fixApplied` 기록(data-model §3).
+- [-] T025 [US4] ~~RH3 실패 시에만(FR-007, RH4)~~ — **미발동.** US4 RH3가
+  통과했다(`No task registered` 부재 + `Worker result SUCCESS`,
+  `dceTrimReproduced: false`). `task.ts` 수정 불필요. `git diff src/` = 0줄.
+- [-] T026 [US4] ~~T025 수행 시에만(RH5)~~ — **미발동** (T025 미수행).
+  계약 테스트 추가 없음.
+- [-] T027 [US4] ~~T025 수행 시에만~~ — **미발동** (T025 미수행). release
+  재빌드 없음.
 
 **Checkpoint**: release 헤드리스 등록·완주 확인 — 기본 경로면 코드 0줄,
 실패 경로면 최소 수정 + 계약 테스트 + release 재확인.
@@ -292,11 +295,10 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   `__tests__/schedule/background-generation.test.ts`만. 새 `src/` 파일 0·
   새 화면 0·새 `*-port.ts` 0·새 `preferences/*.json` 0·새 네이티브 모듈 0·
   새 진단 패널 0·빌드 설정 파일 0.
-- [ ] T030 회귀를 확인한다(quickstart §5) — **코드 변경이 없으면 형식적**
-  (024 §7이 이미 돌림). **T025로 `task.ts`를 고쳤으면 필수**:
-  `npm run test:device`로 020·021·023 흐름 PASS.
-  ⚠️ `unified-permission-onboarding.yml`은 `pm clear`로 앱 데이터를 날리므로
-  **맨 마지막에**, 또는 이후 T006~T008 재배치.
+- [-] T030 회귀를 확인한다(quickstart §5) — **불필요.** 027은 코드 변경
+  0줄(T025 미발동)이고 024 §7이 020·021·023 흐름을 이미 돌렸다. 새 실패가
+  날 소스 변경이 없다. (US1·US2 세션에서 dev 빌드 재설치 후 형식적으로
+  한 번 돌리는 것은 무방하나 판정에 불필요.)
 - [~] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7). **US3·US4분
   완료** (2026-09-01) — §2 절에 삼성 One UI 화면 경로(027 US3) 기록 + "이관"
   포인터, §11에 "잔여 위험 닫힘" 절(027 US4) 추가, 상단 배너·"남은 것"
