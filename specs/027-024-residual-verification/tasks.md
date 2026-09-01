@@ -1,16 +1,17 @@
 # Tasks: 024 잔여 실측 마무리
 
-> **진행 상태(2026-09-01, `/speckit-implement`)**: 기기 없는 부분 완료.
-> **끝난 것** — Setup 5개(T001~T005), Foundational 중 T009(배터리 인텐트
-> 액션 소스 특정), Polish 중 T028(기기 없는 게이트 — `test:logic` 87스위트/
-> 1749테스트 통과, lint 0 error, 헌법 검사 위반 0, prettier 클린). `findings.md`
-> 뼈대 + §0(코드/설정 사전 확인) 작성.
-> **남은 것(전부 실기기·사람 수행)** — T006~T008(모델·합성 하루·캐릭터 배치),
-> US1(T010~T013 배터리 예외 소크), US2(T014~T018 무예외 24h 소크 — **비동기,
-> 24h+ 방치 필요**), US3(T019~T021 삼성 One UI 화면), US4(T022~T027 release
-> 헤드리스 — **서명 키 전제**), T029~T033(대조·회귀·findings/AGENTS·커밋).
-> SM-S901N 무선, 14번 세션과 함께. quickstart.md 절차대로 수행 후 findings.md
-> 표를 채운다. **코드 변경은 US4 RH3 실패 시에만**(T025~T027).
+> **진행 상태(2026-09-01)**:
+> - **`/speckit-implement` (기기 없음)** — Setup 5개(T001~T005), T009(배터리
+>   인텐트 액션 소스 특정), T028(기기 없는 게이트 통과). `findings.md` 뼈대 + §0.
+> - **실기기 1차 시도 (US3·US4 착수)** — T006(모델 이미 배치됨 확인)·T008
+>   (캐릭터 `english`→`quiet`) 완료. **US3·US4는 Metro 번들 서빙 불가로 미착수**
+>   — 앱이 "Loading from localhost:8081..."에 정지, Metro(~21h 실행) 번들
+>   엔드포인트 4분+ 무응답. `findings.md` §0b 참조. 다음 세션에서 Metro
+>   `--clear` 재시작 후 재개.
+> **남은 것** — T007(합성 하루 — US4엔 불필요), US1(T010~T013 배터리 예외 소크),
+> US2(T014~T018 무예외 24h 소크 — **비동기**), US3(T019~T021 삼성 One UI 화면),
+> US4(T022~T027 release 헤드리스 — **서명 키 있음 확인됨**), T029~T033. SM-S901N,
+> 14번·17번 세션과 함께. **코드 변경은 US4 RH3 실패 시에만**(T025~T027).
 
 **Input**: Design documents from `/specs/027-024-residual-verification/`
 
@@ -92,14 +93,14 @@ findings 뼈대 준비.
 **Purpose**: 실기기 라운드가 공통으로 의존하는 준비. **코드 작업 없음** —
 전부 기기 준비.
 
-- [ ] T006 공통 실기기 준비 — 검증용 `quiet` 모델을 배치한다(quickstart
+- [X] T006 공통 실기기 준비 — 검증용 `quiet` 모델을 배치한다(quickstart
   "공통 실기기 준비", **FR-009 — quiet만, narrative 제외**): 개발 기계에서
   `a1.bin`(kanana) 받아 `run-as com.anonymous.alpharium`로 `files/models/`에
   배치 + `state.json`에 `passed:true` verdict(021 D2 방식). `narrative`·VLM은
   14번 세션이 배치.
 - [ ] T007 [P] 사진 없는 합성 하루를 준비한다 — `npm run seed:day -- empty
   <날짜>`(사진 0장이면 `quiet`로 충분, 사진 있는 하루는 027에 불필요).
-- [ ] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
+- [X] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
   선택(개발자 탭 또는 `adb`로 `preferences/selection.json` 주입).
   **FR-009 — `narrative`는 선택하지 않는다**(로드맵 14번 몫).
 - [X] T009 [P] 소스에서 배터리 버튼의 인텐트 액션을 특정한다(US3 사전

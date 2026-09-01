@@ -87,6 +87,52 @@
 
 ---
 
+## §0b 실기기 세션 1차 시도 (2026-09-01) — Metro 문제로 US3·US4 미착수
+
+**환경**: SM-S901N(`R3CTB084WDP`), Android 16/SDK 36, `deviceLocked=0`, debug
+빌드 설치됨(`DEBUGGABLE` 플래그, `versionName=1.0.0`, lastUpdateTime
+2026-08-31 16:56).
+
+**완료:**
+- **T006** — `files/models/`에 `a1`~`a5` + `v1`·`v2` 존재. `state.json`에
+  `a1`(quiet, `verifiedMd5: d8506380fd1f0fdb8e4318a01b8b8e34`,
+  `verifiedBytes: 1522796768`) `passed: true`. VLM `v1`·`v2`도 `passed: true`.
+  → 검증용 모델 이미 배치됨(별도 배치 불필요).
+- **T008** — `files/preferences/selected-character.json`이 `{"character":"english"}`
+  (모카/gemma3)였다. `{"character":"quiet"}`로 교체. **원래 `english` 값은
+  로드맵 17번(샤오바이·모카 생성 실패) 재현 조건 — 별도 세션에서 되돌려
+  확인.** 그 외 preference 파일: `auto-diary.json`
+  `{"enabled":false,"targetHour":7}`, `vision-setting.json` `{"vision":"quick"}`,
+  `geocoding-setting.json`, `onboarding.json` `{"completed":true,"batteryNoticeShown":false}`.
+
+**T009 실기기 보강** — 설정 탭에 `open-battery-settings` 버튼 존재 확인
+(`resource-id="open-battery-settings"`, `class="android.widget.Button"`,
+`content-desc="배터리 설정 열기"`, `bounds=[60,1718][422,1843]`). 이 버튼이
+`onboardingPorts.battery.openSettingsList()` →
+`IntentLauncher.ActivityAction.IGNORE_BATTERY_OPTIMIZATION_SETTINGS`를 부른다
+(§0 T009 표 확인). **버튼 클릭까지는 못 감** — 아래 참조.
+
+**중단 사유 — Metro 번들 서빙 불가:**
+- 처음 `monkey`로 앱을 열었을 땐 정상 로드(일기 목록 화면 렌더, 탭 4개).
+- `am force-stop` + Maestro `launchApp` 후 재로드에서 **"Loading from
+  localhost:8081..." 오버레이에 영구 정지** (AGENTS.md "Metro 캐시가 스테일이면
+  ... 영구히 머문다" 함정 계열).
+- Metro 프로세스(node PID 17696)가 **2026-08-31 16:52부터 ~21시간 실행**,
+  CPU 77,671초 누적, `expo start --dev-client --clear`로 떴음.
+- `curl http://localhost:8081/index.bundle?platform=android&dev=true&minify=false`
+  가 **4분+ 무응답**(2회 시도 전부 타임아웃). Metro 파일 감시자 스테일 또는
+  번들 그래프 꼬임으로 판단.
+- `EXPO_PUBLIC_APP_ENV=dev`가 이 Metro에 셸에서 주어졌는지 불명(AGENTS.md
+  요구 — 없으면 앱이 `local` 환경 인식).
+- RN Dev Menu의 Reload를 눌러도 "Loading..." 유지.
+
+**다음 세션 조치**: 기존 Metro 종료 →
+`EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`로 새로 띄우고
+(AGENTS.md "도구 사용법" 1번), `adb reverse tcp:8081 tcp:8081` 재설정 후
+US3·US4 진행. (이 세션에서 `adb reverse`는 이미 설정함.)
+
+---
+
 ## §1 배터리 예외 라운드 소크 (US1, SC-001) — 실기기 대기
 
 **측정 방법**: quickstart §1. `deviceidle whitelist +com.anonymous.alpharium`
