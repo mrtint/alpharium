@@ -19,8 +19,10 @@
 1. **코드 변경 0줄이 기본.** 024 SC-007 경계(새 사용자 기능·새 저장 계층·새
    네이티브 모듈·검증 전용 로그 모듈·새 진단 패널 금지)를 계승한다. 실측 중
    **검증을 진행하려면 반드시 고쳐야 하는 결함**(024 §9 계열)만 이 스펙에서
-   고친다 — 그 경우 `src/schedule/`·`android/` 안의 최소 변경에 한하고 계약
-   테스트로 잠근다. 품질·기능 결함은 별도 스펙.
+   고친다 — 그 경우 `src/schedule/task.ts` 1~3줄
+   (`AUTO_DIARY_TASK_REGISTERED` 명시적 참조)에 한하고 계약 테스트로 잠근다.
+   빌드 설정(`proguard-rules.pro`·`gradle.properties`·`metro.config.js`)은
+   건드리지 않는다. 품질·기능 결함은 별도 스펙.
 2. **실기기 검증 3라운드** — SM-S901N(무선 디버깅, debug 빌드)에서 (a) 배터리
    예외 소크(자연 15분+ 주기, `deviceidle whitelist +`, `am get-standby-bucket`
    `5`), (b) 무예외 24시간 소크(**비동기** — 세션 안에서 "시작"만, 세션 밖에서
@@ -63,7 +65,7 @@
 - `cmd jobscheduler run -f`는 삼성 절전이 도즈 중 거부 → 소크의 지연 측정은 자연 주기 대기만 유효. release 헤드리스 확인(US4)에서는 배터리 예외를 부여해 강제 실행이 통하게 한다.
 - release는 `run-as`가 안 된다(`package not debuggable`) → 검증용 `quiet` 모델은 release APK 설치 전 debug로 배치하거나, US4는 "새 날짜 1건 생성 완주"만 본다.
 
-**Scale/Scope**: 코드 변경 예상 규모 — **0줄**(FR-007 결함이 없으면). 결함이 있으면 `src/schedule/task.ts` 또는 `android/app/proguard-rules.pro` 1곳 + 계약 테스트 1스위트. 실기기 라운드 4종(배터리 예외 소크·무예외 24h 소크·삼성 One UI 화면·release 헤드리스). 새 화면·새 파일 0개.
+**Scale/Scope**: 코드 변경 예상 규모 — **0줄**(FR-007 결함이 없으면). 결함이 있으면 `src/schedule/task.ts` 1~3줄(`AUTO_DIARY_TASK_REGISTERED` 명시적 참조) + 계약 테스트 1스위트. 실기기 라운드 4종(배터리 예외 소크·무예외 24h 소크·삼성 One UI 화면·release 헤드리스). 새 화면·새 파일 0개.
 
 ## Constitution Check
 
@@ -108,10 +110,12 @@
     읽어 `findings.md`에 옮긴다.
   - `llama-port.ts`의 `timings` 폐기 경계, `GENERATION_TIMEOUT_MS`의
     `engine.run()` 구간만 재는 방식을 그대로 둔다.
-- **FR-007로 코드를 고치는 경우**(R8이 등록 부수 효과를 제거하면): `task.ts`의
-  등록 구문이 R8에 살아남게 하는 것(명시적 참조 유지 또는 `proguard-rules.pro`
-  `-keep`)은 **채점 코드가 아니다** — 태스크 핸들러 등록이 트리셰이킹되지
-  않게 지키는 것이다. 값·임계값을 코드가 정하지 않는다.
+- **FR-007로 코드를 고치는 경우**(DCE가 등록 부수 효과를 제거하면 — minify는
+  OFF이므로 R8이 아니라 Hermes DCE 또는 Metro `@__PURE__`): `task.ts`의 등록
+  구문이 DCE에 살아남게 하는 것(`AUTO_DIARY_TASK_REGISTERED` 명시적 참조
+  유지)은 **채점 코드가 아니다** — 태스크 핸들러 등록이 트리셰이킹되지 않게
+  지키는 것이다. 값·임계값을 코드가 정하지 않는다. `proguard-rules.pro`는
+  minify OFF에서 무효라 넣지 않는다.
 - **판정**: 통과.
 
 ### 원칙 V — 관측된 사실과 추측을 구분해 기록한다
@@ -130,8 +134,9 @@
 ### 개발 방식 — 계약 먼저, 테스트 먼저
 
 - FR-007로 코드를 고치는 경우에만 계약 테스트가 생긴다 — 그때는 구현·검증
-  전에 쓰고(예: `task.ts`의 R8 방어 구문이 소스에 있는지 검사), 위반 주입으로
-  방어를 확인한다(007~026 공통).
+  전에 쓰고(예: `task.ts`의 R-DCE 방어 구문 = `AUTO_DIARY_TASK_REGISTERED`
+  명시적 참조가 소스에 있는지 검사), 위반 주입으로 방어를 확인한다(007~026
+  공통).
 - 코드 변경이 없으면(기본 경로) 계약 테스트도 없다 — 이 스펙은 검증 마무리다.
 - **판정**: 통과.
 
@@ -166,15 +171,11 @@ specs/027-024-residual-verification/
 ```text
 src/
 └── schedule/
-    └── task.ts                  # 읽기만(§9 수정 확인). FR-007 결함(R8 트리셰이킹) 시에만 최소 변경 — 등록 부수 효과가 살아남게
-
-android/
-└── app/
-    └── proguard-rules.pro       # FR-007 결함 시에만 -keep 규칙 1줄. 기본은 무변경(024 §11 판단 — autolinking이 처리)
+    └── task.ts                  # 읽기만(§9 수정 확인). FR-007 결함(DCE가 등록 부수 효과 제거) 시에만 최소 변경 1~3줄 — AUTO_DIARY_TASK_REGISTERED 명시적 참조(research §4 옵션 A)
 
 __tests__/
 └── schedule/
-    └── background-generation.test.ts  # FR-007로 task.ts를 고치면 B1a 확장(R8 방어 구문 소스 검사) — US4. 기본은 무변경
+    └── background-generation.test.ts  # FR-007로 task.ts를 고치면 B1a 확장(R-DCE 방어 구문 소스 검사) — US4. 기본은 무변경
 
 .maestro/
 ├── scheduled-diary-notification.yml   # 회귀 확인만(020). 무변경 예상
@@ -185,14 +186,20 @@ specs/024-background-stability-exceptions/findings.md  # §2 표·§11 판단·"
 AGENTS.md                                              # 027 절 또는 024 절에 결론 한 문단 (FR-010)
 ```
 
-이 스펙이 **명시적으로 만들지 않는** 것: 새 `src/` 파일, 새 화면, 새
-`*-port.ts`, 새 `preferences/*.json`, 새 네이티브 모듈, 새 진단 패널,
-검증 전용 로그 모듈.
+이 스펙이 **명시적으로 만들지 않거나 건드리지 않는** 것: 새 `src/` 파일, 새
+화면, 새 `*-port.ts`, 새 `preferences/*.json`, 새 네이티브 모듈, 새 진단
+패널, 검증 전용 로그 모듈, **빌드 설정 파일**(`android/gradle.properties`의
+minify 토글, `metro.config.js`, `android/app/proguard-rules.pro`). `android/`는
+`.gitignore`가 무시하는 prebuild 생성물이라 그 안의 편집은 `prebuild --clean`에
+사라진다 — release 관련 영속 변경은 config plugin으로만 하는 것이 레포 관례이며,
+minify를 켜고 proguard 규칙을 넣는 것은 로드맵 4번의 몫이다(research §4 옵션 C
+기각, FR-008).
 
 **Structure Decision**: 단일 프로젝트. 020이 만든 `src/schedule/` 경계와 024가
 고친 `task.ts` 모듈 최상단 `defineTask` 부수 효과를 그대로 쓴다. 코드 변경은
-FR-007 조건부이며, 그 경우도 `task.ts` 1곳 또는 `proguard-rules.pro` 1줄 +
-계약 테스트로 한정한다. 새 디렉터리 없음.
+FR-007 조건부이며, 그 경우도 `src/schedule/task.ts` 1~3줄 + 계약 테스트로
+한정한다(`proguard-rules.pro`는 minify OFF인 현재 무효라 넣지 않는다). 새
+디렉터리 없음.
 
 ## Phase 0 — Research (research.md)
 
@@ -267,26 +274,22 @@ FR-007 조건부이며, 그 경우도 `task.ts` 1곳 또는 `proguard-rules.pro`
    - 조사: 024 §11이 "debug 1회로 충분, R8 잔여 위험은 다음 release 세션 1회로
      닫힘"이라 했다 — 이 세션이 그것. 통과 시 §11을 "닫힘"으로 갱신하는 문안.
 
-4. **R8 side-effect 트리셰이킹 대응** (US4 Scenario 3, FR-007 조건부)
-   - 024 §11의 잔여 위험: R8이 `AUTO_DIARY_TASK_REGISTERED =
-     registerAutoDiaryTask()` 모듈 최상단 실행문을 "결과 미사용 부수 효과"로
-     보고 제거할 이론적 가능성. 024는 "(a) `ensureAutoDiaryTaskDefined()`가
-     상수를 읽어 export하고 (b) `registerAutoDiaryTask()` 안에
-     `TaskManager.defineTask()` 부수 효과가 있어 R8이 보수적으로 유지할
-     것"이라 판단.
-   - **재현되면**(release에서 `No task registered` 나옴): 이건 검증 차단
-     결함(FR-007) — 배포 빌드로 자동 생성이 아예 안 됨. 최소 수정 옵션:
-     (a) `task.ts`에서 `AUTO_DIARY_TASK_REGISTERED`를 명시적으로 참조하는
-     구문 추가(R8이 살아 있는 코드로 봄), (b) `proguard-rules.pro`에
-     `-keep class`/`-keepclassmembers` 규칙(024 관례상 `expo` 커스텀 rule은
-     없으나 이 한 줄은 정당), (c) `/*#__PURE__*/`의 반대 — R8은 이 힌트가
-     없으면 기본적으로 부수 효과를 보수적으로 유지하므로, 오히려 다른 곳에
-     `@__PURE__`가 잘못 붙었는지 확인.
-   - 조사: `android/app/build.gradle`·`proguard-rules.pro`의 현재 minify·R8
-     설정, `metro.config.js`의 트랜스폼 설정(`@__PURE__` 주입 여부).
-   - 어느 옵션이 가장 작은 변경인지 결정하고, 그 변경에 대한 계약 테스트
-     (소스 검사 — R8 방어 구문이 `task.ts` 또는 `proguard-rules.pro`에 있는지)
-     형태를 정한다.
+4. **DCE / 트리셰이킹 대응** (US4 Scenario 3, FR-007 조건부) — **research §4에서
+   해소됨.**
+   - **★ 발견**: `android/app/build.gradle`(69행)이
+     `android.enableMinifyInReleaseBuilds`를 기본 `false`로 두고
+     `android/gradle.properties`에 이 속성이 미설정 → **release에서 R8/minify가
+     꺼져 있다.** 024 §11의 "R8 side-effect 트리셰이킹"은 현재 위험이 아니라
+     minify가 켜질 때(로드맵 4번)의 잠재 위험이다.
+   - **그래도 RH3가 실패하면**(minify OFF에서도 Hermes DCE 또는 Metro
+     `@__PURE__`가 `task.ts` 모듈 최상단 `registerAutoDiaryTask()` 부수 효과를
+     제거) — 검증 차단 결함(FR-007). 최소 수정: `src/schedule/task.ts`에서
+     `AUTO_DIARY_TASK_REGISTERED`를 DCE 제거 불가한 방식으로 명시적 참조
+     1~3줄(research §4 옵션 A). `proguard-rules.pro` `-keep`은 minify OFF에서
+     무효라 넣지 않고, `gradle.properties`·`metro.config.js`도 건드리지 않는다
+     (FR-008, 로드맵 4번 몫).
+   - 계약 테스트: 소스 검사(R-DCE 방어 구문이 `src/schedule/task.ts`에 있는지)
+     — `__tests__/schedule/background-generation.test.ts` B1a 확장(RH5).
 
 5. **회귀 대상 목록**
    - `.maestro/scheduled-diary-notification.yml`(020),
@@ -373,14 +376,17 @@ FR-007 조건부이며, 그 경우도 `task.ts` 1곳 또는 `proguard-rules.pro`
   expo-task-manager` 및 `Unregistering task` **부재**, `Registered task with
   name 'alpharium-auto-diary'` 존재, `quiet` 일기가 그 날짜로 정확히 1개
   저장 + 판정 4갈래 통과 + `WM-WorkerWrapper: Worker result SUCCESS`.
-- **RH4 (조건부, FR-007)**: RH3가 실패하면(R8이 등록 부수 효과 제거) —
-  이것은 검증 차단 결함이므로 이 스펙에서 고친다. 수정은 `src/schedule/task.ts`
-  1곳(명시적 참조) 또는 `android/app/proguard-rules.pro` 1줄(`-keep`) 중
-  최소 변경. `findings.md` §11 갱신.
+- **RH4 (조건부, FR-007)**: RH3가 실패하면(minify OFF이므로 R8이 아니라
+  Hermes DCE 또는 Metro `@__PURE__`가 등록 부수 효과 제거) — 이것은 검증
+  차단 결함이므로 이 스펙에서 고친다. 수정은 `src/schedule/task.ts` 1~3줄
+  (`AUTO_DIARY_TASK_REGISTERED` 명시적 참조 유지, research §4 옵션 A).
+  `proguard-rules.pro`·`gradle.properties`·`metro.config.js`는 건드리지
+  않는다(FR-008). `findings.md` §11 갱신.
 - **RH5 (조건부 계약 테스트, FR-012)**: RH4로 코드를 고쳤다면
-  `__tests__/schedule/background-generation.test.ts`의 B1a를 확장 — R8 방어
-  구문(명시적 참조 또는 proguard 규칙)이 소스에 있는지 `readFileSync` 검사.
-  위반 주입: 그 구문을 지우면 테스트가 실패한다.
+  `__tests__/schedule/background-generation.test.ts`의 B1a를 확장 — R-DCE
+  방어 구문(`AUTO_DIARY_TASK_REGISTERED` 명시적 참조 + "제거 불가" 주석)이
+  소스에 있는지 `readFileSync` 검사. 위반 주입: 그 구문을 지우면 테스트가
+  실패한다.
 - **RH6 (기본 경로)**: RH3가 통과하면 코드 변경 0줄 — RH4·RH5는 발동하지
   않는다. `git diff src/`가 0줄이고 이 스펙은 순수 검증으로 끝난다(SC-005).
 

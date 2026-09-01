@@ -81,17 +81,24 @@ findings 뼈대 준비.
 전부 기기 준비.
 
 - [ ] T006 공통 실기기 준비 — 검증용 `quiet` 모델을 배치한다(quickstart
-  "공통 실기기 준비"): 개발 기계에서 `a1.bin`(kanana) 받아 `run-as
-  com.anonymous.alpharium`로 `files/models/`에 배치 + `state.json`에
-  `passed:true` verdict(021 D2 방식). `narrative`·VLM은 14번 세션이 배치.
+  "공통 실기기 준비", **FR-009 — quiet만, narrative 제외**): 개발 기계에서
+  `a1.bin`(kanana) 받아 `run-as com.anonymous.alpharium`로 `files/models/`에
+  배치 + `state.json`에 `passed:true` verdict(021 D2 방식). `narrative`·VLM은
+  14번 세션이 배치.
 - [ ] T007 [P] 사진 없는 합성 하루를 준비한다 — `npm run seed:day -- empty
   <날짜>`(사진 0장이면 `quiet`로 충분, 사진 있는 하루는 027에 불필요).
 - [ ] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
   선택(개발자 탭 또는 `adb`로 `preferences/selection.json` 주입).
+  **FR-009 — `narrative`는 선택하지 않는다**(로드맵 14번 몫).
 - [ ] T009 [P] 소스에서 배터리 버튼의 인텐트 액션을 특정한다(US3 사전
-  작업, research §2) — 021의 `PermissionsSection` / 온보딩 배터리 단계에서
-  `expo-intent-launcher` 호출을 찾아 `intentAction`을 `findings.md` §3
-  레코드의 `intentAction` 칸에 미리 적는다(실기기 클릭 전).
+  작업, research §2) — `AutoDiarySettingsScreen`의 `onOpenBatterySettings`
+  (testID `open-battery-settings`) 구현부와 021의 `PermissionsSection` /
+  온보딩 배터리 단계를 본다. ⚠️ `src/onboarding/os-settings-port.ts` 주석은
+  `IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, `requirements.ts`·
+  `plugins/with-battery-exception.js`는 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`로
+  **주석이 서로 다르므로**, 실제 호출부(`expo-intent-launcher` 인자)를 봐서
+  확정하고 `findings.md` §3 레코드의 `intentAction` 칸에 미리 적는다(실기기
+  클릭 전).
 
 **Checkpoint**: `quiet` 모델·합성 하루·캐릭터 세팅 완료, 배터리 인텐트
 액션 파악. 실기기 라운드 진입 가능.
@@ -115,7 +122,11 @@ findings 뼈대 준비.
   +com.anonymous.alpharium`, `am get-standby-bucket` → `5` 확인,
   `dumpsys jobscheduler | grep -A30 alpharium` → `Minimum latency:
   +14m59s...` 확인, 자동 생성 ON + 목표 시각, `KEYCODE_POWER` →
-  `deviceLocked=1`. (contracts BS1)
+  `deviceLocked=1`. (contracts BS1) **첫 덤프에서 `task-entered` 대용
+  logcat 문자열을 확정한다** — research §1은 `BackgroundTaskConsumer:
+  Executing task 'alpharium-auto-diary'`를 제안하나 더 이른 신호가 보이면
+  그것으로 정하고 `findings.md`에 grep 문자열을 못박는다(이후 T011·T015·T016이
+  같은 문자열을 쓴다).
 - [ ] T011 [US1] quickstart §1 절차 5~6을 수행한다 — 15분+ 주기로
   `adb logcat -d -v time -b all`을 스크래치에 덤프하며 `task-entered` 대용
   신호 시각을 모은다. 최소 1회, SHOULD 3회(각 시도 후 목표 시각을 다음 시로
@@ -151,10 +162,12 @@ findings 뼈대 준비.
 - [ ] T015 [US2] 방치 중 2~4시간마다 `adb logcat -d -b all > dump_<ts>.txt`로
   버퍼를 스크래치에 보존한다(링 버퍼 넘침 대비). **세션이 끝나도 기기는
   방치 상태 유지** — 다음 접속 때 이어받는다.
-- [ ] T016 [US2] (24시간+ 뒤, 세션 밖 후속) quickstart §2 "확인 절차"를
-  수행한다 — 쌓인 덤프에서 `task-entered` 대용 신호 흔적을 찾아
-  `observedHours`·`attemptCount` 계산. `dumpsys jobscheduler`의
-  `Minimum latency`가 15분 전달됐는지(억제 원인이 OS).
+- [ ] T016 [US2] (24시간+ 뒤, 세션 밖 후속 — **`/speckit-implement`는 이
+  태스크를 "차단됨: 24h 경과 대기"로 두고 다음 세션에서 이어받는다**)
+  quickstart §2 "확인 절차"를 수행한다 — 쌓인 덤프에서 `task-entered` 대용
+  신호 흔적을 찾아 `observedHours`·`attemptCount` 계산. `dumpsys jobscheduler`의
+  `Minimum latency`가 15분 전달됐는지(억제 원인이 OS). 세션이 24시간 창을
+  못 채우면 T017의 "부분 판정" 경로로 간다.
 - [ ] T017 [US2] contracts BS4로 판정한다 — `observedHours >= 24` 안에
   `attemptCount >= 1`이면 SC-002 충족. `< 24`면 `{ observedHours,
   attemptCount }` 원시값 + "부분 판정 — N시간 관측 후 M회" 라벨(024
@@ -274,7 +287,9 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
 - [ ] T032 AGENTS.md에 결론 한 문단을 추가한다(FR-010, quickstart §7) —
   "024 —" 절 또는 새 "027 —" 절에 배터리 소크 판정(SC-001·SC-002),
   삼성 One UI 배터리 화면 경로, release 헤드리스 확인 결과, minify OFF 사실.
-- [ ] T033 커밋한다 — 한국어 메시지(헌법 「개발 방식」). 기본 경로면
+- [ ] T033 `git branch --show-current`로 `027-024-residual-verification`
+  브랜치임을 확인한 뒤 커밋한다 — 한국어 메시지(헌법 「개발 방식」),
+  `main` 직접 커밋 금지(`.githooks/pre-commit`이 막음). 기본 경로면
   "027: 실측 마무리 — 배터리 소크·삼성 One UI 화면·release 헤드리스 확인
   (코드 무변경)". T025 수행 시 그 수정을 메시지에 명시.
 
