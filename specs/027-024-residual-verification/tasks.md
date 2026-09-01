@@ -2,16 +2,21 @@
 
 > **진행 상태(2026-09-01)**:
 > - **`/speckit-implement` (기기 없음)** — Setup 5개(T001~T005), T009(배터리
->   인텐트 액션 소스 특정), T028(기기 없는 게이트 통과). `findings.md` 뼈대 + §0.
-> - **실기기 1차 시도 (US3·US4 착수)** — T006(모델 이미 배치됨 확인)·T008
->   (캐릭터 `english`→`quiet`) 완료. **US3·US4는 Metro 번들 서빙 불가로 미착수**
->   — 앱이 "Loading from localhost:8081..."에 정지, Metro(~21h 실행) 번들
->   엔드포인트 4분+ 무응답. `findings.md` §0b 참조. 다음 세션에서 Metro
->   `--clear` 재시작 후 재개.
-> **남은 것** — T007(합성 하루 — US4엔 불필요), US1(T010~T013 배터리 예외 소크),
-> US2(T014~T018 무예외 24h 소크 — **비동기**), US3(T019~T021 삼성 One UI 화면),
-> US4(T022~T027 release 헤드리스 — **서명 키 있음 확인됨**), T029~T033. SM-S901N,
-> 14번·17번 세션과 함께. **코드 변경은 US4 RH3 실패 시에만**(T025~T027).
+>   인텐트 액션 소스 특정), T028(기기 없는 게이트 통과).
+> - **실기기 세션** — T006·T008 완료. Metro(~21h 실행) 번들 서빙 불가로 1차
+>   중단 → `--clear` 재시작(사용자 승인)으로 해소(`findings.md` §0b). 이어서:
+>   - ✅ **US3 완료** (T019~T021) — `IGNORE_BATTERY_OPTIMIZATION_SETTINGS` →
+>     삼성 "배터리 사용 관리"(`AppBatteryUsageActivity`) → alpharium 4탭 →
+>     "제한 없음" → `standbyBucket` `10`→`5`. **SC-003 충족.**
+>   - ✅ **US4 완료** (T022~T024) — release APK(19m 8s, minify OFF, `CN=alpharium`)
+>     → Metro 없이 실행 → 자동 생성 토글 ON → 잡 등록 → 헤드리스 강제 실행
+>     `No task registered` **부재** + `Worker result SUCCESS`. **SC-004 충족,
+>     코드 0줄** (RH4·RH5 발동 안 함). 024 §9 수정이 release에서도 성립.
+> **남은 것** — T007(합성 하루 — US1·US2용), US1(T010~T013 배터리 예외 소크 —
+> 15분+ 주기), US2(T014~T018 무예외 24h 소크 — **비동기**), T029~T033. SM-S901N,
+> 14번·17번 세션과 함께. **⚠️ 실기기가 release 빌드로 바뀜**(`findings.md`
+> "실기기 상태 정리 메모"). US1·US2는 dev 빌드 재설치가 필요할 수 있음(개발자
+> 탭·`run-as` 필요 시).
 
 **Input**: Design documents from `/specs/027-024-residual-verification/`
 
@@ -235,7 +240,7 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
 화면 끔·잠금 → `cmd jobscheduler run -f` → `No task registered` 부재 +
 `quiet` 완주.
 
-- [ ] T022 [US4] quickstart §4 절차 1~4를 수행한다(contracts RH1·RH2) —
+- [X] T022 [US4] quickstart §4 절차 1~4를 수행한다(contracts RH1·RH2) —
   서명 키 전제 확인(`~/.alpharium-signing/alpharium.jks` +
   `~/.gradle/gradle.properties` 비밀번호; 없으면 US4 중단, 사용자에게 알림),
   release APK 배치 전 debug로 `quiet` 모델 배치(T006 재사용), `prebuild
@@ -243,14 +248,14 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   assembleRelease`, `apksigner verify --print-certs`(`CN=Android Debug`
   아님) / `git ls-files | grep -i jks`(빈 결과) / Metro 없이 설치 후 앱
   열기(`Unable to load script`·"이 빌드는 잘못 만들어졌다" 없음).
-- [ ] T023 [US4] quickstart §4 절차 5를 수행한다(contracts RH3) — 설정 탭
+- [X] T023 [US4] quickstart §4 절차 5를 수행한다(contracts RH3) — 설정 탭
   진입 잡 등록 확인 → `deviceidle whitelist +com.anonymous.alpharium` →
   `KEYCODE_POWER` → `deviceLocked=1` → `cmd jobscheduler run -f
   com.anonymous.alpharium <id>` → `adb logcat -d`에서 `No task registered
   for key expo-task-manager` **부재**, `Registered task with name
   'alpharium-auto-diary'` 존재, `quiet` 완주 알림, `WM-WorkerWrapper: Worker
   result SUCCESS`.
-- [ ] T024 [US4] **RH3 통과 시(기본 경로, RH6)**: 코드 변경 없음. `git diff
+- [X] T024 [US4] **RH3 통과 시(기본 경로, RH6)**: 코드 변경 없음. `git diff
   src/`가 0줄임을 확인하고(SC-005), `findings.md` §11을 "현재 release 빌드
   (minify OFF)에서 §9 헤드리스 등록·완주 확인 완료. R8 트리셰이킹은 minify가
   켜질 때(로드맵 4번) 재검토"로 갱신(data-model §3, `dceTrimReproduced:

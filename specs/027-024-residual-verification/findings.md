@@ -126,10 +126,17 @@
   요구 — 없으면 앱이 `local` 환경 인식).
 - RN Dev Menu의 Reload를 눌러도 "Loading..." 유지.
 
-**다음 세션 조치**: 기존 Metro 종료 →
-`EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`로 새로 띄우고
-(AGENTS.md "도구 사용법" 1번), `adb reverse tcp:8081 tcp:8081` 재설정 후
-US3·US4 진행. (이 세션에서 `adb reverse`는 이미 설정함.)
+**해소 (2026-09-01, 사용자 승인)**: 기존 Metro(PID 17696·19096) 종료 →
+`EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear` 백그라운드 재시작
+→ `adb reverse tcp:8081 tcp:8081` 재설정 → 앱 force-stop 후 재실행. **`/status`
+응답이 6.8초 → 0.015초로 정상화**, `Android Bundled 14195ms index.ts (829
+modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
+`expo-file-system`) 정상 번들링, **`SyntaxError` 사라짐**. 이후 US3·US4
+정상 진행. AGENTS.md "Metro 캐시가 스테일이면 ... 오류 없이 영영 로딩 중"
+함정의 한 형태 — 21시간 실행 + 파일 감시자/번들 그래프 병리적 상태였다.
+`.env.development`가 로드되지만(`@expo/env`) 셸에서 준 `EXPO_PUBLIC_APP_ENV=dev`가
+`process.env`에 이미 있어 `.env.development`의 `local`이 덮어쓰지 못한다
+(AGENTS.md 명시대로).
 
 ---
 
@@ -214,41 +221,57 @@ get-standby-bucket` 전후 대조.
 
 ---
 
-## §4 release 헤드리스 확인 (US4, SC-004) — release 빌드 + 실기기 대기
+## §4 release 헤드리스 확인 (US4, SC-004) — ✅ 완료 (2026-09-01)
 
 **측정 방법**: quickstart §4 / contracts RH1~RH6. AGENTS.md "release 빌드와
-서명" 절차 → `apksigner verify` → Metro 없이 설치 → 검증용 `quiet` 모델
-배치(release 설치 전 debug로) → 설정 탭 진입 잡 등록 확인 → 배터리 예외
-부여 → 화면 끔·잠금 → `cmd jobscheduler run -f` → `No task registered` 부재
-+ `quiet` 완주.
+서명" 절차로 release APK 빌드 → `apksigner verify` → Metro 없이 설치(debug
+앱 데이터는 `adb exec-out`으로 `a1.bin`+`state.json`+preferences+diary 백업
+후 uninstall) → 설정 탭에서 자동 생성 토글 ON(알림 권한 허용) → `dumpsys
+jobscheduler`로 잡 등록 확인 → `dumpsys deviceidle whitelist +` → 화면 끔
+(`deviceLocked=1`) → `cmd jobscheduler run -f com.anonymous.alpharium 0` →
+`adb logcat`.
 
-**전제**: `~/.alpharium-signing/alpharium.jks` + `~/.gradle/gradle.properties`
-비밀번호. 없으면 US4 수행 불가 → 사용자에게 알림.
+**빌드**: `prebuild --platform android --clean` → 키 복원 →
+`NODE_ENV=production ./gradlew assembleRelease` (**BUILD SUCCESSFUL in 19m 8s**,
+`app-release.apk` 175,579,857 bytes).
 
-| 필드 | 값 | 통과 조건 |
-|---|---|---|
-| signatureOk | _(대기)_ | `apksigner verify --print-certs`가 `CN=Android Debug` 아님 |
-| keysNotCommitted | _(대기)_ | `git ls-files \| grep -i jks` 빈 결과 |
-| runsWithoutMetro | _(대기)_ | Metro 끄고 앱 열어 `Unable to load script` 없음 |
-| envOk | _(대기)_ | "이 빌드는 잘못 만들어졌다" 아님 |
-| jobRegisteredOnSettingsTab | _(대기)_ | 설정 탭 진입 시 `JOB #<uid>/... SystemJobService` 등록 |
-| noTaskRegisteredErrorAbsent | _(대기)_ | 헤드리스 강제 실행 logcat에 `No task registered for key expo-task-manager` **없음** |
-| registeredTaskLogPresent | _(대기)_ | `Registered task with name 'alpharium-auto-diary'` 있음 |
-| quietCompleted | _(대기)_ | `quiet` 일기 1건 저장 + 판정 통과 |
-| workerResult | _(대기)_ | `WM-WorkerWrapper: Worker result SUCCESS` |
-| dceTrimReproduced | _(대기)_ | 등록 부수 효과가 DCE로 제거됐는가(RH3 실패). minify OFF 기준 |
-| fixApplied | _(대기)_ | `dceTrimReproduced`가 true면 적용한 최소 수정(research §4 옵션 A) |
+| 필드 | 값 |
+|---|---|
+| `signatureOk` | **true** — `apksigner verify --print-certs`: `Signer #1 certificate DN: CN=alpharium, OU=alpharium, O=alpharium, L=Unknown, ST=Unknown, C=KR` (`CN=Android Debug` 아님) |
+| `keysNotCommitted` | **true** — `git ls-files \| grep -i jks` 빈 결과 |
+| `runsWithoutMetro` | **true** — `adb reverse --remove-all` 후 앱 실행, `Unable to load script` 없음, `ReactNativeJS: Running "main"`, 온보딩 "시작하기 전에" (1/5) 정상 렌더 |
+| `envOk` | **true** — "이 빌드는 잘못 만들어졌다" 아님. **탭이 3개**("일기/캐릭터/설정") = **개발자 탭 없음 → `prod` 환경으로 뜸** 확인(`.env.production`) |
+| `jobRegisteredOnSettingsTab` | **true** — 설정 탭 `auto-diary-toggle` ON + 알림 권한 "허용" → `D/BackgroundTaskModule: registerTaskAsync: alpharium-auto-diary with options {minimumInterval=15.0}` → `I/TaskService: Registered task with name 'alpharium-auto-diary'` → `D/BackgroundTaskConsumer: didRegister: alpharium-auto-diary` → `D/BackgroundTaskScheduler: Enqueuing worker ... '15' minutes delay`. `dumpsys jobscheduler`: `JOB #u0a570/0: com.anonymous.alpharium/androidx.work.impl.background.systemjob.SystemJobService`, `Minimum latency: +14m59s992ms` (15분 정확 전달) |
+| `noTaskRegisteredErrorAbsent` | **true** ✅ — 헤드리스 강제 실행(`cmd jobscheduler run -f`, `deviceLocked=1`, standby bucket `5`) logcat에 `No task registered for key expo-task-manager` **및** `Unregistering task` **둘 다 없음** |
+| `registeredTaskLogPresent` | **true** — `D/BackgroundTaskConsumer: Executing task 'alpharium-auto-diary'`, `I/TaskService: Started headless task 1 to keep JS timers alive`, `I/TaskService: Finished task 'alpharium-auto-diary' with eventId '...'`, `I/TaskService: Finished headless task 1` |
+| `quietCompleted` | _(미측정 — `quiet` 모델이 uninstall로 삭제됐고 release는 `run-as` 불가라 재배치 안 함. 태스크가 16ms 만에 완주 = `model-not-ready` 조기 반환. §9에서 debug로 `quiet` 완주(`writingMs` 52.5초)를 이미 확인했고, release도 동일 파이프라인이므로 모델만 있으면 돌 것이 자명. 사용자 결정으로 RH3 핵심 통과로 마무리)_ |
+| `workerResult` | **`SUCCESS`** — `I/WM-WorkerWrapper: Worker result SUCCESS for Work [ id=..., tags={ expo.modules.backgroundtask.BackgroundTaskWork } ]` |
+| `dceTrimReproduced` | **false** ✅ — 등록 부수 효과가 DCE로 제거되지 않았다. `task.ts` 모듈 최상단 `defineTask`(024 §9 수정)가 release 빌드(Hermes 바이트코드, minify OFF)에서도 살아있다 |
+| `fixApplied` | `null` — 코드 변경 불필요. `git diff src/` = 0줄 (RH6 기본 경로) |
 
-**판정 (contracts RH3·RH6)**:
-- [ ] RH3 4개(noTaskRegisteredErrorAbsent·registeredTaskLogPresent·
-  quietCompleted·workerResult=SUCCESS) 전부 통과 → SC-004 충족, 코드 0줄
-- [ ] RH3 실패 → RH4(`task.ts` DCE 방어 참조) + RH5(계약 테스트) + RH1~RH3
-  재실행
+**판정 (contracts RH3·RH6, SC-004)**: ✅ 충족.
+- `noTaskRegisteredErrorAbsent` · `registeredTaskLogPresent` · `workerResult=SUCCESS`
+  3개 통과. `quietCompleted`는 §9 debug 확인 + 동일 파이프라인 근거로 갈음
+  (사용자 결정).
+- **RH4·RH5 발동 안 함** — 코드 변경 0줄. `git diff src/` = 0줄(SC-005 유지).
+- **024 §9가 고친 `task.ts` 모듈 최상단 `defineTask` 부수 효과가 release
+  빌드에서도 헤드리스 태스크 등록을 성립시킨다는 것이 확인됐다.** 024 §11의
+  "R8 side-effect 트리셰이킹" 우려는 (a) minify가 현재 OFF이고 (b) minify
+  OFF에서도 Hermes DCE·Metro `@__PURE__`가 이 부수 효과를 제거하지 않음이
+  실측으로 확인돼 **닫힌다**.
 
-**024 §11 갱신 문안 (T024 또는 T027)**:
-- RH3 통과: "027 세션에서 현재 release 빌드 구성(minify OFF)으로 §9 헤드리스
-  등록·완주 확인 완료. R8 트리셰이킹은 minify가 켜질 때(로드맵 4번) 재검토."
-- RH3 실패: 수정 내역 + `fixApplied` + release 재확인 결과.
+**024 §11 갱신 문안 (→ 024 `findings.md` §11에 반영, T031)**:
+> **잔여 위험 닫힘 (2026-09-01, 027 세션)**: release APK(`assembleRelease`,
+> minify OFF, Hermes)를 빌드해 debug 앱 제거 후 설치, 설정 탭에서 자동
+> 생성 토글 ON → WorkManager 잡 등록(`Minimum latency +14m59s`), 화면 끈
+> 잠긴 상태 `cmd jobscheduler run -f` 강제 실행에서 **`No task registered
+> for key expo-task-manager` 및 `Unregistering task` 부재**, `Executing
+> task 'alpharium-auto-diary'` → `Started headless task` → `Finished
+> headless task` → `WM-WorkerWrapper: Worker result SUCCESS` 확인. §9
+> 수정(`task.ts` 모듈 최상단 `defineTask`)이 release 빌드에서도 성립.
+> R8 트리셰이킹 우려는 minify OFF + DCE 미제거 실측으로 닫힘. `quiet`
+> 생성 완주는 §9 debug 확인으로 갈음(모델이 uninstall로 삭제됨, release
+> `run-as` 불가).
 
 ---
 
@@ -279,13 +302,40 @@ get-standby-bucket` 전후 대조.
 
 ---
 
-## 미확인 잔여 (세션 종료 시 갱신)
+## 진행 상태 (2026-09-01 실기기 세션 종료 시점)
 
-- **§1 배터리 예외 소크** — 실기기 세션 대기. SC-001 미판정.
-- **§2 무예외 24시간 소크** — 비동기, 24h+ 방치 후 확인. SC-002 미판정
-  (부분 판정 가능).
-- **§3 삼성 One UI 배터리 화면** — 실기기 세션 대기. SC-003 미판정.
-- **§4 release 헤드리스** — release 빌드 + 실기기 대기. 서명 키 전제.
-  SC-004 미판정.
-- **T031·T032** — 024 `findings.md` 포인터 추가, AGENTS.md 027 절 — §1~§4
-  실측 후.
+**완료:**
+- ✅ **§3 삼성 One UI 배터리 화면** (US3, SC-003) — `IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+  → "배터리 사용 관리"(`AppBatteryUsageActivity`) → alpharium 4탭 → "제한 없음"
+  → `standbyBucket` `10`→`5`. **SC-003 충족.**
+- ✅ **§4 release 헤드리스** (US4, SC-004) — release APK 빌드(19m 8s, minify OFF,
+  `CN=alpharium`) → Metro 없이 실행 → 자동 생성 토글 ON → 잡 등록 → 헤드리스
+  강제 실행에서 **`No task registered` 부재** + `Executing task` +
+  `Worker result SUCCESS`. **024 §9 수정이 release에서도 성립. SC-004 충족**
+  (`quietCompleted`는 §9 debug 확인으로 갈음 — 모델 uninstall됨). **코드 0줄.**
+
+**미착수 (다음 실기기 세션):**
+- **§1 배터리 예외 소크** (US1, SC-001) — 자연 15분+ 주기 대기 필요. SC-001 미판정.
+- **§2 무예외 24시간 소크** (US2, SC-002) — 비동기, 24h+ 방치. SC-002 미판정
+  (부분 판정 가능). 배터리 예외를 부여한 적 있으므로 US2 전에 반드시
+  `deviceidle whitelist -` + "제한 없음" → "최적화" 원복 확인.
+- **T031·T032** — 024 `findings.md` §2·§11 갱신, AGENTS.md 027 절 —
+  §1·§2까지 끝난 뒤 일괄. (§11 갱신 문안은 §4에 준비돼 있음.)
+
+## 실기기 상태 정리 메모 (2026-09-01 세션 종료 시)
+
+- **설치 빌드가 release로 바뀜** (`CN=alpharium`, `prod` 환경, 개발자 탭 없음).
+  debug로 되돌리려면 `adb uninstall` 후 `npx expo run:android` 또는 debug APK.
+- **debug 앱 데이터 백업**: `scratchpad/debug_backup/`에 `a1.bin`(md5
+  `d8506380…` 검증됨) + `state.json` + preferences 5개 + diary 2건. `a2`·`a4`·
+  `a5`·`v1`·`v2`는 백업 안 함(RH3에 불필요, 로드맵 14번/온보딩으로 재취득).
+- **캐릭터 선택**: debug 시절 `english`(모카)였던 것을 `quiet`로 바꿨음
+  (T008). release는 데이터가 초기화돼 무관.
+- **배터리**: US3에서 UI로 "제한 없음" 부여함(`standbyBucket 5`). US4에서
+  `deviceidle whitelist +` 추가 부여 후 `-`로 제거함. **현재 `standbyBucket`
+  = `10`** (deviceidle 제거됨). 단 US3의 "제한 없음" UI 설정은 그대로일 수
+  있음 — US1·US2 시작 전 재확인.
+- **자동 생성 토글**: US4에서 ON으로 켰음. WorkManager 잡 등록됨
+  (`JOB #u0a570/0`, 15분 간격).
+- **Metro**: `--clear`로 재시작한 dev Metro가 백그라운드에 떠 있음
+  (`scratchpad/metro.log`). release 앱에는 불필요.
