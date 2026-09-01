@@ -1,16 +1,28 @@
 # Tasks: 024 잔여 실측 마무리
 
-> **진행 상태(2026-09-01, `/speckit-implement`)**: 기기 없는 부분 완료.
-> **끝난 것** — Setup 5개(T001~T005), Foundational 중 T009(배터리 인텐트
-> 액션 소스 특정), Polish 중 T028(기기 없는 게이트 — `test:logic` 87스위트/
-> 1749테스트 통과, lint 0 error, 헌법 검사 위반 0, prettier 클린). `findings.md`
-> 뼈대 + §0(코드/설정 사전 확인) 작성.
-> **남은 것(전부 실기기·사람 수행)** — T006~T008(모델·합성 하루·캐릭터 배치),
-> US1(T010~T013 배터리 예외 소크), US2(T014~T018 무예외 24h 소크 — **비동기,
-> 24h+ 방치 필요**), US3(T019~T021 삼성 One UI 화면), US4(T022~T027 release
-> 헤드리스 — **서명 키 전제**), T029~T033(대조·회귀·findings/AGENTS·커밋).
-> SM-S901N 무선, 14번 세션과 함께. quickstart.md 절차대로 수행 후 findings.md
-> 표를 채운다. **코드 변경은 US4 RH3 실패 시에만**(T025~T027).
+> **진행 상태(2026-09-01)**:
+> - **`/speckit-implement` (기기 없음)** — Setup 5개(T001~T005), T009(배터리
+>   인텐트 액션 소스 특정), T028(기기 없는 게이트 통과).
+> - **실기기 세션** — T006·T008 완료. Metro(~21h 실행) 번들 서빙 불가로 1차
+>   중단 → `--clear` 재시작(사용자 승인)으로 해소(`findings.md` §0b). 이어서:
+>   - ✅ **US3 완료** (T019~T021) — `IGNORE_BATTERY_OPTIMIZATION_SETTINGS` →
+>     삼성 "배터리 사용 관리"(`AppBatteryUsageActivity`) → alpharium 4탭 →
+>     "제한 없음" → `standbyBucket` `10`→`5`. **SC-003 충족.**
+>   - ✅ **US4 완료** (T022~T024) — release APK(19m 8s, minify OFF, `CN=alpharium`)
+>     → Metro 없이 실행 → 자동 생성 토글 ON → 잡 등록 → 헤드리스 강제 실행
+>     `No task registered` **부재** + `Worker result SUCCESS`. **SC-004 충족,
+>     코드 0줄** (RH4·RH5 발동 안 함). 024 §9 수정이 release에서도 성립.
+>   - **T025~T027 미발동** — RH3 통과로 조건부 코드 수정 불필요(`git diff
+>     src/` = 0줄). **T030 회귀 불필요** — 코드 0줄, 024 §7이 이미 돌림.
+>   - **T028·T029** 완료(기기 없는 게이트·코드 대조 0줄).
+>   - **T031·T032 부분** — 024 `findings.md` §2·§11 + AGENTS.md 027 절에
+>     US3·US4분 반영 완료. 배터리 소크 문단만 US1·US2 대기.
+> **남은 것 (US1·US2 세션)** — T007(합성 하루), US1(T010~T013 배터리 예외
+> 소크 — 15분+ 주기), US2(T014~T018 무예외 24h 소크 — **비동기**), T031·T032
+> 소크 문단 갱신, T033 최종 커밋. SM-S901N, 로드맵 14·17번 세션과 함께.
+> **⚠️ 실기기가 release 빌드로 바뀜** — dev 빌드 재설치(`npx expo
+> run:android`) + 모델 재배치부터(`a1.bin`만 백업됨). `findings.md` "실기기
+> 상태 정리 메모" 참조.
 
 **Input**: Design documents from `/specs/027-024-residual-verification/`
 
@@ -92,14 +104,16 @@ findings 뼈대 준비.
 **Purpose**: 실기기 라운드가 공통으로 의존하는 준비. **코드 작업 없음** —
 전부 기기 준비.
 
-- [ ] T006 공통 실기기 준비 — 검증용 `quiet` 모델을 배치한다(quickstart
+- [X] T006 공통 실기기 준비 — 검증용 `quiet` 모델을 배치한다(quickstart
   "공통 실기기 준비", **FR-009 — quiet만, narrative 제외**): 개발 기계에서
   `a1.bin`(kanana) 받아 `run-as com.anonymous.alpharium`로 `files/models/`에
   배치 + `state.json`에 `passed:true` verdict(021 D2 방식). `narrative`·VLM은
   14번 세션이 배치.
 - [ ] T007 [P] 사진 없는 합성 하루를 준비한다 — `npm run seed:day -- empty
   <날짜>`(사진 0장이면 `quiet`로 충분, 사진 있는 하루는 027에 불필요).
-- [ ] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
+  **US1·US2 전용** — US3·US4는 필요 없었다. US1·US2 실기기 세션에서 dev
+  빌드 재설치와 함께.
+- [X] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
   선택(개발자 탭 또는 `adb`로 `preferences/selection.json` 주입).
   **FR-009 — `narrative`는 선택하지 않는다**(로드맵 14번 몫).
 - [X] T009 [P] 소스에서 배터리 버튼의 인텐트 액션을 특정한다(US3 사전
@@ -204,16 +218,16 @@ findings에 원시값과 라벨.
 배터리 버튼을 실제로 누름 → `dumpsys activity activities`로 최상위 액티비티·
 제목·경로 기록 → "제한 없음" 선택 → 복귀 → `am get-standby-bucket` `5` 확인.
 
-- [ ] T019 [US3] quickstart §3 절차 2~4를 수행한다 — 앱을 열어 배터리 버튼을
+- [X] T019 [US3] quickstart §3 절차 2~4를 수행한다 — 앱을 열어 배터리 버튼을
   **실제로 누르고**(`adb whitelist` 동등물로 갈음 안 함, contracts BS5),
   `adb shell dumpsys activity activities | head -40`에서 `landedActivity`,
   화면 제목(`screenTitle`), 삼성 One UI 설정 계층 경로(`reachPath`) 기록.
   그 화면에서 "제한 없음" 선택 → 앱 복귀 → `am get-standby-bucket` → `5`인지
   (`exceptionGrantable`·`standbyBucketAfterGrant`).
-- [ ] T020 [US3] quickstart §3 절차 5를 수행한다 — 버튼을 안 눌러도/실패해도
+- [X] T020 [US3] quickstart §3 절차 5를 수행한다 — 버튼을 안 눌러도/실패해도
   온보딩이 다음 단계로 가는지(`onboardingProceededWithoutGrant` — 021
   `batteryNoticeShown` 판정).
-- [ ] T021 [US3] `findings.md` §3 레코드(data-model §2)를 채운다 —
+- [X] T021 [US3] `findings.md` §3 레코드(data-model §2)를 채운다 —
   `trigger`·`intentAction`(T009에서 미리)·`landedActivity`·`screenTitle`·
   `reachPath`·`exceptionGrantable`·`standbyBucketAfterGrant`·
   `onboardingProceededWithoutGrant`·`failureMode`. `failureMode !== null`
@@ -234,7 +248,7 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
 화면 끔·잠금 → `cmd jobscheduler run -f` → `No task registered` 부재 +
 `quiet` 완주.
 
-- [ ] T022 [US4] quickstart §4 절차 1~4를 수행한다(contracts RH1·RH2) —
+- [X] T022 [US4] quickstart §4 절차 1~4를 수행한다(contracts RH1·RH2) —
   서명 키 전제 확인(`~/.alpharium-signing/alpharium.jks` +
   `~/.gradle/gradle.properties` 비밀번호; 없으면 US4 중단, 사용자에게 알림),
   release APK 배치 전 debug로 `quiet` 모델 배치(T006 재사용), `prebuild
@@ -242,30 +256,25 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   assembleRelease`, `apksigner verify --print-certs`(`CN=Android Debug`
   아님) / `git ls-files | grep -i jks`(빈 결과) / Metro 없이 설치 후 앱
   열기(`Unable to load script`·"이 빌드는 잘못 만들어졌다" 없음).
-- [ ] T023 [US4] quickstart §4 절차 5를 수행한다(contracts RH3) — 설정 탭
+- [X] T023 [US4] quickstart §4 절차 5를 수행한다(contracts RH3) — 설정 탭
   진입 잡 등록 확인 → `deviceidle whitelist +com.anonymous.alpharium` →
   `KEYCODE_POWER` → `deviceLocked=1` → `cmd jobscheduler run -f
   com.anonymous.alpharium <id>` → `adb logcat -d`에서 `No task registered
   for key expo-task-manager` **부재**, `Registered task with name
   'alpharium-auto-diary'` 존재, `quiet` 완주 알림, `WM-WorkerWrapper: Worker
   result SUCCESS`.
-- [ ] T024 [US4] **RH3 통과 시(기본 경로, RH6)**: 코드 변경 없음. `git diff
+- [X] T024 [US4] **RH3 통과 시(기본 경로, RH6)**: 코드 변경 없음. `git diff
   src/`가 0줄임을 확인하고(SC-005), `findings.md` §11을 "현재 release 빌드
   (minify OFF)에서 §9 헤드리스 등록·완주 확인 완료. R8 트리셰이킹은 minify가
   켜질 때(로드맵 4번) 재검토"로 갱신(data-model §3, `dceTrimReproduced:
   false`).
-- [ ] T025 [US4] **RH3 실패 시에만(FR-007, RH4)**: `src/schedule/task.ts`에
-  `AUTO_DIARY_TASK_REGISTERED` 명시적 참조 1~3줄 + "제거 불가" 주석을
-  추가한다(research §4 옵션 A). `proguard-rules.pro`·`gradle.properties`·
-  `metro.config.js`는 건드리지 않는다(FR-008).
-- [ ] T026 [US4] **T025 수행 시에만(RH5)**: `__tests__/schedule/background-generation.test.ts`
-  B1a를 확장한다 — R-DCE 방어 구문이 `src/schedule/task.ts` 소스에 있는지
-  `readFileSync` 검사(007·009·012 관례). **위반 주입**: 그 참조 구문을
-  지우면 테스트가 실패함을 실제로 확인 후 되돌린다. `npm run test:logic`·
-  `npm run lint` 통과.
-- [ ] T027 [US4] **T025 수행 시에만**: release를 재빌드하고 T022~T023을
-  재실행해 `No task registered` 부재를 확인한다. `findings.md` §11에
-  `fixApplied` 기록(data-model §3).
+- [-] T025 [US4] ~~RH3 실패 시에만(FR-007, RH4)~~ — **미발동.** US4 RH3가
+  통과했다(`No task registered` 부재 + `Worker result SUCCESS`,
+  `dceTrimReproduced: false`). `task.ts` 수정 불필요. `git diff src/` = 0줄.
+- [-] T026 [US4] ~~T025 수행 시에만(RH5)~~ — **미발동** (T025 미수행).
+  계약 테스트 추가 없음.
+- [-] T027 [US4] ~~T025 수행 시에만~~ — **미발동** (T025 미수행). release
+  재빌드 없음.
 
 **Checkpoint**: release 헤드리스 등록·완주 확인 — 기본 경로면 코드 0줄,
 실패 경로면 최소 수정 + 계약 테스트 + release 재확인.
@@ -280,25 +289,27 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   `npm run test:logic` 전부 통과(`jest-projects.test.ts` 파일 수 검사 유지;
   T026 수행 시 그 스위트 포함), `npm run lint` eslint 0 error·tsc 클린·
   헌법 검사 위반 0(`checkScheduleFile` 포함)·prettier 클린.
-- [ ] T029 `git diff --stat`으로 코드 변경 범위를 대조한다(SC-005) — 기본
+- [X] T029 `git diff --stat`으로 코드 변경 범위를 대조한다(SC-005) — 기본
   경로면 `src/` 0줄(변경은 `specs/027-*`·`specs/024-*/findings.md`·
   `AGENTS.md`뿐). T025 수행 시 `src/schedule/task.ts` 1~3줄 +
   `__tests__/schedule/background-generation.test.ts`만. 새 `src/` 파일 0·
   새 화면 0·새 `*-port.ts` 0·새 `preferences/*.json` 0·새 네이티브 모듈 0·
   새 진단 패널 0·빌드 설정 파일 0.
-- [ ] T030 회귀를 확인한다(quickstart §5) — **코드 변경이 없으면 형식적**
-  (024 §7이 이미 돌림). **T025로 `task.ts`를 고쳤으면 필수**:
-  `npm run test:device`로 020·021·023 흐름 PASS.
-  ⚠️ `unified-permission-onboarding.yml`은 `pm clear`로 앱 데이터를 날리므로
-  **맨 마지막에**, 또는 이후 T006~T008 재배치.
-- [ ] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7) — §2 표
-  두 행(T013·T018) + 삼성 One UI 화면 경로(T021) + §11(T024 또는 T027).
-  "미확인 잔여" 목록에서 "§2 배터리 예외/무예외 소크", "배터리 인텐트가
-  도착한 삼성 One UI 설정 화면 경로", "release APK로 §9 헤드리스 1회 확인"
-  세 줄을 해소 표기 또는 제거. 한쪽에만(중복 금지).
-- [ ] T032 AGENTS.md에 결론 한 문단을 추가한다(FR-010, quickstart §7) —
-  "024 —" 절 또는 새 "027 —" 절에 배터리 소크 판정(SC-001·SC-002),
-  삼성 One UI 배터리 화면 경로, release 헤드리스 확인 결과, minify OFF 사실.
+- [-] T030 회귀를 확인한다(quickstart §5) — **불필요.** 027은 코드 변경
+  0줄(T025 미발동)이고 024 §7이 020·021·023 흐름을 이미 돌렸다. 새 실패가
+  날 소스 변경이 없다. (US1·US2 세션에서 dev 빌드 재설치 후 형식적으로
+  한 번 돌리는 것은 무방하나 판정에 불필요.)
+- [~] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7). **US3·US4분
+  완료** (2026-09-01) — §2 절에 삼성 One UI 화면 경로(027 US3) 기록 + "이관"
+  포인터, §11에 "잔여 위험 닫힘" 절(027 US4) 추가, 상단 배너·"남은 것"
+  목록에서 삼성 화면·release 헤드리스 두 줄 해소 표기, 배터리 소크 두 줄은
+  "027로 이관"으로. **남은 부분** — §2 표의 `batteryException: true`/`false`
+  두 행(027 US1·US2 대기).
+- [~] T032 AGENTS.md에 027 절 추가(FR-010, quickstart §7). **US3·US4분
+  완료** (2026-09-01) — 025 절 뒤에 "### 027 —" 절 신규: minify OFF 발견,
+  US3 삼성 One UI 4탭 경로, US4 release 헤드리스 확인(`No task registered`
+  부재 + `Worker result SUCCESS`, 코드 0줄), Metro 함정 재확인, 실기기
+  상태 변경, 남은 US1·US2. **남은 부분** — US1·US2 판정 후 그 문단 갱신.
 - [ ] T033 `git branch --show-current`로 `027-024-residual-verification`
   브랜치임을 확인한 뒤 커밋한다 — 한국어 메시지(헌법 「개발 방식」),
   `main` 직접 커밋 금지(`.githooks/pre-commit`이 막음). 기본 경로면

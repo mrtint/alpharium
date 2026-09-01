@@ -881,6 +881,60 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
     관측됐다. 새 네이티브 모듈 없어 release 재확인 생략(012).
 - 상세: `specs/025-diary-photo-gallery/`.
 
+### 027 — 024 잔여 실측 마무리 (2026-09-01)
+
+로드맵 15번. 024가 2·3차 실기기 세션에서 사용자 결정으로 매번 건너뛴
+미판정 항목을 판정하는 **검증 마무리 스펙**(019 스파이크 계열, 새 기능
+아님). 산출물은 `findings.md` 실측 수치이고 코드 변경은 조건부(US4 RH3
+실패 시에만 `task.ts` 1~3줄). `/speckit-specify`~`/speckit-converge` 전
+체인 + 실기기 US3·US4 수행. **코드 변경 0줄로 종료.**
+
+- **계획 단계 발견**: `android/app/build.gradle:69`가
+  `android.enableMinifyInReleaseBuilds`를 기본 `false`로 두고
+  `android/gradle.properties`에 미설정 → **release 빌드에서 R8/minify가
+  꺼져 있다.** 024 §11의 "R8 side-effect 트리셰이킹"은 현재 위험이 아니라
+  minify가 켜질 때(로드맵 4번)의 잠재 위험. spec의 US4·FR-007을 이 사실로
+  정정했다.
+- **US3 — 삼성 One UI 배터리 화면**(SC-003, 완료): 설정 탭 "배터리 설정
+  열기" 버튼 → `android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+  인텐트 → 삼성이 **`com.android.settings/.Settings$AppBatteryUsageActivity`
+  ("배터리 사용 관리" 앱 목록)** 으로 라우팅한다. 표준 안드로이드의
+  "배터리 최적화" 목록이 아니다. 예외 부여는 목록 → 앱 검색·탭 → "배터리"
+  상세(제한 없음/최적화/제한 라디오) → **"제한 없음" 선택**까지 **4탭**.
+  딥링크로 앱별 토글에 바로 못 간다. "제한 없음" 선택 시
+  `am get-standby-bucket` **`10` → `5`**, `deviceidle whitelist` 등재 —
+  **`adb shell dumpsys deviceidle whitelist +`(024가 재현에 쓴 것)와 최종
+  결과가 동일**함이 실측으로 확인됐다.
+- **US4 — release APK 헤드리스**(SC-004, 완료): AGENTS.md "release 빌드와
+  서명" 절차로 빌드(BUILD SUCCESSFUL **19m 8s**, `CN=alpharium`, minify
+  OFF, 175MB). debug 앱 uninstall(데이터는 `adb exec-out`으로 `a1.bin`
+  md5 검증 + 백업) → release 설치 → `adb reverse --remove-all` 후 실행
+  (`Unable to load script` 없음, `prod` 환경 — 탭 3개, 개발자 탭 없음).
+  설정 탭 자동 생성 토글 ON + 알림 허용 → `Registered task
+  'alpharium-auto-diary'` + `JOB #u0a570/0` (`Minimum latency +14m59s`).
+  `deviceidle whitelist +` + 화면 끔 + `cmd jobscheduler run -f` → logcat에
+  **`No task registered for key expo-task-manager` 및 `Unregistering task`
+  둘 다 부재**, `Executing task` → `Started/Finished headless task` →
+  `WM-WorkerWrapper: Worker result SUCCESS`. **024 §9 수정(`task.ts` 모듈
+  최상단 `defineTask` 부수 효과)이 release 빌드(Hermes 바이트코드, minify
+  OFF)에서도 헤드리스 태스크 등록을 성립시킨다** — DCE/트리셰이킹이 이
+  부수 효과를 제거하지 않음이 실측으로 확인됐다. `quiet` 생성 완주는 024
+  §9의 debug 확인(`writingMs` 52.5초)으로 갈음(모델이 uninstall로 삭제,
+  release `run-as` 불가). **RH4·RH5 발동 안 함 — `git diff src/` = 0줄.**
+- **Metro 함정 재확인**: 21시간 실행된 Metro가 번들 서빙 불가 상태가 됐다
+  (`/status` 6.8초 지연, 동적 `import`가 `SyntaxError: 'return' not in a
+  function`으로 깨짐, 앱이 "Loading from localhost:8081..."에 정지). AGENTS.md
+  "Metro 캐시가 스테일이면 ... 오류 없이 영영 로딩 중" 계열. `EXPO_PUBLIC_APP_ENV=dev
+  npx expo start --dev-client --clear` 재시작으로 즉시 해소(`/status` 0.015초).
+- **실기기 상태 변경**: US4 위해 debug 앱을 지우고 release를 설치했다 —
+  다음 실기기 세션(027 US1·US2, 로드맵 14·17번)은 `npx expo run:android`로
+  dev 빌드 재설치 + 모델 재배치부터 시작해야 한다(`run-as`·개발자 탭 필요).
+  `a1.bin`(quiet)만 백업돼 있다.
+- **남은 것**: US1(배터리 예외 소크, SC-001, 15분+ 주기)·US2(무예외 24h
+  소크, SC-002, 비동기). 024 `findings.md` §2 표의 두 소크 행이 이것을
+  기다린다. 로드맵 14·17번 세션과 함께.
+- 상세: `specs/027-024-residual-verification/` (`findings.md` §3·§4).
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만
