@@ -1,5 +1,17 @@
 # Tasks: 024 잔여 실측 마무리
 
+> **진행 상태(2026-09-01, `/speckit-implement`)**: 기기 없는 부분 완료.
+> **끝난 것** — Setup 5개(T001~T005), Foundational 중 T009(배터리 인텐트
+> 액션 소스 특정), Polish 중 T028(기기 없는 게이트 — `test:logic` 87스위트/
+> 1749테스트 통과, lint 0 error, 헌법 검사 위반 0, prettier 클린). `findings.md`
+> 뼈대 + §0(코드/설정 사전 확인) 작성.
+> **남은 것(전부 실기기·사람 수행)** — T006~T008(모델·합성 하루·캐릭터 배치),
+> US1(T010~T013 배터리 예외 소크), US2(T014~T018 무예외 24h 소크 — **비동기,
+> 24h+ 방치 필요**), US3(T019~T021 삼성 One UI 화면), US4(T022~T027 release
+> 헤드리스 — **서명 키 전제**), T029~T033(대조·회귀·findings/AGENTS·커밋).
+> SM-S901N 무선, 14번 세션과 함께. quickstart.md 절차대로 수행 후 findings.md
+> 표를 채운다. **코드 변경은 US4 RH3 실패 시에만**(T025~T027).
+
 **Input**: Design documents from `/specs/027-024-residual-verification/`
 
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md,
@@ -51,20 +63,20 @@ US3만 P2.
 **Purpose**: 검증 준비 — 공통 실기기 준비, 회귀 베이스라인, findings 뼈대.
 새 의존성 없음.
 
-- [ ] T001 `npx expo install --check`로 신규 의존성이 없는지 확인한다(FR-008
+- [X] T001 `npx expo install --check`로 신규 의존성이 없는지 확인한다(FR-008
   — 이 스펙은 패키지를 추가하지 않는다). 기존 패치 버전 어긋남은 이 스펙이
   만든 것이 아니므로 무시.
-- [ ] T002 [P] 현재 `npm run test:logic`·`npm run lint`가 초록불인지
+- [X] T002 [P] 현재 `npm run test:logic`·`npm run lint`가 초록불인지
   베이스라인을 기록한다(회귀 판정 기준, SC-005·SC-006). `git rev-parse HEAD`도
   기록 — 기본 경로에서 `git diff src/`가 0줄임을 마지막에 대조하기 위해.
-- [ ] T003 [P] `android/app/build.gradle`(69행)과 `android/gradle.properties`를
+- [X] T003 [P] `android/app/build.gradle`(69행)과 `android/gradle.properties`를
   읽어 `android.enableMinifyInReleaseBuilds`가 **미설정 → 기본 `false`**임을
   재확인하고 `findings.md`에 옮긴다(research §3 — US4의 R8 관련 전제).
-- [ ] T004 [P] `scripts/run-device-tests.mjs`의 `FLOWS`에서 회귀 대상을
+- [X] T004 [P] `scripts/run-device-tests.mjs`의 `FLOWS`에서 회귀 대상을
   확인한다 — `scheduled-diary-notification.yml`(020)·
   `unified-permission-onboarding.yml`(021)·`photo-selection-over-limit.yml`
   (023). 새 흐름은 추가하지 않는다(이 스펙의 라운드는 실기기 수동 절차).
-- [ ] T005 [P] `findings.md` 뼈대를 만든다 — 024 `findings.md` §2 표에 채울
+- [X] T005 [P] `findings.md` 뼈대를 만든다 — 024 `findings.md` §2 표에 채울
   두 행(`batteryException: true`/`false`) + 삼성 One UI 화면 경로 자리 +
   §11 갱신 자리. 헤더에 기기(SM-S901N), Android 16/SDK 36, 삼성 One UI,
   세션 날짜. 갱신은 024 `findings.md` 직접 또는 027 `findings.md` + 024에서
@@ -90,7 +102,7 @@ findings 뼈대 준비.
 - [ ] T008 [P] 자동 생성 캐릭터를 `quiet`(금동이)로 세팅한다 — 007 캐릭터
   선택(개발자 탭 또는 `adb`로 `preferences/selection.json` 주입).
   **FR-009 — `narrative`는 선택하지 않는다**(로드맵 14번 몫).
-- [ ] T009 [P] 소스에서 배터리 버튼의 인텐트 액션을 특정한다(US3 사전
+- [X] T009 [P] 소스에서 배터리 버튼의 인텐트 액션을 특정한다(US3 사전
   작업, research §2) — `AutoDiarySettingsScreen`의 `onOpenBatterySettings`
   (testID `open-battery-settings`) 구현부와 021의 `PermissionsSection` /
   온보딩 배터리 단계를 본다. ⚠️ `src/onboarding/os-settings-port.ts` 주석은
@@ -264,7 +276,7 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
 
 **Purpose**: 회귀, 기기 없는 게이트, 문서 마무리.
 
-- [ ] T028 [P] 기기 없는 게이트를 확인한다(quickstart §6, SC-005·SC-006) —
+- [X] T028 [P] 기기 없는 게이트를 확인한다(quickstart §6, SC-005·SC-006) —
   `npm run test:logic` 전부 통과(`jest-projects.test.ts` 파일 수 검사 유지;
   T026 수행 시 그 스위트 포함), `npm run lint` eslint 0 error·tsc 클린·
   헌법 검사 위반 0(`checkScheduleFile` 포함)·prettier 클린.
