@@ -164,14 +164,25 @@ P1이 아닌 이유는 `adb whitelist` 동등 재현으로 US1·US2를 판정할
 ### User Story 4 - release APK가 헤드리스 자동 생성을 등록하고 완주시킨다 (Priority: P1)
 
 주인이 개발 PC 연결 없이 쓰는 release 빌드에서도, 024 §9가 고친 헤드리스
-태스크 등록이 성립해야 한다. release는 minify·R8·ProGuard가 켜지므로,
-`task.ts`가 모듈 최상단에서 부르는 `require("expo-task-manager")`
-부수 효과가 트리셰이킹으로 제거되면 `No task registered for key
-expo-task-manager`가 다시 나고 자동 생성이 죽는다.
+태스크 등록이 성립해야 한다. release는 debug와 (1) Hermes 바이트코드 사전
+컴파일, (2) `NODE_ENV=production` + `.env.production` 로딩, (3) Metro 없이
+번들 내장이 다르므로, `task.ts`가 모듈 최상단에서 부르는
+`require("expo-task-manager")` 부수 효과가 이 경로에서도 헤드리스 등록을
+성립시키는지는 release에서만 확인된다. 성립하지 않으면 `No task registered
+for key expo-task-manager`가 다시 나고 자동 생성이 죽는다.
+
+**이 스펙 실행 시점의 빌드 구성 사실**: 이 프로젝트는 release에서 R8/minify가
+**꺼져 있다** — `android/app/build.gradle`이 `android.enableMinifyInReleaseBuilds`를
+기본 `false`로 두고 `android/gradle.properties`에 이 속성이 설정돼 있지 않다.
+따라서 024 §11이 말한 "R8 side-effect 트리셰이킹"은 **현재 위험이 아니라
+minify가 나중에 켜질 때(로드맵 4번 "단독 구동용 Release 빌드 배포")의 잠재
+위험**이다. 이 스토리가 확인하는 것은 "현재 release 빌드 구성으로 §9 헤드리스
+등록이 성립하는가"이다.
 
 **Why this priority**: 024 §11이 "debug 1회로 충분, 다만 R8 side-effect
 트리셰이킹 잔여 위험은 다음 release 세션 1회 확인으로 닫힌다"고 판단해
-뒀다. 그 "1회"가 이 스토리다. release에서 헤드리스가 안 되면 배포 빌드로는
+뒀다. 그 "1회"가 이 스토리다 — 확인 대상은 현재 빌드 구성이며, minify OFF
+사실이 위험을 한 단계 낮춘다. release에서 헤드리스가 안 되면 배포 빌드로는
 자동 생성이 아예 동작하지 않는 것이므로 P1이다.
 
 **Independent Test**: AGENTS.md "release 빌드와 서명" 절차로 release APK 빌드
@@ -197,12 +208,14 @@ SUCCESS`) 확인.
    'alpharium-auto-diary'`가 있으며, `quiet` 일기가 그 날짜로 정확히 하나
    저장되고 판정 4갈래를 통과하며 `WM-WorkerWrapper: Worker result SUCCESS`가
    나온다.
-3. **Given** release에서 `No task registered`가 재현된다(R8이 부수 효과를
-   제거함), **When** 그것이 관측된다, **Then** 이것은 검증 차단 결함이므로
-   이 스펙에서 고친다 — `task.ts`의 등록 구문이 R8에 살아남도록 최소 수정
-   (예: `@__PURE__` 반의어 주석, 명시적 참조 유지, `proguard-rules.pro`에
-   `-keep` 규칙)하고 계약 테스트로 잠근 뒤 release로 재확인한다. `findings.md`
-   §11 갱신.
+3. **Given** release에서 `No task registered`가 재현된다(minify OFF에서도
+   Hermes DCE 또는 Metro `@__PURE__` 주입이 모듈 최상단 부수 효과를 제거하는
+   경우), **When** 그것이 관측된다, **Then** 이것은 검증 차단 결함이므로 이
+   스펙에서 고친다 — `task.ts`의 등록 구문이 DCE에 살아남도록 최소 수정
+   (`AUTO_DIARY_TASK_REGISTERED` 상수의 명시적 참조 유지가 우선, `research.md`
+   §4 옵션 A)하고 계약 테스트로 잠근 뒤 release로 재확인한다. `proguard-rules.pro`
+   `-keep` 규칙은 minify가 켜질 때만 효과가 있으므로 현재는 넣지 않는다(로드맵
+   4번의 몫). `findings.md` §11 갱신.
 
 ---
 
@@ -265,8 +278,12 @@ SUCCESS`) 확인.
   스펙에서 기능 확장).
 - **FR-008**: 이 스펙은 새 사용자 기능·새 영속 저장 계층·새 네이티브 모듈·
   검증 전용 로그 모듈·새 진단 패널을 하나도 추가하지 않는다(024 SC-007
-  계승). FR-007의 검증 차단 결함 수정도 `src/schedule/`·`android/` 안의
-  최소 변경에 한하며 새 파일을 만들지 않는다.
+  계승). FR-007의 검증 차단 결함 수정도 `src/schedule/task.ts` 1~3줄
+  (`AUTO_DIARY_TASK_REGISTERED` 명시적 참조 유지, `research.md` §4 옵션 A)에
+  한하며 새 파일을 만들지 않는다. 빌드 설정(`android/gradle.properties`의
+  minify 토글, `metro.config.js`, `proguard-rules.pro`)은 건드리지 않는다 —
+  release minify를 켜는 것은 로드맵 4번의 몫이고, `proguard-rules.pro`
+  `-keep` 규칙은 minify가 꺼진 현재 아무 효과가 없다.
 - **FR-009**: `narrative`(exaone) 헤드리스 완주 불가와 EXAONE mojibake는 이
   스펙의 범위 밖이다 — 로드맵 14번. 이 스펙의 모든 실측은 `quiet`(kanana)로
   수행한다. 14번 세션과 같은 실기기 세션에서 함께 돌릴 때 14번 쪽 관측이
@@ -300,7 +317,8 @@ SUCCESS`) 확인.
 - **release 헤드리스 확인 관측(release headless observation)**: release APK의
   서명 확인 결과, Metro 없이 실행 여부, 설정 탭 진입 시 잡 등록 여부,
   헤드리스 강제 실행 시 `No task registered` 부재 여부, `quiet` 완주 여부
-  (`writingMs`·`Worker result`), R8 트리셰이킹 재현 여부와 수정 내역.
+  (`Worker result`), DCE로 등록 부수 효과가 제거됐는지(minify OFF 기준 —
+  Hermes DCE/Metro `@__PURE__`) 재현 여부와 수정 내역.
 
 ## Success Criteria *(mandatory)*
 
@@ -325,8 +343,9 @@ SUCCESS`) 확인.
   WorkManager 잡이 등록되고, 화면 끈 잠긴 상태 헤드리스 강제 실행에서
   `No task registered for key expo-task-manager`가 나오지 않으며 `quiet`
   일기가 그 날짜로 정확히 하나 저장되고 `Worker result SUCCESS`가 나오는
-  것이 logcat으로 확인된다. 024 `findings.md` §11의 R8 잔여 위험이 이
-  결과로 갱신돼 있다.
+  것이 logcat으로 확인된다. 024 `findings.md` §11이 이 결과로 갱신돼 있고,
+  "R8 트리셰이킹 잔여 위험"이 minify OFF 사실과 함께 "현재 빌드 구성에서는
+  성립하지 않으며 minify를 켜면(로드맵 4번) 재검토"로 정정돼 있다.
 - **SC-005**: 이 스펙의 코드 변경은 FR-007이 규정한 "검증 차단 결함"에
   한하며, 그런 결함이 없었다면 `git diff src/`가 0줄이다. 결함이 있어
   고쳤다면 그 변경에 대한 계약 테스트가 추가돼 있고 위반 주입으로 방어가
