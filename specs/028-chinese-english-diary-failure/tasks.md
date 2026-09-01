@@ -104,7 +104,9 @@ SC-001·SC-002 충족.
 - [ ] T027 [US2] `npm run lint` — eslint·tsc·헌법 검사·prettier 전부 통과. `REJECT_REASONS` 4개(SC-006).
 - [ ] T027a [US2] 실기기 재확인 (FR-014·SC-004·SC-005, C-LJ-A7) — 두 캐릭터로 재생성해 일기가 저장되고 목록에 반영되는 것을 확인. 금동이(`quiet`) 생성이 회귀 없이 정상. debug 1회로 충분(순수 로직, 012 기준). `findings.md` CorrectionRecord `deviceReverify`에.
 
-**Checkpoint**: 정상 본문 통과, 갈래 수 4 유지, 회귀 없음, 실기기 저장·목록 반영 확인.
+**⛔ Phase 4 미발동** — `chosenPath`가 두 캐릭터 모두 `US4`(모델 부적합). T022~T027a 해당 없음.
+
+**Checkpoint** (해당 시): 정상 본문 통과, 갈래 수 4 유지, 회귀 없음, 실기기 저장·목록 반영 확인.
 
 ---
 
@@ -129,7 +131,9 @@ qwen3 한글 혼입). 발동 안 하면 건너뛴다.
 - [ ] T033 [US3] `npm run lint` — 전부 통과.
 - [ ] T034 [US3] 실기기 대조 생성 — 샤오바이·모카 → 출력이 각각 중국어·영어, 일기 저장됨. 금동이·오드·루이 → 여전히 한국어, 되뱉기·지어내기 위반 없음(005~017의 지시 줄 추가 근거 역검증). debug 1회(C-LJ-B8, 012 기준). `findings.md`에 결과.
 
-**Checkpoint**: 두 캐릭터가 캐릭터 언어로 저장, 다른 세 캐릭터 회귀 없음.
+**⛔ Phase 5 미발동** — `chosenPath`가 두 캐릭터 모두 `US4`. `eyeballVerdict`는 `wrong-language`가 아니라 `unfinished`(qwen3 `<think>` 미완, gemma3 반복 붕괴). T028~T034 해당 없음.
+
+**Checkpoint** (해당 시): 두 캐릭터가 캐릭터 언어로 저장, 다른 세 캐릭터 회귀 없음.
 
 ---
 
@@ -154,8 +158,8 @@ spec US4, contracts/language-judgment.md C절.
 
 - [x] T041 최종 기기 없는 게이트 — `npm test`(기기 불필요 전부, ~13초)·`npm run lint` 통과. 교정이 있었으면 신규 계약 테스트 포함.
 - [x] T042 `git diff` 검토 — 교정 없으면 `src/` 0줄(문서·findings만). 교정 있으면 `acceptance.ts` 또는 `prompt.ts` 한 곳 + `__tests__/diary/*.test.ts` 신규 케이스만. `on-device.ts`에 임시 로그 흔적 없음.
-- [ ] T043 커밋 — 한국어 메시지. `028-chinese-english-diary-failure` 브랜치(`git branch --show-current` 재확인, AGENTS.md). `.githooks/pre-commit`이 `main` 직접 커밋을 막음.
-- [ ] T044 (선택) PR 생성 — `main`으로. 로드맵 17번·(조건부)14번 갱신 포함.
+- [x] T043 커밋 — 3커밋 (2608ee8 스펙·로그삽입 / edcb4e5 환경재구축 / 2719ee6 조사완료·로그제거). 한국어 메시지, 브랜치 확인. — 한국어 메시지. `028-chinese-english-diary-failure` 브랜치(`git branch --show-current` 재확인, AGENTS.md). `.githooks/pre-commit`이 `main` 직접 커밋을 막음.
+- [x] T044 PR #42 생성 (main <- 028). 로드맵 17번(완료 표시)·14번(qwen3·gemma3 추가) 갱신 포함.
 
 ---
 
