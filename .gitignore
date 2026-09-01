@@ -69,3 +69,7 @@ lerna-debug.log*
 # (scripts/samples/README.md 참조). 폴더 구조만 .gitkeep으로 유지한다
 scripts/samples/**/*.jpg
 scripts/samples/**/*.jpeg
+
+# 028 — 조사용 원시 logcat 덤프. 기기 노이즈가 섞이고 커질 수 있다
+# (specs/028-chinese-english-diary-failure/tasks.md T006). 폴더는 .gitkeep으로 유지
+specs/028-chinese-english-diary-failure/logs/*.log
