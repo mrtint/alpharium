@@ -534,8 +534,6 @@ export function createOnDeviceBackend(
         const run = await runWithTimeout(engine, prompt, timeoutMs);
         const writingMs = Date.now() - writingStart;
         if (run.timedOut) {
-          // [028-investigation] 조사 후 제거 — spec 028 FR-003a
-          console.log("[028-investigation] timed-out");
           await cleanupUsedPhotos();
           return { kind: "timed-out" };
         }
@@ -551,14 +549,6 @@ export function createOnDeviceBackend(
         );
 
         if (!verdict.ok) {
-          // [028-investigation] 조사 후 제거 — spec 028 FR-003a. 거부된 본문 전문을
-          // 채록하기 위한 임시 로그. Verdict·RunResult 타입은 건드리지 않는다.
-          console.log(
-            "[028-investigation] rejected",
-            verdict.why,
-            run.run.ending.kind,
-            JSON.stringify(run.run.text),
-          );
           await cleanupUsedPhotos();
           // 끊긴 것은 별도 갈래로 말한다 — 사용자가 할 일이 다르다(FR-017d).
           // 앱을 떠나서 끊긴 것이지 모델이 이상한 글을 쓴 것이 아니다.
@@ -577,8 +567,6 @@ export function createOnDeviceBackend(
         // 예외를 던지지 않는다(engine.md E5). 실패는 값이어야 파이프라인이 어느
         // 단계에서 멈췄는지 말할 수 있다(002 FR-019).
         const reason = error instanceof Error ? error.message : String(error);
-        // [028-investigation] 조사 후 제거 — spec 028 FR-003a
-        console.log("[028-investigation] generation-failed", JSON.stringify(reason));
         return { kind: "generation-failed", reason };
       } finally {
         // **성공·실패·예외 어느 경로로도 정리된다**(E2). 정리되지 않으면 다음 요청이

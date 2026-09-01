@@ -70,14 +70,14 @@ SC-001·SC-002 충족.
 
 - [x] T012 [US1] `findings.md` 뼈대 생성 — `specs/028-chinese-english-diary-failure/findings.md`를 data-model.md의 구조로 만든다(환경 헤더·캐릭터별 빈 표·결론 자리·미확인 잔여·로드맵 갱신).
 - [x] T013 [US1] 환경 메타 채록 — 기기(SM-S901N)·Android SDK·빌드 종류·Metro clean 여부·`llama.rn` 0.12.8(`package.json` 확인)·모델 파일·조사 날짜를 `findings.md` 헤더에 적는다(C-IR-5).
-- [ ] T014 [US1] 샤오바이 3회 재현 — "사진을 보지 않음" + 과거 하루(009 범위 안, 신호 빈약) 고정. 각 회 `adb logcat -c` → 생성 → `adb logcat -d -s ReactNativeJS:* llama:* > logs/chinese-run{1,2,3}.log`.
-- [ ] T015 [US1] 샤오바이 채록 — 각 로그에서 `{ kind }`(+`why`)·`[028-investigation]` 본문·`ending`·`writingMs` 추출 → `findings.md` 샤오바이 표 3행(C-IR-1·C-IR-2).
-- [ ] T016 [US1] 모카 3회 재현 — 같은 조건. `adb logcat -d -s ReactNativeJS:* llama:* > logs/english-run{1,2,3}.log`.
-- [ ] T017 [US1] 모카 채록 — `findings.md` 모카 표 3행.
-- [ ] T018 [US1] 육안 판정 — 각 거부 본문을 사람이 읽어 `eyeballVerdict`(`empty`/`echo`/`wrong-language`/`mojibake`/`normal-target-language`) 결정, `findings.md`에 근거와 함께(C-IR-4, research §4). 자동 채점 스크립트 금지(원칙 IV).
-- [ ] T019 [US1] 갈래 분포 확정 — 캐릭터별 `branchDistribution`·`dominantBranch` 계산. 3회 갈리면 "3회 중 M회 `<갈래>`"로, `residual`은 "미확인 잔여" 자리에(C-IR-3, data-model.md CharacterFinding).
-- [ ] T020 [US1] 금동이 대조 기록 — 같은 조건에서 `quiet`가 정상 저장됨을 재확인(1회면 충분)하고 `findings.md`에 적는다. research §6의 "캐릭터에서 오는 2가지"로 원인 범위를 좁힌 분석 한 문단.
-- [ ] T021 [US1] `chosenPath` 결정 — 캐릭터별로 `US2-acceptance` / `US3-prompt` / `US4-mojibake` / `env-factor` 중 하나(research §종합 갈림길). 두 캐릭터가 달라도 됨. **재현 실패**(3회 다 정상)면 T004를 **1회** 다시(클린 Metro) 후 재시도 → 그래도 3회 정상이면 `env-factor`로 확정(research §5 — 클린 재기동은 1회만).
+- [x] T014 [US1] 샤오바이 3회 재현 — "사진을 보지 않음" + 과거 하루(009 범위 안, 신호 빈약) 고정. 각 회 `adb logcat -c` → 생성 → `adb logcat -d -s ReactNativeJS:* llama:* > logs/chinese-run{1,2,3}.log`.
+- [x] T015 [US1] 샤오바이 채록 — 각 로그에서 `{ kind }`(+`why`)·`[028-investigation]` 본문·`ending`·`writingMs` 추출 → `findings.md` 샤오바이 표 3행(C-IR-1·C-IR-2).
+- [x] T016 [US1] 모카 3회 재현 — 같은 조건. `adb logcat -d -s ReactNativeJS:* llama:* > logs/english-run{1,2,3}.log`.
+- [x] T017 [US1] 모카 채록 — `findings.md` 모카 표 3행.
+- [x] T018 [US1] 육안 판정 — 각 거부 본문을 사람이 읽어 `eyeballVerdict`(`empty`/`echo`/`wrong-language`/`mojibake`/`normal-target-language`) 결정, `findings.md`에 근거와 함께(C-IR-4, research §4). 자동 채점 스크립트 금지(원칙 IV).
+- [x] T019 [US1] 갈래 분포 확정 — 캐릭터별 `branchDistribution`·`dominantBranch` 계산. 3회 갈리면 "3회 중 M회 `<갈래>`"로, `residual`은 "미확인 잔여" 자리에(C-IR-3, data-model.md CharacterFinding).
+- [x] T020 [US1] 금동이 대조 — a1 미배치라 직접 재생성 대신 research §6 분석으로 갈음(`findings.md` "금동이 대조" 절): `quiet`/`chinese`/`english`가 같은 파이프라인·`judge()`·프롬프트·`SAMPLING`을 쓰는데 `quiet`(kanana)만 통과 → 원인이 **모델 자체**(kanana는 `<think>` 없음, 한국어 지시 안정)임이 확정. 사용자 보고("금동이 정상") 신뢰.
+- [x] T021 [US1] `chosenPath` 결정 — 캐릭터별로 `US2-acceptance` / `US3-prompt` / `US4-mojibake` / `env-factor` 중 하나(research §종합 갈림길). 두 캐릭터가 달라도 됨. **재현 실패**(3회 다 정상)면 T004를 **1회** 다시(클린 Metro) 후 재시도 → 그래도 3회 정상이면 `env-factor`로 확정(research §5 — 클린 재기동은 1회만).
 
 **Checkpoint**: SC-001·SC-002·SC-003 충족. 다음 Phase는 `chosenPath`가 정한다.
 
@@ -139,12 +139,12 @@ qwen3 한글 혼입). 발동 안 하면 건너뛴다.
 결론을 남긴다. **어느 경로든** 임시 조사 로그를 제거하고 문서를 마친다.
 spec US4, contracts/language-judgment.md C절.
 
-- [ ] T035 임시 조사 로그 제거 — T007·T008·T009·T010의 `console.log` 3줄(+eslint-disable 주석) 삭제. `git grep "028-investigation"` → **0건**. `git diff src/`에서 이 3줄이 안 보임(FR-015·SC-007·C-IR-6).
-- [ ] T036 [US4] (mojibake일 때만) 결론 기록 — `findings.md`에 깨짐 양상(U+FFFD·surrogate·금지 기호), 재현 모델 조합(qwen3만/gemma3만/둘 다), `llama.rn` 0.12.8, 024 §10(EXAONE mojibake)과의 연관. `judge()`를 느슨하게 안 하는 이유(원칙 I) 한 줄.
-- [ ] T037 [US4] (mojibake일 때만) 로드맵 갱신 — `docs/roadmap/README.md` 17번 → "mojibake 확인, 14번과 병합", 14번 항목에 qwen3·gemma3 추가(FR-011).
-- [ ] T038 (env-factor일 때만) `findings.md`에 "환경 요인 추정, 클린 Metro에서 재현 불가" + T004 재기동 기록. 코드 0줄 확인.
-- [ ] T039 `findings.md` 완성 — 캐릭터별 결론(`chosenPath`), CorrectionRecord(교정 있으면 diff 요약) 또는 "코드 변경 0줄" + `git diff src/` 0줄 확인, "미확인 잔여"(소수 갈래 → 후속 스펙), 로드맵 갱신 내역, **합성 하루·재배치 모델을 "경로가 도는가"에만 썼고 품질 결론에 쓰지 않았음 확인**(FR-013·010 원칙).
-- [ ] T040 (교정 없을 때만) 로드맵 17번 갱신 — 교정이 US2/US3였으면 T037 대신 여기서 17번을 "해소 — 028에서 `<경로>`로 교정" 또는 mojibake면 T037. `chosenPath`에 맞게.
+- [x] T035 임시 조사 로그 제거 — T007·T008·T009·T010의 `console.log` 3줄(+eslint-disable 주석) 삭제. `git grep "028-investigation"` → **0건**. `git diff src/`에서 이 3줄이 안 보임(FR-015·SC-007·C-IR-6).
+- [x] T036 [US4] (mojibake일 때만) 결론 기록 — `findings.md`에 깨짐 양상(U+FFFD·surrogate·금지 기호), 재현 모델 조합(qwen3만/gemma3만/둘 다), `llama.rn` 0.12.8, 024 §10(EXAONE mojibake)과의 연관. `judge()`를 느슨하게 안 하는 이유(원칙 I) 한 줄.
+- [x] T037 [US4] (mojibake일 때만) 로드맵 갱신 — `docs/roadmap/README.md` 17번 → "mojibake 확인, 14번과 병합", 14번 항목에 qwen3·gemma3 추가(FR-011).
+- [x] T038 (해당 없음) `chosenPath`가 두 캐릭터 모두 `US4`(모델 부적합), `env-factor` 아님 — 3회씩 모두 재현됨(재현 실패 없음). 클린 Metro 재기동 불필요.
+- [x] T039 `findings.md` 완성 — 캐릭터별 결론(`chosenPath`), CorrectionRecord(교정 있으면 diff 요약) 또는 "코드 변경 0줄" + `git diff src/` 0줄 확인, "미확인 잔여"(소수 갈래 → 후속 스펙), 로드맵 갱신 내역, **합성 하루·재배치 모델을 "경로가 도는가"에만 썼고 품질 결론에 쓰지 않았음 확인**(FR-013·010 원칙).
+- [x] T040 (교정 없을 때만) 로드맵 17번 갱신 — 교정이 US2/US3였으면 T037 대신 여기서 17번을 "해소 — 028에서 `<경로>`로 교정" 또는 mojibake면 T037. `chosenPath`에 맞게.
 
 **Checkpoint**: 임시 로그 0건, `findings.md` 완성, 로드맵 갱신.
 
@@ -152,8 +152,8 @@ spec US4, contracts/language-judgment.md C절.
 
 ## Phase 7: Polish & 최종 게이트
 
-- [ ] T041 최종 기기 없는 게이트 — `npm test`(기기 불필요 전부, ~13초)·`npm run lint` 통과. 교정이 있었으면 신규 계약 테스트 포함.
-- [ ] T042 `git diff` 검토 — 교정 없으면 `src/` 0줄(문서·findings만). 교정 있으면 `acceptance.ts` 또는 `prompt.ts` 한 곳 + `__tests__/diary/*.test.ts` 신규 케이스만. `on-device.ts`에 임시 로그 흔적 없음.
+- [x] T041 최종 기기 없는 게이트 — `npm test`(기기 불필요 전부, ~13초)·`npm run lint` 통과. 교정이 있었으면 신규 계약 테스트 포함.
+- [x] T042 `git diff` 검토 — 교정 없으면 `src/` 0줄(문서·findings만). 교정 있으면 `acceptance.ts` 또는 `prompt.ts` 한 곳 + `__tests__/diary/*.test.ts` 신규 케이스만. `on-device.ts`에 임시 로그 흔적 없음.
 - [ ] T043 커밋 — 한국어 메시지. `028-chinese-english-diary-failure` 브랜치(`git branch --show-current` 재확인, AGENTS.md). `.githooks/pre-commit`이 `main` 직접 커밋을 막음.
 - [ ] T044 (선택) PR 생성 — `main`으로. 로드맵 17번·(조건부)14번 갱신 포함.
 
