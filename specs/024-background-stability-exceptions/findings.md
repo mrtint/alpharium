@@ -32,8 +32,14 @@
 >   열어도 `task.ts` 최상단 `defineTask` → `BackgroundTaskConsumer.didRegister()`
 >   → WorkManager 잡 복원/유지(설정 탭 `register()` 불필요) → SC-006 충족.
 > - **§7 Maestro 회귀 — 2차 세션에서 완료**. 020·021·023 흐름 3개 전부 PASS.
-> - **§2 배터리 예외/무예외 소크 — 미수행**(사용자 결정으로 건너뜀). 자연
->   15분+ 주기 대기가 필요하고 시간이 오래 걸린다.
+> - **§2 배터리 예외/무예외 소크 — 스펙 027로 이관**(SC-003·SC-004 판정을
+>   027 US1·US2가 맡는다). 자연 15분+ 주기·24h 비동기 대기 필요.
+> - **§2 삼성 One UI 배터리 화면 경로 + §11 release 헤드리스 확인 — 027에서
+>   완료**(2026-09-01). 배터리 인텐트 = `IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+>   → 삼성 "배터리 사용 관리"(4탭 경로). release APK 빌드·설치 후 헤드리스
+>   강제 실행에서 `No task registered` 부재 + `Worker result SUCCESS` →
+>   §9 수정이 release에서도 성립, R8 트리셰이킹 잔여 위험 닫힘. §2·§11 절
+>   갱신됨.
 > - **부수 관측**: EXAONE(narrative) 출력이 **깨진 UTF-8 surrogate(mojibake)**로
 >   나온다 — `judge()`는 통과시켰다. `llama.rn` + EXAONE-3.5 Q4_K_M 인코딩
 >   문제로 보인다(스펙 024 범위 밖, §10에 별도 기록).
@@ -91,24 +97,38 @@ Samsung 절전으로 이 세션에서 확인 못 함. 파이프라인·엔진 �
 
 ## §2 배터리 라운드 관측 (US2, SC-003·SC-004)
 
+> **이 절의 잔여 실측은 스펙 027로 이관됐다** — `specs/027-024-residual-verification/`.
+> 아래 표·판정은 027 `findings.md`가 1차 기록이며, 여기는 진행 상태만 남긴다
+> (FR-011 — 중복 금지).
+
 **측정 방법**: quickstart.md §2(예외)·§3(무예외 24h). `dumpsys deviceidle
 whitelist` +/−, `am get-standby-bucket`, `dumpsys jobscheduler`의 `Minimum
 latency`, `adb logcat`의 `task-entered`.
 
 | batteryException | targetHour | roundStartedAt | triggerEnteredAt[] | delayFromTargetMin[] | standbyBucket | minLatencyReported | screenTouchedDuringRound | notes |
 |---|---|---|---|---|---|---|---|---|
-| _(미측정)_ true | | | | | | | | |
-| _(미측정)_ false | | | | | | | false | 24h 소크 |
+| _(027 US1 대기 — 15분+ 주기 소크)_ true | | | | | | | | |
+| _(027 US2 대기 — 24h 비동기 소크)_ false | | | | | | | false | 24h 소크 |
 
 **MUST 판정**:
-- [ ] SC-003 (예외): 목표 시각으로부터 첫 시도 ≤ 60분 — _(미판정)_
-- [ ] SC-002·SC-004 (무예외): 목표 시각 후 24시간 안 ≥ 1회 시도 — _(미판정)_
+- [ ] SC-003 (예외): 목표 시각으로부터 첫 시도 ≤ 60분 — **027 US1 대기**
+- [ ] SC-002·SC-004 (무예외): 목표 시각 후 24시간 안 ≥ 1회 시도 — **027 US2 대기**
 
-**SHOULD**: 예외 시 3회 이상 표본의 과반 ≤ 40분 — _(미측정, 표본 부족 시
+**SHOULD**: 예외 시 3회 이상 표본의 과반 ≤ 40분 — _(027 US1, 표본 부족 시
 원시값만)_
 
 **배터리 인텐트가 실제 도착한 삼성 One UI 설정 화면 경로** (021 T030 관행):
-_(미기록)_
+✅ **확인됨 (2026-09-01, 027 US3, SM-S901N / Android 16 / 삼성 One UI)** —
+설정 탭 "배터리 설정 열기" 버튼 → `android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+인텐트 → 삼성이 **`com.android.settings/.Settings$AppBatteryUsageActivity`
+("배터리 사용 관리" 앱 목록)** 으로 라우팅. 표준 안드로이드의 "배터리
+최적화" 목록이 아니다. 여기서 예외를 부여하려면 목록에서 앱 검색·탭 →
+"배터리" 상세(제한 없음/최적화/제한 라디오) → **"제한 없음" 선택**까지
+**총 4탭**. 딥링크로 앱별 예외 토글 화면에 바로 도달하지 않는다. "제한
+없음" 선택 시 `am get-standby-bucket`이 **`10` → `5`**로 바뀌고
+`dumpsys deviceidle whitelist`에 등재된다 — `adb shell dumpsys deviceidle
+whitelist +`(024가 재현에 쓴 것)와 최종 결과가 동일함이 실측으로 확인됐다.
+상세: 027 `findings.md` §3.
 
 ---
 
@@ -536,6 +556,40 @@ JNI 심볼 — 을 건드릴 때만 release 재확인")에 이 변경이 해당�
 진입 → 화면 끈 헤드리스 강제 실행으로 `No task registered` 부재를 한 번
 확인하면 이 위험도 닫힌다** — 그때까지는 debug 확인을 근거로 진행.
 
+### ★ 잔여 위험 닫힘 (2026-09-01, 스펙 027 US4, SM-S901N)
+
+release APK를 실제로 빌드해 확인 완료:
+
+- **빌드**: `prebuild --platform android --clean` → 키 복원 →
+  `NODE_ENV=production ./gradlew assembleRelease`. BUILD SUCCESSFUL
+  **19m 8s**, `app-release.apk` 175,579,857 bytes, `apksigner verify`
+  `Signer #1 certificate DN: CN=alpharium`. **`android.enableMinifyInReleaseBuilds`
+  미설정 → minify/R8 OFF** — 024 §11이 우려한 "R8 트리셰이킹"은 **현재
+  빌드 구성에서는 애초에 일어나지 않는다**(로드맵 4번이 minify를 켤 때의
+  잠재 위험으로 남는다).
+- **설치·실행**: debug 앱 uninstall(데이터는 `adb exec-out`으로 백업) →
+  release 설치 → `adb reverse --remove-all` 후 실행, `Unable to load
+  script` 없음, `prod` 환경으로 뜸(탭 3개, 개발자 탭 없음).
+- **헤드리스 등록·실행**: 설정 탭 `auto-diary-toggle` ON + 알림 권한 허용 →
+  `D/BackgroundTaskModule: registerTaskAsync` → `I/TaskService: Registered
+  task with name 'alpharium-auto-diary'` → `didRegister` → `Enqueuing
+  worker ... '15' minutes delay`. `JOB #u0a570/0 .../SystemJobService`,
+  `Minimum latency: +14m59s992ms`.
+- **강제 실행**: `deviceidle whitelist +`(standby bucket `5`) + 화면 끔
+  (`deviceLocked=1`) + `cmd jobscheduler run -f com.anonymous.alpharium 0`
+  → logcat에 **`No task registered for key expo-task-manager` 및
+  `Unregistering task` 둘 다 부재**, `Executing task 'alpharium-auto-diary'`
+  → `Started headless task 1` → `Finished headless task 1` →
+  `WM-WorkerWrapper: Worker result SUCCESS`.
+- **결론**: **§9 수정(`task.ts` 모듈 최상단 `defineTask` 부수 효과)이
+  release 빌드(Hermes 바이트코드, minify OFF)에서도 헤드리스 태스크
+  등록을 성립시킨다.** DCE/트리셰이킹이 이 부수 효과를 제거하지 않음이
+  실측으로 확인됐다(`dceTrimReproduced = false`). 코드 변경 0줄. `quiet`
+  생성 완주는 §9의 debug 확인(`writingMs` 52.5초)으로 갈음 — 모델이
+  uninstall로 삭제됐고 release는 `run-as` 불가라 재배치하지 않았으나,
+  release도 동일 파이프라인이므로 모델만 있으면 돈다. 상세: 027
+  `findings.md` §4.
+
 ---
 
 ## §10 부수 관측 — EXAONE(narrative) 출력 mojibake (스펙 024 범위 밖)
@@ -592,17 +646,21 @@ pair**(`\udcec삤\udceb뒛...` 꼴)로 나왔다. `title`에는 프롬프트가
 
 **남은 것:**
 
-- **T012·T013·T014 / T032·T033 — §2 배터리 예외/무예외 소크** — 사용자
-  결정으로 건너뜀(2·3차 세션 모두). 자연 15분+ 주기 대기(예외: 목표
-  시각 후 1시간 안 1회 / 무예외: 24시간 안 1회)가 필요하고 시간이 오래
-  걸린다. `cmd jobscheduler run -f`는 삼성 절전이 앱 도즈 시 거부하므로
-  자연 주기 대기만 유효. **SC-003·SC-004는 미판정 상태로 남는다.**
-- **배터리 인텐트가 도착한 삼성 One UI 설정 화면 경로** — 미기록(설정
-  탭 "배터리 설정 열기" 버튼의 실제 도착지).
-- **release APK로 §9 헤드리스 1회 확인** — §11의 잔여 위험(R8 트리셰이킹)
-  을 닫기 위한 것. debug 확인으로 진행 근거는 섰다.
+- **T012·T013·T014 / T032·T033 — §2 배터리 예외/무예외 소크** — **스펙
+  027로 이관.** 예외 소크(SC-003)는 027 US1, 무예외 24h 소크(SC-004)는
+  027 US2. 자연 15분+ 주기·24h 비동기 대기가 필요해 별도 실기기 세션에서
+  수행한다. **SC-003·SC-004는 027이 판정한다.**
+- ~~**배터리 인텐트가 도착한 삼성 One UI 설정 화면 경로** — 미기록~~ →
+  ✅ **027 US3에서 확인 완료** (2026-09-01). `IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+  → 삼성 "배터리 사용 관리"(`AppBatteryUsageActivity`) → alpharium 4탭 →
+  "제한 없음" → standby bucket `10`→`5`. §2 절 갱신됨.
+- ~~**release APK로 §9 헤드리스 1회 확인** — §11의 잔여 위험(R8 트리셰이킹)~~ →
+  ✅ **027 US4에서 확인 완료** (2026-09-01). release APK(minify OFF,
+  `CN=alpharium`) 빌드·설치, 헤드리스 강제 실행에서 `No task registered`
+  부재 + `Worker result SUCCESS`. §9 수정이 release에서도 성립. §11 절
+  갱신됨(잔여 위험 닫힘).
 - **`narrative` 헤드리스가 "느린 완주"인지 "무한 루프"인지** — 26분에서
   관측 중단. 실용상 무의미(어느 쪽이든 자동 생성 불가)하나 §10 mojibake
-  원인 규명에는 관계될 수 있다.
+  원인 규명에는 관계될 수 있다. **로드맵 14번.**
 - **EXAONE mojibake** (§10) — 별도 스펙. T034가 "narrative 헤드리스
-  완주 불가"까지 밝혔으므로 별도 스펙의 우선순위가 올라간다.
+  완주 불가"까지 밝혔으므로 별도 스펙의 우선순위가 올라간다. **로드맵 14번.**

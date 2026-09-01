@@ -286,7 +286,7 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   `npm run test:logic` 전부 통과(`jest-projects.test.ts` 파일 수 검사 유지;
   T026 수행 시 그 스위트 포함), `npm run lint` eslint 0 error·tsc 클린·
   헌법 검사 위반 0(`checkScheduleFile` 포함)·prettier 클린.
-- [ ] T029 `git diff --stat`으로 코드 변경 범위를 대조한다(SC-005) — 기본
+- [X] T029 `git diff --stat`으로 코드 변경 범위를 대조한다(SC-005) — 기본
   경로면 `src/` 0줄(변경은 `specs/027-*`·`specs/024-*/findings.md`·
   `AGENTS.md`뿐). T025 수행 시 `src/schedule/task.ts` 1~3줄 +
   `__tests__/schedule/background-generation.test.ts`만. 새 `src/` 파일 0·
@@ -297,14 +297,17 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   `npm run test:device`로 020·021·023 흐름 PASS.
   ⚠️ `unified-permission-onboarding.yml`은 `pm clear`로 앱 데이터를 날리므로
   **맨 마지막에**, 또는 이후 T006~T008 재배치.
-- [ ] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7) — §2 표
-  두 행(T013·T018) + 삼성 One UI 화면 경로(T021) + §11(T024 또는 T027).
-  "미확인 잔여" 목록에서 "§2 배터리 예외/무예외 소크", "배터리 인텐트가
-  도착한 삼성 One UI 설정 화면 경로", "release APK로 §9 헤드리스 1회 확인"
-  세 줄을 해소 표기 또는 제거. 한쪽에만(중복 금지).
-- [ ] T032 AGENTS.md에 결론 한 문단을 추가한다(FR-010, quickstart §7) —
-  "024 —" 절 또는 새 "027 —" 절에 배터리 소크 판정(SC-001·SC-002),
-  삼성 One UI 배터리 화면 경로, release 헤드리스 확인 결과, minify OFF 사실.
+- [~] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7). **US3·US4분
+  완료** (2026-09-01) — §2 절에 삼성 One UI 화면 경로(027 US3) 기록 + "이관"
+  포인터, §11에 "잔여 위험 닫힘" 절(027 US4) 추가, 상단 배너·"남은 것"
+  목록에서 삼성 화면·release 헤드리스 두 줄 해소 표기, 배터리 소크 두 줄은
+  "027로 이관"으로. **남은 부분** — §2 표의 `batteryException: true`/`false`
+  두 행(027 US1·US2 대기).
+- [~] T032 AGENTS.md에 027 절 추가(FR-010, quickstart §7). **US3·US4분
+  완료** (2026-09-01) — 025 절 뒤에 "### 027 —" 절 신규: minify OFF 발견,
+  US3 삼성 One UI 4탭 경로, US4 release 헤드리스 확인(`No task registered`
+  부재 + `Worker result SUCCESS`, 코드 0줄), Metro 함정 재확인, 실기기
+  상태 변경, 남은 US1·US2. **남은 부분** — US1·US2 판정 후 그 문단 갱신.
 - [ ] T033 `git branch --show-current`로 `027-024-residual-verification`
   브랜치임을 확인한 뒤 커밋한다 — 한국어 메시지(헌법 「개발 방식」),
   `main` 직접 커밋 금지(`.githooks/pre-commit`이 막음). 기본 경로면
