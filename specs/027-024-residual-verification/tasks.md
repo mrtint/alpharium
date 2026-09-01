@@ -205,16 +205,16 @@ findings에 원시값과 라벨.
 배터리 버튼을 실제로 누름 → `dumpsys activity activities`로 최상위 액티비티·
 제목·경로 기록 → "제한 없음" 선택 → 복귀 → `am get-standby-bucket` `5` 확인.
 
-- [ ] T019 [US3] quickstart §3 절차 2~4를 수행한다 — 앱을 열어 배터리 버튼을
+- [X] T019 [US3] quickstart §3 절차 2~4를 수행한다 — 앱을 열어 배터리 버튼을
   **실제로 누르고**(`adb whitelist` 동등물로 갈음 안 함, contracts BS5),
   `adb shell dumpsys activity activities | head -40`에서 `landedActivity`,
   화면 제목(`screenTitle`), 삼성 One UI 설정 계층 경로(`reachPath`) 기록.
   그 화면에서 "제한 없음" 선택 → 앱 복귀 → `am get-standby-bucket` → `5`인지
   (`exceptionGrantable`·`standbyBucketAfterGrant`).
-- [ ] T020 [US3] quickstart §3 절차 5를 수행한다 — 버튼을 안 눌러도/실패해도
+- [X] T020 [US3] quickstart §3 절차 5를 수행한다 — 버튼을 안 눌러도/실패해도
   온보딩이 다음 단계로 가는지(`onboardingProceededWithoutGrant` — 021
   `batteryNoticeShown` 판정).
-- [ ] T021 [US3] `findings.md` §3 레코드(data-model §2)를 채운다 —
+- [X] T021 [US3] `findings.md` §3 레코드(data-model §2)를 채운다 —
   `trigger`·`intentAction`(T009에서 미리)·`landedActivity`·`screenTitle`·
   `reachPath`·`exceptionGrantable`·`standbyBucketAfterGrant`·
   `onboardingProceededWithoutGrant`·`failureMode`. `failureMode !== null`

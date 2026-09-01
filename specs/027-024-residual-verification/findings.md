@@ -173,22 +173,44 @@ US3·US4 진행. (이 세션에서 `adb reverse`는 이미 설정함.)
 
 ---
 
-## §3 삼성 One UI 배터리 화면 (US3, SC-003) — 실기기 대기
+## §3 삼성 One UI 배터리 화면 (US3, SC-003) — ✅ 완료 (2026-09-01)
 
-**측정 방법**: quickstart §3. 설정 "권한" 섹션(또는 온보딩 배터리 단계)의
-버튼을 **실제로 누름**(`adb whitelist` 동등물로 갈음 안 함) →
-`dumpsys activity activities`로 최상위 액티비티·제목·경로 기록 → "제한 없음"
-선택 → 복귀 → `am get-standby-bucket` `5` 확인.
+**측정 방법**: quickstart §3. 설정 탭 "자동으로 일기 쓰기" 화면의 "배터리
+설정 열기" 버튼(testID `open-battery-settings`)을 **실제로 눌러**(`adb whitelist`
+동등물로 갈음 안 함) `adb logcat`의 `ActivityTaskManager: START` 라인과
+`dumpsys activity activities`의 `topResumedActivity`로 도착 액티비티 확인 →
+앱 목록에서 alpharium 검색 → 배터리 상세 → "제한 없음" 선택 → `am
+get-standby-bucket` 전후 대조.
 
-| trigger | intentAction | landedActivity | screenTitle | reachPath | exceptionGrantable | standbyBucketAfterGrant | onboardingProceededWithoutGrant | failureMode |
-|---|---|---|---|---|---|---|---|---|
-| _(실기기 대기)_ | (T009: REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 또는 IGNORE_BATTERY_OPTIMIZATION_SETTINGS — 경로별) | | | | | | | |
+| 필드 | 값 |
+|---|---|
+| `trigger` | `settings-permissions` (설정 탭 "배터리 설정 열기" 버튼 = 온보딩 secondary와 같은 `openSettingsList()` 경로) |
+| `intentAction` | **`android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS`** (logcat: `START u0 {act=android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS xflg=0x4 cmp=com.android.settings/.Settings$AppBatteryUsageActivity}`) |
+| `landedActivity` | **`com.android.settings/.Settings$AppBatteryUsageActivity`** |
+| `screenTitle` | **"배터리 사용 관리"** (앱별 배터리 사용량 목록, "전체 (0)" 필터, 알파벳순 앱 리스트) |
+| `reachPath` | 앱 "배터리 설정 열기" 버튼 → **"배터리 사용 관리" 목록** → (앱 검색 "alpharium" 또는 목록 스크롤) → **alpharium 탭** → **"배터리" 상세**(제한 없음/최적화/제한 라디오 3개 + 열기/삭제/강제 중지) → **"제한 없음" 라디오 선택** — 총 4탭 |
+| `exceptionGrantable` | **true** — "제한 없음" 라디오("백그라운드에서도 이 앱이 배터리를 제한 없이 사용합니다") 선택 가능 |
+| `standbyBucketAfterGrant` | **`10` → `5`** (`am get-standby-bucket com.anonymous.alpharium`: 부여 전 `10`, "제한 없음" 선택 직후 `5`). `dumpsys deviceidle whitelist`에 `user,com.anonymous.alpharium,10569` 등재됨 |
+| `onboardingProceededWithoutGrant` | _(미측정 — 온보딩 배터리 단계는 이 세션에서 이미 completed 상태라 재노출 안 됨. flag.ts `batteryNoticeShown` 판정은 §0 T009 참조)_ |
+| `failureMode` | `null` — 버튼·인텐트·화면 전환·라디오 선택 전부 정상 |
 
-**판정 (contracts BS5)**:
-- [ ] `intentAction`·`landedActivity`·`screenTitle`·`reachPath` 전부 채워짐 — _(미측정)_
-- [ ] `exceptionGrantable === true` + 부여 후 `standbyBucket` `5` — _(미측정)_
-- [ ] `failureMode !== null`이면 검증 차단 여부 판단(US1은 `adb whitelist`로
-  재현 가능하므로 대개 차단 아님, 실사용자 영향이면 별도 스펙 후보로 명시)
+**판정 (contracts BS5, SC-003)**: ✅ 충족.
+- `intentAction`·`landedActivity`·`screenTitle`·`reachPath` 전부 기록됨.
+- `exceptionGrantable === true`, 부여 후 `standbyBucket` `5` 확인.
+- `failureMode === null` — 검증 차단 결함 없음.
+- **핵심 관측**: 삼성 One UI(Android 16)는 `IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
+  인텐트를 표준 안드로이드의 "배터리 최적화" 앱 목록이 아니라 **"배터리 사용
+  관리"(`AppBatteryUsageActivity`)**로 라우팅한다. 이 화면은 앱별 사용량
+  목록이라, 사용자가 예외를 부여하려면 여기서 앱을 찾아 탭 → 배터리 상세 →
+  "제한 없음"까지 **4탭**을 더 거쳐야 한다(딥링크로 바로 이 앱의 예외 토글
+  화면에 도달하지 않음). 021의 온보딩 primary 버튼(`requestException()` →
+  `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` + `package:` data)이 시스템
+  다이얼로그를 직접 띄우는지는 이 세션에서 미확인 — 그 경로가 1탭이면
+  온보딩 UX가 더 낫다.
+- **024 §2 하단 "배터리 인텐트가 실제 도착한 삼성 One UI 설정 화면 경로"의
+  답**: `IGNORE_BATTERY_OPTIMIZATION_SETTINGS` → "배터리 사용 관리"
+  (`AppBatteryUsageActivity`). `adb shell dumpsys deviceidle whitelist +`가
+  이 UI 경로의 최종 결과(`standbyBucket` `5`)와 동등함이 실측으로 확인됨.
 
 ---
 
