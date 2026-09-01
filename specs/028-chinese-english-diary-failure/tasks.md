@@ -31,10 +31,10 @@ description: "Task list — 샤오바이·모카 일기 생성 실패 조사"
 값이 멀쩡해도 재현이 빗나간다(AGENTS.md).
 
 - [x] T001 브랜치 확인 — `git branch --show-current`가 `028-chinese-english-diary-failure`인지 눈으로 확인한다(스펙킷 `BRANCH:` 필드 아님, AGENTS.md 경고). 아니면 `git checkout 028-chinese-english-diary-failure`.
-- [ ] T002 ⛔ **BLOCKED (사람 필요)** 실기기 dev 빌드 확인 — **현재 release APK 설치됨**(027 US4 잔재, `dumpsys package` `flags=0x0`, `run-as` 불가). `npx expo run:android`로 dev/debug 재설치 필요(15~20분+, `run-as`·개발자 탭 필요). findings.md "실측 전 필수 준비" 참조.
-- [ ] T003 ⛔ **BLOCKED (사람 필요)** 모델 배치 — release라 `run-as`로 확인 불가. dev 빌드 재설치 후 개발 기계에서 a4·a5(최소) 재다운로드 → `run-as cp files/models/` → `state.json` verdict 수동 기록(024 T037 선례). 로컬 GGUF 캐시 없음(`~/.alpharium-signing/`에 키스토어만).
-- [ ] T004 Metro 클린 기동 — `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`. 스테일 Metro가 오류 없이 깨진 번들을 서빙하는 함정(024·027) 회피. `adb reverse tcp:8081 tcp:8081`. (Phase 3 시작 시 사람이.)
-- [x] T005 잠금 해제 확인 — `adb shell dumpsys trust` `deviceLocked=0` 확인됨(2026-09-01). PIN은 세션마다 사람이 다시 넣어야 할 수 있음.
+- [x] T002 실기기 dev 빌드 재설치 완료 (2026-09-01) — release APK가 서명 불일치로 덮어 설치 거부(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) → uninstall 후 `npx expo run:android` debug 설치(gradle 7m 22s). `dumpsys package` `flags=[ DEBUGGABLE ... ]` 확인.
+- [x] T003 모델 재배치 완료 — a4·a5를 HF에서 재다운로드 → `adb push /data/local/tmp` → `run-as cp files/models/{a4,a5}`. on-device md5가 로드맵 17번 "1차 실측" verdict 지문과 정확히 일치. `state.json` 수동 작성(a4·a5 `passed:true`).
+- [x] T004 Metro 클린 기동 완료 — `EXPO_PUBLIC_APP_ENV=dev NODE_ENV=development npx expo start --dev-client --clear`, `adb reverse tcp:8081 tcp:8081`. 번들 8028ms 로드, `ReactNativeJS: Running "main" with {... "fabric":true}`.
+- [x] T005 잠금 해제 확인 — 초기 `deviceLocked=0` 확인. ⚠️ 앱 실행 후 자동 잠금됨(`deviceLocked=1`, Bouncer 화면) — **Phase 3 시작 시 사람이 PIN/패턴 해제 필요**. 화면 자동 꺼짐 10분으로 연장해 둠.
 - [x] T006 로그 디렉터리·gitignore 확인 — `specs/028-chinese-english-diary-failure/logs/`가 있는지(Phase 3 채록 대상). `.gitignore`에 `specs/028-chinese-english-diary-failure/logs/*.log`를 추가해 원시 덤프가 커밋되지 않게 한다(`.gitkeep`은 유지). `adb logcat`은 태그 필터(`-s ReactNativeJS:* llama:*`)로 받아 파일로 저장하고 UTF-8로 읽는다(CP949 뭉갬 방지, 기기 노이즈 축소).
 
 **Checkpoint**: 5개 전제(dev 빌드·모델·클린 Metro·잠금 해제·로그 위치)가 갖춰짐.

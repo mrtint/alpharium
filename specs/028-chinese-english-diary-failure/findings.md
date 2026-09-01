@@ -2,11 +2,63 @@
 
 **Spec**: [spec.md](./spec.md) | **Plan**: [plan.md](./plan.md) | **Tasks**: [tasks.md](./tasks.md)
 
-> **상태: 진행 중 (Phase 1·2 완료, Phase 3 실기기 실측 대기)**
+> **상태: 진행 중 (Phase 1·2 완료 + 실기기 환경 재구축 완료, Phase 3 UI 조작 대기 — 기기 잠금 해제 필요)**
 >
 > 이 스펙의 본체는 실기기에서 사람이 두 캐릭터로 3회씩 일기를 생성하고
 > `adb logcat`에서 거부된 본문·실패 갈래를 채록·육안 판정하는 것이다
 > (FR-001~005). 아래 표는 그 실측이 들어갈 자리이며 지금은 비어 있다.
+
+## 진행 로그 (2026-09-01 세션)
+
+**완료:**
+- Phase 1·2 (T001·T005~T013) — 임시 조사 로그 삽입, 기기 없는 게이트 통과.
+- **실기기 환경 재구축**:
+  - dev/debug 빌드 재설치 완료 — `npx expo run:android` (gradle BUILD
+    SUCCESSFUL 7m 22s). release APK는 서명 불일치로 덮어 설치 거부
+    (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`) → **release 앱 uninstall 후
+    debug 설치** (027 US4 잔재 데이터 소실, 새로 받은 모델로 대체하므로
+    영향 없음). `dumpsys package`에 `flags=[ DEBUGGABLE ... ]` 확인.
+  - 모델 재배치 완료 — a4(Qwen3-1.7B-Q4_K_M, 1,107,409,472 B, md5
+    `dc4836c71a28a136d2a5b782b8465b6f`)·a5(gemma-3-1b-it-Q4_K_M,
+    806,058,272 B, md5 `b00db505c25aa7178848ed1b4aa7af34`)를
+    HuggingFace에서 재다운로드 → `/data/local/tmp` push → `run-as cp
+    files/models/{a4,a5}`. **on-device md5가 로드맵 17번 "1차 실측"의
+    verdict 지문과 정확히 일치** — 사용자가 증상을 본 것과 같은 파일.
+  - `files/models/state.json` 수동 작성 — a4·a5 둘 다
+    `{ passed: true, verifiedMd5, verifiedBytes }`. `readinessOf` 판정상
+    두 캐릭터 `ready`가 되도록.
+  - Metro 클린 기동 (`EXPO_PUBLIC_APP_ENV=dev NODE_ENV=development npx
+    expo start --dev-client --clear`), `adb reverse tcp:8081 tcp:8081`.
+    앱 실행 → `ReactNativeJS: Running "main" with {... "fabric":true}`,
+    "Android Bundled 8028ms index.ts (829 modules)" — 번들 정상 로드.
+  - VLM 모델(v1·v2)은 **배치하지 않음** — 조사가 "사진을 보지 않음"
+    설정이라 불필요.
+
+**중단 지점 (사람 필요):**
+- 앱 실행 후 기기가 자동 잠금됨 (`deviceLocked=1`, `mCurrentFocus=
+  Window{... Bouncer}` — PIN/패턴 입력 화면). **보안 잠금 해제는 사람이
+  해야 한다** (AGENTS.md "PIN은 사람이 넣는다"). 잠긴 상태에서는
+  `screencap`이 검게 나오고 UI 조작이 불가.
+- 화면 자동 꺼짐 시간을 10분으로 늘려 둠 (`settings put system
+  screen_off_timeout 600000`).
+
+**다음 사람이 할 일 (quickstart.md 2단계부터):**
+1. 기기 PIN/패턴 잠금 해제. `adb shell dumpsys trust`에 `deviceLocked=0`.
+2. 앱에서: 캐릭터 = **샤오바이**, 사진 설정 = **사진을 보지 않음**,
+   과거 하루(009 최근 3일 범위 안, 신호 빈약한 날) 선택 → **일기 쓰기**.
+3. 각 회 `adb logcat -c` → 생성 → `adb logcat -d -s ReactNativeJS:* llama:*
+   > specs/028-chinese-english-diary-failure/logs/chinese-run{1,2,3}.log`.
+   3회 반복. **모카**도 동일하게 3회
+   (`logs/english-run{1,2,3}.log`).
+4. 로그에서 `[028-investigation] rejected <why> <ending> "<body>"` 또는
+   `timed-out` / `generation-failed` 채록 → 아래 표.
+5. 거부 본문 육안 판정 (T018) → `chosenPath` 결정 (T021) → 그에 따라
+   Phase 4(US2) / Phase 5(US3) / Phase 6(US4).
+6. **Phase 6 T035에서 임시 조사 로그 3줄 반드시 제거** —
+   `git grep "028-investigation"` → 0건.
+
+**임시 조사 로그가 아직 코드에 있음** (`src/inference/on-device.ts`,
+FR-003a). 조사·교정 완료 후 T035에서 제거해야 최종 diff가 깨끗하다.
 
 ---
 
@@ -16,18 +68,17 @@
 |---|---|---|
 | 기기 | SM-S901N (Galaxy S22) | `adb getprop ro.product.model` |
 | Android | 16 / SDK 36 | `adb getprop ro.build.version.release` = 16 |
-| 빌드 | ⚠️ **현재 release APK 설치됨** (027 US4 잔재, `flags=0x0`, `run-as` 불가) — 조사 전 `npx expo run:android`로 dev/debug 재설치 필요 | `dumpsys package` `flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]`, `versionName=1.0.0` |
-| Metro | 조사 시작 시 `--clear`로 클린 기동 (T004) | — |
+| 빌드 | ✅ **dev/debug 재설치 완료** (2026-09-01, gradle 7m 22s) — release는 서명 불일치로 uninstall 후 debug 설치 | `dumpsys package` `flags=[ DEBUGGABLE HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]`, `versionName=1.0.0` |
+| Metro | ✅ `--clear`로 클린 기동, 번들 8028ms 로드, `ReactNativeJS: Running "main"` | scratchpad/metro.log |
 | llama.rn | 0.12.8 | `package.json` L17 `"llama.rn": "^0.12.8"` |
-| 모델 (chinese) | a4 = Qwen3-1.7B-Q4_K_M, expectedBytes 1,107,409,472 | `roster.ts` — 기기 배치는 dev 빌드 재설치 후 재배치 필요 (release라 `run-as` 확인 불가) |
-| 모델 (english) | a5 = gemma-3-1b-it-Q4_K_M, expectedBytes 806,058,272 | `roster.ts` — 위와 같음 |
-| deviceLocked | 0 (잠금 해제됨) | `dumpsys trust` |
-| 조사 날짜 | 2026-09-01 (Phase 1·2), 실측일 __ | — |
+| 모델 (chinese) | ✅ a4 = Qwen3-1.7B-Q4_K_M, 1,107,409,472 B, md5 `dc4836c71a28a136d2a5b782b8465b6f` (기기 배치·검증됨) | `roster.ts` + on-device `md5sum` |
+| 모델 (english) | ✅ a5 = gemma-3-1b-it-Q4_K_M, 806,058,272 B, md5 `b00db505c25aa7178848ed1b4aa7af34` (기기 배치·검증됨) | `roster.ts` + on-device `md5sum` |
+| state.json | ✅ a4·a5 둘 다 `passed: true` (수동 작성) | `run-as cat files/models/state.json` |
+| deviceLocked | ⚠️ **1 (잠김)** — 앱 실행 후 자동 잠금, PIN/패턴 입력 대기. 사람이 해제해야 함 | `dumpsys trust`, `mCurrentFocus=Window{... Bouncer}` |
+| 조사 날짜 | 2026-09-01 (Phase 1·2 + 환경 재구축), 실측일 __ | — |
 
-**⚠️ 실측 전 필수 준비** (tasks.md T002·T003):
-1. `npx expo run:android` — dev/debug 빌드 재설치 (현재 release가 깔려 있어 `run-as`·개발자 탭 불가)
-2. 모델 재배치 — 개발 기계에서 a4·a5(최소) 재다운로드 → `run-as cp files/models/` → `state.json`에 `passed: true` verdict 수동 기록 (024 T037 선례)
-3. `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear` + `adb reverse tcp:8081 tcp:8081`
+**✅ 실측 전 필수 준비 완료** (tasks.md T002·T003). 남은 것: 기기 잠금
+해제(사람) → quickstart.md 2단계(캐릭터 3회 생성)부터.
 
 ---
 
