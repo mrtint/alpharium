@@ -1,0 +1,126 @@
+# 실기기 자동 테스트 — 일기 쓰기 흐름 단순화 (029)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **홈에서 "일기 쓰기" 한 번 탭으로 생성이 시작되는가**를 본다. 007·009·011·012·
+# 014·018이 홈에 쌓은 4개 위젯(캐릭터·하루·사진 설정·장소명)이 자동 판정 +
+# 설정 탭 이동으로 접혔다.
+#
+# 검증 항목:
+#   029 FR-001·SC-002   홈 = 일기 목록 + "일기 쓰기" + 날짜 셀렉트만
+#   029 FR-001·SC-002   캐릭터·사진 설정·장소명 위젯이 홈에 없다
+#   029 FR-002          날짜 셀렉트에 최근 3일이 있고 기본값이 오늘/마지막 닫힌 하루
+#   029 FR-004·SC-002   "일기 쓰기" 1탭(+덮어쓰기 확인 1회) = 최대 2탭
+#   029 FR-005          정오 이전이면 오늘을 아직 못 쓴다는 안내 (012 유지)
+#   029 FR-007          생성 파라미터를 화면이 묻지 않는다 (배선 계층 자동 판정)
+#
+# **여기서 자동화하지 않는 것** — quickstart.md Q1 3~5·Q3 3·D2:
+#   Q1(온보딩 → 실제 다운로드 완주 → 첫 일기)  — ~2GB + 생성. 사람이 한다.
+#   Q3 3(마지막에 쓴 캐릭터로 쓰인다)          — 생성 + selected-character.json 확인.
+#   D2(생성된 일기의 캐릭터 일치)              — 의미 확인. 기계로 채점 안 함(원칙 IV).
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V). 이 흐름은 clearState 없이
+# 돌린다 — 온보딩을 이미 마치고 필수 에셋이 준비된 "기존 사용자" 상태(Q3)를
+# 전제한다. 최초 실행(Q1)의 온보딩 부분은 unified-permission-onboarding.yml이 본다.
+#
+# ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ testID로 짚는다(R8 생존).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# ── 전제: 온보딩을 지나 홈에 있다 ─────────────────────────────────────
+# 필수 에셋이 준비돼 있지 않으면 진입 게이트가 온보딩을 띄운다(029 FR-020) —
+# 그 경우 이 흐름은 "기존 사용자" 시나리오를 볼 수 없으므로 온보딩을 건너뛰고
+# (권한만), 에셋 단계에서 멈춰 있으면 이 흐름은 여기까지만 유효하다.
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-screen"
+    commands:
+      - repeat:
+          while:
+            visible:
+              id: "onboarding-skip"
+          commands:
+            - tapOn:
+                id: "onboarding-skip"
+      # 에셋이 이미 준비됐으면 [시작하기]로 홈에 들어간다.
+      - runFlow:
+          when:
+            visible:
+              id: "onboarding-start"
+          commands:
+            - tapOn:
+                id: "onboarding-start"
+
+# 온보딩 화면이 아직 떠 있으면(에셋 미준비) 여기서 멈춘다 — 아래는 홈 검증이다.
+- runFlow:
+    when:
+      notVisible:
+        id: "onboarding-screen"
+    commands:
+      # ★ 029 FR-001 — 일기 탭이 첫 화면이다.
+      - assertVisible: "일기"
+
+      # ★ 029 FR-001·SC-002 — **홈에 생성 파라미터 위젯이 없다.**
+      - assertNotVisible: "누가 쓸까"
+      - assertNotVisible: "누가 쓸까요"
+      - assertNotVisible: "사진을 보지 않음"
+      - assertNotVisible: "빠르게 봄"
+      - assertNotVisible: "자세히 봄"
+      - assertNotVisible: "장소 이름"
+      - assertNotVisible: "상상을 섞어"
+
+      # ★ 029 FR-002 — 쓰게 될 하루가 보인다. "YYYY-MM-DD를 쓴다" 꼴.
+      - scrollUntilVisible:
+          element:
+            text: ".*를 쓴다"
+          direction: DOWN
+          timeout: 20000
+
+      # ★ 029 FR-004 — "일기 쓰기" 버튼이 있다(1탭 진입점).
+      - scrollUntilVisible:
+          element:
+            text: "일기 쓰기"
+          direction: DOWN
+          timeout: 20000
+      - assertVisible: "일기 쓰기"
+
+      # ★ 원칙 IV — 누르기 전에 지표가 없다.
+      - assertNotVisible: "%"
+      - assertNotVisible: "남음"
+      - assertNotVisible: "토큰"
+      - assertNotVisible: "초 남"
+
+      # 원칙 III — 홈 어디에도 모델 정보가 없다.
+      - assertNotVisible: "kanana"
+      - assertNotVisible: "exaone"
+      - assertNotVisible: "gguf"
+      - assertNotVisible: "Q4"
+
+      # ★ 029 FR-004 — **"일기 쓰기" 한 번 탭.** 그 하루에 일기가 없으면 확인 없이
+      # 곧바로, 있으면 덮어쓰기 확인 1회. 모델이 준비 안 됐으면 "일기 작성자를
+      # 준비해야 한다" 안내로 끝나고 그것이 정상이다(FR-014, 원칙 I).
+      - tapOn: "일기 쓰기"
+      - runFlow:
+          when:
+            visible: ".*덮어쓴다.*"
+          commands:
+            - tapOn: "확인"
+      - runFlow:
+          when:
+            visible: ".*덮어쓸지 확인.*"
+          commands:
+            - tapOn: "확인"
+
+      # 어떻게 끝나든 「쓰고 있다」가 남지 않는다(005 FR-028c).
+      - extendedWaitUntil:
+          notVisible: "쓰고 있다"
+          timeout: 300000
+
+      # ★ 029 FR-014 / 원칙 III — 실패가 「할 수 있는 것」으로 옮겨진다.
+      - assertNotVisible: "되뱉"
+      - assertNotVisible: "rejected"
+      - assertNotVisible: "unfinished"
+      - assertNotVisible: "model-not-ready"
+      - assertNotVisible: "not-implemented"

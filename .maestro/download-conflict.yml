@@ -46,13 +46,13 @@ appId: com.anonymous.alpharium
 ---
 - launchApp
 
-# 캐릭터 탭으로. 첫 화면은 일기다(006 FR-009).
-- tapOn: "캐릭터"
+# 029 — 캐릭터 다운로드 관리는 설정 탭이다("캐릭터" 탭 흡수, Q1=A). 첫 화면은 일기(006 FR-009).
+- tapOn: "설정"
 
 # 다섯 자리가 보이는 것을 먼저 확인한다 — 이것이 안 되면 아래가 전부 무의미하다.
 # **스크롤해서 찾는다**: 진단 패널이 있는 dev 빌드에서는 목록이 아래로 밀린다.
 - scrollUntilVisible:
-    element: "english"
+    element: "모카"
     direction: DOWN
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ appId: com.anonymous.alpharium
 
       # 받는 중에 **다른 캐릭터**를 누른다 — 여기가 두 버그가 나던 자리다.
       - scrollUntilVisible:
-          element: "chinese"
+          element: "샤오바이"
           direction: DOWN
       # **버튼의 testID로 누른다** — `childOf`로는 좁힐 수 없다(아래 주석 참조).
       - tapOn:
@@ -129,9 +129,9 @@ appId: com.anonymous.alpharium
       # ★ 007까지 탭을 옮기면 `Acquisition` 인스턴스가 통째로 사라져, 돌아왔을 때
       # 받던 것을 **멈출 방법이 없었다.**
       - tapOn: "일기"
-      - tapOn: "캐릭터"
+      - tapOn: "설정"
       - scrollUntilVisible:
-          element: "english"
+          element: "모카"
           direction: DOWN
       - assertVisible:
           id: "pause-english"

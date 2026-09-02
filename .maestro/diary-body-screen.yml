@@ -9,7 +9,7 @@
 #   FR-001   사진이 있는 저장된 일기를 열면 사진 영역이 보인다        (M1)
 #   FR-013   사진 0장인 저장된 일기에는 사진 분석 소요 시간이 없다    (M2)
 #   FR-018   소요 시간 문장이 "M분 SS초" 류 형태로 보인다            (M2)
-#   FR-004~006 장소명 설정 토글이 목록 화면에 있고 켤 때 고지가 뜬다  (M3)
+#   FR-004~006 장소명 설정이 켤 때 고지가 뜬다 (029: 설정 탭 "장소명" 섹션)  (M3)
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # **★ 여기서 자동화하지 않는 것 — quickstart.md D1~D6:**
@@ -95,36 +95,51 @@ appId: com.anonymous.alpharium
           timeout: 20000
       - tapOn: "← 목록"
 
-# ★ M3 — **장소명 설정 토글이 목록 화면에 있다**(FR-004~006).
-- runFlow:
-    when:
-      notVisible: "언제를 쓸까"
-    commands:
-      - tapOn: "일기"
-
+# ★ M3 — **장소명 설정이 설정 탭 "장소명" 섹션에 있다**(FR-004~006).
+#
+# ⚠️ **2026-09-02 갱신(029)** — 017의 `GeocodingSettingToggle`이 홈에서 사라지고
+# 설정 탭 "장소명" 섹션(3-상태: 자동/켬/끔, 기본 "자동")으로 옮겨졌다. 이제 기본이
+# "자동"이라 고지 문구("좌표를 기기의 지도 서비스에 물어봅니다.")가 처음부터 떠
+# 있을 수 있다 — "끔"을 골라야 사라진다(mode !== "off"일 때 고지).
+- tapOn: "설정"
+# ⚠️ 세 옵션을 개별 스크롤로 본다(025 실측 — 제목까지만 스크롤하면 마지막 옵션이 잘린다).
 - scrollUntilVisible:
     element:
-      text: "장소 이름으로 보기"
+      id: "geocoding-auto"
     direction: DOWN
     timeout: 20000
-
 - assertVisible: "장소 이름으로 보기"
+- assertVisible:
+    id: "geocoding-auto"
+- scrollUntilVisible:
+    element:
+      id: "geocoding-on"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "geocoding-on"
+- scrollUntilVisible:
+    element:
+      id: "geocoding-off"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "geocoding-off"
 
-# 지금 꺼져 있으면 켜서 고지 문구가 뜨는지 본다.
-- runFlow:
-    when:
-      notVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
-    commands:
-      - tapOn: "장소 이름으로 보기"
-      # ★ FR-006 — 켤 때 고지 문구가 그 자리에서 뜬다.
-      - assertVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
-      - assertVisible: "선택"
+# ★ FR-006 — "켬"을 고르면 고지 문구가 그 자리에서 뜬다(원래 M3의 핵심).
+- tapOn:
+    id: "geocoding-on"
+- assertVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
+- assertVisible: "선택"
 
 # ★ 원칙 III·IV — 좌표·수치·모델 정보가 화면에 없다.
 - assertNotVisible: "latitude"
 - assertNotVisible: "longitude"
 - assertNotVisible: "expo-location"
 
-# 이 흐름이 기기 상태를 바꾼 채 끝나지 않게 다시 끈다.
-- tapOn: "장소 이름으로 보기"
+# ★ 029 — "끔"을 고르면 고지가 사라진다(mode === "off"). 기기 상태를 자동으로 되돌린다.
+- tapOn:
+    id: "geocoding-off"
 - assertNotVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
+- tapOn:
+    id: "geocoding-auto"

@@ -572,12 +572,17 @@ CRITICAL·HIGH 먼저.
       / analyze C1 (missing) — 기존 `REJECT_REASONS` 개수 테스트·day-boundary 계약
       테스트가 여전히 통과함을 확인하고, 필요하면 `__tests__`에 명시 assert 추가.
       `pipeline.run`이 판정 후에만 저장(FR-028)하는 기존 테스트도 통과 확인.
-- [ ] T077 [MEDIUM] Maestro 흐름 갱신·신규 per US1 SC-009 / T029·T060·T061·T062
-      (missing) — `.maestro/writing-flow-simplified.yml` 신규(Q1 최초 실행 + Q3 기존
-      사용자 1탭), `generate-diary.yml`(홈 위젯 거치던 단계 제거), `diary-character-select.yml`
-      ("캐릭터" 탭 → 설정 탭 "일기 작성자" 섹션), `unified-permission-onboarding.yml`
-      (권한 뒤 assets 단계·[건너뛰기] 부재 assert). 신규 흐름을
-      `scripts/run-device-tests.mjs`의 `FLOWS`에 등록.
+- [x] T077 [MEDIUM] Maestro 흐름 갱신·신규 per US1 SC-009 / T029·T060·T061·T062
+      (missing) — **완료(2026-09-02 실기기)**. 신규 `.maestro/writing-flow-simplified.yml`
+      (`run-device-tests.mjs` FLOWS 등록, 실기기 PASS). 029 갱신·PASS:
+      `unified-permission-onboarding.yml`(권한 뒤 assets 단계·[건너뛰기] 부재·M5 재노출),
+      `generate-diary.yml`(홈 위젯 부재·1탭), `diary-character-select.yml`(설정 탭
+      "일기 작성자" 경로), `diary-user-path.yml`·`photo-vision.yml`·`diary-body-screen.yml`
+      (홈 위젯 → 설정 탭 세 섹션), `model-acquisition.yml`(persona 이름 재작성 —
+      023-era `"quiet"` 내부 키 stale 동시 수정). `download-conflict.yml`·
+      `parallel-model-download.yml`은 탭 경로·스크롤 타깃만 수정(전체 실행은 GB
+      다운로드 필요, 별도 세션). 회귀 없음 확인: skeleton·today-diary·past-day-diary·
+      writing-monologue(2)·prompt-preview·scheduled-diary-notification.
 - [x] T078 [LOW] `src/models/roster.ts`·`src/models/acquisition.ts` 주석의 "사용자가
       고른 캐릭터의 모델만 내려받는 구조여야 한다(MUST)"를 헌법 v1.3.0 개정 문구로
       갱신 per T059 (missing).
@@ -587,5 +592,12 @@ CRITICAL·HIGH 먼저.
       `resolve-generation.ts`에 사진 임계값 상수·`new Date()`·`models/roster` import,
       `essential-assets.ts`에 `models/roster` import를 넣어 각 계약 테스트·헌법
       검사가 잡는지 확인하고 전부 되돌린다.
-- [ ] T081 [LOW] 실기기 검증(SM-S901N, dev) + `quickstart.md` "검증 후 기록" 채우기
-      per SC-009 / T065·T066 (missing) — Q1~Q6. release 재확인 생략 근거(012) 재확인.
+- [x] T081 [LOW] 실기기 검증(SM-S901N, dev) + `quickstart.md` "검증 후 기록" 채우기
+      per SC-009 / T065·T066 (missing) — **완료(2026-09-02)**. Q1(온보딩→에셋
+      다운로드→첫 일기 1탭, model-not-ready 없음, `selected-character.json` 기록),
+      Q2(완료 게이트 AND — a1 삭제 시 재노출, 026 이어받기), Q3(기존 사용자 1탭,
+      마지막 캐릭터=quiet 일치), Q4(설정 탭 3섹션 + "캐릭터" 탭 흡수), Q6(Maestro
+      회귀) 전부 확인. quickstart.md "검증 후 기록" 절에 실측 기입. **미확인 잔여**:
+      Q5(세션 중 손상 안내 — 계약 테스트가 잠금), Q4 실제 생성 SC-005(seed 하루 필요
+      — 계약 테스트 C6·C7이 잠금). release 재확인 생략(012 — 새 네이티브 모듈·빌드
+      설정 없음, 전부 기존 통로 재사용).

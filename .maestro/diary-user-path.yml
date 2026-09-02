@@ -88,6 +88,8 @@ appId: com.anonymous.alpharium
 - assertNotVisible: "rejected"
 - assertNotVisible: "storage"
 
-# 캐릭터 탭으로 갈 수 있다 — 003의 준비 화면이 사용자 경로에 이어져 있다(FR-028).
-- tapOn: "캐릭터"
-- assertVisible: "캐릭터"
+# ⚠️ **2026-09-02 갱신(029)** — "캐릭터" 탭이 사라지고 설정 탭 "일기 작성자"
+# 섹션으로 흡수됐다(Q1=A). 003의 준비 화면(미준비 캐릭터 다운로드)은 설정 탭
+# 아래쪽에 그대로 이어져 있다(FR-028 정신 유지).
+- tapOn: "설정"
+- assertVisible: "일기 작성자"
