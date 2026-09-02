@@ -1,27 +1,34 @@
-# 실기기 자동 테스트 — 앱 요구 권한 실측 및 통합 신청 절차 (021)
+# 실기기 자동 테스트 — 앱 요구 권한 실측 및 통합 신청 절차 (021) + 필수 에셋 단계 (029)
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# **새 설치 시 온보딩이 일기 목록보다 먼저 뜨고, 건너뛰어도 앱이 죽지 않으며,
-# 재실행 시 다시 뜨지 않는가**를 본다.
+# **새 설치 시 온보딩이 일기 목록보다 먼저 뜨고, 권한을 전부 건너뛰어도
+# "필수 에셋 다운로드" 단계가 뒤이어 나오며 그 단계는 건너뛸 수 없는가**를 본다.
 #
 # 검증 항목:
-#   FR-005·SC-001  온보딩이 일기 목록보다 먼저 뜬다                     (M1)
-#   FR-006·FR-007  첫 단계가 사진이고, 설명 문안에 모델 정보가 없다     (M2)
-#   FR-008         각 단계에 [건너뛰기]가 있다                          (M3)
-#   FR-013·SC-003  전부 건너뛰어도 크래시 없이 일기 목록에 도달한다     (M4)
-#   FR-011·SC-003  재실행 시 온보딩이 다시 뜨지 않는다                  (M5)
+#   021 FR-005·SC-001  온보딩이 일기 목록보다 먼저 뜬다                   (M1)
+#   021 FR-006·FR-007  단계 문안에 모델 정보가 없다                       (M2)
+#   021 FR-008         권한 단계에 [건너뛰기]가 있다                      (M3)
+#   029 FR-015·016     권한 단계 뒤에 "필수 에셋 다운로드" 단계가 온다     (M4)
+#   029 FR-016·SR2     에셋 단계에는 [건너뛰기]가 없다                     (M4)
+#   029 FR-017·SR3     에셋 단계 진행률은 바 하나다                        (M4)
+#   029 FR-017·SR3     에셋 준비 전에는 [시작하기]가 없다                  (M4)
+#   029 FR-020·SC-004  에셋 미준비 상태로 재실행하면 온보딩이 다시 뜬다    (M5)
 #
-# **여기서 자동화하지 않는 것** — quickstart.md D0·D2·D3·D5·D6:
-#   D0(필수 권한 실측)           — adb pm revoke + logcat 관측. 사람이 한다.
-#   D2(온보딩 후 has_media>0)    — 실제 생성 + 010 합성 하루. 사람이 한다.
-#   D3(Android 14 부분 허용)     — "선택한 사진만" 선택 + accessPrivileges 관측.
-#   D5(OS 설정 링크·복귀 갱신)   — OS 설정 화면 이동·복귀. 사람이 한다.
-#   D6(020 배터리 로직 제거·시드) — 업그레이드 시나리오. 사람이 한다.
-#   문안 리뷰(SC-008)            — 의미를 읽어야 한다. 기계로 채점하지 않는다(원칙 IV).
+# **여기서 자동화하지 않는 것** — quickstart.md Q1 3~5·D2·D3·D5:
+#   Q1 3~5(실제 다운로드 완주 → 첫 일기)  — ~2GB 다운로드 + 생성. 사람이 한다.
+#   D2(온보딩 후 has_media>0)             — 실제 생성 + 010 합성 하루. 사람이 한다.
+#   D3(Android 14 부분 허용)              — "선택한 사진만" + accessPrivileges 관측.
+#   D5(OS 설정 링크·복귀 갱신)            — OS 설정 화면 이동·복귀. 사람이 한다.
+#   문안 리뷰(SC-008)                     — 의미를 읽어야 한다. 기계로 채점하지 않는다(원칙 IV).
 #
 # **자동화되지 않았다고 통과한 것이 아니다**(원칙 V). 새 설치 상태(앱 데이터
-# 삭제)에서 돌려야 M1·M5가 의미를 갖는다 — run-device-tests.mjs가 clearState로
+# 삭제)에서 돌려야 M1·M4·M5가 의미를 갖는다 — run-device-tests.mjs가 clearState로
 # 보장하거나, 사람이 `adb shell pm clear` 후 돌린다.
+#
+# ⚠️ M5는 에셋이 **아직 준비되지 않은** 상태를 전제한다 — 이 흐름을 clearState로
+# 돌리면 다운로드를 완주하지 않으므로 그 전제가 성립한다. 만약 이전 세션에서
+# 에셋을 이미 받아 뒀다면 M5는 "곧바로 홈"이 정상이므로 이 흐름을 clearState 없이
+# 재사용하지 말 것.
 #
 # ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다(008 실측).
 # ⚠️ 단계·버튼은 testID로 짚는다(R8·ProGuard 생존, 007 실측).
@@ -31,11 +38,11 @@ appId: com.anonymous.alpharium
 - launchApp:
     clearState: true
 
-# ★ M1 — **온보딩이 일기 목록보다 먼저 뜬다**(FR-005·SC-001).
+# ★ M1 — **온보딩이 일기 목록보다 먼저 뜬다**(021 FR-005·SC-001).
 - assertVisible:
     id: "onboarding-screen"
 
-# ★ M2 — **설명 문안에 모델 정보가 없다**(FR-007).
+# ★ M2 — **설명 문안에 모델 정보가 없다**(021 FR-007).
 #   어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다(이미 부여된 권한은
 #   satisfied로 건너뛰므로, 새 설치라도 OS가 자동 부여한 항목이 있으면 첫 단계가
 #   사진이 아닐 수 있다) — 특정 단계 id를 박지 않고, 단계 컨테이너 하나가 떠 있고
@@ -45,12 +52,12 @@ appId: com.anonymous.alpharium
 - assertNotVisible:
     text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
 
-# ★ M3 — **단계에 [건너뛰기]가 있다**(FR-008).
+# ★ M3 — **권한 단계에 [건너뛰기]가 있다**(021 FR-008).
 - assertVisible:
     id: "onboarding-skip"
 
-# ★ M4 — **전부 건너뛰어도 크래시 없이 일기 목록에 도달한다**(FR-013·SC-003).
-#   단계 수(4~5)는 실측(§2)에 달렸으므로 [건너뛰기]가 사라질 때까지 반복한다.
+# ── 권한 단계를 전부 건너뛴다 ────────────────────────────────────────────
+#   단계 수(4~5)는 실측(021 §2)에 달렸으므로 [건너뛰기]가 사라질 때까지 반복한다.
 - repeat:
     while:
       visible:
@@ -58,17 +65,56 @@ appId: com.anonymous.alpharium
     commands:
       - tapOn:
           id: "onboarding-skip"
-- assertVisible:
-    id: "onboarding-start"
-- tapOn:
-    id: "onboarding-start"
 
-# 일기 목록(또는 캐릭터 준비 안내)에 도달했다 — 온보딩 화면이 사라졌다.
-- assertNotVisible:
-    id: "onboarding-screen"
+# ★ M4 — **권한 뒤에 "필수 에셋 다운로드" 단계가 온다**(029 FR-015·016·017).
+#   권한을 전부 건너뛰었어도, 필수 에셋(공용 사진 모델 + 기본 캐릭터)이 준비돼
+#   있지 않으면 이 단계가 뜬다. 이전 세션에서 에셋을 받아 뒀다면 이 단계는 즉시
+#   완료로 보이고 [시작하기]가 바로 뜬다 — 그 경우 아래 assets 블록은
+#   runFlow.when으로 건너뛴다.
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-assets"
+    commands:
+      # SR2 — 에셋 단계에는 [건너뛰기]가 없다.
+      - assertNotVisible:
+          id: "onboarding-skip"
+      # SR3 — 진행률 바 하나. 항목별(파일별) 나열 없음.
+      - assertVisible:
+          id: "onboarding-assets-progress"
+      # SR3 — 다운로드가 끝나기 전에는 [시작하기]가 없다.
+      - assertNotVisible:
+          id: "onboarding-start"
+      # 문안에 모델 정보가 없다(원칙 III).
+      - assertNotVisible:
+          text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_).*"
+      # 내려받기를 시작만 시켜 둔다 — 완주는 이 흐름이 기다리지 않는다(~2GB).
+      - runFlow:
+          when:
+            visible:
+              id: "onboarding-assets-download"
+          commands:
+            - tapOn:
+                id: "onboarding-assets-download"
 
-# ★ M5 — **재실행 시 온보딩이 다시 뜨지 않는다**(FR-011·SC-003).
+# 에셋이 이미 준비돼 있던 경우: 권한을 다 건너뛰었으므로 [시작하기]가 보인다.
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-start"
+    commands:
+      - tapOn:
+          id: "onboarding-start"
+      - assertNotVisible:
+          id: "onboarding-screen"
+
+# ★ M5 — **에셋 미준비 상태로 재실행하면 온보딩이 다시 뜬다**(029 FR-020·SC-004).
+#   `onboarding.json`의 `completed`가 true여도, 필수 에셋이 준비되지 않았으면
+#   진입 게이트가 온보딩을 다시 띄운다(028 model-not-ready 재발 방지).
+#   이 흐름은 다운로드를 완주하지 않으므로 재실행 시 온보딩이 다시 떠야 정상이다.
+#   (에셋을 미리 받아 둔 기기에서는 이 assert가 틀리므로, 이 흐름은 반드시
+#    clearState 상태에서 — 다운로드 미완주 전제로 — 돌린다.)
 - launchApp:
     clearState: false
-- assertNotVisible:
+- assertVisible:
     id: "onboarding-screen"

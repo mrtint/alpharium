@@ -25,15 +25,19 @@ const ALL_STATES: PermissionState[] = ["granted", "limited", "denied", "blocked"
 
 const REQS = PERMISSION_REQUIREMENTS;
 
-describe("D2 — shouldShowOnboarding", () => {
-  it("completed !== true면 온보딩을 띄운다", () => {
-    expect(shouldShowOnboarding({ completed: false, batteryNoticeShown: false })).toBe(true);
-    expect(shouldShowOnboarding({ completed: false, batteryNoticeShown: true })).toBe(true);
+describe("D2 — shouldShowOnboarding (029 FR-019·020, 2-인자)", () => {
+  it("D1 — completed !== true면 essentialAssetsReady와 무관하게 온보딩", () => {
+    expect(shouldShowOnboarding({ completed: false, batteryNoticeShown: false }, false)).toBe(true);
+    expect(shouldShowOnboarding({ completed: false, batteryNoticeShown: true }, true)).toBe(true);
   });
 
-  it("completed === true면 띄우지 않는다", () => {
-    expect(shouldShowOnboarding({ completed: true, batteryNoticeShown: false })).toBe(false);
-    expect(shouldShowOnboarding({ completed: true, batteryNoticeShown: true })).toBe(false);
+  it("D3 — completed === true인데 필수 에셋이 준비 안 됐으면 온보딩 (FR-020)", () => {
+    expect(shouldShowOnboarding({ completed: true, batteryNoticeShown: false }, false)).toBe(true);
+  });
+
+  it("D4 — completed === true이고 필수 에셋도 준비됐으면 홈으로", () => {
+    expect(shouldShowOnboarding({ completed: true, batteryNoticeShown: false }, true)).toBe(false);
+    expect(shouldShowOnboarding({ completed: true, batteryNoticeShown: true }, true)).toBe(false);
   });
 });
 

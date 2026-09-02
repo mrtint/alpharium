@@ -124,3 +124,38 @@ describe("모델 정보가 하나도 없다 (FR-016, SC-004, 원칙 III)", () =>
     expect(CODE).not.toMatch(/models\/roster|assetFor|ModelAsset|vision\/roster/);
   });
 });
+
+/**
+ * ★ 029 — "자동"이 4번째 선택지로 앞에 온다 (FR-024, S2/SS5).
+ */
+describe("029 — 자동 포함 4-상태 (FR-024)", () => {
+  it("자동/보지 않음/빠르게 봄/자세히 봄이 모두 있다", async () => {
+    await render(<VisionPicker onSelect={() => {}} selected="auto" />);
+
+    expect(screen.getByTestId("vision-auto")).toBeTruthy();
+    expect(screen.getByTestId("vision-none")).toBeTruthy();
+    expect(screen.getByTestId("vision-quick")).toBeTruthy();
+    expect(screen.getByTestId("vision-detailed")).toBeTruthy();
+  });
+
+  it('"자동"을 고르면 onSelect("auto")가 불린다', async () => {
+    const chosen: string[] = [];
+    await render(<VisionPicker onSelect={(v) => chosen.push(v)} selected="none" />);
+
+    fireEvent.press(screen.getByTestId("vision-auto"));
+    expect(chosen).toEqual(["auto"]);
+  });
+
+  it('기본이 "자동"이면 그 줄이 선택됨으로 표시된다', async () => {
+    await render(<VisionPicker onSelect={() => {}} selected="auto" />);
+
+    expect(screen.getByTestId("vision-auto").props.accessibilityState?.selected).toBe(true);
+    expect(screen.getByTestId("vision-none").props.accessibilityState?.selected).toBe(false);
+  });
+
+  it('"자동" 설명이 "사진이 있으면 빠르게, 없으면 안 본다"는 뜻이다', async () => {
+    await render(<VisionPicker onSelect={() => {}} selected="auto" />);
+
+    expect(screen.getByText(/사진이 있으면.*없으면/)).toBeTruthy();
+  });
+});

@@ -1,68 +1,84 @@
-# 실기기 자동 테스트 — 캐릭터 목록과 모델 준비 (003 FR-036)
+# 실기기 자동 테스트 — 캐릭터 목록과 모델 준비 (003 FR-036 → 029로 설정 탭 이동)
 #
-# 이 흐름이 확인하는 것은 **화면이 캐릭터를 어떻게 내놓는가**이다. 실제 내려받기는
-# 모델 주소가 정해진 뒤에야 돌 수 있으므로(research.md 「미해결로 남기는 것」),
-# 여기서는 주소 없이도 참인 것만 본다.
+# 이 흐름이 확인하는 것은 **화면이 캐릭터를 어떻게 내놓는가**이다.
 #
 # 검증 항목:
-#   FR-005a  다섯 자리가 처음부터 전부 보인다
-#   FR-005a  아무것도 없으면 전부 "받아야 함"이다
-#   FR-004   화면 어디에도 모델 정보가 없다 (핵심 위험)
-#   FR-005b  추천되거나 미리 골라진 캐릭터가 없다
+#   003 FR-005a  다섯 자리가 전부 보인다 (029: 설정 탭 "일기 작성자" 섹션)
+#   003 FR-005a  준비 안 된 캐릭터는 "받아야 함"/"준비하기"로 표시된다
+#   003 FR-004   화면 어디에도 모델 정보가 없다 (핵심 위험, 원칙 III)
+#   003 FR-005b  추천되거나 미리 골라진 캐릭터가 없다
 #
-# **주소가 채워진 뒤에 더할 것** (quickstart F1~F7 참조):
-#   - 하나를 골라 실제로 받아지는지
-#   - 진행률이 캐릭터 단위로 보이는지
-#   - 앱을 죽였다 이어받는지
-#   - 지우면 공간이 실제로 비는지
+# ⚠️ **2026-09-02 갱신(029)** — "캐릭터" 탭이 사라지고 설정 탭 "일기 작성자"
+# 섹션 + 그 아래 다운로드 관리(ModelSection)로 흡수됐다(Q1=A). 표시 이름은
+# 014에서 persona 이름으로 바뀌었다(금동이·루이·오드·샤오바이·모카) — 이 흐름은
+# 023 회귀 때 놓쳐 `"quiet"` 내부 키를 계속 찾고 있었다(2026-09-02 실기기에서 발견).
 #
 # 한글 검증 문구가 CP949로 뭉개지지 않는 것은 run-device-tests.mjs가
 # JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8로 보장한다.
 appId: com.anonymous.alpharium
 ---
 - launchApp
+- assertVisible: "일기"
 
-# **006이 캐릭터 목록을 탭 뒤로 옮겼다.** 첫 화면은 일기이며(FR-009), 캐릭터 준비는
-# 그 옆 탭이다. 탭을 누르지 않으면 목록이 화면에 없다 — 004에서 목록이 아래로 밀렸을
-# 때와 같은 성질의 변화이나, 그때는 스크롤로 닿았고 지금은 탭을 눌러야 닿는다.
-- tapOn: "캐릭터"
+# 029 — 캐릭터 준비는 설정 탭이다.
+- tapOn: "설정"
 
-# FR-005a — 로스터의 다섯 자리가 전부 보인다.
-# 고를 대상이 보이지 않으면 고를 수 없다(헌법 원칙 III: 성격을 보고 고른다).
-# 이름은 아직 사람이 짓지 않았으므로 자리표시 식별자가 그대로 보인다(FR-004a).
-#
-# **스크롤해서 찾는다** — 004가 진단 화면 위쪽에 권한·신호 자리를 더해서 캐릭터
-# 목록이 첫 화면 밖으로 밀렸다. assertVisible은 스크롤하지 않으므로 그대로 두면
-# chinese·english를 못 찾는다. 「보인다」의 뜻은 「화면에 도달할 수 있다」이지
-# 「첫 화면에 있다」가 아니다.
+# ── 설정 탭 "일기 작성자" 섹션: 다섯 persona가 전부 보인다 ──
+# ⚠️ 각 항목을 개별 스크롤로 본다(025 실측 — 섹션 제목까지만 스크롤하면
+# 두 번째 항목부터 화면 밖).
 - scrollUntilVisible:
-    element: "quiet"
+    element:
+      id: "author-option-0"
     direction: DOWN
-- assertVisible: "narrative"
+    timeout: 20000
+- assertVisible: "금동이"
 - scrollUntilVisible:
-    element: "imaginative"
+    element:
+      id: "author-option-1"
     direction: DOWN
+    timeout: 20000
+- assertVisible: "루이"
 - scrollUntilVisible:
-    element: "chinese"
+    element:
+      id: "author-option-2"
     direction: DOWN
+    timeout: 20000
+- assertVisible: "오드"
 - scrollUntilVisible:
-    element: "english"
+    element:
+      id: "author-option-3"
     direction: DOWN
+    timeout: 20000
+- assertVisible: "샤오바이"
+- scrollUntilVisible:
+    element:
+      id: "author-option-4"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "모카"
 
-# FR-005a — 아무것도 준비되지 않았으면 전부 "받아야 함"이다
-- assertVisible: "받아야 함"
+# ── 그 아래 다운로드 관리(ModelSection): 준비 안 된 캐릭터는 "준비하기" ──
+# 이 기기는 금동이(quiet)만 준비돼 있으므로 나머지에 "준비하기"가 보인다.
+# 다섯을 다 받아 둔 기기에서는 없는 것이 정상이라 조건부로 본다.
+- runFlow:
+    when:
+      visible: ".*준비하기.*"
+    commands:
+      - assertVisible:
+          text: ".*준비하기.*"
 
-# FR-004 — **이 기능의 핵심 위험이다.**
-# 모델 식별자가 화면에 있으면 원칙 III 위반이다. 헌법 로스터의 다섯 모델 이름이
-# 하나도 보이지 않아야 한다.
+# ★ 003 FR-004 — **이 기능의 핵심 위험이다.**
+# 모델 식별자·양자화 방식이 화면에 있으면 원칙 III 위반이다.
 - assertNotVisible: "kanana"
 - assertNotVisible: "exaone"
 - assertNotVisible: "hyperclova"
 - assertNotVisible: "qwen"
 - assertNotVisible: "gemma"
-
-# FR-004 — 파라미터 수·양자화 방식도 나오지 않는다
 - assertNotVisible: "gguf"
 - assertNotVisible: "Q4"
 - assertNotVisible: "2.1B"
 - assertNotVisible: "1.5B"
+
+# 003 FR-005b — 추천·권장 표시가 없다. 다섯이 같은 자격이다.
+- assertNotVisible: "추천"
+- assertNotVisible: "권장"

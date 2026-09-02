@@ -54,6 +54,12 @@ function makePorts(overrides?: { photo?: PermissionState; location?: PermissionS
           calls.push("openAppSettings");
         },
       },
+      // 029 — PermissionsSection은 이 통로를 쓰지 않지만 OnboardingPorts 타입이 요구한다.
+      essentialAssets: {
+        readFacts: async () => [],
+        downloadEssentials: async () => ({ ok: true as const }),
+        hasSpaceForEssentials: async () => true,
+      },
     },
   };
 }

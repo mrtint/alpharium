@@ -48,12 +48,12 @@ appId: com.anonymous.alpharium
           text: "시작하기"
           optional: true
 
-# 캐릭터 탭으로. 첫 화면은 일기다(006 FR-009).
-- tapOn: "캐릭터"
+# 029 — 캐릭터 다운로드 관리는 설정 탭이다("캐릭터" 탭 흡수, Q1=A). 첫 화면은 일기(006 FR-009).
+- tapOn: "설정"
 
 # **스크롤해서 찾는다**: dev 빌드에서는 목록이 아래로 밀린다.
 - scrollUntilVisible:
-    element: "english"
+    element: "모카"
     direction: DOWN
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ appId: com.anonymous.alpharium
 
 # 곧바로 **다른 캐릭터**도 누른다 — 026에서는 이것이 거부되지 않아야 한다.
 - scrollUntilVisible:
-    element: "chinese"
+    element: "샤오바이"
     direction: DOWN
 - tapOn:
     id: "action-chinese"
@@ -85,34 +85,34 @@ appId: com.anonymous.alpharium
 
       # ── FR-005 — 두 줄에 동시에 멈추기가 보인다 ──
       - scrollUntilVisible:
-          element: "english"
+          element: "모카"
           direction: UP
       - assertVisible:
           id: "pause-english"
       - scrollUntilVisible:
-          element: "chinese"
+          element: "샤오바이"
           direction: DOWN
       - assertVisible:
           id: "pause-chinese"
 
       # ── ★ FR-004 — english만 멈춘다. chinese는 계속. ──
       - scrollUntilVisible:
-          element: "english"
+          element: "모카"
           direction: UP
       - tapOn:
           id: "pause-english"
       # chinese는 여전히 받는 중 (멈추기 버튼이 남아 있다).
       - scrollUntilVisible:
-          element: "chinese"
+          element: "샤오바이"
           direction: DOWN
       - assertVisible:
           id: "pause-chinese"
 
       # ── FR-006 — 탭을 왕복해도 chinese가 여전히 받는 중으로 보인다 ──
       - tapOn: "일기"
-      - tapOn: "캐릭터"
+      - tapOn: "설정"
       - scrollUntilVisible:
-          element: "chinese"
+          element: "샤오바이"
           direction: DOWN
       - assertVisible:
           id: "pause-chinese"

@@ -16,7 +16,7 @@
 import { act, render, screen, userEvent, waitFor } from "@testing-library/react-native";
 import { AppState, BackHandler } from "react-native";
 
-import type { SelectionState } from "../../src/app/selection";
+import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { Pipeline, PipelineInput, PipelineResult } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
@@ -54,7 +54,25 @@ const entry: DiaryEntry = {
   createdAt: new Date("2026-08-20T05:00:00Z"),
 };
 
-const selected: SelectionState = { kind: "selected", character: "quiet" };
+/**
+ * 029 — `DiaryHomeScreen`은 이제 `resolve(day)` 콜백으로 생성 파라미터를 받는다.
+ * 대부분의 테스트는 quiet·사진 없음·장소명 꺼짐으로 충분하다.
+ */
+const resolveQuiet =
+  (over: Partial<{ vision: VisionSetting; movedFrom: "quiet" | "narrative" }> = {}) =>
+  (day: string): ResolveOutcome => ({
+    kind: "resolved",
+    params: {
+      character: "quiet",
+      day: day as never,
+      vision: over.vision ?? "none",
+      geocodingEnabled: false,
+      ...(over.movedFrom ? { movedFrom: over.movedFrom } : {}),
+    },
+  });
+
+/** 준비된 캐릭터가 없는 상태 (029 FR-014). */
+const resolveNoReady = (): ResolveOutcome => ({ kind: "no-ready-character" });
 
 /** 부를 때까지 끝나지 않는 파이프라인. 「쓰는 중」을 붙잡아 둔다 */
 function hangingPipeline(): Pipeline & { finish: (result: PipelineResult) => void } {
@@ -96,7 +114,8 @@ async function renderHome(
   options: {
     pipeline?: Pipeline;
     stop?: () => Promise<void>;
-    selection?: SelectionState;
+    resolve?: (day: string) => ResolveOutcome;
+    onGoToSettings?: () => void;
   } = {},
 ) {
   const store = memoryStore();
@@ -104,8 +123,9 @@ async function renderHome(
     <DiaryHomeScreen
       pipeline={options.pipeline}
       resolution={resolved}
-      selection={options.selection ?? selected}
+      resolve={options.resolve ?? resolveQuiet()}
       stop={options.stop}
+      onGoToSettings={options.onGoToSettings}
       store={store}
     />,
   );
@@ -299,12 +319,12 @@ describe("고른 것이 없으면 쓰지 않는다 (007 FR-006)", () => {
   it("「캐릭터를 먼저 준비해야 한다」로 막는다", async () => {
     await renderHome({
       pipeline: hangingPipeline(),
-      selection: { kind: "none" },
+      resolve: resolveNoReady,
     });
 
     await userEvent.press(await screen.findByText("일기 쓰기"));
 
-    // **고르지도 않은 캐릭터로 쓰려 들지 않는다** — 006은 "quiet"으로 채웠다.
+    // 029 — 자동 판정이 no-ready-character면 생성하지 않고 설정 탭으로 안내한다.
     expect(await screen.findByText(/준비/)).toBeTruthy();
     expect(screen.queryByText("쓰고 있다")).toBeNull();
   });
@@ -348,7 +368,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={store}
       />,
     );
@@ -415,7 +435,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={store}
       />,
     );
@@ -450,7 +470,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
         now={() => current}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={store}
       />,
     );
@@ -487,7 +507,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
  * 그래서 아래 테스트가 **파이프라인이 받은 `vision`을 직접 읽는다.**
  * ─────────────────────────────────────────────────────────────────────────────
  */
-describe("011 — 사진 설정이 파이프라인까지 간다", () => {
+describe("029 — 자동 판정한 사진 설정이 파이프라인까지 간다", () => {
   /** `run`이 받은 입력을 기록하는 대역 */
   function recordingPipeline(seen: PipelineInput[]): Pipeline {
     return {
@@ -498,24 +518,19 @@ describe("011 — 사진 설정이 파이프라인까지 간다", () => {
     };
   }
 
-  async function renderWithVision(vision: VisionSetting, seen: PipelineInput[]) {
-    await render(
-      <DiaryHomeScreen
-        pipeline={recordingPipeline(seen)}
-        resolution={resolved}
-        selection={selected}
-        store={memoryStore()}
-        vision={vision}
-      />,
-    );
-  }
-
-  // ★ T039 — 배선 검증.
+  // ★ 029 — vision은 `resolve(day)`가 정한다(FR-010). 홈에 VisionPicker가 없다(FR-001).
   it.each(["none", "quick", "detailed"] as const)(
-    "★ 고른 설정 %s이 pipeline.run까지 도달한다",
+    "★ resolve가 정한 %s이 pipeline.run까지 도달한다",
     async (vision) => {
       const seen: PipelineInput[] = [];
-      await renderWithVision(vision, seen);
+      await render(
+        <DiaryHomeScreen
+          pipeline={recordingPipeline(seen)}
+          resolution={resolved}
+          resolve={resolveQuiet({ vision })}
+          store={memoryStore()}
+        />,
+      );
 
       await userEvent.press(await screen.findByText("일기 쓰기"));
 
@@ -524,72 +539,20 @@ describe("011 — 사진 설정이 파이프라인까지 간다", () => {
     },
   );
 
-  it("설정을 넘기지 않으면 「보지 않음」이다 (FR-018)", async () => {
-    const seen: PipelineInput[] = [];
-    await render(
-      <DiaryHomeScreen
-        pipeline={recordingPipeline(seen)}
-        resolution={resolved}
-        selection={selected}
-        store={memoryStore()}
-      />,
-    );
-
-    await userEvent.press(await screen.findByText("일기 쓰기"));
-
-    expect(seen[0].vision).toBe("none");
-  });
-
-  it("고르는 자리가 화면에 있다 (FR-015)", async () => {
-    await render(
-      <DiaryHomeScreen
-        onSelectVision={() => {}}
-        pipeline={hangingPipeline()}
-        resolution={resolved}
-        selection={selected}
-        store={memoryStore()}
-        vision="none"
-      />,
-    );
-
-    expect(await screen.findByTestId("vision-quick")).toBeTruthy();
-  });
-
-  it("고르면 통로로 전달된다", async () => {
-    const chosen: VisionSetting[] = [];
-    await render(
-      <DiaryHomeScreen
-        onSelectVision={(v) => chosen.push(v)}
-        pipeline={hangingPipeline()}
-        resolution={resolved}
-        selection={selected}
-        store={memoryStore()}
-        vision="none"
-      />,
-    );
-
-    await userEvent.press(await screen.findByTestId("vision-detailed"));
-    expect(chosen).toEqual(["detailed"]);
-  });
-
-  /**
-   * **고를 통로가 없어도 자리는 보이지 않는다** — 009가 하루 셋에서 내린 판단과
-   * 반대다. 하루는 「무엇을 쓸지」라 언제나 보여야 하지만, 사진 설정은 **고칠 수 없으면
-   * 보여 줄 이유가 없다**(누르면 아무 일도 안 일어나는 자리가 생긴다).
-   */
-  it("고를 통로가 없으면 자리가 없다", async () => {
+  it("★ 029 — 홈 화면에 사진 설정 선택기가 없다 (FR-001·006)", async () => {
     await render(
       <DiaryHomeScreen
         pipeline={hangingPipeline()}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={memoryStore()}
-        vision="none"
       />,
     );
 
     await screen.findByText("일기 쓰기");
     expect(screen.queryByTestId("vision-quick")).toBeNull();
+    expect(screen.queryByTestId("vision-detailed")).toBeNull();
+    expect(screen.queryByTestId("geocoding-on")).toBeNull();
   });
 });
 
@@ -616,15 +579,14 @@ describe("011 US4 — 사진을 볼 수 없을 때", () => {
     }),
   });
 
-  async function writeWith(pipeline: Pipeline, onGoToCharacters?: () => void) {
+  async function writeWith(pipeline: Pipeline, onGoToSettings?: () => void) {
     await render(
       <DiaryHomeScreen
-        onGoToCharacters={onGoToCharacters}
+        onGoToSettings={onGoToSettings}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={memoryStore()}
-        vision="quick"
       />,
     );
     await userEvent.press(await screen.findByText("일기 쓰기"));
@@ -651,7 +613,7 @@ describe("011 US4 — 사진을 볼 수 없을 때", () => {
   it("준비하러 가는 길이 있다 (FR-022, 003 FR-028)", async () => {
     await writeWith(visionFailure("not-ready"), () => {});
 
-    expect(await screen.findByText(/캐릭터 준비하러 가기/)).toBeTruthy();
+    expect(await screen.findByText(/설정에서 작성자 준비하기/)).toBeTruthy();
   });
 
   it.each([
@@ -949,9 +911,8 @@ describe("018 — prepare()/release() 트리거", () => {
           prepared.push(character);
         }}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={memoryStore()}
-        vision="none"
       />,
     );
 
@@ -969,9 +930,8 @@ describe("018 — prepare()/release() 트리거", () => {
             prepared.push(character);
           }}
           resolution={resolved}
-          selection={selected}
+          resolve={resolveQuiet({ vision })}
           store={memoryStore()}
-          vision={vision}
         />,
       );
       await screen.findByText("일기 쓰기");
@@ -991,9 +951,8 @@ describe("018 — prepare()/release() 트리거", () => {
           prepared.push(character);
         }}
         resolution={resolved}
-        selection={{ kind: "none" }}
+        resolve={resolveNoReady}
         store={memoryStore()}
-        vision="none"
       />,
     );
 
@@ -1009,9 +968,8 @@ describe("018 — prepare()/release() 트리거", () => {
       <DiaryHomeScreen
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={memoryStore()}
-        vision="none"
       />,
     );
 
@@ -1035,9 +993,8 @@ describe("018 — prepare()/release() 트리거", () => {
           released = true;
         }}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={memoryStore()}
-        vision="none"
       />,
     );
     await screen.findByText("일기 쓰기");
@@ -1070,9 +1027,8 @@ describe("018 — prepare()/release() 트리거", () => {
           released = true;
         }}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet()}
         store={memoryStore()}
-        vision="none"
       />,
     );
 
@@ -1137,9 +1093,8 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         pipeline={recordingPipeline()}
         prepare={prepare}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet({ vision: "quick" })}
         store={memoryStore()}
-        vision="quick"
       />,
     );
     await screen.findByText("일기 쓰기");
@@ -1174,9 +1129,8 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet({ vision: "quick" })}
         store={memoryStore()}
-        vision="quick"
       />,
     );
 
@@ -1203,9 +1157,8 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet({ vision: "quick" })}
         store={memoryStore()}
-        vision="quick"
       />,
     );
     await waitFor(() => expect(captionDay).toHaveBeenCalledTimes(1));
@@ -1257,9 +1210,8 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        selection={selected}
+        resolve={resolveQuiet({ vision: "quick" })}
         store={memoryStore()}
-        vision="quick"
       />,
     );
     await waitFor(() => expect(captionDay).toHaveBeenCalledTimes(1));

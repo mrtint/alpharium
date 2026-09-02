@@ -15,38 +15,54 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
+import type { GeocodingPreference } from "../app/geocoding-setting-store";
+
+/** 029 — 3-상태. "자동"이 기본. */
+const OPTIONS: readonly { mode: GeocodingPreference; name: string; hint: string }[] = [
+  { mode: "auto", name: "자동", hint: "위치 권한이 있으면 이름으로, 없으면 비워 둔다" },
+  { mode: "on", name: "켬", hint: "다닌 자리를 숫자 대신 이름으로 보여준다" },
+  { mode: "off", name: "끔", hint: "장소 이름을 옮기지 않는다" },
+];
+
 export type GeocodingSettingToggleProps = {
-  /** 지금 설정. **기본값은 꺼짐이다**(FR-004) */
-  enabled: boolean;
-  onToggle: (enabled: boolean) => void;
+  /** 지금 설정. **기본값은 "auto"다**(029 FR-025) */
+  mode: GeocodingPreference;
+  onSelect: (mode: GeocodingPreference) => void;
 };
 
-export function GeocodingSettingToggle({ enabled, onToggle }: GeocodingSettingToggleProps) {
+export function GeocodingSettingToggle({ mode, onSelect }: GeocodingSettingToggleProps) {
   return (
     <View style={styles.container}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: enabled }}
-        onPress={() => onToggle(!enabled)}
-        style={[styles.row, enabled && styles.rowSelected]}
-        testID="geocoding-toggle"
-      >
-        <View style={styles.info}>
-          <Text style={styles.name}>장소 이름으로 보기</Text>
-          <Text style={styles.hint}>다닌 자리를 숫자 대신 이름으로 보여준다</Text>
-        </View>
+      <Text style={styles.title}>장소 이름으로 보기</Text>
+      {OPTIONS.map((opt) => {
+        const isSelected = opt.mode === mode;
+        return (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected }}
+            key={opt.mode}
+            onPress={() => onSelect(opt.mode)}
+            style={[styles.row, isSelected && styles.rowSelected]}
+            testID={`geocoding-${opt.mode}`}
+          >
+            <View style={styles.info}>
+              <Text style={styles.name}>{opt.name}</Text>
+              <Text style={styles.hint}>{opt.hint}</Text>
+            </View>
+            {isSelected && <Text style={styles.mark}>선택</Text>}
+          </Pressable>
+        );
+      })}
 
-        {enabled && <Text style={styles.mark}>선택</Text>}
-      </Pressable>
-
-      {/* L8, FR-006 — 켤 때 고지 문구가 그 자리에서 뜬다 */}
-      {enabled && <Text style={styles.notice}>좌표를 기기의 지도 서비스에 물어봅니다.</Text>}
+      {/* L8, FR-006 — 켤 때(또는 자동일 때) 고지 문구. */}
+      {mode !== "off" && <Text style={styles.notice}>좌표를 기기의 지도 서비스에 물어봅니다.</Text>}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { gap: 6 },
+  title: { fontSize: 16, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
