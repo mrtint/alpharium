@@ -172,18 +172,18 @@ describe("D5 — nextStep", () => {
     const steps = planOnboardingSteps({
       platform: "android",
       requirements: REQS,
-      states: { photos: "granted", "photo-location": "denied" },
+      states: { photos: "granted", location: "denied" },
       batteryNoticeShown: false,
       skippedThisSession: [],
     });
-    expect(nextStep(steps)?.requirement.key).toBe("photo-location");
+    expect(nextStep(steps)?.requirement.key).toBe("location");
   });
 
   it("actionable이 뒤에 있어도 order가 앞인 blocked를 먼저 고른다", () => {
     const steps = planOnboardingSteps({
       platform: "android",
       requirements: REQS,
-      states: { photos: "blocked", "photo-location": "undetermined" },
+      states: { photos: "blocked", location: "undetermined" },
       batteryNoticeShown: false,
       skippedThisSession: [],
     });
@@ -196,7 +196,6 @@ describe("D5 — nextStep", () => {
       requirements: REQS,
       states: {
         photos: "granted",
-        "photo-location": "granted",
         location: "granted",
         notifications: "granted",
       },
@@ -212,9 +211,23 @@ describe("D5 — nextStep", () => {
       requirements: REQS,
       states: { photos: "granted" },
       batteryNoticeShown: true,
-      skippedThisSession: ["photo-location", "location", "notifications"],
+      skippedThisSession: ["location", "notifications"],
     });
     expect(nextStep(steps)).toBeNull();
+  });
+
+  it("★ 031 — 사진 허용 후 다음 단계가 location이다 (photo-location 단계 부재, 무한 루프 없음)", () => {
+    // 이 스펙 이전에는 사진 granted → photo-location이 늘 "undetermined" →
+    // statusOf가 "actionable" → nextStep이 photo-location을 영원히 반환했다.
+    const steps = planOnboardingSteps({
+      platform: "android",
+      requirements: PERMISSION_REQUIREMENTS,
+      states: { photos: "granted" },
+      batteryNoticeShown: false,
+      skippedThisSession: [],
+    });
+    expect(steps.map((s) => s.requirement.key)).not.toContain("photo-location");
+    expect(nextStep(steps)?.requirement.key).toBe("location");
   });
 });
 

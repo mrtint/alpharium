@@ -27,12 +27,10 @@ function makePorts(overrides?: { photo?: PermissionState; location?: PermissionS
     ports: {
       photo: {
         photoPermission: async () => overrides?.photo ?? ("granted" as PermissionState),
-        locationPermission: async () => "granted" as PermissionState,
         requestPhotoPermission: async () => {
           calls.push("requestPhoto");
           return "granted" as PermissionState;
         },
-        requestLocationPermission: async () => "granted" as PermissionState,
       },
       notification: {
         ensureChannel: async () => {},
@@ -68,6 +66,18 @@ const BASE = {
   platform: "android" as const,
   requirements: PERMISSION_REQUIREMENTS,
 };
+
+describe("S2 — 031: photo-location 행 제거 (SC-005)", () => {
+  it("★ 권한 섹션에 사진 위치 행이 없다 (4개 행만)", async () => {
+    const { ports } = makePorts();
+    await render(<PermissionsSection {...BASE} ports={ports} onRestartOnboarding={() => {}} />);
+    await screen.findByTestId("permission-row-photos");
+    expect(screen.queryByTestId("permission-row-photo-location")).toBeNull();
+    expect(screen.getByTestId("permission-row-location")).toBeTruthy();
+    expect(screen.getByTestId("permission-row-notifications")).toBeTruthy();
+    expect(screen.getByTestId("permission-row-battery-exception")).toBeTruthy();
+  });
+});
 
 describe("S2 — 배터리 상시 링크 (FR-018)", () => {
   it("배터리 예외 설정 링크가 항상 보이고 openSettingsList를 부른다", async () => {
