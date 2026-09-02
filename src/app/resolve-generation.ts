@@ -63,8 +63,7 @@ export type ResolvedParams = {
 };
 
 export type ResolveOutcome =
-  | { kind: "resolved"; params: ResolvedParams }
-  | { kind: "no-ready-character" };
+  { kind: "resolved"; params: ResolvedParams } | { kind: "no-ready-character" };
 
 /**
  * "일기 쓰기"가 눌렸을 때 생성에 넘길 네 값을 정한다.

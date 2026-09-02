@@ -26,6 +26,15 @@ function makePorts(overrides?: {
   photoLocation?: PermissionState;
   location?: PermissionState;
   notification?: "granted" | "denied";
+  essentialAssets?: {
+    readFacts: () => Promise<{ key: string; ready: boolean }[]>;
+    downloadEssentials: (
+      onProgress: (f: number) => void,
+    ) => Promise<
+      { ok: true } | { ok: false; reason: "insufficient-space" | "network" | "unknown" }
+    >;
+    hasSpaceForEssentials: () => Promise<boolean>;
+  };
 }) {
   const calls: string[] = [];
   const photoState = { value: overrides?.photo ?? ("undetermined" as PermissionState) };
@@ -87,6 +96,19 @@ function makePorts(overrides?: {
         openAppSettings: async () => {
           calls.push("openAppSettings");
         },
+      },
+      // 029 — 필수 에셋 통로. 기본 대역은 "전부 준비됨"이라 assets 단계를 건너뛴다.
+      essentialAssets: overrides?.essentialAssets ?? {
+        readFacts: async () => [
+          { key: "v1", ready: true },
+          { key: "v2", ready: true },
+          { key: "a1", ready: true },
+        ],
+        downloadEssentials: async (onProgress: (f: number) => void) => {
+          onProgress(1);
+          return { ok: true as const };
+        },
+        hasSpaceForEssentials: async () => true,
       },
     },
   };
@@ -219,5 +241,105 @@ describe("S5 — 소스 검사 (SC-008, 원칙 III)", () => {
 
   it("모델 식별자 문자열이 없다", () => {
     expect(RAW).not.toMatch(/kanana|exaone|hyperclovax|qwen3?|gemma3?|GGUF|Q4_|Q8_/i);
+  });
+});
+
+/**
+ * ★ 029 — "필수 에셋 다운로드" 단계 (FR-015~017·022, contracts/onboarding-assets.md §D).
+ *
+ * 권한 단계가 전부 끝났을 때(current === null) 필수 에셋이 준비 안 됐으면 assets
+ * 단계가 뜬다. 이 단계는 건너뛸 수 없다(SR2). 진행률 바 하나(SR3). 준비되면
+ * [시작하기](SR4). 실패 시 안내 + [다시 시도](SR5).
+ */
+describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
+  const allGranted = {
+    photo: "granted" as PermissionState,
+    photoLocation: "granted" as PermissionState,
+    location: "granted" as PermissionState,
+    notification: "granted" as const,
+  };
+
+  it("OS1 — 권한 전부 satisfied + 에셋 미준비면 assets 단계가 뜬다 (SR1·SR2·SR3)", async () => {
+    const { ports } = makePorts({
+      ...allGranted,
+      essentialAssets: {
+        readFacts: async () => [{ key: "v1", ready: false }],
+        downloadEssentials: async () => ({ ok: true as const }),
+        hasSpaceForEssentials: async () => true,
+      },
+    });
+    await render(
+      <OnboardingScreen
+        {...BASE_PROPS}
+        flag={{ completed: false, batteryNoticeShown: true }}
+        ports={ports}
+        onComplete={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-assets")).toBeTruthy(), {
+      timeout: 4000,
+    });
+    // SR3 — 진행률 바 하나.
+    expect(screen.getByTestId("onboarding-assets-progress")).toBeTruthy();
+    // SR2 — 건너뛰기 없음.
+    expect(screen.queryByTestId("onboarding-skip")).toBeNull();
+    // SR3 — 준비 전에는 [시작하기] 없음.
+    expect(screen.queryByTestId("onboarding-start")).toBeNull();
+  });
+
+  it("OS2 — 에셋이 준비되면 assets 단계를 건너뛰고 [시작하기]가 뜬다 (SR4)", async () => {
+    const { ports } = makePorts(allGranted); // 기본 대역 = 전부 ready
+    await render(
+      <OnboardingScreen
+        {...BASE_PROPS}
+        flag={{ completed: false, batteryNoticeShown: true }}
+        ports={ports}
+        onComplete={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-start")).toBeTruthy(), {
+      timeout: 4000,
+    });
+    expect(screen.queryByTestId("onboarding-step-assets")).toBeNull();
+  });
+
+  it("OS3 — 다운로드가 공간 부족으로 실패하면 안내 + [다시 시도] (SR5)", async () => {
+    let attempts = 0;
+    const { ports } = makePorts({
+      ...allGranted,
+      essentialAssets: {
+        readFacts: async () => [{ key: "v1", ready: false }],
+        downloadEssentials: async () => {
+          attempts += 1;
+          return { ok: false as const, reason: "insufficient-space" as const };
+        },
+        hasSpaceForEssentials: async () => false,
+      },
+    });
+    await render(
+      <OnboardingScreen
+        {...BASE_PROPS}
+        flag={{ completed: false, batteryNoticeShown: true }}
+        ports={ports}
+        onComplete={() => {}}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-assets-download")).toBeTruthy(), {
+      timeout: 4000,
+    });
+    fireEvent.press(screen.getByTestId("onboarding-assets-download"));
+
+    await waitFor(() => expect(screen.getByText(/저장 공간이 부족/)).toBeTruthy(), {
+      timeout: 4000,
+    });
+    expect(screen.getByTestId("onboarding-assets-retry")).toBeTruthy();
+    expect(screen.queryByTestId("onboarding-start")).toBeNull();
+
+    // OS4 — [다시 시도]가 downloadEssentials를 재호출한다 (SR6).
+    fireEvent.press(screen.getByTestId("onboarding-assets-retry"));
+    await waitFor(() => expect(attempts).toBeGreaterThanOrEqual(2), { timeout: 4000 });
   });
 });

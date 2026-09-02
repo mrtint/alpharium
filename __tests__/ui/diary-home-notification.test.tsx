@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react-native";
 
-import type { SelectionState } from "../../src/app/selection";
+import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
 import { memoryStore } from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
@@ -41,7 +41,10 @@ const entry: DiaryEntry = {
   createdAt: new Date("2026-08-20T05:00:00Z"),
 };
 
-const selected: SelectionState = { kind: "selected", character: "quiet" };
+const resolveStub = (day: string): ResolveOutcome => ({
+  kind: "resolved",
+  params: { character: "quiet", day: day as never, vision: "none", geocodingEnabled: false },
+});
 
 async function renderWith(
   opts: { initialDay?: string | null; onAcknowledge?: (day: string) => void; seed?: boolean } = {},
@@ -52,7 +55,7 @@ async function renderWith(
     <DiaryHomeScreen
       pipeline={undefined}
       resolution={resolved}
-      selection={selected}
+      resolve={resolveStub}
       store={store}
       initialDay={opts.initialDay ?? null}
       onAcknowledge={opts.onAcknowledge}

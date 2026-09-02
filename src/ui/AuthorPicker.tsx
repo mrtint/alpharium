@@ -50,7 +50,9 @@ export function AuthorPicker({ options, onSelect }: AuthorPickerProps) {
           <View style={styles.info}>
             <Text style={styles.name}>{opt.name}</Text>
             <Text style={styles.tagline}>{opt.tagline}</Text>
-            {!opt.ready && <Text style={styles.hint}>아직 준비되지 않음 — 아래에서 내려받으세요</Text>}
+            {!opt.ready && (
+              <Text style={styles.hint}>아직 준비되지 않음 — 아래에서 내려받으세요</Text>
+            )}
           </View>
           {opt.selected && <Text style={styles.mark}>작성자</Text>}
         </Pressable>

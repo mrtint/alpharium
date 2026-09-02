@@ -189,7 +189,11 @@ export function DiaryHomeScreen({
    *
    * 029 — 목록 화면에 있을 때, 고른 하루에 사진 신호가 없으면 자동 판정 캐릭터로
    * 준비를 데운다. `resolve(day)`가 `no-ready-character`면 준비할 것이 없다.
+   *
+   * **같은 (캐릭터+하루)에 대해 두 번 부르지 않는다** — `resolve`가 매 렌더 새
+   * 클로저일 수 있으므로(테스트·설정 변경) `preparedFor` 표식으로 막는다.
    */
+  const preparedFor = useRef<string | null>(null);
   useEffect(() => {
     if (screen.kind !== "list") return;
     if (captionDay !== undefined) return; // 사진 있는 날 경로(아래)가 담당
@@ -198,6 +202,10 @@ export function DiaryHomeScreen({
     const outcome = resolve(day);
     if (outcome.kind !== "resolved") return;
     if (outcome.params.vision !== "none") return;
+
+    const key = `${outcome.params.character}@${day}`;
+    if (preparedFor.current === key) return;
+    preparedFor.current = key;
 
     void prepare?.(outcome.params.character).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- screen.items는 매 렌더 새 배열이라 넣으면 무한 루프. day 판정 입력만 의존성으로.
@@ -286,8 +294,7 @@ export function DiaryHomeScreen({
 
             setScreen((s) => {
               if (s.kind !== "writing") return s;
-              const characterName =
-                stage === "load" ? personaOf(params.character).name : undefined;
+              const characterName = stage === "load" ? personaOf(params.character).name : undefined;
               const line = pickMonologue(stage, branch, s.line, characterName);
               return { ...s, stage, branch, line };
             });

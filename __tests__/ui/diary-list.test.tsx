@@ -253,12 +253,7 @@ describe("사진 신호 (007 FR-018·019)", () => {
  *
  * **셋이 한자리에 모인다** — 전부 「누르면 무슨 일이 일어나는가」에 답하기 때문이다.
  */
-describe("쓰기 자리 (007 FR-002a·023·024)", () => {
-  const characters = [
-    { character: "quiet" as const, ready: true },
-    { character: "narrative" as const, ready: true },
-  ];
-
+describe("쓰기 자리 (007 FR-002a·023·024, 029 FR-001·006)", () => {
   it("1. 쓰게 될 하루가 보인다(FR-023, SC-009)", async () => {
     await render(
       <DiaryListScreen
@@ -320,54 +315,26 @@ describe("쓰기 자리 (007 FR-002a·023·024)", () => {
     expect(started).toBe(1);
   });
 
-  it("고른 캐릭터가 보이고 바꿀 수 있다(FR-002)", async () => {
-    const picked: string[] = [];
-    await render(
-      <DiaryListScreen
-        characters={characters}
-        items={[]}
-        onOpen={noop}
-        onSelectCharacter={(c) => picked.push(c)}
-        onWrite={noop}
-        selection={{ kind: "selected", character: "quiet" }}
-      />,
-    );
+  // 029 — 캐릭터 선택기가 홈에서 사라졌다(FR-001). 자동 판정이 옮기면 부모가
+  // 만든 문구를 `movedNotice`로 넘긴다(FR-014).
+  it("★ 029 — 홈에 캐릭터 선택기가 없다(FR-001)", async () => {
+    await render(<DiaryListScreen items={[]} onOpen={noop} onWrite={noop} />);
 
-    await userEvent.press(
-      screen.getByRole("button", { name: new RegExp(personaOf("narrative").name) }),
-    );
-
-    expect(picked).toEqual(["narrative"]);
+    expect(screen.queryByText(new RegExp(personaOf("quiet").name))).toBeNull();
+    expect(screen.queryByText(new RegExp(personaOf("narrative").name))).toBeNull();
   });
 
-  it("★ 옮겨졌으면 그 사실을 알린다(FR-005a, SC-003a)", async () => {
-    await render(
-      <DiaryListScreen
-        characters={characters}
-        items={[]}
-        onOpen={noop}
-        onWrite={noop}
-        selection={{ kind: "selected", character: "narrative", movedFrom: "quiet" }}
-      />,
-    );
+  it("★ movedNotice가 주어지면 그 문구를 보인다(FR-014)", async () => {
+    const notice = `${personaOf("quiet").name}을(를) 쓸 수 없어 ${
+      personaOf("narrative").name
+    }(으)로 바꿨다`;
+    await render(<DiaryListScreen items={[]} onOpen={noop} onWrite={noop} movedNotice={notice} />);
 
-    // **말없이 바뀌지 않는다** — 캐릭터마다 글의 성격이 다르다.
-    // 014 — 안내가 내부 식별자가 아니라 persona 이름을 쓴다(FR-005).
-    const movedFromName = personaOf("quiet").name;
-    const toName = personaOf("narrative").name;
-    expect(screen.getByText(new RegExp(`${movedFromName}.*쓸 수 없어.*${toName}`))).toBeTruthy();
+    expect(screen.getByText(notice)).toBeTruthy();
   });
 
-  it("옮기지 않았으면 알림이 없다", async () => {
-    await render(
-      <DiaryListScreen
-        characters={characters}
-        items={[]}
-        onOpen={noop}
-        onWrite={noop}
-        selection={{ kind: "selected", character: "quiet" }}
-      />,
-    );
+  it("movedNotice가 없으면 알림이 없다", async () => {
+    await render(<DiaryListScreen items={[]} onOpen={noop} onWrite={noop} />);
 
     expect(screen.queryByText(/쓸 수 없어/)).toBeNull();
   });

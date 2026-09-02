@@ -4,8 +4,13 @@
  * 계약: specs/003-character-model-files/contracts/acquisition.md
  *       specs/026-parallel-model-download/contracts/concurrent-acquisition.md
  *
- * 헌법 「로스터」의 **"사용자가 고른 캐릭터의 모델만 내려받는 구조여야 한다(MUST)"** 가
- * 여기서 성립한다. 구조의 문제이므로 나중에 고칠 수 없다.
+ * 헌법 「로스터」(v1.3.0)의 **"사용자가 고르지 않은 캐릭터의 모델은 내려받지
+ * 않는다(MUST NOT). 단 최초 실행 시 기본 캐릭터 하나를 자동으로 내려받는 것은
+ * 허용한다(MAY). '다섯 개 다 받기'는 여전히 금지(MUST NOT)"** 가 여기서 성립한다.
+ * 구조의 문제이므로 나중에 고칠 수 없다 — `prepare()`는 캐릭터 하나만 받고,
+ * `allAssets()` 같은 "전부" 진입점은 두지 않는다(FR-010). 029의 온보딩 기본 캐릭터
+ * 자동 내려받기는 `src/app/essential-assets-port.ts`가 이 `prepare("quiet")`를
+ * 부르는 것으로 이뤄진다 — 새 "전부" 경로가 아니다.
  *
  * **GB 단위 파일을 다루는 유일한 자리다.** 002의 저장이 수십 KB였던 것과 다르며, 그래서
  * 진행·중단·재개·공간이 부가 기능이 아니라 본체다.

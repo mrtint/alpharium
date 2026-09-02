@@ -508,3 +508,84 @@ T061 diary-character-select.yml
 - Phase 3~7 = User Story별 커밋.
 - Phase 8 = 회귀·문서·실기기 커밋.
 - `main` 직접 금지 — `029-writing-flow-simplification` 브랜치 → PR (AGENTS.md).
+
+---
+
+## Phase 9: Convergence (2026-09-02)
+
+`/speckit-converge`가 코드 상태를 spec·plan·tasks와 대조해 찾은 미완 작업. Phase 1·2와
+Phase 4·5·7의 핵심 배선은 구현·커밋됐고(로직 테스트 1798개 통과), 아래는 남은 갭이다.
+CRITICAL·HIGH 먼저.
+
+- [x] T068 [CRITICAL] `src/app/essential-assets-port.ts` 신규 생성 per plan §5 /
+      contracts/onboarding-assets.md §B (missing) — `expoEssentialAssetsPort()`:
+      `readFacts()`(011 `visionReadiness`를 v1·v2로, `ports.files.facts(assetFor("quiet").key)`
+      + `verdictFor`를 a1로 매핑), `downloadEssentials(onProgress)`(`prepareVision` +
+      `createAcquisition(ports).prepare("quiet", cb)` 병렬, `essentialDownloadFraction`으로
+      합산), `hasSpaceForEssentials()`(003 `SPACE_HEADROOM`). 계약 테스트
+      `__tests__/app/essential-assets-port.test.ts` (BR1~BR5 — 특히 BR5:
+      `ESSENTIAL_ASSET_KEYS`의 "a1" == `assetFor("quiet").key`). `src/app/`이므로
+      `checkSourceFile` `UI_TOUCHES_MODEL` 대상 아님(로스터 접근 허용).
+- [x] T069 [CRITICAL] `src/ui/OnboardingScreen.tsx`에 "필수 에셋 다운로드" 단계 추가
+      per FR-015·016·017·022 / US1 / contracts/onboarding-assets.md §D (missing) —
+      권한 단계(`nextStep` null) 뒤에 assets 단계. 합산 진행률 바 하나
+      (`testID="onboarding-assets-progress"`, SR3), **[건너뛰기] 버튼 없음**(SR2),
+      [시작하기]는 `essentialAssetsReady` true일 때만(SR3·SR4), 공간 부족·네트워크
+      실패 시 안내 + [다시 시도](`testID="onboarding-assets-retry"`, SR5),
+      `AppState active`에서 `readFacts` 재조회(SR7), 이어받기는 026 자동(SR6).
+      **SR8**: `essentialAssetsReady`·`essentialDownloadFraction`은
+      `../onboarding/essential-assets`에서만, `models/*`·`vision/roster` import 없음.
+- [x] T070 [CRITICAL] `OnboardingPorts`에 `essentialAssets: EssentialAssetsPort` 추가
+      + `App.tsx` `AppFrame`이 `expoEssentialAssetsPort()`를 만들어 `OnboardingScreen`에
+      주입 per FR-015 / T025 (missing) — 021 `OnboardingPorts` 주입 패턴.
+- [x] T071 [CRITICAL] `App.tsx` `AppFrame` 진입 게이트에 필수 에셋 AND 조건 per
+      FR-019·FR-020 / US5 / SC-004 (missing) — `App.tsx:313`의
+      `onboardingFlag.completed !== true || forceOnboarding`을 003·011 readiness로
+      계산한 `essentialAssetsReady`와 함께 `shouldShowOnboarding(flag,
+      essentialAssetsReady)`로 판정. `AppState change→active`에서 재조회(진입 시점
+      한정 — 세션 중 손상은 FR-014가 담당, contracts/home-screen.md H3-2).
+- [x] T072 [CRITICAL] 스테일 UI 테스트 스위트 4개 재작성 per SC-008 (contradicts) —
+      `npm run lint`(tsc)가 지금 실패한다(31 errors). `__tests__/ui/diary-home.test.tsx`
+      (제거된 props `selection`/`characters`/`onSelectVision`/`onGoToCharacters` →
+      새 `resolve`/`onGenerated`/`onGoToSettings`; HT1~HT6),
+      `__tests__/ui/diary-list.test.tsx`(위젯 제거 확인, `movedNotice` prop),
+      `__tests__/ui/diary-home-notification.test.tsx`(prop 갱신),
+      `__tests__/ui/geocoding-setting-toggle.test.tsx`(`enabled`/`onToggle` →
+      `mode`/`onSelect` 3-상태).
+- [x] T073 [HIGH] 새 UI 계약 테스트 추가 per T022·T030·T031·T048·T049·T050 (partial) —
+      `__tests__/ui/vision-picker.test.tsx`에 4-상태 + "auto" 기본(ST4·SS5·SS6),
+      `__tests__/ui/onboarding-screen.test.tsx`에 assets 단계(OS1~OS4),
+      `__tests__/ui/settings-author-section.test.tsx`(신규 — `AuthorPicker`: persona
+      이름만·모델 이름 없음 SS1·ST3, `saveSelection` 호출 SS2, US4 AS4: 값 없을 때
+      온보딩 기본 표시), `__tests__/ui/settings-geocoding-section.test.tsx`("켬" 선택
+      시 위치 권한 요청 통로 호출 SS11).
+- [x] T074 [HIGH] `__tests__/diary/prompt-signature.test.ts` 신규 per SC-006 / T039
+      (missing) — `src/diary/prompt.ts`의 `buildPrompt`/`buildRequest` 입력 시그니처를
+      소스에서 읽어 이 스펙 전후로 동일(character·day·vision만)함을 잠근다.
+- [x] T075 [MEDIUM] 권한 단계가 assets 단계보다 먼저 옴을 잠그는 계약 테스트 +
+      data-model §5 문서 정합 per T023 (missing) — `OnboardingStep` union을 확장하지
+      않고 화면 로컬로 처리했으므로, `decision.ts`/`OnboardingScreen`에 "권한 전부
+      satisfied 전에는 assets 단계가 `current`가 되지 않는다"는 계약 테스트(SR1)를
+      두고, `data-model.md` §5의 union 서술과 어긋나지 않게 코드 주석으로 결정을
+      기록한다(converge는 spec/plan/data-model을 못 고침).
+- [x] T076 [MEDIUM] `day-boundary` 단일 출처·판정 4갈래 회귀 assert per FR-029·FR-030
+      / analyze C1 (missing) — 기존 `REJECT_REASONS` 개수 테스트·day-boundary 계약
+      테스트가 여전히 통과함을 확인하고, 필요하면 `__tests__`에 명시 assert 추가.
+      `pipeline.run`이 판정 후에만 저장(FR-028)하는 기존 테스트도 통과 확인.
+- [ ] T077 [MEDIUM] Maestro 흐름 갱신·신규 per US1 SC-009 / T029·T060·T061·T062
+      (missing) — `.maestro/writing-flow-simplified.yml` 신규(Q1 최초 실행 + Q3 기존
+      사용자 1탭), `generate-diary.yml`(홈 위젯 거치던 단계 제거), `diary-character-select.yml`
+      ("캐릭터" 탭 → 설정 탭 "일기 작성자" 섹션), `unified-permission-onboarding.yml`
+      (권한 뒤 assets 단계·[건너뛰기] 부재 assert). 신규 흐름을
+      `scripts/run-device-tests.mjs`의 `FLOWS`에 등록.
+- [x] T078 [LOW] `src/models/roster.ts`·`src/models/acquisition.ts` 주석의 "사용자가
+      고른 캐릭터의 모델만 내려받는 구조여야 한다(MUST)"를 헌법 v1.3.0 개정 문구로
+      갱신 per T059 (missing).
+- [x] T079 [LOW] `docs/roadmap/README.md` 16번 항목에 "029에서 구현" 결과 문단 추가
+      per T067 (missing) — 007~028 관례.
+- [x] T080 [LOW] 위반 주입 라운드 per 저장소 관례 / T013·T018·T064 (partial) —
+      `resolve-generation.ts`에 사진 임계값 상수·`new Date()`·`models/roster` import,
+      `essential-assets.ts`에 `models/roster` import를 넣어 각 계약 테스트·헌법
+      검사가 잡는지 확인하고 전부 되돌린다.
+- [ ] T081 [LOW] 실기기 검증(SM-S901N, dev) + `quickstart.md` "검증 후 기록" 채우기
+      per SC-009 / T065·T066 (missing) — Q1~Q6. release 재확인 생략 근거(012) 재확인.

@@ -5,7 +5,6 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
 import { resolveGenerationParams } from "./src/app/resolve-generation";
-import { ONBOARDING_DEFAULT_CHARACTER } from "./src/onboarding/essential-assets";
 import { routeFromNotification } from "./src/app/notification-routing";
 import type { DayDate } from "./src/config/day-boundary";
 import {
@@ -26,6 +25,12 @@ import {
 import { applyTargetHour, applyToggleOff, applyToggleOn } from "./src/schedule/settings-effects";
 import { expoPhotoPort } from "./src/signals/expo-port";
 import { loadOnboardingFlag, saveOnboardingFlag, type OnboardingFlag } from "./src/onboarding/flag";
+import { shouldShowOnboarding } from "./src/onboarding/decision";
+import {
+  essentialAssetsReady,
+  ONBOARDING_DEFAULT_CHARACTER,
+} from "./src/onboarding/essential-assets";
+import { expoEssentialAssetsPort } from "./src/app/essential-assets-port";
 import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
 import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
 import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
@@ -255,9 +260,40 @@ function AppFrame() {
       battery: expoBatteryExceptionPort(),
       location: expoLocationPermissionPort(),
       osSettings: expoOsSettingsPort(),
+      // 029 — 필수 에셋 다운로드 통로 (FR-015). `src/app/`에 있어 로스터 접근 허용.
+      essentialAssets: expoEssentialAssetsPort(),
     }),
     [],
   );
+
+  /**
+   * 029 — 필수 에셋(공용 사진 모델 + 기본 캐릭터)이 준비됐는가 (FR-019·020).
+   *
+   * 진입 게이트에 AND로 들어간다 — `completed`가 true여도 이게 false면 온보딩(에셋
+   * 단계)이 다시 뜬다. `onboarding.json`에 저장하지 않고 003·011 readiness를
+   * 실시간 조회한다(모델을 지우면 즉시 false, 028 결함의 방어).
+   */
+  const [essentialsReady, setEssentialsReady] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    const check = () =>
+      void onboardingPorts.essentialAssets
+        .readFacts()
+        .then((facts) => {
+          if (live) setEssentialsReady(essentialAssetsReady(facts));
+        })
+        .catch(() => {
+          if (live) setEssentialsReady(false);
+        });
+    check();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") check();
+    });
+    return () => {
+      live = false;
+      sub.remove();
+    };
+  }, [onboardingPorts]);
 
   const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
 
@@ -305,12 +341,14 @@ function AppFrame() {
     [onboardingFlagPort],
   );
 
-  // 플래그를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
-  if (onboardingFlag === null) {
+  // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
+  if (onboardingFlag === null || essentialsReady === null) {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
   }
 
-  if (onboardingFlag.completed !== true || forceOnboarding) {
+  // 029 — 진입 게이트: shouldShowOnboarding(flag, essentialsReady). `completed`가
+  // true여도 필수 에셋이 준비 안 됐으면 온보딩(에셋 단계)이 다시 뜬다(FR-020).
+  if (shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <OnboardingScreen

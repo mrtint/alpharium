@@ -40,9 +40,7 @@ export const ONBOARDING_DEFAULT_CHARACTER: Character = "quiet";
  * `ESSENTIAL_ASSET_KEYS`의 모든 키가 `facts`에서 `ready: true`일 때만 `true`.
  * 키가 `facts`에 없으면 `false`(미조회 = 미준비).
  */
-export function essentialAssetsReady(
-  facts: readonly { key: string; ready: boolean }[],
-): boolean {
+export function essentialAssetsReady(facts: readonly { key: string; ready: boolean }[]): boolean {
   return ESSENTIAL_ASSET_KEYS.every((key) => facts.some((f) => f.key === key && f.ready === true));
 }
 

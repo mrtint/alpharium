@@ -55,9 +55,7 @@ export function GeocodingSettingToggle({ mode, onSelect }: GeocodingSettingToggl
       })}
 
       {/* L8, FR-006 — 켤 때(또는 자동일 때) 고지 문구. */}
-      {mode !== "off" && (
-        <Text style={styles.notice}>좌표를 기기의 지도 서비스에 물어봅니다.</Text>
-      )}
+      {mode !== "off" && <Text style={styles.notice}>좌표를 기기의 지도 서비스에 물어봅니다.</Text>}
     </View>
   );
 }

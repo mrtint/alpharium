@@ -28,6 +28,8 @@ import {
   type OnboardingFlag,
   type OnboardingStep,
 } from "../onboarding/decision";
+import { essentialAssetsReady } from "../onboarding/essential-assets";
+import type { EssentialAssetFact, EssentialAssetsPort } from "../app/essential-assets-port";
 import type { LocationPermissionPort } from "../onboarding/location-permission-port";
 import type { OsSettingsPort } from "../onboarding/os-settings-port";
 import type { PermissionKey, PermissionRequirement } from "../onboarding/requirements";
@@ -52,6 +54,8 @@ export type OnboardingPorts = {
   };
   location: LocationPermissionPort;
   osSettings: OsSettingsPort;
+  /** 029 — 필수 에셋(공용 사진 모델 + 기본 캐릭터) 다운로드 통로 (FR-015). */
+  essentialAssets: EssentialAssetsPort;
 };
 
 export type OnboardingScreenProps = {
@@ -90,26 +94,62 @@ export function OnboardingScreen({
   const [busy, setBusy] = useState(false);
   const alive = useRef(true);
 
+  /* ── 029 — 필수 에셋 다운로드 단계 (FR-015~017·022) ──────────────────── */
+  const [assetFacts, setAssetFacts] = useState<EssentialAssetFact[]>([]);
+  const [assetFraction, setAssetFraction] = useState(0);
+  const [assetStatus, setAssetStatus] = useState<"idle" | "downloading" | "failed">("idle");
+  const [assetFailReason, setAssetFailReason] = useState<
+    "insufficient-space" | "network" | "unknown" | null
+  >(null);
+  const assetsReady = essentialAssetsReady(assetFacts);
+
   const refresh = useCallback(async () => {
     const next = await readStates(ports);
     if (alive.current) setStates(next);
   }, [ports]);
 
+  const refreshAssets = useCallback(async () => {
+    const facts = await ports.essentialAssets.readFacts().catch(() => [] as EssentialAssetFact[]);
+    if (alive.current) setAssetFacts(facts);
+  }, [ports]);
+
   useEffect(() => {
     alive.current = true;
     void refresh();
+    void refreshAssets();
 
-    // 온보딩 도중 앱이 백그라운드로 갔다가 돌아오면 권한 상태를 다시 읽는다
-    // (spec Edge Case, SC-006). 이미 허용된 단계는 satisfied로 유지된다.
+    // 온보딩 도중 앱이 백그라운드로 갔다가 돌아오면 권한·에셋 상태를 다시 읽는다
+    // (spec Edge Case, SC-006, SR7).
     const sub = AppState.addEventListener("change", (nextAppState) => {
-      if (nextAppState === "active") void refresh();
+      if (nextAppState === "active") {
+        void refresh();
+        void refreshAssets();
+      }
     });
 
     return () => {
       alive.current = false;
       sub.remove();
     };
-  }, [refresh]);
+  }, [refresh, refreshAssets]);
+
+  const downloadAssets = useCallback(async () => {
+    if (assetStatus === "downloading") return;
+    setAssetStatus("downloading");
+    setAssetFailReason(null);
+    // 026 이어받기가 자동으로 이미 받은 부분을 건너뛴다(SR6, FR-021).
+    const result = await ports.essentialAssets.downloadEssentials((fraction) => {
+      if (alive.current) setAssetFraction(fraction);
+    });
+    await refreshAssets();
+    if (!alive.current) return;
+    if (result.ok) {
+      setAssetStatus("idle");
+    } else {
+      setAssetStatus("failed");
+      setAssetFailReason(result.reason);
+    }
+  }, [assetStatus, ports, refreshAssets]);
 
   const steps = planOnboardingSteps({
     platform,
@@ -176,6 +216,10 @@ export function OnboardingScreen({
     (s) => s.status === "satisfied" || s.status === "skipped-eligible",
   ).length;
 
+  // 029 — 권한 단계가 전부 끝났지만(current === null) 필수 에셋이 아직 준비 안 됐으면
+  // "필수 에셋 다운로드" 단계를 보인다. 이 단계는 건너뛸 수 없다(FR-016, SR2).
+  const showAssetsStep = current === null && !assetsReady;
+
   return (
     <ScrollView contentContainerStyle={styles.page} testID="onboarding-screen">
       <Text style={styles.title}>시작하기 전에</Text>
@@ -183,7 +227,57 @@ export function OnboardingScreen({
         휴대폰이 하루를 일기로 쓰려면 몇 가지 허락이 필요해요. 원치 않으면 건너뛰어도 됩니다.
       </Text>
 
-      {current === null ? (
+      {showAssetsStep ? (
+        <View style={styles.section} testID="onboarding-step-assets">
+          <Text style={styles.rationale}>
+            일기를 쓰는 데 필요한 것을 내려받는 중입니다. 캐릭터 하나와 사진을 보는 도구예요.
+          </Text>
+          <Text style={styles.ifDenied}>
+            이 단계는 건너뛸 수 없어요 — 없으면 일기를 쓸 수 없습니다.
+          </Text>
+
+          {/* SR3 — 합산 진행률 바 하나. 항목별 나열 없음(FR-017). */}
+          <View style={styles.progressTrack} testID="onboarding-assets-progress">
+            <View style={[styles.progressFill, { width: `${Math.round(assetFraction * 100)}%` }]} />
+          </View>
+
+          {assetStatus === "failed" && (
+            <>
+              <Text style={styles.warn}>
+                {assetFailReason === "insufficient-space"
+                  ? "저장 공간이 부족해요. 공간을 확보한 뒤 다시 시도하세요."
+                  : assetFailReason === "network"
+                    ? "네트워크가 불안정해요. 연결을 확인하고 다시 시도하세요."
+                    : "내려받다 문제가 생겼어요. 다시 시도해 주세요."}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void downloadAssets()}
+                style={styles.primary}
+                testID="onboarding-assets-retry"
+              >
+                <Text style={styles.primaryText}>다시 시도</Text>
+              </Pressable>
+            </>
+          )}
+
+          {assetStatus === "idle" && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void downloadAssets()}
+              style={styles.primary}
+              testID="onboarding-assets-download"
+            >
+              <Text style={styles.primaryText}>내려받기</Text>
+            </Pressable>
+          )}
+
+          {assetStatus === "downloading" && (
+            <Text style={styles.ifDenied}>내려받는 중… 잠시만 기다려 주세요.</Text>
+          )}
+          {/* SR2 — [건너뛰기] 버튼 없음. [시작하기]도 assetsReady 전에는 없음(SR3). */}
+        </View>
+      ) : current === null ? (
         <View style={styles.section}>
           <Text style={styles.done}>
             준비가 끝났어요. {doneCount}/{total}단계를 확인했습니다.
@@ -244,6 +338,14 @@ const styles = StyleSheet.create({
   page: { padding: 20, gap: 16 },
   title: { fontSize: 20, fontWeight: "600" },
   lead: { fontSize: 14, opacity: 0.75, lineHeight: 20 },
+  warn: { fontSize: 13, opacity: 0.9, lineHeight: 19 },
+  progressTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#e0e0e0",
+    overflow: "hidden",
+  },
+  progressFill: { height: 8, backgroundColor: "#333" },
   section: { gap: 10, marginTop: 8 },
   progress: { fontSize: 12, opacity: 0.5 },
   rationale: { fontSize: 16, lineHeight: 23 },

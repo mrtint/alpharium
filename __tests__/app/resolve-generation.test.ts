@@ -46,7 +46,8 @@ function params(input: ResolveInput) {
 describe("캐릭터 (R1~R3, C1~C6)", () => {
   it("C1 — 마지막 캐릭터가 준비돼 있으면 그대로", () => {
     expect(
-      params(base({ lastCharacter: "narrative", readyCharacters: ["narrative", "quiet"] })).character,
+      params(base({ lastCharacter: "narrative", readyCharacters: ["narrative", "quiet"] }))
+        .character,
     ).toBe("narrative");
   });
 
@@ -101,15 +102,21 @@ describe("캐릭터 (R1~R3, C1~C6)", () => {
 
 describe("사진 설정 (R5, C7~C10)", () => {
   it("C7 — auto + 사진 있음 → quick", () => {
-    expect(params(base({ visionPreference: "auto", photoSignalPresent: true })).vision).toBe("quick");
+    expect(params(base({ visionPreference: "auto", photoSignalPresent: true })).vision).toBe(
+      "quick",
+    );
   });
 
   it("C8 — auto + 사진 없음 → none", () => {
-    expect(params(base({ visionPreference: "auto", photoSignalPresent: false })).vision).toBe("none");
+    expect(params(base({ visionPreference: "auto", photoSignalPresent: false })).vision).toBe(
+      "none",
+    );
   });
 
   it("C9 — 고정값이 auto를 덮어쓴다 (사진 있어도 none)", () => {
-    expect(params(base({ visionPreference: "none", photoSignalPresent: true })).vision).toBe("none");
+    expect(params(base({ visionPreference: "none", photoSignalPresent: true })).vision).toBe(
+      "none",
+    );
   });
 
   it("C10 — 고정값 detailed", () => {
@@ -120,7 +127,9 @@ describe("사진 설정 (R5, C7~C10)", () => {
 
   it("사진 신호는 boolean 하나 — 임계값 없음 (FR-010)", () => {
     // 1장이든 100장이든 photoSignalPresent가 true면 quick.
-    expect(params(base({ visionPreference: "auto", photoSignalPresent: true })).vision).toBe("quick");
+    expect(params(base({ visionPreference: "auto", photoSignalPresent: true })).vision).toBe(
+      "quick",
+    );
   });
 });
 

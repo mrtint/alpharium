@@ -50,10 +50,7 @@ export type OnboardingStep = {
  * `essentialAssetsReady`는 003·011 readiness의 실시간 조회 결과다 — `onboarding.json`
  * 에 저장하지 않는다(파일이 거짓말할 수 없게, 모델을 지우면 즉시 false).
  */
-export function shouldShowOnboarding(
-  flag: OnboardingFlag,
-  essentialAssetsReady: boolean,
-): boolean {
+export function shouldShowOnboarding(flag: OnboardingFlag, essentialAssetsReady: boolean): boolean {
   if (flag.completed !== true) return true;
   return !essentialAssetsReady;
 }
