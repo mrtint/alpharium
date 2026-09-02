@@ -274,6 +274,25 @@ function AppFrame() {
    * 실시간 조회한다(모델을 지우면 즉시 false, 028 결함의 방어).
    */
   const [essentialsReady, setEssentialsReady] = useState<boolean | null>(null);
+
+  /**
+   * 필수 에셋 준비 여부를 다시 읽어 `essentialsReady`에 반영한다.
+   *
+   * 029 버그 수정 — 온보딩에서 다운로드가 **같은 세션 안에서** 끝나면 앱이
+   * 백그라운드로 가지 않아 `AppState "active"`가 안 오고, `OnboardingScreen`의
+   * 로컬 `assetFacts`만 갱신돼 "시작하기"가 보인다. 그런데 진입 게이트가 보는
+   * 이 state는 그대로 false라 [시작하기]를 눌러도 온보딩이 다시 그려진다.
+   * `onOnboardingComplete`가 이 함수를 불러 게이트가 최신 값을 보게 한다.
+   */
+  const refreshEssentialsReady = useCallback(
+    () =>
+      onboardingPorts.essentialAssets
+        .readFacts()
+        .then((facts) => setEssentialsReady(essentialAssetsReady(facts)))
+        .catch(() => setEssentialsReady(false)),
+    [onboardingPorts],
+  );
+
   useEffect(() => {
     let live = true;
     const check = () =>
@@ -337,8 +356,11 @@ function AppFrame() {
       setOnboardingFlag(flag);
       setForceOnboarding(false);
       void saveOnboardingFlag(onboardingFlagPort, flag).catch(() => {});
+      // 029 버그 수정 — 세션 안에서 에셋 다운로드가 끝났으면 `essentialsReady`가
+      // stale이다(위 `refreshEssentialsReady` 주석 참조). 게이트가 최신 값을 보게 한다.
+      void refreshEssentialsReady();
     },
-    [onboardingFlagPort],
+    [onboardingFlagPort, refreshEssentialsReady],
   );
 
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
