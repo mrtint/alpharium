@@ -20,12 +20,15 @@
 
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { VISION_SETTINGS, type VisionSetting } from "../diary/types";
+import type { VisionPreference } from "../app/vision-setting-store";
+
+/** 029 — "자동"이 앞에 온다. 나머지 셋은 011의 VISION_SETTINGS 순서. */
+const OPTIONS: readonly VisionPreference[] = ["auto", "none", "quick", "detailed"];
 
 export type VisionPickerProps = {
-  /** 지금 고른 것. **고른 적이 없으면 「보지 않음」이다**(FR-018) */
-  selected: VisionSetting;
-  onSelect: (vision: VisionSetting) => void;
+  /** 지금 고른 것. **기본값은 "auto"다**(029 FR-024) */
+  selected: VisionPreference;
+  onSelect: (vision: VisionPreference) => void;
 };
 
 /**
@@ -41,7 +44,11 @@ export type VisionPickerProps = {
  * 사용자가 두 설정을 견주게 되고 그것이 곧 비교다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-const LABELS: Readonly<Record<VisionSetting, { name: string; hint: string }>> = {
+const LABELS: Readonly<Record<VisionPreference, { name: string; hint: string }>> = {
+  auto: {
+    name: "자동",
+    hint: "그날 사진이 있으면 빠르게 보고, 없으면 보지 않는다",
+  },
   none: {
     name: "사진을 보지 않음",
     hint: "사진이 몇 장 있었는지만 안다. 가장 빠르다",
@@ -61,7 +68,7 @@ export function VisionPicker({ selected, onSelect }: VisionPickerProps) {
     <View style={styles.container}>
       <Text style={styles.title}>사진을 어떻게 볼까</Text>
 
-      {VISION_SETTINGS.map((setting) => {
+      {OPTIONS.map((setting) => {
         const isSelected = setting === selected;
         const { name, hint } = LABELS[setting];
 

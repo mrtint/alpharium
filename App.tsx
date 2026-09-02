@@ -3,8 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
-import { resolveSelection } from "./src/app/selection";
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
+import { resolveGenerationParams } from "./src/app/resolve-generation";
+import { ONBOARDING_DEFAULT_CHARACTER } from "./src/onboarding/essential-assets";
 import { routeFromNotification } from "./src/app/notification-routing";
 import type { DayDate } from "./src/config/day-boundary";
 import {
@@ -36,17 +37,20 @@ import {
   expoGeocodingSettingPort,
   loadGeocodingSetting,
   saveGeocodingSetting,
+  type GeocodingPreference,
 } from "./src/app/geocoding-setting-store";
 import {
   expoVisionSettingPort,
   loadVisionSetting,
   saveVisionSetting,
+  type VisionPreference,
 } from "./src/app/vision-setting-store";
+import { dayBounds, selectableDays } from "./src/config/day-boundary";
 import { createAppPipeline } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { expoFileSystemPort, fileStore } from "./src/diary/store";
-import { CHARACTERS, type Character, type VisionSetting } from "./src/diary/types";
+import { CHARACTERS, type Character } from "./src/diary/types";
 import { type Acquisition, createAcquisition } from "./src/models/acquisition";
 import { resolveDownloadView } from "./src/models/download-view";
 import { expoModelPorts } from "./src/models/expo-port";
@@ -61,6 +65,10 @@ import {
   visionStorageBytes,
 } from "./src/vision/acquisition";
 import { CharacterListScreen } from "./src/ui/CharacterListScreen";
+import { AuthorPicker } from "./src/ui/AuthorPicker";
+import { VisionPicker } from "./src/ui/VisionPicker";
+import { GeocodingSettingToggle } from "./src/ui/GeocodingSettingToggle";
+import { personaOf } from "./src/diary/persona";
 import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
 import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
 
@@ -325,16 +333,10 @@ function AppFrame() {
         <Pressable accessibilityRole="button" onPress={() => setTab("diary")} style={styles.tab}>
           <Text style={tab === "diary" ? styles.tabOn : styles.tabOff}>일기</Text>
         </Pressable>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setTab("characters")}
-          style={styles.tab}
-        >
-          <Text style={tab === "characters" ? styles.tabOn : styles.tabOff}>캐릭터</Text>
-        </Pressable>
         {/*
-          020 — 자동 생성 설정 탭. **개발자 탭과 달리 prod에도 있다**(FR-001 —
-          엔드유저가 목표 시각을 고르고 자동 생성을 켠다). 진단 게이트와 무관.
+          020 — 자동 생성 설정 탭. **개발자 탭과 달리 prod에도 있다**(FR-001).
+          029 — "캐릭터" 탭이 사라지고 "일기 작성자"·"사진 보기"·"장소명" 섹션이
+          이 탭으로 흡수됐다(Q1=A).
         */}
         <Pressable accessibilityRole="button" onPress={() => setTab("settings")} style={styles.tab}>
           <Text style={tab === "settings" ? styles.tabOn : styles.tabOff}>설정</Text>
@@ -357,7 +359,7 @@ function AppFrame() {
 
       {tab === "diary" ? (
         <DiarySection
-          onGoToCharacters={() => setTab("characters")}
+          onGoToSettings={() => setTab("settings")}
           // 020 — 알림을 눌러 열렸으면 그 하루의 상세로 바로 간다(FR-006).
           initialDay={pendingRoute?.day ?? null}
           onDayOpened={() => setPendingRoute(null)}
@@ -365,25 +367,19 @@ function AppFrame() {
           // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014).
           deniedNotices={deniedNotices}
         />
-      ) : tab === "characters" ? (
-        // 003의 목록은 스스로 스크롤하지 않는다 — 다섯 자리가 화면을 넘길 수 있으므로
-        // 여기서 감싼다.
-        <ScrollView>
-          <ModelSection
-            ports={ports}
-            acquisition={acquisition}
-            progress={progress}
-            setProgress={setProgress}
-            rejection={rejection}
-            setRejection={setRejection}
-          />
-        </ScrollView>
       ) : tab === "settings" ? (
-        // 020 — 자동 생성 설정(FR-001). 021 — "권한" 섹션도 여기(FR-017~020).
+        // 020 — 자동 생성 설정(FR-001). 021 — "권한" 섹션. 029 — "일기 작성자"·
+        // "사진 보기"·"장소명" 섹션도 여기(FR-023~025).
         <AutoDiarySection
           platform={platform}
           onboardingPorts={onboardingPorts}
           onRestartOnboarding={() => setForceOnboarding(true)}
+          modelPorts={ports}
+          acquisition={acquisition}
+          progress={progress}
+          setProgress={setProgress}
+          rejection={rejection}
+          setRejection={setRejection}
         />
       ) : (
         // **개발자 탭도 진단과 같은 조건에서만 그려진다** — 탭이 없으면 이 갈래에
@@ -408,13 +404,14 @@ function AppFrame() {
  * 간다(FR-035a).
  */
 function DiarySection({
-  onGoToCharacters,
+  onGoToSettings,
   initialDay,
   onDayOpened,
   onAcknowledge,
   deniedNotices,
 }: {
-  onGoToCharacters?: () => void;
+  /** 029 — no-ready-character 실패 시 설정 탭으로 (FR-014) */
+  onGoToSettings?: () => void;
   /** 020 — 알림을 눌러 열렸으면 그 하루 (FR-006) */
   initialDay?: DayDate | null;
   /** 020 — 상세를 실제로 연 뒤 pendingRoute를 비운다 */
@@ -437,94 +434,90 @@ function DiarySection({
   const selectionPort = useMemo(() => expoSelectionPort(), []);
 
   /**
-   * 고른 사진 설정 (011 FR-015·017·018).
-   *
-   * **`null`이면 고른 적이 없다는 뜻이고, 그때 「보지 않음」을 쓴다**(FR-018).
-   * 007이 캐릭터를 말없이 집지 않은 것과 같은 판단이다 — 사진을 보는 것은 시간과
-   * 저장 공간을 쓰는 일이므로 고르지 않았는데 시작하지 않는다.
+   * 029 — 설정 탭의 세 선호. 홈의 위젯이 사라졌으므로 여기서 읽어 자동 판정
+   * (`resolveGenerationParams`)에 넘긴다. `AppState active`에서 다시 읽는다 —
+   * 설정 탭에서 바꾸고 일기 탭으로 돌아오면 반영돼야 한다.
    */
-  const [vision, setVision] = useState<VisionSetting | null>(null);
   const visionPort = useMemo(() => expoVisionSettingPort(), []);
-
-  useEffect(() => {
-    let alive = true;
-    void loadVisionSetting(visionPort)
-      .catch(() => null)
-      .then((saved) => {
-        if (alive) setVision(saved);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [visionPort]);
-
-  /** 사용자가 고른다. **저장은 그 즉시** — 앱을 껐다 켜도 남는다(FR-017) */
-  const onSelectVision = useCallback(
-    async (chosen: VisionSetting) => {
-      setVision(chosen);
-      await saveVisionSetting(visionPort, chosen).catch(() => {
-        // 저장하지 못해도 이번 실행 동안은 고른 대로 쓴다. 다음에 다시 고르면 된다.
-      });
-    },
-    [visionPort],
-  );
-
-  /**
-   * 장소명 설정 (017 FR-004~006).
-   *
-   * **꺼짐이 기본값이다**(FR-004) — `vision`처럼 「고른 적 없음」을 따로
-   * 구분하지 않는다(geocoding-setting-store.ts 계약, `loadVisionSetting()`과
-   * 다른 판단).
-   */
-  const [geocodingEnabled, setGeocodingEnabled] = useState(false);
   const geocodingSettingPort = useMemo(() => expoGeocodingSettingPort(), []);
+  const [visionPreference, setVisionPreference] = useState<VisionPreference>("auto");
+  const [geocodingPreference, setGeocodingPreference] = useState<GeocodingPreference>("auto");
+  const [locationPermission, setLocationPermission] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    void loadGeocodingSetting(geocodingSettingPort).then((saved) => {
-      if (alive) setGeocodingEnabled(saved);
+    async function readPrefs() {
+      const [v, g] = await Promise.all([
+        loadVisionSetting(visionPort).catch(() => "auto" as const),
+        loadGeocodingSetting(geocodingSettingPort).catch(() => "auto" as const),
+      ]);
+      let loc = false;
+      try {
+        const Location = await import("expo-location");
+        const status = await Location.getForegroundPermissionsAsync();
+        loc = status.granted === true;
+      } catch {
+        // 통로가 없는 환경 — 권한 없음으로 다룬다.
+      }
+      if (alive) {
+        setVisionPreference(v);
+        setGeocodingPreference(g);
+        setLocationPermission(loc);
+      }
+    }
+    void readPrefs();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void readPrefs();
     });
     return () => {
       alive = false;
+      sub.remove();
     };
-  }, [geocodingSettingPort]);
+  }, [visionPort, geocodingSettingPort]);
 
   /**
-   * 사용자가 장소명 설정을 켜고 끈다.
+   * 029 — 최근 3일 중 사진 신호가 1장 이상인 하루들 (FR-010, 임계값 없음).
    *
-   * ─────────────────────────────────────────────────────────────────────────
-   * **켤 때 위치 런타임 권한을 요청한다**(research.md §3 L8) — 안드로이드의
-   * `Geocoder`는 이 권한이 없으면 빈 결과 또는 예외를 준다. **요청 자체가
-   * 실패하거나 거부돼도 토글 값은 사용자가 낸 대로(켜짐) 유지한다**(L9) —
-   * 권한이 없으면 `geocoding-port.ts`가 이미 `unknown`으로 접으므로,
-   * 여기서 토글을 도로 끄면 사용자가 다시 켠 것을 앱이 조용히 무르는
-   * 꼴이 된다.
-   *
-   * **끌 때는 권한을 요청하지 않는다** — 끄는 것은 권한과 무관하다.
-   * ─────────────────────────────────────────────────────────────────────────
+   * 자동 판정("auto" → 사진 있으면 quick)의 입력이다. 3일치를 한 번 훑어 캐시하고
+   * `AppState active`에서 다시 훑는다. 정밀 판정은 pipeline이 신호에서 다시 한다.
    */
-  const onToggleGeocoding = useCallback(
-    async (enabled: boolean) => {
-      setGeocodingEnabled(enabled);
-      await saveGeocodingSetting(geocodingSettingPort, enabled).catch(() => {
-        // 저장하지 못해도 이번 실행 동안은 고른 대로 쓴다.
-      });
-
-      if (enabled) {
-        await import("expo-location")
-          .then((Location) => Location.requestForegroundPermissionsAsync())
-          .catch(() => {
-            // 권한 요청 자체가 실패해도 토글은 건드리지 않는다(L9) — 실제
-            // 지오코딩 시도는 geocoding-port.ts가 예외를 이미 삼킨다.
-          });
+  const [photoDays, setPhotoDays] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => {
+    let alive = true;
+    async function probe() {
+      const port = expoPhotoPort();
+      const days = selectableDays(new Date());
+      const withPhotos = new Set<string>();
+      for (const day of days) {
+        try {
+          const { startMs, endMs } = dayBounds(day);
+          const photos = await port.photosBetween(startMs, endMs);
+          if (photos.length > 0) withPhotos.add(day);
+        } catch {
+          // 권한 없음·통로 없음 — 그 하루는 "사진 없음"으로 다룬다.
+        }
       }
-    },
-    [geocodingSettingPort],
-  );
+      if (alive) setPhotoDays(withPhotos);
+    }
+    void probe();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void probe();
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, []);
 
-  // **설정이 바뀌면 파이프라인을 다시 만든다** — `geocodingEnabled`는
-  // `createPipeline()` 구성 시점에 고정되는 값이라(파이프라인 인스턴스마다
-  // 하나), 토글이 바뀔 때 다시 만들지 않으면 다음 생성에 반영되지 않는다.
+  // 029 — 장소명이 켜짐(자동+권한 있음, 또는 고정 on)인지 배선에 넘긴다.
+  // `createPipeline`이 구성 시점에 이 값을 고정하므로, 바뀌면 파이프라인을 다시 만든다.
+  const geocodingEnabled =
+    geocodingPreference === "on"
+      ? true
+      : geocodingPreference === "off"
+        ? false
+        : locationPermission;
+
   const wiring = useMemo(
     () => createAppPipeline(environment, { store, geocodingEnabled }),
     [environment, store, geocodingEnabled],
@@ -533,8 +526,10 @@ function DiarySection({
   /**
    * 저장된 선택과 준비 상태를 함께 읽는다 (007 FR-001·003).
    *
-   * **판정은 여기서 하지 않는다** — 재료만 모아 `resolveSelection()`에 넘긴다.
-   * 그래야 「옮김」 규칙 전체가 기기 없이 검증된다(research.md §7).
+   * 029 — 홈에 CharacterPicker가 없으므로 여기서 사용자가 고르는 일은 없다.
+   * `stored`는 "마지막에 쓴 캐릭터"(생성 성공 시 기록) 또는 설정 탭 "일기 작성자"
+   * 고정값이며, 자동 판정(`resolveGenerationParams`)의 `lastCharacter`·`fixedAuthor`로
+   * 넘어간다. `AppState active`에서 다시 읽는다(설정 탭 변경 반영).
    */
   const refreshSelection = useCallback(async () => {
     const [found, saved] = await Promise.all([
@@ -546,26 +541,53 @@ function DiarySection({
 
   useEffect(() => {
     let alive = true;
-    void refreshSelection().then(({ found, saved }) => {
-      if (!alive) return;
-      setReady(found);
-      setStored(saved);
+    const run = () =>
+      void refreshSelection().then(({ found, saved }) => {
+        if (!alive) return;
+        setReady(found);
+        setStored(saved);
+      });
+    run();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") run();
     });
     return () => {
       alive = false;
+      sub.remove();
     };
   }, [refreshSelection]);
 
-  // **순수 함수가 판정한다.** 옮겨졌으면 `movedFrom`이 실려 화면이 알린다(FR-005a).
-  const selection = resolveSelection(stored, ready);
+  /**
+   * 029 — "일기 쓰기"가 눌린 하루에 대해 생성 파라미터를 정한다 (FR-007).
+   *
+   * **순수 함수(`resolveGenerationParams`)가 배선 계층에서 돈다** — 화면은 자기
+   * `chosenDay`를 넘기고 결과만 받는다. `fixedAuthor`는 설정 탭 "일기 작성자" 고정값
+   * 이지만, 홈 CharacterPicker가 없는 지금은 `stored`(마지막에 쓴 캐릭터) 하나가
+   * `lastCharacter`이자 폴백 대상이다 — 설정 탭 고정 선택도 같은 파일에 쓰므로(FR-026),
+   * `fixedAuthor`를 `stored`와 별개로 두지 않는다.
+   */
+  const resolveWrite = useCallback(
+    (day: DayDate) =>
+      resolveGenerationParams({
+        lastCharacter: stored,
+        onboardingDefault: ONBOARDING_DEFAULT_CHARACTER,
+        readyCharacters: ready,
+        fixedAuthor: stored,
+        chosenDay: day,
+        // 029 — 그 날 사진 신호가 1장 이상인가. 임계값 없음(FR-010).
+        photoSignalPresent: photoDays.has(day),
+        locationPermission,
+        visionPreference,
+        geocodingPreference,
+      }),
+    [stored, ready, photoDays, locationPermission, visionPreference, geocodingPreference],
+  );
 
-  /** 사용자가 고른다. **저장은 그 즉시** — 앱을 껐다 켜도 남는다(FR-003) */
-  const onSelect = useCallback(
-    async (character: Character) => {
+  /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
+  const onGenerated = useCallback(
+    (character: Character) => {
       setStored(character);
-      await saveSelection(selectionPort, character).catch(() => {
-        // 저장하지 못해도 이번 실행 동안은 고른 대로 쓴다. 다음에 다시 고르면 된다.
-      });
+      void saveSelection(selectionPort, character).catch(() => {});
     },
     [selectionPort],
   );
@@ -575,35 +597,14 @@ function DiarySection({
       resolution={environment}
       pipeline={wiring.ok ? wiring.pipeline : undefined}
       store={store}
-      // **★ 007이 잇는 끊긴 배선**(research.md §3). 006까지 이 줄이 없어 005의 끊김
-      // 기능이 실기기에서 한 번도 돈 적이 없다 — 넘길 것이 없었기 때문이다.
       stop={wiring.stop}
-      // 고른 것이 없으면 파이프라인이 `model-not-ready`로 멈추고, 화면이
-      // 「캐릭터를 먼저 준비해야 한다」로 옮긴다(FR-006, 006 FR-028).
-      selection={selection}
-      characters={CHARACTERS.map((character) => ({
-        character,
-        ready: ready.includes(character),
-      }))}
-      onSelectCharacter={(character) => void onSelect(character)}
-      // ★ 011 — **이 두 줄이 없으면 화면에서 골라도 언제나 「보지 않음」이 쓰인다.**
-      // 007의 끊긴 `stop`, 009의 `day:` 한 줄과 같은 자리다.
-      vision={vision ?? "none"}
-      onSelectVision={(chosen) => void onSelectVision(chosen)}
-      // 017 — 이 두 줄이 없으면 화면에서 토글을 켜도 파이프라인은 언제나
-      // 꺼짐으로 만들어진다(011의 vision과 같은 자리).
-      geocodingEnabled={geocodingEnabled}
-      onToggleGeocoding={(enabled) => void onToggleGeocoding(enabled)}
-      // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014, SC-004).
+      resolve={resolveWrite}
+      onGenerated={onGenerated}
       deniedNotices={deniedNotices}
-      // 「캐릭터를 먼저 준비해야 한다」로 끝났을 때 갈 곳을 준다(FR-028).
-      onGoToCharacters={onGoToCharacters}
-      // 020 — 알림을 눌러 열렸으면 그 하루의 상세로 바로 간다(FR-006, SC-004).
+      onGoToSettings={onGoToSettings}
       initialDay={initialDay}
       onAcknowledge={(day) => {
         onAcknowledge?.(day);
-        // 알림 경로로 상세를 연 것이면 pendingRoute를 비운다 — 목록으로
-        // 돌아갔다가 다시 이 탭에 와도 상세로 튕기지 않게.
         if (initialDay != null && day === initialDay) onDayOpened?.();
       }}
     />
@@ -921,10 +922,23 @@ function AutoDiarySection({
   platform,
   onboardingPorts,
   onRestartOnboarding,
+  modelPorts,
+  acquisition,
+  progress,
+  setProgress,
+  rejection,
+  setRejection,
 }: {
   platform: "android" | "ios";
   onboardingPorts: OnboardingPorts;
   onRestartOnboarding: () => void;
+  /** 029 — "일기 작성자" 섹션의 다운로드 관리에 쓴다 (기존 ModelSection). */
+  modelPorts: ReturnType<typeof expoModelPorts>;
+  acquisition: Acquisition;
+  progress: ReadonlyMap<Character, DownloadProgress>;
+  setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
+  rejection: DownloadRejection | null;
+  setRejection: (rejection: DownloadRejection | null) => void;
 }) {
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
@@ -932,6 +946,66 @@ function AutoDiarySection({
 
   const [settings, setSettings] = useState<AutoDiarySettings | null>(null);
   const [notificationDenied, setNotificationDenied] = useState(false);
+
+  /* ── 029 — "일기 작성자"·"사진 보기"·"장소명" 섹션 ─────────────────────── */
+  const selectionPort = useMemo(() => expoSelectionPort(), []);
+  const visionPort = useMemo(() => expoVisionSettingPort(), []);
+  const geoPort = useMemo(() => expoGeocodingSettingPort(), []);
+  const [author, setAuthor] = useState<Character | null>(null);
+  const [readyChars, setReadyChars] = useState<readonly Character[]>([]);
+  const [visionPref, setVisionPref] = useState<VisionPreference>("auto");
+  const [geoPref, setGeoPref] = useState<GeocodingPreference>("auto");
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      loadSelection(selectionPort).catch(() => null),
+      readyCharacters(),
+      loadVisionSetting(visionPort).catch(() => "auto" as const),
+      loadGeocodingSetting(geoPort).catch(() => "auto" as const),
+    ]).then(([a, r, v, g]) => {
+      if (!alive) return;
+      setAuthor(a);
+      setReadyChars(r);
+      setVisionPref(v);
+      setGeoPref(g);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [selectionPort, visionPort, geoPort]);
+
+  const onSelectAuthor = useCallback(
+    (index: number) => {
+      const character = CHARACTERS[index];
+      if (character === undefined || !readyChars.includes(character)) return;
+      setAuthor(character);
+      void saveSelection(selectionPort, character).catch(() => {});
+    },
+    [readyChars, selectionPort],
+  );
+
+  const onSelectVisionPref = useCallback(
+    (v: VisionPreference) => {
+      setVisionPref(v);
+      void saveVisionSetting(visionPort, v).catch(() => {});
+    },
+    [visionPort],
+  );
+
+  const onSelectGeoPref = useCallback(
+    (g: GeocodingPreference) => {
+      setGeoPref(g);
+      void saveGeocodingSetting(geoPort, g).catch(() => {});
+      // "켬"일 때 위치 런타임 권한을 요청한다(017 L8·L9 — 실패해도 값은 유지).
+      if (g === "on") {
+        void import("expo-location")
+          .then((Location) => Location.requestForegroundPermissionsAsync())
+          .catch(() => {});
+      }
+    },
+    [geoPort],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -993,7 +1067,7 @@ function AutoDiarySection({
   }
 
   return (
-    <ScrollView>
+    <ScrollView contentContainerStyle={styles.settingsPage}>
       <AutoDiarySettingsScreen
         settings={settings}
         onToggleEnabled={(enabled) => void onToggleEnabled(enabled)}
@@ -1001,6 +1075,34 @@ function AutoDiarySection({
         onOpenBatterySettings={onOpenBatterySettings}
         notificationDenied={notificationDenied}
       />
+
+      {/* 029 — 일기 작성자 (FR-023). persona 이름·소개·준비 여부만. */}
+      <AuthorPicker
+        options={CHARACTERS.map((character) => ({
+          name: personaOf(character).name,
+          tagline: personaOf(character).tagline,
+          ready: readyChars.includes(character),
+          selected: author === character,
+        }))}
+        onSelect={onSelectAuthor}
+      />
+
+      {/* 029 — 사진 보기 (FR-024). 자동/보지 않음/빠르게 봄/자세히 봄. */}
+      <VisionPicker selected={visionPref} onSelect={onSelectVisionPref} />
+
+      {/* 029 — 장소명 (FR-025). 자동/켬/끔. */}
+      <GeocodingSettingToggle mode={geoPref} onSelect={onSelectGeoPref} />
+
+      {/* 029 — 미준비 캐릭터·VLM 다운로드 관리 (기존 ModelSection, SS4). */}
+      <ModelSection
+        ports={modelPorts}
+        acquisition={acquisition}
+        progress={progress}
+        setProgress={setProgress}
+        rejection={rejection}
+        setRejection={setRejection}
+      />
+
       {/* 021 — 권한 상태·재요청·온보딩 재실행 (FR-017~020). prod에도 있다. */}
       <PermissionsSection
         platform={platform}
@@ -1034,4 +1136,5 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
   },
+  settingsPage: { gap: 20, paddingBottom: 24 },
 });

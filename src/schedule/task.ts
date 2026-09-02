@@ -32,8 +32,12 @@ import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createAppPipeline } from "../app/wiring";
 import { loadSelection, expoSelectionPort } from "../app/selection-store";
-import { loadVisionSetting, expoVisionSettingPort } from "../app/vision-setting-store";
-import type { Character, VisionSetting } from "../diary/types";
+import {
+  loadVisionSetting,
+  expoVisionSettingPort,
+  type VisionPreference,
+} from "../app/vision-setting-store";
+import type { Character } from "../diary/types";
 import { decideSchedule } from "./decision";
 import { decideNotify } from "./notify";
 import {
@@ -66,7 +70,8 @@ export type AutoDiaryTaskDeps = {
   /** 저장된 일기 날짜들. 주지 않으면 `createAppPipeline`의 store에서 읽는다 */
   listDiaryDays?: () => Promise<readonly DayDate[]>;
   loadCharacter?: () => Promise<Character | null>;
-  loadVision?: () => Promise<VisionSetting | null>;
+  /** 029 — "auto"이거나 고정값. 백그라운드는 "auto"를 "none"으로 다룬다(위 주석). */
+  loadVision?: () => Promise<VisionPreference | null>;
   /** 파이프라인 조립. 주지 않으면 `createAppPipeline(resolution)` */
   makePipeline?: typeof createAppPipeline;
 };
@@ -125,10 +130,15 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       return "skipped";
     }
 
+    // 029 — 사진 설정이 "auto"이거나 없으면 백그라운드에서는 "none"으로 둔다.
+    // 자동 판정("auto" → 사진 있으면 quick)은 화면의 "일기 쓰기" 흐름 것이며
+    // (resolve-generation.ts), 백그라운드는 그 날 신호를 미리 읽지 않는다. 사용자가
+    // 설정 탭에서 "빠르게 봄"·"자세히 봄"을 명시적으로 고르면 그 값은 그대로 쓴다.
+    const visionPreference = deps.loadVision
+      ? await deps.loadVision()
+      : await loadVisionSetting(expoVisionSettingPort());
     const vision =
-      (deps.loadVision
-        ? await deps.loadVision()
-        : await loadVisionSetting(expoVisionSettingPort())) ?? "none";
+      visionPreference === "quick" || visionPreference === "detailed" ? visionPreference : "none";
 
     // B2-7 — 잠금은 pipeline.run() 안에서 취득한다(wiring.ts가 "background"
     // owner로 배선). 취득 실패로 인한 already-running 결과는 "skipped"로

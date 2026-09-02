@@ -37,12 +37,25 @@ export type OnboardingStep = {
 };
 
 /**
- * 온보딩을 띄워야 하는가 (D2).
+ * 온보딩을 띄워야 하는가 (D2, 029 FR-019·020으로 확장).
  *
- * `completed` 하나만 본다 — `batteryNoticeShown`은 온보딩 재노출과 무관.
+ * **앱 진입 시점**(cold start·resume)에만 호출된다. 세션 중 캐릭터 손상은
+ * 029 FR-014가 다룬다(설정 탭 안내, 온보딩 재노출 아님).
+ *
+ * - `flag.completed !== true` → 온보딩 (기존 021 동작, DR1)
+ * - `flag.completed === true`인데 필수 에셋이 준비 안 됨 → 온보딩 (029 DR2,
+ *   FR-020 — 028의 model-not-ready 재발 방지)
+ * - 둘 다 만족 → 홈 (DR3)
+ *
+ * `essentialAssetsReady`는 003·011 readiness의 실시간 조회 결과다 — `onboarding.json`
+ * 에 저장하지 않는다(파일이 거짓말할 수 없게, 모델을 지우면 즉시 false).
  */
-export function shouldShowOnboarding(flag: OnboardingFlag): boolean {
-  return flag.completed !== true;
+export function shouldShowOnboarding(
+  flag: OnboardingFlag,
+  essentialAssetsReady: boolean,
+): boolean {
+  if (flag.completed !== true) return true;
+  return !essentialAssetsReady;
 }
 
 /** 권한 상태 하나를 StepStatus로 (D3). `battery-exception`은 여기 오지 않는다. */
