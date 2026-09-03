@@ -25,6 +25,7 @@ type Style = { $: { name: string; parent?: string }; item: StyleItem[] };
 type Styles = { resources: { style: Style[] } };
 
 const addForceLightItem: (xml: Styles) => Styles = plugin.addForceLightItem;
+const LIGHT_PARENT: string = plugin.LIGHT_PARENT;
 
 /** Expo 템플릿이 만드는 styles.xml 모양 (xml2js 파싱 결과). 실제 `styles.xml`에서 옮겨 왔다. */
 function templateStyles(): Styles {
@@ -53,9 +54,21 @@ describe("DM1a·b — addForceLightItem", () => {
     expect(typeof addForceLightItem).toBe("function");
   });
 
-  it("★ AppTheme에 android:forceDarkAllowed=false item을 더한다", () => {
-    // **이것이 이 plugin의 존재 이유다.** 이 item이 없으면 One UI 8.5가 흰 배경
-    // 뷰에 force-dark를 씌워 화면이 회색~검정으로 보인다(031 실기기 조사).
+  it("★ AppTheme의 parent를 DayNight → Light로 바꾼다", () => {
+    // **이것이 이 plugin의 진짜 수정이다**(031 실기기 조사, 2026-09-03 SM-S928N).
+    // DayNight 부모면 시스템 night 모드에서 윈도우 배경이 #303030(background_material_dark)
+    // 으로 칠해진다 — expo-system-ui의 MODE_NIGHT_NO는 리소스 계층만 되돌리고
+    // 이미 만들어진 윈도우 데코 배경은 못 고친다(uiMode가 configChanges에 있어
+    // Activity 재생성도 안 됨). Light 부모면 night 모드와 무관하게 라이트로 해석된다.
+    const out = addForceLightItem(templateStyles());
+    const appTheme = out.resources.style.find((s) => s.$.name === "AppTheme")!;
+
+    expect(appTheme.$.parent).toBe(LIGHT_PARENT);
+    expect(LIGHT_PARENT).toBe("Theme.AppCompat.Light.NoActionBar");
+  });
+
+  it("AppTheme에 android:forceDarkAllowed=false item을 더한다 (제조사 force-dark 방어)", () => {
+    // Light 테마에도 force-dark를 씌우는 제조사 대비 무해한 이중 방어.
     const out = addForceLightItem(templateStyles());
     const item = appThemeItems(out).find((i) => i.$.name === "android:forceDarkAllowed");
 

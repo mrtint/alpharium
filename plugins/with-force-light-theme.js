@@ -9,36 +9,60 @@
  * 재현할 수 없다. `with-battery-exception.js`가 매니페스트에 대해, `with-release-
  * signing.js`가 서명 설정에 대해 같은 판단을 한 것과 같은 이유다.
  *
- * **왜 `expo-system-ui`(app.json의 `userInterfaceStyle: "light"`)만으로 부족한가**
+ * **실기기 조사로 확인한 진짜 원인 (2026-09-03, SM-S928N/One UI 8.5)**
  *
- * `expo-system-ui`는 `userInterfaceStyle`이 네이티브 uiMode에 적용되게 한다 —
- * 없으면 `@expo/prebuild-config`가 경고만 내고 무시한다(설치본 확인, 2026-09-03).
- * 그런데 `styles.xml`의 `AppTheme` 부모가 `Theme.AppCompat.DayNight.NoActionBar`
- * (**DayNight**)이고, One UI 8.5는 앱이 라이트를 선언해도 뷰 색을 런타임에
- * 반전하는 **force-dark** 알고리즘을 씌우는 사례가 보고돼 있다(031 실기기 조사:
- * `adb shell "cmd uimode night yes"` 후 화면이 회색~검정으로 관측). 그래서
- * `android:forceDarkAllowed="false"`를 앱 테마에 명시해 이 반전을 끈다.
+ * `cmd uimode night yes`에서 앱 배경이 정확히 `#303030`(= `background_material_dark`,
+ * rgb(48,48,48))으로 나온다. **이건 force-dark 반전이 아니다** — force-dark라면
+ * 글자·이미지까지 전부 반전됐을 텐데, 관측된 건 앱 콘텐츠가 아예 안 그려진 채
+ * `#303030` 단색이었다. 즉 **윈도우 데코 배경이 테마에서 다크로 칠해진 것**이다:
  *
- * `expo-system-ui`(선언 레벨) + `forceDarkAllowed`(변환 차단 레벨)를 함께 두면
- * One UI 버전과 무관하게 라이트가 유지된다.
+ *   `MainActivity`의 매니페스트 `android:theme`는 `Theme.App.SplashScreen`이고
+ *   그 부모가 `AppTheme`, `AppTheme`의 부모가 `Theme.AppCompat.DayNight.NoActionBar`
+ *   (**DayNight**)다. 시스템 night 모드에서 윈도우가 만들어질 때 `DayNight`가
+ *   `android:windowBackground`/`colorBackground`를 다크로 해석한다.
  *
- * `android:forceDarkAllowed`는 API 29(Android 10)+ 속성이다. `minSdk 24`이지만
- * 낮은 버전에서는 무시될 뿐(force-dark 자체가 없음) 빌드가 깨지지 않는다.
+ *   `expo-system-ui`(`userInterfaceStyle: "light"` → `AppCompatDelegate
+ *   .setDefaultNightMode(MODE_NIGHT_NO)`)는 **리소스 해석 계층만** 라이트로
+ *   되돌린다(`dumpsys`의 `mLastConfigurationFromResources`에 `night` 없음 확인).
+ *   하지만 윈도우 데코 배경은 이미 만들어질 때 칠해졌고, 매니페스트
+ *   `android:configChanges`에 `uiMode`가 있어 Activity가 재생성되지 않아
+ *   스테일한 다크 배경이 그대로 남는다.
+ *
+ * **수정: `AppTheme`의 부모를 `DayNight` → `Light`로 바꾼다.** 그러면 시스템
+ * night 모드와 무관하게 윈도우 배경이 항상 라이트로 해석된다. `expo-system-ui`는
+ * 그대로 두어(`userInterfaceStyle: "light"`) RN 뷰·컴포넌트 레벨의 라이트 고정을
+ * 이중으로 보장한다.
+ *
+ * `android:forceDarkAllowed="false"`도 `AppTheme`·`Theme.App.SplashScreen`
+ * 양쪽에 남긴다 — Light 테마에도 force-dark를 씌우는 제조사 대비 무해한 방어다.
+ * API 29(Android 10)+ 속성이라 aapt2가 자동으로 `-v29` variant로 분리하며,
+ * 낮은 버전에서는 무시될 뿐 빌드가 깨지지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 const { withAndroidStyles, AndroidConfig } = require("@expo/config-plugins");
 
+const LIGHT_PARENT = "Theme.AppCompat.Light.NoActionBar";
+
 /**
- * `forceDarkAllowed=false`를 넣을 스타일들.
+ * `styles.xml`(xml2js 파싱 결과)을 받아 라이트 고정을 적용한다:
  *
- * `AppTheme`뿐 아니라 **`Theme.App.SplashScreen`도** 넣는다 — `MainActivity`의
- * 매니페스트 `android:theme`가 이것이고(`expo-splash-screen`), 윈도우 데코가
- * 만들어질 때 읽는 것은 이 스타일의 **자기 속성 집합**이지 상속 체인이 아니다.
- * `AppTheme`에만 넣으면 `Theme.App.SplashScreen`이 상속으로 받지 못해
- * force-dark가 그대로 적용된다(031 실기기: 배경이 rgb(48,48,48)로 반전).
+ *   1. `AppTheme`의 `parent`를 `Theme.AppCompat.Light.NoActionBar`로 바꾼다
+ *      (원래 `Theme.AppCompat.DayNight.NoActionBar`). **이것이 실제 수정이다** —
+ *      윈도우 배경이 시스템 night 모드를 따라 다크로 칠해지는 것을 막는다.
+ *   2. `AppTheme`·`Theme.App.SplashScreen` 둘 다에 `android:forceDarkAllowed
+ *      = false` item을 더한다(제조사 force-dark 대비 방어, 중복 미추가).
+ *
+ * 다른 `<style>`은 건드리지 않는다.
  */
 function addForceLightItem(androidStyles) {
+  // 1. AppTheme parent: DayNight → Light
+  const appTheme = androidStyles.resources?.style?.find((s) => s.$?.name === "AppTheme");
+  if (appTheme && appTheme.$) {
+    appTheme.$.parent = LIGHT_PARENT;
+  }
+
+  // 2. forceDarkAllowed=false (양쪽 테마, 방어)
   let out = AndroidConfig.Styles.assignStylesValue(androidStyles, {
     add: true,
     parent: AndroidConfig.Styles.getAppThemeGroup(),
@@ -66,3 +90,4 @@ module.exports = function withForceLightTheme(config) {
 
 // 테스트가 순수 함수만 검증할 수 있도록 함께 내보낸다(기기·prebuild 없이 돈다).
 module.exports.addForceLightItem = addForceLightItem;
+module.exports.LIGHT_PARENT = LIGHT_PARENT;

@@ -126,9 +126,14 @@ description: "Task list for One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-l
 
 **전제**: T001~T020 + SplashScreen 수정(커밋 `03bb3e1`)까지 기기 없는 구현은 전부 완료·초록불(2168개 통과, lint·헌법 검사·prettier 클린). `styles.xml`에 `AppTheme`·`Theme.App.SplashScreen` 둘 다 `forceDarkAllowed=false` 생성 확인, `strings.xml`에 `expo_system_ui_user_interface_style=light` 확인. `decision.ts` 무변경 확인. `collect.ts`가 `locationPermission` 미호출 확인. `src/ui/`에 `useColorScheme`·`Appearance.` 참조 0건 확인.
 
-**남은 것은 전부 실기기 확인 공백이다 — 코드 공백이 아니다.** T021 1차 시도(SplashScreen 수정 전 APK)에서 S24U 배경이 `rgb(48,48,48)`로 반전되는 것을 관측 → plugin에 SplashScreen 분기 추가 → 재빌드까지 마쳤으나, 재빌드 도중 S24U(SM-S928N)가 연결이 끊겨 재빌드 APK를 설치·검증하지 못했다. 기존 T021~T028이 이 작업을 이미 담고 있으므로, 이 단계는 그 상태를 명시하고 SplashScreen 수정분에 대한 재검증을 못 박는다.
+**남은 것은 전부 실기기 확인 공백이다 — 코드 공백이 아니다.** 단, **다크 모드 수정의 원인 진단이 실기기에서 틀린 것으로 확인돼 수정 방식이 바뀌었다**(2026-09-03, SM-S928N):
 
-- [ ] T029 [US1] SM-S928N(One UI 8.5) 재연결 후 **재빌드된 debug APK**(`android/app/build/outputs/apk/debug/app-debug.apk`, SplashScreen `forceDarkAllowed=false` 포함, 2026-09-03 재빌드)를 `adb install -r`로 설치하고 T021을 수행한다 — `cmd uimode night yes` → 6개 화면군 전부 밝은 배경 + 대비 확인, 특히 **배경이 `rgb(48,48,48)`이 아님**을 픽셀로 확인(1차 시도의 실패 지점), 2026-09-02 22:03·22:28 스크린샷과 대조, 끝나면 `cmd uimode night auto` 복원. per FR-001·SC-001, tasks T021 (partial — 기기 미확인)
+1. T021 1차 시도(`AppTheme`에만 `forceDarkAllowed=false`) → 배경 `rgb(48,48,48)`.
+2. `Theme.App.SplashScreen`에도 `forceDarkAllowed=false` 추가(커밋 `03bb3e1`) → 재빌드·설치 → **여전히 `rgb(48,48,48)`**.
+3. `dumpsys`로 확정: `mLastConfigurationFromResources`에 `night` 없음(= `expo-system-ui`의 `MODE_NIGHT_NO`는 작동) 이나 `mCurrentConfig`에 `night` 잔존, 배경이 정확히 `#303030`(`background_material_dark`). **force-dark 반전이 아니라 `DayNight` 부모 테마가 윈도우 배경을 night 리소스로 해석한 것.** `android:configChanges`의 `uiMode` 때문에 Activity 재생성도 없음.
+4. **수정 변경**: `plugins/with-force-light-theme.js`가 이제 `AppTheme`의 `$.parent`를 `Theme.AppCompat.DayNight.NoActionBar` → `Theme.AppCompat.Light.NoActionBar`로 **교체**한다(`forceDarkAllowed=false`는 방어로 유지). 계약 테스트 DM1b가 `$.parent === LIGHT_PARENT`를 잠근다(9개 통과). spec FR-001·Assumptions, plan Summary, research R1/R1a, contracts/dark-mode DM1을 이 내용으로 정정 완료. prebuild + 재빌드 진행 중.
+
+- [ ] T029 [US1] SM-S928N(One UI 8.5)에 **부모 테마 교체 반영 debug APK**(`android/app/build/outputs/apk/debug/app-debug.apk`, `AppTheme` parent = `Theme.AppCompat.Light.NoActionBar`, 2026-09-03 재빌드)를 `adb install -r`로 설치하고 T021을 수행한다 — `cmd uimode night yes` → 6개 화면군 전부 밝은 배경 + 대비 확인, 특히 **배경이 `rgb(48,48,48)`이 아니라 `rgb(250,250,250)` 계열**임을 픽셀로 확인(1·2차 시도의 실패 지점), 2026-09-02 22:03·22:28 스크린샷과 대조, 끝나면 `cmd uimode night auto` 복원. per FR-001·SC-001, tasks T021 (partial — 기기 미확인)
 - [ ] T030 [US2] SM-S928N에서 T022를 수행한다 — 완전 새 설치 온보딩에서 사진 "모두 허용" 후 **다음 단계가 `onboarding-step-location`**(`onboarding-step-photo-location` 부재), 4단계 통과 후 에셋 다운로드 도달, 설정 "권한" 섹션 행 4개(`permission-row-photo-location` 부재). per FR-006·007·009·SC-002·003·005, tasks T022 (partial — 기기 미확인)
 - [ ] T031 [US2] SM-S928N에서 T023을 수행한다 — 사진 좌표 있는 하루 생성 → 위치 권한 허용 시 지명, `adb pm revoke ... ACCESS_FINE_LOCATION` 후 지명 없음, 031 수정 전과 동일. per FR-010·SC-006·OB7, tasks T023 (missing — 기기 미확인)
 - [ ] T032 연결된 기기에서 `node scripts/run-device-tests.mjs`로 T024를 수행한다 — `unified-permission-onboarding.yml`(4단계 갱신본) + 온보딩 거치는 회귀 흐름(`scheduled-diary-notification.yml`·`diary-photo-gallery.yml` 등) PASS. per FR-012·quickstart Maestro, tasks T024 (missing — 기기 미확인)

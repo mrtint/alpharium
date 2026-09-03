@@ -16,7 +16,8 @@
 ### Session 2026-09-03
 
 - Q: ② 온보딩 "photo-location" 단계를 어떻게 처리할까? → A: **온보딩에서 단계를 제거한다.** `PERMISSION_REQUIREMENTS`에서 `photo-location` 항목을 빼고 `order`를 재배치(사진 1·위치 2·알림 3·배터리 예외 4). 사진 좌표는 신호 수집 계층이 실제로 읽어보고 처리하므로(FR-013a) 온보딩에서 물어볼 이유가 없다. 설정 탭 "권한" 섹션의 `photo-location` 행도 함께 제거한다. 매니페스트의 `ACCESS_MEDIA_LOCATION` 선언·플러그인 설정(`isAccessMediaLocationEnabled: true`)은 유지한다.
-- Q: ① 다크 모드 라이트 고정을 어떤 수단으로 할까? → A: **`expo-system-ui` 설치 + 테마 `forceDarkAllowed=false` 차단(이중).** `npx expo install expo-system-ui`로 `app.json`의 `userInterfaceStyle: "light"`가 실제 네이티브에 적용되게 하고, 추가로 plugin(`plugins/with-*.js` 형태)으로 Android 테마에 `android:forceDarkAllowed="false"`를 선언해 One UI의 force-dark를 이중 차단한다. `expo-system-ui`는 새 네이티브 모듈이므로 release 빌드 재확인 1회가 필요하다(012).
+- Q: ① 다크 모드 라이트 고정을 어떤 수단으로 할까? → A: **`expo-system-ui` 설치 + `AppTheme` 부모를 `DayNight` → `Light`로 교체(이중).** `npx expo install expo-system-ui`로 `app.json`의 `userInterfaceStyle: "light"`가 실제 네이티브에 적용되게 하고(RN 뷰·컴포넌트 레벨), 추가로 plugin(`plugins/with-*.js` 형태)으로 `AppTheme`의 부모 테마를 `Theme.AppCompat.DayNight.NoActionBar` → `Theme.AppCompat.Light.NoActionBar`로 바꿔 윈도우 배경이 시스템 night 모드에 끌려가는 것을 막는다(윈도우 배경 레벨). `expo-system-ui`는 새 네이티브 모듈이므로 release 빌드 재확인 1회가 필요하다(012).
+  - **실기기 조사로 정정(2026-09-03, SM-S928N)**: 초안은 "`forceDarkAllowed=false`로 One UI의 **force-dark 반전**을 차단"이었으나, 그 속성을 양쪽 테마(+`-v29`)에 넣은 빌드에서도 배경이 `#303030`(`background_material_dark`)으로 나왔다. 원인은 force-dark 반전이 아니라 **`DayNight` 부모 테마가 시스템 night 모드에서 윈도우 배경을 다크로 해석**하는 것이었고(`expo-system-ui`의 `MODE_NIGHT_NO`는 리소스 계층만 되돌림, `uiMode`가 `configChanges`에 있어 Activity 재생성도 안 됨), 진짜 수정은 **부모 테마 교체**다. `forceDarkAllowed=false`는 제조사 force-dark 대비 방어로 함께 남긴다. research.md R1a에 상세.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -70,7 +71,7 @@
 
 **① 다크 모드 dimmed 수정**
 
-- **FR-001**: 앱은 시스템(기기)의 다크 모드 설정과 무관하게 **항상 라이트(밝은) 외형**으로 표시되어야 한다. 시스템 다크 모드가 켜져 있어도 앱의 배경·글자·컴포넌트 색이 라이트 모드와 동일해야 한다. 라이트 고정은 앱 레벨 선언(`userInterfaceStyle: "light"`가 실제 적용됨)과 OS의 강제 다크 변환 차단(`forceDarkAllowed=false`) **둘 다**로 달성되어야 한다 — 한쪽만으로는 One UI 8.5의 force-dark를 못 막을 수 있다.
+- **FR-001**: 앱은 시스템(기기)의 다크 모드 설정과 무관하게 **항상 라이트(밝은) 외형**으로 표시되어야 한다. 시스템 다크 모드가 켜져 있어도 앱의 배경·글자·컴포넌트 색이 라이트 모드와 동일해야 한다. 라이트 고정은 앱 레벨 선언(`userInterfaceStyle: "light"`가 `expo-system-ui`로 실제 적용됨 — RN 뷰 레벨)과 **`AppTheme`을 비-DayNight(`Theme.AppCompat.Light`) 테마로 만들어 윈도우 배경이 시스템 night 모드를 따라가지 않게 하는 것**(윈도우 배경 레벨) **둘 다**로 달성되어야 한다 — 한쪽만으로는 부족하다(실기기 확인: `expo-system-ui` 단독으로는 윈도우 데코 배경이 `#303030`으로 잔존). `forceDarkAllowed=false`는 제조사 force-dark 대비 방어로 함께 둔다.
 - **FR-002**: 이 라이트 고정은 앱의 **모든 화면**에 적용되어야 한다 — 온보딩, 일기 목록, 일기 상세(사진 슬라이더·갤러리 포함), 설정, 생성 중 화면, 진단/개발자 탭. 특정 화면만 라이트이고 다른 화면은 시스템을 따라가는 상태가 없어야 한다.
 - **FR-003**: 앱 실행 중 시스템 다크 모드가 전환되어도(auto 설정으로 일몰/일출 시각 도래) 앱 화면은 라이트를 유지해야 하며, 화면 재생성·깜빡임·부분적 색 반전이 없어야 한다.
 - **FR-004**: 라이트 모드에서 앱이 지금 표시되는 방식은 이번 수정으로 바뀌지 않아야 한다(회귀 없음).
@@ -107,7 +108,7 @@
 
 ## Assumptions
 
-- **다크 모드 원인은 라이트 고정 설정의 미적용이다**: `app.json`에 `userInterfaceStyle: "light"`가 선언돼 있으나 이를 네이티브에 적용하는 지원 패키지(`expo-system-ui`)가 없어(`npx expo prebuild`가 `Install expo-system-ui in your project to enable this feature.` 경고 출력) 시스템 다크 모드가 앱 뷰에 강제 다크 변환(force-dark)을 적용하고 있다. **수정 수단은 clarify에서 확정: `expo-system-ui` 설치 + 테마 plugin으로 `forceDarkAllowed=false` 이중 차단.**
+- **다크 모드 원인은 `DayNight` 부모 테마의 윈도우 배경 해석이다** (실기기로 확정, 2026-09-03 SM-S928N — research.md R1a): `app.json`에 `userInterfaceStyle: "light"`가 선언돼 있으나 `expo-system-ui`가 없어 무시됐고, 설치해서 `AppCompatDelegate.setDefaultNightMode(MODE_NIGHT_NO)`가 돌아도 **리소스 해석 계층만** 라이트로 되돌아간다. `AppTheme`의 부모가 `Theme.AppCompat.DayNight.NoActionBar`(DayNight)라 시스템 night 모드에서 **윈도우 데코 배경이 만들어질 때** night 리소스(`#303030` = `background_material_dark`)로 칠해지고, 매니페스트 `android:configChanges`에 `uiMode`가 있어 Activity가 재생성되지 않아 그 배경이 잔존한다. **이건 force-dark 반전이 아니다** — 초안의 진단이 실기기에서 틀린 것으로 확인됐다(`forceDarkAllowed=false`를 양쪽 테마 + `-v29`에 넣어도 배경 `#303030` 유지). **수정 수단: `expo-system-ui` 설치 + `AppTheme` 부모를 `Theme.AppCompat.Light.NoActionBar`로 교체(config plugin). `forceDarkAllowed=false`는 방어로 유지.**
 - **앱은 라이트 전용으로 설계돼 있다**: `src/ui/` 어디에도 다크 팔레트·색상 스킴 감지가 없다. 실제 다크 모드 대응(다크 팔레트 작업)은 이 스펙의 범위가 아니며 로드맵 11번(NativeWind UI)에 속한다. 이 스펙은 "다크 모드에서도 라이트로 보이게" 고정하는 것만 다룬다.
 - **photo-location 단계는 판정 불가능하다**: `ACCESS_MEDIA_LOCATION`은 사용 중인 미디어 라이브러리 API에 전용 요청·조회 함수가 없다(021에서 확인·문서화된 제약, `expo-port.ts:95-97` 주석). 사진 권한이 허용되면 이 권한 상태는 항상 "미정"으로 판정되고, 온보딩이 "미정 → 사용자에게 물어봐야 함"으로 해석해 같은 단계를 무한 반복한다. **수정 방식은 clarify에서 확정: 온보딩·설정 양쪽에서 `photo-location` 단계/항목을 제거.** 021이 이 제약을 `collect.ts`(실제 좌표 읽기)에 흡수했으므로 온보딩에서 물어볼 이유가 없다.
 - **실제 좌표 사용은 별도 경로가 담당한다**: 사진 좌표를 읽어 장소를 짐작하는 것은 신호 수집 계층이 "실제로 좌표를 읽어보고 실패하면 비운다"는 방식으로 이미 처리한다(021 설계, FR-013a). 온보딩 단계를 빼도 이 동작은 영향받지 않는다.

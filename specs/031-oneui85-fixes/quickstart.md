@@ -24,7 +24,7 @@ npm run lint        # eslint + tsc + check:constitution(위반 0) + prettier
 
 1. `PERMISSION_REQUIREMENTS`에 `photo-location` 항목을 도로 추가 → `requirements.test.ts` R2-a·b·c·d FAIL 확인 → 되돌린다.
 2. `PermissionKey`에 `"photo-location"` 추가(항목 없이) → `tsc` 또는 R2-f FAIL → 되돌린다.
-3. `with-force-light-theme.js`가 `forceDarkAllowed`를 `true`로 넣게 고침 → DM1b FAIL → 되돌린다.
+3. `with-force-light-theme.js`가 `AppTheme` 부모를 `DayNight`로 되돌리게 고침 → DM1b FAIL → 되돌린다.
 4. `app.json` `userInterfaceStyle`을 `"automatic"`으로 → DM1f FAIL → 되돌린다.
 
 ## ① 다크 모드 — debug 실기기 (SM-S928N)

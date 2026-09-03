@@ -6,7 +6,9 @@ Phase 0 — 두 결함의 원인을 코드·설치본·실기기 로그로 확�
 
 ## R1. ① 다크 모드 — `userInterfaceStyle: "light"`가 Android에서 무시되는 이유
 
-**Decision**: `expo-system-ui`를 설치한다. 추가로 config plugin으로 Android 테마에 `android:forceDarkAllowed="false"`를 선언한다. 둘 다 한다.
+**Decision**: `expo-system-ui`를 설치한다. **추가로 config plugin으로 `AppTheme`의 부모를 `Theme.AppCompat.DayNight.NoActionBar` → `Theme.AppCompat.Light.NoActionBar`로 바꾼다.** (`forceDarkAllowed=false`도 방어로 함께 넣는다.)
+
+> ⚠️ **초안의 원인 진단이 실기기 조사(2026-09-03, SM-S928N)에서 틀린 것으로 확인됐다.** 초안은 "One UI 8.5가 라이트 앱에도 **force-dark 반전**을 씌운다 → `forceDarkAllowed=false`로 막는다"였으나, `forceDarkAllowed=false`를 `AppTheme`·`Theme.App.SplashScreen` 양쪽(+`-v29` variant)에 넣은 debug 빌드에서도 배경이 **정확히 `#303030`**(= `background_material_dark`, rgb(48,48,48))으로 나왔다. force-dark 반전이면 글자·이미지까지 반전됐을 텐데 앱 콘텐츠가 아예 안 그려진 채 `#303030` 단색이었다 — **윈도우 데코 배경을 `DayNight` 테마가 night 리소스로 해석한 것**이다. 진짜 수정은 부모 테마 교체다. 아래 R1a에 상세.
 
 **근거 (설치본 직접 확인, 2026-09-03)**:
 
@@ -33,23 +35,47 @@ Expo 공식 문서(context7 `/expo/expo`, `develop/user-interface/color-themes.m
 
 **`expo-system-ui` 설치 시**: 그 패키지의 자체 config plugin이 Android 네이티브 설정을 넣어 `userInterfaceStyle: "light"`가 실제로 적용된다(RN `Appearance` API가 "light"를 보고, 네이티브 uiMode가 라이트로 고정).
 
-**왜 `forceDarkAllowed=false`도 필요한가 (이중 차단)**:
+### R1a. 실기기로 확정한 진짜 원인 (2026-09-03, SM-S928N/One UI 8.5, debug)
 
-- `styles.xml`의 `AppTheme` 부모가 `Theme.AppCompat.DayNight.NoActionBar` — **DayNight** 테마다. `expo-system-ui`가 uiMode를 고정해도, One UI 8.5는 앱이 명시적으로 라이트를 선언한 경우에도 **force-dark 알고리즘**(뷰 배경/텍스트 색을 런타임에 반전)을 씌우는 사례가 보고돼 있다. 이번 실기기 조사에서 `adb shell "cmd uimode night yes"` 후 앱 화면이 회색~검정으로 관측된 것이 그 증상.
-- `android:forceDarkAllowed="false"`를 앱 테마에 선언하면 이 반전을 명시적으로 끈다. `expo-system-ui`(선언 레벨) + `forceDarkAllowed`(변환 차단 레벨)를 함께 두면 One UI 버전과 무관하게 라이트가 유지된다.
-- `forceDarkAllowed`는 API 29(Android 10)+ 속성이다. `minSdk 24`이지만 낮은 버전에서는 이 속성이 무시될 뿐(force-dark 자체가 없음) 빌드가 깨지지 않는다.
+`adb shell "cmd uimode night yes"` 후 `adb exec-out screencap` 픽셀 샘플:
+
+| 시스템 night 모드 | 앱 배경색 |
+|---|---|
+| `no` | `rgb(250,250,250)` (라이트, 정상) |
+| `yes` | `rgb(48,48,48)` = `#303030` |
+
+`#303030`은 AppCompat의 `background_material_dark` 정확값이다. `dumpsys activity com.anonymous.alpharium`:
+
+- `mCurrentConfig` = `... port night finger ...` → **프로세스 구성에 `night`가 살아 있다**
+- `mLastConfigurationFromResources` = `... port finger ...` (**`night` 없음**) → **리소스 해석은 라이트** = `expo-system-ui`의 `setDefaultNightMode(MODE_NIGHT_NO)`는 작동 중
+
+즉:
+1. `MainActivity`의 매니페스트 `android:theme` = `Theme.App.SplashScreen` → 부모 `AppTheme` → 부모 `Theme.AppCompat.DayNight.NoActionBar`.
+2. 시스템 night 모드에서 **윈도우 데코가 만들어질 때** `DayNight`가 `android:windowBackground`/`colorBackground`를 night 리소스(`#303030`)로 해석해 칠한다.
+3. `expo-system-ui`(`AppCompatDelegate.setDefaultNightMode(MODE_NIGHT_NO)`)는 **리소스 해석 계층**만 라이트로 되돌린다. 이미 칠해진 윈도우 데코 배경은 안 고친다.
+4. 매니페스트 `android:configChanges`에 **`uiMode`가 포함**돼 있어(`keyboard|...|uiMode|...`), night→resolved-light 전환에도 Activity가 **재생성되지 않는다** → 스테일한 `#303030` 배경이 그대로 남는다.
+
+**이건 force-dark 반전이 아니다.** force-dark였다면 글자·이미지까지 전부 반전됐을 것이고, `forceDarkAllowed=false`(양쪽 테마 + `-v29` variant까지 APK에서 확인)로 막혔을 것이다 — 막히지 않았다.
+
+**수정: `AppTheme`의 부모를 `Theme.AppCompat.Light.NoActionBar`로 바꾼다.** `Light`(비-DayNight) 테마는 시스템 night 모드와 무관하게 윈도우 배경을 라이트로 해석한다. `Theme.App.SplashScreen`은 `AppTheme`을 상속하므로 자동으로 따라온다.
+
+**`forceDarkAllowed=false`도 남긴다 (방어)**:
+
+- `AppTheme`·`Theme.App.SplashScreen` 양쪽에 유지. Light 테마에도 force-dark를 씌우는 제조사(관측된 바 없지만 가능) 대비 무해한 이중 방어.
+- `forceDarkAllowed`는 API 29(Android 10)+ 속성이라 aapt2가 자동으로 `-v29` variant로 분리한다. `minSdk 24`이지만 낮은 버전에서는 무시될 뿐 빌드가 깨지지 않는다.
 
 **Alternatives considered**:
 
 | 대안 | 기각 이유 |
 |---|---|
-| `expo-system-ui`만 설치 | One UI 8.5가 라이트 선언 앱에도 force-dark를 씌운 것이 실측 증상. `forceDarkAllowed=false` 없이는 재발 위험. clarify에서 "이중" 확정. |
-| `forceDarkAllowed=false` plugin만 (expo-system-ui 없이) | `userInterfaceStyle: "light"` 경고가 계속 남고, RN `Appearance`가 여전히 시스템을 따라감(다크 모드에서 `useColorScheme()`이 "dark" 반환 — 나중에 11번 NativeWind 작업이 이 값을 보면 어긋남). 근본 설정이 안 먹는 상태 방치. |
-| `styles.xml` 부모를 `Theme.AppCompat.Light`로 교체 | `android/`가 gitignore라 직접 수정 불가. plugin으로 부모까지 바꾸면 Expo가 관리하는 다른 테마 항목(splash 등)과 충돌 위험. `forceDarkAllowed` 한 줄이 더 좁고 안전. |
+| `expo-system-ui`만 설치 | `setDefaultNightMode(MODE_NIGHT_NO)`가 리소스 해석만 되돌리고 이미 칠해진 윈도우 데코 배경은 못 고침(R1a 실측). 배경 `#303030` 잔존. |
+| `forceDarkAllowed=false` plugin만 (부모 교체 없이) | **실기기에서 실패 확인**(R1a) — 양쪽 테마 + `-v29`에 넣어도 배경 `#303030`. 원인이 force-dark 반전이 아니라 `DayNight` 윈도우 배경 해석이라 이 속성으로는 안 막힘. |
+| `forceDarkAllowed=false` plugin만 (expo-system-ui 없이) | 위에 더해, `userInterfaceStyle: "light"` 경고가 계속 남고 RN `Appearance`가 여전히 시스템을 따라감(다크 모드에서 `useColorScheme()`이 "dark" 반환 — 나중에 11번 NativeWind 작업이 이 값을 보면 어긋남). |
+| `styles.xml` 부모를 `Theme.AppCompat.Light`로 교체 | ← **이것이 채택된 수정.** `android/`가 gitignore라 직접 수정은 불가하지만 config plugin(`withAndroidStyles`)으로 `AppTheme`의 `$.parent`를 바꾼다. `Theme.App.SplashScreen`은 `AppTheme` 상속이라 자동으로 따라옴 — 충돌 없음. `expo-system-ui`(RN 뷰 레벨) + Light 부모(윈도우 배경 레벨)로 이중 보장. |
 | `react-native-edge-to-edge` / `SystemBars` 도입 | edge-to-edge는 별개 문제(StatusBar 무력화)이고 로드맵 11번 범위. 이번 스펙은 다크 모드만. |
 | 앱을 실제 다크 모드 대응(`src/ui/` 다크 팔레트) | 큰 작업, 로드맵 11번(NativeWind UI). 이번 스펙은 "라이트로 고정"까지. |
 
-**plugin 구현 방향**: `@expo/config-plugins`의 `withAndroidStyles`를 쓴다(`node_modules/@expo/config-plugins/build/plugins/android-plugins.js`에 `withAndroidStyles` export 확인). `AppTheme` `<style>`에 `<item name="android:forceDarkAllowed">false</item>`를 더한다. 이미 있으면 덮어쓰지 않는다(prebuild 여러 번 대비). 순수 함수(`addForceLightItem(styles)`)를 함께 export해 기기·prebuild 없이 jest로 검증 — `with-battery-exception.js`가 `addBatteryExceptionPermissions`를 export한 것과 같은 패턴.
+**plugin 구현 방향**: `@expo/config-plugins`의 `withAndroidStyles`를 쓴다. 순수 함수 `addForceLightItem(styles)`가 (1) `AppTheme` `<style>`의 `$.parent`를 `Theme.AppCompat.Light.NoActionBar`로 바꾸고, (2) `AppTheme`·`Theme.App.SplashScreen`에 `<item name="android:forceDarkAllowed">false</item>`를 더한다(`assignStylesValue`, 중복 덮어쓰기). 순수 함수를 함께 export해 기기·prebuild 없이 jest로 검증 — `with-battery-exception.js`가 `addBatteryExceptionPermissions`를 export한 것과 같은 패턴. 계약 테스트가 `$.parent === "Theme.AppCompat.Light.NoActionBar"`를 잠근다(위반 주입: 부모를 `DayNight`로 되돌리면 FAIL).
 
 ---
 
