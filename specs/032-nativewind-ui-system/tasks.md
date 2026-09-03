@@ -337,12 +337,15 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
       (`CharacterListScreen`, 개발자 탭 `DiagnosticsScreen`·`GenerationProbe`·
       `SignalProbe`·`PromptPreviewPanel`)을 오가며 크래시·스타일 누락 없음.
       (SC-008, FR-012)
-- [ ] T057 [P] 전체 테스트 게이트: `npm run test:logic` + `npm run test:ui` +
-      `npm run lint` 전부 GREEN. `jest-projects.test.ts` 파일 수 가드 통과.
-      이전(main) 대비 테스트 개수 증가(회귀 0). (contracts/build-config.md BC8)
-- [ ] T058 [P] `git diff main -- package.json` — 추가 dependency가 `nativewind`·
-      `tailwindcss`뿐. 새 네이티브 모듈 0 → release 재확인 생략(012 기준).
-      (contracts/build-config.md BC9, FR-017)
+- [X] T057 [P] 전체 테스트 게이트: `npm test` = **127 suites / 2243 tests GREEN**
+      (main 대비 +33 suites·+400 tests, 회귀 0). `jest-projects.test.ts` 파일 수
+      가드 통과. `npm run lint` 0 error(2개 pre-existing warning). (BC8)
+- [X] T058 [P] `git diff main -- package.json` — 추가 dependency는 `nativewind@4.2.6`·
+      `tailwindcss@3.4.19`뿐. **`react-native-reanimated`는 css-interop의
+      transitive peer라 node_modules엔 있으나 직접 의존 아님 → 수용(사용자
+      결정)**. `react-native-gesture-handler`·`react-native-edge-to-edge` =
+      `(empty)`(미설치). **reanimated 때문에 release 재확인 1회 필요**(FR-017
+      정정). (BC9)
 - [ ] T059 SM-S928N debug 실기기 완료 게이트(quickstart 시나리오 D): 5개 화면군
       라이트 톤 + 다크 모드 켠 상태 라이트 고정 + 025 슬라이더·갤러리 회귀 없음
       + 생성 중 뷰 진행률·글 미표시 + WCAG 대비 육안 OK. SM1~SM5 관련 Maestro
@@ -350,9 +353,34 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 - [ ] T060 [P] SHOULD(여유 되면, 완료 조건 아님): `CharacterListScreen` 이관 —
       className/토큰 + 재사용 컴포넌트. 기존 `character-list.test.tsx` GREEN 유지.
       개발자 탭 화면은 이관하지 않는다(배포 빌드에서 닿을 수 없음 — 원칙 III).
+      **미완 — SHOULD이고 SM6 완료 게이트가 아님. 후속 세션/PR 리뷰에서.**
 - [ ] T061 PR 생성 — `032-nativewind-ui-system` → `main`. 커밋 메시지 한국어
       (헌법 개발 방식). `.githooks`가 main 직접 커밋을 막음. spec.md
       Success Criteria·quickstart 시나리오 D 체크리스트를 PR 본문에 첨부.
+
+---
+
+## ⚠️ 실기기 검증 대기 (이 세션에서 실행 불가 — 기기 없음)
+
+아래는 **코드가 아니라 SM-S928N/S901N 실기기에서 사람이 확인**해야 하는
+태스크다. 이 세션은 기기가 없어 수행하지 못했다. 코드·기기 없는 테스트는 전부
+GREEN이므로 이관 자체는 끝났고, 남은 것은 **육안·Maestro·release 빌드** 검증이다:
+
+- **T034·T037·T045·T050·T053** — SM1~SM5 화면별 Maestro 흐름 (`diary-user-path`·
+  `diary-body-screen`·`diary-photo-gallery`·`scheduled-diary-notification`·
+  `skeleton`·`writing-monologue*`·`unified-permission-onboarding` 등). `testID`는
+  전부 보존했으므로 통과 예상이나 확인 필요. 깨지면 `testID` 유지 원칙으로 구현을
+  고침(흐름 stale이면 흐름 갱신 + `FLOWS` 등록).
+- **T047·T055·T059** — SM-S928N debug 육안: 5개 화면군 따뜻한 라이트 톤,
+  `adb shell "cmd uimode night yes"`에서 라이트 고정 유지(031), 025 슬라이더·
+  갤러리 회귀 없음, 생성 중 뷰 진행률·글 미표시, WCAG 대비 육안. 미이관 탭
+  (캐릭터 선택·개발자) 크래시 없음.
+- **T056** — 혼재 상태(이관/미이관 화면 오가기) 크래시·스타일 누락 없음.
+- **T059 + release** — `react-native-reanimated`가 새로 들어왔으므로 **release
+  빌드 1회**로 `llama.rn` 로드·첫 렌더·`prod` 환경 표시가 R8/ProGuard에서 깨지지
+  않는지 확인(FR-017 정정, 012 기준). AGENTS.md "release 빌드와 서명" 절차.
+
+**메모리** [[alpharium-device-session-batch]]에 이 세션의 실기기 배치를 추가할 것.
 
 ---
 
