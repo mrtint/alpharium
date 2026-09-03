@@ -96,6 +96,11 @@ export function expoPhotoPort(): PhotoPort {
      * 함수를 주지 않는다.** 패키지 전체에서 이 권한은 `getLocation()`·`getExif()`의 주석에만
      * 등장하며, 조회 API가 없다(설치본 직접 확인, 2026-08-16).
      *
+     * **031 — 온보딩에서는 이 권한을 단계로 묻지 않는다.** 조회할 수 없어 온보딩이
+     * 같은 단계를 무한 반복했다(One UI 8.5 실기기). `collect.ts`가 실제 좌표 읽기로
+     * 처리하며(`locationOf` → `places`), 이 두 함수는 진단 화면(`PermissionPanel`)만
+     * `signals/port.ts`의 `PhotoPort`로 직접 쓴다 — 그래서 남겨 둔다.
+     *
      * 그래서 **좌표를 실제로 읽어 보는 것이 유일한 판정 방법이고**, 그 결과는
      * `locationOf()`의 `failed`로 드러난다. `collect.ts`가 그것을 세어 판정한다.
      *

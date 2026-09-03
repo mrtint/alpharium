@@ -37,17 +37,15 @@ export type PermissionsSectionProps = {
 
 type RowState = PermissionState | "unknown";
 
-/** 사진·좌표·위치·알림 권한을 조회한다. battery는 조회 대상이 아님(`unknown`). */
+/** 사진·위치·알림 권한을 조회한다. battery는 조회 대상이 아님(`unknown`). */
 async function readStates(ports: OnboardingPorts): Promise<Record<PermissionKey, RowState>> {
-  const [photos, photoLocation, location, notifications] = await Promise.all([
+  const [photos, location, notifications] = await Promise.all([
     ports.photo.photoPermission().catch(() => "unknown" as const),
-    ports.photo.locationPermission().catch(() => "unknown" as const),
     ports.location.status().catch(() => "unknown" as const),
     ports.notification.getPermission().catch(() => "unknown" as const),
   ]);
   return {
     photos,
-    "photo-location": photoLocation,
     location,
     notifications,
     "battery-exception": "unknown",
@@ -103,9 +101,6 @@ export function PermissionsSection({
       switch (key) {
         case "photos":
           await ports.photo.requestPhotoPermission();
-          break;
-        case "photo-location":
-          await ports.photo.requestLocationPermission();
           break;
         case "location":
           await ports.location.request();

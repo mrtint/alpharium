@@ -52,12 +52,20 @@ appId: com.anonymous.alpharium
 - assertNotVisible:
     text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
 
+# ★ 031 — **"사진에 담긴 위치"(photo-location) 단계가 온보딩에 없다.**
+#   `ACCESS_MEDIA_LOCATION`은 조회·요청 API가 없어 판정 불가능한 단계였고,
+#   사진 granted 상태에서 온보딩이 이 단계를 무한 반복했다(One UI 8.5 실기기).
+#   권한 단계는 이제 4개(사진·위치·알림·배터리 예외)다.
+- assertNotVisible:
+    id: "onboarding-step-photo-location"
+
 # ★ M3 — **권한 단계에 [건너뛰기]가 있다**(021 FR-008).
 - assertVisible:
     id: "onboarding-skip"
 
 # ── 권한 단계를 전부 건너뛴다 ────────────────────────────────────────────
-#   단계 수(4~5)는 실측(021 §2)에 달렸으므로 [건너뛰기]가 사라질 때까지 반복한다.
+#   단계 수(031부터 최대 4: 사진·위치·알림·배터리 예외)는 실측(021 §2)에 달렸으므로
+#   [건너뛰기]가 사라질 때까지 반복한다. 이미 부여된 권한은 satisfied로 빠진다.
 - repeat:
     while:
       visible:

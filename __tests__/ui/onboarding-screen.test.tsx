@@ -23,7 +23,6 @@ jest.setTimeout(30000);
 /** 모든 권한 상태를 원하는 값으로 돌려주는 mock 통로 묶음. */
 function makePorts(overrides?: {
   photo?: PermissionState;
-  photoLocation?: PermissionState;
   location?: PermissionState;
   notification?: "granted" | "denied";
   essentialAssets?: {
@@ -38,9 +37,6 @@ function makePorts(overrides?: {
 }) {
   const calls: string[] = [];
   const photoState = { value: overrides?.photo ?? ("undetermined" as PermissionState) };
-  const photoLocState = {
-    value: overrides?.photoLocation ?? ("undetermined" as PermissionState),
-  };
   const locState = { value: overrides?.location ?? ("undetermined" as PermissionState) };
   const notifState = {
     value:
@@ -53,16 +49,10 @@ function makePorts(overrides?: {
     ports: {
       photo: {
         photoPermission: async () => photoState.value,
-        locationPermission: async () => photoLocState.value,
         requestPhotoPermission: async () => {
           calls.push("requestPhoto");
           photoState.value = "granted";
           return photoState.value;
-        },
-        requestLocationPermission: async () => {
-          calls.push("requestPhotoLocation");
-          photoLocState.value = "granted";
-          return photoLocState.value;
         },
       },
       notification: {
@@ -135,7 +125,19 @@ describe("S1 — 첫 단계 (FR-005·FR-006)", () => {
     fireEvent.press(screen.getByTestId("onboarding-allow"));
 
     await waitFor(() => expect(calls).toContain("requestPhoto"));
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-photo-location")).toBeTruthy());
+    // 031 — photos 다음 단계는 location이다(photo-location 단계 제거).
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+  });
+
+  it("★ 031 — 사진 허용 후 photo-location 단계가 나타나지 않는다", async () => {
+    const { ports } = makePorts();
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-allow")).toBeTruthy());
+    fireEvent.press(screen.getByTestId("onboarding-allow"));
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    expect(screen.queryByTestId("onboarding-step-photo-location")).toBeNull();
   });
 });
 
@@ -147,7 +149,8 @@ describe("S1.3 — [건너뛰기] (FR-008)", () => {
     await waitFor(() => expect(screen.getByTestId("onboarding-skip")).toBeTruthy());
     fireEvent.press(screen.getByTestId("onboarding-skip"));
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-photo-location")).toBeTruthy());
+    // 031 — photos 다음 단계는 location이다.
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
     expect(calls).not.toContain("requestPhoto");
   });
 });
@@ -205,7 +208,6 @@ describe("S1 — 플랫폼 필터 (FR-003)", () => {
   it("ios + location.platforms:['android']이면 위치 단계가 안 나온다", async () => {
     const { ports } = makePorts({
       photo: "granted",
-      photoLocation: "granted",
       notification: "granted",
     });
     const reqs = PERMISSION_REQUIREMENTS.map((r) =>
@@ -254,7 +256,6 @@ describe("S5 — 소스 검사 (SC-008, 원칙 III)", () => {
 describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
   const allGranted = {
     photo: "granted" as PermissionState,
-    photoLocation: "granted" as PermissionState,
     location: "granted" as PermissionState,
     notification: "granted" as const,
   };

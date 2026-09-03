@@ -49,6 +49,7 @@
         }
       ],
       "./plugins/with-battery-exception",
+      "./plugins/with-force-light-theme",
       [
         "expo-media-library",
         {

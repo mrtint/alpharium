@@ -39,9 +39,7 @@ import type { PermissionState } from "../signals/port";
 export type OnboardingPorts = {
   photo: {
     photoPermission(): Promise<PermissionState>;
-    locationPermission(): Promise<PermissionState>;
     requestPhotoPermission(): Promise<PermissionState>;
-    requestLocationPermission(): Promise<PermissionState>;
   };
   notification: {
     ensureChannel(): Promise<void>;
@@ -68,17 +66,16 @@ export type OnboardingScreenProps = {
   onComplete: (flag: OnboardingFlag) => void;
 };
 
-/** 사진·좌표·위치·알림 권한을 한 번에 조회한다 (battery는 조회 대상이 아님). */
+/** 사진·위치·알림 권한을 한 번에 조회한다 (battery는 조회 대상이 아님). */
 async function readStates(
   ports: OnboardingPorts,
 ): Promise<Partial<Record<PermissionKey, PermissionState>>> {
-  const [photos, photoLocation, location, notifications] = await Promise.all([
+  const [photos, location, notifications] = await Promise.all([
     ports.photo.photoPermission().catch(() => "undetermined" as PermissionState),
-    ports.photo.locationPermission().catch(() => "denied" as PermissionState),
     ports.location.status().catch(() => "undetermined" as PermissionState),
     ports.notification.getPermission().catch(() => "undetermined" as const),
   ]);
-  return { photos, "photo-location": photoLocation, location, notifications };
+  return { photos, location, notifications };
 }
 
 export function OnboardingScreen({
@@ -168,9 +165,6 @@ export function OnboardingScreen({
         switch (step.requirement.key) {
           case "photos":
             await ports.photo.requestPhotoPermission();
-            break;
-          case "photo-location":
-            await ports.photo.requestLocationPermission();
             break;
           case "location":
             await ports.location.request();

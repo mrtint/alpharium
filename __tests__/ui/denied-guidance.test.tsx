@@ -51,7 +51,8 @@ describe("AutoDiarySettingsScreen — 알림·배터리 안내 (FR-014)", () => 
 
 describe("DiaryListScreen — deniedNotices 배너 (FR-014, SC-004)", () => {
   const photoDenied = PERMISSION_REQUIREMENTS.find((r) => r.key === "photos")!.ifDenied;
-  const locDenied = PERMISSION_REQUIREMENTS.find((r) => r.key === "photo-location")!.ifDenied;
+  // 031 — photo-location 항목이 제거됐으므로 location의 ifDenied로 두 번째 문구를 만든다.
+  const locDenied = PERMISSION_REQUIREMENTS.find((r) => r.key === "location")!.ifDenied;
 
   it("deniedNotices가 있으면 그 문구들이 상단에 보인다", async () => {
     await render(

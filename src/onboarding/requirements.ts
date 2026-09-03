@@ -21,20 +21,27 @@
  */
 
 /**
- * 권한 항목의 식별자. **정확히 5갈래**(contracts R2).
+ * 권한 항목의 식별자. **정확히 4갈래**(contracts R2).
  *
  * - `photos` — `READ_MEDIA_IMAGES` (+`READ_MEDIA_VISUAL_USER_SELECTED`)
- * - `photo-location` — `ACCESS_MEDIA_LOCATION` (조회 API 없음, `getLocation()`으로 판정)
  * - `location` — `ACCESS_FINE_LOCATION` (장소명 지오코딩, T030 실측: 안드로이드도 권한 필요 → platforms ["android","ios"])
  * - `notifications` — `POST_NOTIFICATIONS` (Android 13+)
  * - `battery-exception` — `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (권한 아님, 시스템 설정)
+ *
+ * **031 — `photo-location`(`ACCESS_MEDIA_LOCATION`)을 이 목록에서 뺐다.** `expo-media-library
+ * 57`에 조회·요청 API가 없어(`expo-port.ts:95` 주석) 온보딩이 이 단계를 판정할 수 없었고,
+ * 사진 granted 상태에서 상태가 늘 `"undetermined"`로만 나와 온보딩이 같은 단계를 무한
+ * 반복했다(One UI 8.5 실기기). 이 권한은 `getLocation()` 호출 시 시스템이 사진 권한에
+ * 종속해 처리하므로 별도로 물을 필요가 없다 — 실제 좌표 읽기 성공/실패는
+ * `collect.ts`가 `places`에 기록한다(021 FR-013a). 매니페스트의 `ACCESS_MEDIA_LOCATION`
+ * 선언은 유지된다(`app.json`). 조회 API가 생기면 이 상수에 항목을 다시 넣는다(원칙 V —
+ * "축을 영구히 지우는 것이 아니다").
  */
-export type PermissionKey =
-  "photos" | "photo-location" | "location" | "notifications" | "battery-exception";
+export type PermissionKey = "photos" | "location" | "notifications" | "battery-exception";
 
 export type PermissionRequirement = {
   key: PermissionKey;
-  /** 온보딩 고정 순서상의 위치. 낮을수록 먼저. photos=1 … battery-exception=5 */
+  /** 온보딩 고정 순서상의 위치. 낮을수록 먼저. photos=1 … battery-exception=4 */
   order: number;
   /** 이 권한을 요구하는 기능 (근거, 원칙 V — 문서화). */
   neededBy: string;
@@ -64,16 +71,8 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     ifDenied: "사진을 볼 수 없어, 일기는 사진 없이 쓰입니다.",
   },
   {
-    key: "photo-location",
-    order: 2,
-    neededBy: "사진 좌표(004) — 사진에 박힌 좌표로 어디쯤이었는지 짐작한다",
-    platforms: ["android", "ios"],
-    rationale: "사진에 담긴 위치로 그날 어디쯤 있었는지 짐작합니다.",
-    ifDenied: "사진의 위치를 읽지 못해, 어디였는지는 비워 둡니다.",
-  },
-  {
     key: "location",
-    order: 3,
+    order: 2,
     // T030 실측 완료 (2026-08-29, SM-S901N/Galaxy S22, Android 16): 안드로이드에서도
     // `expo-location`의 `reverseGeocodeAsync`는 ACCESS_FINE_LOCATION이 있어야 지명을
     // 준다 — 권한을 거부하면 예외를 던지고(`geocoding-port.ts`가 삼켜 `unknown`),
@@ -87,7 +86,7 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
   },
   {
     key: "notifications",
-    order: 4,
+    order: 3,
     neededBy: "완성 알림(020) — 자동으로 쓴 일기를 알린다",
     platforms: ["android", "ios"],
     rationale: "정한 시간대에 일기가 다 쓰이면 알려 드리기 위해 씁니다.",
@@ -95,7 +94,7 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
   },
   {
     key: "battery-exception",
-    order: 5,
+    order: 4,
     neededBy: "백그라운드 자동 생성(019/020) — 절전 중에도 정한 시간대에 쓴다",
     platforms: ["android", "ios"],
     rationale: "기기가 절전에 들어가도 정한 시간대에 일기를 쓰도록 허용을 요청합니다.",

@@ -327,18 +327,13 @@ function AppFrame() {
   useEffect(() => {
     let live = true;
     async function compute() {
-      const [photo, photoLoc] = await Promise.all([
-        onboardingPorts.photo.photoPermission().catch(() => "unknown" as const),
-        onboardingPorts.photo.locationPermission().catch(() => "unknown" as const),
-      ]);
+      // 031 — photo-location 단계 제거로 좌표 권한 안내는 여기서 다루지 않는다.
+      // (원래도 `location`(FINE_LOCATION) 거부 안내는 push하지 않았다.)
+      const photo = await onboardingPorts.photo.photoPermission().catch(() => "unknown" as const);
       const notices: string[] = [];
       const isDenied = (s: string) => s === "denied" || s === "blocked";
       const req = (key: string) => PERMISSION_REQUIREMENTS.find((r) => r.key === key);
       if (isDenied(photo)) notices.push(req("photos")?.ifDenied ?? "");
-      const locReq = req("location");
-      if (isDenied(photoLoc) || (locReq?.platforms.includes(platform) && isDenied(photoLoc))) {
-        notices.push(req("photo-location")?.ifDenied ?? "");
-      }
       if (live) setDeniedNotices(notices.filter(Boolean));
     }
     void compute();
@@ -349,7 +344,7 @@ function AppFrame() {
       live = false;
       sub.remove();
     };
-  }, [onboardingPorts, platform]);
+  }, [onboardingPorts]);
 
   const onOnboardingComplete = useCallback(
     (flag: OnboardingFlag) => {
