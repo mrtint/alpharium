@@ -21,11 +21,12 @@
 - [ ] **배포용 앱 패키징 및 기본 설정 구성**
 - [ ] **앱 출시를 위한 외부 행정 및 마켓 설정** (참고용)
 - [ ] **자동 생성용 서술형·외국어 모델 재검토** (024 후속 — EXAONE mojibake·헤드리스 미완주 + 028: qwen3·gemma3도 자동 저장 불가)
-- [ ] **024 잔여 실측 마무리** (배터리 예외/무예외 소크 — SC-003·SC-004 미판정)
+- [x] **024 잔여 실측 마무리** (027 — 삼성 One UI 배터리 화면 라우팅 + release APK 헤드리스 1회 확인 완료. 배터리 예외/무예외 소크 SC-001·SC-002는 14번 세션으로 이월)
 - [x] **일기 쓰기 흐름 단순화 + 최초 실행 필수 에셋 다운로드** (029 — 홈 위젯 4개 제거·1탭, 자동 판정, 온보딩 필수 에셋 단계, 헌법 v1.3.0. 11번 UI 선행)
 - [x] **샤오바이·모카 일기 생성 실패 조사** (028 — 조사 완료: 둘 다 **모델 부적합**으로 확정. qwen3=추론 `<think>` 블록이 `n_predict:512` 소진해 본문 미도달, gemma3=지시 이행 불안정. mojibake·판정 오탐·프롬프트 문제 아님. 코드 0줄 → **14번으로 병합**)
 - [ ] **입력 프롬프트 텍스트 최적화** (`prompt.ts` — 이미 단일 평문이나 005~017에 걸쳐 누적된 지시문이 길고 중복됨. 실기기 대조로 압축)
 - [ ] **모델 준비 완료 연출 + 캐릭터 작명** (16번 후속 — 헌법 페르소나 조항 개정 동반)
+- [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: 근본 원인 정정[force-dark 반전 아님, `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`], photo-location: 판정 불가능한 단계라 온보딩에서 제거. One UI 8.5 실기기 debug 검증. 목록·상세·설정·개발자 탭·release·S22는 다음 세션[`tasks.md` T037])
 
 ---
 
@@ -108,13 +109,13 @@
   - **모카 (`english`/gemma3-1b)**: 저장 2/3 (그러나 신호 0인데 전부 환각 + `title`에 `**` 마크다운 미제거), 나머지 1/3 `rejected: unfinished` (영어 캐릭터가 **한국어**로 쓰고 같은 문장 12회+ 반복하다 `length`로 잘림). 지시 이행 불안정 — 헌법 로스터가 이미 관측한 "gemma는 프롬프트를 되뱉는다"의 실측 재현.
   - **exaone mojibake와 실패 양상은 다르지만**(qwen3=추론 블록 미완, gemma3=불안정, exaone=인코딩 깨짐) **로스터 5개 중 3개(narrative + 외국어 2개)가 자동 생성에 부적합**이라는 결론은 공통. `acceptance.ts`/`prompt.ts` 수정 불가(`judge()` 완화 = 원칙 I 위반). 모델 교체 또는 로스터 재검토 필요. 참고: `specs/028-chinese-english-diary-failure/findings.md`.
 
-### 15. 024 잔여 실측 마무리
+### 15. 024 잔여 실측 마무리 — ✅ 027에서 완료 (2026-09-01)
 
 - **배경**: 024 스펙이 2·3차 실기기 세션에서 다음을 미판정으로 남겼다(사용자가 매번 건너뜀). 새 스펙이라기보다 024의 완료되지 않은 검증이다.
   - **SC-003·SC-004 미판정** (024 T012~T014 / T032·T033): 배터리 예외/무예외 소크 테스트 — 예외 적용 시 실제 라운드 실행 간격, 무예외 시 억제율.
   - **배터리 최적화 예외 인텐트의 삼성 One UI 실제 도착 화면** 미확인 (`adb whitelist`로 동등 재현만 함).
   - **release APK로 §9 헤드리스 1회 확인** — debug만 확인함(012 기준상 새 네이티브 모듈 없어 재확인 불필요하나, R8 side-effect 트리셰이킹 잔여 위험이 있어 다음 release 세션 1회로 닫힌다).
-- **아이디어**: 14번 재검토를 위한 실기기 세션을 어차피 돌려야 하므로, 그때 함께 소화하는 편이 효율적입니다.
+- **구현 결과 (027, 2026-09-01)**: 코드 변경 0줄로 종료한 검증 마무리 스펙. **US3** — `IGNORE_BATTERY_OPTIMIZATION_SETTINGS` 인텐트가 삼성에서 `com.android.settings/.Settings$AppBatteryUsageActivity`("배터리 사용 관리" 앱 목록)로 라우팅되고, "제한 없음" 선택까지 4탭. 최종 결과가 `adb dumpsys deviceidle whitelist +`와 동일함(`standby-bucket 10 → 5`) 실측. **US4** — release APK(`CN=alpharium`, minify OFF, 19m 8s 빌드)로 헤드리스 강제 실행 시 `No task registered` / `Unregistering task` 부재, `Worker result SUCCESS` → 024 §9 수정(`task.ts` 모듈 최상단 `defineTask`)이 release 빌드(Hermes 바이트코드)에서도 성립함 확인. **계획 단계 발견**: `android/app/build.gradle:69`가 `enableMinifyInReleaseBuilds`를 기본 `false`로 둬 현재 release에 R8/minify가 꺼져 있다 — 024 §11의 "R8 트리셰이킹 위험"은 minify가 켜질 때(4번)의 잠재 위험. **남은 것**: US1(배터리 예외 소크, 15분+ 주기)·US2(무예외 24h 소크) — 14번 세션과 함께. 상세: `specs/027-024-residual-verification/`.
 
 ### 16. 일기 쓰기 흐름 단순화 + 최초 실행 필수 에셋 다운로드 — ✅ 029에서 구현 (2026-09-02)
 
