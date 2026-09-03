@@ -23,29 +23,50 @@ import { join } from "node:path";
 
 const UI_DIR = join(__dirname, "../../src/ui");
 
-function tsxFiles(dir: string): string[] {
+/**
+ * `src/ui/` 아래 모든 `.tsx`·`.ts`를 훑는다.
+ *
+ * **032에서 `.ts`도 포함하도록 넓혔다** — `src/ui/theme/tokens.ts`(디자인 토큰),
+ * `src/ui/components/*.tsx`(재사용 컴포넌트)까지 같은 문(색 스킴 미감지)을
+ * 적용한다. 원래는 `.tsx`만 봤다(화면). 재귀는 이미 하고 있었다.
+ */
+function uiSourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
     const full = join(dir, e.name);
-    if (e.isDirectory()) return tsxFiles(full);
-    return e.isFile() && e.name.endsWith(".tsx") ? [full] : [];
+    if (e.isDirectory()) return uiSourceFiles(full);
+    return e.isFile() && (e.name.endsWith(".tsx") || e.name.endsWith(".ts")) ? [full] : [];
   });
 }
 
-describe("DM2 — src/ui/는 색상 스킴을 감지하지 않는다", () => {
-  const files = tsxFiles(UI_DIR);
+/** 주석을 걷어낸 소스 — 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다(008). */
+function stripComments(src: string): string {
+  return src.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
+}
 
-  it("검사 대상 .tsx가 하나 이상 있다 (glob 회귀 방지)", () => {
-    expect(files.length).toBeGreaterThan(10);
+describe("DM2 — src/ui/는 색상 스킴을 감지하지 않는다 (032에서 theme/·components/까지 확장)", () => {
+  const files = uiSourceFiles(UI_DIR);
+
+  it("검사 대상 소스가 충분히 있다 (glob 회귀 방지)", () => {
+    expect(files.length).toBeGreaterThan(20);
   });
 
-  it("★ 어느 화면도 useColorScheme을 쓰지 않는다", () => {
-    const offenders = files.filter((f) => /\buseColorScheme\b/.test(readFileSync(f, "utf8")));
+  it("★ 어느 화면·컴포넌트·토큰도 useColorScheme을 쓰지 않는다", () => {
+    const offenders = files.filter((f) =>
+      /\buseColorScheme\b/.test(stripComments(readFileSync(f, "utf8"))),
+    );
     expect(offenders.map((f) => f.replace(UI_DIR, "src/ui"))).toEqual([]);
   });
 
-  it("★ 어느 화면도 Appearance를 읽지 않는다", () => {
+  it("★ 어느 화면·컴포넌트·토큰도 Appearance를 읽지 않는다", () => {
     const offenders = files.filter((f) =>
-      /\bAppearance\.(get|addChangeListener)/.test(readFileSync(f, "utf8")),
+      /\bAppearance\.(get|set|addChangeListener)/.test(stripComments(readFileSync(f, "utf8"))),
+    );
+    expect(offenders.map((f) => f.replace(UI_DIR, "src/ui"))).toEqual([]);
+  });
+
+  it("★ 어느 화면·컴포넌트도 dark: variant className을 쓰지 않는다 (032 BC6)", () => {
+    const offenders = files.filter((f) =>
+      /className=["'`][^"'`]*\bdark:/.test(readFileSync(f, "utf8")),
     );
     expect(offenders.map((f) => f.replace(UI_DIR, "src/ui"))).toEqual([]);
   });

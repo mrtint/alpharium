@@ -14,8 +14,9 @@
 점진 이관**한다. 표현만 바꾸고 기능·문안·네비게이션·데이터 흐름은 불변이다.
 031의 라이트 고정을 유지하고(다크 팔레트·색 스킴 감지 없음), edge-to-edge 전용
 라이브러리는 도입하지 않는다(둘 다 후속 스펙). 완료 기준은 핵심 5개 화면군
-전부 이관 + SM-S928N(One UI 8.5) 실기기 debug 확인 1회(새 네이티브 모듈 없어
-release 재확인 불필요).
+전부 이관 + SM-S928N(One UI 8.5) 실기기 debug 확인 + release 빌드 1회
+(NativeWind가 `react-native-reanimated` 네이티브 모듈을 들이므로 — 2026-09-03
+구현 중 확인, 사용자가 수용 결정).
 
 ## Technical Context
 
@@ -23,11 +24,18 @@ release 재확인 불필요).
 Expo SDK ~57
 
 **Primary Dependencies** (신규):
-- `nativewind@^4` + `tailwindcss@^3.4` (`npx expo install`로 버전 해석,
-  `expo install --check` 검증 — R1). **네이티브 모듈 아님** — babel 플러그인 +
-  Metro 트랜스폼 + JS 런타임(`react-native-css-interop`).
-- 신규 설정 파일: `babel.config.js`, `metro.config.js`, `tailwind.config.js`,
-  `global.css` (전부 저장소 루트, JS 레이어 — prebuild 불필요)
+- `nativewind@4.2.6` + `tailwindcss@3.4.19` (`npx expo install`로 해석).
+- **⚠️ `nativewind@4.2` → `react-native-css-interop`이 `react-native-reanimated`를
+  peerDependency로 요구** → `react-native-reanimated@4.6.0`(+ `react-native-worklets`)이
+  함께 설치됨(2026-09-03 실측, research R1 정정). reanimated는 C++ 코드젠 네이티브
+  모듈 → **release 재확인 1회 필요**(FR-017 정정). 사용자가 이 수용을 결정.
+  gesture-handler·edge-to-edge·`@rn-primitives/*`는 배제 유지.
+- 신규 설정 파일: `babel.config.js`(`jsxImportSource`만 — `nativewind/babel`
+  프리셋은 `react-native-worklets/plugin`을 끌어들여 jest를 깨뜨려 제외),
+  `metro.config.js`, `tailwind.config.js`, `global.css` (전부 저장소 루트).
+- **jest**: `className`→style 변환이 metro 전용이므로 컴포넌트 테스트의
+  `toHaveStyle` 검증을 위해 `nativewind/jest` 프리셋을 `ui` 프로젝트에 배선
+  (research R8 정정).
 
 **Storage**: N/A — 새 저장 필드·신호 없음(spec FR-022). 디자인 토큰은 코드
 상수(`src/ui/theme/tokens.ts`).
@@ -50,7 +58,9 @@ Expo SDK ~57
 깜빡임 없음(육안).
 
 **Constraints**:
-- 새 네이티브 모듈 0 → release 재확인 불필요(spec FR-005·FR-017, 012 기준)
+- NativeWind가 `react-native-reanimated`(네이티브 모듈)를 들임 → **release
+  재확인 1회 필요**(spec FR-005·FR-017 정정, 012 기준). gesture-handler·
+  edge-to-edge는 배제 유지
 - 031 라이트 고정 유지 — `dark:` variant 미사용, `useColorScheme`/`Appearance`
   미사용(spec FR-019, 031 `dark-mode-no-scheme.test.ts` 확장)
 - 본문 텍스트 배경 대비 ≥ 4.5:1, 큰 텍스트 ≥ 3:1 (WCAG AA, spec FR-002/SC-005)
@@ -107,9 +117,12 @@ Expo SDK ~57
 | 실기기 최소 1회 | `quickstart.md` 시나리오 B·D가 SM-S928N debug 확인을 게이트로 명시 |
 | 한 축 깊이 파기 금지 | DT1의 색 값은 "방향 예시", 최종은 실기기 육안 **1패스**로 확정 — 반복 미세조정 금지를 plan·data-model·quickstart 세 곳에 못 박음 |
 
-새 헌법 검사 경계·새 네이티브 모듈·새 저장 계층 **0개**(BC9). 031 방어
-(`with-force-light-theme.js`·`expo-system-ui`) 무수정. 029가 정리한 흐름·탭
-구조 무수정(FR-021).
+새 헌법 검사 경계·새 저장 계층 **0개**. **네이티브 모듈은 `react-native-reanimated`
+1개 추가**(NativeWind v4.2 peerDependency — 2026-09-03 확인, 사용자 수용 결정,
+BC9·FR-005·FR-017 정정) → release 재확인 1회. 이는 헌법 위반이 아니라 원칙 V의
+"debug만으로 release를 단언하지 않는다"를 지키는 것 — 012가 세운 기준 그대로
+release 확인을 추가한다. 031 방어(`with-force-light-theme.js`·`expo-system-ui`)
+무수정. 029가 정리한 흐름·탭 구조 무수정(FR-021).
 
 ## Project Structure
 

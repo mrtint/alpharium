@@ -253,10 +253,14 @@ Phase로 배치한다(research R10).
   값 선택 행 — 일기 작성자·자동 생성 시각, 선택 행). 각 컴포넌트는 디자인
   토큰만 참조한다. 이 앱에 없는 자유 텍스트 입력·드롭다운·라디오 컴포넌트는
   만들지 않는다.
-- **FR-005**: 재사용 컴포넌트는 **새 네이티브 모듈에 의존하지 않아야 한다** —
-  reanimated·gesture-handler·네이티브 포털 등 release 재확인을 유발하는 의존을
-  들이지 않는다. 애니메이션·모달·제스처가 필요하면 RN 코어(`Animated`·`Modal`·
-  `Pressable`)로 구현한다.
+- **FR-005**: 재사용 컴포넌트는 **직접적으로 gesture-handler·네이티브 포털·
+  edge-to-edge 전용 라이브러리를 들이지 않는다** — 애니메이션·모달·제스처가
+  필요하면 RN 코어(`Animated`·`Modal`·`Pressable`)로 구현한다. **다만
+  `react-native-reanimated`는 예외다**: NativeWind v4.2의 `react-native-css-interop`가
+  reanimated를 peerDependency로 요구하므로(2026-09-03 설치 시 확인), NativeWind
+  도입이 곧 reanimated 도입이다. 이는 컴포넌트 계층의 선택이 아니라 NativeWind
+  자체의 요구이며, 이 스펙은 이를 수용한다 — 대신 FR-017의 release 재확인
+  조건이 발동한다.
 - **FR-006**: 각 재사용 컴포넌트에는 최소 렌더/변형 계약을 잠그는 `.tsx` 계약
   테스트가 있어야 한다(jest `ui` 프로젝트).
 - **FR-006a**: 디자인 토큰·재사용 컴포넌트 코드는 `src/ui/` 하위에 둔다 — 순수
@@ -306,9 +310,12 @@ Phase로 배치한다(research R10).
   한다.
 - **FR-017**: 핵심 화면군 전부가 최소 1회 실기기(debug)에서 확인되어야 한다 —
   라이트 톤 표시, 다크 모드 켠 상태에서 라이트 고정 유지, 025 슬라이더·갤러리
-  회귀 없음. 새 네이티브 모듈을 들이지 않았으므로 release 재확인은 필요하지
-  않다(012 기준). 다크 모드 관련 확인이 포함되므로 검증 기기는 **SM-S928N
-  (One UI 8.5)** 을 포함한다.
+  회귀 없음. **NativeWind가 `react-native-reanimated`(네이티브 모듈)를 들이므로
+  release 재확인 1회가 필요하다**(012 기준 — 새 네이티브 모듈·JNI 심볼이
+  R8·ProGuard에서 깨질 수 있음). debug 확인으로 5개 화면군 톤·라이트 고정·025
+  회귀를 보고, release 빌드 1회로 `llama.rn` 로드·앱 첫 렌더·`prod` 환경 표시가
+  깨지지 않는지 확인한다. 다크 모드 관련 확인이 포함되므로 검증 기기는
+  **SM-S928N (One UI 8.5)** 을 포함한다.
 - **FR-018**: 기존 Maestro 흐름이 전환 후에도 통과해야 하며, 화면 요소를
   `id`/`testID`나 문안으로 찾는 기존 흐름이 깨지면 그 흐름을 함께 갱신한다
   (025·023이 겪은 stale Maestro 패턴 방지). 새 Maestro 흐름을 추가하면
@@ -373,11 +380,16 @@ Phase로 배치한다(research R10).
 - **031의 라이트 고정 방어와 충돌하지 않는다**: 031이 `expo-system-ui` +
   `AppTheme` 부모 테마 교체 + `forceDarkAllowed=false`로 세운 방어는 그대로 두고,
   이 스펙은 그 위에서 라이트 톤 팔레트만 정의한다.
-- **새 네이티브 모듈 없음 → release 재확인 불필요**: NativeWind는 babel 플러그인
-  + JS 런타임이라 네이티브 링크가 없다. RN Reusables에서 reanimated·gesture-handler
-  의존 컴포넌트는 배제하고 RN 코어로 대체한다. 따라서 debug 실기기 1회로
-  충분하다(012 기준, 025가 `react-native-pager-view`를 같은 이유로 배제한 선례).
-  단, NativeWind 도입 시 `expo install --check`와 실기기 첫 렌더 확인은 한다.
+- **NativeWind v4.2 = reanimated 도입 (2026-09-03 구현 중 확인, 초안 정정)**:
+  research R1은 "NativeWind는 babel/JS 레이어라 네이티브 링크 없음"으로 봤으나,
+  v4.2의 `react-native-css-interop@0.2.6`이 `react-native-reanimated@>=3.6.2`를
+  **peerDependency로 요구**해 `npx expo install nativewind`가 `react-native-reanimated@4.6.0`
+  (C++ 코드젠 네이티브 모듈)을 함께 설치한다. 사용자 결정(2026-09-03): NativeWind를
+  유지하고 reanimated를 수용한다. 결과: **release 재확인 1회 필요**(FR-017),
+  gesture-handler·edge-to-edge·`@rn-primitives/*`는 여전히 배제(그건 컴포넌트
+  선택이지 NativeWind 요구가 아님). `babel.config.js`는 `nativewind/babel` 프리셋을
+  넣지 않고 `jsxImportSource`만 쓴다(그 프리셋이 `react-native-worklets/plugin`을
+  끌어들여 jest를 깨뜨림 — 실측).
 - **edge-to-edge는 후속으로 분리**: 20번 로드맵이 "11번에서 함께"로 미뤄 뒀으나,
   `react-native-edge-to-edge`는 release 재확인 트리거이고 현재 인셋 처리가 이미
   동작 중이라, 이 스펙은 유지만 하고 별도 스펙으로 넘긴다.

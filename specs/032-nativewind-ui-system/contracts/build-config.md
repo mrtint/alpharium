@@ -54,16 +54,23 @@ NativeWind 레이어에서도 지키는 계약. 계약 테스트는 소스/설�
 - **근거**: spec FR-019, 031 라이트 고정. NativeWind가 OS 색 스킴을 따라가면
   존재하지 않는 다크 팔레트로 분기해 화면이 깨진다.
 
-## BC7 — NativeWind 트랜스폼 회귀 없음 (실행 검증)
+## BC7 — NativeWind 트랜스폼 회귀 없음 (실행 검증, 2026-09-03 정정)
 
 `__tests__/nativewind-transform.test.tsx` (jest `ui`):
 
-- `className="bg-bg p-4"` 를 준 `<View>`가 예외 없이 렌더된다.
-- 렌더 결과에 스타일이 실제로 적용된다(배경색 또는 padding이 `style`에 반영 —
-  `toHaveStyle` 또는 `props.style` 검사).
-- **위반 주입**: babel 플러그인 미설정 상태로 이 테스트를 돌리면 FAIL.
-- **근거**: research R8 위험 A. 이 저장소는 jest transform이 조용히 깨지는 것을
-  007·024·025에서 반복해 당했다.
+- `className`을 준 `<View>`·`<Text>`(단일·다중·style 혼재)가 **예외 없이
+  렌더된다**.
+- **`toHaveStyle`로 tailwind 클래스가 style로 변환됐는지는 검사하지 않는다** —
+  NativeWind의 className→style은 Metro 번들 시점 CSS 컴파일이라 jest(jest-expo)엔
+  없다. `nativewind/test`를 쓰면 되지만 그 모듈이 `transformIgnorePatterns` 밖이라
+  jest-expo에서 SyntaxError로 깨진다(실측). 031 `dark-mode-no-scheme.test.ts`가
+  이미 쓰는 방식(소스 레벨 + 렌더 안전성)을 따른다.
+- 실제 스타일 적용은 **실기기 육안**으로 본다(SC-005, T047/T059).
+- **위반 주입**: `babel.config.js`에서 `jsxImportSource: "nativewind"`를 빼면
+  `className` prop이 코어 컴포넌트 타입에서 사라져 `tsc`가 FAIL(간접) — 또는
+  babel 트랜스폼 자체가 깨지면 이 테스트가 렌더 단계에서 FAIL.
+- **근거**: research R8 위험 A(정정). jest transform이 조용히 깨지는 것을
+  007·024·025에서 반복해 당했으므로 "렌더는 된다"만이라도 잠근다.
 
 ## BC8 — 기존 테스트 전체 회귀 없음 (실행 검증, 게이트)
 
@@ -79,13 +86,17 @@ NativeWind·설정 파일 도입 직후:
   (단 `logic` 테스트는 `tokens.ts`만 import하고 컴포넌트를 import하지 않게 유지 —
   R6 분리가 이걸 보장).
 
-## BC9 — 새 네이티브 모듈 0개 (게이트)
+## BC9 — 네이티브 모듈 경계 (게이트, 2026-09-03 정정)
 
-- `package.json` `dependencies`에 추가된 것은 `nativewind`, `tailwindcss`
-  (+ 이들의 순수 JS 전이 의존)뿐이다.
-- `react-native-reanimated`, `react-native-gesture-handler`,
-  `react-native-edge-to-edge`, `@rn-primitives/*` **추가 안 됨**.
-- `android/` prebuild 산출물에 새 네이티브 모듈 링크 없음 (`expo prebuild` 불필요 —
-  변경이 JS 레이어).
-- **근거**: spec FR-005·FR-017, 012 기준. 이 게이트가 참이면 release 재확인
-  불필요 = debug 1회로 충분.
+- `package.json` `dependencies`에 추가된 것은 `nativewind`, `tailwindcss`뿐이다.
+- **단, `nativewind@4.2` → `react-native-css-interop@0.2.6`이 `react-native-reanimated`를
+  peerDependency로 요구**해 `npx expo install nativewind`가 `react-native-reanimated@4.6.0`
+  (+ `react-native-worklets`)을 함께 설치한다. 이는 NativeWind 자체의 요구이며
+  사용자가 수용을 결정했다(2026-09-03).
+- `react-native-gesture-handler`, `react-native-edge-to-edge`, `@rn-primitives/*`는
+  **여전히 추가 안 됨**.
+- **근거**: spec FR-005(정정)·FR-017(정정). reanimated가 들어오므로 **release
+  재확인 1회 필요**(012 기준) — debug 5개 화면군 확인 + release 빌드 1회
+  (`llama.rn` 로드·첫 렌더·prod 환경).
+- 검증: `git diff main -- package.json`으로 추가 dependency 확인,
+  `npm ls react-native-gesture-handler react-native-edge-to-edge`가 "empty"인지.

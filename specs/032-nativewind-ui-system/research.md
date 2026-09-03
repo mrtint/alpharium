@@ -21,10 +21,18 @@
 
 **Rationale**:
 - NativeWind v4는 babel 플러그인 + Metro 트랜스폼 + 런타임(`react-native-css-interop`)
-  구조이며 **새 네이티브 모듈이 없다** — release 재확인 트리거 아님(spec FR-005,
-  Clarifications). v5는 프리릴리스라 배제.
+  구조. v5는 프리릴리스라 배제.
 - RN 0.86 / React 19.2는 NativeWind v4가 지원하는 범위. `tailwindcss` v3는 v4의
   안정 조합(tailwind v4는 별도 검증 필요, 이번엔 v3).
+
+**⚠️ 정정 (2026-09-03 구현 중 실측)**: 이 항목은 원래 "새 네이티브 모듈 없음 →
+release 재확인 불필요"로 결론냈으나 **틀렸다**. `nativewind@4.2.6` →
+`react-native-css-interop@0.2.6`이 `react-native-reanimated@>=3.6.2`를
+**peerDependency**(optional 아님)로 요구해 `npx expo install nativewind`가
+`react-native-reanimated@4.6.0`(C++ 코드젠 네이티브 모듈)과 `react-native-worklets`를
+함께 설치했다. 사용자 결정: NativeWind 유지 + reanimated 수용. **귀결: release
+재확인 1회 필요**(spec FR-017 정정, BC9 정정). gesture-handler·edge-to-edge·
+`@rn-primitives/*`는 여전히 배제(그건 컴포넌트 선택이지 NativeWind 요구가 아님).
 
 **Alternatives considered**:
 - **NativeWind v5(프리릴리스)**: 성능·API 개선이 있으나 프리릴리스라 회귀 위험.

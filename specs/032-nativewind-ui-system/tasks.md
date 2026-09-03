@@ -112,62 +112,62 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### Tests for US3 (먼저 작성, FAIL 확인) ⚠️
 
-- [ ] T013 [P] [US3] `__tests__/nativewind-transform.test.tsx` 작성 —
+- [X] T013 [P] [US3] `__tests__/nativewind-transform.test.tsx` 작성 —
       `className="bg-bg p-4"` 준 `<View>`가 예외 없이 렌더 + 스타일 적용
       (`toHaveStyle` 또는 `props.style`). (contracts/build-config.md BC7,
       research.md R8 위험 A)
-- [ ] T014 [P] [US3] `__tests__/ui/button.test.tsx` 작성 — 3 변형(`primary`·
+- [X] T014 [P] [US3] `__tests__/ui/button.test.tsx` 작성 — 3 변형(`primary`·
       `secondary`·`danger`) 렌더, `disabled` 시 press 무효, `children` 표시,
       `testID` 조회, hex 리터럴 0·`useColorScheme` 0·도메인 import 0
       (contracts/ui-components.md UC1·UC-C1·UC-C3·UC-C4).
-- [ ] T015 [P] [US3] `__tests__/ui/card.test.tsx` 작성 — `Card`/`Section`
+- [X] T015 [P] [US3] `__tests__/ui/card.test.tsx` 작성 — `Card`/`Section`
       `children` 렌더, `Section` `title` 유무별 헤더, `testID` (UC2).
-- [ ] T016 [P] [US3] `__tests__/ui/list-row.test.tsx` 작성 — `label`/`value`
+- [X] T016 [P] [US3] `__tests__/ui/list-row.test.tsx` 작성 — `label`/`value`
       표시, `onPress` 콜백, `right` 노드, `disabled` 무효, `testID` (UC3).
-- [ ] T017 [P] [US3] `__tests__/ui/section-header.test.tsx` 작성 — 텍스트 표시,
+- [X] T017 [P] [US3] `__tests__/ui/section-header.test.tsx` 작성 — 텍스트 표시,
       `testID` (UC4).
-- [ ] T018 [P] [US3] `__tests__/ui/text-styles.test.tsx` 작성 — 4 변형 렌더,
+- [X] T018 [P] [US3] `__tests__/ui/text-styles.test.tsx` 작성 — 4 변형 렌더,
       `numberOfLines`·`selectable`·`accessibilityLabel` 통과, `testID` (UC5).
-- [ ] T019 [P] [US3] `__tests__/ui/toggle.test.tsx` 작성 — `value` 반영, 토글 시
+- [X] T019 [P] [US3] `__tests__/ui/toggle.test.tsx` 작성 — `value` 반영, 토글 시
       콜백 반대값, `disabled` 무효, `testID` (UC6).
-- [ ] T020 [P] [US3] `__tests__/ui/select-row.test.tsx` 작성 — 옵션 렌더, 선택
+- [X] T020 [P] [US3] `__tests__/ui/select-row.test.tsx` 작성 — 옵션 렌더, 선택
       표식(+`accessibilityLabel`), `onSelect` index, `disabledIndices` 무효,
       `${testID}-option-${i}` (UC7).
 
 ### Implementation for US3
 
-- [ ] T021 [P] [US3] `src/ui/components/Text.tsx` 생성 — `AppText` +
+- [X] T021 [P] [US3] `src/ui/components/Text.tsx` 생성 — `AppText` +
       `variant: "title"|"body"|"bodyStrong"|"caption"` (또는 별칭 export),
       `TYPE` 상수 + 색 토큰, RN `Text` 나머지 prop 통과. (UC5) *다른 컴포넌트가
       의존하므로 먼저.*
-- [ ] T022 [P] [US3] `src/ui/components/Button.tsx` 생성 — `Pressable` 기반,
+- [X] T022 [P] [US3] `src/ui/components/Button.tsx` 생성 — `Pressable` 기반,
       `variant` 3종, `accessibilityRole`/`State`, 토큰 className만. (UC1)
-- [ ] T023 [P] [US3] `src/ui/components/Card.tsx` 생성 — `Card` + `Section`
+- [X] T023 [P] [US3] `src/ui/components/Card.tsx` 생성 — `Card` + `Section`
       (`title?` → `SectionHeader`). (UC2)
-- [ ] T024 [P] [US3] `src/ui/components/SectionHeader.tsx` 생성 — `Text`
+- [X] T024 [P] [US3] `src/ui/components/SectionHeader.tsx` 생성 — `Text`
       (sectionTitle 타이포). (UC4)
-- [ ] T025 [P] [US3] `src/ui/components/ListRow.tsx` 생성 — `onPress` 유무로
+- [X] T025 [P] [US3] `src/ui/components/ListRow.tsx` 생성 — `onPress` 유무로
       `Pressable`/`View`, 좌 label·우 value/right/chevron, 하단 hairline. (UC3)
-- [ ] T026 [P] [US3] `src/ui/components/Toggle.tsx` 생성 — RN `Switch` 래퍼,
+- [X] T026 [P] [US3] `src/ui/components/Toggle.tsx` 생성 — RN `Switch` 래퍼,
       `trackColor`/`thumbColor` = accent/surface 토큰. (UC6)
-- [ ] T027 [P] [US3] `src/ui/components/SelectRow.tsx` 생성 — 옵션별 `Pressable`,
+- [X] T027 [P] [US3] `src/ui/components/SelectRow.tsx` 생성 — 옵션별 `Pressable`,
       `accessibilityState`, 선택 표식 + `accessibilityLabel`(025 교훈),
       `disabledIndices`. (UC7)
-- [ ] T028 [US3] T013~T020 재실행 — `npm run test:ui` 전부 GREEN. 기존 ui 테스트
+- [X] T028 [US3] T013~T020 재실행 — `npm run test:ui` 전부 GREEN. 기존 ui 테스트
       개수 이상 통과(회귀 0). `jest-projects.test.ts` 파일 수 가드 통과. (UC8, BC8)
-- [ ] T028a [US3] SC-002 실증 — `tokens.ts`의 `COLORS.accent` 값을 임시로 다른
+- [X] T028a [US3] SC-002 실증 — `tokens.ts`의 `COLORS.accent` 값을 임시로 다른
       hex로 바꾸고 `npm run test:ui`(스냅샷/`toHaveStyle`) 또는 컴포넌트 렌더
       결과에서 `Button` `primary`의 배경이 함께 바뀜을 확인 → 되돌린다. "한 곳
       바꾸면 전체 반영"을 코드로 증명. (spec SC-002)
-- [ ] T029 [US3] `__tests__/ui/dark-mode-no-scheme.test.ts`(031) 확장 — 검사
+- [X] T029 [US3] `__tests__/ui/dark-mode-no-scheme.test.ts`(031) 확장 — 검사
       대상 glob에 `src/ui/theme/`·`src/ui/components/`의 `.ts`+`.tsx` 포함,
       `useColorScheme`·`Appearance.*` 0건 유지(contracts/build-config.md BC6,
       research.md R7). `npm run test:ui` GREEN.
-- [ ] T030 [US3] 위반 주입 검증: `Button.tsx`에 `style={{ backgroundColor:
+- [X] T030 [US3] 위반 주입 검증: `Button.tsx`에 `style={{ backgroundColor:
       "#B5623C" }}` → T014 FAIL; 아무 컴포넌트에 `import { useColorScheme }
       from "react-native"` → T029 FAIL; 컴포넌트 테스트 하나를 `.ts`로 → 파일 수
       가드/`render` 부재 FAIL. 각각 확인 후 되돌린다.
-- [ ] T031 [US3] `npm run lint` GREEN — eslint + `tsc --noEmit`(nativewind-env.d.ts로
+- [X] T031 [US3] `npm run lint` GREEN — eslint + `tsc --noEmit`(nativewind-env.d.ts로
       `className` 인식) + `check:constitution`(위반 0, `className` 오탐 없음 —
       research.md R7) + prettier.
 
