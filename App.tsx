@@ -1,3 +1,6 @@
+// 032 — NativeWind 스타일 부수 효과 import. `metro.config.js`의 `input`과 짝이며
+// 이 줄이 없으면 런타임에 tailwind base/유틸리티가 실리지 않는다(BC4).
+import "./global.css";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
