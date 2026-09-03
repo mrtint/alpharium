@@ -107,11 +107,13 @@ adb -s <S928N> shell "cmd uimode night auto"
 
 ## 완료 기준 (spec SC)
 
-- [ ] SC-001: S928N 다크 모드 6/6 화면 밝은 배경, dimmed 0건
-- [ ] SC-002: 사진 허용 후 "사진 위치" 단계 안 나옴, 온보딩 4단계
-- [ ] SC-003: 새 설치 온보딩 에셋 다운로드까지 100% 도달
-- [ ] SC-004: S901N 라이트 모드·온보딩 회귀 0건
-- [ ] SC-005: 온보딩·설정 어디에도 `photo-location` 항목 없음
-- [ ] SC-006: 사진 좌표→지명 동작 수정 전후 동일
-- [ ] release 재확인 1회 (expo-system-ui)
-- [ ] `npm test`·`npm run lint` 클린
+- [~] SC-001: S928N 다크 모드 화면 밝은 배경, dimmed 0건 — **부분 확인(2026-09-03)**: 온보딩 1단계·에셋 다운로드 단계·"1/4" 재게이트 3화면에서 배경 `rgb(250,250,250)` + 대비 또렷, `#303030` 재현 0건. 목록·상세·설정·개발자 탭은 에셋(~2GB 모델) 미준비로 미확인(다음 세션).
+- [x] SC-002: 사진 허용 후 "사진 위치" 단계 안 나옴, 온보딩 4단계 — **확인(2026-09-03)**: `uiautomator dump`로 `photos → location → notifications → battery-exception` 순서 확인, `onboarding-step-photo-location` 부재.
+- [x] SC-003: 새 설치 온보딩 에셋 다운로드까지 도달 — **확인(2026-09-03)**: 4개 권한 단계 전부 [건너뛰기]로 통과 → `onboarding-step-assets` 도달, 갇힘 없음.
+- [ ] SC-004: S901N 라이트 모드·온보딩 회귀 0건 — 기기 미연결
+- [~] SC-005: 온보딩·설정 어디에도 `photo-location` 항목 없음 — **온보딩 확인**(위 SC-002), 설정 "권한" 섹션은 에셋 게이트로 미도달
+- [ ] SC-006: 사진 좌표→지명 동작 수정 전후 동일 — 에셋 미준비로 미확인
+- [ ] release 재확인 1회 (expo-system-ui) — 미수행
+- [x] `npm test`·`npm run lint` 클린 — `test:logic` 1825개 통과, lint 0 error, 헌법 검사 위반 0, prettier 클린, `force-light-theme.test.ts` 9개 통과
+
+> **참고**: 다크 모드 수정의 근본 원인이 초안(`forceDarkAllowed=false`로 force-dark 반전 차단)에서 **`AppTheme` 부모를 `DayNight` → `Light`로 교체**로 정정됐다(실기기 조사 2026-09-03, research.md R1a). 커밋 `837b1ef`.
