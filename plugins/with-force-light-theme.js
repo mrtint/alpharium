@@ -29,14 +29,29 @@
 
 const { withAndroidStyles, AndroidConfig } = require("@expo/config-plugins");
 
-/** `AppTheme` `<style>`에 `android:forceDarkAllowed` = `false` item을 더한다. */
+/**
+ * `forceDarkAllowed=false`를 넣을 스타일들.
+ *
+ * `AppTheme`뿐 아니라 **`Theme.App.SplashScreen`도** 넣는다 — `MainActivity`의
+ * 매니페스트 `android:theme`가 이것이고(`expo-splash-screen`), 윈도우 데코가
+ * 만들어질 때 읽는 것은 이 스타일의 **자기 속성 집합**이지 상속 체인이 아니다.
+ * `AppTheme`에만 넣으면 `Theme.App.SplashScreen`이 상속으로 받지 못해
+ * force-dark가 그대로 적용된다(031 실기기: 배경이 rgb(48,48,48)로 반전).
+ */
 function addForceLightItem(androidStyles) {
-  return AndroidConfig.Styles.assignStylesValue(androidStyles, {
+  let out = AndroidConfig.Styles.assignStylesValue(androidStyles, {
     add: true,
     parent: AndroidConfig.Styles.getAppThemeGroup(),
     name: "android:forceDarkAllowed",
     value: "false",
   });
+  out = AndroidConfig.Styles.assignStylesValue(out, {
+    add: true,
+    parent: { name: "Theme.App.SplashScreen" },
+    name: "android:forceDarkAllowed",
+    value: "false",
+  });
+  return out;
 }
 
 /**

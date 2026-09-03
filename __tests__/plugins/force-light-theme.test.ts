@@ -77,14 +77,25 @@ describe("DM1c — 중복 미추가", () => {
   });
 });
 
-describe("DM1d — 다른 style 무변경", () => {
-  it("AppTheme이 아닌 style(Theme.App.SplashScreen)은 건드리지 않는다", () => {
+describe("DM1d — SplashScreen 테마에도 넣는다 (MainActivity 매니페스트 theme)", () => {
+  it("Theme.App.SplashScreen에도 forceDarkAllowed=false가 붙는다", () => {
+    // MainActivity의 매니페스트 android:theme가 Theme.App.SplashScreen이고,
+    // 윈도우 데코가 읽는 건 상속 체인이 아니라 이 스타일의 자기 속성이다.
     const out = addForceLightItem(templateStyles());
     const splash = out.resources.style.find((s) => s.$.name === "Theme.App.SplashScreen")!;
 
-    expect(splash.item).toHaveLength(1);
-    expect(splash.item[0].$.name).toBe("android:windowBackground");
-    expect(splash.item.some((i) => i.$.name === "android:forceDarkAllowed")).toBe(false);
+    const item = splash.item.find((i) => i.$.name === "android:forceDarkAllowed");
+    expect(item?._).toBe("false");
+    // 기존 windowBackground는 그대로.
+    expect(splash.item.some((i) => i.$.name === "android:windowBackground")).toBe(true);
+  });
+
+  it("Base.* 등 관계없는 style은 건드리지 않는다", () => {
+    const seeded = templateStyles();
+    seeded.resources.style.push({ $: { name: "Base.AlertDialog.AppCompat" }, item: [] });
+    const out = addForceLightItem(seeded);
+    const base = out.resources.style.find((s) => s.$.name === "Base.AlertDialog.AppCompat")!;
+    expect(base.item).toHaveLength(0);
   });
 });
 

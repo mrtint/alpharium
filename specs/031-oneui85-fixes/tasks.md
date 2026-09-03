@@ -50,7 +50,8 @@ description: "Task list for One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-l
 
 ### 구현
 
-- [ ] T007 [US1] `npx expo prebuild --platform android --clean` 실행 → `cp ~/.alpharium-signing/alpharium.jks android/app/` (★ prebuild가 키를 지움, AGENTS.md) → `android/app/src/main/res/values/styles.xml`에 `AppTheme`의 `android:forceDarkAllowed` = `false` item이 생성됐는지, `expo-system-ui`가 `userInterfaceStyle` 관련 네이티브 설정을 넣었는지 눈으로 확인. (prebuild 산출물이므로 커밋 대상 아님 — `android/`는 gitignore)
+- [X] T007 [US1] `npx expo prebuild --platform android --clean` 실행 → `cp ~/.alpharium-signing/alpharium.jks android/app/` (★ prebuild가 키를 지움, AGENTS.md) → `android/app/src/main/res/values/styles.xml`에 `AppTheme`의 `android:forceDarkAllowed` = `false` item이 생성됐는지, `expo-system-ui`가 `userInterfaceStyle` 관련 네이티브 설정을 넣었는지 눈으로 확인. (prebuild 산출물이므로 커밋 대상 아님 — `android/`는 gitignore)
+  - **완료 확인(2026-09-03)**: `styles.xml`에 `AppTheme`·`Theme.App.SplashScreen` 둘 다 `<item name="android:forceDarkAllowed">false</item>` 생성됨(★ `MainActivity` 매니페스트 theme가 `Theme.App.SplashScreen`이라 SplashScreen에도 필요 — 실기기 T021 1차에서 `AppTheme`만으로는 배경이 `rgb(48,48,48)`로 반전되는 것 관측, plugin에 SplashScreen 분기 추가). `strings.xml`에 `expo_system_ui_user_interface_style` = `light`.
 
 **Checkpoint**: 기기 없는 테스트(`npm test`) + lint 통과. 실기기 검증은 Phase 5.
 
