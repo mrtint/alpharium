@@ -25,7 +25,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 
@@ -56,6 +55,8 @@ import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DiaryDetailScreen } from "./DiaryDetailScreen";
 import { DiaryListScreen } from "./DiaryListScreen";
 import { OverwriteConfirmScreen } from "./OverwriteConfirmScreen";
+import { AppText } from "./components/Text";
+import { COLORS } from "./theme/tokens";
 
 export type DiaryHomeScreenProps = {
   resolution: EnvironmentResolution;
@@ -410,20 +411,22 @@ export function DiaryHomeScreen({
       return (
         <Frame onBack={() => void backToList()}>
           <View style={styles.notice}>
-            <Text style={styles.day}>{screen.day}</Text>
-            <Text style={styles.noticeText}>이 날의 일기를 읽을 수 없다.</Text>
-            <Text style={styles.hint}>파일이 손상됐다. 그 하루를 다시 쓸 수 있다.</Text>
+            <AppText variant="caption">{screen.day}</AppText>
+            <AppText variant="body">이 날의 일기를 읽을 수 없다.</AppText>
+            <AppText variant="caption">파일이 손상됐다. 그 하루를 다시 쓸 수 있다.</AppText>
           </View>
         </Frame>
       );
 
     case "writing":
+      // 032 — 표현만 바꿨다. 회전 표시 + "그만두기"만. 진행률 숫자·경과 시간·
+      // 생성 중인 글은 여전히 없다(005 FR-028b, 015·016, SM3).
       return (
-        <View style={styles.center}>
-          <ActivityIndicator accessibilityLabel="쓰고 있다" size="large" />
-          <Text style={styles.writing}>{screen.line ?? "쓰고 있다"}</Text>
+        <View className="flex-1 items-center justify-center bg-bg" style={styles.center}>
+          <ActivityIndicator accessibilityLabel="쓰고 있다" size="large" color={COLORS.accent} />
+          <AppText variant="body">{screen.line ?? "쓰고 있다"}</AppText>
           <Pressable accessibilityRole="button" onPress={() => void cancel()} style={styles.link}>
-            <Text>그만두기</Text>
+            <AppText variant="body">그만두기</AppText>
           </Pressable>
         </View>
       );
@@ -443,12 +446,12 @@ export function DiaryHomeScreen({
       return (
         <Frame onBack={() => void backToList()}>
           <View style={styles.notice}>
-            <Text style={styles.noticeText}>{screen.message}</Text>
+            <AppText variant="body">{screen.message}</AppText>
 
             {/* 029 — 작성자를 준비해야 하는 실패면 설정 탭으로 가는 길을 준다(FR-014). */}
             {onGoToSettings !== undefined && /준비/.test(screen.message) && (
               <Pressable accessibilityRole="button" onPress={onGoToSettings} style={styles.link}>
-                <Text>설정에서 작성자 준비하기</Text>
+                <AppText variant="body">설정에서 작성자 준비하기</AppText>
               </Pressable>
             )}
           </View>
@@ -460,29 +463,32 @@ export function DiaryHomeScreen({
 /** 뒤로 갈 수 있는 화면의 껍데기. */
 function Frame({ children, onBack }: { children: React.ReactNode; onBack: () => void }) {
   return (
-    <ScrollView contentContainerStyle={styles.frame}>
+    <ScrollView
+      className="bg-bg"
+      contentContainerStyle={styles.frame}
+      style={{ backgroundColor: COLORS.bg }}
+    >
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.back}>
-        <Text>← 목록</Text>
+        <AppText variant="body">← 목록</AppText>
       </Pressable>
       {children}
     </ScrollView>
   );
 }
 
+// 032 — 색은 tokens.ts에서. 레이아웃 숫자만 남는다(SM3). 생성 중 뷰에 진행률·
+// 경과 시간·글 조각 없음.
 const styles = StyleSheet.create({
   frame: { paddingTop: 12 },
   back: { paddingHorizontal: 20, paddingVertical: 8, alignSelf: "flex-start" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
-  writing: { fontSize: 16 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 },
   notice: { padding: 20, gap: 12 },
   link: {
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderWidth: 1,
+    borderColor: COLORS.border,
     borderRadius: 6,
     alignSelf: "flex-start",
   },
-  day: { fontSize: 14, opacity: 0.6 },
-  noticeText: { fontSize: 16, lineHeight: 24 },
-  hint: { fontSize: 14, opacity: 0.7 },
 });

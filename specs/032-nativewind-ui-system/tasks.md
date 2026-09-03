@@ -283,14 +283,14 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US2-a: `DiaryHomeScreen` 생성 중 뷰 이관 (contracts/screen-migration.md SM3)
 
-- [ ] T048 [US2] `src/ui/DiaryHomeScreen.tsx`에서 **`screen.kind === "writing"`
+- [X] T048 [US2] `src/ui/DiaryHomeScreen.tsx`에서 **`screen.kind === "writing"`
       JSX 블록과 그 블록이 참조하는 `StyleSheet` 엔트리만** 이관 —
       className/토큰 + `AppText`·`Button`("그만두기"). `DiaryHomeScreen`이 렌더하는
       `DiaryListScreen`(US1-a T032에서 이미 이관)·`DayPicker` 등 자식은 건드리지
       않는다. **불변**: 진행률 숫자·경과 시간·생성 중인 글 **없음**(005 FR-028b,
       015·016), 회전 표시(`ActivityIndicator` — 진행률 파라미터 없음) +
       "그만두기"만, 홈 흐름·탭 구조·"일기 쓰기 1탭" 불변(029, FR-021). (SM3, FR-011)
-- [ ] T049 [US2] `npm run test:ui`에서 `__tests__/ui/diary-home.test.tsx`·
+- [X] T049 [US2] `npm run test:ui`에서 `__tests__/ui/diary-home.test.tsx`·
       `diary-home-notification.test.tsx`(+ 015·016 계약 테스트 있으면) 전부
       GREEN(수정 없이). writing 뷰 소스에 원시 hex·`style={{` 잔존 0.
       **029 홈 흐름 회귀 확인**: `diary-home.test.tsx`의 "홈에 위젯 4개가 없다"·
@@ -302,14 +302,14 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US2-b: `OnboardingScreen` + 에셋 단계 이관 (contracts/screen-migration.md SM4)
 
-- [ ] T051 [US2] `src/ui/OnboardingScreen.tsx` 이관 — `Card`/`Section`·`Button`
+- [X] T051 [US2] `src/ui/OnboardingScreen.tsx` 이관 — `Card`/`Section`·`Button`
       (`[허용]`/`[건너뛰기]`/`[시작하기]`)·`AppText` + 진행률 표시(에셋 단계)
       className/토큰. **불변**: 권한 단계 순서·문안·건너뛰기 가능성(021·031),
       031이 뺀 `photo-location` 단계 없음, 단계 `testID`(`onboarding-step-*`),
       에셋 다운로드 **합산 진행률 하나**·항목별 나열 없음·완료 전 `[시작하기]`
       비활성·건너뛰기 없음(029), 뒤로 가기 없음, 완료 시 `onboarding.json`
       `completed: true`. (SM4)
-- [ ] T052 [US2] `npm run test:ui`에서 `onboarding-screen.test.tsx`·
+- [X] T052 [US2] `npm run test:ui`에서 `onboarding-screen.test.tsx`·
       `onboarding-complete-gate.test.tsx`·`denied-guidance.test.tsx` 전부
       GREEN(수정 없이). 소스에 원시 hex·`style={{` 잔존 0.
 - [ ] T053 [US2] Maestro: `.maestro/unified-permission-onboarding.yml` 실기기 1회
@@ -318,7 +318,7 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US2 통합 검증
 
-- [ ] T054 [US2] `npm run lint` GREEN. `check:constitution` 위반 0(생성 중 뷰가
+- [X] T054 [US2] `npm run lint` GREEN. `check:constitution` 위반 0(생성 중 뷰가
       지표·글 미노출, 온보딩이 모델 식별자 미노출).
 - [ ] T055 [US2] SM-S928N debug 실기기 육안: `pm clear` 후 새 온보딩 → 권한
       카드 새 톤·단계 순서·문안 그대로·에셋 다운로드 합산 진행률 하나·완료 전
