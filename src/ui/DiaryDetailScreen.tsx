@@ -32,6 +32,17 @@ import { topicParticleFor } from "../diary/particle";
 import { personaOf } from "../diary/persona";
 import type { DiaryEntry } from "../diary/types";
 import type { DaySignals, SignalValue } from "../signals/types";
+import { AppText } from "./components/Text";
+import { COLORS, RADIUS } from "./theme/tokens";
+
+/**
+ * 032 — 풀스크린 사진 뷰어의 배경/글자.
+ *
+ * 갤러리는 **미디어 뷰어**라 앱 팔레트를 따르지 않고 관례대로 검은 배경 +
+ * 흰 글자를 쓴다(사진을 방해 없이 보이기 위함 — 025 설계). 앱 라이트 톤과
+ * 별개이며 `tokens.ts`의 9역할에 들어가지 않는 의도적 예외다.
+ */
+const PHOTO_VIEWER = { bg: "black", fg: "white" } as const;
 
 export type DiaryDetailScreenProps = {
   entry: DiaryEntry;
@@ -125,17 +136,21 @@ function formatDuration(ms: number): string {
  */
 function SignalsTitle({ entry }: { entry: DiaryEntry }) {
   if (entry.timing === undefined) {
-    return <Text style={styles.signalsTitle}>이 일기가 본 것</Text>;
+    return (
+      <AppText variant="caption" style={{ marginBottom: 4 }}>
+        이 일기가 본 것
+      </AppText>
+    );
   }
 
   const name = personaOf(entry.character).name;
   const particle = topicParticleFor(name);
 
   return (
-    <Text style={styles.signalsTitle}>
+    <AppText variant="caption" style={{ marginBottom: 4 }}>
       {name}
       {particle} 이렇게 일기를 작성했어요.
-    </Text>
+    </AppText>
   );
 }
 
@@ -157,13 +172,13 @@ function TimingLines({ entry }: { entry: DiaryEntry }) {
   return (
     <>
       {timing.visionMs !== undefined && (
-        <Text style={styles.signal}>
+        <AppText variant="body" style={{ opacity: 0.8 }}>
           사진을 {photoCount}장을 분석하는 데 {formatDuration(timing.visionMs)}가 걸렸어요.
-        </Text>
+        </AppText>
       )}
-      <Text style={styles.signal}>
+      <AppText variant="body" style={{ opacity: 0.8 }}>
         일기를 작성하는 데 {formatDuration(timing.writingMs)}가 걸렸어요.
-      </Text>
+      </AppText>
     </>
   );
 }
@@ -377,22 +392,26 @@ export function DiaryDetailScreen({
   const hasPhotos = photos !== undefined && photos.length > 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Text style={styles.day}>{entry.date}</Text>
+    <ScrollView
+      className="bg-bg"
+      contentContainerStyle={styles.page}
+      style={{ backgroundColor: COLORS.bg }}
+    >
+      <AppText variant="caption">{entry.date}</AppText>
 
       {/* 014 — 제목이 있으면 날짜 아래에 보인다(FR-011). 없으면 아무것도 없다 */}
-      {entry.title !== undefined && <Text style={styles.title}>{entry.title}</Text>}
+      {entry.title !== undefined && <AppText variant="title">{entry.title}</AppText>}
 
       {/* **저장하지 못했으면 남지 않는다는 것을 말한다**(FR-012b) */}
-      {!saved && (
-        <Text style={styles.unsaved}>저장하지 못했다. 앱을 나가면 이 일기는 사라진다</Text>
-      )}
+      {!saved && <AppText variant="body">저장하지 못했다. 앱을 나가면 이 일기는 사라진다</AppText>}
 
       {/* **덮어썼다는 사실을 알린다**(FR-034) — 사라진 일기는 되돌릴 수 없다 */}
-      {overwrote && <Text style={styles.overwrote}>이전 일기를 덮어썼다</Text>}
+      {overwrote && <AppText variant="caption">이전 일기를 덮어썼다</AppText>}
 
       {/* 일기가 길면 스크롤된다 */}
-      <Text style={styles.text}>{entry.text}</Text>
+      <AppText variant="body" style={{ fontSize: 16, lineHeight: 26 }}>
+        {entry.text}
+      </AppText>
 
       {/*
         025 — VLM이 실제로 분석한 사진들을 가로 슬라이더로 보인다(FR-001).
@@ -433,9 +452,9 @@ export function DiaryDetailScreen({
           // (사진 0장·옛 일기) 여기가 유일한 정보원이므로 남긴다.
           .filter((line) => !(line.label === "사진" && entry.timing?.visionMs !== undefined))
           .map((line) => (
-            <Text key={line.label} style={styles.signal}>
+            <AppText key={line.label} variant="body" style={{ opacity: 0.8 }}>
               {line.label}: {line.value}
-            </Text>
+            </AppText>
           ))}
         {/*
           017 US3 — 소요 시간 사후 기록(헌법 1.2.0). `entry.timing`이 없으면
@@ -447,30 +466,27 @@ export function DiaryDetailScreen({
   );
 }
 
+// 032 — 색은 전부 `tokens.ts`에서. 레이아웃 숫자·`hairlineWidth`만 남는다.
+// 025 슬라이더·갤러리 구조는 그대로이고 색만 토큰/뷰어 상수로 바꿨다(SM2).
 const styles = StyleSheet.create({
   page: { padding: 20, gap: 16 },
-  day: { fontSize: 14, opacity: 0.6 },
-  title: { fontSize: 20, fontWeight: "600" },
-  unsaved: { fontSize: 14 },
-  overwrote: { fontSize: 13, opacity: 0.7 },
-  text: { fontSize: 16, lineHeight: 26 },
   // 017 격자 잔재. `DiaryPhoto`가 style 미주입 시 폴백으로 쓴다(회귀 안전).
-  photo: { width: 96, height: 96, borderRadius: 8, backgroundColor: "#eee" },
+  photo: { width: 96, height: 96, borderRadius: RADIUS.card, backgroundColor: COLORS.border },
   photoMissing: { alignItems: "center", justifyContent: "center", padding: 4 },
-  photoMissingText: { fontSize: 11, opacity: 0.6, textAlign: "center" },
+  photoMissingText: { fontSize: 11, color: COLORS.textMuted, textAlign: "center" },
   // 025 — 본문 슬라이더.
   sliderFrame: { gap: 6 },
-  sliderPhoto: { height: 240, borderRadius: 8, backgroundColor: "#eee" },
-  photoPosition: { fontSize: 13, opacity: 0.6, textAlign: "center" },
-  // 025 — 풀스크린 갤러리.
-  galleryFrame: { flex: 1, backgroundColor: "#000" },
+  sliderPhoto: { height: 240, borderRadius: RADIUS.card, backgroundColor: COLORS.border },
+  photoPosition: { fontSize: 13, color: COLORS.textMuted, textAlign: "center" },
+  // 025 — 풀스크린 갤러리(미디어 뷰어 — 검은 배경, PHOTO_VIEWER 참조).
+  galleryFrame: { flex: 1, backgroundColor: PHOTO_VIEWER.bg },
   galleryPage: { flex: 1, alignItems: "center", justifyContent: "center" },
   galleryPhoto: { flex: 1, width: "100%" },
   galleryPosition: {
     position: "absolute",
     top: 16,
     alignSelf: "center",
-    color: "#fff",
+    color: PHOTO_VIEWER.fg,
     fontSize: 14,
     opacity: 0.85,
   },
@@ -481,14 +497,12 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 14,
   },
-  galleryCloseText: { color: "#fff", fontSize: 15 },
+  galleryCloseText: { color: PHOTO_VIEWER.fg, fontSize: 15 },
   signals: {
     marginTop: 8,
     paddingTop: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#ccc",
+    borderTopColor: COLORS.border,
     gap: 4,
   },
-  signalsTitle: { fontSize: 13, opacity: 0.6, marginBottom: 4 },
-  signal: { fontSize: 14, opacity: 0.8 },
 });

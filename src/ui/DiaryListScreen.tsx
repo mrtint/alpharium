@@ -3,6 +3,7 @@
  *
  * 계약: specs/006-first-diary-app/contracts/screens.md §2
  *       specs/029-writing-flow-simplification/contracts/home-screen.md (H1·H2·H6)
+ *       specs/032-nativewind-ui-system/contracts/screen-migration.md SM1
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **★ 이 화면이 원칙 I을 어기기 가장 쉬운 자리다.**
@@ -17,13 +18,20 @@
  * VisionPicker·GeocodingSettingToggle과 딸린 안내가 걷혔다 — 캐릭터·사진 설정·장소명은
  * 배선 계층(`resolve-generation.ts`)이 자동 판정한다. 홈에 남는 것은 목록 +
  * "일기 쓰기" + 날짜 셀렉트(009) + 정오 게이트 안내(012) + 거부 권한 안내(021)뿐이다.
+ *
+ * **★ 032에서 표현만 바꿨다** — `StyleSheet` → 디자인 토큰(className + `tokens.ts`)
+ * + 재사용 컴포넌트(`AppText`·`Button`). 기능·문안·`testID`·네비게이션은 불변이다
+ * (SM1). 사진 갈래 3문구, `onWrite` 인자 없음, `day-<date>` testID 그대로.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
+import { AppText } from "./components/Text";
+import { Button } from "./components/Button";
+import { COLORS } from "./theme/tokens";
 import { DayPicker } from "./DayPicker";
 
 export type DiaryListScreenProps = {
@@ -95,44 +103,55 @@ export function DiaryListScreen({
   deniedNotices,
 }: DiaryListScreenProps) {
   return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Text style={styles.title}>일기</Text>
+    <ScrollView
+      className="bg-bg"
+      contentContainerClassName="p-5 gap-3"
+      contentContainerStyle={{ padding: 20, gap: 12 }}
+      style={{ backgroundColor: COLORS.bg }}
+    >
+      <AppText variant="title">일기</AppText>
 
       {/* 021 — 거부된 권한으로 제한되는 기능을 정직하게 알린다(FR-014). */}
       {deniedNotices !== undefined && deniedNotices.length > 0 && (
-        <View style={styles.notices} testID="denied-notices">
+        <View className="gap-1 py-1" style={{ gap: 4, paddingVertical: 4 }} testID="denied-notices">
           {deniedNotices.map((notice) => (
-            <Text key={notice} style={styles.noticeText}>
+            <AppText key={notice} variant="caption">
               {notice}
-            </Text>
+            </AppText>
           ))}
         </View>
       )}
 
       {/* **빈 화면을 보이지 않는다**(FR-018, S7) — 무엇을 하면 생기는지 말한다 */}
       {items.length === 0 && (
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>아직 일기가 없다</Text>
-          <Text style={styles.emptyHint}>
+        <View className="py-6 gap-2" style={{ paddingVertical: 24, gap: 8 }}>
+          <AppText variant="bodyStrong">아직 일기가 없다</AppText>
+          <AppText variant="caption">
             아래에서 하루를 고르고 「일기 쓰기」를 누르면 휴대폰이 그 하루를 일기로 쓴다.
-          </Text>
+          </AppText>
         </View>
       )}
 
       {items.map((item) => (
         <Pressable
           accessibilityRole="button"
+          className="py-3.5 border-b border-border gap-1"
           key={item.day}
           onPress={() => onOpen(item)}
-          style={styles.row}
+          style={{
+            paddingVertical: 14,
+            borderBottomWidth: 0.5,
+            borderBottomColor: COLORS.border,
+            gap: 4,
+          }}
         >
-          <Text style={styles.day}>{item.day}</Text>
+          <AppText variant="body">{item.day}</AppText>
 
-          {item.title !== undefined && <Text style={styles.entryTitle}>{item.title}</Text>}
+          {item.title !== undefined && <AppText variant="caption">{item.title}</AppText>}
 
-          {!item.readable && <Text style={styles.unreadable}>읽을 수 없다</Text>}
+          {!item.readable && <AppText variant="caption">읽을 수 없다</AppText>}
 
-          <Text style={styles.photos}>{photoText(item.photos)}</Text>
+          <AppText variant="caption">{photoText(item.photos)}</AppText>
         </Pressable>
       ))}
 
@@ -142,12 +161,21 @@ export function DiaryListScreen({
         장소명은 배선 계층이 자동 판정한다(FR-006).
         ─────────────────────────────────────────────────────────────────────────
       */}
-      <View style={styles.writeArea}>
+      <View
+        className="mt-4 pt-4 border-t border-border gap-2.5"
+        style={{
+          marginTop: 16,
+          paddingTop: 16,
+          borderTopWidth: 0.5,
+          borderTopColor: COLORS.border,
+          gap: 10,
+        }}
+      >
         {/*
           **자동 판정이 캐릭터를 옮겼으면 알린다**(029 FR-014) — 007의 `movedFrom`
           표시를 이 자리로 옮겼다. 부모가 persona 이름으로 문장을 만들어 넘긴다.
         */}
-        {movedNotice !== undefined && <Text style={styles.moved}>{movedNotice}</Text>}
+        {movedNotice !== undefined && <AppText variant="caption">{movedNotice}</AppText>}
 
         {/*
           **하루를 고르는 자리**(009 FR-006). **판정은 여기서 하지 않는다** —
@@ -164,56 +192,20 @@ export function DiaryListScreen({
         )}
 
         {/* **오늘이 아니라 고른 하루다**(009 FR-008, 006 FR-030) */}
-        {write !== undefined && <Text style={styles.willWrite}>{write.day}를 쓴다</Text>}
+        {write !== undefined && <AppText variant="body">{write.day}를 쓴다</AppText>}
 
         {/* **덮어쓴다는 것을 누르기 전에 말한다**(FR-024). */}
         {write?.overwrites === true && (
-          <Text style={styles.overwrite}>이 날의 일기가 이미 있다. 다시 쓰면 덮어쓴다</Text>
+          <AppText variant="caption">이 날의 일기가 이미 있다. 다시 쓰면 덮어쓴다</AppText>
         )}
 
         {/* **항목이 있든 없든 같은 자리다** — 읽기가 쓰기를 대신하지 않는다(S1) */}
-        <Pressable accessibilityRole="button" onPress={onWrite} style={styles.write}>
-          <Text>일기 쓰기</Text>
-        </Pressable>
+        <View className="self-start mt-3" style={{ alignSelf: "flex-start", marginTop: 12 }}>
+          <Button variant="secondary" onPress={onWrite}>
+            일기 쓰기
+          </Button>
+        </View>
       </View>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  page: { padding: 20, gap: 12 },
-  title: { fontSize: 20, fontWeight: "600" },
-  notices: { gap: 4, paddingVertical: 4 },
-  noticeText: { fontSize: 13, opacity: 0.7, lineHeight: 19 },
-  empty: { paddingVertical: 24, gap: 8 },
-  emptyTitle: { fontSize: 16 },
-  emptyHint: { fontSize: 14, opacity: 0.7, lineHeight: 20 },
-  row: {
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
-    gap: 4,
-  },
-  day: { fontSize: 16 },
-  entryTitle: { fontSize: 14 },
-  unreadable: { fontSize: 13, opacity: 0.6 },
-  photos: { fontSize: 13, opacity: 0.6 },
-  writeArea: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#ccc",
-    gap: 10,
-  },
-  moved: { fontSize: 13, opacity: 0.8 },
-  willWrite: { fontSize: 14 },
-  overwrite: { fontSize: 13, opacity: 0.8 },
-  write: {
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-});

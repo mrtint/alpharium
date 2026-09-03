@@ -21,9 +21,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import type { AutoDiarySettings } from "../schedule/settings";
+import { AppText } from "./components/Text";
+import { Button } from "./components/Button";
+import { COLORS, RADIUS } from "./theme/tokens";
 
 export type AutoDiarySettingsScreenProps = {
   /** 지금 설정. 기본값은 꺼짐·7시(FR-009·FR-001) */
@@ -52,8 +55,12 @@ export function AutoDiarySettingsScreen({
   notificationDenied,
 }: AutoDiarySettingsScreenProps) {
   return (
-    <ScrollView contentContainerStyle={styles.page}>
-      <Text style={styles.title}>자동으로 일기 쓰기</Text>
+    <ScrollView
+      className="bg-bg"
+      contentContainerStyle={styles.page}
+      style={{ backgroundColor: COLORS.bg }}
+    >
+      <AppText variant="title">자동으로 일기 쓰기</AppText>
 
       {/* ★ on/off 토글 (FR-001). */}
       <Pressable
@@ -64,20 +71,24 @@ export function AutoDiarySettingsScreen({
         testID="auto-diary-toggle"
       >
         <View style={styles.info}>
-          <Text style={styles.name}>자동 생성</Text>
-          <Text style={styles.hint}>하루가 지나면 휴대폰이 알아서 그 하루를 일기로 쓴다</Text>
+          <AppText variant="body">자동 생성</AppText>
+          <AppText variant="caption">하루가 지나면 휴대폰이 알아서 그 하루를 일기로 쓴다</AppText>
         </View>
-        {settings.enabled && <Text style={styles.mark}>켜짐</Text>}
+        {settings.enabled && (
+          <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+            켜짐
+          </AppText>
+        )}
       </Pressable>
 
       {/* ★ 목표 시각 선택 UI — 시 단위(0–23). */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>언제쯤 쓸까</Text>
+        <AppText variant="sectionTitle">언제쯤 쓸까</AppText>
 
         {/* ★ E5·SC-001 — 근사치 안내. 이 문구만 보고 "근방"임을 이해할 수 있어야 한다. */}
-        <Text style={styles.notice}>
+        <AppText variant="caption">
           고른 시각 그대로가 아니라 그 무렵에 씁니다. 기기 상태에 따라 더 늦어질 수 있어요.
-        </Text>
+        </AppText>
 
         <View style={styles.hourGrid}>
           {HOURS.map((hour) => {
@@ -91,7 +102,9 @@ export function AutoDiarySettingsScreen({
                 style={[styles.hourCell, isSelected && styles.hourCellSelected]}
                 testID={`target-hour-${hour}`}
               >
-                <Text style={isSelected ? styles.hourTextSelected : styles.hourText}>{hour}시</Text>
+                <AppText variant="body" style={isSelected ? { fontWeight: "600" } : undefined}>
+                  {hour}시
+                </AppText>
               </Pressable>
             );
           })}
@@ -100,35 +113,35 @@ export function AutoDiarySettingsScreen({
 
       {/* ★ N8 — 알림 권한이 거부된 상태 안내. 자동 생성은 켤 수 있다. */}
       {notificationDenied === true && (
-        <Text style={styles.warn}>
+        <AppText variant="caption">
           알림 권한이 없어 완료를 알릴 수 없어요. 앱을 열어 새 일기를 확인하세요.
-        </Text>
+        </AppText>
       )}
 
       {/* ★ E4 — 배터리 예외 상시 링크. batteryExceptionPrompted·enabled와 무관하게 항상. */}
       <View style={styles.section}>
-        <Text style={styles.hint}>
+        <AppText variant="caption">
           일기가 제때 안 써지나요? 배터리 설정에서 이 앱을 &apos;제한 없음&apos;으로 바꾸면 더 자주
           시도합니다.
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          onPress={onOpenBatterySettings}
-          style={styles.link}
-          testID="open-battery-settings"
-        >
-          <Text>배터리 설정 열기</Text>
-        </Pressable>
+        </AppText>
+        <View style={{ alignSelf: "flex-start" }}>
+          <Button
+            variant="secondary"
+            onPress={onOpenBatterySettings}
+            testID="open-battery-settings"
+          >
+            배터리 설정 열기
+          </Button>
+        </View>
       </View>
     </ScrollView>
   );
 }
 
+// 032 — 색은 tokens.ts에서. 시각 시 단위(0–23)·정밀도 암시 문구 없음·testID 불변(SM5).
 const styles = StyleSheet.create({
   page: { padding: 20, gap: 16 },
-  title: { fontSize: 20, fontWeight: "600" },
   section: { gap: 8 },
-  sectionTitle: { fontSize: 15, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -136,32 +149,18 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.card,
   },
-  rowSelected: { borderColor: "#333", borderWidth: 1 },
+  rowSelected: { borderColor: COLORS.accent, borderWidth: 1 },
   info: { flex: 1, gap: 2 },
-  name: { fontSize: 15 },
-  hint: { fontSize: 13, opacity: 0.7, lineHeight: 19 },
-  mark: { fontSize: 13, fontWeight: "600" },
-  notice: { fontSize: 13, opacity: 0.75, lineHeight: 19 },
-  warn: { fontSize: 13, opacity: 0.9, lineHeight: 19 },
   hourGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   hourCell: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
+    borderColor: COLORS.border,
     borderRadius: 6,
   },
-  hourCellSelected: { borderWidth: 2, borderColor: "#333" },
-  hourText: { fontSize: 14 },
-  hourTextSelected: { fontSize: 14, fontWeight: "600" },
-  link: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderRadius: 6,
-    alignSelf: "flex-start",
-  },
+  hourCellSelected: { borderWidth: 2, borderColor: COLORS.accent },
 });

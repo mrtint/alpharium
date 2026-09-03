@@ -13,7 +13,10 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
+
+import { AppText } from "./components/Text";
+import { COLORS, RADIUS } from "./theme/tokens";
 
 export type AuthorOption = {
   /** persona 이름 (014). 모델 식별자가 아니다. */
@@ -36,7 +39,7 @@ export type AuthorPickerProps = {
 export function AuthorPicker({ options, onSelect }: AuthorPickerProps) {
   return (
     <View style={styles.container} testID="author-picker">
-      <Text style={styles.title}>일기 작성자</Text>
+      <AppText variant="sectionTitle">일기 작성자</AppText>
       {options.map((opt, index) => (
         <Pressable
           accessibilityRole="button"
@@ -48,22 +51,26 @@ export function AuthorPicker({ options, onSelect }: AuthorPickerProps) {
           testID={`author-option-${index}`}
         >
           <View style={styles.info}>
-            <Text style={styles.name}>{opt.name}</Text>
-            <Text style={styles.tagline}>{opt.tagline}</Text>
+            <AppText variant="body">{opt.name}</AppText>
+            <AppText variant="caption">{opt.tagline}</AppText>
             {!opt.ready && (
-              <Text style={styles.hint}>아직 준비되지 않음 — 아래에서 내려받으세요</Text>
+              <AppText variant="caption">아직 준비되지 않음 — 아래에서 내려받으세요</AppText>
             )}
           </View>
-          {opt.selected && <Text style={styles.mark}>작성자</Text>}
+          {opt.selected && (
+            <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+              작성자
+            </AppText>
+          )}
         </Pressable>
       ))}
     </View>
   );
 }
 
+// 032 — 색은 tokens.ts에서. persona 이름·소개·testID·문안 불변(SM5, 원칙 III).
 const styles = StyleSheet.create({
   container: { gap: 8 },
-  title: { fontSize: 16, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -71,14 +78,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.card,
   },
-  rowSelected: { borderColor: "#333", borderWidth: 1 },
+  rowSelected: { borderColor: COLORS.accent, borderWidth: 1 },
   rowDisabled: { opacity: 0.5 },
   info: { flex: 1, gap: 2 },
-  name: { fontSize: 15 },
-  tagline: { fontSize: 13, opacity: 0.7 },
-  hint: { fontSize: 12, opacity: 0.6 },
-  mark: { fontSize: 13, fontWeight: "600" },
 });

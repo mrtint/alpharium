@@ -20,8 +20,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
+import { AppText } from "./components/Text";
+import { Button } from "./components/Button";
+import { COLORS } from "./theme/tokens";
 import {
   nextStep,
   planOnboardingSteps,
@@ -215,104 +218,92 @@ export function OnboardingScreen({
   const showAssetsStep = current === null && !assetsReady;
 
   return (
-    <ScrollView contentContainerStyle={styles.page} testID="onboarding-screen">
-      <Text style={styles.title}>시작하기 전에</Text>
-      <Text style={styles.lead}>
+    <ScrollView
+      className="bg-bg"
+      contentContainerStyle={styles.page}
+      style={{ backgroundColor: COLORS.bg }}
+      testID="onboarding-screen"
+    >
+      <AppText variant="title">시작하기 전에</AppText>
+      <AppText variant="body" style={{ opacity: 0.75 }}>
         휴대폰이 하루를 일기로 쓰려면 몇 가지 허락이 필요해요. 원치 않으면 건너뛰어도 됩니다.
-      </Text>
+      </AppText>
 
       {showAssetsStep ? (
         <View style={styles.section} testID="onboarding-step-assets">
-          <Text style={styles.rationale}>
+          <AppText variant="body">
             일기를 쓰는 데 필요한 것을 내려받는 중입니다. 캐릭터 하나와 사진을 보는 도구예요.
-          </Text>
-          <Text style={styles.ifDenied}>
+          </AppText>
+          <AppText variant="caption">
             이 단계는 건너뛸 수 없어요 — 없으면 일기를 쓸 수 없습니다.
-          </Text>
+          </AppText>
 
-          {/* SR3 — 합산 진행률 바 하나. 항목별 나열 없음(FR-017). */}
+          {/* SR3 — 합산 진행률 바 하나. 항목별 나열 없음(FR-017). 029가 온보딩
+              다운로드 진행으로 정리한 것 — 생성 진행률이 아니다(원칙 IV 무관). */}
           <View style={styles.progressTrack} testID="onboarding-assets-progress">
             <View style={[styles.progressFill, { width: `${Math.round(assetFraction * 100)}%` }]} />
           </View>
 
           {assetStatus === "failed" && (
             <>
-              <Text style={styles.warn}>
+              <AppText variant="caption">
                 {assetFailReason === "insufficient-space"
                   ? "저장 공간이 부족해요. 공간을 확보한 뒤 다시 시도하세요."
                   : assetFailReason === "network"
                     ? "네트워크가 불안정해요. 연결을 확인하고 다시 시도하세요."
                     : "내려받다 문제가 생겼어요. 다시 시도해 주세요."}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => void downloadAssets()}
-                style={styles.primary}
-                testID="onboarding-assets-retry"
-              >
-                <Text style={styles.primaryText}>다시 시도</Text>
-              </Pressable>
+              </AppText>
+              <View style={{ alignSelf: "flex-start" }}>
+                <Button onPress={() => void downloadAssets()} testID="onboarding-assets-retry">
+                  다시 시도
+                </Button>
+              </View>
             </>
           )}
 
           {assetStatus === "idle" && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void downloadAssets()}
-              style={styles.primary}
-              testID="onboarding-assets-download"
-            >
-              <Text style={styles.primaryText}>내려받기</Text>
-            </Pressable>
+            <View style={{ alignSelf: "flex-start" }}>
+              <Button onPress={() => void downloadAssets()} testID="onboarding-assets-download">
+                내려받기
+              </Button>
+            </View>
           )}
 
           {assetStatus === "downloading" && (
-            <Text style={styles.ifDenied}>내려받는 중… 잠시만 기다려 주세요.</Text>
+            <AppText variant="caption">내려받는 중… 잠시만 기다려 주세요.</AppText>
           )}
           {/* SR2 — [건너뛰기] 버튼 없음. [시작하기]도 assetsReady 전에는 없음(SR3). */}
         </View>
       ) : current === null ? (
         <View style={styles.section}>
-          <Text style={styles.done}>
+          <AppText variant="body">
             준비가 끝났어요. {doneCount}/{total}단계를 확인했습니다.
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={finish}
-            style={styles.primary}
-            testID="onboarding-start"
-          >
-            <Text style={styles.primaryText}>시작하기</Text>
-          </Pressable>
+          </AppText>
+          <View style={{ alignSelf: "flex-start" }}>
+            <Button onPress={finish} testID="onboarding-start">
+              시작하기
+            </Button>
+          </View>
         </View>
       ) : (
         <View style={styles.section} testID={`onboarding-step-${current.requirement.key}`}>
-          <Text style={styles.progress}>
+          <AppText variant="caption" style={{ opacity: 0.5 }}>
             {Math.min(doneCount + 1, total)} / {total}
-          </Text>
-          <Text style={styles.rationale}>{current.requirement.rationale}</Text>
-          <Text style={styles.ifDenied}>{current.requirement.ifDenied}</Text>
+          </AppText>
+          <AppText variant="body">{current.requirement.rationale}</AppText>
+          <AppText variant="caption">{current.requirement.ifDenied}</AppText>
 
-          {current.status === "blocked" ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void openSettings(current)}
-              style={styles.primary}
-              testID="onboarding-open-settings"
-            >
-              <Text style={styles.primaryText}>설정 열기</Text>
-            </Pressable>
-          ) : (
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy}
-              onPress={() => void allow(current)}
-              style={styles.primary}
-              testID="onboarding-allow"
-            >
-              <Text style={styles.primaryText}>허용</Text>
-            </Pressable>
-          )}
+          <View style={{ alignSelf: "flex-start" }}>
+            {current.status === "blocked" ? (
+              <Button onPress={() => void openSettings(current)} testID="onboarding-open-settings">
+                설정 열기
+              </Button>
+            ) : (
+              <Button disabled={busy} onPress={() => void allow(current)} testID="onboarding-allow">
+                허용
+              </Button>
+            )}
+          </View>
 
           <Pressable
             accessibilityRole="button"
@@ -320,7 +311,7 @@ export function OnboardingScreen({
             style={styles.secondary}
             testID="onboarding-skip"
           >
-            <Text style={styles.secondaryText}>건너뛰기</Text>
+            <AppText variant="caption">건너뛰기</AppText>
           </Pressable>
         </View>
       )}
@@ -328,32 +319,17 @@ export function OnboardingScreen({
   );
 }
 
+// 032 — 색은 tokens.ts에서. 단계 순서·문안·testID·건너뛰기 가능성·에셋 진행률
+// 규칙(합산 바 하나, 건너뛰기 없음) 불변(SM4).
 const styles = StyleSheet.create({
   page: { padding: 20, gap: 16 },
-  title: { fontSize: 20, fontWeight: "600" },
-  lead: { fontSize: 14, opacity: 0.75, lineHeight: 20 },
-  warn: { fontSize: 13, opacity: 0.9, lineHeight: 19 },
   progressTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#e0e0e0",
+    backgroundColor: COLORS.border,
     overflow: "hidden",
   },
-  progressFill: { height: 8, backgroundColor: "#333" },
+  progressFill: { height: 8, backgroundColor: COLORS.accent },
   section: { gap: 10, marginTop: 8 },
-  progress: { fontSize: 12, opacity: 0.5 },
-  rationale: { fontSize: 16, lineHeight: 23 },
-  ifDenied: { fontSize: 13, opacity: 0.6, lineHeight: 19 },
-  done: { fontSize: 15, lineHeight: 22 },
-  primary: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#333",
-    alignSelf: "flex-start",
-  },
-  primaryText: { fontSize: 15, fontWeight: "600" },
   secondary: { paddingVertical: 8, paddingHorizontal: 4, alignSelf: "flex-start" },
-  secondaryText: { fontSize: 13, opacity: 0.6 },
 });

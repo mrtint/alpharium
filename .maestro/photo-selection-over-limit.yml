@@ -20,10 +20,16 @@
 #
 # 선행: `npm run seed:day -- many-camera <날짜>` (Phase 8 도구). 그 날짜를
 #        `SEED_DAY` env로 넘긴다.
+#
+# ⚠️ **2026-09-03 갱신(032)** — `SEED_DAY`는 009의 선택 범위 안이어야 한다
+#   (마지막 닫힌 하루 + 앞 둘 = 3개). 고정 날짜는 며칠 지나면 범위를 벗어나
+#   `day-<날짜>` pill이 사라진다 — 실행 직전에 `npm run seed:day -- many-camera
+#   <어제>`로 다시 심고 `-e SEED_DAY=<어제>`로 덮어쓴다. 아래 기본값은
+#   "심은 직후 실행" 전제의 예시일 뿐이다.
 # ─────────────────────────────────────────────────────────────────────────────
 appId: com.anonymous.alpharium
 env:
-  SEED_DAY: "2026-08-28"
+  SEED_DAY: "2026-09-01"
 ---
 - launchApp
 - assertVisible: "일기"
