@@ -92,11 +92,16 @@
 
 ## UC7 — `SelectRow`
 
-- Props: `label: string`, `options: readonly { label: string }[]`,
+- Props: `label: string`, `options: readonly { label: string; hint?: string }[]`,
   `selectedIndex: number`, `onSelect: (index: number) => void`,
-  `disabledIndices?: readonly number[]`, `testID?`.
-- 각 옵션이 `Pressable` (`${testID}-option-${i}`),
+  `disabledIndices?: readonly number[]`, `testID?`,
+  `optionTestID?: (index, option) => string | undefined` (032 이관에서 추가).
+- 각 옵션이 `Pressable` (`optionTestID?.(i, opt)` ?? `${testID}-option-${i}`),
   `accessibilityState={{ selected, disabled }}`.
+- **`optionTestID`**: 기존 화면(`vision-<x>`·`geocoding-<x>` …)이 고유 옵션 키를
+  이미 쓰므로, `SelectRow`로 이관해도 그 Maestro·테스트 키가 유지되도록 옵션별
+  `testID`를 직접 지정한다(SM 공통 원칙 — `testID` 불변). 미지정 시 기본
+  `${testID}-option-${i}`.
 - 선택된 옵션에 시각 표식(테두리 강조 또는 체크). **표식 텍스트가 여러 조각이면
   `accessibilityLabel` 병행**(025 교훈).
 - `disabledIndices`의 옵션은 press 무효.

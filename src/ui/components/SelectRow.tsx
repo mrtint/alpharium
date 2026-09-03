@@ -32,6 +32,14 @@ export type SelectRowProps = {
   onSelect: (index: number) => void;
   disabledIndices?: readonly number[];
   testID?: string;
+  /**
+   * 옵션별 `testID`를 직접 정한다 (기본은 `${testID}-option-${i}`).
+   *
+   * 032 이관에서 기존 화면들이 `vision-quick`·`geocoding-on`·`author-option-0`·
+   * `target-hour-7` 같은 고유 키를 이미 쓰고 있어, `SelectRow`로 바꿔도 그
+   * Maestro·테스트 키가 유지되도록 한다(SM 공통 원칙 — `testID` 불변).
+   */
+  optionTestID?: (index: number, option: SelectRowOption) => string | undefined;
 };
 
 const OPTION_STYLE: ViewStyle = {
@@ -52,6 +60,7 @@ export function SelectRow({
   onSelect,
   disabledIndices = [],
   testID,
+  optionTestID,
 }: SelectRowProps) {
   return (
     <View className="gap-2" style={{ gap: 8 }} testID={testID}>
@@ -59,6 +68,8 @@ export function SelectRow({
       {options.map((opt, index) => {
         const selected = index === selectedIndex;
         const disabled = disabledIndices.includes(index);
+        const rowTestID =
+          optionTestID?.(index, opt) ?? (testID ? `${testID}-option-${index}` : undefined);
         return (
           <Pressable
             accessibilityLabel={`${opt.label}${selected ? ", 선택됨" : ""}`}
@@ -72,7 +83,7 @@ export function SelectRow({
               selected ? { borderColor: COLORS.accent, borderWidth: 1 } : null,
               disabled ? { opacity: 0.5 } : null,
             ]}
-            testID={testID ? `${testID}-option-${index}` : undefined}
+            testID={rowTestID}
           >
             <View style={{ flex: 1, gap: 2 }}>
               <AppText variant="body">{opt.label}</AppText>

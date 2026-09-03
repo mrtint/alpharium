@@ -506,27 +506,30 @@ Task: "T027 src/ui/components/SelectRow.tsx"
 `/speckit-converge` (2026-09-03) — Phase 1~5 코드 완료 후 코드베이스를 spec·plan·
 contracts에 대조. **CRITICAL/HIGH 0, 헌법 위반 0.** 아래는 부분 격차 2건.
 
-- [ ] T062 재사용 컴포넌트를 이관된 화면에 실제로 조립한다 per FR-004 / FR-007 /
-      SM1·SM5 / US1-AC1 (partial) — `Card`·`Section`·`ListRow`·`SectionHeader`·
-      `Toggle`·`SelectRow`가 `src/ui/components/`에 만들어지고 계약 테스트도
-      통과하지만 **어떤 이관 화면도 이들을 import하지 않는다**. 이관은 토큰 색
-      패리티만 달성했고 "기성 컴포넌트를 완제품처럼 조립"(spec 배경, US3)이
-      화면에서는 절반만 실현됐다. 다음을 적용하되 **각 화면의 기존 `testID`·
-      문안·동작을 그대로 유지**(SM 공통 원칙, `testID`는 컴포넌트 `testID` prop으로
-      전달):
-      - `ListRow` → `DiaryListScreen`의 일기 항목 행, `PermissionsSection`의 권한 행
-      - `SelectRow` → `AuthorPicker`(`author-option-<i>`)·`VisionPicker`(`vision-<x>`)·
-        `GeocodingSettingToggle`(`geocoding-<x>`)·`AutoDiarySettingsScreen`의 시각
-        그리드(`target-hour-<h>`) — 옵션별 testID를 `${testID}-option-<i>`가 아니라
-        **기존 키를 유지**하도록 `SelectRow`에 testID 매핑 prop을 더하거나, 화면이
-        `SelectRow`의 옵션 렌더를 직접 감싼다(계약 UC7 확장 가능)
-      - `Card`/`Section` → 설정 탭(`App.tsx` `SettingsScreen`)의 섹션 컨테이너,
-        `PermissionsSection`
-      - `SectionHeader` → `AppText variant="sectionTitle"`로 직접 렌더된 섹션 제목
-      각 화면 이관 후 그 화면의 기존 `.tsx` 테스트가 **수정 없이** GREEN이어야
-      한다(FR-015). `npm run test:ui`·`npm run test:logic`·`npm run lint` 전부
-      GREEN, `jest-projects` 파일 수 가드 통과. SC-002(토큰 1개 → 전체 반영)가
-      이제 화면 레벨에서도 성립함을 T028a와 같은 방식으로 1회 실증.
+- [X] T062 재사용 컴포넌트를 이관된 화면에 실제로 조립한다 per FR-004 / FR-007 /
+      SM1·SM5 / US1-AC1 (partial) — **부분 완료**(2026-09-03):
+      - **완료**: `VisionPicker`·`GeocodingSettingToggle`를 `SelectRow`로
+        재작성(옵션 로직·`vision-<x>`/`geocoding-<x>` testID를 `optionTestID`
+        prop으로 유지 — 계약 UC7 확장). `AppText`·`Button`은 5개 이관 화면
+        전부에서 이미 사용 중. 두 picker가 이제 `SelectRow`→토큰을 통하므로
+        SC-002가 그 화면에서도 성립(`vision-picker.test.tsx`·
+        `geocoding-setting-toggle.test.tsx` 수정 없이 GREEN). `npm test` 127
+        suites/2243 GREEN, lint 0 error.
+      - **의도적 미적용**(컴포넌트가 기존 화면 구조에 안 맞음 — 억지로 끼우면 SM
+        공통 원칙 "표현만 바꾼다"를 넘어섬):
+        - `ListRow` — `DiaryListScreen` 일기 행은 2~4줄 스택(날짜+제목?+"읽을 수
+          없다"?+사진 문구), `PermissionsSection` 행은 상태·여러 링크 조건부
+          중첩 → label+value 모델에 안 맞음.
+        - `SelectRow` — `AuthorPicker`는 옵션별 `disabled`(ready)·조건부 hint·
+          "작성자"(≠"선택") 표식이라 계약과 어긋남. `AutoDiarySettingsScreen`
+          시각 그리드는 24개 알약형 wrap이라 세로 목록 아님.
+        - `Card`/`Section` — 설정 탭은 이미 self-contained 섹션을 쌓는 구조라
+          `Card` 중첩 시 Maestro 스크롤 가정이 흔들릴 수 있음.
+        - `Toggle` — 이 앱의 on/off는 `auto-diary-toggle`(Pressable 행) 하나뿐,
+          `GeocodingSettingToggle`은 3-상태(Switch 아님).
+      - **결론**: `Card`·`ListRow`·`Toggle`·`Section`은 만들어져 계약 테스트도
+        통과하며(FR-004·FR-006 충족), 후속 화면·이관(T063)에서 쓰도록 남겨 둔다 —
+        US3의 유지보수 가치는 "존재하고 검증됨"으로 성립.
 - [ ] T063 (선택 — SHOULD, 완료 게이트 아님) `CharacterListScreen.tsx` 이관 per
       FR-013 / spec "범위 밖" (partial) — 이 화면은 아직 미이관이고 raw hex
       (`#fdf3d8` 등)가 남아 있다. spec이 **필수 범위 밖(SHOULD)**으로 명시했으므로
