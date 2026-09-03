@@ -117,3 +117,22 @@ description: "Task list for One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-l
 ## MVP
 
 **US2(photo-location 제거)가 최소 MVP** — 새 설치 사용자가 온보딩에서 갇히는 것을 푸는 것이 가장 급하다. US1(다크 모드)은 그다음 P1이지만 `expo-system-ui` 설치·release 재확인이 붙어 사이클이 길다. 둘 다 P1이므로 한 브랜치에서 함께 머지하되, 급하면 US2만 먼저 뽑아낼 수 있다.
+
+---
+
+## Phase 6: Convergence
+
+**작성일**: 2026-09-03 (`/speckit-converge`)
+
+**전제**: T001~T020 + SplashScreen 수정(커밋 `03bb3e1`)까지 기기 없는 구현은 전부 완료·초록불(2168개 통과, lint·헌법 검사·prettier 클린). `styles.xml`에 `AppTheme`·`Theme.App.SplashScreen` 둘 다 `forceDarkAllowed=false` 생성 확인, `strings.xml`에 `expo_system_ui_user_interface_style=light` 확인. `decision.ts` 무변경 확인. `collect.ts`가 `locationPermission` 미호출 확인. `src/ui/`에 `useColorScheme`·`Appearance.` 참조 0건 확인.
+
+**남은 것은 전부 실기기 확인 공백이다 — 코드 공백이 아니다.** T021 1차 시도(SplashScreen 수정 전 APK)에서 S24U 배경이 `rgb(48,48,48)`로 반전되는 것을 관측 → plugin에 SplashScreen 분기 추가 → 재빌드까지 마쳤으나, 재빌드 도중 S24U(SM-S928N)가 연결이 끊겨 재빌드 APK를 설치·검증하지 못했다. 기존 T021~T028이 이 작업을 이미 담고 있으므로, 이 단계는 그 상태를 명시하고 SplashScreen 수정분에 대한 재검증을 못 박는다.
+
+- [ ] T029 [US1] SM-S928N(One UI 8.5) 재연결 후 **재빌드된 debug APK**(`android/app/build/outputs/apk/debug/app-debug.apk`, SplashScreen `forceDarkAllowed=false` 포함, 2026-09-03 재빌드)를 `adb install -r`로 설치하고 T021을 수행한다 — `cmd uimode night yes` → 6개 화면군 전부 밝은 배경 + 대비 확인, 특히 **배경이 `rgb(48,48,48)`이 아님**을 픽셀로 확인(1차 시도의 실패 지점), 2026-09-02 22:03·22:28 스크린샷과 대조, 끝나면 `cmd uimode night auto` 복원. per FR-001·SC-001, tasks T021 (partial — 기기 미확인)
+- [ ] T030 [US2] SM-S928N에서 T022를 수행한다 — 완전 새 설치 온보딩에서 사진 "모두 허용" 후 **다음 단계가 `onboarding-step-location`**(`onboarding-step-photo-location` 부재), 4단계 통과 후 에셋 다운로드 도달, 설정 "권한" 섹션 행 4개(`permission-row-photo-location` 부재). per FR-006·007·009·SC-002·003·005, tasks T022 (partial — 기기 미확인)
+- [ ] T031 [US2] SM-S928N에서 T023을 수행한다 — 사진 좌표 있는 하루 생성 → 위치 권한 허용 시 지명, `adb pm revoke ... ACCESS_FINE_LOCATION` 후 지명 없음, 031 수정 전과 동일. per FR-010·SC-006·OB7, tasks T023 (missing — 기기 미확인)
+- [ ] T032 연결된 기기에서 `node scripts/run-device-tests.mjs`로 T024를 수행한다 — `unified-permission-onboarding.yml`(4단계 갱신본) + 온보딩 거치는 회귀 흐름(`scheduled-diary-notification.yml`·`diary-photo-gallery.yml` 등) PASS. per FR-012·quickstart Maestro, tasks T024 (missing — 기기 미확인)
+- [ ] T033 [US1] SM-S928N에서 T025(release 재확인)를 수행한다 — `npx expo prebuild --platform android --clean` → 키 복사 → `NODE_ENV=production ./gradlew assembleRelease` → `apksigner verify --print-certs`(CN=alpharium) → 새 설치 → `cmd uimode night yes` → 온보딩·목록·상세 3화면 밝은 배경(`expo-system-ui`가 minify 생존) → `auto` 복원. per FR-001·spec Assumptions(release 재확인)·research R3, tasks T025 (missing — 기기 미확인)
+- [ ] T034 [P] SM-S901N(One UI 8 이하) 연결 시 T026(S22 회귀)을 수행한다 — 라이트 모드 6개 화면군이 031 전과 동일, 새 설치 온보딩 4단계 흐름 정상. per FR-013·SC-004, tasks T026 (missing — 기기 미연결)
+- [ ] T035 [US2] `.maestro/unified-permission-onboarding.yml`에 **사진 단계를 통과한 직후 `onboarding-step-location`이 보인다**는 긍정 assert를 추가하거나(현재는 `assertNotVisible: onboarding-step-photo-location`만 있음), 첫 단계가 기기 권한 상태에 따라 달라진다는 이유로 생략을 흐름 주석에 명시한다. per tasks T020(부분 미충족), (partial)
+- [ ] T036 T029~T034의 실기기 관측이 끝나면 `docs/roadmap/README.md`의 로드맵 20번에 "✅ 031에서 수정 (2026-09-03)" 결과 문단(무엇을 어떻게 고쳤는지 + 6화면 밝은 배경·온보딩 4단계·release 재확인 관측값 + 미확인 잔여)을 추가하고(T027), `specs/031-oneui85-fixes/quickstart.md` "완료 기준" 체크박스를 실측으로 채운다(T028). per tasks T027·T028 (partial — 실측 대기)
