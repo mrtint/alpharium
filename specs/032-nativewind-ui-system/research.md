@@ -34,6 +34,20 @@ release 재확인 불필요"로 결론냈으나 **틀렸다**. `nativewind@4.2.6
 재확인 1회 필요**(spec FR-017 정정, BC9 정정). gesture-handler·edge-to-edge·
 `@rn-primitives/*`는 여전히 배제(그건 컴포넌트 선택이지 NativeWind 요구가 아님).
 
+**⚠️ 2차 정정 (2026-09-03 실기기 검증에서 확정)**: `expo install`이 자동으로
+설치한 `reanimated@4.6.0` + `worklets@0.12.1`은 SDK 57에 대해 **너무 최신**이라
+`expo-modules-core@57.0.11`의 C++ (`WorkletJSCallInvoker.cpp`가 부르는
+`worklets::WorkletRuntime::executeSync`)와 심볼이 안 맞아 dev 네이티브 빌드가
+CMake 단계에서 `error: no member named 'executeSync'`로 깨졌다. `npm test`
+2243개는 통과(jest는 네이티브 미포함). 수정:
+`npx expo install react-native-reanimated --check`가 알려준 SDK 57 검증 조합대로
+`package.json`에 **명시 direct dependency 핀** — `react-native-reanimated: 4.5.1`
+(`worklets 0.10.x` peer, RN `0.83-0.86` → 우리 RN 0.86.2와 맞음),
+`react-native-worklets: 0.10.1`. 핀 후 재빌드 `BUILD SUCCESSFUL`, SM-S901N에서
+`libworklets.so` 로드·Fabric 활성·redbox 없음 확인. **교훈: `expo install
+<pkg>` 없이 npm 전이 설치에 맡기면 SDK가 검증하지 않은 최신 버전이 들어온다 —
+NativeWind처럼 Expo가 관리하지 않는 패키지가 네이티브 peer를 끌 때 특히 위험.**
+
 **Alternatives considered**:
 - **NativeWind v5(프리릴리스)**: 성능·API 개선이 있으나 프리릴리스라 회귀 위험.
   이 저장소는 안정 조합만 쓴다(헌법 「기술적 귀결」의 태도).

@@ -316,6 +316,29 @@ Phase로 배치한다(research R10).
   회귀를 보고, release 빌드 1회로 `llama.rn` 로드·앱 첫 렌더·`prod` 환경 표시가
   깨지지 않는지 확인한다. 다크 모드 관련 확인이 포함되므로 검증 기기는
   **SM-S928N (One UI 8.5)** 을 포함한다.
+  - **debug 실기기 검증 완료 (2026-09-03, SM-S901N / Galaxy S22, Android 16 /
+    SDK 36, dev debug)**: 5개 화면군(온보딩·목록·상세·설정·생성 중) + 덮어쓰기
+    확인 화면 전부 아이보리 톤 + 테라코타 액센트 + 토큰 색으로 렌더. `cmd uimode
+    night yes`로 기기 다크 모드를 켜도 앱 전 화면(목록·상세·설정·개발자 탭)이
+    라이트 고정 유지(031 방어 무손상). 025 사진 슬라이더(`1/7` + `photo-slider-*`
+    testID)·풀스크린 갤러리(검정 `PHOTO_VIEWER` 배경, 순환 없음, 뒤로가기 닫힘,
+    앱 종료 안 됨) 회귀 없음. 생성 중 화면에 진행률·경과 시간·생성 중 글 없음
+    (원칙 IV·FR-011). 미이관 개발자 탭(022 프롬프트 미리보기) 크래시 없이 렌더
+    (FR-012). NativeWind Metro transform 정상(1221 modules 번들, className→style),
+    quiet(금동이) 일기 생성 3회 완주(사진 없는 날 39·43초, 사진 3장 날 캡션 54초
+    + 작성 94초, VLM 캡션이 실제 재료로 반영됨). Maestro 회귀: skeleton·
+    diary-body-screen·diary-photo-gallery·prompt-preview·writing-flow-simplified·
+    generate-diary·diary-character-select·past-day-diary·today-diary·
+    writing-monologue·writing-monologue-expansion·diary-user-path·
+    photo-selection-over-limit(SEED_DAY 갱신 후)·unified-permission-onboarding
+    전부 통과.
+  - **미확인 잔여**: (1) **SM-S928N (One UI 8.5) 육안** — 다크 고정이 One UI
+    8.5의 강제 다크 위에서도 유지되는지는 S901N(One UI 7)에서만 봤다. (2)
+    **release 빌드 1회** — reanimated 4.5.1 / worklets 0.10.1 도입으로 R8·minify
+    (현재 android/gradle.properties에 미설정 → release도 minify OFF, 027 발견)
+    에서 worklet 플러그인·JNI 심볼이 깨지지 않는지, prod Metro 번들에서
+    className→style 변환이 실제로 동작하는지. 둘 다 하드웨어(S928N)·긴 빌드
+    필요.
 - **FR-018**: 기존 Maestro 흐름이 전환 후에도 통과해야 하며, 화면 요소를
   `id`/`testID`나 문안으로 찾는 기존 흐름이 깨지면 그 흐름을 함께 갱신한다
   (025·023이 겪은 stale Maestro 패턴 방지). 새 Maestro 흐름을 추가하면
@@ -390,6 +413,19 @@ Phase로 배치한다(research R10).
   선택이지 NativeWind 요구가 아님). `babel.config.js`는 `nativewind/babel` 프리셋을
   넣지 않고 `jsxImportSource`만 쓴다(그 프리셋이 `react-native-worklets/plugin`을
   끌어들여 jest를 깨뜨림 — 실측).
+- **reanimated는 SDK 57 정합 버전 4.5.1로 고정한다 (2026-09-03 실기기 검증에서
+  확정)**: `expo install`이 자동으로 설치한 `reanimated@4.6.0` + `worklets@0.12.1`은
+  너무 최신이라 `expo-modules-core@57.0.11`의 C++ (`WorkletJSCallInvoker.cpp`가
+  부르는 `worklets::WorkletRuntime::executeSync`)와 심볼이 안 맞아 **dev 네이티브
+  빌드가 CMake 단계에서 깨진다**. `npm test` 2243개는 통과했지만 jest는 네이티브를
+  안 타서 이 결함을 못 잡았다(원칙 V — jest 통과 ≠ 네이티브 빌드 통과). 수정:
+  `npx expo install react-native-reanimated --check`가 알려준 SDK 57 검증 조합대로
+  `package.json`에 **명시 direct dependency**로 핀 — `react-native-reanimated: 4.5.1`
+  (`worklets 0.10.x` peer, RN `0.83-0.86` 지원 → 우리 RN 0.86.2와 맞음),
+  `react-native-worklets: 0.10.1`. NativeWind가 4.6.0을 다시 끌어와도 npm이 이 핀을
+  우선한다. 핀 후 CMake 캐시 삭제 → 재빌드 `BUILD SUCCESSFUL`, SM-S901N에서
+  `libworklets.so` 로드·`REASharedTransitionBoundaryManager` 등록·Fabric 활성·
+  redbox 없음 확인.
 - **edge-to-edge는 후속으로 분리**: 20번 로드맵이 "11번에서 함께"로 미뤄 뒀으나,
   `react-native-edge-to-edge`는 release 재확인 트리거이고 현재 인셋 처리가 이미
   동작 중이라, 이 스펙은 유지만 하고 별도 스펙으로 넘긴다.

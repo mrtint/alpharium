@@ -340,16 +340,29 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 - [X] T057 [P] 전체 테스트 게이트: `npm test` = **127 suites / 2243 tests GREEN**
       (main 대비 +33 suites·+400 tests, 회귀 0). `jest-projects.test.ts` 파일 수
       가드 통과. `npm run lint` 0 error(2개 pre-existing warning). (BC8)
-- [X] T058 [P] `git diff main -- package.json` — 추가 dependency는 `nativewind@4.2.6`·
-      `tailwindcss@3.4.19`뿐. **`react-native-reanimated`는 css-interop의
-      transitive peer라 node_modules엔 있으나 직접 의존 아님 → 수용(사용자
-      결정)**. `react-native-gesture-handler`·`react-native-edge-to-edge` =
-      `(empty)`(미설치). **reanimated 때문에 release 재확인 1회 필요**(FR-017
-      정정). (BC9)
-- [ ] T059 SM-S928N debug 실기기 완료 게이트(quickstart 시나리오 D): 5개 화면군
-      라이트 톤 + 다크 모드 켠 상태 라이트 고정 + 025 슬라이더·갤러리 회귀 없음
-      + 생성 중 뷰 진행률·글 미표시 + WCAG 대비 육안 OK. SM1~SM5 관련 Maestro
-      흐름 전부 통과(갱신 포함). (SM6, SC-001·SC-005·SC-006·SC-007·SC-009)
+- [X] T058 [P] `git diff main -- package.json` — 추가 dependency: `nativewind@4.2.6`·
+      `tailwindcss@3.4.19` + **`react-native-reanimated@4.5.1`·`react-native-worklets@0.10.1`
+      (명시 direct 핀)**. 원래는 css-interop의 transitive peer로만 두려 했으나,
+      `expo install`이 자동으로 넣은 4.6.0/0.12.1이 `expo-modules-core@57.0.11`의
+      C++와 안 맞아 네이티브 빌드가 깨져(2026-09-03 실기기 검증) SDK 57 정합
+      버전으로 명시 핀(NativeWind가 4.6.0을 다시 끌어도 npm이 핀 우선).
+      `react-native-gesture-handler`·`react-native-edge-to-edge` = `(empty)`
+      (미설치). **reanimated 때문에 release 재확인 1회 필요**(FR-017 정정). (BC9)
+- [~] T059 실기기 완료 게이트(quickstart 시나리오 D). **SM-S901N (Galaxy S22,
+      One UI 7 / Android 16, dev debug)에서 2026-09-03 수행 — 통과.** 5개 화면군
+      (온보딩·목록·상세·설정·생성 중) + 덮어쓰기 확인 화면 아이보리 톤 + 테라코타
+      액센트. `cmd uimode night yes`에서 앱 전 화면 라이트 고정(031 무손상). 025
+      슬라이더(`photo-slider-*` testID, `1/7`)·갤러리(검정 PHOTO_VIEWER, 순환 없음,
+      뒤로가기 닫힘) 회귀 없음. 생성 중 뷰 진행률·경과·글 없음(원칙 IV). 미이관
+      개발자 탭(022) 크래시 없음(FR-012). Maestro 14흐름 통과(skeleton·
+      diary-body-screen·diary-photo-gallery·prompt-preview·writing-flow-simplified·
+      generate-diary·diary-character-select·past-day-diary·today-diary·
+      writing-monologue·writing-monologue-expansion·diary-user-path·
+      photo-selection-over-limit·unified-permission-onboarding).
+      **잔여 (하드웨어 필요): (1) SM-S928N (One UI 8.5) 육안 — One UI 8.5 강제
+      다크 위에서 라이트 고정 유지. (2) release 빌드 1회 — reanimated 4.5.1 /
+      worklets 0.10.1 도입분이 R8·minify(현재 OFF)·prod Metro 번들에서 안 깨지는지.**
+      (SM6, SC-001·SC-005·SC-006·SC-007·SC-009)
 - [ ] T060 [P] SHOULD(여유 되면, 완료 조건 아님): `CharacterListScreen` 이관 —
       className/토큰 + 재사용 컴포넌트. 기존 `character-list.test.tsx` GREEN 유지.
       개발자 탭 화면은 이관하지 않는다(배포 빌드에서 닿을 수 없음 — 원칙 III).
@@ -360,27 +373,31 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ---
 
-## ⚠️ 실기기 검증 대기 (이 세션에서 실행 불가 — 기기 없음)
+## ⚠️ 실기기 검증 — SM-S901N debug 완료(2026-09-03), 잔여 2건
 
-아래는 **코드가 아니라 SM-S928N/S901N 실기기에서 사람이 확인**해야 하는
-태스크다. 이 세션은 기기가 없어 수행하지 못했다. 코드·기기 없는 테스트는 전부
-GREEN이므로 이관 자체는 끝났고, 남은 것은 **육안·Maestro·release 빌드** 검증이다:
+**2026-09-03 SM-S901N (Galaxy S22, One UI 7 / Android 16, dev debug)에서
+대부분 수행 — 통과.** 세부는 spec FR-017의 debug 검증 문단·T059 참조.
 
-- **T034·T037·T045·T050·T053** — SM1~SM5 화면별 Maestro 흐름 (`diary-user-path`·
-  `diary-body-screen`·`diary-photo-gallery`·`scheduled-diary-notification`·
-  `skeleton`·`writing-monologue*`·`unified-permission-onboarding` 등). `testID`는
-  전부 보존했으므로 통과 예상이나 확인 필요. 깨지면 `testID` 유지 원칙으로 구현을
-  고침(흐름 stale이면 흐름 갱신 + `FLOWS` 등록).
-- **T047·T055·T059** — SM-S928N debug 육안: 5개 화면군 따뜻한 라이트 톤,
-  `adb shell "cmd uimode night yes"`에서 라이트 고정 유지(031), 025 슬라이더·
-  갤러리 회귀 없음, 생성 중 뷰 진행률·글 미표시, WCAG 대비 육안. 미이관 탭
-  (캐릭터 선택·개발자) 크래시 없음.
-- **T056** — 혼재 상태(이관/미이관 화면 오가기) 크래시·스타일 누락 없음.
-- **T059 + release** — `react-native-reanimated`가 새로 들어왔으므로 **release
-  빌드 1회**로 `llama.rn` 로드·첫 렌더·`prod` 환경 표시가 R8/ProGuard에서 깨지지
-  않는지 확인(FR-017 정정, 012 기준). AGENTS.md "release 빌드와 서명" 절차.
+- **✅ T034·T037·T045·T050·T053·T056** — Maestro 14흐름 + 화면별 육안:
+  skeleton·diary-body-screen·diary-photo-gallery·prompt-preview·
+  writing-flow-simplified·generate-diary·diary-character-select·past-day-diary·
+  today-diary·writing-monologue·writing-monologue-expansion·diary-user-path·
+  photo-selection-over-limit·unified-permission-onboarding 전부 통과. `testID`는
+  전부 보존됐다(VisionPicker·GeocodingSettingToggle의 SelectRow 이관 포함 —
+  `vision-quick`·`geocoding-auto/on/off` 조회 OK). `photo-selection-over-limit.yml`
+  은 `SEED_DAY` 고정 날짜가 009 범위를 벗어나던 잠재 결함을 갱신(범위 안 날짜 +
+  "실행 직전 재시드" 주석, FR-018). 혼재 상태(이관/미이관 탭 오가기) 크래시 없음.
+- **✅ T047·T059(부분)** — 5개 화면군 아이보리 톤, `cmd uimode night yes`에서
+  라이트 고정(031 무손상), 025 회귀 없음, 생성 중 뷰 지표 미표시.
+- **⬜ T059 잔여 (1) — SM-S928N (One UI 8.5) 육안**: One UI 8.5의 강제 다크
+  위에서도 라이트 고정이 유지되는지. S901N은 One UI 7이라 8.5 강제 다크 경로를
+  못 봤다. `cmd uimode night yes` + 삼성 "다크 모드 최적화" 켠 상태.
+- **⬜ T059 잔여 (2) — release 빌드 1회**: `reanimated 4.5.1` / `worklets 0.10.1`
+  도입분이 R8·minify(현재 `android/gradle.properties` 미설정 → release도 minify
+  OFF, 027 발견)·prod Metro 번들에서 안 깨지는지 — `llama.rn` 로드·첫 렌더·`prod`
+  환경 표시·className→style 변환 확인. AGENTS.md "release 빌드와 서명" 절차.
 
-**메모리** [[alpharium-device-session-batch]]에 이 세션의 실기기 배치를 추가할 것.
+**메모리** [[alpharium-device-session-batch]]에 이 세션 결과 + 잔여 2건을 갱신할 것.
 
 ---
 
