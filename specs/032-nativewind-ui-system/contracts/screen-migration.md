@@ -8,8 +8,17 @@
 
 **공통 원칙 (모든 이관 화면)**:
 - 기존 `testID`·`accessibilityRole`·화면 문안(사용자가 읽는 한국어) **문자
-  그대로 유지**. 스타일(`style`→`className`)만 교체.
-- 새 `className`은 토큰 유래 클래스만(원시 hex·매직 px 제거 — SC-001).
+  그대로 유지**. 스타일만 교체.
+- **"className + 토큰 style 병행" 패턴** (2026-09-03 구현 중 확정): NativeWind의
+  `className`→`style` 변환은 Metro 번들 시점이라 **jest에는 없다**. 그래서 각
+  요소에 (1) `className`(토큰 유래 클래스 — 실기기 스타일) + (2) 인라인 `style`
+  (`tokens.ts`의 `COLORS.*`·`RADIUS.*` 참조 — jest·초기 렌더·정확성)을 **둘 다**
+  준다. 인라인 `style`의 숫자는 레이아웃 관용값(padding·gap·`0.5` hairline)만
+  허용하고 **색은 반드시 `COLORS.*`**(원시 hex 리터럴 0 — SC-001). `AppText`·
+  `Button` 등 재사용 컴포넌트가 이 병행을 이미 내부에서 하므로, 그것들로 바꾼
+  자리는 화면 코드가 색·타이포를 안 만진다.
+- SC-001의 "원시 색값 0"은 **`#rrggbb` 리터럴이 화면 소스에 없다**는 뜻 —
+  `COLORS.border` 같은 토큰 참조는 위반이 아니다.
 - `checkSourceFile` 위반 0 (모델·프롬프트·지표·색 스킴).
 - 그 화면의 기존 `__tests__/ui/*.test.tsx`가 **초록** (FR-015).
 - 그 화면을 건드리는 Maestro 흐름을 실기기에서 1회 돌린다(FR-018). 깨지면

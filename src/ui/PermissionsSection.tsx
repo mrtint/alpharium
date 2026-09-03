@@ -20,8 +20,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
+import { AppState, Pressable, StyleSheet, View } from "react-native";
 
+import { AppText } from "./components/Text";
+import { COLORS } from "./theme/tokens";
 import { describePhotoAccessLimit } from "../onboarding/decision";
 import type { OnboardingPorts } from "./OnboardingScreen";
 import type { PermissionKey, PermissionRequirement } from "../onboarding/requirements";
@@ -133,10 +135,10 @@ export function PermissionsSection({
 
   return (
     <View style={styles.section} testID="permissions-section">
-      <Text style={styles.title}>권한</Text>
+      <AppText variant="sectionTitle">권한</AppText>
 
       {states === null ? (
-        <Text style={styles.hint}>확인 중…</Text>
+        <AppText variant="caption">확인 중…</AppText>
       ) : (
         rows.map((req) => {
           const state = states[req.key];
@@ -152,21 +154,21 @@ export function PermissionsSection({
 
           return (
             <View key={req.key} style={styles.row} testID={`permission-row-${req.key}`}>
-              <Text style={styles.name}>{req.rationale}</Text>
+              <AppText variant="body">{req.rationale}</AppText>
               {!isBattery && state !== "unknown" && (
-                <Text style={styles.state}>{describe(state)}</Text>
+                <AppText variant="caption">{describe(state)}</AppText>
               )}
 
               {isBattery && (
                 <>
-                  <Text style={styles.hint}>{req.ifDenied}</Text>
+                  <AppText variant="caption">{req.ifDenied}</AppText>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void openSettings("battery-exception")}
                     style={styles.link}
                     testID="permission-battery-open-settings"
                   >
-                    <Text style={styles.linkText}>배터리 예외 설정</Text>
+                    <AppText variant="caption">배터리 예외 설정</AppText>
                   </Pressable>
                 </>
               )}
@@ -178,7 +180,7 @@ export function PermissionsSection({
                   style={styles.link}
                   testID={`permission-${req.key}-request`}
                 >
-                  <Text style={styles.linkText}>허용</Text>
+                  <AppText variant="caption">허용</AppText>
                 </Pressable>
               )}
 
@@ -189,20 +191,20 @@ export function PermissionsSection({
                   style={styles.link}
                   testID={`permission-${req.key}-open-settings`}
                 >
-                  <Text style={styles.linkText}>설정 열기</Text>
+                  <AppText variant="caption">설정 열기</AppText>
                 </Pressable>
               )}
 
               {!isBattery && showFullAccessLink && (
                 <>
-                  <Text style={styles.hint}>그날의 사진 전부를 보지 못할 수 있어요.</Text>
+                  <AppText variant="caption">그날의 사진 전부를 보지 못할 수 있어요.</AppText>
                   <Pressable
                     accessibilityRole="button"
                     onPress={() => void openSettings(req.key)}
                     style={styles.link}
                     testID={`permission-${req.key}-open-settings`}
                   >
-                    <Text style={styles.linkText}>전체 허용</Text>
+                    <AppText variant="caption">전체 허용</AppText>
                   </Pressable>
                 </>
               )}
@@ -217,25 +219,22 @@ export function PermissionsSection({
         style={styles.link}
         testID="permission-restart-onboarding"
       >
-        <Text style={styles.linkText}>권한 안내 다시 보기</Text>
+        <AppText variant="caption">권한 안내 다시 보기</AppText>
       </Pressable>
     </View>
   );
 }
 
+// 032 — 색은 tokens.ts에서. 5행 라이브 상태·OS 링크·복귀 갱신·testID 불변(SM5).
 const styles = StyleSheet.create({
   section: { padding: 20, gap: 14 },
-  title: { fontSize: 15, fontWeight: "600" },
   row: { gap: 4 },
-  name: { fontSize: 14, lineHeight: 20 },
-  state: { fontSize: 13, opacity: 0.7 },
-  hint: { fontSize: 12, opacity: 0.6, lineHeight: 18 },
   link: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderWidth: 1,
+    borderColor: COLORS.border,
     borderRadius: 6,
     alignSelf: "flex-start",
   },
-  linkText: { fontSize: 13 },
 });

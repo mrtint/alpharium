@@ -13,9 +13,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { GeocodingPreference } from "../app/geocoding-setting-store";
+import { AppText } from "./components/Text";
+import { COLORS, RADIUS } from "./theme/tokens";
 
 /** 029 — 3-상태. "자동"이 기본. */
 const OPTIONS: readonly { mode: GeocodingPreference; name: string; hint: string }[] = [
@@ -33,7 +35,7 @@ export type GeocodingSettingToggleProps = {
 export function GeocodingSettingToggle({ mode, onSelect }: GeocodingSettingToggleProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>장소 이름으로 보기</Text>
+      <AppText variant="sectionTitle">장소 이름으로 보기</AppText>
       {OPTIONS.map((opt) => {
         const isSelected = opt.mode === mode;
         return (
@@ -46,23 +48,31 @@ export function GeocodingSettingToggle({ mode, onSelect }: GeocodingSettingToggl
             testID={`geocoding-${opt.mode}`}
           >
             <View style={styles.info}>
-              <Text style={styles.name}>{opt.name}</Text>
-              <Text style={styles.hint}>{opt.hint}</Text>
+              <AppText variant="body">{opt.name}</AppText>
+              <AppText variant="caption">{opt.hint}</AppText>
             </View>
-            {isSelected && <Text style={styles.mark}>선택</Text>}
+            {isSelected && (
+              <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+                선택
+              </AppText>
+            )}
           </Pressable>
         );
       })}
 
       {/* L8, FR-006 — 켤 때(또는 자동일 때) 고지 문구. */}
-      {mode !== "off" && <Text style={styles.notice}>좌표를 기기의 지도 서비스에 물어봅니다.</Text>}
+      {mode !== "off" && (
+        <AppText variant="caption" style={{ paddingHorizontal: 4 }}>
+          좌표를 기기의 지도 서비스에 물어봅니다.
+        </AppText>
+      )}
     </View>
   );
 }
 
+// 032 — 색은 tokens.ts에서. 구조·testID·문안 불변(SM5).
 const styles = StyleSheet.create({
   container: { gap: 6 },
-  title: { fontSize: 16, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -70,13 +80,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.card,
   },
-  rowSelected: { borderColor: "#333", borderWidth: 1 },
+  rowSelected: { borderColor: COLORS.accent, borderWidth: 1 },
   info: { flex: 1, gap: 2 },
-  name: { fontSize: 15 },
-  hint: { fontSize: 13, opacity: 0.7 },
-  mark: { fontSize: 13, fontWeight: "600" },
-  notice: { fontSize: 12, opacity: 0.6, paddingHorizontal: 4 },
 });

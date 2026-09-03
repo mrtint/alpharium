@@ -18,9 +18,11 @@
  * 달라지는가」다 — 전자는 모델 설정이고 사용자가 판단할 수 없는 값이다.
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { VisionPreference } from "../app/vision-setting-store";
+import { AppText } from "./components/Text";
+import { COLORS, RADIUS } from "./theme/tokens";
 
 /** 029 — "자동"이 앞에 온다. 나머지 셋은 011의 VISION_SETTINGS 순서. */
 const OPTIONS: readonly VisionPreference[] = ["auto", "none", "quick", "detailed"];
@@ -66,7 +68,7 @@ const LABELS: Readonly<Record<VisionPreference, { name: string; hint: string }>>
 export function VisionPicker({ selected, onSelect }: VisionPickerProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>사진을 어떻게 볼까</Text>
+      <AppText variant="sectionTitle">사진을 어떻게 볼까</AppText>
 
       {OPTIONS.map((setting) => {
         const isSelected = setting === selected;
@@ -84,11 +86,15 @@ export function VisionPicker({ selected, onSelect }: VisionPickerProps) {
             testID={`vision-${setting}`}
           >
             <View style={styles.info}>
-              <Text style={styles.name}>{name}</Text>
-              <Text style={styles.hint}>{hint}</Text>
+              <AppText variant="body">{name}</AppText>
+              <AppText variant="caption">{hint}</AppText>
             </View>
 
-            {isSelected && <Text style={styles.mark}>선택</Text>}
+            {isSelected && (
+              <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+                선택
+              </AppText>
+            )}
           </Pressable>
         );
       })}
@@ -96,9 +102,9 @@ export function VisionPicker({ selected, onSelect }: VisionPickerProps) {
   );
 }
 
+// 032 — 색은 tokens.ts에서. 구조·testID·문안 불변(SM5).
 const styles = StyleSheet.create({
   container: { gap: 8 },
-  title: { fontSize: 16, fontWeight: "600" },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -106,12 +112,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 12,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 8,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.card,
   },
-  rowSelected: { borderColor: "#333", borderWidth: 1 },
+  rowSelected: { borderColor: COLORS.accent, borderWidth: 1 },
   info: { flex: 1, gap: 2 },
-  name: { fontSize: 15 },
-  hint: { fontSize: 13, opacity: 0.7 },
-  mark: { fontSize: 13, fontWeight: "600" },
 });

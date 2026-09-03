@@ -189,14 +189,14 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US1-a: `DiaryListScreen` 이관 (contracts/screen-migration.md SM1)
 
-- [ ] T032 [US1] `src/ui/DiaryListScreen.tsx` 이관 — `StyleSheet.create`/인라인
+- [X] T032 [US1] `src/ui/DiaryListScreen.tsx` 이관 — `StyleSheet.create`/인라인
       `style`를 `className`(토큰 클래스) + 재사용 컴포넌트(`ListRow` for 일기
       항목, `Button` for "일기 쓰기", `AppText`)로 교체. **불변**: `onWrite`
       인자 없음, 사진 갈래 3문구(`"사진 N장"`/`"사진 없음"`/`"사진 모름"`),
       빈 상태 문구, `testID`(`denied-notices`·`day-<date>`), 날짜 `YYYY-MM-DD`,
       모델·지표 미노출, 고르는 자리 사진 갈래 미표시, `movedNotice`/`revertedFrom`
       문자열만. (SM1)
-- [ ] T033 [US1] `npm run test:ui`에서 `__tests__/ui/diary-list.test.tsx` 전부
+- [X] T033 [US1] `npm run test:ui`에서 `__tests__/ui/diary-list.test.tsx` 전부
       GREEN(수정 없이 — FR-015). 원시 hex·`style={{` 잔존 0 확인
       (`grep -nE '#[0-9A-Fa-f]{6}|style=\{\{' src/ui/DiaryListScreen.tsx` →
       `hairlineWidth`/flex 관용값만).
@@ -207,7 +207,7 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US1-b: `DiaryDetailScreen` 이관 (contracts/screen-migration.md SM2)
 
-- [ ] T035 [US1] `src/ui/DiaryDetailScreen.tsx` 이관 — className + 재사용
+- [X] T035 [US1] `src/ui/DiaryDetailScreen.tsx` 이관 — className + 재사용
       컴포넌트로 교체하되 **025 슬라이더·갤러리 구조는 건드리지 않는다**:
       `photo-slider-pager`/`photo-slider-cell-<i>`/`photo-slider-position`
       (`N / M` + `accessibilityLabel`), 갤러리 `Modal`(RN 코어)·`photo-gallery-*`·
@@ -216,7 +216,7 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
       `diary-photo-missing` + "이 사진은 이제 없다", `diary-photo` testID 유지.
       제목·본문·"이 일기가 본 것" 절 문안 유지. 사후 소요시간 표기 규칙 불변
       (원칙 IV 1.2.0). (SM2)
-- [ ] T036 [US1] `npm run test:ui`에서 `__tests__/ui/diary-detail.test.tsx`·
+- [X] T036 [US1] `npm run test:ui`에서 `__tests__/ui/diary-detail.test.tsx`·
       `__tests__/ui/photo-gallery.test.tsx` 전부 GREEN(수정 없이). 원시 hex·
       `style={{` 잔존 0 확인.
 - [ ] T037 [US1] Maestro: `.maestro/diary-body-screen.yml`·`diary-photo-gallery.yml`
@@ -227,28 +227,28 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US1-c: 설정 탭 조립 이관 (contracts/screen-migration.md SM5)
 
-- [ ] T038 [P] [US1] `src/ui/AuthorPicker.tsx` 이관 — `SelectRow` 재사용(또는
+- [X] T038 [P] [US1] `src/ui/AuthorPicker.tsx` 이관 — `SelectRow` 재사용(또는
       className만). **불변**: persona 이름·소개·준비 여부만(원칙 III, `roster`·
       모델 식별자 미접촉), `author-picker`/`author-option-<i>` testID를 `SelectRow`
       `testID` prop으로 전달해 유지. (SM5)
-- [ ] T039 [P] [US1] `src/ui/GeocodingSettingToggle.tsx` 이관 — `Toggle`(또는
+- [X] T039 [P] [US1] `src/ui/GeocodingSettingToggle.tsx` 이관 — `Toggle`(또는
       `SelectRow` 3-way면 `SelectRow`) 재사용. 기존 동작·`testID` 유지. (SM5)
-- [ ] T040 [P] [US1] `src/ui/VisionPicker.tsx` 이관 — `SelectRow` 재사용. 4-way
+- [X] T040 [P] [US1] `src/ui/VisionPicker.tsx` 이관 — `SelectRow` 재사용. 4-way
       (자동/보지 않음/빠르게 봄/자세히 봄) 옵션·기존 `testID` 유지. (SM5)
-- [ ] T041 [P] [US1] `src/ui/AutoDiarySettingsScreen.tsx` 이관 — `Card`/`Section`·
+- [X] T041 [P] [US1] `src/ui/AutoDiarySettingsScreen.tsx` 이관 — `Card`/`Section`·
       `ListRow`·`SelectRow`(자동 생성 시각 0–23)·`Toggle`(enabled)로 교체.
       **불변**: 시각은 시 단위만, "정각"·"매일 7시" 정밀도 암시 문구 없음(020),
       기존 `testID`. (SM5)
-- [ ] T042 [P] [US1] `src/ui/PermissionsSection.tsx` 이관 — `Card`/`ListRow`·
+- [X] T042 [P] [US1] `src/ui/PermissionsSection.tsx` 이관 — `Card`/`ListRow`·
       `Button`(OS 링크)로 교체. **불변**: 5행 라이브 상태, OS 링크, `AppState`
       `change→active` 복귀 갱신(021 SC-006), 031이 뺀 `photo-location` 행 없음,
       기존 `testID`. (SM5)
-- [ ] T043 [US1] `App.tsx`의 설정 탭 조립부(`SettingsScreen`/`AutoDiarySection`
+- [X] T043 [US1] `App.tsx`의 설정 탭 조립부(`SettingsScreen`/`AutoDiarySection`
       함수) + 탭바 스타일(`styles.tab`/`tabOn`/`tabOff`)을 className/토큰으로
       교체. **불변**: 탭 라벨("일기"/"설정"/"개발자")·`setTab` 동작, 개발자 탭
       노출 조건(`showsDiagnostics` — prod 없음), 흐름·탭 구조(029, FR-021).
       `global.css` import(T005)는 그대로. (SM5)
-- [ ] T044 [US1] `npm run test:ui`에서 `auto-diary-settings-screen`·
+- [X] T044 [US1] `npm run test:ui`에서 `auto-diary-settings-screen`·
       `permissions-section`·`author-picker`·`vision-picker`·
       `geocoding-setting-toggle` 테스트 전부 GREEN(수정 없이). 5개 파일 + App.tsx
       설정부에 원시 hex·`style={{` 잔존 0.
@@ -258,7 +258,7 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 
 ### US1 통합 검증
 
-- [ ] T046 [US1] `npm run lint` GREEN(eslint + tsc + `check:constitution` 위반 0
+- [X] T046 [US1] `npm run lint` GREEN(eslint + tsc + `check:constitution` 위반 0
       + prettier). `check:constitution`가 이관된 목록·상세·설정에서 모델·프롬프트·
       지표·색 스킴 위반 0.
 - [ ] T047 [US1] SM-S928N debug 실기기 육안(quickstart 시나리오 B 4): 목록·상세·

@@ -3,7 +3,7 @@
 import "./global.css";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AppState, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
@@ -41,6 +41,8 @@ import { PERMISSION_REQUIREMENTS } from "./src/onboarding/requirements";
 import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
 import { PermissionsSection } from "./src/ui/PermissionsSection";
+import { AppText } from "./src/ui/components/Text";
+import { COLORS } from "./src/ui/theme/tokens";
 import {
   expoGeocodingSettingPort,
   loadGeocodingSetting,
@@ -387,9 +389,11 @@ function AppFrame() {
     // `edges`를 적어 둔다 — 기본값은 네 변 전부이며, 무엇을 피하는지가 코드에 보이는
     // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-      <View style={styles.tabs}>
+      <View className="flex-row border-b border-border" style={styles.tabs}>
         <Pressable accessibilityRole="button" onPress={() => setTab("diary")} style={styles.tab}>
-          <Text style={tab === "diary" ? styles.tabOn : styles.tabOff}>일기</Text>
+          <AppText variant="body" style={tab === "diary" ? styles.tabOn : styles.tabOff}>
+            일기
+          </AppText>
         </Pressable>
         {/*
           020 — 자동 생성 설정 탭. **개발자 탭과 달리 prod에도 있다**(FR-001).
@@ -397,7 +401,9 @@ function AppFrame() {
           이 탭으로 흡수됐다(Q1=A).
         */}
         <Pressable accessibilityRole="button" onPress={() => setTab("settings")} style={styles.tab}>
-          <Text style={tab === "settings" ? styles.tabOn : styles.tabOff}>설정</Text>
+          <AppText variant="body" style={tab === "settings" ? styles.tabOn : styles.tabOff}>
+            설정
+          </AppText>
         </Pressable>
         {/*
           **개발자 탭은 진단과 같은 조건으로 존재 자체가 사라진다**(FR-024·SC-013을
@@ -410,7 +416,9 @@ function AppFrame() {
             onPress={() => setTab("developer")}
             style={styles.tab}
           >
-            <Text style={tab === "developer" ? styles.tabOn : styles.tabOff}>개발자</Text>
+            <AppText variant="body" style={tab === "developer" ? styles.tabOn : styles.tabOff}>
+              개발자
+            </AppText>
           </Pressable>
         )}
       </View>
@@ -935,7 +943,7 @@ function ModelSection(props: ModelSectionProps) {
   if (readiness === null) {
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.title}>캐릭터 상태를 읽는 중…</Text>
+        <AppText variant="bodyStrong">캐릭터 상태를 읽는 중…</AppText>
       </View>
     );
   }
@@ -1119,7 +1127,7 @@ function AutoDiarySection({
   if (settings === null) {
     return (
       <View style={styles.placeholder}>
-        <Text style={styles.title}>설정을 읽는 중…</Text>
+        <AppText variant="bodyStrong">설정을 읽는 중…</AppText>
       </View>
     );
   }
@@ -1175,6 +1183,8 @@ function AutoDiarySection({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    // 032 — 앱 전체의 따뜻한 라이트 바탕. 개별 화면이 같은 색을 다시 칠해도 무해.
+    backgroundColor: COLORS.bg,
   },
   // 이전에는 탭 위에 얹힌 작은 창이라 `maxHeight`가 있었다(260). 이제 개발자
   // 탭이 다른 두 탭과 같은 자격으로 화면 전체를 쓰므로 그 제약이 없다.
@@ -1182,17 +1192,15 @@ const styles = StyleSheet.create({
   tabs: {
     flexDirection: "row",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ccc",
+    borderBottomColor: COLORS.border,
   },
   tab: { paddingVertical: 12, paddingHorizontal: 20 },
-  tabOn: { fontSize: 15, fontWeight: "600" },
-  tabOff: { fontSize: 15, opacity: 0.5 },
+  // 032 — 선택된 탭은 굵게, 안 된 탭은 흐리게. AppText body 위에 얹는다.
+  tabOn: { fontWeight: "600" },
+  tabOff: { opacity: 0.5 },
   placeholder: {
     padding: 24,
     alignItems: "center",
-  },
-  title: {
-    fontSize: 16,
   },
   settingsPage: { gap: 20, paddingBottom: 24 },
 });
