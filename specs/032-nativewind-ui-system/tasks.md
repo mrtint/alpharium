@@ -74,26 +74,26 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
 **Purpose**: `tokens.ts` 단일 출처 + `tailwind.config.js` 연결. 컴포넌트·화면
 이관 전부의 전제. **⚠️ 이 phase 완료 전에는 컴포넌트/화면 작업 불가.**
 
-- [ ] T008 [P] `__tests__/theme-tokens.test.ts` 작성(먼저, FAIL 확인) — jest
+- [X] T008 [P] `__tests__/theme-tokens.test.ts` 작성(먼저, FAIL 확인) — jest
       `logic`. 검사: `COLORS` 9키(`bg`·`surface`·`border`·`text`·`textMuted`·
       `accent`·`accentForeground`·`danger`·`dangerForeground`) 존재·hex 문자열·
       `readonly`(DT1); `RADIUS`·`TYPE` 구조(DT2); `contrastRatio` 순수 함수
       경계값(DT3); WCAG AA 쌍 6개 ≥ 목표(DT4); `tailwind.config.js` 색 키 ==
       `COLORS` 키(DT5); `COLORS_DARK`·색 스킴 분기 없음(DT6). (contracts/design-tokens.md)
-- [ ] T009 `src/ui/theme/tokens.ts` 생성 — `COLORS`(라이트 값만, `as const`),
+- [X] T009 `src/ui/theme/tokens.ts` 생성 — `COLORS`(라이트 값만, `as const`),
       `RADIUS`, `TYPE`(시스템 서체 — `fontFamily` 없음), `contrastRatio(a,b)`
       순수 함수. 색 값은 data-model.md §1.1의 방향 예시에서 시작하되
       `contrastRatio`로 6쌍이 목표(text/bg·text/surface·textMuted/bg·
       accentForeground/accent·dangerForeground/danger ≥ 4.5, danger/bg ≥ 3.0)를
       넘도록 조정. **1패스로 확정 — 반복 미세조정 금지**(헌법 개발 방식).
-- [ ] T010 저장소 루트에 `tailwind.config.js` 생성 — `require("./src/ui/theme/tokens")`로
+- [X] T010 저장소 루트에 `tailwind.config.js` 생성 — `require("./src/ui/theme/tokens")`로
       `theme.extend.colors`/`borderRadius`/`fontSize` 구성(값 하드코딩 금지 —
       단일 출처, 018 교훈), `presets: [require("nativewind/preset")]`,
       `darkMode: "class"`, `content: ["./App.tsx", "./src/**/*.{ts,tsx}"]`
       (contracts/build-config.md BC5·BC6, contracts/design-tokens.md DT5).
-- [ ] T011 T008 재실행 — `npm run test:logic`에서 `theme-tokens.test.ts` 전부
+- [X] T011 T008 재실행 — `npm run test:logic`에서 `theme-tokens.test.ts` 전부
       GREEN. 기존 logic 테스트 개수 이상 통과(회귀 0 — contracts/build-config.md BC8).
-- [ ] T012 위반 주입 검증: `tokens.ts`의 `COLORS`를 `let`으로 / `text`를 밝은
+- [X] T012 위반 주입 검증: `tokens.ts`의 `COLORS`를 `let`으로 / `text`를 밝은
       회색으로 / `tailwind.config.js`에 하드코딩 hex 추가 — 각각 T008이 FAIL함을
       확인 후 되돌린다(007~014 관례).
 
