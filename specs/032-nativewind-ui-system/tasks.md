@@ -498,3 +498,39 @@ Task: "T027 src/ui/components/SelectRow.tsx"
 - Metro 설정 변경 후 첫 실행은 `npx expo start --clear`(AGENTS.md).
 - 미확인으로 남길 수 있는 것: 회전 시 동작(`orientation: "portrait"` 고정 —
   016·025 계열), iOS 표시(Android 전용 검증).
+
+---
+
+## Phase 7: Convergence
+
+`/speckit-converge` (2026-09-03) — Phase 1~5 코드 완료 후 코드베이스를 spec·plan·
+contracts에 대조. **CRITICAL/HIGH 0, 헌법 위반 0.** 아래는 부분 격차 2건.
+
+- [ ] T062 재사용 컴포넌트를 이관된 화면에 실제로 조립한다 per FR-004 / FR-007 /
+      SM1·SM5 / US1-AC1 (partial) — `Card`·`Section`·`ListRow`·`SectionHeader`·
+      `Toggle`·`SelectRow`가 `src/ui/components/`에 만들어지고 계약 테스트도
+      통과하지만 **어떤 이관 화면도 이들을 import하지 않는다**. 이관은 토큰 색
+      패리티만 달성했고 "기성 컴포넌트를 완제품처럼 조립"(spec 배경, US3)이
+      화면에서는 절반만 실현됐다. 다음을 적용하되 **각 화면의 기존 `testID`·
+      문안·동작을 그대로 유지**(SM 공통 원칙, `testID`는 컴포넌트 `testID` prop으로
+      전달):
+      - `ListRow` → `DiaryListScreen`의 일기 항목 행, `PermissionsSection`의 권한 행
+      - `SelectRow` → `AuthorPicker`(`author-option-<i>`)·`VisionPicker`(`vision-<x>`)·
+        `GeocodingSettingToggle`(`geocoding-<x>`)·`AutoDiarySettingsScreen`의 시각
+        그리드(`target-hour-<h>`) — 옵션별 testID를 `${testID}-option-<i>`가 아니라
+        **기존 키를 유지**하도록 `SelectRow`에 testID 매핑 prop을 더하거나, 화면이
+        `SelectRow`의 옵션 렌더를 직접 감싼다(계약 UC7 확장 가능)
+      - `Card`/`Section` → 설정 탭(`App.tsx` `SettingsScreen`)의 섹션 컨테이너,
+        `PermissionsSection`
+      - `SectionHeader` → `AppText variant="sectionTitle"`로 직접 렌더된 섹션 제목
+      각 화면 이관 후 그 화면의 기존 `.tsx` 테스트가 **수정 없이** GREEN이어야
+      한다(FR-015). `npm run test:ui`·`npm run test:logic`·`npm run lint` 전부
+      GREEN, `jest-projects` 파일 수 가드 통과. SC-002(토큰 1개 → 전체 반영)가
+      이제 화면 레벨에서도 성립함을 T028a와 같은 방식으로 1회 실증.
+- [ ] T063 (선택 — SHOULD, 완료 게이트 아님) `CharacterListScreen.tsx` 이관 per
+      FR-013 / spec "범위 밖" (partial) — 이 화면은 아직 미이관이고 raw hex
+      (`#fdf3d8` 등)가 남아 있다. spec이 **필수 범위 밖(SHOULD)**으로 명시했으므로
+      (FR-012·FR-013) 이 스펙의 "완료"를 막지 않는다. 여유가 되면 토큰 + `AppText`·
+      `Button`·`ListRow`로 이관하고 `character-list.test.tsx`를 수정 없이 GREEN으로
+      유지한다. 개발자 탭 화면(`DiagnosticsScreen` 등)은 이관하지 않는다(배포
+      빌드에서 닿을 수 없음 — 원칙 III).
