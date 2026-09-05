@@ -17,16 +17,17 @@
 - [x] **사진 분석 수량 상한 측정 및 확장** (023 — 5 → 8장, 시간 제약)
 - [x] **일기 본문 사진 슬라이드 및 갤러리 뷰 개선** (025 — 가로 슬라이더 + 풀스크린 갤러리, 코어 RN만)
 - [x] **LLM 모델 다운로드 속도 개선** (026 — 여러 캐릭터 동시 + 한 파일 세그먼트 병렬 + 폴백 + 세그먼트 이어받기)
-- [ ] **NativeWind 및 React Native Reusables 기반 미니멀 UI 시스템 도입**
+- [x] **NativeWind 및 React Native Reusables 기반 미니멀 UI 시스템 도입** (032 — 디자인 토큰·재사용 컴포넌트 7종·핵심 화면 5개 이관, 라이트 고정 유지. reanimated는 NativeWind의 peer dep으로 들어왔으나 아직 실제로 쓰이진 않음. SM-S928N 육안·release 재확인·`CharacterListScreen` 이관[T063]은 21번으로 이월)
 - [ ] **배포용 앱 패키징 및 기본 설정 구성**
 - [ ] **앱 출시를 위한 외부 행정 및 마켓 설정** (참고용)
 - [ ] **자동 생성용 서술형·외국어 모델 재검토** (024 후속 — EXAONE mojibake·헤드리스 미완주 + 028: qwen3·gemma3도 자동 저장 불가)
 - [x] **024 잔여 실측 마무리** (027 — 삼성 One UI 배터리 화면 라우팅 + release APK 헤드리스 1회 확인 완료. 배터리 예외/무예외 소크 SC-001·SC-002는 14번 세션으로 이월)
 - [x] **일기 쓰기 흐름 단순화 + 최초 실행 필수 에셋 다운로드** (029 — 홈 위젯 4개 제거·1탭, 자동 판정, 온보딩 필수 에셋 단계, 헌법 v1.3.0. 11번 UI 선행)
 - [x] **샤오바이·모카 일기 생성 실패 조사** (028 — 조사 완료: 둘 다 **모델 부적합**으로 확정. qwen3=추론 `<think>` 블록이 `n_predict:512` 소진해 본문 미도달, gemma3=지시 이행 불안정. mojibake·판정 오탐·프롬프트 문제 아님. 코드 0줄 → **14번으로 병합**)
-- [ ] **입력 프롬프트 텍스트 최적화** (`prompt.ts` — 이미 단일 평문이나 005~017에 걸쳐 누적된 지시문이 길고 중복됨. 실기기 대조로 압축)
+- [~] **입력 프롬프트 텍스트 최적화** (`prompt.ts` — 14번[자동 생성용 모델 재검토]과 합류. **알파리움에서는 컨셉만 정립**하고 실제 프롬프트·페르소나 후보 실험은 `my-ollama`에서 API로 진행 — 온디바이스는 후보 하나 도는 데 최대 240초라 반복이 안 됨. 2026-09-03 핸드오프 문서 작성·push 완료: `033-diary-concept-prompt-handoff` 브랜치 `docs/superpowers/specs/2026-09-03-diary-concept-prompt-experiment-handoff-design.md` — 컨셉 고정 뼈대[화자=표면 제3자·실체 휴대폰, 아는 범위=권한만큼, 사진 속 인물 정체 불명, 독백], 페르소나가 톤·태도를 프롬프트에서 지시하도록 원칙 III 완화[헌법 개정 선행], 로스터 5개 전부 재평가 대상, 현재 지시문 8+6+5줄의 스펙별 출처·근거, 불변 제약 6가지, 프롬프트 후보 3개 스케치. **`my-ollama`의 실험 리포트(§8 계약)가 오면 그걸 근거로 별도 speckit 스펙에서 `prompt.ts`·`persona.ts`·헌법을 고친다** — 아직 미완료.)
 - [ ] **모델 준비 완료 연출 + 캐릭터 작명** (16번 후속 — 헌법 페르소나 조항 개정 동반)
 - [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: 근본 원인 정정[force-dark 반전 아님, `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`], photo-location: 판정 불가능한 단계라 온보딩에서 제거. One UI 8.5 실기기 debug 검증. 목록·상세·설정·개발자 탭·release·S22는 다음 세션[`tasks.md` T037])
+- [ ] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (2026-09-05 제안 — 아래 상세 참조)
 
 ---
 
@@ -80,9 +81,13 @@
 - **아이디어**: 최초 혹은 업데이트 시 수 기가바이트에 달하는 LLM 모델 파일의 다운로드 속도를 개선합니다. 기기 내 멀티스레드 분할(세그먼트 병렬) 다운로드 모듈 도입이나, 클라우드 스토리지 배포처(CDN 캐싱 등) 튜닝을 통한 최적화 방안을 설계합니다.
 - **구현 결과 (026, 2026-08-31)**: 두 갈래를 한 스펙으로. **(1) 여러 캐릭터 동시 내려받기** — 003 FR-020의 "한 번에 하나"를 해제했다. `acquisition.ts`의 `running: Character|null`을 `Map<Character, Running>`으로 바꾸고, `busy` 거부는 유지하되 의미를 **"같은 캐릭터 중복 요청"**으로 좁혔다(FR-003 — 같은 파일을 두 다운로드가 쓰면 손상). `pause(character?)`, `busyWith(): Character[]`. 공간 판정에 이미 받는 중인 것들의 남은 용량 합산(FR-007). 상한 없음(사용자 요청). `download-view.ts`의 `active`가 `DownloadProgress[]`로, 008의 네 불변식은 전부 유지. **(2) 한 파일 세그먼트 병렬** — 서버가 HTTP Range를 지원하면 파일을 사람이 정한 개수(`SEGMENT_COUNT=4`, `MIN_SEGMENT_BYTES=8MiB` — 012·021·023 선례로 못박은 `readonly` 상수, 잠정·실기기 확정 대기)의 구간으로 나눠 병렬 수신. 미지원·크기 불명이면 조용히 기존 단일 스트림으로 **폴백**(회귀 방지). **세그먼트 이어받기**를 직접 구현 — 각 구간의 받은 바이트를 `state.json`의 `segmented[]`에 저장하고(`PausedDownload`와 상호배타) 재개 시 남은 Range부터. **방식**: 세그먼트 계획 계산(구간 나누기·재개·병합·완료 판정)은 `src/models/segmented/plan.ts`의 순수 함수, 기기에 닿는 것은 `RangeFetchPort`(`probeRange`·`fetchRange`) 하나. `DownloadPort` 계약 뒤에서 `expo-port.ts`가 세그먼트/폴백을 고르므로 `acquisition.ts`·`download-view.ts`는 전송 방식을 모른다(003 경계 유지). **`src/vision/acquisition.ts`는 코드 변경 0줄**(SC-009) — 011이 `DownloadPort`를 캐릭터 없이 재사용하는 구조 덕에 비전 모델도 자동으로 세그먼트 병렬을 얻는다. 헌법 검사 `checkSegmentedFile` 추가(`segmented/*`가 Character·roster·diary import 또는 속도 어휘를 두면 위반). 진행률은 여전히 `{ character, fraction }` 하나(원칙 III·IV — 구간 개수·처리량이 타입에 들어갈 자리 없음). 기기 없는 테스트 2076개 통과, lint·헌법 검사·prettier 클린. 위반 주입 3종 확인. **실기기 검증 완료 (2026-08-31, SM-S901N / Galaxy S22, Android 16, debug)**: Q0(`FileHandle.offset` 시커블 쓰기로 4구간을 흩어 써도 md5가 로스터와 정확히 일치 — `.part` 폴백 불필요), Q1(오드+샤오바이 동시 다운로드, 거부 안내 안 뜸, 둘 다 byte-exact+verified), Q2(오드만 멈춰도 모카 완주 — FR-004), Q3(HF CDN이 리다이렉트 후 Range·Content-Length 유지 → 로스터 5개 모델 전부 세그먼트 경로, `SEGMENT_COUNT=4` 유지), Q5(세그먼트 65%에서 멈춤→`segmented[]` 저장→"이어받기"→68%에서 재개→md5 일치→재개 상태 정리), Q6(`git diff` src/vision 0줄, FR-003 중복 거부 조용히 억제, state.json 스키마 자동 마이그레이션) 전부 PASS. **★ 실기기에서 버그 둘 발견·수정**: (A) 진행률 %가 0%↔100%만 표시(`Math.round(fraction*1)`) → `runSegmented`에 `onSizeResolved` 콜백 추가, (B) 세그먼트 멈춤 후 "다시 받기" 표시 → `readinessOf`가 `segmentedResume`도 보게 수정. 계약 테스트 4개 추가. 미확인 잔여: Q4 강제 폴백 토글(계약 테스트 C9가 대역 검증)·Maestro 실행·prod 게이트는 다음 세션(`findings.md` §8). CDN 배포처 튜닝은 이 저장소가 배포처를 통제하지 않아 범위 밖. 상세: `specs/026-parallel-model-download/`.
 
-### 11. NativeWind 및 React Native Reusables 기반 미니멀 UI 시스템 도입
+### 11. NativeWind 및 React Native Reusables 기반 미니멀 UI 시스템 도입 — ✅ 032에서 구현
 
 - **아이디어**: 획일화된 구글 머티리얼 UI 스타일을 피하고, 모던하고 얇은 미니멀 톤앤매너를 구축하기 위해 React Native Reusables(shadcn-style)와 NativeWind를 도입합니다. 1인 개발자의 디자인 리소스를 보존하기 위해 기본적으로 준비되어 있는 기성 컴포넌트들을 완제품처럼 조립하여 사용하되, 알파리움 고유의 따뜻하고 감성적인 커스텀 스타일은 코딩 에이전트(AI)가 코드 수준에서 전담하여 일괄 깎고 고도화합니다.
+- **구현 결과 (032, 2026-09-03)**: `src/ui/theme/tokens.ts` 단일 출처(따뜻한 아이보리·테라코타·벽돌, 전 쌍 WCAG AA)로 `tailwind.config.js`가 값을 가져온다. 재사용 컴포넌트 7종(`Text`/`Button`/`Card`/`SectionHeader`/`ListRow`/`Toggle`/`SelectRow`) — 전부 토큰만 참조, 도메인 import 0, `useColorScheme` 0. 핵심 화면 5개(목록·상세·설정·생성 중·온보딩) + 덮어쓰기 확인 + 탭바 이관, 원시 hex 0. `VisionPicker`·`GeocodingSettingToggle`을 `SelectRow`로 재작성. 031의 라이트 고정 무손상(`darkMode:"class"` + `dark:` 미사용 + `useColorScheme` 미사용). **React Native Reusables 자체(`@rn-primitives/*`)는 채택하지 않았다** — reanimated·gesture-handler 의존이 있어 "직접 작성한 컴포넌트 + shadcn 스타일 참고"로 대체.
+  - **★ NativeWind v4.2가 `react-native-reanimated`(네이티브 모듈)를 peerDependency로 끌어왔다** — 애초 "새 네이티브 모듈 없음" 전제가 실측으로 뒤집혔다. Expo SDK 57이 검증한 `reanimated 4.5.1`/`worklets 0.10.1`로 명시 핀(자동 설치된 4.6.0/0.12.1은 `expo-modules-core` C++와 심볼 불일치로 네이티브 빌드가 깨짐 — jest는 못 잡는 결함, 원칙 V). **reanimated는 이 시점까지 실제 애니메이션에는 안 쓰였다** — 21번이 그 활용처.
+  - **실기기 검증 완료(SM-S901N, dev debug)**: 5개 화면군 톤·라이트 고정·025 슬라이더/갤러리 회귀 없음·생성 중 지표 미표시. Maestro 14흐름 통과.
+  - **미완료 잔여 → 21번으로 이월**: SM-S928N(One UI 8.5) 육안, release 빌드 1회(reanimated 도입분 R8·prod 번들 확인), `CharacterListScreen` 이관(T063, SHOULD로 미룸), 만들었으나 기존 화면 구조에 안 맞아 미적용인 `Card`/`ListRow`/`Toggle`/`Section`. 상세: `specs/032-nativewind-ui-system/`.
 
 ### 12. 배포용 앱 패키징 및 기본 설정 구성
 
@@ -148,7 +153,7 @@
 - **의심 지점**: 증상 4번(생성은 끝나는데 저장이 안 됨)이고 메시지가 `describeFailure()`의 "다시 시도해 볼 만하다"류 → 세 갈래 중 하나: (a) `rejected` — `acceptance.ts` 4갈래(`empty`/`echo`/`language`/`unfinished`) 중 하나에 걸림. **`isWrongLanguage`가 유력** — 샤오바이는 중국어, 모카는 한국어가 아닌 언어로 써야 하는데 판정이 언어를 잘못 보거나 모델이 엉뚱한 언어를 냄. (b) `timed-out` — `GENERATION_TIMEOUT_MS`(180초, `engine.run()` 구간) 초과. (c) `generation-failed` — 추론 자체 실패. **024 §10의 EXAONE mojibake와 같은 계열(GGUF 인코딩)일 가능성** — qwen3·gemma3 Q4_K_M + `llama.rn` 조합에서 출력이 깨지면 `judge()`가 `language`/`empty`로 거부할 수 있다.
 - **다음 세션 할 일**: `adb logcat`(`ReactNativeJS`·`llama` 태그)을 걸고 샤오바이/모카로 "보지 않음" 설정 생성 → 실패 갈래(`rejected: <why>` / `timed-out` / `generation-failed`)를 로그에서 확인 → 저장된(거부된) 본문을 `stopCompletion` 없이 캡처해 mojibake 여부 확인. 결과에 따라 14번(서술형 모델 재검토)과 병합하거나 `acceptance.ts` 언어 판정을 고친다. **판정 갈래는 늘리지 않는다**(헌법 원칙 IV — `REJECT_REASONS` 4개 고정).
 
-### 18. 입력 프롬프트 텍스트 최적화
+### 18. 입력 프롬프트 텍스트 최적화 — 🔄 진행 중, 14번과 합류 (2026-09-03)
 
 - **배경** (2026-09-01, 사용자 지적: "프롬프트가 상당히 길고 중구난방"): 확인 결과 **아키텍처는 이미 옳다** — `buildPrompt()` 하나가 유일한 통과 지점(헌법 원칙 II), `messages` 배열·채팅 템플릿 없이 **5개 모델에 바이트 단위로 같은 형태의 평문 하나**를 넘긴다(005 research.md §4). 캐릭터에서 오는 차이는 이름 한 줄(`너는 '금동이'이라 불린다.`)과 출력 언어 한 줄(`한국어로 써라.`)뿐. **따라서 "단일화"는 이미 됐고 남은 것은 텍스트 자체의 압축이다.**
 - **문제**: `SPEAKER_RULES`·`TITLE_INSTRUCTION`·사진 한계 문구들이 005~017에 걸쳐 실기기 위반을 볼 때마다 덧붙어 누적됐다:
@@ -159,6 +164,14 @@
   - 각 줄은 그 스펙에서 정당한 이유로 추가됐으나 **아무도 전체를 놓고 "중복은 없나, 더 짧게 같은 효과를 낼 수 없나"를 재검토하지 않았다** — 16·17번과 같은 "한 축을 깊게 판" 누적.
 - **접근**: (1) 022의 개발자 탭 프롬프트 미리보기(`SIGNAL_PRESETS`)로 현재 전체 길이를 자·토큰 근사값으로 파악. (2) 중복·장황한 문구를 압축한 후보 프롬프트를 만들고, **실기기에서 기존 vs 압축본을 같은 신호로 대조 생성**해 지어내기·되뱉기·언어 위반이 재발하지 않는지 확인(005~017이 각 줄을 추가한 근거를 역으로 검증). (3) `promptPrefix()`/`fixedHead()`의 바이트 동일성(018 KV 캐시 프리필)과 `instructionLines()`의 되뱉기 판정 비교 대상 일치(P7 계약)를 깨지 않도록 유지.
 - **제약**: 프롬프트는 `prompt.ts`에만(005 FR-013b). 판정 갈래 안 늘림(원칙 IV). 캐릭터에서 오는 것은 이름·언어뿐(원칙 III). 자동 채점 코드 금지(원칙 IV — 압축 전후 비교는 사람이 실기기 로그로 판단, `check-constitution.mts`가 재는 게 아님).
+- **2026-09-03 재정의 (14번과 합류, 사용자 브레인스토밍)**: 압축만으로 끝날 문제가 아니라는 것이 드러났다 — 025 검증 중 나온 실제 일기("여성은 근처 물가로 산책을 나섰다. 그녀는 하얀 블라우스에...")가 화자(휴대폰)에서 사진 속 인물의 3인칭 시점으로 미끄러지는 것을 관측했다. **프롬프트를 어떻게 구성하느냐(페르소나 세팅)가 출력을 "휴대폰의 일기 / 소설 / 스토커 시점" 사이에서 가른다** — 문구 압축이 아니라 컨셉·페르소나 설계의 문제.
+  - **온디바이스로는 반복 실험이 안 된다**(캐릭터당 웜 2~3초~콜드 240초) → **API 반복 실험은 `my-ollama`에서, 알파리움에서는 컨셉만 정립**한다(원칙 IV — 알파리움은 측정 장치가 아니다).
+  - **산출물(2026-09-03)**: 브랜치 `033-diary-concept-prompt-handoff`, `docs/superpowers/specs/2026-09-03-diary-concept-prompt-experiment-handoff-design.md`. 알파리움 코드 0줄.
+    - 컨셉 고정 뼈대: 화자=표면 제3의 서술자·실체는 휴대폰(온디바이스가 특장점이라 정체는 열림) / 아는 범위=허용받은 권한만큼 / 사진 속 인물은 정체·관계 불명("그녀"로 단정 금지) / 수신자는 독백 / **로스터 5개 전부가 재평가 대상**(1개로 미리 안 좁힘).
+    - 페르소나가 돌리는 변수: **톤·태도·성격을 프롬프트에서 지시** — 헌법 원칙 III("성격 지시 금지"에 가까웠던 현행 persona.md P4)을 완화, **헌법 개정이 선행**되어야 함(16·19번과 같은 패턴). 길이·구조 압력도 페르소나별.
+    - 현재 지시문(`SPEAKER_RULES` 8줄·`TITLE_INSTRUCTION` 6문장·사진 한계 5종)의 스펙별 출처·근거표, 불변 제약 6가지(평문 하나·판정 4갈래·`promptPrefix()` 바이트 동일성·P7 되뱉기 판정), 화자 미끄러짐 관측 사례 전문.
+    - 프롬프트 후보 3개 스케치(캡션 재서술 / 페르소나 블록+압축 / "내가 본 것" 통합 목록) + 페르소나 5종 톤 지시 초안.
+  - **왕복 구조**: 이 문서 → `my-ollama` API 실험 → **실험 결과 리포트**(모델 추천 5가지·확정 페르소나 세트·입력 조합 규칙·압축 지시문·제약 준수 확인) → 그 리포트를 근거로 알파리움이 별도 speckit 스펙에서 `prompt.ts`·`persona.ts`·헌법 개정. **아직 리포트 대기 중 — 리포트가 오면 `033` 브랜치에 함께 커밋해 PR로 처리.**
 
 ### 19. 모델 준비 완료 연출 + 캐릭터 작명
 
@@ -186,3 +199,14 @@
   - **② photo-location** — `PERMISSION_REQUIREMENTS`(`src/onboarding/requirements.ts`)에서 `photo-location` 항목·`PermissionKey` 멤버를 제거하고 `order`를 1..4로 재배치(사진·위치·알림·배터리 예외). `OnboardingScreen`·`PermissionsSection`·`App.tsx`의 `photo-location` 분기와 계약 테스트를 함께 정리. `collect.ts`(실제 좌표 읽기, FR-013a)·매니페스트 `ACCESS_MEDIA_LOCATION` 선언·`expo-media-library` 플러그인 설정은 무변경.
   - **실기기 관측 (SM-S928N/One UI 8.5, `cmd uimode night yes`, debug)**: 온보딩 1단계·에셋 다운로드 단계·"1/4" 재게이트 전부 배경 `rgb(250,250,250)` + 텍스트 검정 + 대비 또렷 — 어제 22:03·22:28 dimmed(`#303030`) 재현 **0건**. `cmd uimode night no`에서도 `rgb(250,250,250)` 동일(회귀 없음). 온보딩 4단계가 `photos → location → notifications → battery-exception` 순서로 정확히 나오고 `photo-location` 단계 **부재**, 4개 전부 [건너뛰기]로 통과 → 에셋 다운로드 단계 도달(**갇힘 없음**). `cmd uimode night auto` 복원 완료.
   - **미확인 잔여**: 목록·상세·설정·개발자 탭의 다크 모드 화면(에셋 ~2GB 모델 미준비로 온보딩 게이트를 못 넘음 — 다음 세션에서 모델 배치 후), 설정 "권한" 섹션 행 4개 확인, release APK 재확인(`expo-system-ui` minify 생존, 012), S22(One UI 8 이하) 회귀. 상세는 `specs/031-oneui85-fixes/tasks.md` Phase 6.
+
+### 21. 032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션
+
+- **배경** (2026-09-05 제안): 032가 NativeWind + 디자인 토큰 + 재사용 컴포넌트 7종을 도입하고 핵심 화면 5개를 이관했지만, 두 갈래가 미완으로 남았다.
+  1. **미이관 화면·미적용 컴포넌트** — `CharacterListScreen.tsx`가 여전히 `StyleSheet` + 원시 hex(`#fdf3d8` 등)로 남아 있다(T063, SHOULD로 미룸). 032가 만든 `Card`·`ListRow`·`Toggle`·`Section` 컴포넌트는 계약 테스트는 통과하지만 **어느 화면에도 실제로 안 쓰인다** — 기존 화면 구조(다중 행·상태별 버튼 하나·저장 공간 표시)가 안 맞아 만들고 안 썼다(032 T062 판단). `ListRow`는 `CharacterListScreen`의 행 구조(label=이름+소개, value=상태, right=action 버튼)와 형태가 가장 가까워 보인다 — 이관 시 실측이 필요하다.
+  2. **reanimated가 들어왔지만 안 쓰인다** — NativeWind v4.2가 `react-native-css-interop`의 peerDependency로 `react-native-reanimated`(+ `worklets`)를 끌어왔고(032, SDK 57 정합 버전 4.5.1/0.10.1로 고정), release 재확인까지 필요해졌다. 그런데 이 시점까지 **실제 애니메이션·인터랙션에는 전혀 안 쓰였다** — 이미 치른 빌드 크기·복잡도 비용을 활용하지 않는 상태.
+- **아이디어**:
+  - `CharacterListScreen`을 토큰·`ListRow`(또는 다른 032 컴포넌트)로 이관해 032의 톤을 완성한다. 기존 동작 계약(원칙 III — 모델 정보 안 새게 하는 코드 주석들, FR-004~006 등)과 `character-row-*`·`action-*`·`pause-*` testID는 무변경.
+  - reanimated로 버튼 눌림 피드백, 화면 전환 트랜지션, 새로고침 인디케이터 같은 가벼운 인터랙션을 추가한다. **생성 중인 글을 보여주지 않는다는 원칙 IV, 진행률 숫자를 노출하지 않는다는 제약은 애니메이션을 더해도 유지**해야 한다(005 FR-028b) — 진행 "표시"의 부드러움을 더하는 것과 진행 "수치"를 드러내는 것은 다르다.
+- **선행 확인 필요**: SM-S928N 육안·release 빌드 재확인(032가 이월한 잔여)을 이 스펙에서 함께 닫을지, 별도로 유지할지. `CharacterListScreen`은 032 스펙이 명시적으로 범위 밖(T063 SHOULD)이라 표시했던 화면이라, 이관 시 032의 계약(`contracts/screen-migration.md`)을 그대로 재사용할 수 있는지부터 확인한다.
+- **미착수 — 다음 세션에서 브레인스토밍·speckit 진행.**
