@@ -52,9 +52,16 @@ appId: com.anonymous.alpharium
 - tapOn: "설정"
 
 # **스크롤해서 찾는다**: dev 빌드에서는 목록이 아래로 밀린다.
+#
+# ⚠️ **텍스트("모카")로 찾지 않는다**(033 실측, 2026-09-07). 029가 설정 탭에
+# `AuthorPicker`("일기 작성자")를 넣으면서 **「모카」가 두 곳에 생겼다** — 위쪽
+# `AuthorPicker`의 그것에서 스크롤이 멈춰 아래 `ModelSection`의 캐릭터 행까지
+# 못 간다. `testID`로 짚으면 그 자리 하나만 가리킨다(023 선례).
 - scrollUntilVisible:
-    element: "모카"
+    element:
+      id: "character-row-english"
     direction: DOWN
+    timeout: 20000
 
 # ─────────────────────────────────────────────────────────────────────────────
 # **아직 받지 않은 둘**(`english`·`chinese`)을 쓴다. 「쓸 수 있음」인 줄의 버튼은
@@ -66,11 +73,26 @@ appId: com.anonymous.alpharium
     id: "action-english"
 
 # 곧바로 **다른 캐릭터**도 누른다 — 026에서는 이것이 거부되지 않아야 한다.
+# ⚠️ **`testID`로 스크롤하고, 탭 전에 멈춤을 준다**(033 실측, 2026-09-07).
+# 「샤오바이」도 `AuthorPicker`와 `ModelSection` 두 곳에 있다(「모카」와 같은 문제).
+# 그리고 `scrollUntilVisible` 직후 곧바로 탭하면 **스크롤 관성 중에 들어가
+# 탭이 COMPLETED로 보고되고도 다운로드가 시작되지 않는다** — 손으로 같은 자리를
+# 누르면 정상 동작하는 것으로 제품 결함이 아님을 확인했다.
 - scrollUntilVisible:
-    element: "샤오바이"
+    element:
+      id: "character-row-chinese"
     direction: DOWN
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: "action-chinese"
+    timeout: 10000
 - tapOn:
     id: "action-chinese"
+- extendedWaitUntil:
+    visible:
+      id: "pause-chinese"
+    timeout: 20000
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 여기서부터는 **둘 다 받는 중일 때만** 참이다.
@@ -85,35 +107,53 @@ appId: com.anonymous.alpharium
 
       # ── FR-005 — 두 줄에 동시에 멈추기가 보인다 ──
       - scrollUntilVisible:
-          element: "모카"
+          element:
+            id: "character-row-english"
           direction: UP
+          timeout: 20000
       - assertVisible:
           id: "pause-english"
       - scrollUntilVisible:
-          element: "샤오바이"
+          element:
+            id: "character-row-chinese"
           direction: DOWN
+          timeout: 20000
       - assertVisible:
           id: "pause-chinese"
 
       # ── ★ FR-004 — english만 멈춘다. chinese는 계속. ──
       - scrollUntilVisible:
-          element: "모카"
+          element:
+            id: "character-row-english"
           direction: UP
+          timeout: 20000
       - tapOn:
           id: "pause-english"
       # chinese는 여전히 받는 중 (멈추기 버튼이 남아 있다).
       - scrollUntilVisible:
-          element: "샤오바이"
+          element:
+            id: "character-row-chinese"
           direction: DOWN
+          timeout: 20000
       - assertVisible:
           id: "pause-chinese"
 
       # ── FR-006 — 탭을 왕복해도 chinese가 여전히 받는 중으로 보인다 ──
       - tapOn: "일기"
       - tapOn: "설정"
-      - scrollUntilVisible:
-          element: "샤오바이"
-          direction: DOWN
+      # ⚠️ 탭 왕복 뒤에는 스크롤 위치가 그대로 남아 **이미 보이는 경우**가 있다.
+      # `scrollUntilVisible`은 그때 "찾지 못했다"로 실패하므로(025 계열),
+      # 보이지 않을 때만 스크롤한다.
+      - runFlow:
+          when:
+            notVisible:
+              id: "character-row-chinese"
+          commands:
+            - scrollUntilVisible:
+                element:
+                  id: "character-row-chinese"
+                direction: DOWN
+                timeout: 20000
       - assertVisible:
           id: "pause-chinese"
 

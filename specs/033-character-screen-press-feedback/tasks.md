@@ -129,15 +129,15 @@
 **기기**: SM-S901N (Galaxy S22, One UI 7 / Android 16), dev debug.
 **원칙 V**: 건너뛴 실기기 테스트는 통과가 아니다.
 
-- [ ] T026 실기기 환경을 준비한다 per quickstart Q3-0 — `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`(★ `babel.config.js`를 고쳤으므로 `--clear` 필수), `adb reverse tcp:8081 tcp:8081`, `adb shell dumpsys trust`로 `deviceLocked=0` 확인. Metro는 gradle 빌드가 끝난 뒤에 띄운다.
+- [X] T026 실기기 환경을 준비한다 per quickstart Q3-0 — `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`(★ `babel.config.js`를 고쳤으므로 `--clear` 필수), `adb reverse tcp:8081 tcp:8081`, `adb shell dumpsys trust`로 `deviceLocked=0` 확인. Metro는 gradle 빌드가 끝난 뒤에 띄운다.
 
-- [ ] T027 [US1] 화면 이관을 육안 확인한다 per quickstart Q3-1 — **가는 길: 설정 탭 → 아래로 스크롤 → `VisionPicker`·`GeocodingSettingToggle` 아래**(029 SS4, "캐릭터" 탭은 없다). 아이보리 톤 일치(SC-003), 다섯 캐릭터 이름·소개·상태, 문안 불변, 지우기만 위험색, 사진 모델 줄이 아래에 별도로, 모델 정보·추천 표시 **0건**.
+- [X] T027 [US1] 화면 이관을 육안 확인한다 per quickstart Q3-1 — **가는 길: 설정 탭 → 아래로 스크롤 → `VisionPicker`·`GeocodingSettingToggle` 아래**(029 SS4, "캐릭터" 탭은 없다). 아이보리 톤 일치(SC-003), 다섯 캐릭터 이름·소개·상태, 문안 불변, 지우기만 위험색, 사진 모델 줄이 아래에 별도로, 모델 정보·추천 표시 **0건**.
 
-- [ ] T028 [US2] **눌림 반응을 육안 확인한다** per quickstart Q3-2 — 이 스펙의 존재 이유다. 누르면 작아지고 떼면 돌아온다, 밖으로 끌고 나가 떼면 아무 일 없음, 주변이 안 밀림, 비활성은 무반응, 탭 결과 불변. **반응이 전혀 없으면 T001의 worklets 플러그인을 의심한다**(조용한 실패 — research R1).
+- [X] T028 [US2] **눌림 반응을 육안 확인한다** per quickstart Q3-2 — 이 스펙의 존재 이유다. 누르면 작아지고 떼면 돌아온다, 밖으로 끌고 나가 떼면 아무 일 없음, 주변이 안 밀림, 비활성은 무반응, 탭 결과 불변. **반응이 전혀 없으면 T001의 worklets 플러그인을 의심한다**(조용한 실패 — research R1).
 
-- [ ] T029 원칙 IV를 확인한다 per quickstart Q3-3 / spec SC-006 — 일기 탭 → 일기 쓰기 → 생성 중 화면에 진행률 숫자·경과 시간·생성 중인 글이 **여전히 0개**이고 회전 표시와 그만두기 버튼뿐.
+- [X] T029 원칙 IV를 확인한다 per quickstart Q3-3 / spec SC-006 — 일기 탭 → 일기 쓰기 → 생성 중 화면에 진행률 숫자·경과 시간·생성 중인 글이 **여전히 0개**이고 회전 표시와 그만두기 버튼뿐.
 
-- [ ] T030 Maestro 흐름 **셋**을 갱신 없이 돌린다 per quickstart Q3-4 / CS10 — `download-conflict.yml`·`parallel-model-download.yml`·`photo-vision.yml`. **⚠️ `diary-character-select.yml`은 이 화면과 무관하다**(research R7 — `AuthorPicker`용). 깨지면 가장 유력한 원인은 **행 높이 변화로 인한 스크롤 도달 어긋남**(T020) — 흐름이 아니라 구현을 고친다. 그래도 안 되면 흐름을 조정하되 SC-004가 깨진 것이므로 **명시적으로 보고**한다.
+- [X] T030 Maestro 흐름 **셋**을 갱신 없이 돌린다 per quickstart Q3-4 / CS10 — `download-conflict.yml`·`parallel-model-download.yml`·`photo-vision.yml`. **⚠️ `diary-character-select.yml`은 이 화면과 무관하다**(research R7 — `AuthorPicker`용). 깨지면 가장 유력한 원인은 **행 높이 변화로 인한 스크롤 도달 어긋남**(T020) — 흐름이 아니라 구현을 고친다. 그래도 안 되면 흐름을 조정하되 SC-004가 깨진 것이므로 **명시적으로 보고**한다.
 
 **체크포인트**: 실기기에서 실제로 동작함이 확인됐다.
 
@@ -213,3 +213,101 @@ quickstart Q5와 동일:
 - [ ] T030 Maestro 흐름 셋 **갱신 없이** PASS
 - [ ] T031 032 이월 잔여에 눌림 반응 확인 항목 추가
 - [ ] T034 브랜치 → PR (`main` 직접 커밋 없음)
+
+---
+
+## ✅ 실기기 검증 결과 (2026-09-07, SM-S901N / Galaxy S22, One UI 7 / Android 16, dev debug)
+
+### ★ T028 — 눌림 반응이 실제로 동작한다 (이 스펙의 존재 이유)
+
+**jest가 구조적으로 못 잡던 항목**(목이 진짜 reanimated를 대신하므로 — PF7).
+접근성 트리의 bounds를 평상시/누른 채로 재어 실측했다:
+
+| | 평상시 | 누른 채 | 비율 |
+|---|---|---|---|
+| 버튼 내부 노드 | 117 × 66 | **113 × 64** | **0.966 / 0.970** |
+| 바깥 버튼(`action-quiet`) | 201 × 129 | **201 × 129 (불변)** | — |
+
+- `PRESS.scale = 0.97`과 실측이 일치한다.
+- **바깥 bounds가 안 변한 것이 PF4의 증거** — transform만 바뀌어 주변이 밀려나지
+  않는다. 뗀 뒤 높이가 66으로 복귀하는 것도 확인.
+- **즉 T001(`babel.config.js`의 worklets 플러그인)이 유효했다.** logcat에
+  `libworklets.so`·`libreanimated.so` 적재가 찍혔고, 이 실패는 조용해서
+  (오류 없이 애니메이션만 안 돎) 이것 말고는 드러날 통로가 없었다.
+- **PF5 확인**: 버튼을 누른 채 밖으로 끌고 나가 떼니 다운로드가 시작되지 않았다
+  (`action-narrative` 그대로) — 눌림 반응이 `onPress`를 가로채지 않는다.
+
+### T027 — 화면 이관 육안
+
+설정 탭 하단(029 SS4)에서 확인: 아이보리 톤 일치, 다섯 캐릭터 이름·소개·상태,
+「지우기」만 테라코타 위험색 `Button`, 나머지 보조색, 「사진을 보는 데 필요한 것」이
+캐릭터 아래 별도 행, `460MB` 합산 표시. **문안 전부 이관 전과 동일.**
+모델 식별자·추천 표시 0건.
+
+- **CS4 실측**: `character-row-quiet`·`action-quiet`(content-desc "지우기")·
+  `pause-narrative` 등이 접근성 트리에 살아 있고, **버튼이
+  `android.widget.Button`으로 자기 이름을 갖는다**(008 실측 요구 충족).
+- **CS10 실측**: 행 높이 255~265px로 이관 전 구조 유지.
+- **008 FR-011 회귀 없음**: 다운로드 중 그 행만 「멈추기」로 바뀌고 멈추면 복귀.
+
+### T029 — 원칙 IV 유지 (SC-006)
+
+생성 중 화면의 **모든 텍스트가 5개**뿐이다: 탭 3개(일기·설정·개발자) + 독백 문구
+(「오늘 일상이 어땠는지 들여다보는 중…」) + 「그만두기」. 금지어 7종
+(`%`·`초`·`토큰`·`ms`·`남음`·`경과`·`/s`) **전부 0건**. 회전 표시만 있고 진행률
+숫자·경과 시간·생성 중인 글이 없다.
+
+### T030 — Maestro 흐름 셋
+
+| 흐름 | 결과 |
+|---|---|
+| `photo-vision.yml` | ✅ **갱신 없이 전체 PASS** — `scrollUntilVisible`로 `vision-row`를 찾는 것까지 통과. **CS10(행 높이 보존)이 유효했다.** |
+| `parallel-model-download.yml` | ✅ **PASS** (아래 stale 수정 후) |
+| `download-conflict.yml` | ⚠️ **026 이후 검증 대상 소멸** — 아래 참조 |
+
+**⚠️ 발견한 stale 결함 셋 — 전부 033 회귀가 아니다** (023·025·020과 같은 계열):
+
+1. **`scrollUntilVisible: "모카"`가 엉뚱한 곳에서 멈춘다** (두 흐름 공통).
+   029가 설정 탭에 `AuthorPicker`를 넣으면서 **「모카」·「샤오바이」가 두 곳에
+   생겼다** — 위쪽 `AuthorPicker`의 그것에서 스크롤이 멈춰 아래 `ModelSection`의
+   캐릭터 행까지 못 간다. `testID`(`character-row-english`/`-chinese`)로 짚도록
+   고쳤다(023 선례).
+2. **`scrollUntilVisible` 직후 곧바로 탭하면 다운로드가 시작되지 않는다.**
+   탭이 COMPLETED로 보고되고도 파일이 안 생긴다 — 스크롤 관성 중에 들어가는
+   것으로 보인다. **손으로 같은 자리를 누르면 정상 동작**함을 확인해 제품 결함이
+   아님을 가렸다. `extendedWaitUntil`로 탭 전후에 멈춤을 줘 해소.
+3. **탭 왕복 뒤 이미 보이는 요소를 `scrollUntilVisible`이 못 찾는다**(025 계열).
+   `runFlow: when: notVisible`로 감싸 보이지 않을 때만 스크롤하게 했다.
+
+**⚠️ `download-conflict.yml`은 026 이후 PASS할 수 없다 — 로드맵으로 미룬다**
+(2026-09-07 사용자 결정). 이 흐름의 핵심은 008 FR-001~003의 거부 안내
+(`download-notice`)인데, **026이 003 FR-020의 「한 번에 하나」 제약을 명시적으로
+풀었다**("누른 만큼 전부 동시에, 무제한"). 그래서 두 캐릭터를 눌러도 거부가
+일어나지 않고 `pause-english`·`pause-chinese`가 동시에 존재한다 — **제품이 옳게
+동작하기 때문에 assert가 실패한다.** 026이 이 흐름을 회귀 대상으로 적어만 두고
+(`tasks.md` T042 Q6) 갱신하지 않았다. 흐름 상단에 이 사실을 못박아 뒀다.
+
+### 세션 중 사용자 지적으로 함께 고친 것
+
+- **설정 탭 좌우 여백**(커밋 `b72db2a`): 「일기 작성자」·「사진을 어떻게 볼까」·
+  「장소 이름으로 보기」 셋이 화면 끝에 붙어 있었다(실측 0~1080, 캐릭터 행은
+  72~1008). `App.tsx`의 `settingsSection`(20)으로 감싸고 `CharacterListScreen`도
+  24→20으로 맞췄다. **실기기 재확인: 세 섹션 전부 60~1020으로 통일.**
+- **`DayPicker` 토큰 이관**: 원시 hex(`#ccc`·`#333`)가 남은 마지막 살아있는
+  엔드유저 화면이었다. 고른 날짜 테두리가 검정 → 강조색으로 바뀌었다.
+  `day-picker.test.tsx` 무수정 GREEN. **엔드유저 화면 전체의 className 병행
+  이관은 로드맵 22번으로 분리**(사용자 결정).
+
+### 검증 중 있었던 조작 실수 (코드 결함 아님)
+
+눌림 반응을 재려고 `action-quiet`(지우기)를 길게 눌렀는데 그것이 실제 탭으로
+처리돼 **금동이 모델이 지워졌다.** 측정 자체는 성공했으나 검증용 모델을 잃어
+온보딩 다운로드 게이트가 열렸고, 다시 받아 복구했다(`a1`·`a4`·`a5`·`v1`·`v2`
+전부 `passed: true`). **이 과정에서 029 온보딩·에셋 다운로드 단계가 정상
+동작하는 것을 덤으로 확인했다.**
+
+### 미확인으로 남는 것
+
+- **release 빌드에서의 눌림 반응** — 032 이월 잔여 (2)와 함께(spec FR-023, T031).
+  이 스펙이 worklets 플러그인을 처음 활성화했으므로 그 잔여에 확인 항목을 더해 뒀다.
+- **One UI 8.5(SM-S928N) 육안** — 032 이월 잔여 (1).
