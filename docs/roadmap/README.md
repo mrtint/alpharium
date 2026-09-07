@@ -27,7 +27,8 @@
 - [~] **입력 프롬프트 텍스트 최적화** (`prompt.ts` — 14번[자동 생성용 모델 재검토]과 합류. **알파리움에서는 컨셉만 정립**하고 실제 프롬프트·페르소나 후보 실험은 `my-ollama`에서 API로 진행 — 온디바이스는 후보 하나 도는 데 최대 240초라 반복이 안 됨. 2026-09-03 핸드오프 문서 작성·push 완료: `033-diary-concept-prompt-handoff` 브랜치 `docs/superpowers/specs/2026-09-03-diary-concept-prompt-experiment-handoff-design.md` — 컨셉 고정 뼈대[화자=표면 제3자·실체 휴대폰, 아는 범위=권한만큼, 사진 속 인물 정체 불명, 독백], 페르소나가 톤·태도를 프롬프트에서 지시하도록 원칙 III 완화[헌법 개정 선행], 로스터 5개 전부 재평가 대상, 현재 지시문 8+6+5줄의 스펙별 출처·근거, 불변 제약 6가지, 프롬프트 후보 3개 스케치. **`my-ollama`의 실험 리포트(§8 계약)가 오면 그걸 근거로 별도 speckit 스펙에서 `prompt.ts`·`persona.ts`·헌법을 고친다** — 아직 미완료.)
 - [ ] **모델 준비 완료 연출 + 캐릭터 작명** (16번 후속 — 헌법 페르소나 조항 개정 동반)
 - [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: 근본 원인 정정[force-dark 반전 아님, `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`], photo-location: 판정 불가능한 단계라 온보딩에서 제거. One UI 8.5 실기기 debug 검증. 목록·상세·설정·개발자 탭·release·S22는 다음 세션[`tasks.md` T037])
-- [ ] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (2026-09-05 제안 — 아래 상세 참조)
+- [~] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (033에서 구현 — 아래 상세 참조)
+- [ ] **엔드유저 화면 전체를 NativeWind/토큰으로 이관** (033 후속, 2026-09-07 사용자 요청 — 아래 상세 참조)
 
 ---
 
@@ -232,3 +233,33 @@
   있지 않다"는 주석이 스테일이었다 — 실제로는 설치돼 있었다. 033이 활성화했다.
 - **남은 것**: 실기기 검증(SM-S901N debug) — 화면 이관 육안, **눌림 반응 육안**,
   생성 중 화면 미노출, Maestro 흐름 셋 무갱신 PASS.
+
+### 22. 엔드유저 화면 전체를 NativeWind/토큰으로 이관 (033 후속)
+
+- **배경** (2026-09-07 사용자 요청): 032가 다섯 화면군을, 033이
+  `CharacterListScreen`·`DayPicker`를 이관했다. 그런데 **`src/ui/`의 17개 파일이
+  아직 자체 `StyleSheet.create`를 쓴다.** 다만 그중 **15개는 이미 원시 hex 0개**로
+  토큰만 참조하므로, 남은 것은 "원시 색값 제거"가 아니라 **"className 병행 패턴의
+  일관성"**이다.
+- **현황** (2026-09-07 실측):
+  - **원시 hex가 남은 파일 0개** — 033이 `DayPicker`(`#ccc`·`#333`)를 이관해
+    마지막이 사라졌다. `CharacterPicker.tsx`에 2개가 남아 있으나 **029가 홈에서
+    걷어내 어느 화면도 렌더하지 않는 죽은 코드**다(제거 여부도 이 스펙에서 정한다).
+  - **`className`이 아예 없는 파일**: `AuthorPicker`·`AutoDiaryTriggerButton`·
+    `BuildErrorScreen`·`DiagnosticsScreen`·`GenerationProbe`·`OverwriteConfirmScreen`·
+    `PermissionPanel`·`PermissionsSection`·`PromptPreviewPanel`·`SignalProbe`.
+    이 중 개발자 탭 전용(`DiagnosticsScreen`·`SignalProbe`·`GenerationProbe`·
+    `PromptPreviewPanel`)은 **배포 빌드에서 닿을 수 없으므로 범위 밖**이다(원칙 III).
+- **아이디어**: 032 `contracts/screen-migration.md`의 공통 원칙("표현만 바꾼다",
+  문안·`testID` 불변, 기존 테스트 무수정 통과)을 그대로 재사용해 남은 엔드유저
+  화면에 className 병행을 넣는다. 033이 `DayPicker`에서 쓴 패턴(`ROW`/`ROW_SELECTED`
+  상수 + `className` 문자열)이 선례다.
+- **⚠️ 선행 확인 필요 — 이 작업의 진짜 위험은 레이아웃이다.** 025·023이 겪은 대로
+  **행 높이·여백이 바뀌면 문안·`testID`가 전부 불변이어도 Maestro
+  `scrollUntilVisible`이 깨진다**(033 CS10이 같은 이유로 `paddingVertical: 12`를
+  명시적으로 유지했다). 화면 하나씩 이관하고 그때마다 관련 흐름을 돌리는 편이,
+  한꺼번에 바꾸고 19개 흐름을 한 번에 돌리는 것보다 원인 추적이 쉽다.
+- **함께 정할 것**: 설정 탭의 좌우 여백을 `App.tsx`의 `settingsSection`으로
+  감싸는 지금 방식(033)을 유지할지, `SelectRow` 같은 공용 컴포넌트가 자체 여백을
+  갖게 할지. 후자는 그 컴포넌트를 쓰는 모든 자리에 영향이 간다.
+- **미착수.**

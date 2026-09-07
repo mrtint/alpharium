@@ -1142,22 +1142,41 @@ function AutoDiarySection({
         notificationDenied={notificationDenied}
       />
 
-      {/* 029 — 일기 작성자 (FR-023). persona 이름·소개·준비 여부만. */}
-      <AuthorPicker
-        options={CHARACTERS.map((character) => ({
-          name: personaOf(character).name,
-          tagline: personaOf(character).tagline,
-          ready: readyChars.includes(character),
-          selected: author === character,
-        }))}
-        onSelect={onSelectAuthor}
-      />
+      {/*
+        033 — **이 셋은 좌우 여백을 여기서 준다**(2026-09-07 실기기 지적).
+
+        `settingsPage`에는 좌우 padding이 없고 각 자식이 알아서 여백을 낸다 —
+        `AutoDiarySettingsScreen`(20)·`PermissionsSection`(20)·
+        `CharacterListScreen`(20)은 자체 padding이 있는데 이 셋만 없어
+        **화면 끝에서 끝까지 붙어 보였다**(실측: `geocoding-auto`가 0~1080,
+        캐릭터 행은 72~1008).
+
+        `SelectRow`(공용 컴포넌트)를 고치면 이것을 쓰는 다른 자리까지 바뀌므로
+        **조립하는 여기서 감싼다.** 세 컴포넌트의 내부 구조·`testID`·문안은
+        건드리지 않는다.
+      */}
+      <View style={styles.settingsSection}>
+        {/* 029 — 일기 작성자 (FR-023). persona 이름·소개·준비 여부만. */}
+        <AuthorPicker
+          options={CHARACTERS.map((character) => ({
+            name: personaOf(character).name,
+            tagline: personaOf(character).tagline,
+            ready: readyChars.includes(character),
+            selected: author === character,
+          }))}
+          onSelect={onSelectAuthor}
+        />
+      </View>
 
       {/* 029 — 사진 보기 (FR-024). 자동/보지 않음/빠르게 봄/자세히 봄. */}
-      <VisionPicker selected={visionPref} onSelect={onSelectVisionPref} />
+      <View style={styles.settingsSection}>
+        <VisionPicker selected={visionPref} onSelect={onSelectVisionPref} />
+      </View>
 
       {/* 029 — 장소명 (FR-025). 자동/켬/끔. */}
-      <GeocodingSettingToggle mode={geoPref} onSelect={onSelectGeoPref} />
+      <View style={styles.settingsSection}>
+        <GeocodingSettingToggle mode={geoPref} onSelect={onSelectGeoPref} />
+      </View>
 
       {/* 029 — 미준비 캐릭터·VLM 다운로드 관리 (기존 ModelSection, SS4). */}
       <ModelSection
@@ -1203,4 +1222,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   settingsPage: { gap: 20, paddingBottom: 24 },
+  /**
+   * 033 — 자체 padding이 없는 설정 섹션의 좌우 여백.
+   *
+   * 값 20은 이미 자체 padding을 가진 이웃들과 같다
+   * (`AutoDiarySettingsScreen.page`·`PermissionsSection.section`이 20,
+   * `CharacterListScreen`도 20) — 설정 탭 전체가 같은 세로선에 선다.
+   */
+  settingsSection: { paddingHorizontal: 20 },
 });

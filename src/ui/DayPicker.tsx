@@ -23,8 +23,10 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, View } from "react-native";
 
+import { AppText } from "./components/Text";
+import { COLORS, RADIUS } from "./theme/tokens";
 import type { DayDate } from "../config/day-boundary";
 import type { SelectableDay } from "../app/state";
 
@@ -66,8 +68,8 @@ export function DayPicker({
   onSelect,
 }: DayPickerProps) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>언제를 쓸까</Text>
+    <View className="gap-2" style={{ gap: 8 }}>
+      <AppText variant="sectionTitle">언제를 쓸까</AppText>
 
       {/*
         **말없이 다른 하루를 쓰지 않는다**(FR-009). 쓰기 자리를 열어 둔 채 04:00을
@@ -75,9 +77,9 @@ export function DayPicker({
         엉뚱한 하루의 일기를 얻는다. 007이 캐릭터 옮김을 알린 것과 같은 성질이다.
       */}
       {revertedFrom !== undefined && (
-        <Text style={styles.reverted}>
+        <AppText variant="caption">
           {revertedFrom}는 이제 쓸 수 없어 {selected}로 바꿨다
-        </Text>
+        </AppText>
       )}
 
       {/*
@@ -86,7 +88,9 @@ export function DayPicker({
         이 문구가 유일하게 "정오"라는 값을 사람이 읽는 말로 바꾸는 자리다.
       */}
       {todayNotYetWritable === true && (
-        <Text style={styles.notice}>오늘은 아직 하루가 끝나지 않아 정오(12시)부터 쓸 수 있다</Text>
+        <AppText variant="caption">
+          오늘은 아직 하루가 끝나지 않아 정오(12시)부터 쓸 수 있다
+        </AppText>
       )}
 
       {days.map(({ day, hasDiary }) => {
@@ -98,24 +102,27 @@ export function DayPicker({
             accessibilityState={{ selected: isSelected }}
             key={day}
             onPress={() => onSelect(day)}
-            style={[styles.row, isSelected && styles.rowSelected]}
+            className={`flex-row items-center justify-between py-2.5 px-3 rounded-card border ${
+              isSelected ? "border-2 border-accent" : "border-border"
+            }`}
+            style={[ROW, isSelected ? ROW_SELECTED : null]}
             // **하루마다 따로 준다** — RN은 접근성 트리가 평탄화되어 Maestro의
             // `childOf`가 통하지 않는다(008 실측). `testID`는 release에서 살아남는다.
             testID={`day-${day}`}
           >
-            <View style={styles.info}>
+            <View className="flex-1 gap-0.5" style={{ flex: 1, gap: 2 }}>
               {/* 날짜를 그대로 적는다 — 「어제」로 옮기지 않는다 */}
-              <Text style={styles.day}>{day}</Text>
+              <AppText variant="body">{day}</AppText>
 
               {/*
                 **「일기가 있다」뿐이다**(FR-011a). 사진 몇 장인지·무엇을 보고 썼는지는
                 여기 오지 않는다 — 아직 쓰지 않은 하루에 대해서는 알 수 없는 것이고,
                 이미 쓴 하루에 대해서만 아는 것을 섞으면 줄마다 뜻이 달라진다.
               */}
-              {hasDiary && <Text style={styles.hint}>일기가 있다</Text>}
+              {hasDiary && <AppText variant="caption">일기가 있다</AppText>}
             </View>
 
-            {isSelected && <Text style={styles.mark}>선택</Text>}
+            {isSelected && <AppText variant="caption">선택</AppText>}
           </Pressable>
         );
       })}
@@ -123,24 +130,23 @@ export function DayPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: 8 },
-  title: { fontSize: 15, fontWeight: "600" },
-  reverted: { fontSize: 13, opacity: 0.8, lineHeight: 18 },
-  notice: { fontSize: 13, opacity: 0.8, lineHeight: 18 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "#ccc",
-    borderRadius: 6,
-  },
-  rowSelected: { borderWidth: 2, borderColor: "#333" },
-  info: { flex: 1, gap: 2 },
-  day: { fontSize: 15 },
-  hint: { fontSize: 12, opacity: 0.7 },
-  mark: { fontSize: 12, opacity: 0.7 },
-});
+/**
+ * 033 — 색·모서리를 토큰에서 가져온다(`#ccc`·`#333`이던 자리).
+ *
+ * 032의 "className + 토큰 style 병행" 패턴을 따른다 — NativeWind 변환은 Metro
+ * 시점이라 jest에 없으므로 인라인 `style`을 함께 준다. 숫자는 레이아웃 관용값만
+ * 두고 **색은 반드시 `COLORS.*`**다.
+ */
+const ROW = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  paddingVertical: 10,
+  paddingHorizontal: 12,
+  borderWidth: 1,
+  borderColor: COLORS.border,
+  borderRadius: RADIUS.card,
+} as const;
+
+/** 고른 줄 — 테두리가 굵고 강조색이다(013·009의 "선택" 표식과 같은 성질). */
+const ROW_SELECTED = { borderWidth: 2, borderColor: COLORS.accent } as const;

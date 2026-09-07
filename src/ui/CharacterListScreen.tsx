@@ -219,8 +219,17 @@ export function CharacterListScreen(props: CharacterListProps) {
 
   return (
     <View
-      className="flex-1 p-6 gap-3"
-      style={{ flex: 1, padding: 24, gap: 12, backgroundColor: COLORS.bg }}
+      /* 033 — 좌우 20은 설정 탭의 다른 섹션과 같은 값이다
+         (`AutoDiarySettingsScreen`·`PermissionsSection`·`App.tsx`의
+         `settingsSection`). 이 화면은 설정 탭 안에 살므로 같은 세로선에 선다. */
+      className="flex-1 px-5 py-6 gap-3"
+      style={{
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingVertical: 24,
+        gap: 12,
+        backgroundColor: COLORS.bg,
+      }}
     >
       <AppText variant="title" style={{ marginBottom: 8 }}>
         캐릭터
