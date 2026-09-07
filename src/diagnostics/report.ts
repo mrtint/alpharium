@@ -11,7 +11,7 @@
  */
 
 import { currentEnvironment, desktopInferenceUrl } from "../config/environment";
-import { CHARACTERS } from "../diary/types";
+import { CHARACTERS, type CustomNames } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation } from "../inference/types";
 import { displayName } from "../models/roster";
@@ -35,6 +35,11 @@ function collectCharacterModels(): Readonly<Record<(typeof CHARACTERS)[number], 
 export type ReportOptions = {
   requested?: InferenceLocation;
   serverBaseUrl?: string;
+  /**
+   * 035 — 사용자 지정 캐릭터 이름. 프롬프트 미리보기의 호칭 줄에 흐른다(FR-018).
+   * 안 주면 코드 기본 이름으로 미리보기가 조립된다.
+   */
+  customNames?: CustomNames;
 };
 
 /**
@@ -89,7 +94,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
       moduleStatus: { kind: "unavailable", reason: "추론 위치를 고르지 못했다" },
       storage,
       characterModels: collectCharacterModels(),
-      promptPreviews: collectPromptPreviews(),
+      promptPreviews: collectPromptPreviews(options.customNames),
       failures,
     };
   }
@@ -108,7 +113,7 @@ export async function collectReport(options: ReportOptions = {}): Promise<Diagno
     moduleStatus,
     storage,
     characterModels: collectCharacterModels(),
-    promptPreviews: collectPromptPreviews(),
+    promptPreviews: collectPromptPreviews(options.customNames),
     failures,
   };
 }

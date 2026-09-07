@@ -82,7 +82,10 @@ export function AuthorPicker({
     <View className="gap-2" style={{ gap: 8 }} testID="author-picker">
       <AppText variant="sectionTitle">일기 작성자</AppText>
       {options.map((opt, index) => (
-        <View key={opt.name} style={{ gap: 6 }}>
+        // 035 — key는 **위치**다. `opt.name`을 키로 쓰면 이름을 바꾸는 순간 줄이
+        // 언마운트·리마운트되어 편집 중인 `editing` 상태가 사라진다. 로스터는
+        // CHARACTERS 순서로 고정이라 index가 안정적이다.
+        <View key={index} style={{ gap: 6 }}>
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ selected: opt.selected, disabled: !opt.ready }}

@@ -637,7 +637,8 @@ function AppFrame() {
         // 대비해 한 번 더 지킨다(예: 실행 중 환경이 바뀌는 것은 없지만 방어적으로).
         showsDiagnostics && (
           <ScrollView style={styles.diagnostics}>
-            <DiagnosticsScreen />
+            {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
+            <DiagnosticsScreen characterNames={customNames} />
           </ScrollView>
         )
       )}

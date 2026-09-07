@@ -130,6 +130,12 @@ const FLOWS = [
   // ⚠️ **첫 실행 환영 연출(US1)과 확인 실패 갈래는 여기 없다** — `pm clear` +
   // ~2GB 에셋 다운로드, 모델 파일 손상이 필요하다. quickstart.md §2-2·§2-5를
   // 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
+  // ⚠️⚠️ **rename 블록이 실기기(SM-S901N, 2026-09-08)에서 자동화 실패한다** —
+  // Maestro가 NativeWind로 이관된 `author-rename-0`(`Pressable`)의 좌표를 잘못
+  // 봐 시간대 그리드를 눌러 버린다(AGENTS.md 참조). raw `adb input tap`으로는
+  // 정상이고, 계약 테스트(`author-picker.test.tsx` W18·W19)와 T047 실기기
+  // raw-adb 검증이 rename을 덮는다. 이 흐름은 "환영 화면 등장 + 설정 탭 진입"
+  // 까지만 신뢰하고, rename 자동화는 재작성이 필요하다.
   ".maestro/welcome-naming.yml",
 ];
 

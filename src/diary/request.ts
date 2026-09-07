@@ -8,7 +8,7 @@
 
 import { isDayClosed, type DayDate } from "../config/day-boundary";
 import type { DaySignals } from "../signals/types";
-import type { Character, DiaryRequest, VisionSetting } from "./types";
+import type { Character, CustomNames, DiaryRequest, VisionSetting } from "./types";
 
 /**
  * 요청을 만든 결과.
@@ -34,6 +34,12 @@ export type RequestResult =
  * 출처는 `isDayClosed(day, now)`이며, **새 계산을 만들지 않는다.** 둘을 안 주면
  * `dayStillOpen: false`다(지난 하루와 같은 동작 — 003의 `isModelReady?` 선례를 따라
  * 기존 호출자가 깨지지 않도록 옵셔널로 확장했다).
+ *
+ * **035 — `customNames`가 옵셔널로 늘었다.** 실제 생성 경로는 `pipeline.ts`가
+ * `buildRequest` 뒤에 이름을 얹지만, 진단 미리보기(`prompt-preview.ts`)는
+ * 파이프라인을 거치지 않으므로 여기서 직접 받아 호칭 줄에 흐르게 한다(FR-018 —
+ * 진단 화면의 프롬프트 미리보기에도 사용자 지정 이름이 반영돼야 한다). 안 주면
+ * `customNames` 없이 만들어져 `buildPrompt`가 코드 기본 이름으로 폴백한다.
  */
 export function buildRequest(
   signals: DaySignals,
@@ -41,6 +47,7 @@ export function buildRequest(
   vision: VisionSetting,
   day?: DayDate,
   now?: Date,
+  customNames?: CustomNames,
 ): RequestResult {
   if (character === undefined) {
     return { ok: false, reason: "no-character" };
@@ -48,5 +55,14 @@ export function buildRequest(
 
   const dayStillOpen = day !== undefined && now !== undefined ? !isDayClosed(day, now) : false;
 
-  return { ok: true, request: { signals, character, vision, dayStillOpen } };
+  return {
+    ok: true,
+    request: {
+      signals,
+      character,
+      vision,
+      dayStillOpen,
+      ...(customNames !== undefined ? { customNames } : {}),
+    },
+  };
 }

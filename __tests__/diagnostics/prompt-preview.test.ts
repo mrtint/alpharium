@@ -172,3 +172,42 @@ describe("PP8 — 조립 실패는 값으로 표시되고 빈 문자열이 아�
     }
   });
 });
+
+describe("035 — 사용자 지정 이름이 미리보기의 호칭 줄에 흐른다 (FR-018)", () => {
+  // 진단 탭의 프롬프트 미리보기는 파이프라인을 거치지 않으므로 `buildRequest`가
+  // 직접 `customNames`를 받아야 한다. 안 그러면 사용자가 이름을 "복실이"로 바꿔도
+  // 미리보기는 계속 코드 기본 이름을 보인다 — spec.md §2-3 표가 이 자리에서
+  // `너는 '복실이'이라 불린다.`를 확인하라고 못 박았다.
+
+  it("customNames를 주면 그 이름이 호칭 줄에 들어간다", () => {
+    const named = buildPreview("quiet", SIGNAL_PRESETS[0], { quiet: "복실이" });
+    const plain = buildPreview("quiet", SIGNAL_PRESETS[0]);
+
+    expect(named.ok && plain.ok).toBe(true);
+    if (named.ok && plain.ok) {
+      expect(named.text).toContain("너는 '복실이'이라 불린다.");
+      expect(named.text).not.toContain("너는 '금동이'이라 불린다.");
+      // 안 주면 코드 기본 이름 그대로 — 옛 동작이 안 깨진다.
+      expect(plain.text).toContain("너는 '금동이'이라 불린다.");
+    }
+  });
+
+  it("collectPromptPreviews(customNames)가 그 이름을 전 프리셋에 흘린다", () => {
+    const previews = collectPromptPreviews({ quiet: "복실이" });
+    for (const preset of SIGNAL_PRESETS) {
+      const p = previews.quiet[preset.id];
+      expect(p.ok).toBe(true);
+      if (p.ok) expect(p.text).toContain("너는 '복실이'이라 불린다.");
+    }
+  });
+
+  it("이름은 호칭 줄에만 흐른다 — tagline·성격 지시는 안 바뀐다 (FR-019)", () => {
+    const named = buildPreview("quiet", SIGNAL_PRESETS[0], { quiet: "복실이" });
+    const plain = buildPreview("quiet", SIGNAL_PRESETS[0]);
+    if (named.ok && plain.ok) {
+      // 호칭 줄 한 줄만 다르다.
+      const diff = named.text.split("\n").filter((line, i) => line !== plain.text.split("\n")[i]);
+      expect(diff).toEqual(["너는 '복실이'이라 불린다."]);
+    }
+  });
+});

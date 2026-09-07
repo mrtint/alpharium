@@ -117,6 +117,23 @@
   **`diary-character-select.yml`은 이 화면과 무관하다**(설정 탭의 `AuthorPicker`를
   본다). 셋 다 `scrollUntilVisible`로 찾아 들어가므로 **행 높이가 바뀌면 문안·
   `testID`가 전부 불변이어도 깨질 수 있다**(025의 "컨테이너 상단에서 멈춘다").
+- **★ Maestro가 NativeWind로 이관된 `Pressable`의 좌표를 잘못 볼 수 있다**(035
+  실측, SM-S901N). 설정 탭 하단 `AuthorPicker`의 `author-rename-0`
+  (`className` + `style` 병행 `Pressable`)에 `scrollUntilVisible` → `tapOn`을
+  하면, Maestro의 뷰 계층 질의가 **엉뚱한 좌표**(그 위 시간대 선택 그리드)를
+  반환해 "16시"를 눌러 키보드가 올라온다 — `adb shell uiautomator dump`로 얻는
+  좌표는 **정확하며** 그 좌표로 raw `adb input tap`을 하면 편집기가 정상적으로
+  열린다. 033의 "`Pressable`은 responder 시스템으로 컴파일된다"와 같은 계열이되
+  이번엔 `tapOn`이 아니라 **`scrollUntilVisible`의 대상 좌표**가 빗나갔다.
+  `welcome-naming.yml`의 rename 블록이 이것 때문에 자동화 실패했고, 계약 테스트
+  (`author-picker.test.tsx` W18·W19)와 실기기 raw-adb 검증으로 대체했다.
+- **RN 리스트의 `key`는 위치여야 한다 — 표시 문자열을 키로 쓰지 않는다**(035
+  실측). `AuthorPicker`가 `<View key={opt.name}>`였는데, 이름을 바꾸면 `opt.name`
+  이 바뀌어 **줄이 언마운트·리마운트**되고 편집 중인 로컬 `useState`(`editing`)가
+  사라졌다 — 실기기에서 저장 버튼에 닿기 전에 편집기가 닫혔다. 로스터는
+  `CHARACTERS` 순서로 고정이라 `key={index}`가 안정적이다. jest는 리렌더를
+  자동으로 안 시켜 이 결함을 못 잡았다 — `rerender()`로 부모 갱신을 흉내내는
+  테스트를 따로 넣어야 한다.
 
 ## 도구 사용법 — 실기기 검증 전에 (실측으로 얻은 것)
 

@@ -44,10 +44,14 @@ appId: com.anonymous.alpharium
 - assertVisible: "일기 작성자"
 
 # 준비된 캐릭터에 이름 편집 진입점이 있다(FR-022, W17).
+# ⚠️ author-picker는 설정 탭 맨 아래라 편집 버튼이 처음엔 화면 밖이다 —
+#    visibilityPercentage를 낮춰 부분만 보여도 스크롤을 멈춘다(025 실측).
 - scrollUntilVisible:
     element:
       id: "author-rename-0"
     direction: DOWN
+    visibilityPercentage: 30
+    centerElement: true
 - assertVisible:
     id: "author-rename-0"
 
@@ -55,14 +59,20 @@ appId: com.anonymous.alpharium
 - tapOn:
     id: "author-rename-0"
 
-# 편집을 열면 현재 이름이 초기값이다.
+# 편집을 열면 현재 이름이 초기값이다. ⚠️ 편집기의 TextInput이 autoFocus라
+# 키보드가 올라오며 저장 버튼이 화면 밖으로 밀린다 — 키보드를 내리고 스크롤한다.
 - assertVisible:
     id: "author-rename-input-0"
-
 - tapOn:
     id: "author-rename-input-0"
 - eraseText
 - inputText: "복실이"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "author-rename-save-0"
+    direction: DOWN
+    visibilityPercentage: 40
 - tapOn:
     id: "author-rename-save-0"
 
@@ -79,11 +89,23 @@ appId: com.anonymous.alpharium
 - assertNotVisible: ".*Q4_K_M.*"
 
 # ── 이름을 비우면 기본 이름으로 되돌아간다 (FR-025, W19) ──────────────────
+- scrollUntilVisible:
+    element:
+      id: "author-rename-0"
+    direction: DOWN
+    visibilityPercentage: 30
+    centerElement: true
 - tapOn:
     id: "author-rename-0"
 - tapOn:
     id: "author-rename-input-0"
 - eraseText
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "author-rename-save-0"
+    direction: DOWN
+    visibilityPercentage: 40
 - tapOn:
     id: "author-rename-save-0"
 

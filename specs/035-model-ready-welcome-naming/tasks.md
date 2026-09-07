@@ -190,12 +190,29 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 
 - [X] T043 Maestro 흐름 `.maestro/welcome-naming.yml` 작성 — 환영 화면 등장, 작명 입력·확정, 설정 탭 이름 변경, 목록 반영을 검증한다. **텍스트 매칭은 노드 전체와 맞으므로 부분 문자열은 정규식으로**, `scrollUntilVisible`이 필요한 자리를 확인한다
 - [X] T044 `scripts/run-device-tests.mjs`의 `FLOWS` 배열에 `.maestro/welcome-naming.yml` 등록 — **등록하지 않으면 파일이 있어도 안 돌고 초록불인데 아무것도 검증되지 않는다**(AGENTS.md 경고)
-- [ ] T045 [US1] 실기기 US1 검증 — quickstart.md §2-2 표대로: `pm clear` → 온보딩 → 에셋 다운로드 완주 → **홈이 아니라 환영 흐름이 먼저 뜨는지**, 대기 문구에 응답 텍스트·초·토큰 수 0건, `adb logcat`에서 **확인용 프롬프트가 일기 프롬프트보다 훨씬 짧은지**(L6 — 화자 규칙 8줄이 없어야 한다), 재실행 시 환영 미재등장(FR-008)
-- [ ] T046 [US2] 실기기 US2 검증 — quickstart.md §2-3 표대로: 빈 입력·13자 차단, 건너뛰기 시 기본 이름, 재실행 후 이름 유지, **네 곳 반영**(목록·설정·진단·프롬프트). 프롬프트는 개발자 탭 "입력 프롬프트 미리보기"(022)에서 `너는 '복실이'이라 불린다.`를 확인한다
-- [ ] T047 [US3] 실기기 US3 검증 — quickstart.md §2-4 표대로. **SC-005a 재현**: 이름 "금동이"로 일기 A 생성 → "복실이"로 변경 → 일기 B 생성 → 목록에서 A는 "금동이", B는 "복실이". `adb shell run-as com.anonymous.alpharium cat files/diary/<날짜>.json | grep authorName`으로 스냅샷 확인
-- [ ] T048 확인 실패 갈래 검증(FR-006·FR-007) — quickstart.md §2-5: 모델을 손상시켜(`dd if=/dev/urandom`) 환영 미표시·플레이스홀더 없음·오류 사유 미노출·[다시 시도]/[건너뛰기] 동작 확인. **재현이 어려우면 계약 테스트로 갈음한다**(spec 명시)
-- [ ] T049 Maestro 회귀 — `diary-character-select.yml`(023에서 페르소나 이름을 문안으로 씀 — 이름이 사용자 지정이 되면 깨질 수 있다), `prompt-preview.yml`(022 — 호칭 줄이 바뀐다), `diary-user-path.yml`을 돌린다. 깨지면 **035 회귀인지 기존 stale 버그인지 구분해 기록**한다(022·023·024가 반복 겪은 것)
-- [ ] T050 `unified-permission-onboarding.yml`(021)을 **맨 마지막에** 돌린다 — `pm clear`로 데이터가 날아가므로
+- [X] T045 [US1] 실기기 US1 검증 (2026-09-08, SM-S901N, debug) — `onboarding.json`이 pre-035(2필드)라 `welcomeShown` 파싱 폴백이 동작 → 재시작 시 **홈이 아니라 환영 흐름**이 먼저 떴다. 대기·환영 문구에 응답 텍스트·초·토큰 수 **0건**, 모델 식별자 **0건**. `adb logcat`에서 확인용 프롬프트가 **`num_prompt_tokens=18`**(화자 규칙 8줄 없음, 토큰 시퀀스 `...user...안녕?` 하나뿐), 일기 프롬프트(700+토큰)보다 훨씬 짧음(L6). `has_media=0`. 확인 1회만 돎(L12). 작명 후 `onboarding.json`에 `welcomeShown:true` 추가 → 재실행 시 환영 미재등장(FR-008). ⚠️ 첫 실행 전체(`pm clear` + ~2GB 에셋 다운로드)는 재현 안 함 — 게이트 판정만 pre-035 파일로 재현
+- [X] T046 [US2] 실기기 US2 검증 (2026-09-08) — 환영 흐름에서 13자 입력 → maxLength 12로 잘림(FR-013), 빈 입력이면 "이 이름으로 할래요" 비활성(FR-012), "나중에 할래요" 탈출구(FR-014). "복실이" 입력·확정 → 홈 도달, `character-names.json`에 `{"names":{"quiet":"복실이"}}` 저장(W19 — quiet만). **네 곳 반영 확인**: ① 목록·상세("복실이는 이렇게 일기를 작성했어요.") ② 설정 "일기 작성자"(`author-option-0` = "복실이") ③ 진단 탭 "입력 프롬프트 미리보기"(`너는 '복실이'이라 불린다.` — **`collectPromptPreviews`가 `customNames`를 안 받던 결함을 발견·수정**, 아래 수렴 태스크 참조) ④ 상세 화면 폴백(`authorName` 없는 옛 일기가 현재 이름으로 표시). 재실행 후 이름 유지
+- [X] T047 [US3] 실기기 US3·SC-005a 검증 (2026-09-08) — 설정 "일기 작성자"에서 rename 편집기 열기·"TestName" 입력·저장 → `author-option-0` 즉시 갱신·`character-names.json` 반영(FR-022), **tagline 불변**("군더더기 없이 담백하게 적어요" — 헌법 1.4.0). 이름 비우고 저장 → "금동이"로 되돌아감·`{"names":{}}`로 키 삭제(FR-025·W19). 미준비 캐릭터(루이·오드·샤오바이)는 rename 진입점 없음(FR-023). **SC-005a**: 이름 없음(기본 "금동이")으로 일기 A(2026-09-05) 생성 → `authorName:"금동이"` 스냅샷. `character-names.json`에 "복실이" 직접 기록 후 재시작 → 일기 B(2026-09-06) 생성 → `authorName:"복실이"`. 목록·상세에서 A는 "금동이", B는 "복실이"(소급 마이그레이션 없음). ⚠️ Maestro로 rename을 자동화하지 못함 — 아래 참조
+- [X] T048 확인 실패 갈래 (FR-006·FR-007) — **계약 테스트로 갈음**(spec 명시). `judgeLiveness()`의 `failed` 네 갈래(`!loaded`/`timeout`/빈 텍스트/공백만)가 `__tests__/welcome/liveness.test.ts` L3에서 기기 없이 검증됨. 모델 손상 재현은 하지 않음(모델 재다운로드 비용)
+- [X] T049 Maestro 회귀 (2026-09-08) — `prompt-preview.yml`(022) **PASS**(호칭 줄 기본값 유지 — `quiet`만 이름이 바뀌고 흐름은 캐릭터 전환 칩을 봄). `diary-user-path.yml` **PASS**. `diary-character-select.yml` — **stale 버그 발견·수정**: 029 이후 홈 레이아웃이 커져 "일기 쓰기"가 처음부터 화면 밖 → `scrollUntilVisible`로 교체(035 회귀 아님, AGENTS.md 025 계열). 재실행 PASS. 캐릭터 선택 로직 자체는 정상(미준비 캐릭터 탭 무시, `selected-character.json`이 `quiet` 유지)
+- [ ] T050 `unified-permission-onboarding.yml`(021)을 **맨 마지막에** 돌린다 — `pm clear`로 데이터가 날아가므로. **아직 안 돌림**(다른 실기기 세션과 함께, 모델 재배치가 따르므로)
+
+### ⚠️ `.maestro/welcome-naming.yml` — 자동화 실패, 수동 검증으로 대체
+
+`welcome-naming.yml`이 rename 편집기를 여는 데 실패한다(2026-09-08 실기기, 4회
+시도). 원인: **Maestro의 뷰 계층 질의가 NativeWind(034)로 이관된 `AuthorPicker`의
+`author-rename-0`(`Pressable`) 좌표를 잘못 보고한다** — `scrollUntilVisible`이
+그 잘못된 좌표로 시간대 선택 그리드가 화면을 채우도록 스크롤하고, `tapOn`이
+"16시"를 눌러 키보드가 올라온다. `adb shell uiautomator dump`로 얻는 좌표는
+**정확하며**(그 좌표로 raw `adb input tap`을 하면 편집기가 정상적으로 열린다 —
+T047에서 그렇게 검증했다), Maestro 자체 계층 질의만 빗나간다. 033의
+"`Pressable`은 responder 시스템으로 컴파일된다" 계열이되, 이번엔 `tapOn`이 아니라
+`scrollUntilVisible`의 대상 좌표가 문제다. `key={opt.name}` → `key={index}`
+수정으로도 해결되지 않았다(그 수정은 별개의 편집 상태 유실 결함이었고,
+`author-picker.test.tsx`가 잠갔다). **다음 작업자에게**: 이 흐름의 rename 블록은
+계약 테스트(`author-picker.test.tsx` W18·W19)와 실기기 raw-adb 검증(T047)으로
+덮여 있으므로, Maestro 흐름은 "환영 화면 등장 + 설정 탭 진입"까지만 신뢰하고
+rename 자동화는 재작성이 필요하다.
 
 ---
 
@@ -206,6 +223,22 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 - [X] T053 `specs/035-model-ready-welcome-naming/spec.md`의 미확인 잔여를 갱신한다 — 실기기에서 확인 못 한 갈래를 명시적으로 남긴다(원칙 V — "건너뛴 것은 통과가 아니다")
 - [ ] T054 quickstart.md §3 완료 판정 체크리스트를 전부 확인한다
 - [ ] T055 PR 생성 — `main` 직접 커밋 금지(헌법·AGENTS.md). 커밋 메시지는 한국어. **T001(헌법) 커밋이 코드 커밋보다 앞에 있는지** `git log --oneline`으로 확인한다
+
+---
+
+## Phase 8: 수렴 (실기기 검증 중 발견)
+
+**Purpose**: T046 실기기 검증에서 FR-018의 "진단(개발자) 화면" 반영 자리가
+실제로는 코드 기본 이름을 보이던 것을 발견했다. `/speckit-converge`가 F1~F4를
+잡을 때 이 경로(진단 프롬프트 미리보기)는 놓쳤다 — 저장·읽기가 아니라 **인자
+전달 누락**이라 정적 분석에 안 걸렸다.
+
+- [X] T056 `src/diary/request.ts` — `buildRequest`에 옵셔널 `customNames` 인자 추가, 있으면 `request`에 얹는다. 실제 생성 경로는 `pipeline.ts`가 얹지만 진단 미리보기는 파이프라인을 안 거친다
+- [X] T057 `src/diagnostics/prompt-preview.ts` — `buildPreview`·`collectPromptPreviews`가 `customNames`를 받아 `buildRequest`로 흘린다(옵셔널, 옛 호출자 안 깨짐)
+- [X] T058 `src/diagnostics/report.ts` — `ReportOptions.customNames` 추가, 두 `collectPromptPreviews()` 호출에 `options.customNames` 전달
+- [X] T059 `src/ui/DiagnosticsScreen.tsx` + `App.tsx` — `DiagnosticsScreenProps.characterNames`, `collectReport({ customNames })`, App.tsx가 `customNames` state를 넘긴다
+- [X] T060 `__tests__/diagnostics/prompt-preview.test.ts` — 미리보기 호칭 줄에 `customNames`가 흐르는지(3 테스트: `buildPreview`·`collectPromptPreviews`·호칭 줄만 다름). 실기기(2026-09-08)에서 진단 탭에 `너는 '복실이'이라 불린다.` 확인
+- [X] T061 `src/ui/AuthorPicker.tsx` — 줄 `key={opt.name}` → `key={index}`. 이름을 바꾸면 줄이 리마운트되어 편집 상태가 사라지던 결함(실기기 발견). `author-picker.test.tsx`에 리마운트 방어 2 테스트 추가
 
 ---
 

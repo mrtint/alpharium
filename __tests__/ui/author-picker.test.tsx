@@ -157,6 +157,36 @@ describe("W18·W19 — 편집 입력과 저장", () => {
     expect(onRename).not.toHaveBeenCalled();
     expect(screen.queryByTestId("author-rename-input-0")).toBeNull();
   });
+
+  it("★ 편집 중 이름 prop이 바뀌어도 편집기가 살아 있다 (줄 key는 위치다)", async () => {
+    // key={opt.name}이면 이름이 바뀌는 순간 줄이 언마운트·리마운트되어 편집
+    // 상태가 사라진다 — 실기기에서 저장 버튼에 닿기 전에 편집기가 닫혔다(035).
+    const { rerender } = await render(
+      <AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={() => {}} />,
+    );
+    await fireEvent.press(screen.getByTestId("author-rename-0"));
+    await fireEvent.changeText(screen.getByTestId("author-rename-input-0"), "복");
+
+    // 부모가 다른 이유로 다시 그려도(예: readiness 갱신) 편집기가 유지된다.
+    rerender(
+      <AuthorPicker
+        options={[{ ...OPTIONS[0]!, name: "금동이" }, OPTIONS[1]!, OPTIONS[2]!]}
+        onSelect={() => {}}
+        onRename={() => {}}
+      />,
+    );
+
+    expect(screen.queryByTestId("author-rename-input-0")).not.toBeNull();
+    expect(screen.getByTestId("author-rename-input-0").props.value).toBe("복");
+  });
+
+  it("★ 소스의 줄 key가 opt.name이 아니다 (리마운트로 편집이 날아가지 않도록)", () => {
+    const CODE = readFileSync(join(__dirname, "../../src/ui/AuthorPicker.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(CODE).not.toMatch(/key=\{opt\.name\}/);
+    expect(CODE).toMatch(/key=\{index\}/);
+  });
 });
 
 describe("035 — 화면은 여전히 모델도 검증 규칙도 모른다 (원칙 III)", () => {
