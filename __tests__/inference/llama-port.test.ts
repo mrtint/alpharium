@@ -12,6 +12,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { buildPrompt, promptPrefix } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character } from "../../src/diary/types";
@@ -580,7 +583,7 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     const engine = createLlamaEngine(loader, pathFor);
 
     await engine.load("narrative");
-    await engine.prewarm("narrative");
+    await engine.prewarm("narrative", promptPrefix("narrative"));
 
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
@@ -595,14 +598,14 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     const engine = createLlamaEngine(loader, pathFor);
 
     await engine.load("narrative");
-    expect(await engine.prewarm("narrative")).toBeUndefined();
+    expect(await engine.prewarm("narrative", promptPrefix("narrative"))).toBeUndefined();
   });
 
   it("E9: load() 없이 부르면 네이티브를 건드리지 않고 조용히 끝난다", async () => {
     const { calls, loader } = recordingLoader();
     const engine = createLlamaEngine(loader, pathFor);
 
-    await expect(engine.prewarm("narrative")).resolves.toBeUndefined();
+    await expect(engine.prewarm("narrative", promptPrefix("narrative"))).resolves.toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 
@@ -611,8 +614,19 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     const engine = createLlamaEngine(loader, pathFor);
 
     await engine.load("quiet");
-    await expect(engine.prewarm("narrative")).resolves.toBeUndefined();
+    await expect(engine.prewarm("narrative", promptPrefix("narrative"))).resolves.toBeUndefined();
     expect(calls).toHaveLength(0);
+  });
+
+  it("N18: llama-port.ts가 diary/prompt를 import하지 않는다 (035)", () => {
+    // 018에서는 포트가 promptPrefix()를 직접 불렀다. 035가 사용자 지정 이름을
+    // 접두사에 들이면서 포트가 이름까지 알아야 하는 문제가 생겼고, 접두사를
+    // 통째로 인자로 받아 해소했다 — 경계가 오히려 깨끗해졌다.
+    const code = readFileSync(join(__dirname, "../../src/inference/llama-port.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/from\s+["'][^"']*diary\/prompt["']/);
+    expect(code).not.toContain("promptPrefix");
   });
 
   it("E10: completion()이 실패해도 던지지 않는다", async () => {
@@ -627,6 +641,6 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     }, pathFor);
 
     await engine.load("narrative");
-    await expect(engine.prewarm("narrative")).resolves.toBeUndefined();
+    await expect(engine.prewarm("narrative", promptPrefix("narrative"))).resolves.toBeUndefined();
   });
 });

@@ -34,8 +34,8 @@
 
 import { USER_VISIBLE_SIGNAL_AXES, type DaySignals, type SignalValue } from "../signals/types";
 import type { PhotoVision } from "../vision/types";
-import { personaOf } from "./persona";
-import type { Character, DiaryRequest } from "./types";
+import { displayNameOf } from "./character-name";
+import type { Character, CustomNames, DiaryRequest } from "./types";
 
 /* ────────────────────────── 고정 지시문 ────────────────────────── */
 
@@ -141,8 +141,8 @@ const TITLE_INSTRUCTION = [
  * 절대 읽지 않는다(persona.md 계약 P4) — 소개 문구가 프롬프트에 섞이면 "군더더기
  * 없이 담백하게 적어요" 같은 문구가 성격 지시로 오독될 위험이 있다.
  */
-function nameLine(character: Character): string {
-  return `너는 '${personaOf(character).name}'이라 불린다.`;
+function nameLine(character: Character, customNames: CustomNames): string {
+  return `너는 '${displayNameOf(character, customNames)}'이라 불린다.`;
 }
 
 /**
@@ -152,9 +152,16 @@ function nameLine(character: Character): string {
  * 어긋나면 프리워밍의 KV 캐시가 빗나가 018의 효과가 조용히 사라진다(성능
  * 저하로만 나타나 오류가 없다).
  */
-function fixedHead(character: Character): string[] {
+function fixedHead(character: Character, customNames: CustomNames): string[] {
   const language = LANGUAGE[character];
-  return [...SPEAKER_RULES, nameLine(character), TITLE_INSTRUCTION, "", `${language}로 써라.`, ""];
+  return [
+    ...SPEAKER_RULES,
+    nameLine(character, customNames),
+    TITLE_INSTRUCTION,
+    "",
+    `${language}로 써라.`,
+    "",
+  ];
 }
 
 /**
@@ -163,8 +170,8 @@ function fixedHead(character: Character): string[] {
  * **`buildPrompt()`의 결과는 언제나 이 문자열로 시작한다**(P8) — 그 성질이
  * 018 기능 전체의 안전장치이며 `prompt.test.ts`가 잠근다.
  */
-export function promptPrefix(character: Character): string {
-  return fixedHead(character).join("\n");
+export function promptPrefix(character: Character, customNames: CustomNames = {}): string {
+  return fixedHead(character, customNames).join("\n");
 }
 
 /** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것과 이름뿐이다** */
@@ -271,7 +278,11 @@ const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못�
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
-  const lines = [...SPEAKER_RULES, nameLine(request.character), TITLE_INSTRUCTION];
+  const lines = [
+    ...SPEAKER_RULES,
+    nameLine(request.character, request.customNames ?? {}),
+    TITLE_INSTRUCTION,
+  ];
 
   // 012 — 사진 축과 무관하게, 하루가 아직 끝나지 않았으면 붙는다(FR-004).
   if (request.dayStillOpen) {
@@ -469,7 +480,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
 
   return [
     // 018 — promptPrefix()와 같은 배열에서 나온다(contracts/prompt-prefix.md P9).
-    ...fixedHead(request.character),
+    ...fixedHead(request.character, request.customNames ?? {}),
     ...dayStillOpenPart,
     `${request.signals.date}에 네가 본 것:`,
     ...signalLines(request.signals),

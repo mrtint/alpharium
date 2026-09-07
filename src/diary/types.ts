@@ -44,6 +44,19 @@ export type VisionSetting = "none" | "quick" | "detailed";
 export const VISION_SETTINGS: readonly VisionSetting[] = ["none", "quick", "detailed"] as const;
 
 /**
+ * 사용자가 지은 캐릭터 이름들 (035, 헌법 1.4.0).
+ *
+ * **일부 캐릭터만 값이 있을 수 있다** — 안 지은 캐릭터는 키가 없다. `null`이나
+ * `""`로 채우지 않는다(원칙 V: 모르는 것을 기본값으로 채우지 않는다).
+ *
+ * **여기 있는 이유**: `DiaryRequest`가 이 타입을 쓰고 `character-name.ts`가
+ * `Character`를 쓰므로, 저쪽에 두면 순환 import가 된다. 캐릭터에 딸린 모양이니
+ * 캐릭터 타입 옆이 맞는 자리다. 해석(`displayNameOf`)은 여전히
+ * `character-name.ts` 하나뿐이다(FR-017).
+ */
+export type CustomNames = Partial<Record<Character, string>>;
+
+/**
  * 추론 어댑터가 받는 입력.
  *
  * **모델 식별자를 담지 않는다**(FR-008). 어느 모델이 도는지는 요청이 알 바가 아니다 —
@@ -71,6 +84,18 @@ export type DiaryRequest = {
    * 결과에서 나온 값이어야 한다("두 개의 진실" 금지, 원칙 II).
    */
   placeName?: string;
+  /**
+   * 사용자가 지은 캐릭터 이름들 (035 FR-018·FR-019).
+   *
+   * **요청에 실려 다닌다** — 별도 인자로 두면 부르는 쪽이 잊을 수 있고, 잊어도
+   * 오류가 아니라 **조용히 기본 이름이 쓰인다**(011의 `has_media=0`, 013의 URI
+   * 계약 불일치와 같은 계열의 결함). 017이 `placeName?`을 같은 방식으로 더했다.
+   *
+   * 옵셔널이며 없으면 코드 안 기본 이름을 쓴다 — `displayNameOf()`가 그 폴백의
+   * 유일한 자리다(FR-017). **호칭 한 줄에만 흐르고 소개·말투로 번지지
+   * 않는다**(헌법 1.4.0, 014 계약 P4).
+   */
+  customNames?: CustomNames;
 };
 
 /**
@@ -102,6 +127,21 @@ export type DiaryEntry = {
    */
   title?: string;
   character: Character;
+  /**
+   * 생성 시점의 작성자 표시 이름 (035 FR-026a).
+   *
+   * **생성 시점의 사실이며 이후 갱신되지 않는다**(N11). 사용자가 이름을 바꿔도
+   * 이미 저장된 일기의 이 값은 그대로다 — 그때 그 이름으로 쓴 것이 사실이고,
+   * 나중 이름으로 덮으면 없던 일을 만드는 것이다.
+   *
+   * **옵셔널이며 옛 일기에는 없다.** 없으면 현재 이름 규칙으로 폴백한다
+   * (FR-026b) — **소급 생성하지 않는다**(N12, 원칙 V). 그 시점의 이름은
+   * 관측된 적이 없는 값이며, 지어내면 원칙 V 위반이다.
+   *
+   * **문자열 하나뿐이다**(N10·FR-026c). 이름 이력·변경 시각·모델 식별자가
+   * 들어갈 자리가 없다 — `RunResult`가 둘뿐인 것과 같은 방어.
+   */
+  authorName?: string;
   signalsUsed: DaySignals;
   createdAt: Date;
   /**

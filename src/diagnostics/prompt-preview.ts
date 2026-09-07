@@ -21,7 +21,7 @@
 
 import { buildRequest } from "../diary/request";
 import { buildPrompt } from "../diary/prompt";
-import { CHARACTERS, type Character } from "../diary/types";
+import { CHARACTERS, type Character, type CustomNames } from "../diary/types";
 import type { DaySignals } from "../signals/types";
 import type { PromptPreview, PromptPreviewSet } from "./types";
 
@@ -112,8 +112,16 @@ export const SIGNAL_PRESETS: readonly SignalPreset[] = [
 export function buildPreview(
   character: Character | undefined,
   preset: SignalPreset,
+  customNames: CustomNames = {},
 ): PromptPreview {
-  const request = buildRequest(preset.signals, character, "none", preset.signals.date, PREVIEW_NOW);
+  const request = buildRequest(
+    preset.signals,
+    character,
+    "none",
+    preset.signals.date,
+    PREVIEW_NOW,
+    customNames,
+  );
 
   if (!request.ok) {
     return { ok: false, reason: `요청을 만들 수 없다 (${request.reason})` };
@@ -128,13 +136,20 @@ export const PRESET_LABELS: Readonly<Record<string, string>> = Object.fromEntrie
   SIGNAL_PRESETS.map((preset) => [preset.id, preset.label]),
 );
 
-/** 다섯 캐릭터 × 모든 프리셋의 미리보기 (022 FR-005·FR-007, PP4). */
-export function collectPromptPreviews(): Readonly<Record<Character, PromptPreviewSet>> {
+/**
+ * 다섯 캐릭터 × 모든 프리셋의 미리보기 (022 FR-005·FR-007, PP4).
+ *
+ * **035 — `customNames`를 받아 호칭 줄에 흐르게 한다**(FR-018). 안 주면 코드 기본
+ * 이름으로 조립된다(옛 호출자가 안 깨지도록 옵셔널).
+ */
+export function collectPromptPreviews(
+  customNames: CustomNames = {},
+): Readonly<Record<Character, PromptPreviewSet>> {
   return Object.fromEntries(
     CHARACTERS.map((character) => [
       character,
       Object.fromEntries(
-        SIGNAL_PRESETS.map((preset) => [preset.id, buildPreview(character, preset)]),
+        SIGNAL_PRESETS.map((preset) => [preset.id, buildPreview(character, preset, customNames)]),
       ),
     ]),
   ) as Readonly<Record<Character, PromptPreviewSet>>;

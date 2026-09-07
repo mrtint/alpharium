@@ -28,7 +28,7 @@ import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createPipeline, type LockHandle, type Pipeline } from "../diary/pipeline";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
-import type { Character, VisionSetting } from "../diary/types";
+import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
 import { acquireLock as acquireLockRecord, releaseLock, type LockPort } from "../schedule/lock";
@@ -38,6 +38,8 @@ import { expoPhotoPort } from "../signals/expo-port";
 import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
 import type { VisionOutcome } from "../vision/types";
+import type { LivenessOutcome } from "../welcome/liveness";
+import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
 
 /**
  * 조립 결과.
@@ -84,6 +86,14 @@ export type AppPipelineResult =
         vision: VisionSetting,
       ) => Promise<VisionOutcome>;
       /**
+       * 이 캐릭터가 살아 있는지 한 번 확인하는 통로 (035, liveness.md L8·L13).
+       *
+       * `prepare`·`captionDay`와 같은 이유로 옵셔널이다 — 데스크톱 경로에는
+       * 확인할 온디바이스 엔진이 없다. **`"ok" | "failed"` 둘뿐이라 시간·응답
+       * 텍스트가 밖으로 나갈 자리가 없다**(원칙 IV).
+       */
+      checkLiveness?: (character: Character) => Promise<LivenessOutcome>;
+      /**
        * 이 파이프라인이 쓰는 일기 저장소 (020).
        *
        * 백그라운드 자동 생성(`src/schedule/task.ts`)이 "지금 어느 하루를
@@ -104,6 +114,7 @@ export type AppPipelineResult =
       prepare?: undefined;
       release?: undefined;
       captionDay?: undefined;
+      checkLiveness?: undefined;
       store?: undefined;
     };
 
@@ -114,6 +125,13 @@ export type WiringDeps = {
   isModelReady?: (character: Character) => Promise<boolean>;
   /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
   geocodingEnabled?: boolean;
+  /**
+   * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
+   *
+   * `prepare()`가 프리필할 접두사와 `generate()`가 만드는 프롬프트가 **같은
+   * 이름을 봐야** KV 캐시가 빗나가지 않는다. 주지 않으면 기기 통로를 쓴다.
+   */
+  loadCustomNames?: () => Promise<CustomNames>;
   /**
    * 이 파이프라인을 누가 조립하는가 (020, contracts/generation-lock.md L5).
    *
@@ -140,6 +158,11 @@ function deviceStore(): DiaryStore {
   return fileStore(expoFileSystemPort("diary"));
 }
 
+/** 사용자가 지은 이름들. 035의 저장 통로를 그대로 쓴다 */
+function deviceCustomNames(): Promise<CustomNames> {
+  return loadCustomNames(expoCharacterNamesPort());
+}
+
 /** 그 하루의 실제 신호. 004의 수집을 그대로 쓴다 */
 function deviceSignals(day: DayDate): Promise<DaySignals> {
   return collectDaySignals(expoPhotoPort(), day);
@@ -163,6 +186,7 @@ export function createAppPipeline(
     undefined,
     desktopInferenceUrl(),
     deps.loadSignals ?? deviceSignals,
+    deps.loadCustomNames ?? deviceCustomNames,
   );
   if (!selection.ok) {
     return { ok: false, reason: selection.reason, detail: selection.detail };
@@ -211,6 +235,8 @@ export function createAppPipeline(
   const prepare = selection.backend.prepare?.bind(selection.backend);
   const release = selection.backend.release?.bind(selection.backend);
   const captionDay = selection.backend.captionDay?.bind(selection.backend);
+  // 035 — 정상 동작 확인. 위 넷과 같은 이유로 데스크톱에는 undefined다.
+  const checkLiveness = selection.backend.checkLiveness?.bind(selection.backend);
 
   return {
     ok: true,
@@ -220,6 +246,7 @@ export function createAppPipeline(
     prepare,
     release,
     captionDay,
+    checkLiveness,
     store,
   };
 }

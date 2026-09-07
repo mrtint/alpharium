@@ -20,7 +20,7 @@ import type { PhotoVision } from "../vision/types";
 import { buildRequest } from "./request";
 import type { DiaryStore } from "./store";
 import { extractTitle } from "./title";
-import type { Character, DiaryEntry, VisionSetting } from "./types";
+import type { Character, CustomNames, DiaryEntry, VisionSetting } from "./types";
 
 /** 어느 단계에서 멈췄는가. 실패 경로마다 정확히 하나가 붙는다(FR-019). */
 export type PipelineStage =
@@ -87,6 +87,22 @@ export type PipelineInput = {
    * 파이프라인을 거치지 않고는 실제 백엔드에 닿을 수 없다)의 해소다.
    */
   seen?: PhotoVision;
+  /**
+   * 사용자가 지은 캐릭터 이름들 (035 FR-018).
+   *
+   * 프롬프트의 호칭 줄에 실린다 — 파이프라인은 이 값을 해석하지 않고
+   * `buildRequest()`가 만든 요청에 실어 그대로 넘긴다(018의 `seen?`과 같은
+   * 방식). 없으면 코드 안 기본 이름이 쓰인다.
+   */
+  customNames?: CustomNames;
+  /**
+   * 이 일기에 남길 작성자 표시 이름 (035 FR-026a).
+   *
+   * **주입받는다** — 파이프라인이 `displayNameOf()`를 부르지 않는다. 조립부가
+   * 이미 계산한 문자열을 그대로 담아, 화면 표시와 저장된 이름이 어긋나지
+   * 않게 한다("두 개의 진실" 금지). 없으면 키 자체를 만들지 않는다.
+   */
+  authorName?: string;
 };
 
 /**
@@ -255,6 +271,12 @@ async function runStages(
     return stop("request-build", "캐릭터가 정해지지 않아 요청을 만들지 못했다");
   }
 
+  // 035 — 사용자 지정 이름을 요청에 싣는다(FR-018). 프롬프트의 호칭 줄이
+  // 이 값을 쓴다. 없으면 코드 안 기본 이름이며 035 이전과 같은 문자열이 나온다.
+  if (input.customNames !== undefined) {
+    request.request = { ...request.request, customNames: input.customNames };
+  }
+
   // 4b. 모델이 기기에 있는가 (003 FR-008).
   //
   // **생성을 시도하기 전에 막는다.** 요청이 만들어져야 어느 캐릭터인지 알 수 있으므로
@@ -314,6 +336,11 @@ async function runStages(
     text: body,
     ...(title !== undefined ? { title } : {}),
     character: request.request.character,
+    // 035 — **생성 시점의 이름을 함께 남긴다**(FR-026a). 나중에 이름을 바꿔도
+    // 이 일기의 작성자 표시는 그대로다 — 그때 그 이름으로 쓴 것이 사실이다.
+    // 요청에 이름이 없으면(옛 경로) 키 자체를 만들지 않는다(N10) — `undefined`를
+    // 담으면 「없다」와 「모른다」가 뒤섞인다.
+    ...(input.authorName !== undefined ? { authorName: input.authorName } : {}),
     signalsUsed: signals,
     createdAt: input.now,
     ...(generated.usedPhotos !== undefined ? { photos: generated.usedPhotos } : {}),

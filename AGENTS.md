@@ -89,6 +89,27 @@
   `onResponderRelease`만 남는다 — `getByTestId(...).props.onPressIn`으로
   배선을 검사하려던 계약 테스트가 이것 때문에 실패했다. 이벤트를 실제로
   쏘거나(`fireEvent(node, "pressIn")`) 소스를 읽어 확인한다.
+- **RNTL 14는 `render`도 `fireEvent`도 Promise를 반환한다** — 둘 다 `await`
+  없이는 렌더·상태 갱신이 flush되지 않는다(025가 `fireEvent`를, 035가 `render`를
+  실측). `await` 없이 쓰면 **"`render` function has not been called"**라는
+  엉뚱한 오류가 나서 원인을 안 가리킨다. 쿼리는 `screen.*`에서 온다(반환값
+  구조분해가 아니다).
+- **★ 018의 프롬프트 접두사에서 호칭 줄을 빼면 안 된다**(035 실측·위반 주입).
+  접두사에 들어가는 캐릭터별 값은 **이름과 출력 언어 둘뿐**인데, 한국어
+  캐릭터가 셋(`quiet`·`narrative`·`imaginative`)이라 **이름을 빼면 셋의 접두사가
+  완전히 같아진다** — 018 P11("캐릭터마다 접두사가 다르다")이 막으려던
+  "캐릭터를 바꿔도 이전 캐릭터의 KV 캐시를 재사용한다"가 정확히 발생한다.
+  035가 사용자 지정 이름을 접두사에 들이며 이 갈래를 실제로 시험했고,
+  `prompt.test.ts`의 N16이 위반 주입에서 잡는 것을 확인했다.
+  **이름이 바뀌어 접두사가 바뀌는 것 자체는 문제가 아니다** — KV 캐시가 부분
+  재사용되어 **느려질 뿐 틀리지 않으며**, 018 계약 E10이 이미 그것을 허용한다.
+  무효화 로직을 만들지 않는다(만들면 "언제 무효화하는가"를 재게 되고 원칙 IV다).
+- **계약 테스트가 소스를 읽을 때는 주석을 먼저 걷어낸다**(011 `vision/
+  engine.test.ts`가 세우고 035가 재확인). 이 저장소의 주석은 **무엇을 왜
+  금지하는가**를 적으므로 금지어가 설명 안에 정당하게 등장한다 — 주석째로
+  검사하면 이유를 적을 수 없게 되고, 그것은 이 저장소가 지켜 온 것과 정반대다.
+  `.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")`가 관용구다.
+  `scripts/constitution-rules.ts`의 검사들도 같은 이유로 줄 단위로 걷어낸다.
 - **`CharacterListScreen`은 설정 탭 하단에 있다**(029 SS4가 「캐릭터」 탭을 흡수).
   `App.tsx`의 `ModelSection` 안, `VisionPicker`·`GeocodingSettingToggle` 아래다.
   이 화면을 지나는 Maestro 흐름은 **`download-conflict`·
@@ -96,6 +117,23 @@
   **`diary-character-select.yml`은 이 화면과 무관하다**(설정 탭의 `AuthorPicker`를
   본다). 셋 다 `scrollUntilVisible`로 찾아 들어가므로 **행 높이가 바뀌면 문안·
   `testID`가 전부 불변이어도 깨질 수 있다**(025의 "컨테이너 상단에서 멈춘다").
+- **★ Maestro가 NativeWind로 이관된 `Pressable`의 좌표를 잘못 볼 수 있다**(035
+  실측, SM-S901N). 설정 탭 하단 `AuthorPicker`의 `author-rename-0`
+  (`className` + `style` 병행 `Pressable`)에 `scrollUntilVisible` → `tapOn`을
+  하면, Maestro의 뷰 계층 질의가 **엉뚱한 좌표**(그 위 시간대 선택 그리드)를
+  반환해 "16시"를 눌러 키보드가 올라온다 — `adb shell uiautomator dump`로 얻는
+  좌표는 **정확하며** 그 좌표로 raw `adb input tap`을 하면 편집기가 정상적으로
+  열린다. 033의 "`Pressable`은 responder 시스템으로 컴파일된다"와 같은 계열이되
+  이번엔 `tapOn`이 아니라 **`scrollUntilVisible`의 대상 좌표**가 빗나갔다.
+  `welcome-naming.yml`의 rename 블록이 이것 때문에 자동화 실패했고, 계약 테스트
+  (`author-picker.test.tsx` W18·W19)와 실기기 raw-adb 검증으로 대체했다.
+- **RN 리스트의 `key`는 위치여야 한다 — 표시 문자열을 키로 쓰지 않는다**(035
+  실측). `AuthorPicker`가 `<View key={opt.name}>`였는데, 이름을 바꾸면 `opt.name`
+  이 바뀌어 **줄이 언마운트·리마운트**되고 편집 중인 로컬 `useState`(`editing`)가
+  사라졌다 — 실기기에서 저장 버튼에 닿기 전에 편집기가 닫혔다. 로스터는
+  `CHARACTERS` 순서로 고정이라 `key={index}`가 안정적이다. jest는 리렌더를
+  자동으로 안 시켜 이 결함을 못 잡았다 — `rerender()`로 부모 갱신을 흉내내는
+  테스트를 따로 넣어야 한다.
 
 ## 도구 사용법 — 실기기 검증 전에 (실측으로 얻은 것)
 

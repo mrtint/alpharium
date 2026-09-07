@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from "react-native";
 
 import { createAppPipeline } from "../app/wiring";
 import { currentEnvironment } from "../config/environment";
-import { CHARACTERS, type Character } from "../diary/types";
+import { CHARACTERS, type Character, type CustomNames } from "../diary/types";
 import { collectReport } from "../diagnostics/report";
 import { PRESET_LABELS } from "../diagnostics/prompt-preview";
 import type { DiagnosticReport } from "../diagnostics/types";
@@ -60,18 +60,26 @@ const generation = createAppPipeline(currentEnvironment());
  */
 const PROBE_CHARACTER: Character = "imaginative";
 
-export function DiagnosticsScreen() {
+/**
+ * 035 — `characterNames`가 프롬프트 미리보기의 호칭 줄에 흐른다(FR-018). 안 주면
+ * 코드 기본 이름으로 미리보기가 조립된다(옛 호출자·테스트가 안 깨지도록 옵셔널).
+ */
+export type DiagnosticsScreenProps = {
+  characterNames?: CustomNames;
+};
+
+export function DiagnosticsScreen({ characterNames }: DiagnosticsScreenProps = {}) {
   const [report, setReport] = useState<DiagnosticReport | null>(null);
 
   useEffect(() => {
     let alive = true;
-    collectReport().then((r) => {
+    collectReport({ customNames: characterNames }).then((r) => {
       if (alive) setReport(r);
     });
     return () => {
       alive = false;
     };
-  }, []);
+  }, [characterNames]);
 
   if (!report) {
     return (

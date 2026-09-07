@@ -116,5 +116,9 @@ appId: com.anonymous.alpharium
           id: "author-option-2"
 
 # 설정 탭을 벗어나도 크래시가 없다.
+# ⚠️ 029 이후 홈 레이아웃이 커져 "일기 쓰기"가 처음부터 화면에 없다 — 스크롤로
+#    찾는다(AGENTS.md 025 "행 높이가 바뀌면 assertVisible이 깨진다").
 - tapOn: "일기"
-- assertVisible: "일기 쓰기"
+- scrollUntilVisible:
+    element: "일기 쓰기"
+    direction: DOWN

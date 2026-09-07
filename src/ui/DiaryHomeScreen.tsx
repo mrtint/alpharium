@@ -102,7 +102,30 @@ export type DiaryHomeScreenProps = {
   initialDay?: DayDate | null;
   /** 그 하루의 일기를 사용자가 확인했음을 기록한다 (020, FR-007 (2)). */
   onAcknowledge?: (day: DayDate) => void;
+  /**
+   * 캐릭터 → 지금 부르는 이름 (035 FR-018).
+   *
+   * **조립부가 `displayNameOf()`로 만든 문자열만 받는다** — 화면은 사용자 지정
+   * 이름이 어디 저장되는지도, 폴백 규칙도 모른다(FR-017의 단일 통과 지점).
+   * 주지 않으면 `personaOf()`의 기본 이름을 쓴다.
+   */
+  characterNames?: Readonly<Partial<Record<Character, string>>>;
 };
+
+/**
+ * 이 캐릭터를 지금 뭐라 부르는가 (035 FR-018).
+ *
+ * **화면은 사용자 지정 이름의 저장·검증을 모른다** — 조립부가 이미 만든 문자열을
+ * 받아 쓰고, 안 받았으면(옛 호출자·테스트) `personaOf()`의 기본 이름을 쓴다.
+ * 규칙의 유일한 자리는 `diary/character-name.ts`의 `displayNameOf()`이며 이
+ * 함수는 그 결과를 고르기만 한다.
+ */
+function nameOf(
+  character: Character,
+  names: Readonly<Partial<Record<Character, string>>> | undefined,
+): string {
+  return names?.[character] ?? personaOf(character).name;
+}
 
 export function DiaryHomeScreen({
   resolution,
@@ -117,6 +140,7 @@ export function DiaryHomeScreen({
   captionDay,
   now = () => new Date(),
   onGoToSettings,
+  characterNames,
   initialDay,
   onAcknowledge,
 }: DiaryHomeScreenProps) {
@@ -289,13 +313,18 @@ export function DiaryHomeScreen({
             character: params.character,
             vision: params.vision,
             ...(seenVision !== undefined ? { seen: seenVision } : {}),
+            // 035 — 프롬프트의 호칭 줄과 저장될 작성자 이름이 같은 값에서 나온다
+            // ("두 개의 진실" 금지). 없으면 코드 안 기본 이름이 쓰인다.
+            ...(characterNames !== undefined ? { customNames: characterNames } : {}),
+            authorName: nameOf(params.character, characterNames),
           },
           (stage, branch) => {
             if (stage === "load" && branch === undefined) return;
 
             setScreen((s) => {
               if (s.kind !== "writing") return s;
-              const characterName = stage === "load" ? personaOf(params.character).name : undefined;
+              const characterName =
+                stage === "load" ? nameOf(params.character, characterNames) : undefined;
               const line = pickMonologue(stage, branch, s.line, characterName);
               return { ...s, stage, branch, line };
             });
@@ -313,7 +342,9 @@ export function DiaryHomeScreen({
         running.current = false;
       }
     },
-    [pipeline, now, onGenerated],
+    // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
+    // 생성·독백이 돈다(조용히 틀리는 결함).
+    [pipeline, now, onGenerated, characterNames],
   );
 
   /**
@@ -336,9 +367,10 @@ export function DiaryHomeScreen({
     // 029 — 캐릭터가 옮겨졌으면 화면에 알린다(FR-014). persona 이름으로 문장을 만든다.
     setMovedNotice(
       outcome.params.movedFrom !== undefined
-        ? `${personaOf(outcome.params.movedFrom).name}을(를) 쓸 수 없어 ${
-            personaOf(outcome.params.character).name
-          }(으)로 바꿨다`
+        ? `${nameOf(outcome.params.movedFrom, characterNames)}을(를) 쓸 수 없어 ${nameOf(
+            outcome.params.character,
+            characterNames,
+          )}(으)로 바꿨다`
         : undefined,
     );
 
@@ -351,7 +383,7 @@ export function DiaryHomeScreen({
     }
 
     await generate({ ...outcome.params, day: prompt.day });
-  }, [screen, now, chosenDay, resolve, generate]);
+  }, [screen, now, chosenDay, resolve, generate, characterNames]);
 
   const cancel = useCallback(async () => {
     cancelled.current = true;
@@ -389,7 +421,10 @@ export function DiaryHomeScreen({
     case "detail":
       return (
         <Frame onBack={() => void backToList()}>
-          <DiaryDetailScreen entry={screen.entry} />
+          <DiaryDetailScreen
+            currentAuthorName={nameOf(screen.entry.character, characterNames)}
+            entry={screen.entry}
+          />
         </Frame>
       );
 
@@ -435,6 +470,7 @@ export function DiaryHomeScreen({
       return (
         <Frame onBack={() => void backToList()}>
           <DiaryDetailScreen
+            currentAuthorName={nameOf(screen.entry.character, characterNames)}
             entry={screen.entry}
             saved={screen.saved}
             overwrote={screen.overwrote}

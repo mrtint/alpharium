@@ -124,6 +124,19 @@ const FLOWS = [
   // ~2GB 다운로드·실제 생성·모델 파일 조작·사람의 눈이 필요하다. quickstart.md
   // Q1~Q6를 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/writing-flow-simplified.yml",
+  // 035 — 첫 만남 연출과 캐릭터 작명. **설정 탭에서 준비된 캐릭터의 이름을
+  // 바꿀 수 있는가**(미준비는 못 바꾸는가), **바꾼 이름이 즉시 반영되는가**,
+  // **비우면 기본 이름으로 돌아가는가**, **소개는 그대로인가**를 본다.
+  // ⚠️ **첫 실행 환영 연출(US1)과 확인 실패 갈래는 여기 없다** — `pm clear` +
+  // ~2GB 에셋 다운로드, 모델 파일 손상이 필요하다. quickstart.md §2-2·§2-5를
+  // 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
+  // ⚠️⚠️ **rename 블록이 실기기(SM-S901N, 2026-09-08)에서 자동화 실패한다** —
+  // Maestro가 NativeWind로 이관된 `author-rename-0`(`Pressable`)의 좌표를 잘못
+  // 봐 시간대 그리드를 눌러 버린다(AGENTS.md 참조). raw `adb input tap`으로는
+  // 정상이고, 계약 테스트(`author-picker.test.tsx` W18·W19)와 T047 실기기
+  // raw-adb 검증이 rename을 덮는다. 이 흐름은 "환영 화면 등장 + 설정 탭 진입"
+  // 까지만 신뢰하고, rename 자동화는 재작성이 필요하다.
+  ".maestro/welcome-naming.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

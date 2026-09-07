@@ -19,11 +19,13 @@ import {
   checkMonologueFile,
   checkOnboardingFile,
   checkPhotoPortFile,
+  checkPromptFile,
   checkScheduleFile,
   checkSeedFile,
   checkSegmentedFile,
   checkSourceFile,
   checkVisionFile,
+  checkWelcomeFile,
   formatViolations,
   type Violation,
 } from "./constitution-rules.ts";
@@ -74,6 +76,12 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 026 — 세그먼트 병렬 코어가 캐릭터·속도에 닿지 못하게. checkSegmentedFile이
       // 경로로 대상(src/models/segmented/)을 정한다.
       violations.push(...checkSegmentedFile(child, contents));
+      // 035 — 연출·작명 계층이 로스터·프롬프트·판정·저장소·시간에 닿지 못하게.
+      // checkWelcomeFile이 경로로 대상(src/welcome/)을 정한다.
+      violations.push(...checkWelcomeFile(child, contents));
+      // 035 — 반대 방향. 일기 프롬프트가 연출 계층을 참조하지 못하게 막는다.
+      // 한쪽만 막으면 prompt.ts가 확인용 문자열을 끌어올 수 있다(L7).
+      violations.push(...checkPromptFile(child, contents));
     }
   }
 

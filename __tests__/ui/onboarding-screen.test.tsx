@@ -107,7 +107,7 @@ function makePorts(overrides?: {
 const BASE_PROPS = {
   platform: "android" as const,
   requirements: PERMISSION_REQUIREMENTS,
-  flag: { completed: false, batteryNoticeShown: false },
+  flag: { completed: false, batteryNoticeShown: false, welcomeShown: false },
 };
 
 describe("S1 — 첫 단계 (FR-005·FR-006)", () => {
@@ -217,7 +217,7 @@ describe("S1 — 플랫폼 필터 (FR-003)", () => {
       <OnboardingScreen
         platform="ios"
         requirements={reqs}
-        flag={{ completed: false, batteryNoticeShown: true }}
+        flag={{ completed: false, batteryNoticeShown: true, welcomeShown: false }}
         ports={ports}
         onComplete={() => {}}
       />,
@@ -272,7 +272,7 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
     await render(
       <OnboardingScreen
         {...BASE_PROPS}
-        flag={{ completed: false, batteryNoticeShown: true }}
+        flag={{ completed: false, batteryNoticeShown: true, welcomeShown: false }}
         ports={ports}
         onComplete={() => {}}
       />,
@@ -294,7 +294,7 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
     await render(
       <OnboardingScreen
         {...BASE_PROPS}
-        flag={{ completed: false, batteryNoticeShown: true }}
+        flag={{ completed: false, batteryNoticeShown: true, welcomeShown: false }}
         ports={ports}
         onComplete={() => {}}
       />,
@@ -322,7 +322,7 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
     await render(
       <OnboardingScreen
         {...BASE_PROPS}
-        flag={{ completed: false, batteryNoticeShown: true }}
+        flag={{ completed: false, batteryNoticeShown: true, welcomeShown: false }}
         ports={ports}
         onComplete={() => {}}
       />,

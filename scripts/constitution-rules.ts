@@ -158,6 +158,17 @@ const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets)\b/;
 const UI_TOUCHES_PROMPT = /\bfrom\s+["'][^"']*diary\/prompt["']/;
 
 /**
+ * 화면이 연출 판정 계층(`src/welcome/`)에 닿는 것 (035 W14).
+ *
+ * 022가 `UI_TOUCHES_PROMPT`로 화면→프롬프트를 막은 것과 같은 자리다. 화면이 받는
+ * 것은 `phase`("checking"/"welcome"/"failed") 갈래와 이름 문자열, 콜백뿐이며,
+ * `LivenessOutcome`·`LIVENESS_INPUT`·`judgeLiveness`에 닿으면 확인의 내부가
+ * 화면으로 샌다(원칙 IV — 그 순간 "얼마나 걸렸나"를 그리고 싶어진다).
+ */
+const UI_TOUCHES_WELCOME =
+  /\bfrom\s+["'][^"']*welcome\/(?:liveness|decision|naming|names-port)["']|\bjudgeLiveness\b|\bLIVENESS_INPUT\b/;
+
+/**
  * 진단 경로가 사용자 화면의 축 제외 상수를 보는 것 (012, 헌법 원칙 V).
  *
  * ─────────────────────────────────────────────────────────────────────────
@@ -234,6 +245,17 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "화면이 프롬프트 조립에 닿는다 — 진단 리포트의 문자열만 받아야 한다 (022 FR-008, 원칙 II)",
+      });
+    }
+
+    // 035 — 화면은 연출 판정 계층을 모른다. 022가 `diary/prompt`를 막은 것과 같은
+    // 자리다(welcome-gate.md W14). 화면이 받는 것은 `phase` 갈래와 이름 문자열,
+    // 콜백뿐이며 `LivenessOutcome`·`LIVENESS_INPUT`에 닿으면 안 된다.
+    if (normalized.startsWith("src/ui/") && UI_TOUCHES_WELCOME.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "화면이 연출 판정 계층에 닿는다 — phase 갈래와 문자열만 받아야 한다 (035 W14, 원칙 III·IV)",
       });
     }
   }
@@ -672,6 +694,106 @@ export function checkSegmentedFile(fileName: string, contents: string): Violatio
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "세그먼트 코어가 속도·처리량을 잰다 — 진행률은 fraction 하나뿐이다 (026 FR-016, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
+/* ─────────────────── 환영 연출·작명 경계 검사 (035) ─────────────────── */
+
+/**
+ * 연출·작명 계층이 제품 계층에 닿는 것을 잡는다
+ * (035, contracts/liveness.md L5·L7·L11, character-name.md N6, 원칙 III·IV).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `src/welcome/`는 모델이 준비됐을 때의 정상 동작 확인·작명 검증·진입 판정을 모으는
+ * 자리다. 020의 `checkScheduleFile`, 021의 `checkOnboardingFile`과 같은 성격이다.
+ *
+ * **막는 것**:
+ *  - `models/roster`·`ModelAsset`·`assetFor` — 연출 계층이 모델을 알면 화면까지
+ *    새는 경로가 생긴다(원칙 III).
+ *  - `diary/prompt`(`buildPrompt`·`promptPrefix`) — 확인용 입력은 일기 프롬프트가
+ *    아니다(L7). 섞이면 `prompt.ts`가 일기와 무관한 문자열을 갖게 되고, 018의
+ *    `fixedHead()` 배열이 그것과 뒤섞일 위험이 생긴다.
+ *  - `diary/acceptance`(`judge`) — 「안녕?」의 응답은 `echo`·`language`로 거부될 수
+ *    있는데 그것은 모델이 죽었다는 뜻이 아니다. 일기 판정 4갈래를 이 경로에
+ *    끌어들이면 갈래의 의미가 흐려진다(L5, 005 FR-018b).
+ *  - `diary/store`·`DiaryEntry` — 확인이 실패해도 플레이스홀더 일기를 만들지
+ *    않는다(L11, 원칙 I). 011의 `checkVisionFile`이 같은 이유로 같은 것을 막았다.
+ *  - 시간·토큰 어휘 — 확인 결과는 갈래 둘뿐이고 값을 갖지 않는다(L2, 원칙 IV).
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const WELCOME_TOUCHES_PRODUCT_LAYER =
+  /\bfrom\s+["'][^"']*(?:(?:models\/|\.\.?\/)roster|diary\/(?:prompt|acceptance|store|pipeline|persona))["']|\bassetFor\b|\bModelAsset\b|\bbuildPrompt\b|\bpromptPrefix\b|\bDiaryEntry\b/;
+
+/**
+ * 확인 결과가 시간·토큰을 담는 것 (L2, 원칙 IV).
+ *
+ * `LivenessOutcome`이 문자열 둘인 것이 방어다 — `{ kind, elapsedMs }`로 바뀌면
+ * 여기서 걸린다. `LIVENESS_TIMEOUT_MS` 상수 선언은 상한이지 측정이 아니므로
+ * `timeoutMs`·`TIMEOUT_MS`는 제외한다.
+ */
+const WELCOME_MEASURES_TIME =
+  /\b(?:elapsed\w*|durationMs|timings|tokens_\w+|predicted\w*|perSecond|Date\.now|performance\.now)\b/;
+
+/** 연출·작명 계층 파일인지 보고, 맞으면 위 규칙을 적용한다. */
+export function checkWelcomeFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/welcome/")) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (WELCOME_TOUCHES_PRODUCT_LAYER.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "연출·작명 계층이 로스터·프롬프트·판정·저장소에 닿는다 (035 L5·L7·L11, 원칙 I·III)",
+      });
+    }
+
+    if (WELCOME_MEASURES_TIME.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "정상 동작 확인이 시간·토큰을 담는다 — 갈래 둘뿐이어야 한다 (035 L2, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
+/**
+ * 프롬프트가 연출 계층을 참조하는 것을 잡는다 (035 L7 역방향, FR-003b).
+ *
+ * `LIVENESS_INPUT`과 일기 프롬프트는 **서로를 모른다**. `checkWelcomeFile`이
+ * 한 방향을 막고 이것이 반대 방향을 막는다 — 한쪽만 막으면 `prompt.ts`가
+ * 확인용 문자열을 끌어와 `fixedHead()` 옆에 두는 일이 생길 수 있고, 그러면
+ * 018의 접두사 바이트 동일성(P8~P11)이 흔들린다.
+ */
+const PROMPT_TOUCHES_WELCOME = /\bfrom\s+["'][^"']*welcome\/[^"']*["']|\bLIVENESS_INPUT\b/;
+
+/** `src/diary/prompt.ts`가 연출 계층을 참조하는지 본다. */
+export function checkPromptFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (normalized !== "src/diary/prompt.ts") return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (PROMPT_TOUCHES_WELCOME.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "일기 프롬프트가 연출 계층을 참조한다 — 둘은 서로를 모른다 (035 L7, FR-003b)",
       });
     }
   }

@@ -40,6 +40,16 @@ export type CharacterListProps = {
   /** 캐릭터별 준비 상태 */
   readiness: Record<Character, ModelReadiness>;
   /**
+   * 캐릭터 → 지금 부르는 이름 (035 FR-018).
+   *
+   * **조립부가 만든 문자열만 받는다** — 화면은 사용자 지정 이름의 저장·폴백
+   * 규칙을 모른다(FR-017). 주지 않으면 `personaOf()`의 기본 이름을 쓴다.
+   *
+   * **`tagline`은 여기 없다** — 소개는 코드 안 고정값이며 사용자가 바꿀 수
+   * 없다(헌법 1.4.0이 연 것은 이름뿐이다).
+   */
+  characterNames?: Readonly<Partial<Record<Character, string>>>;
+  /**
    * 무엇을 보일 것인가 — **판정은 `download-view.ts`가 끝냈다**(008).
    *
    * 006까지 이 자리가 `progress: DownloadProgress | null`이었고, 화면이 「받는 중인가」를
@@ -215,6 +225,7 @@ const ROW_OVERRIDE = { paddingVertical: 12 } as const;
 
 export function CharacterListScreen(props: CharacterListProps) {
   const { readiness, view, usage, onPrepare, onPause, onRemove, onDismissNotice } = props;
+  const { characterNames } = props;
   const { visionReadiness, visionProgress, onPrepareVision, onRemoveVision, visionBytes } = props;
 
   return (
@@ -267,7 +278,12 @@ export function CharacterListScreen(props: CharacterListProps) {
                   014 — persona.ts의 이름·소개로 보인다(FR-001·004). 003의 FR-004a
                   주석("이름은 사람이 짓는다")이 가리키던 빈자리를 이제 채운다.
                 */
-                name={personaOf(character).name}
+                /*
+                  035 — 이름은 사용자가 지을 수 있다(헌법 1.4.0). 주입값이 없으면
+                  `persona.ts`의 기본 이름으로 떨어진다 — 빈 이름은 나오지 않는다.
+                  **소개는 그대로 `personaOf()`에서 온다** — 사용자가 못 바꾼다.
+                */
+                name={characterNames?.[character] ?? personaOf(character).name}
                 tagline={personaOf(character).tagline}
                 /*
                   거부당한 줄도 **평소대로다**(008 FR-007). 거부는 그 캐릭터의 준비

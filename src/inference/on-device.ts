@@ -23,15 +23,24 @@
 
 import type { DayDate } from "../config/day-boundary";
 import { judge } from "../diary/acceptance";
-import { buildPrompt, instructionLines } from "../diary/prompt";
+import { buildPrompt, instructionLines, promptPrefix } from "../diary/prompt";
 import { buildRequest } from "../diary/request";
-import type { Character, DiaryRequest, VisionSetting } from "../diary/types";
+import type { Character, CustomNames, DiaryRequest, VisionSetting } from "../diary/types";
 import type { DaySignals, Photo } from "../signals/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
 import { reachedVisionLimit, selectForVision } from "../vision/select";
 import type { PhotoCaption, PhotoVision, VisionDepth, VisionOutcome } from "../vision/types";
 import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
+// 035 — 정상 동작 확인. **순수 판정만 가져온다**(`judgeLiveness`는 시간을 재지
+// 않고 응답이 비었는가만 본다). 이 어댑터가 `run()`을 부르는 유일한 자리이므로
+// 확인 경로도 여기 있어야 E1(한 번에 하나만 열림)을 지킬 수 있다.
+import {
+  judgeLiveness,
+  LIVENESS_INPUT,
+  LIVENESS_TIMEOUT_MS,
+  type LivenessOutcome,
+} from "../welcome/liveness";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
@@ -83,6 +92,21 @@ export type StoppableBackend = InferenceBackend & {
    * 한다 — 두 엔진이 동시에 열리면 안 된다(E1·E15).
    */
   captionDay(day: DayDate, character: Character, vision: VisionSetting): Promise<VisionOutcome>;
+  /**
+   * 이 캐릭터가 살아 있는가 (035, contracts/liveness.md L8·L10·L12·L13).
+   *
+   * 모델이 준비된 직후 **응답이 오는가만** 한 번 확인한다. `load()` →
+   * `run(LIVENESS_INPUT)` → `judgeLiveness()` 순서로 돌며, **응답 텍스트는
+   * 판정 직후 버린다**(L10) — 반환값이 `"ok" | "failed"` 둘뿐이라 글이 밖으로
+   * 나갈 자리가 구조적으로 없다.
+   *
+   * **`prewarm()`을 쓰지 않는다**(L8) — 반환값이 없어(018 E6) 성공·실패를
+   * 알 수 없다. 018의 시그니처는 그대로 둔다.
+   *
+   * **품질을 채점하지 않는다**(원칙 IV) — 길이·언어·유사도를 재지 않고
+   * 「비었는가」만 본다. `judgeLiveness()`가 그 판정의 유일한 자리다.
+   */
+  checkLiveness(character: Character): Promise<LivenessOutcome>;
 };
 
 /**
@@ -292,6 +316,15 @@ export function createOnDeviceBackend(
    * 같은 함수가 주입된다.
    */
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
+  /**
+   * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
+   *
+   * `prepare()`가 프리필할 접두사를 만들 때 쓴다 — **`prewarm()`과 `run()`이
+   * 같은 이름을 봐야** KV 캐시가 빗나가지 않는다. 화면은 이름을 모르므로
+   * (원칙 III) `loadSignals`와 같은 방식으로 주입받는다. 주지 않으면 기본
+   * 이름으로 프리필하며, 그때도 틀리지 않고 느려질 뿐이다(018 E10).
+   */
+  loadCustomNames?: () => Promise<CustomNames>,
 ): StoppableBackend {
   /**
    * 그만두라는 신호. **캡션 단계와 생성 단계가 함께 본다.**
@@ -336,7 +369,18 @@ export function createOnDeviceBackend(
       if (engine === undefined) return;
       const loaded = await engine.load(character);
       if (!loaded.ok) return; // E13 — 조용히 끝난다. generate()가 다시 시도한다.
-      await engine.prewarm(character);
+
+      /*
+       * 035 — **`prewarm()`과 `run()`이 같은 이름을 봐야 한다**(N14).
+       *
+       * 이름이 접두사에 들어가므로, 여기서 프리필한 접두사와 `generate()`가
+       * 만드는 프롬프트의 머리가 어긋나면 KV 캐시가 빗나간다. 화면은 이름을
+       * 모르므로(원칙 III) 여기서 읽는다 — `loadSignals`를 주입받은 것과 같은
+       * 구조다. 읽지 못하면 기본 이름으로 프리필하며, 그때도 **틀리지 않고
+       * 느려질 뿐이다**(018 E10).
+       */
+      const customNames = (await loadCustomNames?.().catch(() => ({}))) ?? {};
+      await engine.prewarm(character, promptPrefix(character, customNames));
       // **unload하지 않는다**(E12) — 열어 두어야 generate()의 load()가
       // warm으로 재사용하고 KV 캐시가 살아 있다.
     },
@@ -344,6 +388,50 @@ export function createOnDeviceBackend(
     /** 준비해 둔 컨텍스트를 놓아준다 (018, E14) */
     async release(): Promise<void> {
       await engine?.unload().catch(() => {});
+    },
+
+    /**
+     * 이 캐릭터가 살아 있는가 (035, contracts/liveness.md L8·L10·L12·L13·L14).
+     *
+     * **`prepare()`와 같은 자리에 둔다** — 둘 다 "화면이 사용자를 기다리게 하기
+     * 전에 부르는 준비 작업"이고, `engine`을 직접 다루는 코드가 흩어지면 E1
+     * (한 번에 하나만 열림)을 지키기 어려워진다.
+     *
+     * **엔진이 없으면 `failed`다** — 시뮬레이터·웹에서 네이티브 모듈이 없는
+     * 경우이며, 그때 「살아 있다」고 말하면 거짓이다(원칙 I).
+     *
+     * **응답 텍스트를 버린다**(L10). `judgeLiveness()`에 넘긴 뒤 어디에도
+     * 담지 않는다 — 반환 타입이 `LivenessOutcome`이라 담을 자리가 없다.
+     */
+    async checkLiveness(character: Character): Promise<LivenessOutcome> {
+      if (engine === undefined) return "failed";
+
+      try {
+        const loaded = await engine.load(character);
+        if (!loaded.ok) return judgeLiveness({ loaded: false, text: "", ending: { kind: "eos" } });
+
+        // **상한은 engine.run() 구간만 잰다**(L14) — 위 load()는 포함하지 않는다.
+        // 023이 확립한 runWithTimeout()의 관례와 같다.
+        const outcome = await runWithTimeout(engine, LIVENESS_INPUT, LIVENESS_TIMEOUT_MS);
+        if (outcome.timedOut) {
+          return judgeLiveness({ loaded: true, text: "", ending: { kind: "timeout" } });
+        }
+
+        // 판정하고 나면 outcome.run.text는 여기서 끝난다(L10).
+        return judgeLiveness({
+          loaded: true,
+          text: outcome.run.text,
+          ending: outcome.run.ending,
+        });
+      } catch {
+        // 예외도 「대답이 오지 않았다」다. 오류 문구를 밖으로 내보내지 않는다
+        // (원칙 III — 그 안에 경로가, 경로에 자산 키가 있다).
+        return "failed";
+      } finally {
+        // E2 — 어떻게 끝나든 정리한다. 확인은 생성이 아니므로 컨텍스트를
+        // 열어 둘 이유가 없다(prepare()와 다른 점이다).
+        await engine.unload().catch(() => {});
+      }
     },
 
     /**
@@ -585,6 +673,15 @@ export function createOnDeviceBackend(
 export function onDeviceBackend(
   /** 018 2단계 — `captionDay()`가 신호를 읽는 데 쓴다. 주지 않으면 no-photos로 끝난다 */
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
+  /**
+   * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
+   *
+   * `prepare()`가 프리필할 접두사를 만들 때 쓴다 — **`prewarm()`과 `run()`이
+   * 같은 이름을 봐야** KV 캐시가 빗나가지 않는다. 화면은 이름을 모르므로
+   * (원칙 III) `loadSignals`와 같은 방식으로 주입받는다. 주지 않으면 기본
+   * 이름으로 프리필하며, 그때도 틀리지 않고 느려질 뿐이다(018 E10).
+   */
+  loadCustomNames?: () => Promise<CustomNames>,
 ): StoppableBackend {
   return createOnDeviceBackend(
     async () => {
@@ -600,6 +697,7 @@ export function onDeviceBackend(
     // 배선과 같은 종류의 조용한 실패가 나는 자리다.
     visionSupport(),
     loadSignals,
+    loadCustomNames,
   );
 }
 

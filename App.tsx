@@ -38,8 +38,14 @@ import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
 import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
 import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
 import { PERMISSION_REQUIREMENTS } from "./src/onboarding/requirements";
+// 035 — 환영 연출·작명. 조립부가 파일을 읽고 화면에는 문자열만 넘긴다.
+import { displayNameOf, type CustomNames } from "./src/diary/character-name";
+import { shouldShowWelcome } from "./src/welcome/decision";
+import { validateCharacterName } from "./src/welcome/naming";
+import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/welcome/names-port";
 import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
+import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { PermissionsSection } from "./src/ui/PermissionsSection";
 import { AppText } from "./src/ui/components/Text";
 import { COLORS } from "./src/ui/theme/tokens";
@@ -363,6 +369,157 @@ function AppFrame() {
     [onboardingFlagPort, refreshEssentialsReady],
   );
 
+  /* ─────────────────── 035 — 환영 연출 (게이트 세 번째 단) ─────────────────── */
+
+  /**
+   * 사용자가 지은 캐릭터 이름들 (035 FR-015).
+   *
+   * **조립부가 파일을 읽고 화면에는 문자열만 넘긴다** — `displayNameOf()`가
+   * 순수 함수로 남아야 `buildPrompt()`의 결정성(005 P6)이 지켜진다.
+   */
+  const characterNamesPort = useMemo(() => expoCharacterNamesPort(), []);
+  const [customNames, setCustomNames] = useState<CustomNames>({});
+
+  useEffect(() => {
+    let alive = true;
+    void loadCustomNames(characterNamesPort).then((names) => {
+      if (alive) setCustomNames(names);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [characterNamesPort]);
+
+  /**
+   * 지금 어느 단계인가 (035 W12). **영속하지 않는다**(FR-009) — 연출 도중 앱이
+   * 죽으면 다음 진입에서 확인부터 다시 한다.
+   */
+  const [welcomePhase, setWelcomePhase] = useState<WelcomePhase>("checking");
+
+  const welcomeNeeded =
+    onboardingFlag !== null &&
+    essentialsReady !== null &&
+    shouldShowWelcome({
+      onboardingNeeded: shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding,
+      essentialAssetsReady: essentialsReady,
+      welcomeShown: onboardingFlag.welcomeShown === true,
+    });
+
+  /**
+   * 정상 동작 확인을 **정확히 한 번** 돌린다 (035 L12).
+   *
+   * 자동 재시도 루프를 만들지 않는다 — 루프를 두면 "몇 번 만에 성공했나"가
+   * 생기고 그것이 지표다(원칙 IV). 실패하면 사용자가 [다시 시도]를 눌러야 한다.
+   */
+  const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    if (!welcomeNeeded) return;
+    let alive = true;
+
+    /*
+     * **비동기 콜백에서만 상태를 옮긴다.** 효과 본문에서 동기적으로
+     * `setWelcomePhase("checking")`을 부르면 연쇄 렌더가 생기고
+     * `react-hooks/set-state-in-effect`가 잡는다 — `"checking"`은 이미
+     * 초기값이고, 재시도는 아래 `onRetry`가 상태를 되돌린다.
+     */
+    async function check() {
+      // 어댑터는 `createAppPipeline`에서만 온다(006 FR-026) — 직접 만들지 않는다.
+      const wiring = createAppPipeline(environment);
+      const probe = wiring.ok ? wiring.checkLiveness : undefined;
+
+      // 데스크톱 경로거나 조립이 실패했으면 확인할 엔진이 없다 — 「살아 있다」고
+      // 말할 근거가 없으므로 실패로 둔다(원칙 I).
+      if (probe === undefined) return "failed" as const;
+
+      return await probe(ONBOARDING_DEFAULT_CHARACTER);
+    }
+
+    void check()
+      .then((outcome) => {
+        if (alive) setWelcomePhase(outcome === "ok" ? "welcome" : "failed");
+      })
+      .catch(() => {
+        if (alive) setWelcomePhase("failed");
+      });
+
+    return () => {
+      alive = false;
+    };
+    // `retryToken`이 바뀌면 확인을 다시 돌린다(L12 — 자동 루프가 아니라
+    // 사용자가 [다시 시도]를 누른 것이다).
+  }, [welcomeNeeded, environment, retryToken]);
+
+  /** 사용자가 [다시 시도]를 눌렀다. **연출 완료 플래그를 쓰지 않는다**(W9). */
+  const retryLivenessCheck = useCallback(() => {
+    setWelcomePhase("checking");
+    setRetryToken((n) => n + 1);
+  }, []);
+
+  /** 연출을 통과했다 (W9) — 이름 확정·건너뛰기·실패 후 건너뛰기 셋뿐이다. */
+  const finishWelcome = useCallback(
+    (names?: CustomNames) => {
+      if (names !== undefined) {
+        setCustomNames(names);
+        void saveCustomNames(characterNamesPort, names).catch(() => {});
+      }
+      setOnboardingFlag((prev) => {
+        if (prev === null) return prev;
+        const next = { ...prev, welcomeShown: true };
+        void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
+        return next;
+      });
+    },
+    [characterNamesPort, onboardingFlagPort],
+  );
+
+  /**
+   * 준비된 캐릭터의 이름을 바꾼다 (035 FR-022·FR-024·FR-025).
+   *
+   * **첫 만남과 같은 검증을 쓴다**(W18) — 두 자리에 각각 규칙을 두면 갈라진다.
+   * **비우면 키를 제거해 기본 이름으로 되돌린다**(W19) — `{ quiet: "" }`를
+   * 저장하면 파일에 뜻 없는 값이 남는다.
+   *
+   * **저장된 일기를 건드리지 않는다**(W20/N11) — 이 경로는 `DiaryStore`를
+   * 부르지 않으며, 과거 일기의 `authorName`은 생성 시점 그대로 남는다.
+   */
+  const onRenameCharacter = useCallback(
+    (character: Character, raw: string) => {
+      setCustomNames((prev) => {
+        const next: CustomNames = { ...prev };
+        const validated = validateCharacterName(raw);
+
+        if (validated.ok) {
+          next[character] = validated.value;
+        } else if (validated.reason === "empty") {
+          // 비운 것은 「기본 이름으로 되돌린다」는 뜻이다(FR-025).
+          delete next[character];
+        } else {
+          // too-long — 저장하지 않고 직전 값을 유지한다(FR-024).
+          return prev;
+        }
+
+        void saveCustomNames(characterNamesPort, next).catch(() => {});
+        return next;
+      });
+    },
+    [characterNamesPort],
+  );
+
+  const onSubmitWelcomeName = useCallback(
+    (raw: string) => {
+      // 화면이 아니라 조립부가 검증한다 — 첫 만남과 설정 편집이 같은 규칙을
+      // 쓰도록(W18) `validateCharacterName()` 하나를 공유한다.
+      const validated = validateCharacterName(raw);
+      finishWelcome(
+        validated.ok
+          ? { ...customNames, [ONBOARDING_DEFAULT_CHARACTER]: validated.value }
+          : undefined,
+      );
+    },
+    [customNames, finishWelcome],
+  );
+
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
@@ -379,6 +536,28 @@ function AppFrame() {
           flag={onboardingFlag}
           ports={onboardingPorts}
           onComplete={onOnboardingComplete}
+        />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  /*
+   * 035 — 진입 게이트의 세 번째 단: 온보딩 → **환영 연출** → 홈.
+   *
+   * `shouldShowWelcome()`이 `onboardingNeeded`를 인자로 받으므로(W2) 위 분기와
+   * 순서가 어긋날 수 없다. **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(W5)
+   * — 설정 탭에서 캐릭터를 새로 받아도 연출은 뜨지 않는다(FR-002a).
+   */
+  if (welcomeNeeded) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <WelcomeScreen
+          characterName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
+          onRetry={retryLivenessCheck}
+          onSkip={() => finishWelcome()}
+          onSubmitName={onSubmitWelcomeName}
+          phase={welcomePhase}
         />
         <StatusBar style="auto" />
       </SafeAreaView>
@@ -432,6 +611,8 @@ function AppFrame() {
           onAcknowledge={onAcknowledge}
           // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014).
           deniedNotices={deniedNotices}
+          // 035 — 사용자가 지은 이름. 화면은 문자열만 받는다(FR-018).
+          characterNames={customNames}
         />
       ) : tab === "settings" ? (
         // 020 — 자동 생성 설정(FR-001). 021 — "권한" 섹션. 029 — "일기 작성자"·
@@ -446,6 +627,9 @@ function AppFrame() {
           setProgress={setProgress}
           rejection={rejection}
           setRejection={setRejection}
+          // 035 — 사용자가 지은 이름과 그 편집 통로(FR-022).
+          characterNames={customNames}
+          onRenameCharacter={onRenameCharacter}
         />
       ) : (
         // **개발자 탭도 진단과 같은 조건에서만 그려진다** — 탭이 없으면 이 갈래에
@@ -453,7 +637,8 @@ function AppFrame() {
         // 대비해 한 번 더 지킨다(예: 실행 중 환경이 바뀌는 것은 없지만 방어적으로).
         showsDiagnostics && (
           <ScrollView style={styles.diagnostics}>
-            <DiagnosticsScreen />
+            {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
+            <DiagnosticsScreen characterNames={customNames} />
           </ScrollView>
         )
       )}
@@ -475,6 +660,7 @@ function DiarySection({
   onDayOpened,
   onAcknowledge,
   deniedNotices,
+  characterNames,
 }: {
   /** 029 — no-ready-character 실패 시 설정 탭으로 (FR-014) */
   onGoToSettings?: () => void;
@@ -486,6 +672,8 @@ function DiarySection({
   onAcknowledge?: (day: DayDate) => void;
   /** 021 — 거부된 권한 안내 (FR-014). 부모가 계산 */
   deniedNotices?: readonly string[];
+  /** 035 — 캐릭터 → 지금 부르는 이름. 조립부가 만든 문자열만 (FR-018) */
+  characterNames?: CustomNames;
 }) {
   const environment = currentEnvironment();
 
@@ -668,6 +856,7 @@ function DiarySection({
       onGenerated={onGenerated}
       deniedNotices={deniedNotices}
       onGoToSettings={onGoToSettings}
+      characterNames={characterNames}
       initialDay={initialDay}
       onAcknowledge={(day) => {
         onAcknowledge?.(day);
@@ -732,10 +921,13 @@ type ModelSectionProps = {
   setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
   rejection: DownloadRejection | null;
   setRejection: (rejection: DownloadRejection | null) => void;
+  /** 035 — 캐릭터 → 지금 부르는 이름 (FR-018). 아래 목록이 그린다. */
+  characterNames?: CustomNames;
 };
 
 function ModelSection(props: ModelSectionProps) {
   const { ports, acquisition, progress, setProgress, rejection, setRejection } = props;
+  const { characterNames } = props;
 
   /**
    * **준비 상태는 올리지 않는다**(008).
@@ -951,6 +1143,10 @@ function ModelSection(props: ModelSectionProps) {
   return (
     <CharacterListScreen
       readiness={readiness}
+      // 035 — 사용자가 지은 이름. 없으면 persona.ts의 기본 이름으로 떨어진다.
+      // **위 `AuthorPicker`와 같은 값을 봐야 한다** — 갈리면 같은 화면에서 한
+      // 캐릭터가 두 이름으로 보인다(수렴 검사 F3).
+      characterNames={characterNames}
       // **판정은 순수 함수가 하고 화면은 그린다**(008). 「거부 안내가 아직 참인가」가
       // 시간에 따라 거짓이 되므로, 지우는 코드를 두지 않고 **매번 다시 묻는다.**
       view={resolveDownloadView([...progress.values()], rejection)}
@@ -994,6 +1190,8 @@ function AutoDiarySection({
   setProgress,
   rejection,
   setRejection,
+  characterNames,
+  onRenameCharacter,
 }: {
   platform: "android" | "ios";
   onboardingPorts: OnboardingPorts;
@@ -1005,6 +1203,16 @@ function AutoDiarySection({
   setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
   rejection: DownloadRejection | null;
   setRejection: (rejection: DownloadRejection | null) => void;
+  /** 035 — 캐릭터 → 지금 부르는 이름 (FR-018·FR-022). */
+  characterNames?: CustomNames;
+  /**
+   * 035 — 준비된 캐릭터의 이름을 바꾼다 (FR-022·FR-025).
+   *
+   * 빈 문자열을 넘기면 기본 이름으로 되돌린다 — 조립부가 키를 제거한다(W19).
+   * 검증(`validateCharacterName`)도 조립부가 한다: 첫 만남과 설정이 같은
+   * 규칙을 쓴다(W18).
+   */
+  onRenameCharacter?: (character: Character, name: string) => void;
 }) {
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
@@ -1159,12 +1367,23 @@ function AutoDiarySection({
         {/* 029 — 일기 작성자 (FR-023). persona 이름·소개·준비 여부만. */}
         <AuthorPicker
           options={CHARACTERS.map((character) => ({
-            name: personaOf(character).name,
+            // 035 — 이름만 사용자가 지을 수 있다(헌법 1.4.0). **소개(tagline)는
+            // 코드 안 고정값 그대로다** — 말투·성격은 사용자가 바꿀 수 없다.
+            name: characterNames?.[character] ?? personaOf(character).name,
             tagline: personaOf(character).tagline,
             ready: readyChars.includes(character),
             selected: author === character,
           }))}
           onSelect={onSelectAuthor}
+          // index → Character는 조립부가 옮긴다 — 화면은 심볼을 모른다(원칙 III).
+          onRename={
+            onRenameCharacter === undefined
+              ? undefined
+              : (index, name) => {
+                  const character = CHARACTERS[index];
+                  if (character !== undefined) onRenameCharacter(character, name);
+                }
+          }
         />
       </View>
 
@@ -1186,6 +1405,7 @@ function AutoDiarySection({
         setProgress={setProgress}
         rejection={rejection}
         setRejection={setRejection}
+        characterNames={characterNames}
       />
 
       {/* 021 — 권한 상태·재요청·온보딩 재실행 (FR-017~020). prod에도 있다. */}

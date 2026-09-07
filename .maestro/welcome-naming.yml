@@ -1,0 +1,127 @@
+# 실기기 자동 테스트 — 첫 만남 연출과 캐릭터 작명 (035)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 검증 항목:
+#   035 FR-022·023   설정 탭 "일기 작성자"에서 준비된 캐릭터만 이름을 바꾼다
+#   035 FR-012·013   빈 이름은 확정할 수 없고, 글자 수 상한이 있다
+#   035 FR-018       바꾼 이름이 "일기 작성자" 목록에 즉시 반영된다
+#   035 FR-025       이름을 비우면 코드 안 기본 이름으로 되돌아간다
+#   035 FR-027       화면 어디에도 모델 식별자·파라미터·양자화가 없다 (원칙 III)
+#   헌법 1.4.0       소개(tagline)는 코드 안 고정값 그대로다 — 이름만 바뀐다
+#
+# **여기서 자동화하지 않는 것** — quickstart.md §2-2·§2-5:
+#   첫 실행 환영 연출(US1)     — `pm clear` + 온보딩 + GB 단위 에셋 다운로드가 따른다.
+#                                 사람이 한다(quickstart §2-2).
+#   정상 동작 확인 실패 갈래   — 모델 파일을 손상시켜야 한다. 사람이 하거나 계약
+#                                 테스트로 갈음한다(spec 명시).
+#   프롬프트 호칭 줄 반영      — 생성 + 모델 파일이 필요하다. 개발자 탭의 "입력
+#                                 프롬프트 미리보기"(022)로 사람이 확인한다.
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+#
+# ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ testID로 짚는다(R8 생존).
+# ⚠️ 여러 텍스트 조각이 한 <Text>에 있으면 testID가 접근성 트리에 안 나온다 —
+#    035는 이름 표시·입력창에 accessibilityLabel을 함께 달았다(025 실측).
+# ⚠️ 설정 탭은 prod에도 있다(020 FR-001). 개발자 탭은 dev 빌드에만 있다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# 일기 탭이 첫 화면이다(006 FR-009 유지). 환영 연출을 이미 통과한 기기가 전제다 —
+# 첫 실행 연출은 quickstart §2-2에서 사람이 본다.
+- assertVisible: "일기"
+
+# 설정 탭으로 간다.
+- tapOn: "설정"
+
+# ── "일기 작성자" 섹션 (029 → 035) ────────────────────────────────────────
+- scrollUntilVisible:
+    element:
+      id: "author-picker"
+    direction: DOWN
+
+- assertVisible: "일기 작성자"
+
+# 준비된 캐릭터에 이름 편집 진입점이 있다(FR-022, W17).
+# ⚠️ author-picker는 설정 탭 맨 아래라 편집 버튼이 처음엔 화면 밖이다 —
+#    visibilityPercentage를 낮춰 부분만 보여도 스크롤을 멈춘다(025 실측).
+- scrollUntilVisible:
+    element:
+      id: "author-rename-0"
+    direction: DOWN
+    visibilityPercentage: 30
+    centerElement: true
+- assertVisible:
+    id: "author-rename-0"
+
+# ── 이름 바꾸기 (FR-022) ──────────────────────────────────────────────────
+- tapOn:
+    id: "author-rename-0"
+
+# 편집을 열면 현재 이름이 초기값이다. ⚠️ 편집기의 TextInput이 autoFocus라
+# 키보드가 올라오며 저장 버튼이 화면 밖으로 밀린다 — 키보드를 내리고 스크롤한다.
+- assertVisible:
+    id: "author-rename-input-0"
+- tapOn:
+    id: "author-rename-input-0"
+- eraseText
+- inputText: "복실이"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "author-rename-save-0"
+    direction: DOWN
+    visibilityPercentage: 40
+- tapOn:
+    id: "author-rename-save-0"
+
+# 바꾼 이름이 목록에 즉시 반영된다(FR-018).
+- assertVisible: "복실이"
+
+# **소개는 그대로다** — 헌법 1.4.0이 연 것은 이름뿐이다.
+- assertVisible: "군더더기 없이 담백하게 적어요"
+
+# ── 모델 정보 미노출 (FR-027, 원칙 III) ───────────────────────────────────
+- assertNotVisible: ".*kanana.*"
+- assertNotVisible: ".*exaone.*"
+- assertNotVisible: ".*gguf.*"
+- assertNotVisible: ".*Q4_K_M.*"
+
+# ── 이름을 비우면 기본 이름으로 되돌아간다 (FR-025, W19) ──────────────────
+- scrollUntilVisible:
+    element:
+      id: "author-rename-0"
+    direction: DOWN
+    visibilityPercentage: 30
+    centerElement: true
+- tapOn:
+    id: "author-rename-0"
+- tapOn:
+    id: "author-rename-input-0"
+- eraseText
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: "author-rename-save-0"
+    direction: DOWN
+    visibilityPercentage: 40
+- tapOn:
+    id: "author-rename-save-0"
+
+# 기본 이름(금동이)이 돌아왔고 "복실이"는 사라졌다.
+- assertVisible: "금동이"
+- assertNotVisible: "복실이"
+
+# ── 미준비 캐릭터는 이름을 바꿀 수 없다 (FR-023, W17) ─────────────────────
+#
+# ⚠️ 이 블록은 **미준비 캐릭터가 실제로 있을 때만** 뜻이 있다. 모든 캐릭터가
+#    준비된 기기에서는 "아직 준비되지 않음"이 없어 이 검사가 건너뛰어진다 —
+#    **건너뛴 것은 통과가 아니다**(원칙 V). 그때는 quickstart §2-4로 사람이 본다.
+- runFlow:
+    when:
+      visible: "아직 준비되지 않음 — 아래에서 내려받으세요"
+    commands:
+      # 미준비 줄에는 편집 진입점이 없다. 준비된 줄(0)의 것만 있어야 한다.
+      - assertNotVisible:
+          id: "author-rename-1"
