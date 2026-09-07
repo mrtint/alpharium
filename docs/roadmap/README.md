@@ -262,4 +262,66 @@
 - **함께 정할 것**: 설정 탭의 좌우 여백을 `App.tsx`의 `settingsSection`으로
   감싸는 지금 방식(033)을 유지할지, `SelectRow` 같은 공용 컴포넌트가 자체 여백을
   갖게 할지. 후자는 그 컴포넌트를 쓰는 모든 자리에 영향이 간다.
-- **미착수.**
+- **🔄 034에서 구현 — 코드 완료, 실기기 검증 대기**(2026-09-07,
+  `specs/034-enduser-nativewind-migration/`). 위 물음들의 답:
+  - **범위 정정**: 사용자 요청이 든 6파일 중 `AutoDiaryTriggerButton`·
+    `PermissionPanel`은 실제로 `DiagnosticsScreen`(dev 게이트) 안에서만 렌더된다
+    (`src/ui/DiagnosticsScreen.tsx:113,130`) — 배포 빌드에서 엔드유저가 못 보므로
+    개발자 탭 4종과 함께 범위 밖. **실제 대상은 4파일**: `AuthorPicker`·
+    `BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection`.
+  - **이관 단위** (Clarify OQ-1): **일괄 이관** — 네 파일을 한꺼번에 옮기고
+    `npm test` 통과 후 실기기 Maestro 회귀를 한 세션으로. 여백을 안 바꾸기로 했으니
+    화면별로 끊을 필요 없다는 판단.
+  - **설정 탭 여백** (OQ-2): **`App.tsx` 조립부가 좌우 여백 소유**. `PermissionsSection`의
+    `section` 스타일을 `{ gap: 14 }`만 남기고 `App.tsx`에서 `settingsSection`
+    (`paddingHorizontal: 20`) 래퍼로 감쌌다 — 033이 `AuthorPicker`·`VisionPicker`·
+    `GeocodingSettingToggle`에 쓴 방식에 편입. `App.tsx` 1곳 변경. `SelectRow` 무변경.
+  - **미적용 컴포넌트** (OQ-3): **`Card`·`SectionHeader`를 `PermissionsSection`에
+    처음 적용**했다 — 각 권한 행을 `Card`(`style={{ padding: 12 }}`로 기본 `padding: 16`
+    오버라이드)로 감싸고 머리글을 `<SectionHeader>`로. `Section`(섹션 전체 `Card`
+    래핑)·`Toggle`은 톤 불일치·해당 없음으로 미적용(research R3).
+  - **`AuthorPicker`는 `SelectRow`로 안 바꿨다** — `SelectRow`가 선택 표식을 `"선택"`으로
+    하드코딩하고 미준비 사유 캡션 슬롯이 없어 `author-picker.test.tsx`가 잠근
+    `"작성자"` 표식·`"아직 준비되지 않음"` 캡션을 못 낸다(research R2). 033 `DayPicker`
+    방식(`AppText` + 토큰 + `className` 병행 + 모듈 상수).
+- **★ 검증 완료 (기기 없는)**: 130 suites / 2378 tests GREEN(+69, 신규 계약 스위트
+  `enduser-screen-migration.test.tsx` ES1~ES14). 기존 4개 스위트(`author-picker`·
+  `build-error`·`overwrite-confirm`·`permissions-section`)·`card`·`section-header`
+  전부 **무수정 GREEN**. eslint 0 error, `tsc` 0, 헌법 검사 위반 0, prettier 클린.
+  위반 주입 5종(원시 hex / `useColorScheme` / `dark:` / `models/roster` import /
+  좌우 padding 되살림) 전부 잡힘. `git diff`: `src/ui/` 4파일 + `App.tsx` 1곳 +
+  신규 테스트 1스위트. 도메인 계층(`diary/`·`models/`·`inference/`·`signals/`·
+  `vision/`·`schedule/`·`onboarding/`) **0줄**. `FLOWS` 19개 불변.
+- **★ 실기기 검증 완료 (2026-09-07, SM-S901N/Galaxy S22, Android, dev debug)**:
+  - **Maestro 7흐름 무갱신 PASS**: `diary-character-select`(033이 안 돌린 흐름 —
+    stale 아님, 갱신 없이 PASS), `writing-flow-simplified`, `generate-diary`,
+    `past-day-diary`, `writing-monologue-expansion`, `skeleton`, `model-acquisition`.
+  - **★ 새 `OverwriteConfirmScreen` Button 실기기 확인**: `generate-diary`가
+    `.*덮어쓸지 확인.*` → "확인"(primary Button) 탭, `past-day-diary`가 "취소"
+    (secondary Button) 탭 — 두 Button이 텍스트 렌더 + 탭 수신.
+  - **설정 탭 육안**: "일기 작성자" 선택 행 테라코타 테두리 + "작성자" 표식,
+    미준비 행 회색 + `opacity-50` + 캡션. "권한" 5개 행이 `Card`로 렌더,
+    `permissions-section`·`permission-row-*`·`permission-restart-onboarding` 문안 그대로.
+    **좌우 정렬선 통일 확인** — 네 설정 섹션이 화면 끝에서 ~20px 한 세로선(ES14 —
+    `App.tsx` `settingsSection` 래퍼가 `PermissionsSection` 편입).
+  - **`photo-vision.yml` PASS** — 033의 `CharacterListScreen` 지정 흐름. 설정 탭
+    `vision-row`·`action-vision`·`vision-auto`/`vision-quick` 무회귀 확인.
+  - **FAIL 2건 — 원인 규명, 034 회귀 아님, 이 브랜치에서 해소 불가**:
+    - `photo-selection-over-limit`: `SEED_DAY=2026-09-01`이 009 선택 범위 밖(오늘
+      09-07 → 09-05/06/07). 범위 안으로 재심기 시도했으나 **seed 도구의 시간대 한계**
+      (요청일 +1일 착지 — 023·010 기록)로 09-05에 착지 불가(06·07은 일기 있음, 08은
+      범위 밖). 유일한 034-관련 단계(옵셔널 `OverwriteConfirmScreen` "확인" 탭)는
+      `generate-diary`·`past-day-diary`가 이미 통과한 동일 상호작용이라 중복.
+    - `parallel-model-download`: 기기에 **`a5.bin`(english/모카)이 이미 완전 다운로드·
+      검증됨** → `action-english`가 다운로드가 아니라 삭제를 부름 → `pause-chinese`
+      영영 안 뜸. 흐름 주석이 이 상태를 "SKIPPED가 아니라 FAILED로 드러난다 — 손으로
+      확인(원칙 V)"으로 **명시**. 이 흐름은 `CharacterListScreen`만 지나고 034는 그
+      파일을 한 줄도 안 건드림(`git diff --stat main` = App.tsx + 4개 화면). 해소하려면
+      `a5.bin` 삭제가 필요한데 다른 흐름의 테스트 데이터 파괴 + 026 세션 셋업 영역.
+  - **덮어쓰기 확인 화면 톤 육안**: 「취소」=secondary Button(흰 배경+회색 테두리),
+    「확인」=primary Button(테라코타 배경+오프화이트 텍스트). "확인" 탭 → 생성 시작 →
+    생성 중 화면 금지어 0건(FR-017 회귀 없음). "그만두기"로 중단 → 홈 복귀.
+  - **빌드 오류 화면 톤 육안**(`EXPO_PUBLIC_APP_ENV=bogus`로 재현): 아이보리 배경,
+    제목 `variant="title"` 중앙 정렬, 본문 `variant="body"`+opacity 0.8. 환경 변수
+    이름·"다시 시도" 문구·모델 식별자 0건(원칙 III·S10). 검증 후 dev 환경 복원.
+  - **release 재확인 불필요**(새 네이티브 모듈 0 — 012).

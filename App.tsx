@@ -1189,12 +1189,16 @@ function AutoDiarySection({
       />
 
       {/* 021 — 권한 상태·재요청·온보딩 재실행 (FR-017~020). prod에도 있다. */}
-      <PermissionsSection
-        platform={platform}
-        requirements={PERMISSION_REQUIREMENTS}
-        ports={onboardingPorts}
-        onRestartOnboarding={onRestartOnboarding}
-      />
+      {/* 034 — 좌우 여백은 조립부가 소유한다(OQ-2): 다른 설정 섹션과 같은
+          `settingsSection` 래퍼로 감싸 화면 끝에서 20px인 한 세로선에 세운다. */}
+      <View style={styles.settingsSection}>
+        <PermissionsSection
+          platform={platform}
+          requirements={PERMISSION_REQUIREMENTS}
+          ports={onboardingPorts}
+          onRestartOnboarding={onRestartOnboarding}
+        />
+      </View>
     </ScrollView>
   );
 }

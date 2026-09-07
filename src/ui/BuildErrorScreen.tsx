@@ -1,6 +1,10 @@
 /**
  * 이 빌드가 잘못 만들어졌다 (006 FR-035b).
  *
+ * 계약: specs/006-first-diary-app/contracts/screens.md §2
+ *       specs/034-enduser-nativewind-migration/contracts/enduser-screen-migration.md
+ *       ES1·ES6·ES12
+ *
  * ─────────────────────────────────────────────────────────────────────────────
  * 환경 판정이 실패하면 추론 위치를 고를 수 없으므로 일기를 쓸 수 없다.
  *
@@ -16,22 +20,32 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { StyleSheet, Text, View } from "react-native";
+import { View } from "react-native";
+
+import { AppText } from "./components/Text";
 
 export function BuildErrorScreen() {
   return (
-    <View style={styles.page}>
-      <Text style={styles.title}>이 빌드는 잘못 만들어졌다</Text>
-      <Text style={styles.body}>
+    <View className="flex-1 items-center justify-center" style={PAGE}>
+      <AppText variant="title" style={{ textAlign: "center" }}>
+        이 빌드는 잘못 만들어졌다
+      </AppText>
+      <AppText variant="body" style={{ textAlign: "center", opacity: 0.8 }}>
         앱이 어떤 환경으로 만들어졌는지 알 수 없어 일기를 쓸 수 없다. 이 앱을 만든 사람에게 알려야
         고쳐진다.
-      </Text>
+      </AppText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  page: { flex: 1, alignItems: "center", justifyContent: "center", padding: 32, gap: 12 },
-  title: { fontSize: 18, fontWeight: "600", textAlign: "center" },
-  body: { fontSize: 15, lineHeight: 23, textAlign: "center", opacity: 0.8 },
-});
+/**
+ * 034 — 레이아웃 관용값만(색·타이포는 `AppText`가 토큰에서 가져온다). NativeWind
+ * 변환은 Metro 시점이라 jest에 없으므로 인라인 `style`을 함께 준다.
+ */
+const PAGE = {
+  flex: 1,
+  alignItems: "center",
+  justifyContent: "center",
+  padding: 32,
+  gap: 12,
+} as const;
