@@ -55,6 +55,8 @@
 | `actions` | `{ flexDirection:"row", gap:12, marginTop:8 }` | `className="flex-row gap-3 mt-2" style={{ flexDirection:"row", gap:12, marginTop:8 }}` |
 | `button` (`Pressable` ×2: `paddingVertical:10, paddingHorizontal:16, borderWidth:1, borderRadius:6`) | — | `<Button variant="secondary" onPress={onCancel}>취소</Button>` + `<Button variant="primary" onPress={onConfirm}>확인</Button>`. `Button`이 padding·border·radius·눌림 피드백을 내장 |
 
+**버튼 높이 소폭 증가 허용**: `Button` 기본 `paddingVertical: 12` vs 현행 `10` — 버튼이 4px 높아진다. 이 화면은 중앙 정렬 통짜 뷰이고 Maestro가 「취소」/「확인」을 **문안으로만** 조회하므로(`generate-diary.yml`·`past-day-diary.yml` 등 optional 단계) 스크롤·`testID` 도달에 영향이 없다. FR-009의 "행 높이 불변"은 목록형 화면(`AuthorPicker`)의 스크롤 붕괴 방지가 목적이며 이 화면은 해당 없음 — 허용.
+
 **불변**: 문안 `"이 날의 일기가 이미 있다. 덮어쓸지 확인이 필요하다"`·`day`·`"취소"`·`"확인"`, `OverwriteConfirmScreenProps`(`day`·`onCancel`·`onConfirm` — **`entry` 없음** X1), 진행률·경과시간 부재(X2), 모델 식별자 부재(X3), `accessibilityRole="button"`.
 **주의**: `overwrite-confirm.test.tsx`가 `screen.getByText("확인")`·`getByText("취소")`로 찾는다 — `Button`이 children을 `AppText`로 렌더하므로 텍스트 조회는 유지됨. `userEvent.press(getByText("확인"))`도 `Button`의 `Pressable`로 전파됨(033 `character-list.test.tsx`가 같은 패턴으로 통과 확인).
 
@@ -67,7 +69,7 @@
 
 | 현행 `styles.*` | 값 | → 이관 후 |
 | --- | --- | --- |
-| `section` | `{ padding: 20, gap: 14 }` | **좌우 padding 제거**(R4 — `App.tsx` 래퍼가 소유). `style={{ gap: 14 }}` + `paddingVertical`은 육안 조정. `className="gap-3.5"` (14≈3.5×4) |
+| `section` | `{ padding: 20, gap: 14 }` | **`{ gap: 14 }`만 남긴다**(R4 — 좌우는 `App.tsx` 래퍼가, 섹션 상하 간격은 조립부가 소유). `className="gap-3.5"` (14≈3.5×4). 육안에서 상하 어긋나면 최소 `paddingVertical` 복원 |
 | `row` | `{ gap: 4 }` | 각 권한 행을 `<Card style={{ padding: 12, gap: 4 }} testID={\`permission-row-${req.key}\`}>` 로 감쌈 (R3 — `Card` 기본 `padding:16`을 12로 오버라이드). `key`·`testID`는 `Card`에 |
 | `link` | `{ paddingVertical:8, paddingHorizontal:12, borderWidth:1, borderColor:COLORS.border, borderRadius:6 }` | 모듈 상수 `LINK` + `className="py-2 px-3 rounded-md border border-border"`. `Pressable`은 유지(공용 `Button`으로 바꾸면 `link` testID들이 `Button` 스타일에 종속 — 링크는 secondary Button보다 작아야 함. 육안 판단, 기본은 `Pressable` + 토큰 유지) |
 | 머리글 `<AppText variant="sectionTitle">권한</AppText>` | — | `<SectionHeader>권한</SectionHeader>` 로 교체 (`SectionHeader` = `AppText variant="sectionTitle"` 래퍼 — 동등, OQ-3의 "머리글을 Section/SectionHeader로") |

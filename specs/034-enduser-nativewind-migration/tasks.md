@@ -50,7 +50,7 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 
 - [ ] T004 [US1] `src/ui/AuthorPicker.tsx`에서 `StyleSheet`를 RN import에서 빼고, `styles.container`/`row`/`rowSelected`/`rowDisabled`/`info`를 모듈 상수 `ROW`/`ROW_SELECTED`/`INFO`(`as const`, `COLORS.*`·`RADIUS.*` 참조)로 옮긴 뒤 `StyleSheet.create`를 제거한다 per data-model.md §1 — 033 `DayPicker` 선례. `hairline` → `borderWidth: 1`.
 
-- [ ] T005 [US1] 같은 파일에서 각 요소에 `className` 문자열을 병행으로 준다 per data-model.md §1 / contracts ES9 — 컨테이너 `className="gap-2"`, 행 `className="flex-row items-center justify-between py-3 px-3 rounded-card border border-border"` + 조건부 `"border-2 border-accent"`(선택)·`"opacity-50"`(미준비), info `className="flex-1 gap-0.5"`. 인라인 `style`은 모듈 상수 + 조건부 객체. `"작성자"` 표식의 `<AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>`는 **그대로 유지**(문안·색 불변, FR-005).
+- [ ] T005 [US1] 같은 파일에서 각 요소에 `className` 문자열을 병행으로 준다 per data-model.md §1 / contracts ES9 — 컨테이너 `className="gap-2"`, 행 `className="flex-row items-center justify-between py-3 px-3 rounded-card border border-border"` + 조건부 선택/미준비, info `className="flex-1 gap-0.5"`. 인라인 `style`은 모듈 상수 + 조건부 객체. **선택 행 테두리 굵기는 현행 `rowSelected: { borderColor: COLORS.accent, borderWidth: 1 }`을 유지한다** — 033 `DayPicker`는 `border-2`로 굵혔으나 `AuthorPicker`의 현행값은 1이고, FR-009("행 높이·여백 불변")를 지키려면 굵기도 그대로 둔다. `className`도 `"border border-accent"`(2 아님). `"작성자"` 표식의 `<AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>`는 **그대로 유지**(문안·색 불변, FR-005).
 
 - [ ] T006 [US1] `AuthorPicker.tsx`가 `SelectRow`를 import하지 않는지, `testID`(`author-picker`·`author-option-${index}`)·문안(`일기 작성자`·`작성자`·`아직 준비되지 않음 — 아래에서 내려받으세요`)·`AuthorOption`/`AuthorPickerProps` 타입·`onSelect(index)` 시그니처가 불변인지 확인한다 per contracts ES3·ES4·ES10 — 소스 눈 검토 + `tsc`.
 
@@ -60,7 +60,7 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 
 - [ ] T008 [US1] 같은 파일에서 머리글 `<AppText variant="sectionTitle">권한</AppText>`를 `<SectionHeader>권한</SectionHeader>`로 바꾸고 `import { SectionHeader } from "./components/SectionHeader"`를 추가한다 per data-model.md §4 / contracts ES13 — 동등 교체(`SectionHeader`가 그 `AppText`의 래퍼). `Section`은 import하지 않는다.
 
-- [ ] T009 [US1] 같은 파일에서 `styles.section`(`{ padding: 20, gap: 14 }`)의 **좌우 padding을 제거**한다 per research R4 / contracts ES14 — `{ gap: 14 }`만 남기거나 `paddingVertical`만 유지(세로 간격은 육안 조정). `styles.row`는 T007이 `Card`로 대체했으므로 제거, `styles.link`는 모듈 상수 `LINK`로 옮긴다. `className` 병행(`gap-3.5` 등)을 준다. `StyleSheet.create`가 비면 제거.
+- [ ] T009 [US1] 같은 파일에서 `styles.section`(`{ padding: 20, gap: 14 }`)을 **`{ gap: 14 }`만 남긴다** per research R4 / contracts ES14 — 좌우·상하 padding을 전부 제거한다. 좌우는 `App.tsx` 래퍼(`settingsSection`, T010)가 소유하고, 섹션 상하 간격은 `App.tsx` 조립부가 형제 섹션 사이에서 관리한다(`AuthorPicker`·`VisionPicker` 등 다른 섹션도 자체 상하 padding 없이 조립부가 간격을 냄). `styles.row`는 T007이 `Card`로 대체했으므로 제거, `styles.link`는 모듈 상수 `LINK`로 옮긴다. `className` 병행(`gap-3.5` 등)을 준다. `StyleSheet.create`가 비면 제거. — **육안(T027 (c))에서 상하 간격이 다른 섹션과 어긋나면 그때만 `paddingVertical`을 최소로 되살린다.**
 
 - [ ] T010 [US1] `App.tsx`의 `SettingsScreen` 조립부에서 `<PermissionsSection platform={...} requirements={...} ports={...} onRestartOnboarding={...} />`를 `<View style={styles.settingsSection}><PermissionsSection .../></View>`로 감싼다 per data-model.md §5 / research R4 — `styles.settingsSection`(`{ paddingHorizontal: 20 }`)은 이미 정의됨(App.tsx:1232). `AuthorPicker`·`VisionPicker`·`GeocodingSettingToggle` 조립부는 무변경(이미 래퍼 안). 이 1곳이 유일한 조립 계층 변경.
 
@@ -68,7 +68,7 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 
 ### US1 검증
 
-- [ ] T012 [US1] `npm run test:ui -- author-picker permissions-section enduser-screen-migration`으로 기존 2개 스위트가 **무수정 GREEN**이고 계약 스위트의 US1 관련 블록(ES10·ES13·ES14 + 공통)이 GREEN인지 확인한다 per quickstart §1·§2 / spec SC-002·SC-011.
+- [ ] T012 [US1] `npm run test:ui -- author-picker permissions-section enduser-screen-migration card section-header`로 기존 스위트(`author-picker`·`permissions-section`·`card`·`section-header`)가 **무수정 GREEN**이고 계약 스위트의 US1 관련 블록(ES10·ES13·ES14 + 공통)이 GREEN인지 확인한다 per quickstart §1·§2 / spec SC-002·SC-011 — `card.test.tsx`·`section-header.test.tsx`도 `PermissionsSection`이 이 컴포넌트를 처음 쓰므로 회귀 확인 대상.
 
 **체크포인트**: 설정 탭 두 섹션이 이관됨. `git diff -- __tests__/ui/author-picker.test.tsx __tests__/ui/permissions-section.test.tsx`가 비어 있음.
 
@@ -133,7 +133,7 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 run:android`(033 세션이 debug 앱을 지웠으면 재설치 + 모델 재배치), 기기 잠금 해제,
 `adb reverse tcp:8081 tcp:8081`.
 
-- [ ] T024 `diary-character-select.yml`·`writing-flow-simplified.yml`을 돌린다 per quickstart §5 / contracts Maestro / spec SC-007 — `author-picker`·`author-option-0/1/2`·`일기 작성자` 조회, 덮어쓰기 확인(`.*덮어쓴다.*`) optional. 깨지면 흐름이 아니라 구현을 고친다. 흐름이 이미 stale이면 갱신 후 명시적 보고(SC-007 부분 미충족 기록).
+- [ ] T024 `diary-character-select.yml`·`writing-flow-simplified.yml`을 돌린다 per quickstart §5 / contracts Maestro / spec SC-007 — `author-picker`·`author-option-0/1/2`·`일기 작성자` 조회, 덮어쓰기 확인(`.*덮어쓴다.*`) optional. **`diary-character-select.yml`은 033이 "이 화면과 무관"이라 안 돌렸으므로(033 세션은 `CharacterListScreen`), 034에서 처음 회귀 돌리는 것이다 — 만약 014/029 이후 방치돼 이미 깨져 있으면(문안·`testID` 어긋남) 그것은 034 회귀가 아니라 stale이므로 흐름을 갱신하고 `FLOWS` 등록 확인 후 명시 보고한다.** 034 이관이 깨뜨린 것이면 흐름이 아니라 구현을 고친다.
 
 - [ ] T025 `generate-diary.yml`·`past-day-diary.yml`·`photo-selection-over-limit.yml`·`writing-monologue-expansion.yml`·`skeleton.yml`을 돌린다 per quickstart §5 / spec SC-007 — 덮어쓰기 확인(「취소」/「확인」·`.*덮어쓸지 확인.*`) optional 단계가 `Button` 교체 후에도 조회·탭됨을 확인.
 

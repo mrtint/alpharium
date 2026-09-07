@@ -98,13 +98,13 @@
 ### ES13 — `PermissionsSection`: `Card` + `SectionHeader` 실제 사용 (OQ-3 / research R3)
 
 - `from ".../components/Card"` import + `<Card` 사용 — **각 권한 행을 감싼다**. `Card`에 `style={{ padding: 12, ... }}` 오버라이드로 기본 `padding: 16`을 현행 행 여백에 맞춤 (컴포넌트 자체는 무변경).
-- 머리글이 `<SectionHeader>권한</SectionHeader>` 또는 `<AppText variant="sectionTitle">권한</AppText>` (둘은 동등 — `SectionHeader`가 후자의 래퍼).
-- **`Section`(섹션 전체를 `Card`로 감싸는 것)은 쓰지 않는다** — `from ".../Card"`에서 `Section`을 가져와 `<Section`으로 섹션 전체를 감싸면 안 된다(R3 — 다른 설정 섹션과 톤 불일치).
+- 머리글이 `<SectionHeader>권한</SectionHeader>` — `from ".../components/SectionHeader"` import + `<SectionHeader` 사용. (`AppText variant="sectionTitle"`도 동등하나, SC-011이 `SectionHeader` 사용을 명시적으로 요구하므로 `SectionHeader`로 통일한다.)
+- **`Section`(섹션 전체를 `Card`로 감싸는 것)은 쓰지 않는다** — `from ".../Card"`에서 `Section`을 가져와 `<Section`으로 섹션 전체를 감싸면 안 된다(R3 — 다른 설정 섹션과 톤 불일치). 계약 테스트가 `<Section` 부재를 확인.
 - `Toggle`을 쓰지 않는다 (`PermissionsSection`에 on/off 성격 행 없음).
 
 ### ES14 — `PermissionsSection`: 좌우 여백을 `App.tsx`가 소유 (OQ-2 / research R4)
 
-- `PermissionsSection.tsx`의 `section` 스타일(또는 모듈 상수)에 좌우 padding(`paddingHorizontal:` 또는 좌우를 포함하는 `padding:` 숫자)이 없다. 세로 `gap: 14`는 유지.
+- `PermissionsSection.tsx`의 `section` 스타일(또는 모듈 상수)에 좌우 padding(`paddingHorizontal:` 또는 좌우를 포함하는 `padding:` 숫자)이 없다. **세로 `gap: 14`만 남기고 `paddingVertical`도 제거**한다 — 섹션 상하 간격은 `App.tsx` 조립부가 형제 섹션 사이에서 관리한다(`AuthorPicker`·`VisionPicker`가 자체 상하 padding 없이 조립부 간격에 의존하는 것과 동일). 육안(quickstart §6 (c))에서 상하 간격이 어긋날 때만 최소 `paddingVertical`을 되살린다.
 - `App.tsx`가 `<PermissionsSection />`을 `<View style={styles.settingsSection}>`(`paddingHorizontal: 20`)로 감싼다 — `AuthorPicker`·`VisionPicker`·`GeocodingSettingToggle`과 같은 래퍼.
 - **실기기 육안**(SC-006): 설정 탭에서 `PermissionsSection`의 좌우 정렬선이 `AuthorPicker`·`VisionPicker`·`GeocodingSettingToggle`과 같은 세로선(화면 끝에서 20px)에 있다.
 

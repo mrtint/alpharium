@@ -142,7 +142,7 @@
   - **`Section`(섹션 전체를 `Card`로 감싸는 것)은 쓰지 않는다** — 다른 설정 섹션(`AuthorPicker`·`VisionPicker` — 배경 박스 없음)과 톤이 어긋나므로. (research R3의 ㉯ + ㉰ 조합)
   - `PermissionsSection`을 직접 지나는 Maestro 흐름이 없어(FR-019) `Card` 도입 레이아웃 변화는 육안 검증(SC-006)으로 확인. 향후 그 흐름을 추가하는 스펙이 스크롤 타겟을 정한다.
   - `Toggle`은 `PermissionsSection`에 on/off 성격 행이 없으므로 미적용 — 032 T062·033 판단 유지.
-- **OQ-4 (`PermissionsSection` 범위·검증)**: 240줄로 대상 중 가장 크고, 021이 만든 5갈래 권한 행·OS 링크·복귀 재조회 로직이 있다. 현재 이 화면을 지나는 Maestro 흐름이 없다. → **이 스펙은 `PermissionsSection`을 네 대상에 포함한다. `Card`/`Section` 적용 여부(OQ-3)와 별개로, 이관 자체는 다른 세 화면과 같은 방식이다. 새 Maestro 흐름을 만들지는 사용자 판단에 맡긴다 — 만들지 않고 육안 검증만 해도 012 기준상 완료 조건을 만족한다. 필요하면 별도 스펙에서 흐름을 추가할 수 있다.**
+- **OQ-4 (`PermissionsSection` 범위·검증)** — **확정됨 (스펙 작성 시)**: 240줄로 대상 중 가장 크고, 021이 만든 5갈래 권한 행·OS 링크·복귀 재조회 로직이 있다. 현재 이 화면을 지나는 Maestro 흐름이 없다. → **이 스펙은 `PermissionsSection`을 네 대상에 포함한다. `Card`/`Section` 적용 여부(OQ-3)와 별개로, 이관 자체는 다른 세 화면과 같은 방식이다. 새 Maestro 흐름을 만들지는 사용자 판단에 맡긴다 — 만들지 않고 육안 검증만 해도 012 기준상 완료 조건을 만족한다. 필요하면 별도 스펙에서 흐름을 추가할 수 있다.**
 
 ## Key Entities
 
@@ -162,8 +162,8 @@
 - **SC-008**: 실기기에서 설정 탭의 캐릭터 전환·권한 요청 버튼·OS 설정 링크·"권한 안내 다시 보기"·포그라운드 복귀 재조회가 이관 전과 동일하게 동작하는 것을 확인한다.
 - **SC-009**: `git diff`에서 `src/diary/`·`src/models/`·`src/inference/`·`src/signals/`·`src/vision/`·`src/schedule/`·`src/onboarding/` 변경이 0줄이다 (표현만 바꾼다 — 도메인 계층 무변경). `App.tsx`는 설정 탭 조립부에서 `PermissionsSection`을 `settingsSection` 래퍼로 감싸는 1곳만 변경된다 (OQ-2·FR-009a). 그 외 `App.tsx` 변경 0줄.
 - **SC-010**: 새 Maestro 흐름 수는 0이다 (OQ-4에서 만들기로 하지 않는 한). `FLOWS` 배열 길이 불변.
-- **SC-011**: `PermissionsSection`이 `Card`와 `Section`/`SectionHeader`를 실제로 import·사용한다 (OQ-3 — 계약 테스트가 소스를 읽어 `from ".../components/Card"` + `<Card` + 머리글 컴포넌트 사용을 확인). `card.test.tsx`·`section-header.test.tsx` 등 기존 컴포넌트 테스트는 무수정 통과.
-- **SC-012**: `PermissionsSection`에 `Card`/`Section`을 적용한 뒤에도 5개 권한 행의 `describe()` 상태 문구·요청/설정 링크 분기·`AppState` 복귀 재조회가 이관 전과 동일하게 동작한다 (`permissions-section.test.tsx` 무수정 통과 — SC-002에 포함되나 `Card` 도입으로 특히 강조).
+- **SC-011**: `PermissionsSection`이 `Card`와 `SectionHeader`를 실제로 import·사용한다 (OQ-3 — 계약 테스트가 소스를 읽어 `from ".../components/Card"` + `<Card` + `from ".../components/SectionHeader"` + `<SectionHeader` 사용을 확인). `Section`(섹션 전체 `Card` 래핑)은 import·사용하지 않는다 (research R3). `card.test.tsx`·`section-header.test.tsx` 등 기존 컴포넌트 테스트는 무수정 통과.
+- **SC-012**: `PermissionsSection`에 `Card`/`SectionHeader`를 적용한 뒤에도 5개 권한 행의 `describe()` 상태 문구·요청/설정 링크 분기·`AppState` 복귀 재조회가 이관 전과 동일하게 동작한다 (`permissions-section.test.tsx` 무수정 통과 — SC-002에 포함되나 `Card` 도입으로 특히 강조).
 
 ## Assumptions
 

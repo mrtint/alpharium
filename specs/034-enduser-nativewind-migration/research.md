@@ -106,7 +106,7 @@
 - **`StyleSheet.create` 부재**: `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`은 완전 제거. `PermissionsSection`은 모듈 상수로 옮겼으면 제거, 아니면 남을 수 있음 — 소스 검사로 확인 후 정한다.
 - **원칙 III 경계**: `models/roster`·`ModelAsset`·`diary/prompt`·`diary/persona` import 없음 (4파일).
 - **032 경계**: `dark:` variant 없음, `useColorScheme`·`Appearance` 없음 (4파일).
-- **`PermissionsSection` 고유**: `from ".../components/Card"` + `<Card` 사용, 머리글이 `SectionHeader` 또는 `AppText variant="sectionTitle"`, `section` 스타일에 좌우 padding(`paddingHorizontal`·`padding:`)이 없거나 `App.tsx`가 래퍼로 감쌈.
+- **`PermissionsSection` 고유**: `from ".../components/Card"` + `<Card` 사용, `<Section` 부재, 머리글이 `from ".../components/SectionHeader"` + `<SectionHeader`, `section` 스타일에 좌우·상하 padding이 없고(`gap`만) `App.tsx`가 `settingsSection` 래퍼로 감쌈.
 - **`AuthorPicker` 고유**: `SelectRow` 미사용 확인 (R2 — `from ".../SelectRow"` 없음), `"작성자"` 문자열 존재.
 - **`OverwriteConfirmScreen` 고유**: `from ".../components/Button"` + `<Button` 사용, `"확인"`·`"취소"` 문자열, `entry` prop 없음 (props 타입에 `entry` 토큰 부재).
 - **`BuildErrorScreen` 고유**: `"이 빌드는 잘못 만들어졌다"` 문자열, `EXPO_PUBLIC`·`APP_ENV`·`NODE_ENV` 토큰 부재.

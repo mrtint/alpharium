@@ -35,6 +35,12 @@
 - **`/speckit-clarify` 2026-09-07 완료** — 3개 질문 해소:
   - OQ-1 (이관 순서): 일괄 이관 + 마지막에 전체 Maestro 회귀 1회.
   - OQ-2 (설정 탭 여백): `App.tsx` 조립부가 좌우 여백 소유. `PermissionsSection` 좌우 padding을 `settingsSection` 래퍼로 이관. `App.tsx` 1곳 변경(SC-009 명시).
-  - OQ-3 (`Card`·`Toggle`·`Section`): `PermissionsSection`에 `Card`(행 감싸기) + `Section`/`SectionHeader`(머리글) 실제 적용. `Card`의 `padding: 16`·배경·border로 인한 레이아웃 변화 세부 3갈래(㉮ 섹션 전체 Card / ㉯ 머리글만 SectionHeader + 행만 Card / ㉰ Card padding 조정)는 plan에서 확정. `Toggle` 미적용.
+  - OQ-3 (`Card`·`Toggle`·`Section`): `PermissionsSection`에 `Card`(행 감싸기, `style={{ padding: 12 }}`) + `SectionHeader`(머리글) 적용. `Section`(섹션 전체 `Card`)·`Toggle` 미적용 — research R3 확정(㉯+㉰).
 - OQ-4(PermissionsSection 범위)는 스펙 안에서 결정 — 네 대상에 포함, 새 Maestro 흐름은 선택.
-- **plan이 확정할 잔여**: OQ-3의 ㉮/㉯/㉰ 중 하나. 이건 구현 세부라 plan 단계가 적절하다.
+- **`/speckit-analyze` 2026-09-07 완료** — CRITICAL/HIGH 0. MEDIUM 3건(SC-011·SC-012의 `Section` 잔재, PermissionsSection 세로 padding 모호)·LOW 4건 전부 수정:
+  - SC-011·SC-012에서 `Section` → `SectionHeader` 정정.
+  - T009/ES14/data-model §4: `section` 스타일을 `{ gap: 14 }`만 — 상하 간격은 `App.tsx` 조립부.
+  - T005: `AuthorPicker` 선택 행 테두리 `borderWidth: 1` 유지 명시.
+  - data-model §3: `Button` 교체로 버튼 4px 증가 허용 명시.
+  - T024: `diary-character-select.yml` stale 확인 지침 추가.
+  - T012: `card`·`section-header` 테스트 회귀 대상 추가.
