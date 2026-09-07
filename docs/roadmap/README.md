@@ -28,7 +28,7 @@
 - [ ] **모델 준비 완료 연출 + 캐릭터 작명** (16번 후속 — 헌법 페르소나 조항 개정 동반)
 - [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: 근본 원인 정정[force-dark 반전 아님, `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`], photo-location: 판정 불가능한 단계라 온보딩에서 제거. One UI 8.5 실기기 debug 검증. 목록·상세·설정·개발자 탭·release·S22는 다음 세션[`tasks.md` T037])
 - [~] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (033에서 구현 — 아래 상세 참조)
-- [ ] **엔드유저 화면 전체를 NativeWind/토큰으로 이관** (033 후속, 2026-09-07 사용자 요청 — 아래 상세 참조)
+- [x] **엔드유저 화면 전체를 NativeWind/토큰으로 이관** (034 — `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection` 4개 이관, `App.tsx` 설정 탭 여백 1곳. `Card`·`SectionHeader` 첫 실사용. 실기기 debug 검증·PR #51 머지 완료. `AutoDiaryTriggerButton`·`PermissionPanel`은 개발자 탭 전용이라 범위 밖)
 
 ---
 
