@@ -12,6 +12,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { buildPrompt, instructionLines, promptPrefix } from "../../src/diary/prompt";
 import { personaOf } from "../../src/diary/persona";
 import { buildRequest } from "../../src/diary/request";
@@ -797,13 +800,113 @@ describe("018 — 고정 접두사 (contracts/prompt-prefix.md)", () => {
   it("P11: 캐릭터마다 접두사가 다르다", () => {
     // 이름과 언어가 들어 있으므로 달라야 한다 — 같으면 캐릭터를 바꿔도
     // 이전 캐릭터의 KV 캐시를 그대로 재사용해 버린다.
-    const all = CHARACTERS.map(promptPrefix);
+    //
+    // ★ `CHARACTERS.map(promptPrefix)`로 쓰지 않는다 — 035에서 두 번째 인자가
+    // 생겨 배열 인덱스가 `customNames`로 넘어간다(009가 `Function.length`로
+    // 배운 것과 같은 계열의 함정이며, 이번엔 `tsc`가 잡았다).
+    const all = CHARACTERS.map((character) => promptPrefix(character));
     expect(new Set(all).size).toBe(all.length);
   });
 
   it("P12: promptPrefix()는 순수 함수다 — 같은 캐릭터는 항상 같은 결과", () => {
     for (const character of CHARACTERS) {
       expect(promptPrefix(character)).toBe(promptPrefix(character));
+    }
+  });
+});
+
+/* ──────────────── 035 — 사용자 지정 이름 (contracts/character-name.md) ──────────────── */
+
+describe("035 — 사용자 지정 이름이 호칭 줄에 흐른다 (N14~N17)", () => {
+  const days = [richDay(DAY), emptyDay(DAY), unknownDay(DAY), partiallyUnknownDay(DAY)];
+  const CUSTOM = { quiet: "복실이" } as const;
+
+  it("N14/P8: 사용자 지정 이름이 있어도 buildPrompt는 promptPrefix로 시작한다", () => {
+    for (const character of CHARACTERS) {
+      const prefix = promptPrefix(character, CUSTOM);
+      for (const day of days) {
+        const prompt = buildPrompt({ ...requestFor(day, character), customNames: CUSTOM });
+        expect(prompt.startsWith(prefix)).toBe(true);
+      }
+    }
+  });
+
+  it("지정한 캐릭터의 호칭 줄이 사용자 이름을 쓴다 (FR-018)", () => {
+    const prompt = buildPrompt({ ...requestFor(richDay(DAY), "quiet"), customNames: CUSTOM });
+    expect(prompt).toContain("너는 '복실이'이라 불린다.");
+    expect(prompt).not.toContain("너는 '금동이'이라 불린다.");
+  });
+
+  it("지정하지 않은 캐릭터는 기본 이름 그대로다", () => {
+    const prompt = buildPrompt({ ...requestFor(richDay(DAY), "narrative"), customNames: CUSTOM });
+    expect(prompt).toContain("너는 '루이'이라 불린다.");
+  });
+
+  it("customNames가 없으면 035 이전과 바이트 단위로 같다", () => {
+    // 이 기능이 기존 동작을 건드리지 않았다는 것의 확인.
+    for (const character of CHARACTERS) {
+      expect(buildPrompt({ ...requestFor(richDay(DAY), character), customNames: {} })).toBe(
+        buildPrompt(requestFor(richDay(DAY), character)),
+      );
+    }
+  });
+
+  it("N16: 같은 캐릭터라도 이름이 다르면 접두사가 다르다", () => {
+    // 이름이 접두사에 있으므로 바뀌면 접두사도 바뀐다 — 그래야 프리필한
+    // KV 캐시와 실제 프롬프트가 어긋나지 않는다.
+    expect(promptPrefix("quiet", CUSTOM)).not.toBe(promptPrefix("quiet"));
+  });
+
+  it("★ N16: 호칭 줄이 접두사에 남아 있어 한국어 캐릭터 셋이 서로 다르다", () => {
+    // 호칭 줄을 접두사에서 빼면 quiet·narrative·imaginative가 전부 같은
+    // 접두사가 되고(셋 다 한국어) P11이 막으려던 상황이 정확히 발생한다.
+    const korean = ["quiet", "narrative", "imaginative"] as const;
+    const prefixes = korean.map((c) => promptPrefix(c));
+    expect(new Set(prefixes).size).toBe(korean.length);
+  });
+
+  it("N15/P10: 이름이 있어도 접두사에 날마다 바뀌는 것은 없다", () => {
+    const prefix = promptPrefix("quiet", CUSTOM);
+    expect(prefix).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(prefix).not.toContain("에 네가 본 것");
+    expect(prefix).not.toContain("다닌 자리");
+  });
+
+  it("P12: 사용자 이름이 있어도 순수 함수다", () => {
+    expect(promptPrefix("quiet", CUSTOM)).toBe(promptPrefix("quiet", CUSTOM));
+  });
+
+  it("빈 이름·공백만이면 기본 이름으로 폴백한다 (N3)", () => {
+    for (const bogus of [{ quiet: "" }, { quiet: "   " }]) {
+      expect(promptPrefix("quiet", bogus)).toBe(promptPrefix("quiet"));
+    }
+  });
+
+  it("FR-019: 소개(tagline)는 여전히 프롬프트에 들어가지 않는다 (014 P4)", () => {
+    const prompt = buildPrompt({ ...requestFor(richDay(DAY), "quiet"), customNames: CUSTOM });
+    expect(prompt).not.toContain("군더더기 없이 담백하게 적어요");
+    expect(prompt).not.toContain("상상력이 풍부해요");
+  });
+
+  it("되뱉기 판정 줄도 같은 이름을 쓴다 (P-7 유지)", () => {
+    const request = { ...requestFor(richDay(DAY), "quiet"), customNames: CUSTOM };
+    const prompt = buildPrompt(request);
+    for (const line of instructionLines(request)) {
+      expect(prompt).toContain(line);
+    }
+  });
+});
+
+describe("N17 — 프리필 무효화 로직을 만들지 않는다 (FR-020)", () => {
+  it("on-device.ts·llama-port.ts에 무효화 흔적이 없다", () => {
+    // 이름이 바뀌면 접두사가 바뀌고 KV 캐시가 부분 재사용된다 — **느려질 뿐
+    // 틀리지 않는다**(018 E10이 이미 허용한 상태). 무효화 판정 코드를 넣으면
+    // "언제 무효화하는가"를 검증하려고 시간을 재게 되고 그것이 원칙 IV다.
+    for (const path of ["../../src/inference/on-device.ts", "../../src/inference/llama-port.ts"]) {
+      const code = readFileSync(join(__dirname, path), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code).not.toMatch(/invalidate|cacheVersion|lastPrefix|prefixChanged|resetCache/i);
     }
   });
 });

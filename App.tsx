@@ -473,6 +473,39 @@ function AppFrame() {
     [characterNamesPort, onboardingFlagPort],
   );
 
+  /**
+   * 준비된 캐릭터의 이름을 바꾼다 (035 FR-022·FR-024·FR-025).
+   *
+   * **첫 만남과 같은 검증을 쓴다**(W18) — 두 자리에 각각 규칙을 두면 갈라진다.
+   * **비우면 키를 제거해 기본 이름으로 되돌린다**(W19) — `{ quiet: "" }`를
+   * 저장하면 파일에 뜻 없는 값이 남는다.
+   *
+   * **저장된 일기를 건드리지 않는다**(W20/N11) — 이 경로는 `DiaryStore`를
+   * 부르지 않으며, 과거 일기의 `authorName`은 생성 시점 그대로 남는다.
+   */
+  const onRenameCharacter = useCallback(
+    (character: Character, raw: string) => {
+      setCustomNames((prev) => {
+        const next: CustomNames = { ...prev };
+        const validated = validateCharacterName(raw);
+
+        if (validated.ok) {
+          next[character] = validated.value;
+        } else if (validated.reason === "empty") {
+          // 비운 것은 「기본 이름으로 되돌린다」는 뜻이다(FR-025).
+          delete next[character];
+        } else {
+          // too-long — 저장하지 않고 직전 값을 유지한다(FR-024).
+          return prev;
+        }
+
+        void saveCustomNames(characterNamesPort, next).catch(() => {});
+        return next;
+      });
+    },
+    [characterNamesPort],
+  );
+
   const onSubmitWelcomeName = useCallback(
     (raw: string) => {
       // 화면이 아니라 조립부가 검증한다 — 첫 만남과 설정 편집이 같은 규칙을
@@ -578,6 +611,8 @@ function AppFrame() {
           onAcknowledge={onAcknowledge}
           // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014).
           deniedNotices={deniedNotices}
+          // 035 — 사용자가 지은 이름. 화면은 문자열만 받는다(FR-018).
+          characterNames={customNames}
         />
       ) : tab === "settings" ? (
         // 020 — 자동 생성 설정(FR-001). 021 — "권한" 섹션. 029 — "일기 작성자"·
@@ -592,6 +627,9 @@ function AppFrame() {
           setProgress={setProgress}
           rejection={rejection}
           setRejection={setRejection}
+          // 035 — 사용자가 지은 이름과 그 편집 통로(FR-022).
+          characterNames={customNames}
+          onRenameCharacter={onRenameCharacter}
         />
       ) : (
         // **개발자 탭도 진단과 같은 조건에서만 그려진다** — 탭이 없으면 이 갈래에
@@ -621,6 +659,7 @@ function DiarySection({
   onDayOpened,
   onAcknowledge,
   deniedNotices,
+  characterNames,
 }: {
   /** 029 — no-ready-character 실패 시 설정 탭으로 (FR-014) */
   onGoToSettings?: () => void;
@@ -632,6 +671,8 @@ function DiarySection({
   onAcknowledge?: (day: DayDate) => void;
   /** 021 — 거부된 권한 안내 (FR-014). 부모가 계산 */
   deniedNotices?: readonly string[];
+  /** 035 — 캐릭터 → 지금 부르는 이름. 조립부가 만든 문자열만 (FR-018) */
+  characterNames?: CustomNames;
 }) {
   const environment = currentEnvironment();
 
@@ -814,6 +855,7 @@ function DiarySection({
       onGenerated={onGenerated}
       deniedNotices={deniedNotices}
       onGoToSettings={onGoToSettings}
+      characterNames={characterNames}
       initialDay={initialDay}
       onAcknowledge={(day) => {
         onAcknowledge?.(day);
@@ -1140,6 +1182,8 @@ function AutoDiarySection({
   setProgress,
   rejection,
   setRejection,
+  characterNames,
+  onRenameCharacter,
 }: {
   platform: "android" | "ios";
   onboardingPorts: OnboardingPorts;
@@ -1151,6 +1195,16 @@ function AutoDiarySection({
   setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
   rejection: DownloadRejection | null;
   setRejection: (rejection: DownloadRejection | null) => void;
+  /** 035 — 캐릭터 → 지금 부르는 이름 (FR-018·FR-022). */
+  characterNames?: CustomNames;
+  /**
+   * 035 — 준비된 캐릭터의 이름을 바꾼다 (FR-022·FR-025).
+   *
+   * 빈 문자열을 넘기면 기본 이름으로 되돌린다 — 조립부가 키를 제거한다(W19).
+   * 검증(`validateCharacterName`)도 조립부가 한다: 첫 만남과 설정이 같은
+   * 규칙을 쓴다(W18).
+   */
+  onRenameCharacter?: (character: Character, name: string) => void;
 }) {
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
@@ -1305,12 +1359,23 @@ function AutoDiarySection({
         {/* 029 — 일기 작성자 (FR-023). persona 이름·소개·준비 여부만. */}
         <AuthorPicker
           options={CHARACTERS.map((character) => ({
-            name: personaOf(character).name,
+            // 035 — 이름만 사용자가 지을 수 있다(헌법 1.4.0). **소개(tagline)는
+            // 코드 안 고정값 그대로다** — 말투·성격은 사용자가 바꿀 수 없다.
+            name: characterNames?.[character] ?? personaOf(character).name,
             tagline: personaOf(character).tagline,
             ready: readyChars.includes(character),
             selected: author === character,
           }))}
           onSelect={onSelectAuthor}
+          // index → Character는 조립부가 옮긴다 — 화면은 심볼을 모른다(원칙 III).
+          onRename={
+            onRenameCharacter === undefined
+              ? undefined
+              : (index, name) => {
+                  const character = CHARACTERS[index];
+                  if (character !== undefined) onRenameCharacter(character, name);
+                }
+          }
         />
       </View>
 

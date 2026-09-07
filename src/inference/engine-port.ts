@@ -125,8 +125,20 @@ export interface GenerationEngine {
    *
    * **부르는 쪽 책임**: `load()` 없이 부르면 조용히 아무 일도 하지 않는다(E9).
    * 이 뒤에 VLM을 열면 안 된다(E1) — 순서는 항상 호출자 책임이다.
+   *
+   * ─────────────────────────────────────────────────────────────────────────
+   * **035 — 접두사를 인자로 받는다**(character-name.md N18).
+   *
+   * 018에서는 포트가 `promptPrefix(character)`를 직접 불렀다. 035가 사용자 지정
+   * 이름을 접두사에 들이면서 포트가 **이름까지 알아야 하는** 문제가 생겼다 —
+   * 접두사를 통째로 받으면 포트는 문자열 하나만 알면 되고, `llama-port.ts`가
+   * `prompt.ts`를 import하지 않게 되어 경계가 오히려 깨끗해진다.
+   *
+   * **반환값은 여전히 없다**(L8a) — 018 E6가 막는 것은 **반환값**이지 인자가
+   * 아니다. `Promise<boolean>`으로 바꾸면 "얼마나 걸렸나"를 담고 싶어진다.
+   * ─────────────────────────────────────────────────────────────────────────
    */
-  prewarm(character: Character): Promise<void>;
+  prewarm(character: Character, prefix: string): Promise<void>;
   run(prompt: string, limits: RunLimits): Promise<RunResult>;
   stop(): Promise<void>;
   unload(): Promise<void>;

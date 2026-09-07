@@ -78,3 +78,102 @@ describe("US4 AS4 — 고정값이 없으면 온보딩 기본(quiet)이 현재 �
     expect(screen.getByTestId("author-option-0").props.accessibilityState?.selected).toBe(true);
   });
 });
+
+/* ──────────── 035 — 이름 바꾸기 (contracts/welcome-gate.md W17~W20) ──────────── */
+
+describe("W17 — 준비된 캐릭터만 이름을 바꿀 수 있다 (FR-022·FR-023)", () => {
+  it("준비된 줄에 편집 진입점이 있다", async () => {
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={() => {}} />);
+
+    // 금동이(0)·오드(2)는 ready, 루이(1)는 미준비.
+    expect(screen.queryByTestId("author-rename-0")).not.toBeNull();
+    expect(screen.queryByTestId("author-rename-2")).not.toBeNull();
+  });
+
+  it("★ 미준비 줄에는 편집 진입점이 없다", async () => {
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={() => {}} />);
+
+    expect(screen.queryByTestId("author-rename-1")).toBeNull();
+  });
+
+  it("미준비 안내 문구는 그대로다 (029·034 회귀)", async () => {
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={() => {}} />);
+
+    expect(screen.getByText("아직 준비되지 않음 — 아래에서 내려받으세요")).toBeTruthy();
+  });
+
+  it("onRename을 주지 않으면 편집 진입점이 아예 없다 (029 동작 보존)", async () => {
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} />);
+
+    expect(screen.queryByTestId("author-rename-0")).toBeNull();
+  });
+});
+
+describe("W18·W19 — 편집 입력과 저장", () => {
+  it("편집을 열면 현재 이름이 초기값이다", async () => {
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={() => {}} />);
+    await fireEvent.press(screen.getByTestId("author-rename-0"));
+
+    expect(screen.getByTestId("author-rename-input-0").props.value).toBe("금동이");
+  });
+
+  it("FR-013 — 입력 상한이 12다", async () => {
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={() => {}} />);
+    await fireEvent.press(screen.getByTestId("author-rename-0"));
+
+    expect(screen.getByTestId("author-rename-input-0").props.maxLength).toBe(12);
+  });
+
+  it("저장하면 index와 입력값을 넘긴다", async () => {
+    const onRename = jest.fn();
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={onRename} />);
+
+    await fireEvent.press(screen.getByTestId("author-rename-0"));
+    await fireEvent.changeText(screen.getByTestId("author-rename-input-0"), "복실이");
+    await fireEvent.press(screen.getByTestId("author-rename-save-0"));
+
+    expect(onRename).toHaveBeenCalledWith(0, "복실이");
+  });
+
+  it("★ W19 — 비운 채 저장하면 빈 문자열을 넘긴다 (조립부가 기본 이름으로 되돌린다)", async () => {
+    const onRename = jest.fn();
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={onRename} />);
+
+    await fireEvent.press(screen.getByTestId("author-rename-0"));
+    await fireEvent.changeText(screen.getByTestId("author-rename-input-0"), "");
+    await fireEvent.press(screen.getByTestId("author-rename-save-0"));
+
+    expect(onRename).toHaveBeenCalledWith(0, "");
+  });
+
+  it("취소하면 콜백을 부르지 않고 편집이 닫힌다", async () => {
+    const onRename = jest.fn();
+    await render(<AuthorPicker options={OPTIONS} onSelect={() => {}} onRename={onRename} />);
+
+    await fireEvent.press(screen.getByTestId("author-rename-0"));
+    await fireEvent.changeText(screen.getByTestId("author-rename-input-0"), "복실이");
+    await fireEvent.press(screen.getByTestId("author-rename-cancel-0"));
+
+    expect(onRename).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("author-rename-input-0")).toBeNull();
+  });
+});
+
+describe("035 — 화면은 여전히 모델도 검증 규칙도 모른다 (원칙 III)", () => {
+  it("사용자 지정 이름을 그대로 그린다 — 폴백은 조립부가 한다", async () => {
+    const renamed = [{ ...OPTIONS[0]!, name: "복실이" }, OPTIONS[1]!, OPTIONS[2]!];
+    await render(<AuthorPicker options={renamed} onSelect={() => {}} onRename={() => {}} />);
+
+    expect(screen.getByText("복실이")).toBeTruthy();
+    // 소개는 코드 안 고정값 그대로다(헌법 1.4.0 — 이름만 사용자가 짓는다).
+    expect(screen.getByText("군더더기 없이 담백하게 적어요")).toBeTruthy();
+  });
+
+  it("src/welcome/를 import하지 않는다 (W14)", () => {
+    const CODE = readFileSync(join(__dirname, "../../src/ui/AuthorPicker.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(CODE).not.toMatch(/from\s+["'][^"']*welcome\//);
+    expect(CODE).not.toContain("validateCharacterName");
+  });
+});

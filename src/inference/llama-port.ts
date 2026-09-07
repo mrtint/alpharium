@@ -21,7 +21,6 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { promptPrefix } from "../diary/prompt";
 import type { Character } from "../diary/types";
 import { assetFor } from "../models/roster";
 import { modelFilePath } from "../models/expo-port";
@@ -161,15 +160,20 @@ export function createLlamaEngine(
      * 보내면 채팅 템플릿이 다르게 둘러져 접두사 토큰 열이 달라지고, KV
      * 캐시가 빗나간다. **`n_predict: 1`**로 생성 자체는 하지 않는다(E8).
      * 결과는 어디에도 담지 않는다(E11, 원칙 IV).
+     *
+     * **035 — 접두사를 인자로 받는다**(N18). 018에서는 여기서
+     * `promptPrefix(character)`를 직접 불렀으나, 사용자 지정 이름이 접두사에
+     * 들어가면서 포트가 이름까지 알아야 하는 문제가 생겼다. 문자열 하나만
+     * 받으면 이 파일이 `diary/prompt`를 import하지 않아도 된다.
      */
-    async prewarm(character: Character): Promise<void> {
+    async prewarm(character: Character, prefix: string): Promise<void> {
       // load()를 건너뛴 채 부른 것이거나 다른 캐릭터가 열려 있다. 던지지
       // 않는다(E5) — 순서는 호출자 책임이다(E9).
       if (context === null || openFor !== character) return;
 
       try {
         await context.completion({
-          messages: [{ role: "user", content: promptPrefix(character) }],
+          messages: [{ role: "user", content: prefix }],
           jinja: true,
           temperature: SAMPLING.temperature,
           top_p: SAMPLING.top_p,

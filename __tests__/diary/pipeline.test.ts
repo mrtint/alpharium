@@ -10,6 +10,9 @@
  * 의존하지 않는다(FR-018a).
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { createPipeline } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
 import type { Character, DiaryEntry, VisionSetting } from "../../src/diary/types";
@@ -69,6 +72,8 @@ function inputFor(
     character?: Character;
     vision?: VisionSetting;
     seen?: PhotoVision;
+    customNames?: Record<string, string>;
+    authorName?: string;
   } = {},
 ) {
   return {
@@ -77,6 +82,8 @@ function inputFor(
     character: "character" in overrides ? overrides.character : ("quiet" as Character),
     vision: overrides.vision ?? ("quick" as VisionSetting),
     ...("seen" in overrides ? { seen: overrides.seen } : {}),
+    ...("customNames" in overrides ? { customNames: overrides.customNames } : {}),
+    ...("authorName" in overrides ? { authorName: overrides.authorName } : {}),
   };
 }
 
@@ -1236,5 +1243,68 @@ describe("018 — PipelineInput.seen이 backend.generate()로 그대로 전달�
     expect(receivedSeen?.captions[0]?.text).toBe("커피잔");
     expect(receivedSeen?.considered).toBe(1);
     expect(receivedSeen?.available).toBe(1);
+  });
+});
+
+/* ─────────── 035 — 작성자 이름 스냅샷 (contracts/character-name.md N10~N12) ─────────── */
+
+describe("035 — DiaryEntry.authorName (FR-026a·b·c)", () => {
+  it("N10: authorName을 주입하면 저장된 일기에 담긴다", async () => {
+    const { pipeline, store } = makePipeline({ backend: generating("제목\n\n본문") });
+
+    await pipeline.run(inputFor({ authorName: "복실이" }));
+
+    expect((await store.load(DAY))?.authorName).toBe("복실이");
+  });
+
+  it("★ N10: 주입하지 않으면 키 자체가 없다 (undefined가 아니다)", async () => {
+    // `undefined`를 담으면 JSON에 키가 남지 않지만, 타입상 「있는데 모른다」와
+    // 「없다」가 뒤섞인다. 017의 `title?`·`placeName?`과 같은 방식이어야 한다.
+    const { pipeline, store } = makePipeline({ backend: generating("제목\n\n본문") });
+
+    await pipeline.run(inputFor());
+
+    const entry = await store.load(DAY);
+    expect(entry).not.toBeNull();
+    expect("authorName" in (entry as object)).toBe(false);
+  });
+
+  it("N11: 파이프라인이 이름을 스스로 계산하지 않고 주입받는다", () => {
+    // 조립부가 이미 만든 문자열을 담아야 화면 표시와 저장된 이름이 어긋나지
+    // 않는다("두 개의 진실" 금지).
+    const code = readFileSync(join(__dirname, "../../src/diary/pipeline.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toContain("displayNameOf");
+    expect(code).not.toContain("personaOf");
+  });
+
+  it("N12: 옛 일기에 authorName을 소급 생성하는 코드가 없다 (원칙 V)", () => {
+    // 그 시점의 이름은 관측된 적이 없는 값이다 — 지어내면 원칙 V 위반이다.
+    for (const path of ["../../src/diary/pipeline.ts", "../../src/diary/store.ts"]) {
+      const code = readFileSync(join(__dirname, path), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(code).not.toMatch(/migrate|backfill|upgradeEntry|fillAuthor/i);
+    }
+  });
+
+  it("customNames를 주입하면 요청에 실려 백엔드에 닿는다 (FR-018)", async () => {
+    let seenNames: unknown;
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate(request) {
+        seenNames = request.customNames;
+        return { text: "제목\n\n본문" };
+      },
+    };
+    const { pipeline } = makePipeline({ backend });
+
+    await pipeline.run(inputFor({ customNames: { quiet: "복실이" } }));
+
+    expect(seenNames).toEqual({ quiet: "복실이" });
   });
 });

@@ -28,7 +28,7 @@ import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createPipeline, type LockHandle, type Pipeline } from "../diary/pipeline";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
-import type { Character, VisionSetting } from "../diary/types";
+import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
 import { acquireLock as acquireLockRecord, releaseLock, type LockPort } from "../schedule/lock";
@@ -39,6 +39,7 @@ import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
 import type { VisionOutcome } from "../vision/types";
 import type { LivenessOutcome } from "../welcome/liveness";
+import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
 
 /**
  * 조립 결과.
@@ -125,6 +126,13 @@ export type WiringDeps = {
   /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
   geocodingEnabled?: boolean;
   /**
+   * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
+   *
+   * `prepare()`가 프리필할 접두사와 `generate()`가 만드는 프롬프트가 **같은
+   * 이름을 봐야** KV 캐시가 빗나가지 않는다. 주지 않으면 기기 통로를 쓴다.
+   */
+  loadCustomNames?: () => Promise<CustomNames>;
+  /**
    * 이 파이프라인을 누가 조립하는가 (020, contracts/generation-lock.md L5).
    *
    * `"screen"`이면 화면 수동 생성, `"background"`면 자동 생성 태스크.
@@ -150,6 +158,11 @@ function deviceStore(): DiaryStore {
   return fileStore(expoFileSystemPort("diary"));
 }
 
+/** 사용자가 지은 이름들. 035의 저장 통로를 그대로 쓴다 */
+function deviceCustomNames(): Promise<CustomNames> {
+  return loadCustomNames(expoCharacterNamesPort());
+}
+
 /** 그 하루의 실제 신호. 004의 수집을 그대로 쓴다 */
 function deviceSignals(day: DayDate): Promise<DaySignals> {
   return collectDaySignals(expoPhotoPort(), day);
@@ -173,6 +186,7 @@ export function createAppPipeline(
     undefined,
     desktopInferenceUrl(),
     deps.loadSignals ?? deviceSignals,
+    deps.loadCustomNames ?? deviceCustomNames,
   );
   if (!selection.ok) {
     return { ok: false, reason: selection.reason, detail: selection.detail };

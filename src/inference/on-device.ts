@@ -23,9 +23,9 @@
 
 import type { DayDate } from "../config/day-boundary";
 import { judge } from "../diary/acceptance";
-import { buildPrompt, instructionLines } from "../diary/prompt";
+import { buildPrompt, instructionLines, promptPrefix } from "../diary/prompt";
 import { buildRequest } from "../diary/request";
-import type { Character, DiaryRequest, VisionSetting } from "../diary/types";
+import type { Character, CustomNames, DiaryRequest, VisionSetting } from "../diary/types";
 import type { DaySignals, Photo } from "../signals/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
 import type { ResizeExecutor } from "../vision/resize";
@@ -316,6 +316,15 @@ export function createOnDeviceBackend(
    * 같은 함수가 주입된다.
    */
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
+  /**
+   * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
+   *
+   * `prepare()`가 프리필할 접두사를 만들 때 쓴다 — **`prewarm()`과 `run()`이
+   * 같은 이름을 봐야** KV 캐시가 빗나가지 않는다. 화면은 이름을 모르므로
+   * (원칙 III) `loadSignals`와 같은 방식으로 주입받는다. 주지 않으면 기본
+   * 이름으로 프리필하며, 그때도 틀리지 않고 느려질 뿐이다(018 E10).
+   */
+  loadCustomNames?: () => Promise<CustomNames>,
 ): StoppableBackend {
   /**
    * 그만두라는 신호. **캡션 단계와 생성 단계가 함께 본다.**
@@ -360,7 +369,18 @@ export function createOnDeviceBackend(
       if (engine === undefined) return;
       const loaded = await engine.load(character);
       if (!loaded.ok) return; // E13 — 조용히 끝난다. generate()가 다시 시도한다.
-      await engine.prewarm(character);
+
+      /*
+       * 035 — **`prewarm()`과 `run()`이 같은 이름을 봐야 한다**(N14).
+       *
+       * 이름이 접두사에 들어가므로, 여기서 프리필한 접두사와 `generate()`가
+       * 만드는 프롬프트의 머리가 어긋나면 KV 캐시가 빗나간다. 화면은 이름을
+       * 모르므로(원칙 III) 여기서 읽는다 — `loadSignals`를 주입받은 것과 같은
+       * 구조다. 읽지 못하면 기본 이름으로 프리필하며, 그때도 **틀리지 않고
+       * 느려질 뿐이다**(018 E10).
+       */
+      const customNames = (await loadCustomNames?.().catch(() => ({}))) ?? {};
+      await engine.prewarm(character, promptPrefix(character, customNames));
       // **unload하지 않는다**(E12) — 열어 두어야 generate()의 load()가
       // warm으로 재사용하고 KV 캐시가 살아 있다.
     },
@@ -653,6 +673,15 @@ export function createOnDeviceBackend(
 export function onDeviceBackend(
   /** 018 2단계 — `captionDay()`가 신호를 읽는 데 쓴다. 주지 않으면 no-photos로 끝난다 */
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
+  /**
+   * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
+   *
+   * `prepare()`가 프리필할 접두사를 만들 때 쓴다 — **`prewarm()`과 `run()`이
+   * 같은 이름을 봐야** KV 캐시가 빗나가지 않는다. 화면은 이름을 모르므로
+   * (원칙 III) `loadSignals`와 같은 방식으로 주입받는다. 주지 않으면 기본
+   * 이름으로 프리필하며, 그때도 틀리지 않고 느려질 뿐이다(018 E10).
+   */
+  loadCustomNames?: () => Promise<CustomNames>,
 ): StoppableBackend {
   return createOnDeviceBackend(
     async () => {
@@ -668,6 +697,7 @@ export function onDeviceBackend(
     // 배선과 같은 종류의 조용한 실패가 나는 자리다.
     visionSupport(),
     loadSignals,
+    loadCustomNames,
   );
 }
 

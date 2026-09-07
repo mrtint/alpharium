@@ -27,15 +27,13 @@
  */
 
 import { personaOf } from "./persona";
-import type { Character } from "./types";
+import type { Character, CustomNames } from "./types";
 
 /**
- * 사용자가 지은 이름들. **일부 캐릭터만 값이 있을 수 있다.**
- *
- * 안 지은 캐릭터는 **키가 없다** — `null`이나 `""`로 채우지 않는다(원칙 V:
- * 모르는 것을 기본값으로 채우지 않는다).
+ * 사용자가 지은 이름들. **타입은 `types.ts`에 있다**(`DiaryRequest`가 쓰므로
+ * 여기 두면 순환 import가 된다). 해석은 아래 `displayNameOf()` 하나뿐이다.
  */
-export type CustomNames = Partial<Record<Character, string>>;
+export type { CustomNames };
 
 /**
  * 지금 이 캐릭터를 뭐라 부르는가 (N1).
