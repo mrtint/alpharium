@@ -27,11 +27,11 @@
 **목표**: 이관 불변식(ES1~ES14)을 검사하는 계약 테스트 스위트를 세우고, 지금
 **RED**임을 확인한다. 구현 전에 계약이 먼저 있어야 한다.
 
-- [ ] T001 `__tests__/ui/enduser-screen-migration.test.tsx`를 만들고 공통 블록(ES7 원시 hex 0 / ES8 032 경계 / ES5 원칙 III 경계 / ES9 className 병행)을 4파일 전부에 대해 먼저 쓴다 per contracts/enduser-screen-migration.md ES1·ES5·ES7·ES8·ES9 — 각 `.tsx` 소스를 `readFileSync`로 읽어 검사(007 이후 관례). 이 시점에 `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection`이 아직 `className`·토큰 병행이 없으므로 **RED여야 한다**.
+- [X] T001 `__tests__/ui/enduser-screen-migration.test.tsx`를 만들고 공통 블록(ES7 원시 hex 0 / ES8 032 경계 / ES5 원칙 III 경계 / ES9 className 병행)을 4파일 전부에 대해 먼저 쓴다 per contracts/enduser-screen-migration.md ES1·ES5·ES7·ES8·ES9 — 각 `.tsx` 소스를 `readFileSync`로 읽어 검사(007 이후 관례). 이 시점에 `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection`이 아직 `className`·토큰 병행이 없으므로 **RED여야 한다**.
 
-- [ ] T002 같은 파일에 화면별 고유 블록을 더한다 per contracts ES10~ES14 — ES10(`AuthorPicker`가 `SelectRow` 미사용 + `StyleSheet.create` 부재), ES11(`OverwriteConfirmScreen`이 `components/Button` 사용 + `StyleSheet.create` 부재), ES12(`BuildErrorScreen`이 `Text`·`StyleSheet` RN import 부재), ES13(`PermissionsSection`이 `components/Card` 사용 + `Section` 미사용 + `Toggle` 미사용 + 머리글이 `SectionHeader`), ES14(`PermissionsSection` `section` 스타일에 좌우 padding 부재). **RED 확인.**
+- [X] T002 같은 파일에 화면별 고유 블록을 더한다 per contracts ES10~ES14 — ES10(`AuthorPicker`가 `SelectRow` 미사용 + `StyleSheet.create` 부재), ES11(`OverwriteConfirmScreen`이 `components/Button` 사용 + `StyleSheet.create` 부재), ES12(`BuildErrorScreen`이 `Text`·`StyleSheet` RN import 부재), ES13(`PermissionsSection`이 `components/Card` 사용 + `Section` 미사용 + `Toggle` 미사용 + 머리글이 `SectionHeader`), ES14(`PermissionsSection` `section` 스타일에 좌우 padding 부재). **RED 확인.**
 
-- [ ] T003 `npm run test:ui -- enduser-screen-migration`이 RED(예상된 실패)이고 기존 4개 스위트는 여전히 GREEN인지 확인한다 per quickstart §1 — T001·T002가 기존 테스트를 건드리지 않았음을 확인하는 게이트. `jest-projects.test.ts` 파일 수 가드가 새 `.tsx`를 ui 프로젝트에 잡는지도 확인.
+- [X] T003 `npm run test:ui -- enduser-screen-migration`이 RED(예상된 실패)이고 기존 4개 스위트는 여전히 GREEN인지 확인한다 per quickstart §1 — T001·T002가 기존 테스트를 건드리지 않았음을 확인하는 게이트. `jest-projects.test.ts` 파일 수 가드가 새 `.tsx`를 ui 프로젝트에 잡는지도 확인.
 
 **체크포인트**: 계약 스위트 RED, 기존 4개 GREEN, lint 클린. 이관이 열린다.
 
@@ -48,27 +48,27 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 
 ### AuthorPicker (DayPicker 방식 — research R1·R2)
 
-- [ ] T004 [US1] `src/ui/AuthorPicker.tsx`에서 `StyleSheet`를 RN import에서 빼고, `styles.container`/`row`/`rowSelected`/`rowDisabled`/`info`를 모듈 상수 `ROW`/`ROW_SELECTED`/`INFO`(`as const`, `COLORS.*`·`RADIUS.*` 참조)로 옮긴 뒤 `StyleSheet.create`를 제거한다 per data-model.md §1 — 033 `DayPicker` 선례. `hairline` → `borderWidth: 1`.
+- [X] T004 [US1] `src/ui/AuthorPicker.tsx`에서 `StyleSheet`를 RN import에서 빼고, `styles.container`/`row`/`rowSelected`/`rowDisabled`/`info`를 모듈 상수 `ROW`/`ROW_SELECTED`/`INFO`(`as const`, `COLORS.*`·`RADIUS.*` 참조)로 옮긴 뒤 `StyleSheet.create`를 제거한다 per data-model.md §1 — 033 `DayPicker` 선례. `hairline` → `borderWidth: 1`.
 
-- [ ] T005 [US1] 같은 파일에서 각 요소에 `className` 문자열을 병행으로 준다 per data-model.md §1 / contracts ES9 — 컨테이너 `className="gap-2"`, 행 `className="flex-row items-center justify-between py-3 px-3 rounded-card border border-border"` + 조건부 선택/미준비, info `className="flex-1 gap-0.5"`. 인라인 `style`은 모듈 상수 + 조건부 객체. **선택 행 테두리 굵기는 현행 `rowSelected: { borderColor: COLORS.accent, borderWidth: 1 }`을 유지한다** — 033 `DayPicker`는 `border-2`로 굵혔으나 `AuthorPicker`의 현행값은 1이고, FR-009("행 높이·여백 불변")를 지키려면 굵기도 그대로 둔다. `className`도 `"border border-accent"`(2 아님). `"작성자"` 표식의 `<AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>`는 **그대로 유지**(문안·색 불변, FR-005).
+- [X] T005 [US1] 같은 파일에서 각 요소에 `className` 문자열을 병행으로 준다 per data-model.md §1 / contracts ES9 — 컨테이너 `className="gap-2"`, 행 `className="flex-row items-center justify-between py-3 px-3 rounded-card border border-border"` + 조건부 선택/미준비, info `className="flex-1 gap-0.5"`. 인라인 `style`은 모듈 상수 + 조건부 객체. **선택 행 테두리 굵기는 현행 `rowSelected: { borderColor: COLORS.accent, borderWidth: 1 }`을 유지한다** — 033 `DayPicker`는 `border-2`로 굵혔으나 `AuthorPicker`의 현행값은 1이고, FR-009("행 높이·여백 불변")를 지키려면 굵기도 그대로 둔다. `className`도 `"border border-accent"`(2 아님). `"작성자"` 표식의 `<AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>`는 **그대로 유지**(문안·색 불변, FR-005).
 
-- [ ] T006 [US1] `AuthorPicker.tsx`가 `SelectRow`를 import하지 않는지, `testID`(`author-picker`·`author-option-${index}`)·문안(`일기 작성자`·`작성자`·`아직 준비되지 않음 — 아래에서 내려받으세요`)·`AuthorOption`/`AuthorPickerProps` 타입·`onSelect(index)` 시그니처가 불변인지 확인한다 per contracts ES3·ES4·ES10 — 소스 눈 검토 + `tsc`.
+- [X] T006 [US1] `AuthorPicker.tsx`가 `SelectRow`를 import하지 않는지, `testID`(`author-picker`·`author-option-${index}`)·문안(`일기 작성자`·`작성자`·`아직 준비되지 않음 — 아래에서 내려받으세요`)·`AuthorOption`/`AuthorPickerProps` 타입·`onSelect(index)` 시그니처가 불변인지 확인한다 per contracts ES3·ES4·ES10 — 소스 눈 검토 + `tsc`.
 
 ### PermissionsSection (부분 병행 + Card + 여백 이관 — research R1·R3·R4)
 
-- [ ] T007 [US1] `src/ui/PermissionsSection.tsx`에서 `import { Card } from "./components/Card"`를 추가하고, 각 권한 행을 감싸던 `<View key={req.key} style={styles.row} testID={\`permission-row-${req.key}\`}>`를 `<Card key={req.key} style={{ padding: 12, gap: 4 }} testID={\`permission-row-${req.key}\`}>`로 바꾼다 per data-model.md §4 / contracts ES13 — `Card` 기본 `padding: 16`을 12로 오버라이드(033 `DayPicker`·`AuthorPicker` 행 여백과 맞춤). 컴포넌트 자체는 무변경. 행 안 요청/설정 링크의 `testID`는 그 안 `Pressable`에 그대로.
+- [X] T007 [US1] `src/ui/PermissionsSection.tsx`에서 `import { Card } from "./components/Card"`를 추가하고, 각 권한 행을 감싸던 `<View key={req.key} style={styles.row} testID={\`permission-row-${req.key}\`}>`를 `<Card key={req.key} style={{ padding: 12, gap: 4 }} testID={\`permission-row-${req.key}\`}>`로 바꾼다 per data-model.md §4 / contracts ES13 — `Card` 기본 `padding: 16`을 12로 오버라이드(033 `DayPicker`·`AuthorPicker` 행 여백과 맞춤). 컴포넌트 자체는 무변경. 행 안 요청/설정 링크의 `testID`는 그 안 `Pressable`에 그대로.
 
-- [ ] T008 [US1] 같은 파일에서 머리글 `<AppText variant="sectionTitle">권한</AppText>`를 `<SectionHeader>권한</SectionHeader>`로 바꾸고 `import { SectionHeader } from "./components/SectionHeader"`를 추가한다 per data-model.md §4 / contracts ES13 — 동등 교체(`SectionHeader`가 그 `AppText`의 래퍼). `Section`은 import하지 않는다.
+- [X] T008 [US1] 같은 파일에서 머리글 `<AppText variant="sectionTitle">권한</AppText>`를 `<SectionHeader>권한</SectionHeader>`로 바꾸고 `import { SectionHeader } from "./components/SectionHeader"`를 추가한다 per data-model.md §4 / contracts ES13 — 동등 교체(`SectionHeader`가 그 `AppText`의 래퍼). `Section`은 import하지 않는다.
 
-- [ ] T009 [US1] 같은 파일에서 `styles.section`(`{ padding: 20, gap: 14 }`)을 **`{ gap: 14 }`만 남긴다** per research R4 / contracts ES14 — 좌우·상하 padding을 전부 제거한다. 좌우는 `App.tsx` 래퍼(`settingsSection`, T010)가 소유하고, 섹션 상하 간격은 `App.tsx` 조립부가 형제 섹션 사이에서 관리한다(`AuthorPicker`·`VisionPicker` 등 다른 섹션도 자체 상하 padding 없이 조립부가 간격을 냄). `styles.row`는 T007이 `Card`로 대체했으므로 제거, `styles.link`는 모듈 상수 `LINK`로 옮긴다. `className` 병행(`gap-3.5` 등)을 준다. `StyleSheet.create`가 비면 제거. — **육안(T027 (c))에서 상하 간격이 다른 섹션과 어긋나면 그때만 `paddingVertical`을 최소로 되살린다.**
+- [X] T009 [US1] 같은 파일에서 `styles.section`(`{ padding: 20, gap: 14 }`)을 **`{ gap: 14 }`만 남긴다** per research R4 / contracts ES14 — 좌우·상하 padding을 전부 제거한다. 좌우는 `App.tsx` 래퍼(`settingsSection`, T010)가 소유하고, 섹션 상하 간격은 `App.tsx` 조립부가 형제 섹션 사이에서 관리한다(`AuthorPicker`·`VisionPicker` 등 다른 섹션도 자체 상하 padding 없이 조립부가 간격을 냄). `styles.row`는 T007이 `Card`로 대체했으므로 제거, `styles.link`는 모듈 상수 `LINK`로 옮긴다. `className` 병행(`gap-3.5` 등)을 준다. `StyleSheet.create`가 비면 제거. — **육안(T027 (c))에서 상하 간격이 다른 섹션과 어긋나면 그때만 `paddingVertical`을 최소로 되살린다.**
 
-- [ ] T010 [US1] `App.tsx`의 `SettingsScreen` 조립부에서 `<PermissionsSection platform={...} requirements={...} ports={...} onRestartOnboarding={...} />`를 `<View style={styles.settingsSection}><PermissionsSection .../></View>`로 감싼다 per data-model.md §5 / research R4 — `styles.settingsSection`(`{ paddingHorizontal: 20 }`)은 이미 정의됨(App.tsx:1232). `AuthorPicker`·`VisionPicker`·`GeocodingSettingToggle` 조립부는 무변경(이미 래퍼 안). 이 1곳이 유일한 조립 계층 변경.
+- [X] T010 [US1] `App.tsx`의 `SettingsScreen` 조립부에서 `<PermissionsSection platform={...} requirements={...} ports={...} onRestartOnboarding={...} />`를 `<View style={styles.settingsSection}><PermissionsSection .../></View>`로 감싼다 per data-model.md §5 / research R4 — `styles.settingsSection`(`{ paddingHorizontal: 20 }`)은 이미 정의됨(App.tsx:1232). `AuthorPicker`·`VisionPicker`·`GeocodingSettingToggle` 조립부는 무변경(이미 래퍼 안). 이 1곳이 유일한 조립 계층 변경.
 
-- [ ] T011 [US1] `PermissionsSection.tsx`의 순수 함수(`readStates`·`describe`·`describePhotoAccessLimit` 호출·`showFullAccessLink` 판정)·`requestFor`·`openSettings`·`AppState` `change`→`"active"` 재조회 리스너·`PermissionsSectionProps` 타입·`rows` 정렬(`platforms.includes` + `order`)이 불변인지, `describe()`의 6개 반환 문자열과 `권한`·`권한 안내 다시 보기`·`배터리 예외 설정`·`허용`·`설정 열기`·`전체 허용`·`그날의 사진 전부를 보지 못할 수 있어요.`·`확인 중…`가 바이트 동일한지 확인한다 per contracts ES1·ES2·ES3 — 소스 눈 검토 + `tsc`.
+- [X] T011 [US1] `PermissionsSection.tsx`의 순수 함수(`readStates`·`describe`·`describePhotoAccessLimit` 호출·`showFullAccessLink` 판정)·`requestFor`·`openSettings`·`AppState` `change`→`"active"` 재조회 리스너·`PermissionsSectionProps` 타입·`rows` 정렬(`platforms.includes` + `order`)이 불변인지, `describe()`의 6개 반환 문자열과 `권한`·`권한 안내 다시 보기`·`배터리 예외 설정`·`허용`·`설정 열기`·`전체 허용`·`그날의 사진 전부를 보지 못할 수 있어요.`·`확인 중…`가 바이트 동일한지 확인한다 per contracts ES1·ES2·ES3 — 소스 눈 검토 + `tsc`.
 
 ### US1 검증
 
-- [ ] T012 [US1] `npm run test:ui -- author-picker permissions-section enduser-screen-migration card section-header`로 기존 스위트(`author-picker`·`permissions-section`·`card`·`section-header`)가 **무수정 GREEN**이고 계약 스위트의 US1 관련 블록(ES10·ES13·ES14 + 공통)이 GREEN인지 확인한다 per quickstart §1·§2 / spec SC-002·SC-011 — `card.test.tsx`·`section-header.test.tsx`도 `PermissionsSection`이 이 컴포넌트를 처음 쓰므로 회귀 확인 대상.
+- [X] T012 [US1] `npm run test:ui -- author-picker permissions-section enduser-screen-migration card section-header`로 기존 스위트(`author-picker`·`permissions-section`·`card`·`section-header`)가 **무수정 GREEN**이고 계약 스위트의 US1 관련 블록(ES10·ES13·ES14 + 공통)이 GREEN인지 확인한다 per quickstart §1·§2 / spec SC-002·SC-011 — `card.test.tsx`·`section-header.test.tsx`도 `PermissionsSection`이 이 컴포넌트를 처음 쓰므로 회귀 확인 대상.
 
 **체크포인트**: 설정 탭 두 섹션이 이관됨. `git diff -- __tests__/ui/author-picker.test.tsx __tests__/ui/permissions-section.test.tsx`가 비어 있음.
 
@@ -85,23 +85,23 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 
 ### OverwriteConfirmScreen (전면 교체 + Button — research R1)
 
-- [ ] T013 [P] [US2] `src/ui/OverwriteConfirmScreen.tsx`에서 RN import를 `View`만 남기고(`Pressable`·`StyleSheet`·`Text` 제거), `import { AppText } from "./components/Text"` + `import { Button } from "./components/Button"`를 추가한다 per data-model.md §3.
+- [X] T013 [P] [US2] `src/ui/OverwriteConfirmScreen.tsx`에서 RN import를 `View`만 남기고(`Pressable`·`StyleSheet`·`Text` 제거), `import { AppText } from "./components/Text"` + `import { Button } from "./components/Button"`를 추가한다 per data-model.md §3.
 
-- [ ] T014 [P] [US2] 같은 파일에서 `<Text style={styles.day}>{day}</Text>`·`<Text style={styles.notice}>...</Text>`를 `AppText`로, `Pressable` 2개를 `<Button variant="secondary" onPress={onCancel}>취소</Button>`·`<Button variant="primary" onPress={onConfirm}>확인</Button>`로 바꾼다 per data-model.md §3 / contracts ES11 — 컨테이너·`actions`에 `className` + 인라인 `style` 병행. `StyleSheet.create` 제거. `OverwriteConfirmScreenProps`(`day`·`onCancel`·`onConfirm` — **`entry` 없음**)·문안(`이 날의 일기가 이미 있다. 덮어쓸지 확인이 필요하다`·`취소`·`확인`)은 그대로.
+- [X] T014 [P] [US2] 같은 파일에서 `<Text style={styles.day}>{day}</Text>`·`<Text style={styles.notice}>...</Text>`를 `AppText`로, `Pressable` 2개를 `<Button variant="secondary" onPress={onCancel}>취소</Button>`·`<Button variant="primary" onPress={onConfirm}>확인</Button>`로 바꾼다 per data-model.md §3 / contracts ES11 — 컨테이너·`actions`에 `className` + 인라인 `style` 병행. `StyleSheet.create` 제거. `OverwriteConfirmScreenProps`(`day`·`onCancel`·`onConfirm` — **`entry` 없음**)·문안(`이 날의 일기가 이미 있다. 덮어쓸지 확인이 필요하다`·`취소`·`확인`)은 그대로.
 
-- [ ] T015 [P] [US2] `overwrite-confirm.test.tsx`의 `getByText("확인")`/`getByText("취소")` 조회와 `userEvent.press(getByText(...))` 전파가 `Button` 교체 후에도 통과하는지, X1(`entry` 없음)·X2(진행률·경과시간 없음)·X3(모델 식별자 없음)이 유지되는지 확인한다 per contracts ES3·ES6·ES11 — 033 `character-list.test.tsx`가 같은 `Button` 패턴으로 통과한 선례.
+- [X] T015 [P] [US2] `overwrite-confirm.test.tsx`의 `getByText("확인")`/`getByText("취소")` 조회와 `userEvent.press(getByText(...))` 전파가 `Button` 교체 후에도 통과하는지, X1(`entry` 없음)·X2(진행률·경과시간 없음)·X3(모델 식별자 없음)이 유지되는지 확인한다 per contracts ES3·ES6·ES11 — 033 `character-list.test.tsx`가 같은 `Button` 패턴으로 통과한 선례.
 
 ### BuildErrorScreen (전면 교체 — research R1)
 
-- [ ] T016 [P] [US2] `src/ui/BuildErrorScreen.tsx`에서 RN import를 `View`만 남기고(`Text`·`StyleSheet` 제거), `import { AppText } from "./components/Text"`를 추가한다 per data-model.md §2.
+- [X] T016 [P] [US2] `src/ui/BuildErrorScreen.tsx`에서 RN import를 `View`만 남기고(`Text`·`StyleSheet` 제거), `import { AppText } from "./components/Text"`를 추가한다 per data-model.md §2.
 
-- [ ] T017 [P] [US2] 같은 파일에서 `<Text style={styles.title}>`를 `<AppText variant="title" style={{ textAlign: "center" }}>`로, `<Text style={styles.body}>`를 `<AppText variant="body" style={{ textAlign: "center", opacity: 0.8 }}>`로 바꾸고 `page` 컨테이너에 `className="flex-1 items-center justify-center"` + 인라인 `style` 병행을 준다 per data-model.md §2 / contracts ES12 — `StyleSheet.create` 제거. 문안(`이 빌드는 잘못 만들어졌다` + 본문 문장)은 바이트 그대로.
+- [X] T017 [P] [US2] 같은 파일에서 `<Text style={styles.title}>`를 `<AppText variant="title" style={{ textAlign: "center" }}>`로, `<Text style={styles.body}>`를 `<AppText variant="body" style={{ textAlign: "center", opacity: 0.8 }}>`로 바꾸고 `page` 컨테이너에 `className="flex-1 items-center justify-center"` + 인라인 `style` 병행을 준다 per data-model.md §2 / contracts ES12 — `StyleSheet.create` 제거. 문안(`이 빌드는 잘못 만들어졌다` + 본문 문장)은 바이트 그대로.
 
-- [ ] T018 [P] [US2] `build-error.test.tsx`가 무수정 GREEN인지(제목·본문 조회, S10 "다시 시도" 부재, 환경 변수 이름 부재 `EXPO_PUBLIC`/`APP_ENV`/`NODE_ENV`/`.env`/`prod`/`dev`/`local`, 모델·지표 부재) 확인한다 per contracts ES1·ES6.
+- [X] T018 [P] [US2] `build-error.test.tsx`가 무수정 GREEN인지(제목·본문 조회, S10 "다시 시도" 부재, 환경 변수 이름 부재 `EXPO_PUBLIC`/`APP_ENV`/`NODE_ENV`/`.env`/`prod`/`dev`/`local`, 모델·지표 부재) 확인한다 per contracts ES1·ES6.
 
 ### US2 검증
 
-- [ ] T019 [US2] `npm run test:ui -- overwrite-confirm build-error enduser-screen-migration`으로 기존 2개 스위트가 무수정 GREEN이고 계약 스위트의 US2 관련 블록(ES11·ES12 + 공통)이 GREEN인지 확인한다 per quickstart §1·§2 / spec SC-002.
+- [X] T019 [US2] `npm run test:ui -- overwrite-confirm build-error enduser-screen-migration`으로 기존 2개 스위트가 무수정 GREEN이고 계약 스위트의 US2 관련 블록(ES11·ES12 + 공통)이 GREEN인지 확인한다 per quickstart §1·§2 / spec SC-002.
 
 **체크포인트**: 확인·오류 화면이 이관됨. `git diff -- __tests__/ui/overwrite-confirm.test.tsx __tests__/ui/build-error.test.tsx`가 비어 있음.
 
@@ -112,13 +112,13 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 **목표**: 네 파일 일괄 이관이 저장소 전체 테스트·lint·헌법 검사를 깨지 않았음을
 확인한다.
 
-- [ ] T020 `npm test` 전체(jest 두 프로젝트)가 GREEN인지 확인한다 per quickstart §3 / spec SC-004 — `jest-projects.test.ts` 파일 수 가드 포함.
+- [X] T020 `npm test` 전체(jest 두 프로젝트)가 GREEN인지 확인한다 per quickstart §3 / spec SC-004 — `jest-projects.test.ts` 파일 수 가드 포함.
 
-- [ ] T021 `npm run lint`가 클린인지 확인한다 per quickstart §3 / spec SC-004·SC-005 — eslint 0 error, `tsc` 0, `scripts/check-constitution.mts` 위반 0(`UI_TOUCHES_MODEL`·`UI_TOUCHES_ASSET`·`UI_TOUCHES_PROMPT`), prettier 클린.
+- [X] T021 `npm run lint`가 클린인지 확인한다 per quickstart §3 / spec SC-004·SC-005 — eslint 0 error, `tsc` 0, `scripts/check-constitution.mts` 위반 0(`UI_TOUCHES_MODEL`·`UI_TOUCHES_ASSET`·`UI_TOUCHES_PROMPT`), prettier 클린.
 
-- [ ] T022 위반 주입 5종으로 방어를 확인한다 per quickstart §4 / spec SC-005 — (1) `AuthorPicker`에 `borderColor: "#ccc"` → ES7, (2) `BuildErrorScreen`에 `useColorScheme` import → `dark-mode-no-scheme.test.ts`, (3) `OverwriteConfirmScreen`에 `className="dark:bg-black"` → `dark-mode-no-scheme.test.ts`, (4) `PermissionsSection`에 `import { roster } from "../models/roster"` → `check-constitution.mts`, (5) `PermissionsSection` `section`에 `paddingHorizontal: 20` 되살림 → ES14. 각각 잡히는 것을 확인하고 되돌린다.
+- [X] T022 위반 주입 5종으로 방어를 확인한다 per quickstart §4 / spec SC-005 — (1) `AuthorPicker`에 `borderColor: "#ccc"` → ES7, (2) `BuildErrorScreen`에 `useColorScheme` import → `dark-mode-no-scheme.test.ts`, (3) `OverwriteConfirmScreen`에 `className="dark:bg-black"` → `dark-mode-no-scheme.test.ts`, (4) `PermissionsSection`에 `import { roster } from "../models/roster"` → `check-constitution.mts`, (5) `PermissionsSection` `section`에 `paddingHorizontal: 20` 되살림 → ES14. 각각 잡히는 것을 확인하고 되돌린다.
 
-- [ ] T023 `git diff --stat`으로 변경 범위를 확인한다 per quickstart §7 / spec SC-009·SC-010 — `src/ui/`의 4파일 + `App.tsx` 1곳 + `__tests__/ui/enduser-screen-migration.test.tsx` 신규만. `src/diary/`·`src/models/`·`src/inference/`·`src/signals/`·`src/vision/`·`src/schedule/`·`src/onboarding/` 0줄. `scripts/run-device-tests.mjs`의 `FLOWS` 배열 길이 불변.
+- [X] T023 `git diff --stat`으로 변경 범위를 확인한다 per quickstart §7 / spec SC-009·SC-010 — `src/ui/`의 4파일 + `App.tsx` 1곳 + `__tests__/ui/enduser-screen-migration.test.tsx` 신규만. `src/diary/`·`src/models/`·`src/inference/`·`src/signals/`·`src/vision/`·`src/schedule/`·`src/onboarding/` 0줄. `scripts/run-device-tests.mjs`의 `FLOWS` 배열 길이 불변.
 
 **체크포인트**: 기기 없는 검증 완료. 실기기로 넘어간다.
 
@@ -149,9 +149,9 @@ run:android`(033 세션이 debug 앱을 지웠으면 재설치 + 모델 재배�
 
 ## Phase 6: Polish & 마무리
 
-- [ ] T029 로드맵 `docs/roadmap/README.md` §22를 이관 완료로 갱신한다 — 032·033처럼 "구현 결과" 요약(4파일 + App.tsx 1곳, `Card`·`SectionHeader` 첫 사용, 실기기 관측). 미확인 잔여(있으면)를 명시.
+- [X] T029 로드맵 `docs/roadmap/README.md` §22를 "🔄 034에서 구현 — 코드 완료, 실기기 검증 대기"로 갱신했다 — 범위 정정(4파일)·OQ-1~3 답·기기 없는 검증 결과·남은 실기기 항목 명시. 실기기 관측은 Phase 5 완료 후 채운다.
 
-- [ ] T030 PR을 연다 per spec FR-022 — `034-enduser-nativewind-migration` → `main`. 커밋 메시지 한국어(헌법 「개발 방식」). `main` 직접 커밋 0건 확인(`git log main..HEAD --author` 눈 검토, `.githooks/pre-commit`이 방어).
+- [~] T030 PR — 코드·문서 커밋 완료. 실제 PR 오픈은 실기기 검증(Phase 5) 후. `main` 직접 커밋 0건(`.githooks/pre-commit`이 방어, 브랜치 `034-enduser-nativewind-migration`에서만 작업).
 
 ---
 

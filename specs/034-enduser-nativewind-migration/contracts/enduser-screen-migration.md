@@ -70,7 +70,11 @@
 
 ### ES9 — className + 토큰 style 병행
 
-4개 화면의 스타일을 받는 요소가 (1) `className` 문자열 + (2) `tokens.ts` 값 참조 인라인 `style`을 함께 갖는다. `AppText`·`Button`·`Card`로 교체한 자리는 그 컴포넌트가 병행을 내부에서 하므로 화면 코드가 색·타이포를 안 만진다. 인라인 `style` 숫자는 레이아웃 관용값(padding·gap·hairline)만, 색은 `COLORS.*`.
+4개 화면의 스타일을 받는 요소가 (1) `className` 문자열 + (2) 인라인 `style`(레이아웃 관용값 객체 또는 토큰 참조)을 함께 갖는다. 4개 화면 모두 `./components/*`(`AppText`·`Button`·`Card` 등)를 import해 색·타이포를 그 컴포넌트에 넘긴다(FR-003) — 화면 코드가 색을 직접 안 만진다.
+
+- **`AuthorPicker`·`PermissionsSection`**은 자체 `COLORS.*` 참조(행 테두리·선택 강조 등)가 남아 `theme/tokens`를 직접 import한다.
+- **`BuildErrorScreen`·`OverwriteConfirmScreen`**은 전면 교체돼 `AppText`·`Button`이 병행을 내부에서 하므로 `theme/tokens` 직접 import가 없어도 된다. 인라인 `style`은 레이아웃 관용값(`flex`·`padding`·`gap`·`textAlign`·`opacity`)만.
+- 인라인 `style` 숫자는 레이아웃 관용값만, 색 리터럴은 0(ES7). `COLORS.*` 참조는 위반 아님.
 
 ---
 

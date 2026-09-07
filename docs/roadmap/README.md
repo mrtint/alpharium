@@ -262,4 +262,39 @@
 - **함께 정할 것**: 설정 탭의 좌우 여백을 `App.tsx`의 `settingsSection`으로
   감싸는 지금 방식(033)을 유지할지, `SelectRow` 같은 공용 컴포넌트가 자체 여백을
   갖게 할지. 후자는 그 컴포넌트를 쓰는 모든 자리에 영향이 간다.
-- **미착수.**
+- **🔄 034에서 구현 — 코드 완료, 실기기 검증 대기**(2026-09-07,
+  `specs/034-enduser-nativewind-migration/`). 위 물음들의 답:
+  - **범위 정정**: 사용자 요청이 든 6파일 중 `AutoDiaryTriggerButton`·
+    `PermissionPanel`은 실제로 `DiagnosticsScreen`(dev 게이트) 안에서만 렌더된다
+    (`src/ui/DiagnosticsScreen.tsx:113,130`) — 배포 빌드에서 엔드유저가 못 보므로
+    개발자 탭 4종과 함께 범위 밖. **실제 대상은 4파일**: `AuthorPicker`·
+    `BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection`.
+  - **이관 단위** (Clarify OQ-1): **일괄 이관** — 네 파일을 한꺼번에 옮기고
+    `npm test` 통과 후 실기기 Maestro 회귀를 한 세션으로. 여백을 안 바꾸기로 했으니
+    화면별로 끊을 필요 없다는 판단.
+  - **설정 탭 여백** (OQ-2): **`App.tsx` 조립부가 좌우 여백 소유**. `PermissionsSection`의
+    `section` 스타일을 `{ gap: 14 }`만 남기고 `App.tsx`에서 `settingsSection`
+    (`paddingHorizontal: 20`) 래퍼로 감쌌다 — 033이 `AuthorPicker`·`VisionPicker`·
+    `GeocodingSettingToggle`에 쓴 방식에 편입. `App.tsx` 1곳 변경. `SelectRow` 무변경.
+  - **미적용 컴포넌트** (OQ-3): **`Card`·`SectionHeader`를 `PermissionsSection`에
+    처음 적용**했다 — 각 권한 행을 `Card`(`style={{ padding: 12 }}`로 기본 `padding: 16`
+    오버라이드)로 감싸고 머리글을 `<SectionHeader>`로. `Section`(섹션 전체 `Card`
+    래핑)·`Toggle`은 톤 불일치·해당 없음으로 미적용(research R3).
+  - **`AuthorPicker`는 `SelectRow`로 안 바꿨다** — `SelectRow`가 선택 표식을 `"선택"`으로
+    하드코딩하고 미준비 사유 캡션 슬롯이 없어 `author-picker.test.tsx`가 잠근
+    `"작성자"` 표식·`"아직 준비되지 않음"` 캡션을 못 낸다(research R2). 033 `DayPicker`
+    방식(`AppText` + 토큰 + `className` 병행 + 모듈 상수).
+- **★ 검증 완료 (기기 없는)**: 130 suites / 2378 tests GREEN(+69, 신규 계약 스위트
+  `enduser-screen-migration.test.tsx` ES1~ES14). 기존 4개 스위트(`author-picker`·
+  `build-error`·`overwrite-confirm`·`permissions-section`)·`card`·`section-header`
+  전부 **무수정 GREEN**. eslint 0 error, `tsc` 0, 헌법 검사 위반 0, prettier 클린.
+  위반 주입 5종(원시 hex / `useColorScheme` / `dark:` / `models/roster` import /
+  좌우 padding 되살림) 전부 잡힘. `git diff`: `src/ui/` 4파일 + `App.tsx` 1곳 +
+  신규 테스트 1스위트. 도메인 계층(`diary/`·`models/`·`inference/`·`signals/`·
+  `vision/`·`schedule/`·`onboarding/`) **0줄**. `FLOWS` 19개 불변.
+- **남은 것**: 실기기 검증(SM-S901N debug) — 설정 탭 톤·좌우 정렬선·`Card` 여백
+  육안, 덮어쓰기 확인 화면 톤, Maestro 회귀 9흐름(`diary-character-select`·
+  `writing-flow-simplified`·`generate-diary`·`past-day-diary`·`photo-selection-over-limit`·
+  `writing-monologue-expansion`·`model-acquisition`·`parallel-model-download`·`skeleton`)
+  무갱신 PASS. ⚠️ `diary-character-select.yml`은 033이 안 돌린 흐름이라 stale이면
+  갱신 필요. release 재확인 불필요(새 네이티브 모듈 0 — 012).
