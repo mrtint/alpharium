@@ -342,7 +342,9 @@ export function DiaryHomeScreen({
         running.current = false;
       }
     },
-    [pipeline, now, onGenerated],
+    // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
+    // 생성·독백이 돈다(조용히 틀리는 결함).
+    [pipeline, now, onGenerated, characterNames],
   );
 
   /**
@@ -381,7 +383,7 @@ export function DiaryHomeScreen({
     }
 
     await generate({ ...outcome.params, day: prompt.day });
-  }, [screen, now, chosenDay, resolve, generate]);
+  }, [screen, now, chosenDay, resolve, generate, characterNames]);
 
   const cancel = useCallback(async () => {
     cancelled.current = true;

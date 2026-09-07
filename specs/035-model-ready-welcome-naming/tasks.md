@@ -86,26 +86,26 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 
 ### 계약 테스트 먼저
 
-- [ ] T015 [P] [US1] `__tests__/onboarding/flag.test.ts` 확장 — contracts/welcome-gate.md W7·W8·W10 검증: `welcomeShown`이 없는 옛 파일을 읽으면 `undefined`이고 게이트가 연출을 띄움(W8), `completed`·`batteryNoticeShown`이 여전히 정상 파싱됨(021 회귀), 직렬화 왕복에서 `welcomeShown` 보존. **W7: `OnboardingFlag`에 진행 중 상태 필드(`welcomeStep`·`livenessChecked` 등)가 없는지 소스로 확인**(FR-009). **W10: `welcomeShown`을 `true`에서 `false`로 되돌리는 코드가 제품 경로에 없는지 소스로 확인**
-- [ ] T016 [P] [US1] `__tests__/ui/welcome-screen.test.tsx` 작성 — contracts/welcome-gate.md W11·W12·W13·W15·W16 + liveness.md L15·L16 검증: 세 `phase`("checking"/"welcome"/"failed")가 각각 다른 것을 그림, **props 타입에 금지 필드(`Character`·`RunResult`·`LivenessOutcome`·`text`·`ms`·`token`)가 없음을 소스로 확인**(W13·L15), 세 phase 전부에 건너뛰기 경로 존재(W11), 실패 화면에 오류 사유·경로가 없음(W16), 문구가 고정 상수이고 캐릭터 이름만 보간됨(L16). **RNTL 14는 `await fireEvent.press(...)`가 필요하다**(025 실측)
+- [X] T015 [P] [US1] `__tests__/onboarding/flag.test.ts` 확장 — contracts/welcome-gate.md W7·W8·W10 검증: `welcomeShown`이 없는 옛 파일을 읽으면 `undefined`이고 게이트가 연출을 띄움(W8), `completed`·`batteryNoticeShown`이 여전히 정상 파싱됨(021 회귀), 직렬화 왕복에서 `welcomeShown` 보존. **W7: `OnboardingFlag`에 진행 중 상태 필드(`welcomeStep`·`livenessChecked` 등)가 없는지 소스로 확인**(FR-009). **W10: `welcomeShown`을 `true`에서 `false`로 되돌리는 코드가 제품 경로에 없는지 소스로 확인**
+- [X] T016 [P] [US1] `__tests__/ui/welcome-screen.test.tsx` 작성 — contracts/welcome-gate.md W11·W12·W13·W15·W16 + liveness.md L15·L16 검증: 세 `phase`("checking"/"welcome"/"failed")가 각각 다른 것을 그림, **props 타입에 금지 필드(`Character`·`RunResult`·`LivenessOutcome`·`text`·`ms`·`token`)가 없음을 소스로 확인**(W13·L15), 세 phase 전부에 건너뛰기 경로 존재(W11), 실패 화면에 오류 사유·경로가 없음(W16), 문구가 고정 상수이고 캐릭터 이름만 보간됨(L16). **RNTL 14는 `await fireEvent.press(...)`가 필요하다**(025 실측)
 
 ### 저장 계층
 
-- [ ] T017 [US1] `src/onboarding/flag.ts` 수정 — `OnboardingFlag`에 `welcomeShown?: boolean` 추가하고 파싱·직렬화에 반영한다(021의 `batteryNoticeShown` 패턴 그대로). **진행 중 상태 필드를 만들지 않는다**(W7). T015가 통과해야 한다
+- [X] T017 [US1] `src/onboarding/flag.ts` 수정 — `OnboardingFlag`에 `welcomeShown?: boolean` 추가하고 파싱·직렬화에 반영한다(021의 `batteryNoticeShown` 패턴 그대로). **진행 중 상태 필드를 만들지 않는다**(W7). T015가 통과해야 한다
 
 ### 화면
 
-- [ ] T018 [US1] `src/ui/WelcomeScreen.tsx` 신규 — `WelcomeScreenProps { phase, characterName, onSubmitName, onSkip, onRetry }`. 대기·환영·실패 문구는 **사람이 쓴 고정 상수**이고 캐릭터 이름만 보간된다. 모델 식별자·시간·토큰·오류 사유를 표시하지 않는다. `src/welcome/`를 import하지 않는다(W14). 032/034의 NativeWind 토큰(`COLORS`·`RADIUS`·`AppText`)을 쓴다. **`<Text>`에 여러 조각이 있으면 `testID`가 접근성 트리에 안 나오므로 `accessibilityLabel`을 함께 준다**(025 실측). T016이 통과해야 한다
+- [X] T018 [US1] `src/ui/WelcomeScreen.tsx` 신규 — `WelcomeScreenProps { phase, characterName, onSubmitName, onSkip, onRetry }`. 대기·환영·실패 문구는 **사람이 쓴 고정 상수**이고 캐릭터 이름만 보간된다. 모델 식별자·시간·토큰·오류 사유를 표시하지 않는다. `src/welcome/`를 import하지 않는다(W14). 032/034의 NativeWind 토큰(`COLORS`·`RADIUS`·`AppText`)을 쓴다. **`<Text>`에 여러 조각이 있으면 `testID`가 접근성 트리에 안 나오므로 `accessibilityLabel`을 함께 준다**(025 실측). T016이 통과해야 한다
 
 ### 실행 배선 (기기 통로)
 
-- [ ] T019 [US1] `src/inference/on-device.ts`에 정상 동작 확인 실행 경로 추가 — `prepare()`·`captionDay()`가 이미 "화면이 부르는 준비 작업"을 모으는 자리이므로 여기다(`wiring.ts`가 아니다). `load(character)` → `run(LIVENESS_INPUT, { timeoutMs: LIVENESS_TIMEOUT_MS })` → `judgeLiveness(...)` 순서(L8). **응답 텍스트를 판정 후 버린다**(L10 — 변수에 담아 화면 state·파일·`console.log`로 보내는 경로가 없어야 한다). **확인 경로를 위해 `prewarm()`의 반환값을 바꾸지 않는다**(L8a — `Promise<void>` 유지. 단 T027의 인자 추가는 별개이며 허용된다). 대상은 `ONBOARDING_DEFAULT_CHARACTER` 하나뿐(L13), 순회하지 않는다
-- [ ] T020 [US1] `App.tsx` 게이트 3단화 — 기존 `shouldShowOnboarding(...)` 분기 **다음에** `shouldShowWelcome({ onboardingNeeded, essentialAssetsReady, welcomeShown })` 분기를 넣어 `WelcomeScreen`을 그린다(W1). `onboardingFlag`에서 `welcomeShown`을 읽고, 확인 실행(T019)을 트리거해 `phase`를 만든다. **`welcomeShown: true`를 쓰는 경로는 셋뿐이다**(W9): 이름 확정 / 작명 건너뛰기 / 실패 화면에서 건너뛰기. **[다시 시도]는 플래그를 쓰지 않는다**(아직 통과하지 않았다). **`WelcomeScreen`을 이 자리 밖에서 렌더하지 않는다**(W5). 확인은 정확히 한 번 돌고 자동 재시도 루프를 만들지 않는다(L12)
+- [X] T019 [US1] `src/inference/on-device.ts`에 정상 동작 확인 실행 경로 추가 — `prepare()`·`captionDay()`가 이미 "화면이 부르는 준비 작업"을 모으는 자리이므로 여기다(`wiring.ts`가 아니다). `load(character)` → `run(LIVENESS_INPUT, { timeoutMs: LIVENESS_TIMEOUT_MS })` → `judgeLiveness(...)` 순서(L8). **응답 텍스트를 판정 후 버린다**(L10 — 변수에 담아 화면 state·파일·`console.log`로 보내는 경로가 없어야 한다). **확인 경로를 위해 `prewarm()`의 반환값을 바꾸지 않는다**(L8a — `Promise<void>` 유지. 단 T027의 인자 추가는 별개이며 허용된다). 대상은 `ONBOARDING_DEFAULT_CHARACTER` 하나뿐(L13), 순회하지 않는다
+- [X] T020 [US1] `App.tsx` 게이트 3단화 — 기존 `shouldShowOnboarding(...)` 분기 **다음에** `shouldShowWelcome({ onboardingNeeded, essentialAssetsReady, welcomeShown })` 분기를 넣어 `WelcomeScreen`을 그린다(W1). `onboardingFlag`에서 `welcomeShown`을 읽고, 확인 실행(T019)을 트리거해 `phase`를 만든다. **`welcomeShown: true`를 쓰는 경로는 셋뿐이다**(W9): 이름 확정 / 작명 건너뛰기 / 실패 화면에서 건너뛰기. **[다시 시도]는 플래그를 쓰지 않는다**(아직 통과하지 않았다). **`WelcomeScreen`을 이 자리 밖에서 렌더하지 않는다**(W5). 확인은 정확히 한 번 돌고 자동 재시도 루프를 만들지 않는다(L12)
 
 ### 검증
 
-- [ ] T021 [US1] `npm run test:logic && npm run test:ui && npm run lint` 통과 확인. `tsc`가 `OnboardingFlag` 변경의 누락 호출처를 잡는지 함께 본다
-- [ ] T022 [US1] 위반 주입 검증 — contracts/liveness.md·welcome-gate.md의 「위반 주입」 표에서 US1 관련 항목을 **실제로 어겨 보고** 테스트가 잡는지 확인한다: `LivenessOutcome`에 `"slow"` 갈래 추가(L1), **`LivenessOutcome`을 `{ kind, elapsedMs }`로 변경**(L2), `judgeLiveness`에 `text.length < 5 → failed` 추가(L3), `shouldShowWelcome`에서 `onboardingNeeded` 무시(W2), `WelcomeScreen`에 `character: Character` prop 추가(W13), **`OnboardingFlag`에 `welcomeStep?: string` 추가**(W7), **[다시 시도]가 `welcomeShown: true`를 쓰게 변경**(W9)
+- [X] T021 [US1] `npm run test:logic && npm run test:ui && npm run lint` 통과 확인. `tsc`가 `OnboardingFlag` 변경의 누락 호출처를 잡는지 함께 본다
+- [X] T022 [US1] 위반 주입 검증 — contracts/liveness.md·welcome-gate.md의 「위반 주입」 표에서 US1 관련 항목을 **실제로 어겨 보고** 테스트가 잡는지 확인한다: `LivenessOutcome`에 `"slow"` 갈래 추가(L1), **`LivenessOutcome`을 `{ kind, elapsedMs }`로 변경**(L2), `judgeLiveness`에 `text.length < 5 → failed` 추가(L3), `shouldShowWelcome`에서 `onboardingNeeded` 무시(W2), `WelcomeScreen`에 `character: Character` prop 추가(W13), **`OnboardingFlag`에 `welcomeStep?: string` 추가**(W7), **[다시 시도]가 `welcomeShown: true`를 쓰게 변경**(W9)
 
 **Checkpoint**: US1이 기기 없이 완결됐다. 실기기 확인은 Phase 6에서 한다.
 
@@ -123,33 +123,33 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 
 ### 계약 테스트 먼저
 
-- [ ] T023 [P] [US2] `__tests__/welcome/names-store.test.ts` 작성 — contracts/character-name.md N8·N9 검증: 깨진 JSON → `{}`, **로스터 밖 키 하나 + 정상 키 하나 → 정상 키만 살아남는 부분 복구**, 빈 문자열 값·상한 초과 값이 섞이면 그 키만 버려짐, 저장된 JSON에 `asset`·`path`·`bytes`·`at` 키 부재
-- [ ] T024 [P] [US2] `__tests__/diary/prompt.test.ts` 확장 — contracts/character-name.md N14·N15·N16·N17 + 018 P8·P10·P11 검증: 모든 캐릭터 × 사용자 지정 이름 있음/없음 조합에서 `buildPrompt(...).startsWith(promptPrefix(...))`, **기본 이름 상태에서 다섯 접두사가 서로 다름(기존 P11 유지)**, **같은 캐릭터라도 이름이 다르면 접두사가 다름**, 접두사에 날짜·"에 네가 본 것"·"사진" 부재(P10·N15 유지), 접두사·프롬프트 어디에도 `tagline` 문구 부재(014 P4 유지). **N17 — `src/inference/on-device.ts`·`llama-port.ts` 소스에 프리필 무효화 흔적(`invalidate`·`cacheVersion`·`lastPrefix` 등)이 없는지 `readFileSync`로 확인한다**(FR-020의 확정 설계가 "무효화 없음"이므로, 무효화 코드가 슬쩍 들어오면 원칙 IV 경계에 접근한다)
+- [X] T023 [P] [US2] `__tests__/welcome/names-store.test.ts` 작성 — contracts/character-name.md N8·N9 검증: 깨진 JSON → `{}`, **로스터 밖 키 하나 + 정상 키 하나 → 정상 키만 살아남는 부분 복구**, 빈 문자열 값·상한 초과 값이 섞이면 그 키만 버려짐, 저장된 JSON에 `asset`·`path`·`bytes`·`at` 키 부재
+- [X] T024 [P] [US2] `__tests__/diary/prompt.test.ts` 확장 — contracts/character-name.md N14·N15·N16·N17 + 018 P8·P10·P11 검증: 모든 캐릭터 × 사용자 지정 이름 있음/없음 조합에서 `buildPrompt(...).startsWith(promptPrefix(...))`, **기본 이름 상태에서 다섯 접두사가 서로 다름(기존 P11 유지)**, **같은 캐릭터라도 이름이 다르면 접두사가 다름**, 접두사에 날짜·"에 네가 본 것"·"사진" 부재(P10·N15 유지), 접두사·프롬프트 어디에도 `tagline` 문구 부재(014 P4 유지). **N17 — `src/inference/on-device.ts`·`llama-port.ts` 소스에 프리필 무효화 흔적(`invalidate`·`cacheVersion`·`lastPrefix` 등)이 없는지 `readFileSync`로 확인한다**(FR-020의 확정 설계가 "무효화 없음"이므로, 무효화 코드가 슬쩍 들어오면 원칙 IV 경계에 접근한다)
 
 ### 저장 계층
 
-- [ ] T025 [US2] `src/welcome/names-port.ts` 신규 — `CharacterNamesPort` 인터페이스, `loadCustomNames(port)`(**예외를 던지지 않고 부분 복구**, N8), `saveCustomNames(port, names)`, `expoCharacterNamesPort()`(`preferences/character-names.json`, 지연 import + 임시 파일 쓰고 옮기기 — 007 `selection-store.ts` 패턴). T023이 통과해야 한다
+- [X] T025 [US2] `src/welcome/names-port.ts` 신규 — `CharacterNamesPort` 인터페이스, `loadCustomNames(port)`(**예외를 던지지 않고 부분 복구**, N8), `saveCustomNames(port, names)`, `expoCharacterNamesPort()`(`preferences/character-names.json`, 지연 import + 임시 파일 쓰고 옮기기 — 007 `selection-store.ts` 패턴). T023이 통과해야 한다
 
 ### 프롬프트 경계 (018 계약과 맞물림 — 한 번에 간다)
 
-- [ ] T026 [US2] `src/diary/prompt.ts` 수정 — `nameLine()`·`fixedHead()`·`promptPrefix()`·`buildPrompt()`·`instructionLines()`가 표시 이름을 받도록 확장한다. **`fixedHead()` 한 배열에서 접두사와 본프롬프트가 나오는 018 P9 구조를 유지**하고, **호칭 줄을 접두사에서 빼지 않는다**(N16 — 빼면 한국어 캐릭터 셋의 접두사가 같아져 P11이 깨진다). `welcome/`를 import하지 않는다(L7 역방향). T024가 통과해야 한다
-- [ ] T027 [US2] `src/inference/engine-port.ts` 수정 — `prewarm(character: Character, prefix: string): Promise<void>`로 시그니처 변경. **반환값은 여전히 `void`**(018 E6 유지 — `Promise<boolean>`으로 바꾸지 않는다). 주석에 "접두사를 인자로 받는 이유"(포트가 `prompt.ts`를 모르게 한다)를 남긴다
-- [ ] T028 [US2] `src/inference/llama-port.ts` 수정 — `prewarm()`이 인자로 받은 `prefix`를 쓰고 **`promptPrefix()` 직접 호출과 `prompt.ts` import를 제거**한다(N18). `RunResult`는 `{ text, ending }` 그대로(L9)
-- [ ] T029 [US2] `src/inference/on-device.ts` 수정 — `prepare(character)`가 표시 이름으로 접두사를 만들어 `engine.prewarm(character, prefix)`에 넘긴다. **`prewarm()`과 `run()`이 같은 이름 값을 보게 한다**(N14). E12(`unload`하지 않음)·E1(한 번에 하나만 열림)은 그대로
-- [ ] T030 [US2] `tsc`로 `prewarm()` 시그니처 변경의 모든 호출처·목이 갱신됐는지 확인한다 — `__tests__/`의 엔진 목 다수가 함께 바뀐다(021이 `NotificationPort` 확장 때 겪은 것과 같은 계열)
+- [X] T026 [US2] `src/diary/prompt.ts` 수정 — `nameLine()`·`fixedHead()`·`promptPrefix()`·`buildPrompt()`·`instructionLines()`가 표시 이름을 받도록 확장한다. **`fixedHead()` 한 배열에서 접두사와 본프롬프트가 나오는 018 P9 구조를 유지**하고, **호칭 줄을 접두사에서 빼지 않는다**(N16 — 빼면 한국어 캐릭터 셋의 접두사가 같아져 P11이 깨진다). `welcome/`를 import하지 않는다(L7 역방향). T024가 통과해야 한다
+- [X] T027 [US2] `src/inference/engine-port.ts` 수정 — `prewarm(character: Character, prefix: string): Promise<void>`로 시그니처 변경. **반환값은 여전히 `void`**(018 E6 유지 — `Promise<boolean>`으로 바꾸지 않는다). 주석에 "접두사를 인자로 받는 이유"(포트가 `prompt.ts`를 모르게 한다)를 남긴다
+- [X] T028 [US2] `src/inference/llama-port.ts` 수정 — `prewarm()`이 인자로 받은 `prefix`를 쓰고 **`promptPrefix()` 직접 호출과 `prompt.ts` import를 제거**한다(N18). `RunResult`는 `{ text, ending }` 그대로(L9)
+- [X] T029 [US2] `src/inference/on-device.ts` 수정 — `prepare(character)`가 표시 이름으로 접두사를 만들어 `engine.prewarm(character, prefix)`에 넘긴다. **`prewarm()`과 `run()`이 같은 이름 값을 보게 한다**(N14). E12(`unload`하지 않음)·E1(한 번에 하나만 열림)은 그대로
+- [X] T030 [US2] `tsc`로 `prewarm()` 시그니처 변경의 모든 호출처·목이 갱신됐는지 확인한다 — `__tests__/`의 엔진 목 다수가 함께 바뀐다(021이 `NotificationPort` 확장 때 겪은 것과 같은 계열)
 
 ### 일기 스냅샷
 
-- [ ] T031 [US2] `src/diary/types.ts` 수정 — `DiaryEntry`에 `authorName?: string` 추가(N10). 주석에 "생성 시점의 사실이며 갱신되지 않는다", "옵셔널이며 옛 일기에는 없다", "소급 생성하지 않는다"를 적는다(`title?`·`placeName?` 주석 스타일). **`serializeEntry`/`deserializeEntry`는 수정하지 않는다**(`JSON.stringify` 하나라 자동 반영)
-- [ ] T032 [US2] `src/diary/pipeline.ts` 수정 — `PipelineInput`에 `authorName?: string` 추가(018의 `seen?` 선례)하고, 엔트리 조립에서 조건부 스프레드로 담는다(`...(input.authorName !== undefined ? { authorName: input.authorName } : {})`). **주입받을 뿐 파일을 읽지 않는다**
-- [ ] T033 [P] [US2] `__tests__/diary/pipeline.test.ts` 확장 — N10·N11·N12 검증: `authorName`이 주입되면 저장 엔트리에 담김, **주입되지 않으면 키 자체가 없음**(`undefined`가 아니라 키 부재), 이름 변경 경로가 `store.save()`를 부르지 않음(소스 읽기). **N12 — `src/diary/`·`src/welcome/` 소스에 소급 생성·마이그레이션·백필 함수가 없는지 확인한다**(`migrate`·`backfill`·`upgradeEntry` 토큰 부재). 옛 일기의 그 시점 이름은 관측된 적이 없으므로 지어내면 원칙 V 위반이다
+- [X] T031 [US2] `src/diary/types.ts` 수정 — `DiaryEntry`에 `authorName?: string` 추가(N10). 주석에 "생성 시점의 사실이며 갱신되지 않는다", "옵셔널이며 옛 일기에는 없다", "소급 생성하지 않는다"를 적는다(`title?`·`placeName?` 주석 스타일). **`serializeEntry`/`deserializeEntry`는 수정하지 않는다**(`JSON.stringify` 하나라 자동 반영)
+- [X] T032 [US2] `src/diary/pipeline.ts` 수정 — `PipelineInput`에 `authorName?: string` 추가(018의 `seen?` 선례)하고, 엔트리 조립에서 조건부 스프레드로 담는다(`...(input.authorName !== undefined ? { authorName: input.authorName } : {})`). **주입받을 뿐 파일을 읽지 않는다**
+- [X] T033 [P] [US2] `__tests__/diary/pipeline.test.ts` 확장 — N10·N11·N12 검증: `authorName`이 주입되면 저장 엔트리에 담김, **주입되지 않으면 키 자체가 없음**(`undefined`가 아니라 키 부재), 이름 변경 경로가 `store.save()`를 부르지 않음(소스 읽기). **N12 — `src/diary/`·`src/welcome/` 소스에 소급 생성·마이그레이션·백필 함수가 없는지 확인한다**(`migrate`·`backfill`·`upgradeEntry` 토큰 부재). 옛 일기의 그 시점 이름은 관측된 적이 없으므로 지어내면 원칙 V 위반이다
 
 ### 화면·조립 배선
 
-- [ ] T034 [US2] `src/ui/WelcomeScreen.tsx` 확장 — 작명 입력 단계 추가. 빈 문자열·공백만이면 확정 비활성(FR-012), `maxLength={12}`(FR-013), [건너뛰기] 제공(FR-014). 입력창에 `testID`와 `accessibilityLabel`을 준다. T016을 확장해 이 갈래를 잠근다
-- [ ] T035 [US2] `App.tsx` 배선 — 앱 진입 시 `loadCustomNames()`를 읽어 상태로 들고, `displayNameOf()`로 만든 **문자열**을 화면들에 넘긴다. 작명 확정 시 `validateCharacterName()` → `saveCustomNames()` → `welcomeShown: true`. 일기 생성 호출에 `authorName`을 주입한다. **폴백(`entry.authorName ?? displayNameOf(...)`)을 조립부에서 계산해 넘긴다**(N13)
-- [ ] T036 [US2] `personaOf()`를 쓰던 표시 자리 6곳을 표시 이름 문자열로 교체 — `src/ui/CharacterListScreen.tsx:270`, `src/ui/CharacterPicker.tsx:78`, `src/ui/DiaryDetailScreen.tsx:146`, `src/ui/DiaryHomeScreen.tsx:298·339-340`, `App.tsx:1162`. **`tagline`은 그대로 `personaOf()`에서 온다**(사용자가 못 바꾼다). 진단 화면의 캐릭터 표시도 함께 확인한다(FR-018)
-- [ ] T037 [US2] `npm test && npm run lint` 통과 확인 + 위반 주입 검증 — `displayNameOf`가 `custom[c] ?? ""` 반환(N3), `naming.ts`에 `import { CHARACTERS }` 추가(N6), **호칭 줄을 `fixedHead()`에서 제거**(018 P11 — 한국어 셋이 같아지는지), `pipeline`이 `authorName`을 항상 담음(N10), `prompt.ts`에 `import { LIVENESS_INPUT }` 추가(L7 역방향). **N4 확인: `git diff --stat src/diary/persona.ts`가 비어 있어야 한다** — `PERSONAS`·`personaOf()`는 이 기능에서 수정되지 않는다(014 계약 P2·P3·P4 보존)
+- [X] T034 [US2] `src/ui/WelcomeScreen.tsx` 확장 — 작명 입력 단계 추가. 빈 문자열·공백만이면 확정 비활성(FR-012), `maxLength={12}`(FR-013), [건너뛰기] 제공(FR-014). 입력창에 `testID`와 `accessibilityLabel`을 준다. T016을 확장해 이 갈래를 잠근다
+- [X] T035 [US2] `App.tsx` 배선 — 앱 진입 시 `loadCustomNames()`를 읽어 상태로 들고, `displayNameOf()`로 만든 **문자열**을 화면들에 넘긴다. 작명 확정 시 `validateCharacterName()` → `saveCustomNames()` → `welcomeShown: true`. 일기 생성 호출에 `authorName`을 주입한다. **폴백(`entry.authorName ?? displayNameOf(...)`)을 조립부에서 계산해 넘긴다**(N13)
+- [X] T036 [US2] `personaOf()`를 쓰던 표시 자리 6곳을 표시 이름 문자열로 교체 — `src/ui/CharacterListScreen.tsx:270`, `src/ui/CharacterPicker.tsx:78`, `src/ui/DiaryDetailScreen.tsx:146`, `src/ui/DiaryHomeScreen.tsx:298·339-340`, `App.tsx:1162`. **`tagline`은 그대로 `personaOf()`에서 온다**(사용자가 못 바꾼다). 진단 화면의 캐릭터 표시도 함께 확인한다(FR-018)
+- [X] T037 [US2] `npm test && npm run lint` 통과 확인 + 위반 주입 검증 — `displayNameOf`가 `custom[c] ?? ""` 반환(N3), `naming.ts`에 `import { CHARACTERS }` 추가(N6), **호칭 줄을 `fixedHead()`에서 제거**(018 P11 — 한국어 셋이 같아지는지), `pipeline`이 `authorName`을 항상 담음(N10), `prompt.ts`에 `import { LIVENESS_INPUT }` 추가(L7 역방향). **N4 확인: `git diff --stat src/diary/persona.ts`가 비어 있어야 한다** — `PERSONAS`·`personaOf()`는 이 기능에서 수정되지 않는다(014 계약 P2·P3·P4 보존)
 
 **Checkpoint**: US1 + US2가 기기 없이 완결됐다. 이름이 네 곳과 프롬프트에 흐른다.
 
@@ -166,14 +166,14 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 
 ### 계약 테스트 먼저
 
-- [ ] T038 [P] [US3] `__tests__/ui/author-picker.test.tsx` 확장 — contracts/welcome-gate.md W17·W18·W19 검증: `ready: false`인 행에 편집 진입점이 없고 "아직 준비되지 않음" 표시가 유지됨(034 회귀), 편집이 `validateCharacterName()`과 같은 규칙을 씀, **이름을 비우면 `{ quiet: "" }`를 저장하는 게 아니라 키를 제거함**(W19)
+- [X] T038 [P] [US3] `__tests__/ui/author-picker.test.tsx` 확장 — contracts/welcome-gate.md W17·W18·W19 검증: `ready: false`인 행에 편집 진입점이 없고 "아직 준비되지 않음" 표시가 유지됨(034 회귀), 편집이 `validateCharacterName()`과 같은 규칙을 씀, **이름을 비우면 `{ quiet: "" }`를 저장하는 게 아니라 키를 제거함**(W19)
 
 ### 구현
 
-- [ ] T039 [US3] `src/ui/AuthorPicker.tsx` 수정 — 준비된 행에 이름 편집 진입점 추가. `AuthorOption`에 편집 관련 필드/콜백을 더하되 **화면은 여전히 문자열과 콜백만 받는다**(원칙 III, 034의 구조 유지). 미준비 행의 현행 표시·`testID`·문안을 바꾸지 않는다(회귀 방지). T038이 통과해야 한다
-- [ ] T040 [US3] `App.tsx` 설정 탭 배선 — 이름 편집 확정 시 `validateCharacterName()` → `saveCustomNames()` → 상태 갱신으로 즉시 반영(FR-022). **비우면 `CustomNames`에서 그 키를 제거**한다(W19). **이 경로가 `DiaryStore.save()`/`load()`를 부르지 않는다**(W20/N11)
-- [ ] T041 [US3] 과거 일기 표시 폴백 확인 — 목록·상세가 `entry.authorName ?? displayNameOf(entry.character, custom)`로 계산된 문자열을 받는지 확인한다(N13·FR-026b). 옛 일기(스냅샷 없음)에서 빈 이름이 나오지 않아야 한다
-- [ ] T042 [US3] `npm test && npm run lint` 통과 확인 + 위반 주입(이름 비우기가 `{ quiet: "" }`를 저장하는지 — W19)
+- [X] T039 [US3] `src/ui/AuthorPicker.tsx` 수정 — 준비된 행에 이름 편집 진입점 추가. `AuthorOption`에 편집 관련 필드/콜백을 더하되 **화면은 여전히 문자열과 콜백만 받는다**(원칙 III, 034의 구조 유지). 미준비 행의 현행 표시·`testID`·문안을 바꾸지 않는다(회귀 방지). T038이 통과해야 한다
+- [X] T040 [US3] `App.tsx` 설정 탭 배선 — 이름 편집 확정 시 `validateCharacterName()` → `saveCustomNames()` → 상태 갱신으로 즉시 반영(FR-022). **비우면 `CustomNames`에서 그 키를 제거**한다(W19). **이 경로가 `DiaryStore.save()`/`load()`를 부르지 않는다**(W20/N11)
+- [X] T041 [US3] 과거 일기 표시 폴백 확인 — 목록·상세가 `entry.authorName ?? displayNameOf(entry.character, custom)`로 계산된 문자열을 받는지 확인한다(N13·FR-026b). 옛 일기(스냅샷 없음)에서 빈 이름이 나오지 않아야 한다
+- [X] T042 [US3] `npm test && npm run lint` 통과 확인 + 위반 주입(이름 비우기가 `{ quiet: "" }`를 저장하는지 — W19)
 
 **Checkpoint**: 세 스토리가 전부 기기 없이 완결됐다.
 
@@ -188,8 +188,8 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 앱 데이터를 전부 날린다(모델·일기·설정 삭제 — 024 §7이 이것에 당했다).
 **모델이 필요한 흐름을 먼저, 그 흐름을 맨 마지막에.**
 
-- [ ] T043 Maestro 흐름 `.maestro/welcome-naming.yml` 작성 — 환영 화면 등장, 작명 입력·확정, 설정 탭 이름 변경, 목록 반영을 검증한다. **텍스트 매칭은 노드 전체와 맞으므로 부분 문자열은 정규식으로**, `scrollUntilVisible`이 필요한 자리를 확인한다
-- [ ] T044 `scripts/run-device-tests.mjs`의 `FLOWS` 배열에 `.maestro/welcome-naming.yml` 등록 — **등록하지 않으면 파일이 있어도 안 돌고 초록불인데 아무것도 검증되지 않는다**(AGENTS.md 경고)
+- [X] T043 Maestro 흐름 `.maestro/welcome-naming.yml` 작성 — 환영 화면 등장, 작명 입력·확정, 설정 탭 이름 변경, 목록 반영을 검증한다. **텍스트 매칭은 노드 전체와 맞으므로 부분 문자열은 정규식으로**, `scrollUntilVisible`이 필요한 자리를 확인한다
+- [X] T044 `scripts/run-device-tests.mjs`의 `FLOWS` 배열에 `.maestro/welcome-naming.yml` 등록 — **등록하지 않으면 파일이 있어도 안 돌고 초록불인데 아무것도 검증되지 않는다**(AGENTS.md 경고)
 - [ ] T045 [US1] 실기기 US1 검증 — quickstart.md §2-2 표대로: `pm clear` → 온보딩 → 에셋 다운로드 완주 → **홈이 아니라 환영 흐름이 먼저 뜨는지**, 대기 문구에 응답 텍스트·초·토큰 수 0건, `adb logcat`에서 **확인용 프롬프트가 일기 프롬프트보다 훨씬 짧은지**(L6 — 화자 규칙 8줄이 없어야 한다), 재실행 시 환영 미재등장(FR-008)
 - [ ] T046 [US2] 실기기 US2 검증 — quickstart.md §2-3 표대로: 빈 입력·13자 차단, 건너뛰기 시 기본 이름, 재실행 후 이름 유지, **네 곳 반영**(목록·설정·진단·프롬프트). 프롬프트는 개발자 탭 "입력 프롬프트 미리보기"(022)에서 `너는 '복실이'이라 불린다.`를 확인한다
 - [ ] T047 [US3] 실기기 US3 검증 — quickstart.md §2-4 표대로. **SC-005a 재현**: 이름 "금동이"로 일기 A 생성 → "복실이"로 변경 → 일기 B 생성 → 목록에서 A는 "금동이", B는 "복실이". `adb shell run-as com.anonymous.alpharium cat files/diary/<날짜>.json | grep authorName`으로 스냅샷 확인
@@ -201,9 +201,9 @@ Governance("원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드�
 
 ## Phase 7: Polish & 문서
 
-- [ ] T051 [P] `docs/roadmap/README.md`의 19번 항목에 구현 결과를 적는다 — 확정된 결정(호칭 줄 유지 + 프리필 무효화 없음, 스냅샷 방식, 60초·12자 상수)과 실기기 관측값, 미확인으로 남은 것을 함께(원칙 V)
-- [ ] T052 [P] `AGENTS.md`에 이번에 얻은 실무 사실을 더한다 — 018 접두사와 사용자 지정 이름의 상호작용(호칭 줄을 빼면 한국어 캐릭터 셋의 접두사가 같아진다)은 다음 작업자가 반드시 알아야 한다
-- [ ] T053 `specs/035-model-ready-welcome-naming/spec.md`의 미확인 잔여를 갱신한다 — 실기기에서 확인 못 한 갈래를 명시적으로 남긴다(원칙 V — "건너뛴 것은 통과가 아니다")
+- [X] T051 [P] `docs/roadmap/README.md`의 19번 항목에 구현 결과를 적는다 — 확정된 결정(호칭 줄 유지 + 프리필 무효화 없음, 스냅샷 방식, 60초·12자 상수)과 실기기 관측값, 미확인으로 남은 것을 함께(원칙 V)
+- [X] T052 [P] `AGENTS.md`에 이번에 얻은 실무 사실을 더한다 — 018 접두사와 사용자 지정 이름의 상호작용(호칭 줄을 빼면 한국어 캐릭터 셋의 접두사가 같아진다)은 다음 작업자가 반드시 알아야 한다
+- [X] T053 `specs/035-model-ready-welcome-naming/spec.md`의 미확인 잔여를 갱신한다 — 실기기에서 확인 못 한 갈래를 명시적으로 남긴다(원칙 V — "건너뛴 것은 통과가 아니다")
 - [ ] T054 quickstart.md §3 완료 판정 체크리스트를 전부 확인한다
 - [ ] T055 PR 생성 — `main` 직접 커밋 금지(헌법·AGENTS.md). 커밋 메시지는 한국어. **T001(헌법) 커밋이 코드 커밋보다 앞에 있는지** `git log --oneline`으로 확인한다
 

@@ -89,6 +89,27 @@
   `onResponderRelease`만 남는다 — `getByTestId(...).props.onPressIn`으로
   배선을 검사하려던 계약 테스트가 이것 때문에 실패했다. 이벤트를 실제로
   쏘거나(`fireEvent(node, "pressIn")`) 소스를 읽어 확인한다.
+- **RNTL 14는 `render`도 `fireEvent`도 Promise를 반환한다** — 둘 다 `await`
+  없이는 렌더·상태 갱신이 flush되지 않는다(025가 `fireEvent`를, 035가 `render`를
+  실측). `await` 없이 쓰면 **"`render` function has not been called"**라는
+  엉뚱한 오류가 나서 원인을 안 가리킨다. 쿼리는 `screen.*`에서 온다(반환값
+  구조분해가 아니다).
+- **★ 018의 프롬프트 접두사에서 호칭 줄을 빼면 안 된다**(035 실측·위반 주입).
+  접두사에 들어가는 캐릭터별 값은 **이름과 출력 언어 둘뿐**인데, 한국어
+  캐릭터가 셋(`quiet`·`narrative`·`imaginative`)이라 **이름을 빼면 셋의 접두사가
+  완전히 같아진다** — 018 P11("캐릭터마다 접두사가 다르다")이 막으려던
+  "캐릭터를 바꿔도 이전 캐릭터의 KV 캐시를 재사용한다"가 정확히 발생한다.
+  035가 사용자 지정 이름을 접두사에 들이며 이 갈래를 실제로 시험했고,
+  `prompt.test.ts`의 N16이 위반 주입에서 잡는 것을 확인했다.
+  **이름이 바뀌어 접두사가 바뀌는 것 자체는 문제가 아니다** — KV 캐시가 부분
+  재사용되어 **느려질 뿐 틀리지 않으며**, 018 계약 E10이 이미 그것을 허용한다.
+  무효화 로직을 만들지 않는다(만들면 "언제 무효화하는가"를 재게 되고 원칙 IV다).
+- **계약 테스트가 소스를 읽을 때는 주석을 먼저 걷어낸다**(011 `vision/
+  engine.test.ts`가 세우고 035가 재확인). 이 저장소의 주석은 **무엇을 왜
+  금지하는가**를 적으므로 금지어가 설명 안에 정당하게 등장한다 — 주석째로
+  검사하면 이유를 적을 수 없게 되고, 그것은 이 저장소가 지켜 온 것과 정반대다.
+  `.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")`가 관용구다.
+  `scripts/constitution-rules.ts`의 검사들도 같은 이유로 줄 단위로 걷어낸다.
 - **`CharacterListScreen`은 설정 탭 하단에 있다**(029 SS4가 「캐릭터」 탭을 흡수).
   `App.tsx`의 `ModelSection` 안, `VisionPicker`·`GeocodingSettingToggle` 아래다.
   이 화면을 지나는 Maestro 흐름은 **`download-conflict`·
