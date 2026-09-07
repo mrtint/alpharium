@@ -70,6 +70,32 @@
 - **이 기기(SM-G986N, Snapdragon 865)는 GPU/NPU 추론 경로를 못 쓴다** —
   `hasDotProd && hasI8mm && hasHexagon && hasAdreno`가 모두 참이어야 하는데
   `i8mm`이 없다(ARMv8.2, i8mm은 ARMv8.6부터). 다른 기기에서는 다를 수 있다.
+- **`babel.config.js`에 `react-native-worklets/plugin`이 없으면 reanimated가
+  조용히 안 돈다**(033 실측). reanimated 4.x는 `useAnimatedStyle`·`withTiming`
+  안의 함수를 worklet으로 컴파일하는데, 그 플러그인이 없으면 변환이 일어나지
+  않는다 — **오류를 내지 않고 애니메이션만 안 된다.** 011의 `has_media=0`,
+  013의 URI 계약 불일치, 020의 헤드리스 `defineTask` 미등록과 같은 계열이다.
+  게다가 jest는 reanimated를 목으로 대체하므로 **기기 없는 테스트가 이 결함을
+  구조적으로 못 잡는다** — 실기기 육안이 유일한 통로다. 플러그인은 `plugins`
+  배열의 마지막에 온다.
+- **reanimated는 jest에서 손으로 쓴 목이 필요하다**(033 실측). 목 없이
+  import하면 `Cannot read properties of undefined (reading 'loadUnpackers')`로
+  죽고, **공식 목(`react-native-reanimated/mock`)도 실제 index를 다시 import해
+  똑같이 죽는다.** `jest-expo` 프리셋에도 reanimated 목이 없다.
+  `jest/setup-ui.ts`가 `jest.mock`으로 직접 만든다 — 대가로 기기 없는 테스트는
+  눌림 반응이 **"배선됐는가"만 검증하고 "실제로 움직이는가"는 검증하지 못한다.**
+- **`Pressable`의 `onPressIn`/`onPressOut`은 host 노드의 props에 안 남는다**
+  (033 실측). RN이 責任자(responder) 시스템으로 컴파일해 `onResponderGrant`·
+  `onResponderRelease`만 남는다 — `getByTestId(...).props.onPressIn`으로
+  배선을 검사하려던 계약 테스트가 이것 때문에 실패했다. 이벤트를 실제로
+  쏘거나(`fireEvent(node, "pressIn")`) 소스를 읽어 확인한다.
+- **`CharacterListScreen`은 설정 탭 하단에 있다**(029 SS4가 「캐릭터」 탭을 흡수).
+  `App.tsx`의 `ModelSection` 안, `VisionPicker`·`GeocodingSettingToggle` 아래다.
+  이 화면을 지나는 Maestro 흐름은 **`download-conflict`·
+  `parallel-model-download`·`photo-vision` 셋**이며,
+  **`diary-character-select.yml`은 이 화면과 무관하다**(설정 탭의 `AuthorPicker`를
+  본다). 셋 다 `scrollUntilVisible`로 찾아 들어가므로 **행 높이가 바뀌면 문안·
+  `testID`가 전부 불변이어도 깨질 수 있다**(025의 "컨테이너 상단에서 멈춘다").
 
 ## 도구 사용법 — 실기기 검증 전에 (실측으로 얻은 것)
 
