@@ -14,7 +14,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **3개 남음 (OQ-1·OQ-2·OQ-3), 의도적. `/speckit-clarify`에서 해소.**
+- [x] No [NEEDS CLARIFICATION] markers remain — OQ-1·OQ-2·OQ-3 전부 `/speckit-clarify` 2026-09-07 세션에서 해소. OQ-3은 세부(㉮/㉯/㉰)를 plan에 위임.
 - [x] Requirements are testable and unambiguous — FR-001~022 전부 소스 검사·테스트·육안으로 검증 가능
 - [x] Success criteria are measurable — SC-001~010 전부 개수·통과/실패·육안 확인
 - [x] Success criteria are technology-agnostic — 리팩터링 스펙 특성상 파일명은 불가피하나, 결과는 "동일한 톤", "테스트 무수정 통과", "위반 0"으로 표현
@@ -32,5 +32,9 @@
 
 ## Notes
 
-- **[NEEDS CLARIFICATION] 3개는 의도적으로 남겼다** — 이관 순서·단위(OQ-1), 설정 탭 여백 소유권(OQ-2), Card/Toggle/Section 활용(OQ-3). 셋 다 "합리적 기본값이 있으나 사용자 입력이 명시적으로 '이 스펙에서 확정할 것'으로 요청한 결정"이라 `/speckit-clarify`로 넘긴다.
-- OQ-4(PermissionsSection 범위)는 스펙 안에서 결정했다 — 네 대상에 포함, 새 Maestro 흐름은 선택.
+- **`/speckit-clarify` 2026-09-07 완료** — 3개 질문 해소:
+  - OQ-1 (이관 순서): 일괄 이관 + 마지막에 전체 Maestro 회귀 1회.
+  - OQ-2 (설정 탭 여백): `App.tsx` 조립부가 좌우 여백 소유. `PermissionsSection` 좌우 padding을 `settingsSection` 래퍼로 이관. `App.tsx` 1곳 변경(SC-009 명시).
+  - OQ-3 (`Card`·`Toggle`·`Section`): `PermissionsSection`에 `Card`(행 감싸기) + `Section`/`SectionHeader`(머리글) 실제 적용. `Card`의 `padding: 16`·배경·border로 인한 레이아웃 변화 세부 3갈래(㉮ 섹션 전체 Card / ㉯ 머리글만 SectionHeader + 행만 Card / ㉰ Card padding 조정)는 plan에서 확정. `Toggle` 미적용.
+- OQ-4(PermissionsSection 범위)는 스펙 안에서 결정 — 네 대상에 포함, 새 Maestro 흐름은 선택.
+- **plan이 확정할 잔여**: OQ-3의 ㉮/㉯/㉰ 중 하나. 이건 구현 세부라 plan 단계가 적절하다.
