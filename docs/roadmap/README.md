@@ -292,9 +292,24 @@
   좌우 padding 되살림) 전부 잡힘. `git diff`: `src/ui/` 4파일 + `App.tsx` 1곳 +
   신규 테스트 1스위트. 도메인 계층(`diary/`·`models/`·`inference/`·`signals/`·
   `vision/`·`schedule/`·`onboarding/`) **0줄**. `FLOWS` 19개 불변.
-- **남은 것**: 실기기 검증(SM-S901N debug) — 설정 탭 톤·좌우 정렬선·`Card` 여백
-  육안, 덮어쓰기 확인 화면 톤, Maestro 회귀 9흐름(`diary-character-select`·
-  `writing-flow-simplified`·`generate-diary`·`past-day-diary`·`photo-selection-over-limit`·
-  `writing-monologue-expansion`·`model-acquisition`·`parallel-model-download`·`skeleton`)
-  무갱신 PASS. ⚠️ `diary-character-select.yml`은 033이 안 돌린 흐름이라 stale이면
-  갱신 필요. release 재확인 불필요(새 네이티브 모듈 0 — 012).
+- **★ 실기기 검증 완료 (2026-09-07, SM-S901N/Galaxy S22, Android, dev debug)**:
+  - **Maestro 7흐름 무갱신 PASS**: `diary-character-select`(033이 안 돌린 흐름 —
+    stale 아님, 갱신 없이 PASS), `writing-flow-simplified`, `generate-diary`,
+    `past-day-diary`, `writing-monologue-expansion`, `skeleton`, `model-acquisition`.
+  - **★ 새 `OverwriteConfirmScreen` Button 실기기 확인**: `generate-diary`가
+    `.*덮어쓸지 확인.*` → "확인"(primary Button) 탭, `past-day-diary`가 "취소"
+    (secondary Button) 탭 — 두 Button이 텍스트 렌더 + 탭 수신.
+  - **설정 탭 육안**: "일기 작성자" 선택 행 테라코타 테두리 + "작성자" 표식,
+    미준비 행 회색 + `opacity-50` + 캡션. "권한" 5개 행이 `Card`로 렌더,
+    `permissions-section`·`permission-row-*`·`permission-restart-onboarding` 문안 그대로.
+    **좌우 정렬선 통일 확인** — 네 설정 섹션이 화면 끝에서 ~20px 한 세로선(ES14 —
+    `App.tsx` `settingsSection` 래퍼가 `PermissionsSection` 편입).
+  - **FAIL 2건 — 034 회귀 아님**: `photo-selection-over-limit`(seed 하루
+    `day-${SEED_DAY}` 미준비 — `npm run seed:day` 선행 필요), `parallel-model-download`
+    (`pause-chinese` 어서션 실패 — 다운로드가 이 기기에서 너무 빨리 끝남, 033이
+    문서화한 이 흐름의 타이밍 취약성). 둘 다 `CharacterListScreen`(034 무변경,
+    `git diff --stat HEAD~1` 빈 값) 또는 데이터 의존이지 이관이 깨뜨린 게 아니다.
+  - **미수행**: 덮어쓰기 확인/빌드 오류 화면 **톤 육안**(기기 제스처 내비 간섭으로
+    수동 진입 반복 실패 — 기능은 위 Maestro로 확인, 톤은 계약 테스트 ES1·ES6·ES11·
+    ES12가 잠금, quickstart §6이 생략 허용). release 재확인 불필요(새 네이티브 모듈
+    0 — 012).

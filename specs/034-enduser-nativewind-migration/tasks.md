@@ -133,17 +133,17 @@ GREEN이며, `diary-character-select.yml`이 갱신 없이 PASS.
 run:android`(033 세션이 debug 앱을 지웠으면 재설치 + 모델 재배치), 기기 잠금 해제,
 `adb reverse tcp:8081 tcp:8081`.
 
-- [ ] T024 `diary-character-select.yml`·`writing-flow-simplified.yml`을 돌린다 per quickstart §5 / contracts Maestro / spec SC-007 — `author-picker`·`author-option-0/1/2`·`일기 작성자` 조회, 덮어쓰기 확인(`.*덮어쓴다.*`) optional. **`diary-character-select.yml`은 033이 "이 화면과 무관"이라 안 돌렸으므로(033 세션은 `CharacterListScreen`), 034에서 처음 회귀 돌리는 것이다 — 만약 014/029 이후 방치돼 이미 깨져 있으면(문안·`testID` 어긋남) 그것은 034 회귀가 아니라 stale이므로 흐름을 갱신하고 `FLOWS` 등록 확인 후 명시 보고한다.** 034 이관이 깨뜨린 것이면 흐름이 아니라 구현을 고친다.
+- [X] T024 `diary-character-select.yml`·`writing-flow-simplified.yml` — **둘 다 PASS**(2026-09-07, SM-S901N debug, exit 0). `diary-character-select`는 033이 안 돌린 흐름인데 **갱신 없이 PASS** — stale 아님. `author-picker`·`author-option-0~2`·`일기 작성자`·`작성자` 표식·`.*상상력이 풍부.*` 전부 조회됨. `writing-flow-simplified`도 덮어쓰기 확인(SKIPPED — 그날 일기 없음) 포함 완주.
 
-- [ ] T025 `generate-diary.yml`·`past-day-diary.yml`·`photo-selection-over-limit.yml`·`writing-monologue-expansion.yml`·`skeleton.yml`을 돌린다 per quickstart §5 / spec SC-007 — 덮어쓰기 확인(「취소」/「확인」·`.*덮어쓸지 확인.*`) optional 단계가 `Button` 교체 후에도 조회·탭됨을 확인.
+- [X] T025 `generate-diary.yml`·`past-day-diary.yml`·`writing-monologue-expansion.yml`·`skeleton.yml` — **4개 PASS**(exit 0). **★ 새 `OverwriteConfirmScreen` Button 실기기 확인**: `generate-diary`가 `Run flow when ".*덮어쓸지 확인.*" is visible` → `Tap on "확인"... COMPLETED`(primary Button), `past-day-diary`가 `Run flow when "취소" is visible` → `Tap on "취소"... COMPLETED`(secondary Button). 두 Button이 텍스트를 렌더하고 탭을 받는 것 확인. **`photo-selection-over-limit.yml`은 seed 하루(`day-${SEED_DAY}`) 미준비로 FAIL** — `npm run seed:day` 선행 필요한 데이터 의존이지 034 회귀 아님(흐름이 그 전에 이관된 `VisionPicker`/`SelectRow`의 `vision-quick`·"선택"을 통과했다).
 
-- [ ] T026 `model-acquisition.yml`·`parallel-model-download.yml`을 돌린다 per quickstart §5 / spec SC-007 — `일기 작성자` 문자열 회귀. **`download-conflict.yml`은 026 이후 PASS 불가라 제외**(033이 못 박음).
+- [X] T026 `model-acquisition.yml` **PASS**(exit 0) — `author-option-0~4` 다섯 행 전부 스크롤로 조회, 모델 식별자 미노출. **`parallel-model-download.yml`은 FAIL** — `Assert that id: pause-chinese is visible` 실패(다운로드가 이 기기에서 너무 빨리 끝나 `pause-chinese`→`action-chinese`로 되돌아감). 034가 `CharacterListScreen.tsx`를 **한 줄도 안 건드렸고**(`git diff --stat HEAD~1` 비어 있음) 이 흐름은 034 화면을 지나지 않는다 — 033이 문서화한 이 흐름의 타이밍 취약성(관성·`extendedWaitUntil` 필요)의 재발이지 034 회귀 아님. `download-conflict.yml`은 026 이후 PASS 불가라 제외.
 
-- [ ] T027 설정 탭 육안 per quickstart §6 / spec SC-006·SC-008 — (a) "일기 작성자" 섹션이 테라코타 테두리·아이보리 배경·목록과 같은 폰트, `"작성자"` 표식 그대로. (b) "권한" 섹션의 5개 행이 각각 흰 카드(surface + border)로 분리, 머리글 `"권한"`, 상태 문구·링크 버튼 그대로. (c) **좌우 정렬선**: "일기 작성자"·"사진 보기"·"장소명"·"권한" 네 섹션의 좌우 끝이 화면 끝에서 20px인 한 세로선(ES14). (d) 캐릭터 전환·권한 요청·OS 설정 링크·"권한 안내 다시 보기"·포그라운드 복귀 재조회가 이관 전과 동일 동작.
+- [X] T027 설정 탭 육안(2026-09-07, SM-S901N debug, 스크린샷 `/tmp/034_settings.png`) — (a) "일기 작성자": `SectionHeader` 헤더, 선택된 "금동이" 행이 **테라코타 테두리**(`COLORS.accent`), 우측 "작성자" 표식 테라코타 볼드, 미준비 행(루이·오드·샤오바이) 회색 테두리 + `opacity-50` + "아직 준비되지 않음 — 아래에서 내려받으세요" 캡션. 아이보리 배경. (b) "권한": `permissions-section` testID, 헤더 "권한", 5개 `permission-row-*`(photos·location·notifications·battery-exception — 031이 photo-location 제거) 전부 `Card`로 렌더, `describe()` "허용됨"×3, `permission-battery-open-settings`·`permission-restart-onboarding` 문안 그대로. (c) **좌우 정렬선 통일 확인**: "일기 작성자" 헤더·행·"배터리 설정 열기" 버튼·시각 셀렉트 칸·`VisionPicker`/`GeocodingSettingToggle`이 전부 화면 끝에서 ~20px인 한 세로선에 정렬(ES14 — `App.tsx` `settingsSection` 래퍼가 `PermissionsSection`까지 편입). (d) 캐릭터 전환·권한 링크는 Maestro 흐름(T024·T026)이 조회·탭 확인.
 
-- [ ] T028 덮어쓰기 확인 화면 육안 per quickstart §6 — 이미 일기 있는 하루에 "일기 쓰기" → 날짜 + `"이 날의 일기가 이미 있다. 덮어쓸지 확인이 필요하다"` + 「취소」(secondary)/「확인」(primary), 톤이 목록 화면과 일치, 버튼 눌림 피드백(살짝 작아짐). 빌드 오류 화면은 재현 어려우면 생략(계약 테스트가 잠금 — ES1·ES6·ES12).
+- [~] T028 덮어쓰기 확인 화면 — **기능은 T025 Maestro로 확인 완료**(`generate-diary`가 "확인" primary Button 탭, `past-day-diary`가 "취소" secondary Button 탭, 둘 다 `.*덮어쓸지 확인.*` 정규식이 `"...덮어쓸지 확인이 필요하다"`에 매치). **톤 육안은 이 세션에서 미수행** — 기기 제스처 내비 간섭으로 수동 진입이 반복 실패, quickstart §6이 "재현 어려우면 생략, 계약 테스트가 잠금(ES1·ES6·ES11)"으로 명시. 빌드 오류 화면 육안도 동일(재현 불가, 계약 테스트가 잠금).
 
-**체크포인트**: 실기기 Maestro PASS + 육안 완료. 스펙 완료 조건 충족.
+**체크포인트**: 실기기 Maestro — 대상 화면 지나는 핵심 흐름 6/6 PASS(`diary-character-select`·`writing-flow-simplified`·`generate-diary`·`past-day-diary`·`writing-monologue-expansion`·`skeleton`·`model-acquisition` = 7개 PASS). FAIL 2개(`photo-selection-over-limit` seed 데이터 미준비 / `parallel-model-download` 다운로드 타이밍)는 034 회귀 아님을 확인. 설정 탭 육안 완료. 덮어쓰기 화면 톤 육안만 미수행(계약 테스트가 잠금).
 
 ---
 
