@@ -303,3 +303,21 @@ Task: "src/welcome/decision.ts — shouldShowWelcome()"
   `OnboardingFlag`·`DiaryEntry`·`PipelineInput` 확장 넷이 그렇다
 - 커밋 메시지는 한국어(헌법 MUST). `main` 직접 작업 금지
 - 각 태스크 또는 논리적 묶음마다 커밋한다
+
+---
+
+## Phase 8: Convergence
+
+**Purpose**: `/speckit-converge`(2026-09-07)가 발견한 배선 누락. **네 건 전부
+`partial`** — 코드가 있으나 요구사항을 아직 다 만족하지 못한다.
+
+**공통 뿌리**: 일기 **상세·캐릭터 목록** 화면이 이름 계층에 연결되지 않았다.
+`authorName`은 저장되는데 읽는 쪽이 없고, 두 화면이 `personaOf()`를 직접 부른다 —
+**저장은 되는데 화면이 옛 이름을 보이는 조용한 결함**이며, 011(`has_media=0`)·
+013(URI 계약 불일치)과 같은 계열이다. 기기 없는 테스트 2562개가 초록불인 채로
+통과했다는 것이 F4의 근거다.
+
+- [X] T056 [US3] `DiaryDetailScreen`이 저장된 작성자 이름을 우선 쓰게 배선한다 per FR-026b·US3/AS6 (partial) — `src/ui/DiaryDetailScreen.tsx:146`의 `personaOf(entry.character).name`을 **`entry.authorName ?? <주입받은 현재 이름>`** 으로 바꾼다. `DiaryEntry.authorName`이 `pipeline.ts`에서 저장되지만 **읽는 곳이 하나도 없어**(`grep -rn authorName src/ui/` → 0건) 스냅샷 기능 전체가 화면에서 무효다. **폴백은 조립부가 계산해 문자열로 넘긴다**(N13) — 화면이 두 값을 받아 스스로 고르면 폴백이 화면마다 흩어진다. `topicParticleFor(name)`(조사 선택)이 새 이름에도 맞는지 함께 확인한다
+- [X] T057 [US2] `DiaryHomeScreen`이 `characterNames`를 `DiaryDetailScreen`에 넘긴다 per FR-018·SC-003 (partial) — `src/ui/DiaryHomeScreen.tsx:424·469`의 두 렌더 자리. `characterNames`는 이미 그 컴포넌트의 스코프에 있다(035 Phase 4에서 배선됨). T056과 한 묶음으로 간다 — 상세 화면이 이름을 받을 통로가 이것뿐이다. **SC-003의 "네 곳 모두"에서 상세 화면이 빠져 있는 것**이 이 태스크가 메우는 구멍이다
+- [X] T058 [US3] `CharacterListScreen`이 이름을 주입받게 배선한다 per FR-018 (partial) — `src/ui/CharacterListScreen.tsx:270`의 `personaOf(character).name`. 이 화면은 설정 탭 하단에 실제로 렌더되므로(`App.tsx:1140`) **같은 화면 안에서 `AuthorPicker`는 "복실이", 그 아래 목록은 "금동이"로 이름이 갈려 보인다.** `AuthorPicker`와 같은 방식(조립부가 문자열을 넘김)으로 고친다. **`tagline`은 그대로 `personaOf()`에서 온다**(헌법 1.4.0 — 이름만 사용자가 짓는다)
+- [X] T059 이름이 흐르는 자리를 계약 테스트로 잠근다 per FR-030·SC-006 (partial) — F1~F3이 **테스트 2562개가 전부 통과하는 상태로 빠져나갔다**(저장소가 반복 겪은 "초록불인데 아무것도 검증되지 않은 상태"). `src/ui/` 소스를 `readFileSync`로 읽어 **화면에서 `personaOf(...).name`을 직접 부르는 자리가 없는지** 검사한다(`tagline`은 허용 — 사용자가 못 바꾼다). 예외로 둘 파일이 있으면 사람이 못 박은 상수 목록으로 두고 이유를 적는다(012 `USER_VISIBLE_SIGNAL_AXES` 선례). 위반 주입으로 방어를 확인한다

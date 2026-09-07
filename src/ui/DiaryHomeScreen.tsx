@@ -421,7 +421,10 @@ export function DiaryHomeScreen({
     case "detail":
       return (
         <Frame onBack={() => void backToList()}>
-          <DiaryDetailScreen entry={screen.entry} />
+          <DiaryDetailScreen
+            currentAuthorName={nameOf(screen.entry.character, characterNames)}
+            entry={screen.entry}
+          />
         </Frame>
       );
 
@@ -467,6 +470,7 @@ export function DiaryHomeScreen({
       return (
         <Frame onBack={() => void backToList()}>
           <DiaryDetailScreen
+            currentAuthorName={nameOf(screen.entry.character, characterNames)}
             entry={screen.entry}
             saved={screen.saved}
             overwrote={screen.overwrote}

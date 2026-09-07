@@ -47,6 +47,15 @@ const PHOTO_VIEWER = { bg: "black", fg: "white" } as const;
 export type DiaryDetailScreenProps = {
   entry: DiaryEntry;
   /**
+   * 이 일기의 작성자를 지금 뭐라 부르는가 (035 FR-018·FR-026b).
+   *
+   * **조립부가 만든 문자열만 받는다** — 화면은 사용자 지정 이름의 저장·폴백
+   * 규칙을 모른다(FR-017의 단일 통과 지점). 주지 않으면 `entry.authorName`
+   * (생성 시점 스냅샷)을 쓰고, 그것도 없으면(옛 일기) 코드 안 기본 이름으로
+   * 떨어진다 — 어느 경우에도 빈 이름이 나오지 않는다(SC-005).
+   */
+  currentAuthorName?: string;
+  /**
    * 저장됐는가 (006 FR-012b).
    *
    * 목록에서 연 일기는 이미 저장된 것이므로 기본값이 `true`다. 방금 생성했는데 저장에
@@ -134,7 +143,13 @@ function formatDuration(ms: number): string {
  * 작성했어요.`가 곧 절 제목이며, 소요 시간 문장(있으면)은 그 아래 본문에만 있다.
  * `entry.timing`이 없으면(옛 일기) 원래 고정 타이틀로 되돌아간다(FR-018, 회귀 없음).
  */
-function SignalsTitle({ entry }: { entry: DiaryEntry }) {
+function SignalsTitle({
+  entry,
+  currentAuthorName,
+}: {
+  entry: DiaryEntry;
+  currentAuthorName?: string;
+}) {
   if (entry.timing === undefined) {
     return (
       <AppText variant="caption" style={{ marginBottom: 4 }}>
@@ -143,7 +158,13 @@ function SignalsTitle({ entry }: { entry: DiaryEntry }) {
     );
   }
 
-  const name = personaOf(entry.character).name;
+  /*
+   * 035 — **생성 시점 이름이 우선이다**(FR-026a·b). 사용자가 나중에 이름을 바꿔도
+   * 이 일기는 그때 그 이름으로 쓴 것이 사실이다. 스냅샷이 없는 옛 일기만 현재
+   * 이름으로 폴백하며, **소급 생성하지 않는다**(원칙 V — 그 시점 이름은 관측된
+   * 적이 없다).
+   */
+  const name = entry.authorName ?? currentAuthorName ?? personaOf(entry.character).name;
   const particle = topicParticleFor(name);
 
   return (
@@ -381,6 +402,7 @@ type GalleryState = { open: false } | { open: true; index: number };
 
 export function DiaryDetailScreen({
   entry,
+  currentAuthorName,
   saved = true,
   overwrote = false,
 }: DiaryDetailScreenProps) {
@@ -444,7 +466,7 @@ export function DiaryDetailScreen({
         무엇을 보고 썼는가(002 FR-011). **모르는 것과 없는 것이 구분된다**(원칙 V).
       */}
       <View style={styles.signals}>
-        <SignalsTitle entry={entry} />
+        <SignalsTitle currentAuthorName={currentAuthorName} entry={entry} />
         {signalLines(entry.signalsUsed, entry.placeName)
           // 017 — `timing.visionMs`가 있으면 아래 TimingLines의 "사진을 N장을
           // 분석하는 데 ..." 문장이 이미 장수를 말하므로 "사진: N장" 줄은

@@ -920,10 +920,13 @@ type ModelSectionProps = {
   setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
   rejection: DownloadRejection | null;
   setRejection: (rejection: DownloadRejection | null) => void;
+  /** 035 — 캐릭터 → 지금 부르는 이름 (FR-018). 아래 목록이 그린다. */
+  characterNames?: CustomNames;
 };
 
 function ModelSection(props: ModelSectionProps) {
   const { ports, acquisition, progress, setProgress, rejection, setRejection } = props;
+  const { characterNames } = props;
 
   /**
    * **준비 상태는 올리지 않는다**(008).
@@ -1139,6 +1142,10 @@ function ModelSection(props: ModelSectionProps) {
   return (
     <CharacterListScreen
       readiness={readiness}
+      // 035 — 사용자가 지은 이름. 없으면 persona.ts의 기본 이름으로 떨어진다.
+      // **위 `AuthorPicker`와 같은 값을 봐야 한다** — 갈리면 같은 화면에서 한
+      // 캐릭터가 두 이름으로 보인다(수렴 검사 F3).
+      characterNames={characterNames}
       // **판정은 순수 함수가 하고 화면은 그린다**(008). 「거부 안내가 아직 참인가」가
       // 시간에 따라 거짓이 되므로, 지우는 코드를 두지 않고 **매번 다시 묻는다.**
       view={resolveDownloadView([...progress.values()], rejection)}
@@ -1397,6 +1404,7 @@ function AutoDiarySection({
         setProgress={setProgress}
         rejection={rejection}
         setRejection={setRejection}
+        characterNames={characterNames}
       />
 
       {/* 021 — 권한 상태·재요청·온보딩 재실행 (FR-017~020). prod에도 있다. */}
