@@ -15,6 +15,7 @@ import type { Environment, EnvironmentResolution } from "../config/types";
 import type { Character, VisionSetting } from "../diary/types";
 import type { DaySignals } from "../signals/types";
 import type { VisionOutcome } from "../vision/types";
+import type { LivenessOutcome } from "../welcome/liveness";
 import { createDesktopServerBackend, httpProbe } from "./desktop-server";
 import { onDeviceBackend } from "./on-device";
 import type { InferenceBackend, InferenceLocation, SelectionFailure } from "./types";
@@ -93,6 +94,13 @@ export type SelectedBackend = InferenceBackend & {
     character: Character,
     vision: VisionSetting,
   ) => Promise<VisionOutcome>;
+  /**
+   * 이 캐릭터가 살아 있는지 한 번 확인하는 통로 (035, liveness.md L8·L13).
+   *
+   * 위 넷과 같은 이유로 옵셔널이다 — 데스크톱 경로에는 확인할 온디바이스
+   * 엔진이 없다.
+   */
+  checkLiveness?: (character: Character) => Promise<LivenessOutcome>;
 };
 
 export type BackendSelection =

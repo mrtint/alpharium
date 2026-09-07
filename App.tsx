@@ -38,8 +38,14 @@ import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
 import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
 import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
 import { PERMISSION_REQUIREMENTS } from "./src/onboarding/requirements";
+// 035 — 환영 연출·작명. 조립부가 파일을 읽고 화면에는 문자열만 넘긴다.
+import { displayNameOf, type CustomNames } from "./src/diary/character-name";
+import { shouldShowWelcome } from "./src/welcome/decision";
+import { validateCharacterName } from "./src/welcome/naming";
+import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/welcome/names-port";
 import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
+import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { PermissionsSection } from "./src/ui/PermissionsSection";
 import { AppText } from "./src/ui/components/Text";
 import { COLORS } from "./src/ui/theme/tokens";
@@ -363,6 +369,124 @@ function AppFrame() {
     [onboardingFlagPort, refreshEssentialsReady],
   );
 
+  /* ─────────────────── 035 — 환영 연출 (게이트 세 번째 단) ─────────────────── */
+
+  /**
+   * 사용자가 지은 캐릭터 이름들 (035 FR-015).
+   *
+   * **조립부가 파일을 읽고 화면에는 문자열만 넘긴다** — `displayNameOf()`가
+   * 순수 함수로 남아야 `buildPrompt()`의 결정성(005 P6)이 지켜진다.
+   */
+  const characterNamesPort = useMemo(() => expoCharacterNamesPort(), []);
+  const [customNames, setCustomNames] = useState<CustomNames>({});
+
+  useEffect(() => {
+    let alive = true;
+    void loadCustomNames(characterNamesPort).then((names) => {
+      if (alive) setCustomNames(names);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [characterNamesPort]);
+
+  /**
+   * 지금 어느 단계인가 (035 W12). **영속하지 않는다**(FR-009) — 연출 도중 앱이
+   * 죽으면 다음 진입에서 확인부터 다시 한다.
+   */
+  const [welcomePhase, setWelcomePhase] = useState<WelcomePhase>("checking");
+
+  const welcomeNeeded =
+    onboardingFlag !== null &&
+    essentialsReady !== null &&
+    shouldShowWelcome({
+      onboardingNeeded: shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding,
+      essentialAssetsReady: essentialsReady,
+      welcomeShown: onboardingFlag.welcomeShown === true,
+    });
+
+  /**
+   * 정상 동작 확인을 **정확히 한 번** 돌린다 (035 L12).
+   *
+   * 자동 재시도 루프를 만들지 않는다 — 루프를 두면 "몇 번 만에 성공했나"가
+   * 생기고 그것이 지표다(원칙 IV). 실패하면 사용자가 [다시 시도]를 눌러야 한다.
+   */
+  const [retryToken, setRetryToken] = useState(0);
+
+  useEffect(() => {
+    if (!welcomeNeeded) return;
+    let alive = true;
+
+    /*
+     * **비동기 콜백에서만 상태를 옮긴다.** 효과 본문에서 동기적으로
+     * `setWelcomePhase("checking")`을 부르면 연쇄 렌더가 생기고
+     * `react-hooks/set-state-in-effect`가 잡는다 — `"checking"`은 이미
+     * 초기값이고, 재시도는 아래 `onRetry`가 상태를 되돌린다.
+     */
+    async function check() {
+      // 어댑터는 `createAppPipeline`에서만 온다(006 FR-026) — 직접 만들지 않는다.
+      const wiring = createAppPipeline(environment);
+      const probe = wiring.ok ? wiring.checkLiveness : undefined;
+
+      // 데스크톱 경로거나 조립이 실패했으면 확인할 엔진이 없다 — 「살아 있다」고
+      // 말할 근거가 없으므로 실패로 둔다(원칙 I).
+      if (probe === undefined) return "failed" as const;
+
+      return await probe(ONBOARDING_DEFAULT_CHARACTER);
+    }
+
+    void check()
+      .then((outcome) => {
+        if (alive) setWelcomePhase(outcome === "ok" ? "welcome" : "failed");
+      })
+      .catch(() => {
+        if (alive) setWelcomePhase("failed");
+      });
+
+    return () => {
+      alive = false;
+    };
+    // `retryToken`이 바뀌면 확인을 다시 돌린다(L12 — 자동 루프가 아니라
+    // 사용자가 [다시 시도]를 누른 것이다).
+  }, [welcomeNeeded, environment, retryToken]);
+
+  /** 사용자가 [다시 시도]를 눌렀다. **연출 완료 플래그를 쓰지 않는다**(W9). */
+  const retryLivenessCheck = useCallback(() => {
+    setWelcomePhase("checking");
+    setRetryToken((n) => n + 1);
+  }, []);
+
+  /** 연출을 통과했다 (W9) — 이름 확정·건너뛰기·실패 후 건너뛰기 셋뿐이다. */
+  const finishWelcome = useCallback(
+    (names?: CustomNames) => {
+      if (names !== undefined) {
+        setCustomNames(names);
+        void saveCustomNames(characterNamesPort, names).catch(() => {});
+      }
+      setOnboardingFlag((prev) => {
+        if (prev === null) return prev;
+        const next = { ...prev, welcomeShown: true };
+        void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
+        return next;
+      });
+    },
+    [characterNamesPort, onboardingFlagPort],
+  );
+
+  const onSubmitWelcomeName = useCallback(
+    (raw: string) => {
+      // 화면이 아니라 조립부가 검증한다 — 첫 만남과 설정 편집이 같은 규칙을
+      // 쓰도록(W18) `validateCharacterName()` 하나를 공유한다.
+      const validated = validateCharacterName(raw);
+      finishWelcome(
+        validated.ok
+          ? { ...customNames, [ONBOARDING_DEFAULT_CHARACTER]: validated.value }
+          : undefined,
+      );
+    },
+    [customNames, finishWelcome],
+  );
+
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
@@ -379,6 +503,28 @@ function AppFrame() {
           flag={onboardingFlag}
           ports={onboardingPorts}
           onComplete={onOnboardingComplete}
+        />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  /*
+   * 035 — 진입 게이트의 세 번째 단: 온보딩 → **환영 연출** → 홈.
+   *
+   * `shouldShowWelcome()`이 `onboardingNeeded`를 인자로 받으므로(W2) 위 분기와
+   * 순서가 어긋날 수 없다. **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(W5)
+   * — 설정 탭에서 캐릭터를 새로 받아도 연출은 뜨지 않는다(FR-002a).
+   */
+  if (welcomeNeeded) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <WelcomeScreen
+          characterName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
+          onRetry={retryLivenessCheck}
+          onSkip={() => finishWelcome()}
+          onSubmitName={onSubmitWelcomeName}
+          phase={welcomePhase}
         />
         <StatusBar style="auto" />
       </SafeAreaView>

@@ -38,6 +38,7 @@ import { expoPhotoPort } from "../signals/expo-port";
 import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
 import type { VisionOutcome } from "../vision/types";
+import type { LivenessOutcome } from "../welcome/liveness";
 
 /**
  * 조립 결과.
@@ -84,6 +85,14 @@ export type AppPipelineResult =
         vision: VisionSetting,
       ) => Promise<VisionOutcome>;
       /**
+       * 이 캐릭터가 살아 있는지 한 번 확인하는 통로 (035, liveness.md L8·L13).
+       *
+       * `prepare`·`captionDay`와 같은 이유로 옵셔널이다 — 데스크톱 경로에는
+       * 확인할 온디바이스 엔진이 없다. **`"ok" | "failed"` 둘뿐이라 시간·응답
+       * 텍스트가 밖으로 나갈 자리가 없다**(원칙 IV).
+       */
+      checkLiveness?: (character: Character) => Promise<LivenessOutcome>;
+      /**
        * 이 파이프라인이 쓰는 일기 저장소 (020).
        *
        * 백그라운드 자동 생성(`src/schedule/task.ts`)이 "지금 어느 하루를
@@ -104,6 +113,7 @@ export type AppPipelineResult =
       prepare?: undefined;
       release?: undefined;
       captionDay?: undefined;
+      checkLiveness?: undefined;
       store?: undefined;
     };
 
@@ -211,6 +221,8 @@ export function createAppPipeline(
   const prepare = selection.backend.prepare?.bind(selection.backend);
   const release = selection.backend.release?.bind(selection.backend);
   const captionDay = selection.backend.captionDay?.bind(selection.backend);
+  // 035 — 정상 동작 확인. 위 넷과 같은 이유로 데스크톱에는 undefined다.
+  const checkLiveness = selection.backend.checkLiveness?.bind(selection.backend);
 
   return {
     ok: true,
@@ -220,6 +232,7 @@ export function createAppPipeline(
     prepare,
     release,
     captionDay,
+    checkLiveness,
     store,
   };
 }
