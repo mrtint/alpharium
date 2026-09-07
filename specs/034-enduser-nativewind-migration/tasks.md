@@ -141,9 +141,11 @@ run:android`(033 세션이 debug 앱을 지웠으면 재설치 + 모델 재배�
 
 - [X] T027 설정 탭 육안(2026-09-07, SM-S901N debug, 스크린샷 `/tmp/034_settings.png`) — (a) "일기 작성자": `SectionHeader` 헤더, 선택된 "금동이" 행이 **테라코타 테두리**(`COLORS.accent`), 우측 "작성자" 표식 테라코타 볼드, 미준비 행(루이·오드·샤오바이) 회색 테두리 + `opacity-50` + "아직 준비되지 않음 — 아래에서 내려받으세요" 캡션. 아이보리 배경. (b) "권한": `permissions-section` testID, 헤더 "권한", 5개 `permission-row-*`(photos·location·notifications·battery-exception — 031이 photo-location 제거) 전부 `Card`로 렌더, `describe()` "허용됨"×3, `permission-battery-open-settings`·`permission-restart-onboarding` 문안 그대로. (c) **좌우 정렬선 통일 확인**: "일기 작성자" 헤더·행·"배터리 설정 열기" 버튼·시각 셀렉트 칸·`VisionPicker`/`GeocodingSettingToggle`이 전부 화면 끝에서 ~20px인 한 세로선에 정렬(ES14 — `App.tsx` `settingsSection` 래퍼가 `PermissionsSection`까지 편입). (d) 캐릭터 전환·권한 링크는 Maestro 흐름(T024·T026)이 조회·탭 확인.
 
-- [~] T028 덮어쓰기 확인 화면 — **기능은 T025 Maestro로 확인 완료**(`generate-diary`가 "확인" primary Button 탭, `past-day-diary`가 "취소" secondary Button 탭, 둘 다 `.*덮어쓸지 확인.*` 정규식이 `"...덮어쓸지 확인이 필요하다"`에 매치). **톤 육안은 이 세션에서 미수행** — 기기 제스처 내비 간섭으로 수동 진입이 반복 실패, quickstart §6이 "재현 어려우면 생략, 계약 테스트가 잠금(ES1·ES6·ES11)"으로 명시. 빌드 오류 화면 육안도 동일(재현 불가, 계약 테스트가 잠금).
+- [X] T028 덮어쓰기 확인 화면 + 빌드 오류 화면 톤 육안 — **완료**(2026-09-07, SM-S901N debug, 3버튼 내비로 재현).
+  - **덮어쓰기 확인**(스크린샷 `034_overwrite.png`): 아이보리 배경, 날짜 `"2026-09-07"` 회색(opacity 0.6), 본문 `"이 날의 일기가 이미 있다. 덮어쓸지 확인이 필요하다"` 브라운블랙. **「취소」 = secondary Button**(흰 배경 + 회색 테두리 + 브라운블랙 텍스트, `rounded-card`), **「확인」 = primary Button**(테라코타 배경 `COLORS.accent` + 오프화이트 텍스트). "확인" 탭 → 생성 시작(`onConfirm` 발화) → 생성 중 화면 "글을 쓰는 중…" + "그만두기"만, 금지어(`%`·`토큰`·`초 남`·모델 식별자) **0건**(FR-017/SC-005 회귀 없음). "그만두기"로 중단 → 홈 복귀(원칙 I 방어 정상).
+  - **빌드 오류 화면**(스크린샷 `034_builderror.png`): `EXPO_PUBLIC_APP_ENV=bogus`로 Metro 재시작해 재현. 아이보리 배경, 제목 `"이 빌드는 잘못 만들어졌다"` 중앙 정렬 `variant="title"`, 본문 중앙 정렬 `variant="body"` + opacity 0.8, 문안 바이트 그대로. **환경 변수 이름·값 0건**(`EXPO_PUBLIC`/`APP_ENV`/`NODE_ENV`/`prod`/`dev`/`local` — 유일한 "dev" 매치는 uiautomator 자체 출력 `/dev/tty`), **"다시 시도"류 문구 0건**(S10), 모델·지표 0건. 검증 후 Metro를 `EXPO_PUBLIC_APP_ENV=dev`로 복원, 앱 정상 확인.
 
-**체크포인트**: 실기기 Maestro — 대상 화면 지나는 핵심 흐름 6/6 PASS(`diary-character-select`·`writing-flow-simplified`·`generate-diary`·`past-day-diary`·`writing-monologue-expansion`·`skeleton`·`model-acquisition` = 7개 PASS). FAIL 2개(`photo-selection-over-limit` seed 데이터 미준비 / `parallel-model-download` 다운로드 타이밍)는 034 회귀 아님을 확인. 설정 탭 육안 완료. 덮어쓰기 화면 톤 육안만 미수행(계약 테스트가 잠금).
+**체크포인트**: 실기기 Maestro 7흐름 PASS(`diary-character-select`·`writing-flow-simplified`·`generate-diary`·`past-day-diary`·`writing-monologue-expansion`·`skeleton`·`model-acquisition`). FAIL 2개(`photo-selection-over-limit` seed 데이터 미준비 / `parallel-model-download` 다운로드 타이밍)는 034 회귀 아님을 확인. **설정 탭·덮어쓰기 확인·빌드 오류 화면 톤 육안 전부 완료.** 스펙 완료 조건 충족.
 
 ---
 
