@@ -151,7 +151,7 @@
 
 - [X] T033 [P] `AGENTS.md`에 이 스펙의 실측 결론을 더한다 — (a) **`babel.config.js`의 worklets 플러그인 없이는 reanimated가 조용히 안 돈다**, (b) **reanimated는 jest에서 손으로 쓴 목이 필요하다**(공식 `mock.js`가 안 통함), (c) **`CharacterListScreen`은 설정 탭 하단에 있고 관련 Maestro 흐름은 셋**(`diary-character-select.yml` 아님). 기존 "지금도 유효한 실측 규칙" 절의 문체를 따른다.
 
-- [ ] T034 `git status`로 위반 주입 잔재가 없는지 확인하고, 한국어 커밋 메시지로 커밋한 뒤 PR을 만든다 per AGENTS.md 작업 습관 — **`main` 직접 커밋 금지**(`.githooks/pre-commit`이 막는다). `git branch --show-current`로 `033-character-screen-press-feedback`인지 눈으로 확인한다.
+- [X] T034 `git status`로 위반 주입 잔재가 없는지 확인하고, 한국어 커밋 메시지로 커밋한 뒤 PR을 만든다 per AGENTS.md 작업 습관 — **`main` 직접 커밋 금지**(`.githooks/pre-commit`이 막는다). `git branch --show-current`로 `033-character-screen-press-feedback`인지 눈으로 확인한다.
 
 ---
 
@@ -205,14 +205,16 @@ US1(P1)이 사용자 가치가 더 크므로**, 실제 권장 MVP는 **Phase 1~4
 
 quickstart Q5와 동일:
 
-- [ ] T023·T024 전부 GREEN — 원시 hex 0, `PRESS` 참조 2파일, 컴포넌트 7개
-- [ ] T025 위반 주입 6종이 **전부 잡힌다**
-- [ ] T027 화면 이관 육안 통과
-- [ ] T028 **눌림 반응이 실기기에서 실제로 보인다** ← 이 스펙의 존재 이유
-- [ ] T029 생성 중 화면 미노출 유지
-- [ ] T030 Maestro 흐름 셋 **갱신 없이** PASS
-- [ ] T031 032 이월 잔여에 눌림 반응 확인 항목 추가
-- [ ] T034 브랜치 → PR (`main` 직접 커밋 없음)
+- [X] T023·T024 전부 GREEN — 원시 hex 0, `PRESS` 참조 2파일, 컴포넌트 7개
+- [X] T025 위반 주입 6종이 **전부 잡힌다**
+- [X] T027 화면 이관 육안 통과
+- [X] T028 **눌림 반응이 실기기에서 실제로 보인다** ← 이 스펙의 존재 이유
+- [X] T029 생성 중 화면 미노출 유지
+- [X] T030 Maestro 흐름 셋 — `photo-vision.yml` **갱신 없이** PASS(CS10 유효),
+      `parallel-model-download.yml` PASS(stale 수정 후), `download-conflict.yml`은
+      026 이후 검증 대상 소멸로 로드맵 이관 → **SC-004 부분 미충족**(T036)
+- [X] T031 032 이월 잔여에 눌림 반응 확인 항목 추가
+- [X] T034 브랜치 → PR (`main` 직접 커밋 없음)
 
 ---
 
@@ -311,3 +313,43 @@ quickstart Q5와 동일:
 - **release 빌드에서의 눌림 반응** — 032 이월 잔여 (2)와 함께(spec FR-023, T031).
   이 스펙이 worklets 플러그인을 처음 활성화했으므로 그 잔여에 확인 항목을 더해 뒀다.
 - **One UI 8.5(SM-S928N) 육안** — 032 이월 잔여 (1).
+
+---
+
+## Phase 8: Convergence
+
+`/speckit-converge` (2026-09-07) — 실기기 검증 완료 후 코드베이스를 spec·plan·
+contracts에 대조. **CRITICAL/HIGH/MEDIUM 0, 헌법 위반 0, `missing`·`contradicts`·
+`unrequested` 0.** 코드로 할 수 있는 것은 전부 끝났고, 아래 둘은 **코드 결함이
+아니라 기록이 실제 상태보다 뒤처진 것**이다.
+
+실측으로 재확인한 것(2026-09-07 converge):
+
+- `CharacterListScreen` 코드 내 원시 hex 0 · `StyleSheet` 0 (SC-001)
+- `PRESS` 참조 파일 정확히 둘(`Button.tsx`·`ListRow.tsx`) (SC-008)
+- `src/ui/components/` 7개 — 늘어난 컴포넌트 0 (FR-016a)
+- 눌림 외 애니메이션 API 사용 0건 (FR-017)
+- **`character-list.test.tsx`·`button.test.tsx` 바이트 단위 무수정** (SC-002)
+- 추론·프롬프트 계층(`src/inference|vision|diary|models|signals|schedule|config`)
+  변경 0줄 (원칙 I·II)
+- 측정 어휘 0건 (원칙 IV) · `PRESS`에 계산·분기 0건 (원칙 V)
+- `dark:`·`useColorScheme`·`Appearance` 0건 (032 경계)
+- 129 suites / 2309 tests GREEN, eslint 0 error, 헌법 검사 위반 0
+
+- [X] T035 완료 판정 체크박스를 실제 상태로 갱신한다 per tasks.md 완료 판정 절 (partial)
+      — T034와 "완료 판정" 8개 항목이 `[ ]`로 남아 있으나 **전부 충족됐다**:
+      브랜치 `033-character-screen-press-feedback` 클린(미커밋 0건), 커밋 3건
+      (`4152056`·`b72db2a`·`0f32694`), **PR #50 OPEN**, `main` 직접 커밋 0건,
+      위반 주입 잔재 0, 실기기 T026~T030 완료. 기록만 뒤처져 있다.
+
+- [X] T036 SC-004가 **부분 미충족**임을 명시한다 per SC-004 / FR-021 (partial)
+      — SC-004는 "흐름 셋이 **갱신 없이** 통과"를 요구했는데
+      `download-conflict.yml`·`parallel-model-download.yml` 두 파일을 수정했다.
+      **원인은 033이 아니다**: (a) 029가 `AuthorPicker`를 넣으며 「모카」·
+      「샤오바이」가 두 곳에 생겨 `scrollUntilVisible`이 위쪽에서 멈춤,
+      (b) 026이 「한 번에 하나」를 풀어 `download-conflict.yml`의 검증 대상이
+      소멸, (c) 스크롤 관성·이미 보이는 요소 문제(025 계열).
+      `photo-vision.yml`은 **갱신 없이 PASS**했고 CS10(행 높이 보존)이 유효했다.
+      **FR-021의 "새 흐름 0개"는 충족**(19→19, 전부 `M`이고 `A` 0건).
+      spec을 고치지 않고 이 사실을 tasks.md 기록으로 남긴다 — 스펙 문안 정정은
+      converge의 권한 밖이다.
