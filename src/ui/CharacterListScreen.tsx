@@ -1,5 +1,9 @@
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { View } from "react-native";
 
+import { AppText } from "./components/Text";
+import { Button } from "./components/Button";
+import { ListRow } from "./components/ListRow";
+import { COLORS, RADIUS } from "./theme/tokens";
 import { CHARACTERS, type Character } from "../diary/types";
 import { personaOf } from "../diary/persona";
 import type {
@@ -140,30 +144,87 @@ function DownloadNotice({
   onDismiss: () => void;
 }) {
   return (
-    <View testID="download-notice" style={styles.notice}>
-      <Text style={styles.noticeText}>
+    <View
+      testID="download-notice"
+      className="flex-row items-center gap-3 p-3 rounded-card"
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 12,
+        padding: 12,
+        // 033 — 옛 노란 배경이던 자리. 안내는 배경이 살짝 도드라져야 눈에 든다.
+        backgroundColor: COLORS.surface,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+        borderRadius: RADIUS.card,
+      }}
+    >
+      <AppText variant="caption" style={{ flex: 1 }}>
         {notice.busyWith}을(를) 받는 중이라 지금은 받을 수 없다. {notice.busyWith}을(를) 멈추면 받을
         수 있다.
-      </Text>
-      <TouchableOpacity
-        accessibilityRole="button"
-        testID="dismiss-notice"
-        onPress={onDismiss}
-        style={styles.dismiss}
-      >
-        <Text>닫기</Text>
-      </TouchableOpacity>
+      </AppText>
+      <Button variant="secondary" testID="dismiss-notice" onPress={onDismiss}>
+        닫기
+      </Button>
     </View>
   );
 }
+
+/**
+ * 033 — 한 줄의 좌측 내용.
+ *
+ * `ListRow`의 `label`이 노드를 받게 되면서(033 data-model §2) 이 자리가 생겼다.
+ * 이름·소개·상태·저장공간이 **세로로 쌓이므로** 문자열 하나에 안 담긴다 —
+ * 032 T062가 "구조가 안 맞는다"고 판단했던 바로 그 이유이며, 타입을 넓히자
+ * 전제가 사라졌다.
+ */
+function RowLabel({
+  name,
+  tagline,
+  status,
+  usage,
+}: {
+  name: string;
+  tagline?: string;
+  status: string;
+  usage?: string;
+}) {
+  return (
+    <View className="flex-1 gap-0.5" style={{ flex: 1, gap: 2 }}>
+      <AppText variant="body">{name}</AppText>
+      {tagline !== undefined && <AppText variant="caption">{tagline}</AppText>}
+      <AppText variant="caption">{status}</AppText>
+      {usage !== undefined && <AppText variant="caption">{usage}</AppText>}
+    </View>
+  );
+}
+
+/**
+ * 033 — 행의 세로 여백을 현행(12)에 맞춘다 (contracts CS10).
+ *
+ * **`ListRow`의 기본값은 14다.** 다섯 행 + 사진 모델 행이 2px씩 커지면 누적
+ * 12px이 밀리고, 025가 실측한 "`scrollUntilVisible`이 컨테이너 상단에서 멈춘다"
+ * 성질과 겹치면 그 아래 버튼이 화면 밖에 남는다 — **문안·`testID`가 전부
+ * 불변인데도 Maestro가 깨지는 경로다**(`download-conflict`·
+ * `parallel-model-download`·`photo-vision` 셋이 이 화면을 스크롤로 찾는다).
+ *
+ * **`ListRow`의 기본값은 안 고친다** — 공용 컴포넌트를 이 화면 하나 때문에
+ * 바꾸지 않는다.
+ */
+const ROW_OVERRIDE = { paddingVertical: 12 } as const;
 
 export function CharacterListScreen(props: CharacterListProps) {
   const { readiness, view, usage, onPrepare, onPause, onRemove, onDismissNotice } = props;
   const { visionReadiness, visionProgress, onPrepareVision, onRemoveVision, visionBytes } = props;
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>캐릭터</Text>
+    <View
+      className="flex-1 p-6 gap-3"
+      style={{ flex: 1, padding: 24, gap: 12, backgroundColor: COLORS.bg }}
+    >
+      <AppText variant="title" style={{ marginBottom: 8 }}>
+        캐릭터
+      </AppText>
 
       {/*
         안내는 **하나뿐이다**(FR-006). `view.notice`가 배열이 아니므로 쌓일 수 없고,
@@ -187,57 +248,62 @@ export function CharacterListScreen(props: CharacterListProps) {
         const bytes = usage?.find((u) => u.character === character)?.bytes ?? 0;
 
         return (
-          <View key={character} testID={`character-row-${character}`} style={styles.row}>
-            <View style={styles.info}>
-              {/*
-                014 — persona.ts의 이름·소개로 보인다(FR-001·004). 003의 FR-004a
-                주석("이름은 사람이 짓는다")이 가리키던 빈자리를 이제 채운다.
-              */}
-              <Text style={styles.name}>{personaOf(character).name}</Text>
-              <Text style={styles.tagline}>{personaOf(character).tagline}</Text>
-              {/*
-                거부당한 줄도 **평소대로다**(008 FR-007). 거부는 그 캐릭터의 준비
-                상태를 바꾸지 않았으므로 「받아야 함」이던 것은 그대로 「받아야 함」이다.
-              */}
-              <Text style={styles.status}>
-                {inFlight ? progressText(inFlight.fraction) : statusText(state)}
-              </Text>
-              {/* 저장 공간은 **캐릭터 단위**로만 보인다(FR-028a) */}
-              {bytes > 0 && <Text style={styles.usage}>{formatBytes(bytes)}</Text>}
-            </View>
+          <ListRow
+            key={character}
+            testID={`character-row-${character}`}
+            style={ROW_OVERRIDE}
+            label={
+              <RowLabel
+                /*
+                  014 — persona.ts의 이름·소개로 보인다(FR-001·004). 003의 FR-004a
+                  주석("이름은 사람이 짓는다")이 가리키던 빈자리를 이제 채운다.
+                */
+                name={personaOf(character).name}
+                tagline={personaOf(character).tagline}
+                /*
+                  거부당한 줄도 **평소대로다**(008 FR-007). 거부는 그 캐릭터의 준비
+                  상태를 바꾸지 않았으므로 「받아야 함」이던 것은 그대로 「받아야 함」이다.
+                */
+                status={inFlight ? progressText(inFlight.fraction) : statusText(state)}
+                /* 저장 공간은 **캐릭터 단위**로만 보인다(FR-028a) */
+                usage={bytes > 0 ? formatBytes(bytes) : undefined}
+              />
+            }
+            right={
+              busy ? (
+                // **멈추기는 받는 중인 줄에만 있다**(008 FR-011). 026 — 여러 줄이 동시에
+                // 이 버튼을 가질 수 있으므로, **어느 캐릭터를 멈출지 인자로 넘긴다**.
+                <Button
+                  variant="secondary"
+                  testID={`pause-${character}`}
+                  onPress={() => onPause(character)}
+                >
+                  멈추기
+                </Button>
+              ) : (
+                /*
+                  **버튼에 직접 testID를 준다**(008, 2026-08-21 실측).
 
-            {busy ? (
-              // **멈추기는 받는 중인 줄에만 있다**(008 FR-011). 026 — 여러 줄이 동시에
-              // 이 버튼을 가질 수 있으므로, **어느 캐릭터를 멈출지 인자로 넘긴다**.
-              <TouchableOpacity
-                accessibilityRole="button"
-                testID={`pause-${character}`}
-                onPress={() => onPause(character)}
-                style={styles.button}
-              >
-                <Text>멈추기</Text>
-              </TouchableOpacity>
-            ) : (
-              /*
-                **버튼에 직접 testID를 준다**(008, 2026-08-21 실측).
+                  줄(`character-row-*`)에 testID가 있어도 **Maestro가 이 버튼을 그 줄의
+                  자식으로 보지 않는다** — 좌표로는 줄 안(x=824~968 ⊂ 68~1013)인데
+                  접근성 트리에서는 형제로 평탄화된다. `childOf`로 좁힐 수 없으므로
+                  버튼 자신이 이름을 가져야 한다.
 
-                줄(`character-row-*`)에 testID가 있어도 **Maestro가 이 버튼을 그 줄의
-                자식으로 보지 않는다** — 좌표로는 줄 안(x=824~968 ⊂ 68~1013)인데
-                접근성 트리에서는 형제로 평탄화된다. `childOf`로 좁힐 수 없으므로
-                버튼 자신이 이름을 가져야 한다.
-              */
-              <TouchableOpacity
-                accessibilityRole="button"
-                testID={`action-${character}`}
-                onPress={() =>
-                  state.kind === "ready" ? onRemove(character) : onPrepare(character)
-                }
-                style={styles.button}
-              >
-                <Text>{actionLabel(state)}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+                  033 — **지우기만 위험색이다**(spec FR-009a). 되돌릴 수 없는 동작이고,
+                  나머지(준비·이어받기·다시 받기)는 보조 갈래다.
+                */
+                <Button
+                  variant={state.kind === "ready" ? "danger" : "secondary"}
+                  testID={`action-${character}`}
+                  onPress={() =>
+                    state.kind === "ready" ? onRemove(character) : onPrepare(character)
+                  }
+                >
+                  {actionLabel(state)}
+                </Button>
+              )
+            }
+          />
         );
       })}
 
@@ -251,30 +317,34 @@ export function CharacterListScreen(props: CharacterListProps) {
         보이며, 파일이 둘이라는 것도 드러나지 않는다(FR-026).
       */}
       {visionReadiness !== undefined && (
-        <View testID="vision-row" style={styles.row}>
-          <View style={styles.info}>
-            <Text style={styles.name}>사진을 보는 데 필요한 것</Text>
-            <Text style={styles.status}>
-              {visionProgress !== undefined && visionProgress !== null
-                ? progressText(visionProgress)
-                : statusText(visionReadiness)}
-            </Text>
-            {visionBytes !== undefined && visionBytes > 0 && (
-              <Text style={styles.usage}>{formatBytes(visionBytes)}</Text>
-            )}
-          </View>
-
-          <TouchableOpacity
-            accessibilityRole="button"
-            testID="action-vision"
-            onPress={() =>
-              visionReadiness.kind === "ready" ? onRemoveVision?.() : onPrepareVision?.()
-            }
-            style={styles.button}
-          >
-            <Text>{actionLabel(visionReadiness)}</Text>
-          </TouchableOpacity>
-        </View>
+        <ListRow
+          testID="vision-row"
+          style={ROW_OVERRIDE}
+          label={
+            <RowLabel
+              name="사진을 보는 데 필요한 것"
+              status={
+                visionProgress !== undefined && visionProgress !== null
+                  ? progressText(visionProgress)
+                  : statusText(visionReadiness)
+              }
+              usage={
+                visionBytes !== undefined && visionBytes > 0 ? formatBytes(visionBytes) : undefined
+              }
+            />
+          }
+          right={
+            <Button
+              variant={visionReadiness.kind === "ready" ? "danger" : "secondary"}
+              testID="action-vision"
+              onPress={() =>
+                visionReadiness.kind === "ready" ? onRemoveVision?.() : onPrepareVision?.()
+              }
+            >
+              {actionLabel(visionReadiness)}
+            </Button>
+          }
+        />
       )}
     </View>
   );
@@ -291,32 +361,3 @@ function formatBytes(bytes: number): string {
   if (gb >= 1) return `${gb.toFixed(1)}GB`;
   return `${Math.round(bytes / 1024 ** 2)}MB`;
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, padding: 24, gap: 12 },
-  title: { fontSize: 20, fontWeight: "600", marginBottom: 8 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#ddd",
-  },
-  notice: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 12,
-    backgroundColor: "#fdf3d8",
-    borderRadius: 8,
-  },
-  noticeText: { flex: 1, fontSize: 13, lineHeight: 19 },
-  dismiss: { paddingHorizontal: 12, paddingVertical: 6 },
-  info: { flex: 1, gap: 2 },
-  name: { fontSize: 16 },
-  tagline: { fontSize: 12, color: "#666" },
-  status: { fontSize: 13, color: "#666" },
-  usage: { fontSize: 12, color: "#999" },
-  button: { paddingHorizontal: 16, paddingVertical: 8, backgroundColor: "#eee", borderRadius: 6 },
-});

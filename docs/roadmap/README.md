@@ -200,7 +200,7 @@
   - **실기기 관측 (SM-S928N/One UI 8.5, `cmd uimode night yes`, debug)**: 온보딩 1단계·에셋 다운로드 단계·"1/4" 재게이트 전부 배경 `rgb(250,250,250)` + 텍스트 검정 + 대비 또렷 — 어제 22:03·22:28 dimmed(`#303030`) 재현 **0건**. `cmd uimode night no`에서도 `rgb(250,250,250)` 동일(회귀 없음). 온보딩 4단계가 `photos → location → notifications → battery-exception` 순서로 정확히 나오고 `photo-location` 단계 **부재**, 4개 전부 [건너뛰기]로 통과 → 에셋 다운로드 단계 도달(**갇힘 없음**). `cmd uimode night auto` 복원 완료.
   - **미확인 잔여**: 목록·상세·설정·개발자 탭의 다크 모드 화면(에셋 ~2GB 모델 미준비로 온보딩 게이트를 못 넘음 — 다음 세션에서 모델 배치 후), 설정 "권한" 섹션 행 4개 확인, release APK 재확인(`expo-system-ui` minify 생존, 012), S22(One UI 8 이하) 회귀. 상세는 `specs/031-oneui85-fixes/tasks.md` Phase 6.
 
-### 21. 032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션
+### 21. 032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션 — 🔄 033에서 구현 (2026-09-07, 실기기 대기)
 
 - **배경** (2026-09-05 제안): 032가 NativeWind + 디자인 토큰 + 재사용 컴포넌트 7종을 도입하고 핵심 화면 5개를 이관했지만, 두 갈래가 미완으로 남았다.
   1. **미이관 화면·미적용 컴포넌트** — `CharacterListScreen.tsx`가 여전히 `StyleSheet` + 원시 hex(`#fdf3d8` 등)로 남아 있다(T063, SHOULD로 미룸). 032가 만든 `Card`·`ListRow`·`Toggle`·`Section` 컴포넌트는 계약 테스트는 통과하지만 **어느 화면에도 실제로 안 쓰인다** — 기존 화면 구조(다중 행·상태별 버튼 하나·저장 공간 표시)가 안 맞아 만들고 안 썼다(032 T062 판단). `ListRow`는 `CharacterListScreen`의 행 구조(label=이름+소개, value=상태, right=action 버튼)와 형태가 가장 가까워 보인다 — 이관 시 실측이 필요하다.
@@ -209,4 +209,26 @@
   - `CharacterListScreen`을 토큰·`ListRow`(또는 다른 032 컴포넌트)로 이관해 032의 톤을 완성한다. 기존 동작 계약(원칙 III — 모델 정보 안 새게 하는 코드 주석들, FR-004~006 등)과 `character-row-*`·`action-*`·`pause-*` testID는 무변경.
   - reanimated로 버튼 눌림 피드백, 화면 전환 트랜지션, 새로고침 인디케이터 같은 가벼운 인터랙션을 추가한다. **생성 중인 글을 보여주지 않는다는 원칙 IV, 진행률 숫자를 노출하지 않는다는 제약은 애니메이션을 더해도 유지**해야 한다(005 FR-028b) — 진행 "표시"의 부드러움을 더하는 것과 진행 "수치"를 드러내는 것은 다르다.
 - **선행 확인 필요**: SM-S928N 육안·release 빌드 재확인(032가 이월한 잔여)을 이 스펙에서 함께 닫을지, 별도로 유지할지. `CharacterListScreen`은 032 스펙이 명시적으로 범위 밖(T063 SHOULD)이라 표시했던 화면이라, 이관 시 032의 계약(`contracts/screen-migration.md`)을 그대로 재사용할 수 있는지부터 확인한다.
-- **미착수 — 다음 세션에서 브레인스토밍·speckit 진행.**
+- **🔄 033에서 구현 — 코드 완료, 실기기 검증 대기**(2026-09-07,
+  `specs/033-character-screen-press-feedback/`). 위 다섯 물음의 답:
+  1. **`CharacterListScreen` 이관** — `ListRow`로 이관했다. `label`을
+     `string | ReactNode`로 넓히자(순수 확장, 기존 6개 테스트 무수정 GREEN)
+     032 T062의 "구조가 안 맞는다"는 전제가 사라졌다. 032
+     `contracts/screen-migration.md` 공통 원칙을 그대로 재사용했고 별도
+     계약(CS1~CS10)만 더했다. 버튼은 공용 `Button`으로 교체(지우기만 danger).
+  2. **미적용 컴포넌트** — `ListRow`만 실제로 적용했다. `Card`·`Toggle`·
+     `Section`은 032 T062 판단을 유지한다(쓸 자리를 억지로 만들지 않는다).
+  3. **애니메이션 범위** — **눌림 피드백만**(`scale 0.97` / `120ms`,
+     `tokens.ts`의 `PRESS` 상수 한 곳). 화면 전환·목록 등장·인디케이터
+     재작성은 범위 밖으로 명시했다. **새 컴포넌트 0개** — 032의 7종 그대로.
+  4. **032 이월 잔여** — **별도 유지**. 다만 032 T059 잔여 (2)(release 빌드)에
+     "눌림 반응이 배포 빌드에서 동작하는가"를 확인 항목으로 추가했다.
+  5. **Maestro** — **새 흐름 0개**. ⚠️ 조사 중 정정: 이 화면을 지나는 흐름은
+     `diary-character-select.yml`이 **아니라**(029가 `AuthorPicker`로 분리)
+     `download-conflict`·`parallel-model-download`·`photo-vision` 셋이다.
+- **★ 구현 중 발견 — `babel.config.js`에 `react-native-worklets/plugin`이
+  없었다.** reanimated 4.x는 이것 없이 worklet이 컴파일되지 않는데, 실패가
+  조용하다(오류 없이 애니메이션만 안 돎). 032가 남긴 "이 플러그인이 설치돼
+  있지 않다"는 주석이 스테일이었다 — 실제로는 설치돼 있었다. 033이 활성화했다.
+- **남은 것**: 실기기 검증(SM-S901N debug) — 화면 이관 육안, **눌림 반응 육안**,
+  생성 중 화면 미노출, Maestro 흐름 셋 무갱신 PASS.

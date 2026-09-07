@@ -396,6 +396,12 @@ Phase 3 = 컴포넌트 계층, Phase 4 = US1 화면, Phase 5 = US2 화면.
   도입분이 R8·minify(현재 `android/gradle.properties` 미설정 → release도 minify
   OFF, 027 발견)·prod Metro 번들에서 안 깨지는지 — `llama.rn` 로드·첫 렌더·`prod`
   환경 표시·className→style 변환 확인. AGENTS.md "release 빌드와 서명" 절차.
+  - **★ 033이 확인 항목을 하나 더했다**(2026-09-07): 033이 `babel.config.js`에
+    `react-native-worklets/plugin`을 **처음 활성화**했고 `Button`·`ListRow`가
+    실제로 worklet을 쓴다(눌림 반응). release 빌드에서 **버튼을 눌러 크기가
+    작아지는지 육안 확인**한다 — 이 실패는 조용해서(오류 없이 애니메이션만 안
+    돎) 이것 말고는 드러나는 통로가 없다. 032가 reanimated를 의존성으로만
+    들여왔을 때는 잴 것이 없었으나 이제 있다.
 
 **메모리** [[alpharium-device-session-batch]]에 이 세션 결과 + 잔여 2건을 갱신할 것.
 
@@ -547,9 +553,14 @@ contracts에 대조. **CRITICAL/HIGH 0, 헌법 위반 0.** 아래는 부분 격�
       - **결론**: `Card`·`ListRow`·`Toggle`·`Section`은 만들어져 계약 테스트도
         통과하며(FR-004·FR-006 충족), 후속 화면·이관(T063)에서 쓰도록 남겨 둔다 —
         US3의 유지보수 가치는 "존재하고 검증됨"으로 성립.
-- [ ] T063 (선택 — SHOULD, 완료 게이트 아님) `CharacterListScreen.tsx` 이관 per
-      FR-013 / spec "범위 밖" (partial) — 이 화면은 아직 미이관이고 raw hex
-      (`#fdf3d8` 등)가 남아 있다. spec이 **필수 범위 밖(SHOULD)**으로 명시했으므로
+- [X] T063 (선택 — SHOULD, 완료 게이트 아님) `CharacterListScreen.tsx` 이관 per
+      FR-013 / spec "범위 밖" — **✅ 033에서 완료**(2026-09-07,
+      `specs/033-character-screen-press-feedback/`). 토큰 + `AppText`·`Button`·
+      `ListRow`로 이관했고 `character-list.test.tsx`가 **무수정 GREEN**이다.
+      `ListRow.label`을 `string | ReactNode`로 넓혀(순수 확장) T062가 "구조가
+      안 맞는다"고 판단했던 전제를 해소했다 — **032가 만들고 안 쓰던
+      `ListRow`가 이제 실제로 쓰인다.** 아래는 이관 전 상태의 기록이다.
+      이 화면은 아직 미이관이고 raw hex (`#fdf3d8` 등)가 남아 있다. spec이 **필수 범위 밖(SHOULD)**으로 명시했으므로
       (FR-012·FR-013) 이 스펙의 "완료"를 막지 않는다. 여유가 되면 토큰 + `AppText`·
       `Button`·`ListRow`로 이관하고 `character-list.test.tsx`를 수정 없이 GREEN으로
       유지한다. 개발자 탭 화면(`DiagnosticsScreen` 등)은 이관하지 않는다(배포

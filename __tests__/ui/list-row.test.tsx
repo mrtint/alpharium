@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { render, screen, fireEvent } from "@testing-library/react-native";
-import { Text } from "react-native";
+import { Text, View } from "react-native";
 
 import { ListRow } from "../../src/ui/components/ListRow";
 
@@ -47,6 +47,44 @@ describe("UC3 — ListRow", () => {
   it("chevron이 true면 › 가 보인다", async () => {
     await render(<ListRow label="이동" chevron onPress={() => {}} testID="r6" />);
     expect(screen.getByText("›")).toBeTruthy();
+  });
+
+  /*
+   * 033 — `label`이 노드도 받는다 (data-model.md §2).
+   *
+   * `CharacterListScreen`의 행은 좌측이 이름·소개·상태·저장공간으로 세로로
+   * 쌓이므로 문자열 하나에 안 담긴다. **위 여섯 케이스는 손대지 않았다** —
+   * 순수 확장이라 문자열 경로가 그대로 돌아야 한다(spec SC-002).
+   */
+  it("★ 033 — label에 노드를 넘기면 그대로 렌더된다", async () => {
+    await render(
+      <ListRow
+        label={
+          <View>
+            <Text>금동이</Text>
+            <Text>조용히 씁니다</Text>
+            <Text>쓸 수 있음</Text>
+          </View>
+        }
+        testID="r7"
+      />,
+    );
+    expect(screen.getByText("금동이")).toBeTruthy();
+    expect(screen.getByText("조용히 씁니다")).toBeTruthy();
+    expect(screen.getByText("쓸 수 있음")).toBeTruthy();
+  });
+
+  it("★ 033 — 노드 label에도 value·right가 함께 온다", async () => {
+    await render(
+      <ListRow
+        label={<Text>왼쪽 노드</Text>}
+        right={<Text>[버튼]</Text>}
+        onPress={() => {}}
+        testID="r8"
+      />,
+    );
+    expect(screen.getByText("왼쪽 노드")).toBeTruthy();
+    expect(screen.getByText("[버튼]")).toBeTruthy();
   });
 });
 
