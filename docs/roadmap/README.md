@@ -304,11 +304,20 @@
     `permissions-section`·`permission-row-*`·`permission-restart-onboarding` 문안 그대로.
     **좌우 정렬선 통일 확인** — 네 설정 섹션이 화면 끝에서 ~20px 한 세로선(ES14 —
     `App.tsx` `settingsSection` 래퍼가 `PermissionsSection` 편입).
-  - **FAIL 2건 — 034 회귀 아님**: `photo-selection-over-limit`(seed 하루
-    `day-${SEED_DAY}` 미준비 — `npm run seed:day` 선행 필요), `parallel-model-download`
-    (`pause-chinese` 어서션 실패 — 다운로드가 이 기기에서 너무 빨리 끝남, 033이
-    문서화한 이 흐름의 타이밍 취약성). 둘 다 `CharacterListScreen`(034 무변경,
-    `git diff --stat HEAD~1` 빈 값) 또는 데이터 의존이지 이관이 깨뜨린 게 아니다.
+  - **`photo-vision.yml` PASS** — 033의 `CharacterListScreen` 지정 흐름. 설정 탭
+    `vision-row`·`action-vision`·`vision-auto`/`vision-quick` 무회귀 확인.
+  - **FAIL 2건 — 원인 규명, 034 회귀 아님, 이 브랜치에서 해소 불가**:
+    - `photo-selection-over-limit`: `SEED_DAY=2026-09-01`이 009 선택 범위 밖(오늘
+      09-07 → 09-05/06/07). 범위 안으로 재심기 시도했으나 **seed 도구의 시간대 한계**
+      (요청일 +1일 착지 — 023·010 기록)로 09-05에 착지 불가(06·07은 일기 있음, 08은
+      범위 밖). 유일한 034-관련 단계(옵셔널 `OverwriteConfirmScreen` "확인" 탭)는
+      `generate-diary`·`past-day-diary`가 이미 통과한 동일 상호작용이라 중복.
+    - `parallel-model-download`: 기기에 **`a5.bin`(english/모카)이 이미 완전 다운로드·
+      검증됨** → `action-english`가 다운로드가 아니라 삭제를 부름 → `pause-chinese`
+      영영 안 뜸. 흐름 주석이 이 상태를 "SKIPPED가 아니라 FAILED로 드러난다 — 손으로
+      확인(원칙 V)"으로 **명시**. 이 흐름은 `CharacterListScreen`만 지나고 034는 그
+      파일을 한 줄도 안 건드림(`git diff --stat main` = App.tsx + 4개 화면). 해소하려면
+      `a5.bin` 삭제가 필요한데 다른 흐름의 테스트 데이터 파괴 + 026 세션 셋업 영역.
   - **덮어쓰기 확인 화면 톤 육안**: 「취소」=secondary Button(흰 배경+회색 테두리),
     「확인」=primary Button(테라코타 배경+오프화이트 텍스트). "확인" 탭 → 생성 시작 →
     생성 중 화면 금지어 0건(FR-017 회귀 없음). "그만두기"로 중단 → 홈 복귀.

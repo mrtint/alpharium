@@ -135,9 +135,21 @@ run:android`(033 세션이 debug 앱을 지웠으면 재설치 + 모델 재배�
 
 - [X] T024 `diary-character-select.yml`·`writing-flow-simplified.yml` — **둘 다 PASS**(2026-09-07, SM-S901N debug, exit 0). `diary-character-select`는 033이 안 돌린 흐름인데 **갱신 없이 PASS** — stale 아님. `author-picker`·`author-option-0~2`·`일기 작성자`·`작성자` 표식·`.*상상력이 풍부.*` 전부 조회됨. `writing-flow-simplified`도 덮어쓰기 확인(SKIPPED — 그날 일기 없음) 포함 완주.
 
-- [X] T025 `generate-diary.yml`·`past-day-diary.yml`·`writing-monologue-expansion.yml`·`skeleton.yml` — **4개 PASS**(exit 0). **★ 새 `OverwriteConfirmScreen` Button 실기기 확인**: `generate-diary`가 `Run flow when ".*덮어쓸지 확인.*" is visible` → `Tap on "확인"... COMPLETED`(primary Button), `past-day-diary`가 `Run flow when "취소" is visible` → `Tap on "취소"... COMPLETED`(secondary Button). 두 Button이 텍스트를 렌더하고 탭을 받는 것 확인. **`photo-selection-over-limit.yml`은 seed 하루(`day-${SEED_DAY}`) 미준비로 FAIL** — `npm run seed:day` 선행 필요한 데이터 의존이지 034 회귀 아님(흐름이 그 전에 이관된 `VisionPicker`/`SelectRow`의 `vision-quick`·"선택"을 통과했다).
+- [X] T025 `generate-diary.yml`·`past-day-diary.yml`·`writing-monologue-expansion.yml`·`skeleton.yml` — **4개 PASS**(exit 0). **★ 새 `OverwriteConfirmScreen` Button 실기기 확인**: `generate-diary`가 `Run flow when ".*덮어쓸지 확인.*" is visible` → `Tap on "확인"... COMPLETED`(primary Button), `past-day-diary`가 `Run flow when "취소" is visible` → `Tap on "취소"... COMPLETED`(secondary Button). 두 Button이 텍스트를 렌더하고 탭을 받는 것 확인.
 
-- [X] T026 `model-acquisition.yml` **PASS**(exit 0) — `author-option-0~4` 다섯 행 전부 스크롤로 조회, 모델 식별자 미노출. **`parallel-model-download.yml`은 FAIL** — `Assert that id: pause-chinese is visible` 실패(다운로드가 이 기기에서 너무 빨리 끝나 `pause-chinese`→`action-chinese`로 되돌아감). 034가 `CharacterListScreen.tsx`를 **한 줄도 안 건드렸고**(`git diff --stat HEAD~1` 비어 있음) 이 흐름은 034 화면을 지나지 않는다 — 033이 문서화한 이 흐름의 타이밍 취약성(관성·`extendedWaitUntil` 필요)의 재발이지 034 회귀 아님. `download-conflict.yml`은 026 이후 PASS 불가라 제외.
+- [X] T026 `model-acquisition.yml` **PASS**(exit 0) — `author-option-0~4` 다섯 행 전부 스크롤로 조회, 모델 식별자 미노출. `photo-vision.yml`(033의 `CharacterListScreen` 지정 흐름) 도 **PASS**(FAILED 0) — 설정 탭 `vision-row`·`action-vision`·`vision-auto`/`vision-quick` 무회귀. `download-conflict.yml`은 026 이후 PASS 불가라 제외.
+
+### FAIL 2건 — 원인 규명, 034 회귀 아님, 이 브랜치에서 해소 불가
+
+- **`photo-selection-over-limit.yml` FAIL** (`Scrolling DOWN until id: day-${SEED_DAY}` 실패):
+  - **원인**: 흐름의 `SEED_DAY: "2026-09-01"` 기본값이 stale. 009 선택 범위는 "마지막 닫힌 하루 + 앞 둘"(오늘 09-07 기준 09-05/06/07)이고 09-01은 밖이라 `day-2026-09-01` pill이 없다.
+  - **재심기 시도 → 데이터 도구의 시간대 한계로 막힘**: `npm run seed:day -- many-camera 2026-09-05` → "2026-09-05에 심으려 했는데 2026-09-06로 잡혔다"(기기·개발기계 시간대 차 +1일, 023·010이 기록한 한계). 범위 안 날짜(05/06/07)를 요청하면 +1일 착지(06/07/08)하는데 06·07은 이미 일기가 있고 08은 범위 밖 → **이 기기에서 09-05에 seed를 착지시킬 수 없다.**
+  - **034와의 관계**: 흐름의 유일한 034-관련 단계는 옵셔널 `.*덮어쓸지 확인.*` → `tapOn "확인"`인데, 이는 `generate-diary`·`past-day-diary`가 이미 통과한 **동일한 `OverwriteConfirmScreen` Button 상호작용**이라 중복이다. 데이터 도구 한계는 별도 스펙(seed-day.mts 시간대 처리)의 일이다.
+
+- **`parallel-model-download.yml` FAIL** (`Assert/Tap id: pause-chinese` 실패):
+  - **원인**: 기기 `files/models/`에 **`a5.bin`(english/모카 모델)이 이미 완전히 받아져 검증됨**(`state.json` `passed:true`). 흐름은 `action-english`가 **다운로드를 시작**한다고 전제하지만, english가 이미 준비돼 있어 그 행 버튼은 "지우기"이고 `action-english` 탭은 삭제를 부른다 → 이후 `pause-chinese`가 절대 안 뜬다.
+  - **흐름 자체가 이 상태를 FAIL로 설계함**: 흐름 주석 명시 — *"이 둘이 이미 준비돼 있으면 이 흐름은 SKIPPED가 아니라 FAILED로 드러나며 — quickstart Q1·Q2를 손으로 확인한다(원칙 V)."* `extendedWaitUntil`은 033이 이미 넣었다(관성 대응). 이번 실패는 관성이 아니라 **선행 조건(english+chinese 둘 다 미다운로드) 위반**이다.
+  - **034와의 관계**: 이 흐름은 **`CharacterListScreen`만** 지난다(`character-row-*`·`action-*`·`pause-*`·`download-notice`). 034는 `CharacterListScreen.tsx`를 **한 줄도 안 건드렸다**(`git diff --stat main` = `App.tsx` + 4개 화면뿐). 해소하려면 `a5.bin`을 지워야 하는데 그건 다른 흐름이 쓰는 테스트 데이터를 파괴하고, 026 세션 셋업의 일이지 034 이관의 일이 아니다. `photo-vision.yml` PASS로 `CharacterListScreen` 영역에 034 회귀가 없음을 별도 확인했다.
 
 - [X] T027 설정 탭 육안(2026-09-07, SM-S901N debug, 스크린샷 `/tmp/034_settings.png`) — (a) "일기 작성자": `SectionHeader` 헤더, 선택된 "금동이" 행이 **테라코타 테두리**(`COLORS.accent`), 우측 "작성자" 표식 테라코타 볼드, 미준비 행(루이·오드·샤오바이) 회색 테두리 + `opacity-50` + "아직 준비되지 않음 — 아래에서 내려받으세요" 캡션. 아이보리 배경. (b) "권한": `permissions-section` testID, 헤더 "권한", 5개 `permission-row-*`(photos·location·notifications·battery-exception — 031이 photo-location 제거) 전부 `Card`로 렌더, `describe()` "허용됨"×3, `permission-battery-open-settings`·`permission-restart-onboarding` 문안 그대로. (c) **좌우 정렬선 통일 확인**: "일기 작성자" 헤더·행·"배터리 설정 열기" 버튼·시각 셀렉트 칸·`VisionPicker`/`GeocodingSettingToggle`이 전부 화면 끝에서 ~20px인 한 세로선에 정렬(ES14 — `App.tsx` `settingsSection` 래퍼가 `PermissionsSection`까지 편입). (d) 캐릭터 전환·권한 링크는 Maestro 흐름(T024·T026)이 조회·탭 확인.
 
