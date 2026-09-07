@@ -14,7 +14,7 @@
 
 - Q: 이관을 화면 하나씩 처리하며 그때마다 Maestro 흐름을 돌릴까, 네 파일 일괄 이관 후 마지막에 전체 회귀만 돌릴까? → A: 일괄 이관 (Option B) — 네 파일을 한꺼번에 이관하고 `npm test` 통과 후 실기기에서 전체 Maestro 회귀를 한 번 돌린다. tasks.md는 "이관"·"검증" 두 단계로 나뉜다. 여백을 안 바꾸기로 했으므로(FR-009) 화면별로 끊을 필요가 없다는 판단.
 - Q: 이관 후 설정 탭 좌우 여백을 `App.tsx` 조립부가 소유할까, 각 섹션이 자체 `padding`을 가질까? → A: `App.tsx` 조립부가 소유 (Option A) — `PermissionsSection`의 자체 `padding: 20`(좌우분)을 걷어내고 `App.tsx`에서 `settingsSection`(`paddingHorizontal: 20`) 래퍼로 감싼다. 033이 확립한 방식에 `PermissionsSection`을 편입해 설정 탭 전체 세로 정렬선을 완성한다. `SelectRow`·`VisionPicker`·`GeocodingSettingToggle`은 무변경. 세로 여백(`gap`·행 간격)은 `PermissionsSection`이 계속 자체 소유.
-- Q: `Card`·`Toggle`·`Section`을 이번 이관에서 실제로 쓸 자리를 찾을까, 이번에도 미적용으로 둘까? → A: 실제 적용 (Option A) — `PermissionsSection`의 각 권한 행을 `Card`로 감싸고, "권한"·"일기 작성자" 섹션 머리글을 `Section`(또는 `SectionHeader`)으로 교체해 032가 만들고 안 쓰던 컴포넌트를 실제로 쓴다. **단 `Card`는 `padding: 16` + surface 배경 + border를 더하므로 행 구조·간격이 바뀐다** — 이 변경은 FR-009·FR-016의 회귀 위험을 키운다. plan 단계에서 (a) `Section`이 children을 `Card`로 감싸 섹션 전체에 배경 박스가 생기는 것을 허용할지, (b) 머리글만 `SectionHeader`로 바꾸고 행만 `Card`로 감쌀지, (c) `Card` 기본 `padding: 16`을 현행 행 여백에 맞게 조정할지를 확정한다. `Toggle`은 `PermissionsSection`에 on/off 성격 행이 없으면 미적용(032 T062 판단 유지).
+- Q: `Card`·`Toggle`·`Section`을 이번 이관에서 실제로 쓸 자리를 찾을까, 이번에도 미적용으로 둘까? → A: 실제 적용 (Option A) — `PermissionsSection`의 각 권한 행을 `Card`로 감싸고 머리글을 `SectionHeader`로 교체해 032가 만들고 안 쓰던 컴포넌트를 실제로 쓴다. **plan research R3 확정**: `Card`에 `style={{ padding: 12 }}`로 기본 `padding: 16`을 현행 여백에 맞춘다(㉰). `Section`(섹션 전체를 `Card`로 감싸는 것)은 다른 설정 섹션과 톤이 어긋나므로 안 쓴다(㉯). `Toggle`은 on/off 성격 행이 없어 미적용. `PermissionsSection`을 직접 지나는 Maestro 흐름이 없어(FR-019) `Card` 도입 레이아웃 변화는 육안 검증(SC-006).
 
 ## 배경 및 문제 정의
 
@@ -64,7 +64,7 @@
 **Acceptance Scenarios**:
 
 1. **Given** 설정 탭이 열려 있고, **When** "일기 작성자" 섹션을 본다, **Then** 캐릭터 행의 테두리·선택 표식이 032 토큰 색(테라코타)으로 그려지고, persona 이름·소개·`author-option-N` testID·"작성자" 표식 문안이 전부 그대로다.
-2. **Given** 설정 탭이 열려 있고, **When** "권한" 섹션을 본다, **Then** 5개 권한 행이 각각 `Card`(surface 배경 + border)로 감싸여 그려지고 머리글이 `Section`/`SectionHeader`로 렌더되며, `permission-row-*`·`permission-*-request`·`permission-restart-onboarding` testID와 모든 한국어 문안이 그대로다.
+2. **Given** 설정 탭이 열려 있고, **When** "권한" 섹션을 본다, **Then** 5개 권한 행이 각각 `Card`(surface 배경 + border, `padding: 12`)로 감싸여 그려지고 머리글이 `SectionHeader`로 렌더되며, `permission-row-*`·`permission-*-request`·`permission-restart-onboarding` testID와 모든 한국어 문안이 그대로다.
 3. **Given** 이관 후, **When** 설정 탭에서 캐릭터를 바꾸거나 권한 요청 버튼을 누른다, **Then** 이관 전과 동일하게 동작한다 (순수 함수·포트 호출·`AppState` 복귀 재조회 로직 무변경).
 
 ---
@@ -91,7 +91,7 @@
 - **`PermissionsSection`이 이미 `AppText`·`COLORS`를 일부 쓴다** — 완전한 미이관이 아니라 `className` 병행이 없는 상태. `StyleSheet.create`의 `section`·`link` 스타일을 병행으로 옮긴다. OQ-2 결정에 따라 `section`의 좌우 padding은 걷어내고 `App.tsx` 래퍼가 소유하되, 세로 `gap`(14)은 유지한다.
 - **`OverwriteConfirmScreen` 문안과 Maestro 정규식의 어긋남** — 소스는 `"덮어쓸지 확인이 필요하다"`인데 `generate-diary.yml`은 `.*덮어쓴다.*`도 optional로 본다. 문안은 불변이므로 이관이 이 어긋남을 건드리지 않는다 (기존 상태 유지).
 - **`PermissionsSection`에 `Card`를 넣으면 행 높이가 바뀐다** — `Card`는 `padding: 16` + border를 더한다. 5개 권한 행이 각각 16px씩 커지면 누적 세로 증가가 크고, `unified-permission-onboarding.yml`이 `PermissionsSection`을 직접 지나지 않아도 향후 흐름 추가 시 `scrollUntilVisible` 붕괴 위험이 있다. plan에서 `Card` padding 조정 또는 행만 감싸기로 완충한다.
-- **`Section`이 섹션 전체에 배경 박스를 만든다** — `Section`은 children을 `Card`로 감싸므로 "권한" 섹션 전체에 surface 배경 + border가 생긴다. 지금은 배경 없는 평면이다. 이것을 의도된 시각 변화로 받아들일지(㉮), 머리글만 `SectionHeader`로 바꿔 평면을 유지할지(㉯) plan에서 확정한다.
+- **`Section`이 섹션 전체에 배경 박스를 만든다** — research R3에서 `Section` 미사용으로 확정. 머리글만 `SectionHeader`(평면 유지) + 행만 개별 `Card`. 다른 설정 섹션과 톤 유지.
 - **`App.tsx` 설정 탭 조립부를 건드린다** — OQ-2 결정에 따라 `PermissionsSection`을 `settingsSection`(`paddingHorizontal: 20`) 래퍼로 감싸는 1곳을 수정한다. `VisionPicker`·`GeocodingSettingToggle`은 이미 그 래퍼 안이라 무변경. `SelectRow` 컴포넌트는 건드리지 않는다(모든 사용처에 영향).
 
 ## Requirements *(mandatory)*
@@ -101,7 +101,7 @@
 - **FR-001**: 시스템은 `AuthorPicker.tsx`·`BuildErrorScreen.tsx`·`OverwriteConfirmScreen.tsx`·`PermissionsSection.tsx` 네 파일을 032의 "className + 토큰 style 병행" 패턴으로 이관해야 한다 (033의 `DayPicker` 이관이 선례).
 - **FR-002**: 각 이관 파일은 요소마다 (1) 토큰 유래 `className` 문자열 + (2) `tokens.ts`의 `COLORS.*`·`RADIUS.*`를 참조하는 인라인 `style`을 **둘 다** 가져야 한다. 인라인 `style`의 숫자는 레이아웃 관용값(padding·gap·hairline)만 허용하고 색은 반드시 `COLORS.*`여야 한다 (원시 hex 리터럴 0).
 - **FR-003**: 이관 파일이 색·타이포를 직접 다루는 자리는 재사용 컴포넌트(`AppText`·`Button` 등)로 교체해야 한다. 그 컴포넌트가 병행을 내부에서 하므로 화면 코드가 색·폰트 크기를 만지지 않는다.
-- **FR-003a**: `PermissionsSection`은 각 권한 행을 `Card`로 감싸고 섹션 머리글을 `Section` 또는 `SectionHeader`로 교체해야 한다 (OQ-3 — 032가 만들고 안 쓰던 컴포넌트를 실제로 쓴다). `Card`의 배경·border·`padding: 16`이 더해지는 레이아웃 변화를 plan에서 확정한 방식으로 처리하고, 바뀐 화면으로 Maestro 회귀를 돌린다. `Toggle`은 이 스펙에서 미적용.
+- **FR-003a**: `PermissionsSection`은 각 권한 행을 `Card`(with `style={{ padding: 12 }}` 오버라이드)로 감싸고 섹션 머리글을 `SectionHeader`로 교체해야 한다 (OQ-3 / research R3 — 032가 만들고 안 쓰던 컴포넌트를 실제로 쓴다). `Section`(섹션 전체 `Card` 래핑)과 `Toggle`은 쓰지 않는다. `Card` 도입으로 인한 행 시각 변화는 육안 검증(SC-006).
 - **FR-004**: 각 이관 파일의 기존 `__tests__/ui/*.test.tsx`가 **수정 없이 통과**해야 한다 (033이 확립한 "1차 계약은 기존 테스트가 무수정 통과").
 
 ### 불변 (표현만 바꾼다)
@@ -136,7 +136,12 @@
 
 - **OQ-1 (이관 순서·단위)** — **확정됨 (Clarifications 2026-09-07)**: 네 파일을 **일괄 이관**하고 `npm test` 통과 후 실기기에서 전체 Maestro 회귀를 한 번 돌린다. tasks.md는 "이관"·"검증" 두 단계. 여백을 안 바꾸기로 했으므로(FR-009) 화면별로 끊을 필요가 없다. 이관 중 예상치 못한 레이아웃 변화가 드러나면 그 화면만 되돌려 재작업한다.
 - **OQ-2 (설정 탭 여백 소유권)** — **확정됨 (Clarifications 2026-09-07)**: `App.tsx` 조립부가 좌우 여백을 소유한다. `PermissionsSection`의 자체 `section` 스타일에서 좌우 padding(`padding: 20`의 좌우분)을 걷어내고, `App.tsx` 설정 탭 조립부에서 `settingsSection`(`paddingHorizontal: 20`) 래퍼로 `PermissionsSection`을 감싼다 — 033이 `AuthorPicker`·`VisionPicker`·`GeocodingSettingToggle`에 쓴 방식과 동일. 세로 여백(`gap: 14`, 행 간 `gap`)은 `PermissionsSection`이 계속 자체 소유한다. `SelectRow`·`VisionPicker`·`GeocodingSettingToggle`은 이미 그 방식이라 무변경. 이 결정으로 `App.tsx` 설정 탭 조립부 1곳이 변경 대상에 포함된다(SC-009 예외).
-- **OQ-3 (`Card`·`Toggle`·`Section` 활용)** — **확정됨 (Clarifications 2026-09-07)**: `PermissionsSection`에 `Card`·`Section`(또는 `SectionHeader`)을 실제로 적용한다. 각 권한 행을 `Card`로 감싸고 섹션 머리글을 `Section`/`SectionHeader`로 교체한다. `Card`가 `padding: 16` + surface 배경 + border를 더하므로 행 구조가 바뀐다 — plan 단계에서 세 갈래(㉮ `Section`이 섹션 전체를 `Card`로 감싸는 것 허용 / ㉯ 머리글만 `SectionHeader`, 행만 `Card` / ㉰ `Card` 기본 padding 조정) 중 하나를 확정하고, 바뀐 레이아웃으로 Maestro 회귀를 반드시 돌린다(SC-007). `Toggle`은 `PermissionsSection`에 on/off 성격 행이 없으므로 미적용 — 032 T062·033 판단 유지.
+- **OQ-3 (`Card`·`Toggle`·`Section` 활용)** — **확정됨 (Clarifications 2026-09-07 + plan research R3)**: `PermissionsSection`에 `Card` + `SectionHeader`를 적용한다.
+  - **각 권한 행을 `Card`로 감싼다** — `Card`에 `style={{ padding: 12 }}`를 넘겨 기본 `padding: 16`을 현행 행 여백(`AuthorPicker`·`DayPicker`의 `paddingVertical: 12`)에 맞춘다. 컴포넌트 자체는 무변경.
+  - **머리글을 `SectionHeader`로** — `SectionHeader`는 `AppText variant="sectionTitle"` 래퍼라 현행과 동등.
+  - **`Section`(섹션 전체를 `Card`로 감싸는 것)은 쓰지 않는다** — 다른 설정 섹션(`AuthorPicker`·`VisionPicker` — 배경 박스 없음)과 톤이 어긋나므로. (research R3의 ㉯ + ㉰ 조합)
+  - `PermissionsSection`을 직접 지나는 Maestro 흐름이 없어(FR-019) `Card` 도입 레이아웃 변화는 육안 검증(SC-006)으로 확인. 향후 그 흐름을 추가하는 스펙이 스크롤 타겟을 정한다.
+  - `Toggle`은 `PermissionsSection`에 on/off 성격 행이 없으므로 미적용 — 032 T062·033 판단 유지.
 - **OQ-4 (`PermissionsSection` 범위·검증)**: 240줄로 대상 중 가장 크고, 021이 만든 5갈래 권한 행·OS 링크·복귀 재조회 로직이 있다. 현재 이 화면을 지나는 Maestro 흐름이 없다. → **이 스펙은 `PermissionsSection`을 네 대상에 포함한다. `Card`/`Section` 적용 여부(OQ-3)와 별개로, 이관 자체는 다른 세 화면과 같은 방식이다. 새 Maestro 흐름을 만들지는 사용자 판단에 맡긴다 — 만들지 않고 육안 검증만 해도 012 기준상 완료 조건을 만족한다. 필요하면 별도 스펙에서 흐름을 추가할 수 있다.**
 
 ## Key Entities
