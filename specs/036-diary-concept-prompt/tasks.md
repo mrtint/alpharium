@@ -224,4 +224,19 @@ SC-001·001a·002·003·006, 원칙 I~V). 바이트 일치 게이트(verify-036.
 - [~] T037 실기기에서 루이(narrative)·오드(imaginative)로 설정 탭 "일기 작성자" 변경 후 사진 없는 날 각 1편을 생성해 (a) 저장 여부 (b) E2SN 머리에서 나온 일기를 `specs/036-diary-concept-prompt/logs/`에 **관측만** 글로 기록한다 (채점 없음, 원칙 IV; 리포트 §5.5는 kanana만 실측 — 이 관측이 로드맵 14번 입력) — SC-004a (partial)
 - [X] T038 실기기 금동이 생성 1회의 `writingMs`가 현행(base) 대비 늘어나지 않았음을 확인한다 (E2SN 416자 < base 464자, BA 대비 빠름은 요구 안 함) — SC-007 (partial)
 - [X] T039 `.maestro/` 회귀를 `scripts/run-device-tests.mjs`로 돌려 `generate-diary.yml`·`diary-user-path.yml`·`prompt-preview.yml`(assert `사진은 두 장이 남았다`로 갱신 완료)이 새 프롬프트에서 PASS함을 확인한다 — plan Phase 6 / T030 (partial)
-- [ ] T040 실기기 검증(T035~T039) 결과를 `specs/036-diary-concept-prompt/`와 로드맵 `docs/roadmap/README.md` 18번 항목("실기기 검증 대기" → 완료)에 기록하고, `036-diary-concept-prompt` → `main` PR을 연다 (커밋 메시지 한국어, 본문에 헌법 1.5.0·바이트 일치·실기기 관측 요약) — T033/T034 완료
+- [X] T040 실기기 검증(T035~T039) 결과를 `specs/036-diary-concept-prompt/`와 로드맵 `docs/roadmap/README.md` 18번 항목("실기기 검증 대기" → 완료)에 기록하고, `036-diary-concept-prompt` → `main` PR을 연다 (커밋 메시지 한국어, 본문에 헌법 1.5.0·바이트 일치·실기기 관측 요약) — T033/T034 완료
+
+---
+
+## 실기기 세션 완료 (2026-09-08, /speckit-implement 실기기 연결)
+
+- ✅ T035·T036·T038 — 금동이 6편, SC-004(5/6, #5 면책 끝 — §5.6 예측 일치)·SC-005
+  (인물형 단정 0)·SC-007(회귀 없음). `logs/device-session-2026-09-08.md`.
+- ✅ T039 — Maestro 3흐름 PASS. `prompt-preview.yml` D1 assert 갱신
+  (`너는 주인의 휴대폰이다` → `주인의 휴대폰이다` + `본 것으로 주인의 하루를 짐작하는 글이다`).
+- 🔶 T037 — SC-004a(루이·오드) 미수행: `a2`/`a3` 모델 파일 기기 부재(~2.4GB).
+  로드맵 14번 세션으로 이관. E2SN 머리는 계약 테스트·바이트 대조로 세 한국어
+  캐릭터 확인됨.
+- ✅ T040 — 로드맵 18번 완료 표시. **PR #55** (`036-diary-concept-prompt` → `main`).
+
+**전체 스펙 완료.** 잔여는 로드맵 14번(루이·오드 E2SN 실측)으로 이관.
