@@ -125,7 +125,7 @@ description: "Task list for 036 — 일기 자동 생성 프롬프트 재구성 
 - [ ] T030 [P] `.maestro/` 회귀 — `generate-diary.yml`·`diary-user-path.yml`을 `scripts/run-device-tests.mjs`로 돌려 새 프롬프트에서 흐름이 안 깨지는지 확인. 신규 Maestro 흐름은 없음.
 - [ ] T031 실기기(SM-S901N, dev debug) — 금동이 사진 없는 날 3편 + 있는 날 3편 생성(quickstart §4a). `adb logcat`으로 `unfinished`·`echo` 거부율 현행 대비 확인, 마지막 문단이 면책으로 끝나지 않음(SC-004), 짐작 어미 없는 인물형 지어내기 0편(SC-005), `writingMs` 방향(SC-007). 사진 있는 날은 캡션 인물이 등장인물이 안 되는지(`SCENE_LIMIT` 효과).
 - [ ] T032 실기기 — 루이·오드로 설정 탭 "일기 작성자" 변경 후 사진 없는 날 각 1편 생성(quickstart §4b, SC-004a). (a) 저장 여부(`rejected`?), (b) E2SN 머리에서 나온 일기를 **글로 기록**(채점 없음, 원칙 IV). `specs/036-diary-concept-prompt/logs/` 또는 findings에.
-- [ ] T033 [P] `specs/036-diary-concept-prompt/`에 실기기 관측 결과를 남긴다(quickstart 완료 체크리스트 갱신). 로드맵 `docs/roadmap/README.md` 18번 항목에 "036에서 구현" 결과를 추가한다(035 항목과 같은 형식 — 헌법 1.5.0 선행 커밋, 세 자리 변경, 실기기 관측, 루이·오드 미확정 → 14번).
+- [~] T033 [P] `specs/036-diary-concept-prompt/`에 실기기 관측 결과를 남긴다(quickstart 완료 체크리스트 갱신). 로드맵 `docs/roadmap/README.md` 18번 항목에 "036에서 구현" 결과를 추가한다(035 항목과 같은 형식 — 헌법 1.5.0 선행 커밋, 세 자리 변경, 실기기 관측, 루이·오드 미확정 → 14번).
 - [ ] T034 PR 준비 — `036-diary-concept-prompt` 브랜치를 `main`으로 PR. 커밋 메시지 한국어(헌법 「개발 방식」). 본문에 헌법 1.5.0(`5a061b6`)·리포트 §7 결정 1~11·바이트 일치 결과·실기기 관측 요약.
 
 ---
@@ -185,3 +185,27 @@ T014~T018이 전부 `src/diary/prompt.ts`를 고친다 → **순차**. [P] 없�
 
 US1 구현 중 바이트가 심하게 어긋나면(T024), `concept-candidates.ts`가 아니라
 alpharium `prompt.ts`를 맞춘다(FR-024). E2SN 조립이 실측의 기준이다.
+
+---
+
+## 구현 세션 완료 상태 (2026-09-08, /speckit-implement)
+
+**코드 완료 + 기기 없는 검증 통과. 실기기·PR 대기.**
+
+- ✅ T001~T029 완료. 기기 없는 테스트 2626개 통과, lint(위반 0)·prettier 클린.
+- ✅ SC-001 (18프롬프트 바이트 일치) + SC-001a (12프롬프트 회귀 없음) — my-ollama
+  `verify-036.mjs` 통과, 30/30 일치.
+- ✅ SC-002 (018 P8) — `prompt-e2sn.test.ts` E4/P8.
+- ✅ SC-003 (test + lint + acceptance.ts diff 0) — 통과.
+- ✅ SC-006 (사용자 지정 이름) — `prompt-e2sn.test.ts` US3.
+- 🔶 T033 (문서) — 로드맵 18번 갱신 완료. 실기기 관측 결과는 세션 후 추가.
+- ⏳ **T030** — Maestro 회귀(`generate-diary`·`diary-user-path`·`prompt-preview`).
+  `prompt-preview.yml`의 `사진: 2장` → `사진은 두 장이 남았다` 갱신 완료. 기기 필요.
+- ⏳ **T031** — 실기기 금동이 6편 (SC-004·SC-005·SC-007). SM-S901N 세션.
+- ⏳ **T032** — 실기기 루이·오드 각 1편 관측 (SC-004a). SM-S901N 세션.
+- ⏳ **T034** — `036-diary-concept-prompt` → `main` PR. 실기기 검증 후.
+
+**my-ollama 쪽 변경** (`concept-prompt-experiment` 브랜치):
+- `scripts/concept-prompt/gen-baseline.ts` — Windows `pathToFileURL` 수정.
+- `scripts/concept-prompt/verify-036.mjs` — 신규 대조 스크립트.
+- `results/concept-prompt/prompts/baseline{,-pre036}.json` — 036 프롬프트 스냅샷.
