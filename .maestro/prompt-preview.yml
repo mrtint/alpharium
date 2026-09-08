@@ -45,9 +45,13 @@ appId: com.anonymous.alpharium
     timeout: 20000
 
 # ★ D1 — 첫 캐릭터(quiet)의 프롬프트 원본에 화자 규칙이 들어 있다.
-#    buildPrompt()가 실제로 불렸다는 증거 — SPEAKER_RULES 첫 줄.
+#    buildPrompt()가 실제로 불렸다는 증거.
+#    036 — 한국어 캐릭터는 E2SN 머리. 첫 줄이 "너는 '금동이'이라 불린다. 주인의
+#    휴대폰이다. ..."이고, E2_RULES가 "본 것으로 주인의 하루를 짐작하는 글"을 말한다.
 - assertVisible:
-    text: ".*너는 주인의 휴대폰이다.*"
+    text: ".*주인의 휴대폰이다.*"
+- assertVisible:
+    text: ".*본 것으로 주인의 하루를 짐작하는 글이다.*"
 
 # ★ D3 — 근사 크기가 "실측 토큰 아님" 라벨과 함께 보인다(원칙 IV).
 - assertVisible:

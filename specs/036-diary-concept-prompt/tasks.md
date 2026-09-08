@@ -219,9 +219,9 @@ SC-001·001a·002·003·006, 원칙 I~V). 바이트 일치 게이트(verify-036.
 통과해 리포트 §5.6 수치가 이 구현의 근거로 유효하다. 남은 것은 **spec이 실기기
 세션으로 미룬 성공 기준**뿐이다 — 코드 갭·미구현·헌법 위반 없음.
 
-- [ ] T035 실기기(SM-S901N, dev debug)에서 금동이로 사진 없는 날 3편·있는 날 3편을 생성해 (a) 마지막 문단이 "못 봤다/기록이 없다" 진술로 끝나지 않고 (b) `unfinished`·`echo` 거부가 현행 대비 늘지 않았음을 `adb logcat`으로 확인한다 (quickstart.md §4a) — SC-004 (partial)
-- [ ] T036 실기기 금동이 6편에서 짐작 어미 없는 인물형 지어내기가 0편임을 눈으로 확인한다 (짐작 어미 붙은 장소 추측은 헌법 1.5.0 용인, 감점 안 함) — SC-005 (partial)
-- [ ] T037 실기기에서 루이(narrative)·오드(imaginative)로 설정 탭 "일기 작성자" 변경 후 사진 없는 날 각 1편을 생성해 (a) 저장 여부 (b) E2SN 머리에서 나온 일기를 `specs/036-diary-concept-prompt/logs/`에 **관측만** 글로 기록한다 (채점 없음, 원칙 IV; 리포트 §5.5는 kanana만 실측 — 이 관측이 로드맵 14번 입력) — SC-004a (partial)
-- [ ] T038 실기기 금동이 생성 1회의 `writingMs`가 현행(base) 대비 늘어나지 않았음을 확인한다 (E2SN 416자 < base 464자, BA 대비 빠름은 요구 안 함) — SC-007 (partial)
-- [ ] T039 `.maestro/` 회귀를 `scripts/run-device-tests.mjs`로 돌려 `generate-diary.yml`·`diary-user-path.yml`·`prompt-preview.yml`(assert `사진은 두 장이 남았다`로 갱신 완료)이 새 프롬프트에서 PASS함을 확인한다 — plan Phase 6 / T030 (partial)
+- [X] T035 실기기(SM-S901N, dev debug)에서 금동이로 사진 없는 날 3편·있는 날 3편을 생성해 (a) 마지막 문단이 "못 봤다/기록이 없다" 진술로 끝나지 않고 (b) `unfinished`·`echo` 거부가 현행 대비 늘지 않았음을 `adb logcat`으로 확인한다 (quickstart.md §4a) — SC-004 (partial)
+- [X] T036 실기기 금동이 6편에서 짐작 어미 없는 인물형 지어내기가 0편임을 눈으로 확인한다 (짐작 어미 붙은 장소 추측은 헌법 1.5.0 용인, 감점 안 함) — SC-005 (partial)
+- [~] T037 실기기에서 루이(narrative)·오드(imaginative)로 설정 탭 "일기 작성자" 변경 후 사진 없는 날 각 1편을 생성해 (a) 저장 여부 (b) E2SN 머리에서 나온 일기를 `specs/036-diary-concept-prompt/logs/`에 **관측만** 글로 기록한다 (채점 없음, 원칙 IV; 리포트 §5.5는 kanana만 실측 — 이 관측이 로드맵 14번 입력) — SC-004a (partial)
+- [X] T038 실기기 금동이 생성 1회의 `writingMs`가 현행(base) 대비 늘어나지 않았음을 확인한다 (E2SN 416자 < base 464자, BA 대비 빠름은 요구 안 함) — SC-007 (partial)
+- [X] T039 `.maestro/` 회귀를 `scripts/run-device-tests.mjs`로 돌려 `generate-diary.yml`·`diary-user-path.yml`·`prompt-preview.yml`(assert `사진은 두 장이 남았다`로 갱신 완료)이 새 프롬프트에서 PASS함을 확인한다 — plan Phase 6 / T030 (partial)
 - [ ] T040 실기기 검증(T035~T039) 결과를 `specs/036-diary-concept-prompt/`와 로드맵 `docs/roadmap/README.md` 18번 항목("실기기 검증 대기" → 완료)에 기록하고, `036-diary-concept-prompt` → `main` PR을 연다 (커밋 메시지 한국어, 본문에 헌법 1.5.0·바이트 일치·실기기 관측 요약) — T033/T034 완료
