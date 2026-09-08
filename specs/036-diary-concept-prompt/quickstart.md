@@ -68,43 +68,60 @@ ALPHARIUM_DIR=~/Workspace/alpharium npx tsx scripts/concept-prompt/gen-baseline.
 
 `~/Workspace/my-ollama/scripts/concept-prompt/verify-036.mjs` (신규, my-ollama 쪽):
 
+**대조 방향** (analyze C3·C4): my-ollama `buildCandidate('E2SN', …)`의 `e2HeadLines`는
+`E_TONE[character]`를 **모든 캐릭터에 리터럴로 넣는다** — narrative·imaginative
+프롬프트에도 "하루의 결을 짚되…"·"추리는 자유롭게…" 톤 줄이 들어 있다. 반면
+alpharium `fixedHead()`(036)는 narrative·imaginative에 **톤 줄을 아예 안 낸다**
+(조건부 spread `...(E_TONE[c] ? [E_TONE[c]] : [])` — 빈 줄도 없음, R4 옵션 B / §3.1).
+따라서 대조는 **my-ollama 쪽 expected에서 톤 줄을 뺀다**:
+
 ```js
 import { readFileSync } from "node:fs";
 import { CONCEPT_CASES } from "../../src/fixtures/alpharium/concept-cases.ts";
-import { buildCandidate } from "../../src/fixtures/alpharium/concept-candidates.ts";
-import { E_TONE } from "../../src/fixtures/alpharium/concept-candidates.ts";
+import { buildCandidate, E_TONE as MYOLLAMA_E_TONE } from "../../src/fixtures/alpharium/concept-candidates.ts";
 
 const post = JSON.parse(readFileSync("results/concept-prompt/prompts/baseline.json"));
 const pre  = JSON.parse(readFileSync("results/concept-prompt/prompts/baseline-pre036.json"));
 const rowOf = (j, cid, ch) => j.rows.find(r => r.caseId === cid && r.character === ch);
 
+function firstDiff(a, b) {
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i++) if (a[i] !== b[i]) return i;
+  return a.length === b.length ? -1 : n;
+}
+
 let fail = 0;
 for (const c of CONCEPT_CASES) {
-  // 한국어 3캐릭터: E2SN 조립과 대조
+  // 한국어 3캐릭터: my-ollama E2SN 조립과 대조 (pre row를 baseline 입력으로)
   for (const ch of ["quiet", "narrative", "imaginative"]) {
-    const row = rowOf(post, c.id, ch);
-    const cand = buildCandidate("E2SN", c, rowOf(pre, c.id, ch)); // pre row를 baseline으로
-    let expected = cand.prompt;
+    const got = rowOf(post, c.id, ch).prompt;
+    let expected = buildCandidate("E2SN", c, rowOf(pre, c.id, ch)).prompt;
     if (ch !== "quiet") {
-      // R4 옵션 B — narrative·imaginative는 톤 줄 한 줄 제외 대조
-      expected = expected.replace("\n" + E_TONE[ch], "");
+      // my-ollama 프롬프트에서 톤 줄 한 줄(앞의 \n 포함) 제거 — alpharium은 안 냄
+      expected = expected.replace("\n" + MYOLLAMA_E_TONE[ch], "");
     }
-    if (row.prompt !== expected) {
-      console.error(`✗ ${c.id}/${ch} 바이트 불일치`);
-      // 첫 diff 위치 출력
+    if (got !== expected) {
+      const at = firstDiff(got, expected);
+      console.error(`✗ ${c.id}/${ch} 바이트 불일치 @${at}: got …${JSON.stringify(got.slice(at, at+40))} / exp …${JSON.stringify(expected.slice(at, at+40))}`);
       fail++;
     } else console.log(`✓ ${c.id}/${ch}`);
   }
-  // 외국어 2캐릭터: 구현 전과 동일 (회귀)
+  // 외국어 2캐릭터: 구현 전과 동일 (회귀, SC-001a)
   for (const ch of ["chinese", "english"]) {
     const a = rowOf(post, c.id, ch).prompt;
     const b = rowOf(pre, c.id, ch).prompt;
-    if (a !== b) { console.error(`✗ ${c.id}/${ch} 회귀 (구현 전과 다름)`); fail++; }
-    else console.log(`✓ ${c.id}/${ch} (회귀 없음)`);
+    if (a !== b) {
+      console.error(`✗ ${c.id}/${ch} 회귀 (구현 전과 다름) @${firstDiff(a, b)}`);
+      fail++;
+    } else console.log(`✓ ${c.id}/${ch} (회귀 없음)`);
   }
 }
 process.exit(fail ? 1 : 0);
 ```
+
+**전제**: alpharium `fixedHead()`가 톤 줄을 조건부 spread로 넣어 narrative·
+imaginative에서 `\n\n`(빈 줄)이 생기지 않아야 이 `replace`가 정확히 한 줄만
+지운다. contracts E8 참조.
 
 ```bash
 cd ~/Workspace/my-ollama

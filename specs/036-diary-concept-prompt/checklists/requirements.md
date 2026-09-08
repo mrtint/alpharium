@@ -47,6 +47,20 @@
 - **Q2 = B**: 바이트 일치 검증은 세 한국어 캐릭터 × 6 = 18. chinese·english × 6 = 12는
   회귀 검증. → FR-024·024a·025, SC-001·001a 갱신.
 
+## Analyze 지적 반영 (2026-09-08, /speckit-analyze)
+
+CRITICAL 0. MEDIUM 4 + LOW 3 수정:
+- **C1** (FR-016 부분 커버): `visionLimitLines()` 언어 분기 — `S_VISION_PARTIAL`만
+  갈라지고 `VISION_UNREAD`·`VISION_NONE_READ`는 현행 문안. → FR-016 재작성, T016 갱신.
+- **C2** (FR-024a/SC-001a 명시 gate 없음): T024에 chinese·english 12행 회귀를 세
+  gate 중 하나로 명시.
+- **C3·C4** (verify-036 대조 방향): 톤 줄 제거는 **my-ollama `buildCandidate`
+  출력**에 적용(alpharium은 안 냄). `fixedHead` 조건부 spread로 `\n\n` 방지. →
+  quickstart §3c 재작성, contracts E8 강화, T014·T023 갱신.
+- **A1** (SC-007 지표 모호): "base 대비 안 늘어남"으로 재작성(BA 대비 빠름 요구 안 함).
+- **A2·I1** (부분 문자열 충돌 / jest 카운트 가드): T008에 주의 추가.
+- **FR-022** (llama-port gate 부재): T019에 `git diff src/inference/llama-port.ts` = 0.
+
 ## Notes
 
 - 기술 용어(함수명·상수명)를 남긴 것은 의도적이다. 이 스펙은 새 기능이 아니라

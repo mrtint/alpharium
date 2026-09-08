@@ -151,23 +151,32 @@ E4 실패(A-rule 기각, §4.1).
 
 ---
 
-## E8 — 톤 줄 캐릭터별
+## E8 — 톤 줄 캐릭터별 (조건부 spread)
 
 - `E_TONE.quiet` === `"담담하게, 짧게 쓴다."` 이고 `fixedHead("quiet")`에 이 줄이
   **있다**.
-- `fixedHead("narrative")`·`fixedHead("imaginative")`에 톤 줄이 **없다** — `E2_RULES`
+- alpharium `E_TONE.narrative` === `""`, `E_TONE.imaginative` === `""` (빈 문자열).
+- `fixedHead()`(한국어)는 톤 줄을 **조건부 spread**로 넣는다:
+  `...(E_TONE[character] ? [E_TONE[character]] : [])`. 빈 문자열이면 배열 원소가
+  아예 안 들어가 `.join("\n")`에서 **`\n\n`(빈 줄)이 생기지 않는다**. `E2_RULES`
   마지막 줄 다음이 바로 `E2_TITLE`.
+- **검사**: `promptPrefix("narrative")`에 `"\n\n"`이 (언어 줄 앞 한 곳 말고는) 없다.
+  `fixedHead("narrative")` 배열 길이 === `fixedHead("quiet")` 배열 길이 − 1.
 - 코드 주석에 근거가 있다(FR-004a): quiet는 §3.1 실측(글자 238~311, 잘림 0, 톤 이행
   83~94%, 씨앗과 같은 방향), narrative·imaginative는 §3.1 "채택 안 함"(루이 잘림
   4~8/18, 오드 이행 22~33%).
 
-**바이트 대조와의 관계**(R4): `buildCandidate('E2SN', …)`의 `e2HeadLines`는
-`E_TONE[character]`를 모든 캐릭터에 넣는다. 그래서 SC-001의 narrative·imaginative
-대조는 **"my-ollama 프롬프트에서 `E_TONE[character]` 한 줄을 제거한 것 == alpharium
-프롬프트"**로 한다. quiet × 6은 완전 일치(제거할 줄 없음). quickstart.md §3에
-대조 스크립트를 둔다.
+**바이트 대조와의 관계**(R4, analyze C3·C4): my-ollama `buildCandidate('E2SN', …)`의
+`e2HeadLines`는 `MYOLLAMA_E_TONE[character]`(non-empty 문자열)를 **모든 캐릭터에
+리터럴로** 넣는다. 그래서 SC-001의 narrative·imaginative 대조는 **"my-ollama
+프롬프트에서 `"\n" + MYOLLAMA_E_TONE[character]`를 제거한 것 == alpharium 프롬프트"**
+로 한다 — 제거는 **my-ollama 쪽 expected에** 적용한다(alpharium은 그 줄을 애초에
+안 냄). quiet × 6은 제거 없이 완전 일치. `MYOLLAMA_E_TONE`은 `concept-candidates.ts`
+에서 import한다(alpharium `E_TONE` 아님). quickstart.md §3c 스크립트.
 
-**위반 주입**: `E_TONE.narrative` 값을 `fixedHead("narrative")`에 넣으면 → E8 실패.
+**위반 주입**: alpharium `E_TONE.narrative`에 non-empty 값을 넣고 `fixedHead`가
+그것을 spread하면 → E8 검사(배열 길이·`\n\n` 부재) 실패, 그리고 SC-001 대조에서
+narrative가 my-ollama와 톤 줄까지 같아져 `replace` 후 불일치.
 
 ---
 

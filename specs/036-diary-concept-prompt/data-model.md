@@ -36,7 +36,7 @@
 4. {E2_RULES[2]}   무엇을 먹었는지, 누구를 만났는지, … 끌어와 짐작을 채우지 마라.
 5. {E2_RULES[3]}   짐작은 '~였을 것 같다', … 단정은 기록에 있는 것에만 쓴다.
 6. {E2_RULES[4]}   일기는 기록에 있는 하루 한 편이다. … 마지막 문장은 그날에 대한 짐작으로 끝내라.
-7. {E_TONE[character]}   (quiet만: "담담하게, 짧게 쓴다." / narrative·imaginative: "" — 이 줄 자체가 안 들어감)
+7. {E_TONE[character]}   조건부 spread — quiet만 "담담하게, 짧게 쓴다."; narrative·imaginative는 "" 라 원소 자체가 안 들어감(`\n\n` 없음, contracts E8)
 8. {E2_TITLE}   첫 줄에 제목을, … 본문 첫 문장은 주인이 그날 한 일에 대한 짐작으로 시작한다. (4문장 " " join, 한 줄)
 9. (빈 줄)
 10. {LANGUAGE[character]}로 써라.   → "한국어로 써라."
