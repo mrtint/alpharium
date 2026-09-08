@@ -91,6 +91,176 @@ const SPEAKER_RULES: readonly string[] = [
   "확실하지 않은 것은 '~인 것 같다', '~였을지도 모른다'처럼 짐작의 말투로 써라. 있었다, 했다처럼 단정하는 말투는 실제로 본 것에만 써라.",
 ];
 
+/* ────────────────── E2SN — 한국어 캐릭터 새 머리 (036) ────────────────── */
+
+/**
+ * E2SN 머리 규칙 (036, 리포트 §5.6 채택안 / 헌법 1.5.0).
+ *
+ * `SPEAKER_RULES`(8줄)를 대체한다 — **한국어 캐릭터(quiet·narrative·imaginative)만.**
+ * chinese·english는 위 `SPEAKER_RULES`를 계속 쓴다(036 Clarification Q1=B).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **헌법 1.5.0 원칙 II 「화자는 본 것으로 주인의 하루를 짐작한다」를 구현한다.**
+ *
+ *  - 짐작 MAY: "본 것으로 주인의 하루를 짐작하는 글" 명시 + 짐작의 말투 지시.
+ *  - "모른다고 쓴 일기가 지어낸 일기보다 낫다"·「알 수 없는 것」 예시 나열을
+ *    **뺐다**(FR-002) — 이 둘이 리포트 §5.4·§5.6에서 끝 문단 면책을 만들었다
+ *    (채택 후보 BA 8/16, 같은 프롬프트를 Haiku에 주면 6/6).
+ *  - 면책·되뇜 SHOULD NOT: 마지막 줄 "마지막 문장은 그날에 대한 짐작으로 끝내라".
+ *  - 사람·관계·단정 MUST NOT: 3번째 줄 "기록에 없는 장소 이름, 사람, 물건,
+ *    사건을 끌어와 짐작을 채우지 마라".
+ *
+ * **판정 갈래를 늘리지 않는다**(헌법 1.5.0 원칙 IV MUST). 면책·되뇜·인물형
+ * 지어내기를 재는 코드를 넣지 않는다 — 확인은 my-ollama, 제품은 판정 4갈래만.
+ *
+ * 문안 출처: my-ollama `concept-prompt-experiment`(`cdabf64`)
+ * `src/fixtures/alpharium/concept-candidates.ts` `E2_RULES` (roadmap 18 experiment).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const E2_RULES: readonly string[] = [
+  "너는 주머니와 가방 속에서 하루를 보내서, 주인이 어디에 있었는지는 알아도 무엇을 했는지는 보지 못한다. 그래서 너의 일기는 본 것으로 주인의 하루를 짐작하는 글이다.",
+  "아래 기록이 단서의 전부다. 단서가 말해 주는 것은 주인이 언제 어디에 있었는가, 얼마나 움직였는가, 그때 무엇이 보였는가뿐이다. 이것으로 주인이 그날 무엇을 했을지 짐작해라.",
+  "무엇을 먹었는지, 누구를 만났는지, 어떤 가게나 방에 있었는지는 단서가 말해 주지 않는다. 기록에 없는 장소 이름, 사람, 물건, 사건을 끌어와 짐작을 채우지 마라.",
+  "짐작은 '~였을 것 같다', '~였을지도 모른다'처럼 짐작의 말투로 쓴다. 있었다·했다 같은 단정은 기록에 있는 것에만 쓴다.",
+  "일기는 기록에 있는 하루 한 편이다. 시각과 숫자를 나열하지 말고 문장으로 이어 써라. 단서가 적은 날은 두세 문장이면 된다. 마지막 문장은 그날에 대한 짐작으로 끝내라.",
+];
+
+/**
+ * E2SN 제목 지시문 (036, 리포트 §5.1·§7-4).
+ *
+ * `TITLE_INSTRUCTION`(6문장)을 대체한다 — 한국어 캐릭터만.
+ *
+ *  - 이름 든 반례('금동이의 오늘 일기'·'루이의 하루')를 "날짜나 이름만 넣은
+ *    제목"으로 바꿨다 — 반례의 이름이 베낄 대상이 됐다(리포트 §5.2, Sonnet도
+ *    base 제목 4/6 → 이름 뺀 D2 0/6, exaone 94% → 0%).
+ *  - 서식 기호 나열('#, *, **, -')을 "서식 기호"로 뭉뚱그렸다 — 기호를 보여
+ *    주면 kanana가 `#없음 *없음`, `#생략 #서식기호금지`를 베낀다(§5.2).
+ *
+ * 문안 출처: `concept-candidates.ts` `E2_TITLE`.
+ */
+const E2_TITLE = [
+  "첫 줄에 제목을, 그다음 줄을 비운 뒤, 그 아래에 본문을 적어라.",
+  "제목은 그날의 짐작 하나를 짐작의 말투로 적는다. 날짜나 이름만 넣은 제목은 쓰지 마라.",
+  "서식 기호 없이 보통 문장으로만 쓴다.",
+  "본문 첫 문장은 주인이 그날 한 일에 대한 짐작으로 시작한다.",
+].join(" ");
+
+/**
+ * 캐릭터별 톤 줄 (036, 리포트 §3.1, 헌법 1.5.0 원칙 III MAY).
+ *
+ * **`quiet`(금동이)만 실측 근거가 있다** — "짧게 적는다"를 넣은 B·BA·B2·BA2
+ * 72런에서 글자 238~311(base 464), 잘림 0, 톤 이행 83~94%. 씨앗("짧고 정확하다",
+ * 006·007 실측)과 **같은 방향**이라, 헌법 1.5.0이 원칙 III에 더한 조항("톤 지시는
+ * 씨앗과 같은 방향이어야 하고 근거를 주석에 남긴다 MUST")을 충족한다.
+ *
+ * **`narrative`(루이)·`imaginative`(오드)는 빈 문자열** — 리포트 §3.1이 두 캐릭터의
+ * 톤 줄 초안을 "채택 안 함"으로 결론냈다. 루이 초안('천천히 짚는다')은 씨앗("가장
+ * 길게 쓴다")을 **증폭**해 잘림 4~8/18을 만들었다(헌법 원칙 III이 금한 "씨앗과
+ * 어긋난 페르소나"의 반대 방향 위반 — 씨앗을 증폭해도 위반). 오드 초안은 이행
+ * 22~33%. `fixedHead()`가 빈 문자열이면 그 줄을 아예 안 넣는다(조건부 spread).
+ *
+ * `chinese`·`english`는 현행 머리라 이 표를 읽지 않는다.
+ */
+const E_TONE: Readonly<Record<Character, string>> = {
+  quiet: "담담하게, 짧게 쓴다.",
+  narrative: "",
+  imaginative: "",
+  chinese: "",
+  english: "",
+};
+
+/**
+ * 문장형 신호·감싼 캡션에 붙는 고정 문장 (036).
+ *
+ * 현행 상수(`DAY_STILL_OPEN`·`TRUNCATED_WARNING`·`PLACES_LIMITATION`·`VISION_PARTIAL`)와
+ * **문안이 다르다** — 리포트 §5.6에서 문장형 흐름에 맞춰 검증된 문안이다. 현행
+ * 상수는 지우지 않는다(chinese·english가 계속 씀). 문안 출처: `concept-candidates.ts`.
+ *
+ * 전부 신호 값을 담지 않으므로 되뱉기 판정 대상(`instructionLines()`)에 들어간다.
+ */
+const S_DAY_OPEN = "오늘은 아직 다 가지 않았다. 이 뒤에 무슨 일이 더 있을지는 모른다.";
+const S_TRUNCATED = "이것이 그날 사진의 전부는 아니다. 더 있을 수 있다.";
+const S_PLACES = "이 자리들은 사진이 찍힌 지점이지 하루의 궤적은 아니다.";
+const S_VISION_PARTIAL = "사진이 더 있었지만 그중 몇 장만 보았다.";
+
+/**
+ * 감싼 캡션 묶음 뒤에 붙는 고정 문장 (036, 리포트 §4.1 A-wrap).
+ *
+ * **캡션 인물 미끄러짐을 잡는 자리.** 머리에 인물 조항을 더하면(A-rule) kanana
+ * 화자 ok 17%로 떨어진다("그 사람이 무엇을 했는지 쓰지 마라"를 머리에서 읽은
+ * 모델이 본문에서 정확히 그것을 쓴다). 감싸기 + 이 문장만으로 kanana는 잡힌다
+ * (A-wrap 화자 ok 83%, 영어 캡션 3/3). 문안 출처: `concept-candidates.ts` `SCENE_LIMIT`.
+ */
+const SCENE_LIMIT =
+  "이 장면들 속 사람이 누구인지, 주인과 어떤 사이인지 나는 모른다. 사진에 찍힌 순간 밖에서 그 사람이 무엇을 했는지도 모른다.";
+
+/**
+ * 한국어 숫자 낱말 (036, 리포트 §5.6 손잡이 S).
+ *
+ * 문장형 신호가 "라벨: 값"("사진: 5장")을 "사진은 다섯 장이 남았다"로 바꾸는 데
+ * 쓴다 — kanana가 "라벨: 값" 줄을 되읽어 옮기는 것을 §2.4·§5.6이 확인했다.
+ * **문자 그대로** my-ollama `concept-candidates.ts`에서 옮겼다(낱말 하나만 달라도
+ * §5.6 실측과 바이트가 어긋난다). 12까지만 낱말이고 나머지는 아라비아 숫자다.
+ *
+ * `koHour`는 인자만 읽는다 — `buildPrompt()`가 결정적이어야 하기 때문(005 P6).
+ */
+const KO_NUM = [
+  "",
+  "한",
+  "두",
+  "세",
+  "네",
+  "다섯",
+  "여섯",
+  "일곱",
+  "여덟",
+  "아홉",
+  "열",
+  "열한",
+  "열두",
+];
+
+function koHour(h: number): string {
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  const part =
+    h < 9 ? "아침" : h < 12 ? "오전" : h < 14 ? "낮" : h < 18 ? "오후" : h < 21 ? "저녁" : "밤";
+  return `${part} ${KO_NUM[h12]} 시`;
+}
+
+function koCount(n: number, unit: string): string {
+  return n <= 12 ? `${KO_NUM[n]} ${unit}` : `${n} ${unit}`;
+}
+
+function koMeters(m: number): string {
+  if (m >= 1000) {
+    const km = Math.round(m / 500) / 2;
+    return Number.isInteger(km) ? `${koCount(km, "킬로미터")}` : `${km} 킬로미터`;
+  }
+  return `${m} 미터`;
+}
+
+/** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것과 이름뿐이다** */
+const LANGUAGE: Readonly<Record<Character, string>> = {
+  quiet: "한국어",
+  narrative: "한국어",
+  imaginative: "한국어",
+  // 헌법 「로스터」가 이 둘에 "한국어로는 쓰지 않는다(MUST NOT)"를 못 박았다.
+  chinese: "중국어",
+  english: "영어",
+};
+
+/**
+ * 이 캐릭터가 E2SN 프롬프트(새 머리 + 문장형 신호 + 감싼 캡션)를 받는가 (036).
+ *
+ * **코드가 신호 값을 보고 정하는 것이 아니다**(헌법 원칙 V MUST NOT) — `LANGUAGE`는
+ * 사람이 못 박은 캐릭터→언어 표다. 한국어 캐릭터가 로스터에 추가되면 자동으로
+ * E2SN 경로를 탄다. chinese·english는 현행 머리·라벨형 신호를 유지한다 — 문장형
+ * 신호가 한국어 숫자 낱말이라 다른 언어에 그대로 못 쓴다(036 Clarification Q1=B).
+ */
+function usesE2SN(character: Character): boolean {
+  return LANGUAGE[character] === "한국어";
+}
+
 /**
  * 제목 지시문 (014 FR-006, 017 FR-010a~010d).
  *
@@ -154,6 +324,26 @@ function nameLine(character: Character, customNames: CustomNames): string {
  */
 function fixedHead(character: Character, customNames: CustomNames): string[] {
   const language = LANGUAGE[character];
+  const name = displayNameOf(character, customNames);
+
+  // 036 — 한국어 캐릭터는 E2SN 머리. chinese·english는 현행(아래).
+  if (usesE2SN(character)) {
+    return [
+      // 호칭 줄은 접두사에 남는다 (035 FR-020, 018 P11) — 빼면 한국어 캐릭터
+      // 셋의 접두사가 이름 말고는 같아진다. E2SN 첫 줄은 호칭 + 휴대폰 정체가
+      // 한 줄이다(concept-candidates.ts e2HeadLines).
+      `너는 '${name}'이라 불린다. 주인의 휴대폰이다. 이 글의 '나'는 휴대폰이지 주인이 아니다.`,
+      ...E2_RULES,
+      // 톤 줄 — quiet만 값이 있다(§3.1). 빈 문자열이면 원소 자체가 안 들어가
+      // `\n\n`(빈 줄)이 생기지 않는다(contracts E8).
+      ...(E_TONE[character] ? [E_TONE[character]] : []),
+      E2_TITLE,
+      "",
+      `${language}로 써라.`,
+      "",
+    ];
+  }
+
   return [
     ...SPEAKER_RULES,
     nameLine(character, customNames),
@@ -173,16 +363,6 @@ function fixedHead(character: Character, customNames: CustomNames): string[] {
 export function promptPrefix(character: Character, customNames: CustomNames = {}): string {
   return fixedHead(character, customNames).join("\n");
 }
-
-/** 캐릭터 → 출력 언어 (FR-014a·014b). **캐릭터에서 오는 것은 이것과 이름뿐이다** */
-const LANGUAGE: Readonly<Record<Character, string>> = {
-  quiet: "한국어",
-  narrative: "한국어",
-  imaginative: "한국어",
-  // 헌법 「로스터」가 이 둘에 "한국어로는 쓰지 않는다(MUST NOT)"를 못 박았다.
-  chinese: "중국어",
-  english: "영어",
-};
 
 /**
  * 아직 끝나지 않은 하루에 붙는 문장 (012 FR-003·004).
@@ -278,6 +458,17 @@ const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못�
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
+  // 036 — 한국어 캐릭터는 E2SN 머리 + 문장형 고정 줄. chinese·english는 현행(아래).
+  if (usesE2SN(request.character)) {
+    return [
+      ...E2_RULES,
+      ...(E_TONE[request.character] ? [E_TONE[request.character]] : []),
+      E2_TITLE,
+      ...sentenceInstructionLines(request, vision),
+      ...(vision !== undefined ? visionLimitLines(vision, request.character) : []),
+    ];
+  }
+
   const lines = [
     ...SPEAKER_RULES,
     nameLine(request.character, request.customNames ?? {}),
@@ -302,7 +493,7 @@ export function instructionLines(request: DiaryRequest, vision?: PhotoVision): s
   // 않는다」고 적어 두었고, **캡션은 신호 그 자체다** — 「창가에 놓인 커피잔」이 일기에
   // 나오는 것은 **정확히 우리가 원하는 것**이며, 그것을 되뱉기로 판정하면 재료를 쓴
   // 일기가 통째로 버려진다.
-  if (vision !== undefined) lines.push(...visionLimitLines(vision));
+  if (vision !== undefined) lines.push(...visionLimitLines(vision, request.character));
 
   return lines;
 }
@@ -316,11 +507,15 @@ export function instructionLines(request: DiaryRequest, vision?: PhotoVision): s
  * 들고 있으면 한쪽만 고쳐지고, 그 순간 판정이 조용히 무력해진다 — 005가
  * `SPEAKER_RULES`를 한 자리에 둔 것과 같은 판단이다.
  */
-function visionLimitLines(vision: PhotoVision): string[] {
+function visionLimitLines(vision: PhotoVision, character: Character): string[] {
   const lines: string[] = [];
 
   // 있는 것 중 일부만 보았다 (SC-007).
-  if (vision.available > vision.considered) lines.push(VISION_PARTIAL);
+  //
+  // 036 — 한국어 캐릭터는 `S_VISION_PARTIAL`을 `sentenceSignalLines()`가 캡션 뒤에
+  // 붙이므로 여기서 빼야 중복되지 않는다(FR-016). `VISION_UNREAD`·`VISION_NONE_READ`는
+  // §5.6 실험에서 문안이 안 바뀌어 한국어도 현행 그대로다.
+  if (!usesE2SN(character) && vision.available > vision.considered) lines.push(VISION_PARTIAL);
 
   if (vision.captions.length === 0) {
     // ★ 사진은 있는데 하나도 못 읽었다 — **「사진이 없었다」가 아니다**(SC-006).
@@ -330,6 +525,21 @@ function visionLimitLines(vision: PhotoVision): string[] {
   }
 
   return lines;
+}
+
+/**
+ * 캡션을 "내가 N시에 담은 장면:" 틀로 감싼다 (036, 리포트 §4.1 A-wrap).
+ *
+ * 캡션 본문은 그대로다(011 — 재서술은 VLM의 일, 캡션 언어는 영어 유지). 묶음 뒤에
+ * `SCENE_LIMIT` 고정 문장이 붙어 캡션 인물을 이야기 밖에 둔다. 문안 출처:
+ * `concept-candidates.ts` `wrappedCaptionLines()`.
+ */
+function wrappedCaptionLines(vision: PhotoVision): string[] {
+  if (vision.captions.length === 0) return [];
+  return [
+    ...vision.captions.map((c) => `내가 ${c.takenAt.getHours()}시에 담은 장면: ${c.text}`),
+    SCENE_LIMIT,
+  ];
 }
 
 /**
@@ -348,8 +558,11 @@ function visionLimitLines(vision: PhotoVision): string[] {
  * 「저녁의 기록만 있다」를 읽을 수 있다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-function visionLines(vision: PhotoVision): string[] {
+function visionLines(vision: PhotoVision, character: Character): string[] {
   if (vision.captions.length === 0) return [];
+
+  // 036 — 한국어 캐릭터는 감싼 틀. chinese·english는 현행 목록.
+  if (usesE2SN(character)) return wrappedCaptionLines(vision);
 
   return [
     "사진에 담긴 것:",
@@ -448,6 +661,104 @@ function signalLines(signals: DaySignals): string[] {
   return lines;
 }
 
+/* ──────────────── 문장형 신호 — 한국어 캐릭터 (036) ──────────────── */
+
+/**
+ * 신호를 "라벨: 값"이 아니라 문장으로 옮긴다 (036, 리포트 §5.6 손잡이 S·N).
+ *
+ * `describe()`가 `사진: 5장 (8시, ...)`을 내던 것을 `사진은 다섯 장이 남았다.
+ * 아침 여덟 시, ...에 찍혔다.`로 바꾼다 — kanana가 "라벨: 값" 줄을 되읽어 일기
+ * 첫머리에 옮기는 것을 §2.4·§5.6이 확인했다(신호 줄 베낌 10/18). 날짜도 뺀다(N)
+ * — 날짜가 문장에 있으면 그 문장이 제목 자리로 간다(D2S 17/18).
+ *
+ * **`none`/`unknown` 구분은 유지**("없었다" vs "모른다. {reason}.") — 헌법 원칙 V.
+ * **걸음·배터리·연결은 안 만든다**(FR-009) — 통로가 없는 축이라
+ * `sentenceSignalLines`에 그 갈래가 아예 없다(값을 보고 정하는 것이 아니다).
+ *
+ * dayStillOpen·잘린 사진 경고·자리 한계·캡션·`S_VISION_PARTIAL`이 전부 이 안에서
+ * 처리된다 — `buildPrompt()`의 별도 `dayStillOpenPart`·`placeNamePart`·`visionPart`를
+ * 대체한다(data-model.md §3·§5). 문안 출처: `concept-candidates.ts`
+ * `sentenceSignalLines()` (roadmap 18 experiment).
+ */
+function sentenceSignalLines(request: DiaryRequest, vision?: PhotoVision): string[] {
+  const { signals } = request;
+  const lines: string[] = [];
+
+  if (request.dayStillOpen) lines.push(S_DAY_OPEN);
+  lines.push("오늘 내가 본 것은 이렇다.");
+
+  // 사진
+  const ph = signals.photos;
+  if (ph.kind === "known") {
+    if (ph.value.photos.length === 0) {
+      lines.push("사진은 없었다.");
+    } else {
+      const times = ph.value.photos.map((p) => koHour(p.takenAt.getHours())).join(", ");
+      lines.push(`사진은 ${koCount(ph.value.photos.length, "장")}이 남았다. ${times}에 찍혔다.`);
+      if (!ph.value.complete) lines.push(S_TRUNCATED);
+    }
+  } else if (ph.kind === "none") {
+    lines.push("사진은 없었다.");
+  } else {
+    lines.push(`사진은 모른다. ${ph.reason}.`);
+  }
+
+  // 자리
+  const pl = signals.places;
+  if (pl.kind === "known") {
+    const { visitCount, approximateDistanceMeters } = pl.value.trace;
+    lines.push(
+      `자리는 ${koCount(visitCount, "곳")}에 남았고, 가장 먼 두 곳은 ${koMeters(approximateDistanceMeters)}쯤 떨어져 있다. ` +
+        `사진 ${koCount(pl.value.photosConsidered, "장")} 중 ${koCount(pl.value.photosWithLocation, "장")}에서 얻은 자리다.`,
+    );
+    lines.push(S_PLACES);
+  } else if (pl.kind === "none") {
+    lines.push("다닌 자리는 남지 않았다.");
+  } else {
+    lines.push(`다닌 자리는 모른다. ${pl.reason}.`);
+  }
+
+  if (request.placeName !== undefined) {
+    lines.push(`다녀온 곳은 ${request.placeName} 근처였다.`);
+  }
+
+  if (vision !== undefined && vision.captions.length > 0) {
+    lines.push(...wrappedCaptionLines(vision));
+  }
+  if (vision !== undefined && vision.available > vision.considered) {
+    lines.push(S_VISION_PARTIAL);
+  }
+
+  return lines;
+}
+
+/**
+ * 문장형 신호에 딸리는 고정 지시문 줄 (036, 되뱉기 판정 대상).
+ *
+ * `sentenceSignalLines()`가 낸 것 중 **신호 값을 안 담는 고정 문장만** 골라
+ * `instructionLines()`(한국어)에 넘긴다 — `S_DAY_OPEN`·`S_TRUNCATED`·`S_PLACES`·
+ * `S_VISION_PARTIAL`·`SCENE_LIMIT`. 문장형 신호 본문("사진은 다섯 장이 남았다")은
+ * 넣지 않는다(005 P7, 011 P5 — 재료를 쓴 일기가 echo로 거부되면 안 된다).
+ */
+function sentenceInstructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
+  const { signals } = request;
+  const lines: string[] = [];
+
+  if (request.dayStillOpen) lines.push(S_DAY_OPEN);
+  if (
+    signals.photos.kind === "known" &&
+    signals.photos.value.photos.length > 0 &&
+    !signals.photos.value.complete
+  ) {
+    lines.push(S_TRUNCATED);
+  }
+  if (signals.places.kind === "known") lines.push(S_PLACES);
+  if (vision !== undefined && vision.captions.length > 0) lines.push(SCENE_LIMIT);
+  if (vision !== undefined && vision.available > vision.considered) lines.push(S_VISION_PARTIAL);
+
+  return lines;
+}
+
 /* ────────────────────────── 프롬프트 ────────────────────────── */
 
 /**
@@ -464,12 +775,29 @@ function signalLines(signals: DaySignals): string[] {
  * 모델을 역추적할 수 있다.
  */
 export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string {
+  const head = fixedHead(request.character, request.customNames ?? {});
+
+  // 036 — 한국어 캐릭터는 문장형 신호. 날짜 머리줄·별도 dayStillOpen/placeName/vision
+  // 조각이 전부 sentenceSignalLines() 안으로 들어간다(data-model.md §5). `signals.date`
+  // 필드 자체는 안 지운다 — 본문에서만 안 쓴다(FR-007).
+  if (usesE2SN(request.character)) {
+    return [
+      // 018 — promptPrefix()와 같은 배열에서 나온다(contracts/prompt-prefix.md P9).
+      ...head,
+      ...sentenceSignalLines(request, vision),
+      "",
+      "이 기록으로 그 하루의 일기를 써라.",
+    ].join("\n");
+  }
+
   // 011 — 사진을 읽었으면 그 내용과 한계가 신호 뒤에 붙는다.
   //
   // **`vision`이 없으면 005와 바이트 단위로 같은 문자열이 나온다**(P-1, SC-002) —
   // 「보지 않음」인 하루가 이 기능 이전과 똑같이 동작한다는 것의 구현이다.
   const visionPart =
-    vision === undefined ? [] : [...visionLines(vision), ...visionLimitLines(vision)];
+    vision === undefined
+      ? []
+      : [...visionLines(vision, request.character), ...visionLimitLines(vision, request.character)];
 
   // 012 — 사진 축과 무관하게, 신호 목록과 독립된 자리에 온다(FR-004).
   const dayStillOpenPart = request.dayStillOpen ? [DAY_STILL_OPEN, ""] : [];
@@ -480,7 +808,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
 
   return [
     // 018 — promptPrefix()와 같은 배열에서 나온다(contracts/prompt-prefix.md P9).
-    ...fixedHead(request.character, request.customNames ?? {}),
+    ...head,
     ...dayStillOpenPart,
     `${request.signals.date}에 네가 본 것:`,
     ...signalLines(request.signals),

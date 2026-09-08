@@ -155,7 +155,73 @@
 - **의심 지점**: 증상 4번(생성은 끝나는데 저장이 안 됨)이고 메시지가 `describeFailure()`의 "다시 시도해 볼 만하다"류 → 세 갈래 중 하나: (a) `rejected` — `acceptance.ts` 4갈래(`empty`/`echo`/`language`/`unfinished`) 중 하나에 걸림. **`isWrongLanguage`가 유력** — 샤오바이는 중국어, 모카는 한국어가 아닌 언어로 써야 하는데 판정이 언어를 잘못 보거나 모델이 엉뚱한 언어를 냄. (b) `timed-out` — `GENERATION_TIMEOUT_MS`(180초, `engine.run()` 구간) 초과. (c) `generation-failed` — 추론 자체 실패. **024 §10의 EXAONE mojibake와 같은 계열(GGUF 인코딩)일 가능성** — qwen3·gemma3 Q4_K_M + `llama.rn` 조합에서 출력이 깨지면 `judge()`가 `language`/`empty`로 거부할 수 있다.
 - **다음 세션 할 일**: `adb logcat`(`ReactNativeJS`·`llama` 태그)을 걸고 샤오바이/모카로 "보지 않음" 설정 생성 → 실패 갈래(`rejected: <why>` / `timed-out` / `generation-failed`)를 로그에서 확인 → 저장된(거부된) 본문을 `stopCompletion` 없이 캡처해 mojibake 여부 확인. 결과에 따라 14번(서술형 모델 재검토)과 병합하거나 `acceptance.ts` 언어 판정을 고친다. **판정 갈래는 늘리지 않는다**(헌법 원칙 IV — `REJECT_REASONS` 4개 고정).
 
-### 18. 입력 프롬프트 텍스트 최적화 — 🔄 진행 중, 14번과 합류 (2026-09-03)
+### 18. 입력 프롬프트 텍스트 최적화 — ✅ 036에서 구현 (2026-09-08, 실기기 검증 완료)
+
+- **구현 결과 (036)**: my-ollama 실험 리포트(kanana 1,242런 + Haiku·Sonnet·Opus
+  기준선 136편, `docs/superpowers/specs/2026-09-07-diary-concept-prompt-experiment-report.md`)의
+  결정 12를 저장소 소유자가 **E2SN 채택**으로 정했다.
+  - **헌법 1.5.0 선행 커밋**(`5a061b6`, 코드보다 먼저). 원칙 II에 「화자는 본 것으로
+    주인의 하루를 짐작한다」 조항 추가: 짐작 MAY(짐작의 말투로), 면책·되뇜 SHOULD NOT,
+    **기록에 없는 사람·관계·사물·장면을 만들거나 짐작 어미 없이 단언하는 것은 MUST NOT**.
+    프롬프트에서 "모른다고 쓴 일기가 지어낸 일기보다 낫다"와 예시 나열을 뺀다(면책
+    문단을 만들었다, 리포트 §5.4·§5.6). 원칙 V에 일기 끝을 면책으로 맺는 것이 소음의
+    전형이라는 SHOULD NOT 한 줄. 로스터 kanana 항에 §5.5 관측(짐작 중심 머리를 주면
+    단서 무관한 일상 틀로 채운다).
+  - **`src/diary/prompt.ts` 세 자리** — `LANGUAGE[character] === "한국어"`로 분기해
+    **한국어 캐릭터(quiet·narrative·imaginative)만** E2SN, chinese·english는 현행 유지
+    (036 Clarification Q1=B):
+    1. **새 머리** — `SPEAKER_RULES`(8줄) → `E2_RULES`(5줄), `TITLE_INSTRUCTION`(6문장)
+       → `E2_TITLE`(4문장, 이름 든 반례·기호 나열 제거), 톤 줄은 **금동이만**
+       (`E_TONE.quiet` = "담담하게, 짧게 쓴다.", 조건부 spread — narrative·imaginative는
+       빈 문자열이라 줄이 안 붙음, §3.1 "채택 안 함"). 호칭 줄은 접두사에 유지
+       (`displayNameOf`, 035 FR-020 / 018 P11).
+    2. **문장형 신호 + 날짜 삭제** — `sentenceSignalLines()` 신규. "사진: 5장" →
+       "사진은 다섯 장이 남았다. 아침 여덟 시, …에 찍혔다." (한국어 숫자 낱말
+       `koHour`/`koCount`/`koMeters`). `buildPrompt()`의 날짜 머리줄(`${date}에 네가
+       본 것:`) 삭제 — `signals.date` 필드는 유지, 본문에서만 안 씀(FR-007). `none`/
+       `unknown` 구분 유지, 통로 없는 축 제외 유지.
+    3. **캡션 감싸기** — `wrappedCaptionLines()` 신규. "사진에 담긴 것:" 목록 →
+       "내가 N시에 담은 장면: {캡션}" + `SCENE_LIMIT` 고정 줄. A-rule(머리 인물 조항)
+       기각 — kanana 화자 ok 17%로 떨어진다(§4.1). VLM·캡션 언어(영어) 무변경.
+  - **판정 4갈래 불변** — `acceptance.ts`·`llama-port.ts` diff 0줄. 면책·되뇜·인물형
+    지어내기를 재는 코드 없음(원칙 IV). 꼬리에 제목 규칙(T 손잡이) 안 붙임 — kanana가
+    지시문을 베낀다(§5.6).
+  - **바이트 일치 확인** — my-ollama `scripts/concept-prompt/gen-baseline.ts`가 036
+    `prompt.ts`를 직접 import해 뽑은 30프롬프트를 `verify-036.mjs`가 대조: **세 한국어
+    캐릭터 × 6케이스 = 18프롬프트가 `buildCandidate('E2SN', …)` 조립과 바이트 일치**
+    (SC-001), **chinese·english × 6 = 12는 구현 전과 동일**(SC-001a, 회귀 없음). 18프롬프트
+    전문은 `specs/036-diary-concept-prompt/logs/e2sn-prompts.txt`. (Windows에서
+    `gen-baseline.ts`의 동적 import를 `pathToFileURL`로 고쳐 my-ollama에 커밋 —
+    리포트는 macOS에서 작성돼 안 드러났던 결함.)
+  - **기기 없는 테스트 2626개 통과**, lint(eslint 0 error·tsc·헌법 검사 위반 0·prettier)
+    클린. `prompt.test.ts` 회귀는 언어 분기에 맞춰 갱신(현행 문안·라벨형 신호·목록형
+    캡션 검사는 `chinese`로 재타깃, E2SN 계약은 신규 `prompt-e2sn.test.ts` 32개가 잠금).
+    `prompt-preview.test.ts`(035)·`generate.test.ts`(011)도 갱신. Maestro
+    `prompt-preview.yml`의 `사진: 2장` assert를 `사진은 두 장이 남았다`로 갱신.
+  - **✅ 실기기 검증 완료**(2026-09-08, SM-S901N/Galaxy S22, Android, dev debug —
+    `specs/036-diary-concept-prompt/logs/device-session-2026-09-08.md`). Metro
+    `--clear` 필요(첫 시도에 스테일 번들이 옛 프롬프트 렌더). 개발자 탭 프롬프트
+    미리보기가 E2SN 확인(신호 없음 844자, `logs/e2sn-prompts.txt`와 일치).
+    - **SC-004**(금동이 6편, 사진 없는 날 3 + 있는 날 3 seed): 면책 문단으로 안
+      끝남 **5/6**. #5(09-07 사진 3장)만 "먹었거나 만났는지는 기록에 없으므로 알 수
+      없다"로 끝남 — 리포트 §5.6 "E2SN 끝 문단 면책 2/18" 예측과 일치(제로 아님).
+      현행 base(4/16)·BA(8/16) 대비 크게 줄었다. `unfinished`·`echo` 거부 0편.
+    - **SC-005**(짐작 어미 없는 인물형 지어내기 0편): 명명된 사람·단정된 관계
+      **0편**. 헤지된 "친구/가족" 언급(#4·#5·#6, 활동 예시로 짐작 어미와 함께)은
+      §7-12가 예고한 "셋 중 하나꼴 사람·관계"이나 단정형 아님. 사진 없는 날의
+      단정형 장소·시각 추측(#2·#3)은 헌법 1.5.0 용인 범위.
+    - **SC-007**(writingMs): 사진 없는 날 19~22초(024 base 콜드 54초 대비 감소),
+      사진 있는 날 VLM 포함 31~45초. 회귀 없음.
+    - **캡션 미끄러짐**(원칙 II): `SCENE_LIMIT`으로 3편(캡션 3~19장) 전부 사진 속
+      인물이 등장인물이 안 됨. base 관측 "여성/그녀" 3인칭 미끄러짐 없음.
+    - **T039 Maestro**: `prompt-preview.yml`(D1 assert `너는 주인의 휴대폰이다` →
+      `주인의 휴대폰이다` + `본 것으로 주인의 하루를 짐작하는 글이다` 갱신)·
+      `diary-user-path.yml`·`generate-diary.yml` 3흐름 PASS.
+    - **SC-004a(루이·오드) 미수행** — `a2`/`a3` 모델 파일 기기 부재(~2.4GB). E2SN
+      머리는 세 한국어 캐릭터에 적용되나(계약 테스트·바이트 대조로 확인) 두
+      캐릭터의 짐작 중심 머리 실측은 **로드맵 14번 세션으로 이관**. 리포트 §5.5는
+      kanana만 실측.
+    - release 재확인 생략(012 — 새 네이티브 모듈·빌드 설정 없음).
 
 - **배경** (2026-09-01, 사용자 지적: "프롬프트가 상당히 길고 중구난방"): 확인 결과 **아키텍처는 이미 옳다** — `buildPrompt()` 하나가 유일한 통과 지점(헌법 원칙 II), `messages` 배열·채팅 템플릿 없이 **5개 모델에 바이트 단위로 같은 형태의 평문 하나**를 넘긴다(005 research.md §4). 캐릭터에서 오는 차이는 이름 한 줄(`너는 '금동이'이라 불린다.`)과 출력 언어 한 줄(`한국어로 써라.`)뿐. **따라서 "단일화"는 이미 됐고 남은 것은 텍스트 자체의 압축이다.**
 - **문제**: `SPEAKER_RULES`·`TITLE_INSTRUCTION`·사진 한계 문구들이 005~017에 걸쳐 실기기 위반을 볼 때마다 덧붙어 누적됐다:
