@@ -29,6 +29,7 @@
 - [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: 근본 원인 정정[force-dark 반전 아님, `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`], photo-location: 판정 불가능한 단계라 온보딩에서 제거. One UI 8.5 실기기 debug 검증. 목록·상세·설정·개발자 탭·release·S22는 다음 세션[`tasks.md` T037])
 - [~] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (033에서 구현 — 아래 상세 참조)
 - [x] **엔드유저 화면 전체를 NativeWind/토큰으로 이관** (034 — `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection` 4개 이관, `App.tsx` 설정 탭 여백 1곳. `Card`·`SectionHeader` 첫 실사용. 실기기 debug 검증·PR #51 머지 완료. `AutoDiaryTriggerButton`·`PermissionPanel`은 개발자 탭 전용이라 범위 밖)
+- [ ] **완성된 일기 첫 표시를 타자기 연출로** (생성 직후 `written` 화면에서 제목+본문이 글자 단위로 흐른다. 화면 탭 시 즉시 전체. 이미 저장·판정 통과한 본문이므로 "생성 중인 글 미노출"[005 FR-028b]과 무관 — 다만 실시간 생성처럼 보이면 안 됨. 아래 23번 상세)
 
 ---
 
@@ -339,3 +340,63 @@
     제목 `variant="title"` 중앙 정렬, 본문 `variant="body"`+opacity 0.8. 환경 변수
     이름·"다시 시도" 문구·모델 식별자 0건(원칙 III·S10). 검증 후 dev 환경 복원.
   - **release 재확인 불필요**(새 네이티브 모듈 0 — 012).
+
+### 23. 완성된 일기 첫 표시를 타자기 연출로
+
+- **배경** (2026-09-08 사용자 제안): 지금은 "일기 쓰기"를 누르면 회전 표시 +
+  독백 한 줄(`writing` 화면)만 보다가, 완성되면 `written` 화면에서 일기 **전체가
+  한 번에** 나타난다(`DiaryHomeScreen`의 `written` 케이스 → `DiaryDetailScreen`).
+  사용자는 그 첫 표시를, 완성된 본문이 **타자기처럼 글자 단위로 흐르는** 연출로
+  바꾸고 싶다("클로드 코드가 답을 글자씩 흘려보내는 것처럼"). "완성의 순간"을
+  느끼게 하는 것이 목적.
+- **헌법 관계** — **금지 대상 아님.** 원칙이 막는 것은 *생성 중인 글*을 보여주는
+  것(005 FR-028b — 토큰 콜백을 `completion()`에 아예 안 넘긴다)이다. 이 연출은
+  이미 **생성 완료·4갈래 판정 통과·저장까지 끝난** 본문 문자열을 자르는 것이라
+  그 금지에 해당하지 않는다. **다만 톤 위험**: 타자기가 "실시간으로 쓰는 중"처럼
+  *보이면* 015·016이 반복 확인한 "생성 중엔 회전 표시만" 경계를 화면상 흐린다 —
+  `writing`(회전 표시)과 `written`(저장된 본문 타이핑)이 명확히 다른 상태임을
+  유지한다. 새 헌법 검사 규칙은 불필요하나 이 위험을 설계 문서에 명시한다.
+- **결정된 사항** (2026-09-08 브레인스토밍):
+  1. **연출 방식** — 타자기(글자가 하나씩 흐름). 문단 페이드인·전체 슬라이드인
+     아님.
+  2. **흘릴 범위** — 제목 + 본문. 제목이 먼저 타이핑되고 이어서 본문. 그 아래
+     "이 일기가 본 것"(사진·장소명·소요 시간, 017)과 사진 슬라이더·갤러리(025)는
+     본문 타이핑이 끝난 뒤 나타난다.
+  3. **속도** — 글자당 ~15ms(빠름, "기다림"보다 "드러남"). `tokens.ts` 상수 한
+     곳에 두고 나중에 조정 가능.
+  4. **건너뛰기** — 화면 아무 곳이나 탭하면 즉시 전체 표시 + 하단 절 등장.
+  5. **완료 후** — 그 자리가 **그대로 상세 화면**이 된다. 별도 화면 전환 없음.
+  6. **노출 시점** — **생성 직후 첫 표시(`written` 케이스)만.** 나중에 목록에서
+     그 일기를 다시 열면(`detail` 케이스) 즉시 전체. 재생 안 됨.
+- **접근** (A안 채택):
+  - **A. `written` 케이스에서 `DiaryDetailScreen`이 타이핑 상태를 prop으로
+    받는다** — `<DiaryDetailScreen reveal ... />`. `reveal`이 있으면 제목→본문을
+    점진 노출, 끝나면 로컬 state `revealDone`으로 하단 절 렌더. `reveal`이 없으면
+    (목록에서 연 `detail` 케이스) 지금과 100% 동일. 화면 전환 없음 → "그 자리가
+    그대로 상세"에 정확히 맞음. `src/ui/` 안에서 완결(025 갤러리와 같은 성격).
+  - B. `written`을 별도 `DiaryRevealScreen`으로 분리 — 화면 전환이 한 번 생기고
+    상세 렌더 로직을 두 곳에서 관리. 기각.
+  - C. `App.tsx` 레벨 애니메이션 래퍼 — 과함. `written` 상태 하나에만 필요. 기각.
+- **새 컴포넌트** — `src/ui/components/TypewriterText.tsx`. 순수 표시. 완성
+  문자열을 받아 `Array.from(text)`(서로게이트·이모지·한글 완성 글자 단위 안전)로
+  잘라 `useEffect` 타이머로 점진 노출. `skipToEnd` prop이 참이 되면 즉시 전체 +
+  `onDone` 1회. `text` 교체 시 처음부터. 언마운트 시 타이머 정리. **reanimated
+  불필요** — 투명도 전환이 아니라 문자열 슬라이스라 `setState`로 충분.
+- **경계** — `src/diary/`·`src/inference/`·`src/vision/` 무변경. 파이프라인·
+  `RunResult`·판정 무변경. `writing` 케이스(회전 표시) 무변경. 새 네이티브 모듈
+  0개 → debug 실기기 1회로 충분(012).
+- **테스트** — `TypewriterText` 계약(`.tsx`, jest-expo): `jest.useFakeTimers` +
+  `act(() => jest.advanceTimersByTime(...))`로 노출 글자 수 증가, `skipToEnd`로
+  전체+`onDone` 1회, `text` 교체 재시작. RNTL 14 — `render`·`fireEvent` `await`.
+  `DiaryDetailScreen` 계약: `reveal` 없으면 하단 절 즉시 존재, 있으면 타이핑
+  완료 전엔 부재. 위반 주입: `skipToEnd` 무시 → FAIL, `reveal` 없이도 잘리게 →
+  목록 화면 회귀 FAIL.
+- **위험/미해결**:
+  - **Maestro 타이밍** — 타자기가 도는 동안 `assertVisible`이 본문 일부를 못 볼
+    수 있다. 생성 후 상세를 보는 기존 흐름(`diary-photo-gallery.yml` 등)의 시작부에
+    "화면 탭(건너뛰기)"을 넣어 해소. 025가 겪은 `scrollUntilVisible` 함정과 같은
+    계열.
+  - **`written`에서 뒤로 갔다 재진입** — "첫 표시만"이므로 목록에서 다시 열면
+    `detail` = 즉시 전체. 재생 안 됨(의도).
+- **선행 확인** — 21번(033)의 reanimated·눌림 피드백 작업과 겹치지 않는다(이건
+  `setState` 타이핑, reanimated 안 씀). 순서 무관.
