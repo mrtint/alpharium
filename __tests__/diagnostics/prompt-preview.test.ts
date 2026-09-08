@@ -205,9 +205,12 @@ describe("035 — 사용자 지정 이름이 미리보기의 호칭 줄에 흐�
     const named = buildPreview("quiet", SIGNAL_PRESETS[0], { quiet: "복실이" });
     const plain = buildPreview("quiet", SIGNAL_PRESETS[0]);
     if (named.ok && plain.ok) {
-      // 호칭 줄 한 줄만 다르다.
+      // 호칭 줄 한 줄만 다르다. 036 — 한국어 캐릭터의 E2SN 머리는 호칭 + 휴대폰
+      // 정체가 한 줄이므로, 그 한 줄 안에서 이름만 바뀐다.
       const diff = named.text.split("\n").filter((line, i) => line !== plain.text.split("\n")[i]);
-      expect(diff).toEqual(["너는 '복실이'이라 불린다."]);
+      expect(diff).toEqual([
+        "너는 '복실이'이라 불린다. 주인의 휴대폰이다. 이 글의 '나'는 휴대폰이지 주인이 아니다.",
+      ]);
     }
   });
 });
