@@ -32,6 +32,25 @@ Sonnet이 넷, Opus가 둘을 낸다(§2.4). 자동 생성에 쓸 수 있는 모
 `scripts/concept-prompt/gen-baseline.ts`로 6케이스 프롬프트를 뽑아 `buildCandidate('E2SN', …)`
 출력과 바이트가 같은지 확인한다 — 한 글자라도 다르면 리포트 수치는 근거가 아니다.
 
+## Clarifications
+
+### Session 2026-09-08
+
+- Q: 루이(exaone)·오드(hyperclovax)가 수동 선택으로 `buildPrompt()`에 닿을 때 새
+  E2SN 머리를 받을까, 현행 머리를 유지할까? → A: **B** — 세 한국어 캐릭터
+  (quiet·narrative·imaginative) 모두 E2SN 머리 + 문장형 신호를 받는다. 문장형 신호가
+  한국어 숫자 낱말이라 셋 다 유효하다. 샤오바이·모카(중국어·영어)는 현행 머리·
+  라벨형 신호를 유지한다. 리포트 §5.5는 kanana만 실측했으므로 루이·오드에 대한
+  검증은 이 스펙의 실기기 확인(사용자 선택 경로)에서 관측만 남기고, 자동 생성
+  대상 여부는 로드맵 14번의 결정으로 둔다.
+- Q: gen-baseline 바이트 일치 검증(FR-024)은 몇 개 캐릭터를 대상으로 하나? → A:
+  **B** — 세 한국어 캐릭터(quiet·narrative·imaginative) × 6케이스 = 18프롬프트를
+  `buildCandidate('E2SN', …)` 출력과 바이트 대조한다. E2SN 조립 함수는 세 캐릭터에
+  결정론적으로 같은 구조를 내므로(호칭·언어 줄만 다름) "조립대로 옮겼는가"를 셋
+  다 검증할 수 있다. chinese·english × 6 = 12프롬프트는 별도로 "구현 전 `prompt.ts`
+  출력과 바이트 동일"(회귀 검증)로 확인한다 — 스펙상 현행 머리를 유지하므로 E2SN
+  조립과 다른 것이 정상이다.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - 금동이 일기가 짐작으로 하루를 잇는다 (Priority: P1)
@@ -114,14 +133,17 @@ KV 캐시 프리필(018)도 빗나간다.
 
 ### Edge Cases
 
-- **루이·오드로 자동 생성을 시도하면?** 문장형 신호(한국어 숫자 낱말)와 새 머리는
-  금동이(kanana) 기준으로 검증됐다. 루이·오드는 자동 생성 대상에서 빠지므로(결정 6)
-  이 스펙은 그 경로를 바꾸지 않는다. 두 캐릭터가 사용자 선택으로 남아 수동 생성될
-  때 어떤 머리를 받는지는 이 스펙의 범위 밖이며, 현행 `SPEAKER_RULES`/`TITLE_INSTRUCTION`을
-  그대로 받는다(회귀 없음).
+- **루이·오드로 생성하면?** (Clarification Q1 = B) 세 한국어 캐릭터가 모두 E2SN
+  머리 + 문장형 신호를 받는다. 리포트 §5.5는 kanana만 실측했으므로 루이(exaone)·
+  오드(hyperclovax)가 짐작 중심 머리에서 어떻게 쓰는지는 미검증이다 — 이 스펙의
+  실기기 확인에서 두 캐릭터를 각 1편씩 사용자 선택으로 생성해 **관측만 남긴다**
+  (채점하지 않는다, 원칙 IV). 자동 생성 대상 여부(결정 6)는 로드맵 14번의 결정이며
+  이 스펙이 바꾸지 않는다.
 - **샤오바이·모카(중국어·영어)?** 문장형 신호는 한국어 숫자 낱말("다섯 장", "세 곳")이라
   다른 언어에 그대로 못 쓴다. 두 캐릭터는 모델 교체 대상(결정 5, 별도 스펙)이고 이
-  스펙은 건드리지 않는다 — 현행 경로 유지.
+  스펙은 건드리지 않는다 — 현행 머리(`SPEAKER_RULES`/`TITLE_INSTRUCTION`)·라벨형
+  신호(`describe()`)·라벨형 캡션 유지. `fixedHead()`·`signalLines()`·`visionLines()`가
+  `character`(또는 언어)로 분기한다.
 - **캡션 없는 사진 날의 지어내기?** E2SN에서도 캡션 없는 사진이 지어내기의 주된
   자리다(§5.4). 이 스펙은 프롬프트만 바꾸며, "사진 있는 날 VLM 항상 돌림"은 `vision/`
   설정 결정으로 이 스펙의 범위 밖이다(결정 8, 관측만 기록).
@@ -137,25 +159,36 @@ KV 캐시 프리필(018)도 빗나간다.
 
 #### 새 머리 (결정 1·2·4 — §5.6 E2SN, §3.1)
 
-- **FR-001**: `SPEAKER_RULES`(현행 8줄)를 E2SN 머리 규칙(E2_RULES 5줄)으로 교체한다.
-  내용은 my-ollama `concept-candidates.ts`의 `E2_RULES` 상수 그대로다. 이 규칙은
-  "본 것으로 주인의 하루를 짐작하는 글"을 명시하고, "알 수 없는 것"의 예시 나열
-  (날씨·먹은 것·만난 사람·집에서 한 일)을 빼며, "마지막 문장은 그날에 대한 짐작으로
-  끝내라"를 포함한다.
+- **FR-000**: E2SN 머리·문장형 신호·감싼 캡션은 **세 한국어 캐릭터**
+  (`quiet`·`narrative`·`imaginative`)에 적용한다(Clarification Q1 = B). 샤오바이
+  (`chinese`)·모카(`english`)는 현행 머리(`SPEAKER_RULES`/`TITLE_INSTRUCTION`)·
+  라벨형 신호(`describe()`)·라벨형 캡션(`visionLines()` 현행)을 유지한다 —
+  `fixedHead()`·`signalLines()`·`instructionLines()`·`visionLines()`가 언어(또는
+  `character`)로 분기한다. 분기 기준은 `LANGUAGE[character] === "한국어"` 하나로
+  두어 로스터가 바뀌어도 자동으로 따라오게 한다.
+- **FR-001**: `SPEAKER_RULES`(현행 8줄)를 E2SN 머리 규칙(E2_RULES 5줄)으로 교체한다
+  (한국어 캐릭터). 내용은 my-ollama `concept-candidates.ts`의 `E2_RULES` 상수
+  그대로다. 이 규칙은 "본 것으로 주인의 하루를 짐작하는 글"을 명시하고, "알 수 없는
+  것"의 예시 나열(날씨·먹은 것·만난 사람·집에서 한 일)을 빼며, "마지막 문장은 그날에
+  대한 짐작으로 끝내라"를 포함한다.
 - **FR-002**: 프롬프트에서 "모른다고 쓴 일기가 지어낸 일기보다 낫다"는 문장을
   뺀다(헌법 1.5.0 MUST). E2_RULES에 이 문장이 없다.
 - **FR-003**: `TITLE_INSTRUCTION`(현행 6문장)을 E2SN 제목 지시문(E2_TITLE 4문장)으로
   교체한다. 이름 든 반례("'금동이의 오늘 일기'", "'루이의 하루'")를 "날짜나 이름만
   넣은 제목"으로 바꾸고, 서식 기호 나열("#, *, **, -")을 "서식 기호"로 뭉뚱그린다.
   내용은 `concept-candidates.ts`의 `E2_TITLE` 상수 그대로다.
-- **FR-004**: 페르소나 톤 줄은 금동이(quiet)만 받는다 — `E_TONE.quiet` =
-  "담담하게, 짧게 쓴다." 이 줄은 새 머리에서 E2_RULES 뒤, E2_TITLE 앞에 온다.
-  루이·오드·샤오바이·모카는 자동 생성 대상이 아니므로 이 스펙에서 톤 줄을 정하지
-  않는다.
-- **FR-004a**: 톤 줄이 그 모델의 씨앗과 같은 방향이라는 근거를 코드 주석에 남긴다
-  (헌법 1.5.0 원칙 III MUST) — 리포트 §3.1: "짧게 적는다"를 넣은 B·BA·B2·BA2 72런에서
-  글자 238~311(base 464), 잘림 0, 톤 이행 83~94%. 씨앗("짧고 정확하다", 006·007 실측)과
-  같은 방향이다.
+- **FR-004**: 페르소나 톤 줄은 **금동이(quiet)만** 실측 근거가 있다 — `E_TONE.quiet`
+  = "담담하게, 짧게 쓴다." 이 줄은 새 머리에서 E2_RULES 뒤, E2_TITLE 앞에 온다.
+  루이(narrative)·오드(imaginative)는 E2SN 머리를 받지만(FR-000) **톤 줄은 넣지
+  않는다** — 리포트 §3.1이 두 캐릭터의 톤 줄 초안을 "채택 안 함"으로 결론냈다
+  (루이 초안은 잘림 4~8/18, 오드 초안은 이행 22~33%). `E_TONE`을 옮기되 quiet만
+  실제로 쓰고, narrative·imaginative는 빈 문자열(줄 자체가 안 붙음)로 둔다.
+  샤오바이·모카는 현행 머리라 무관하다.
+- **FR-004a**: quiet 톤 줄이 그 모델의 씨앗과 같은 방향이라는 근거를 코드 주석에
+  남긴다(헌법 1.5.0 원칙 III MUST) — 리포트 §3.1: "짧게 적는다"를 넣은 B·BA·B2·BA2
+  72런에서 글자 238~311(base 464), 잘림 0, 톤 이행 83~94%. 씨앗("짧고 정확하다",
+  006·007 실측)과 같은 방향이다. narrative·imaginative에 톤 줄을 안 넣는 근거(§3.1의
+  "채택 안 함")도 주석에 남긴다.
 - **FR-005**: 호칭 줄("너는 '___'이라 불린다.")은 새 머리에서도 `displayNameOf(character,
   customNames)`를 쓰고 접두사(`fixedHead`)에 남는다(035 FR-020, 018 P11). E2SN 머리의
   첫 줄은 "너는 '___'이라 불린다. 주인의 휴대폰이다. 이 글의 '나'는 휴대폰이지 주인이
@@ -163,8 +196,8 @@ KV 캐시 프리필(018)도 빗나간다.
 
 #### 문장형 신호 + 날짜 삭제 (결정 9 — §5.6 손잡이 S·N)
 
-- **FR-006**: 신호 줄을 "라벨: 값" 형식에서 문장 형식으로 바꾼다. `concept-candidates.ts`의
-  `sentenceSignalLines()`와 같은 문안:
+- **FR-006**: 신호 줄을 "라벨: 값" 형식에서 문장 형식으로 바꾼다(한국어 캐릭터).
+  `concept-candidates.ts`의 `sentenceSignalLines()`와 같은 문안:
   - 머리줄: 날짜 없이 "오늘 내가 본 것은 이렇다." (withDate=false)
   - 사진(known, ≥1장): "사진은 {N}장이 남았다. {시각 목록}에 찍혔다."
   - 사진(none): "사진은 없었다." / 사진(unknown): "사진은 모른다. {reason}."
@@ -236,44 +269,57 @@ KV 캐시 프리필(018)도 빗나간다.
   `T_TAIL`은 안 씀)와 `conditions.ts`에서 가져온다. 손으로 옮겨 적으며 오타를 내지
   않는다.
 - **FR-024**: 구현 후 my-ollama `scripts/concept-prompt/gen-baseline.ts`를 036 브랜치에
-  대해 돌려 `results/concept-prompt/prompts/baseline.json`을 생성하고, 6케이스 × 금동이
-  프롬프트가 `buildCandidate('E2SN', …)` 출력과 바이트 단위로 같은지 확인한다.
-  다르면 `prompt.ts`를 E2SN 조립과 맞춘다(반대 방향 금지).
-- **FR-025**: 검증용 6케이스 프롬프트를 금동이로 뽑아 파일로 낸다(스펙 `quickstart.md`
-  또는 `logs/`에). 이 파일은 실측의 기준이 무엇이었는지를 되짚는 자료이며 제품
-  코드가 아니다.
+  대해 돌려 `results/concept-prompt/prompts/baseline.json`(30행 = 5캐릭터 × 6케이스)을
+  생성하고, **세 한국어 캐릭터(quiet·narrative·imaginative) × 6케이스 = 18프롬프트**가
+  `buildCandidate('E2SN', case, baselineRow)` 출력과 바이트 단위로 같은지 확인한다
+  (Clarification Q2 = B). 다르면 `prompt.ts`를 E2SN 조립과 맞춘다(반대 방향 금지).
+- **FR-024a**: chinese·english × 6케이스 = 12프롬프트는 별도로 **구현 전 `prompt.ts`
+  출력과 바이트 동일**(회귀 검증)임을 확인한다. 이 둘은 현행 머리·라벨형 신호를
+  유지하므로 E2SN 조립과 다른 것이 정상이며, 036이 두 캐릭터의 프롬프트를 바꾸지
+  않았다는 것만 본다.
+- **FR-025**: 검증용 18프롬프트(세 한국어 캐릭터 × 6케이스)를 파일로 낸다(스펙
+  `logs/` 또는 `quickstart.md`에). 이 파일은 실측의 기준이 무엇이었는지를 되짚는
+  자료이며 제품 코드가 아니다.
 
 ### Key Entities
 
-- **E2SN 머리**: E2_RULES(5줄) + 톤 줄(금동이만) + E2_TITLE(4문장) + 호칭·언어 줄.
+- **E2SN 머리**: 호칭 줄(휴대폰 정체 포함) + E2_RULES(5줄) + 톤 줄(금동이만, 나머지
+  두 한국어 캐릭터는 빈 줄) + E2_TITLE(4문장) + 언어 줄. 세 한국어 캐릭터가 받는다.
   캐릭터별로 바뀌는 것은 호칭·언어·톤 줄뿐이며, 018 프리필의 대상이다(신호에 따라
-  안 바뀜).
+  안 바뀜). chinese·english는 이 머리 대신 현행 `SPEAKER_RULES`/`TITLE_INSTRUCTION`.
 - **문장형 신호**: `sentenceSignalLines()`가 내는 줄들. 한국어 숫자 낱말로 시각·개수·
   거리를 쓰고, `none`/`unknown`을 다른 문장으로 가른다. 날짜를 안 쓴다. 신호 값이
   들었으므로 되뱉기 판정 비교 대상이 아니다.
 - **감싼 캡션**: "내가 {N}시에 담은 장면: {영어 캡션}" 줄들 + `SCENE_LIMIT` 고정 줄.
   캡션 본문은 신호이고, `SCENE_LIMIT`은 고정 문장이라 판정 대상이다.
-- **gen-baseline 검증**: my-ollama 스크립트가 036 `prompt.ts`를 직접 import해 6케이스
-  프롬프트를 뽑고 E2SN 조립과 대조. 코드 변경은 alpharium 쪽뿐이고, my-ollama는
+- **gen-baseline 검증**: my-ollama 스크립트가 036 `prompt.ts`를 직접 import해 30행
+  (5캐릭터 × 6케이스)을 뽑고, 세 한국어 캐릭터 × 6 = 18을 E2SN 조립과, chinese·
+  english × 6 = 12를 구현 전 출력과 대조. 코드 변경은 alpharium 쪽뿐이고, my-ollama는
   읽기만 한다.
 
 ## Success Criteria *(mandatory)*
 
 ### Measurable Outcomes
 
-- **SC-001**: 6케이스(`empty`/`photos-places`/`truncated`/`day-open`/`caption-ko`/`caption-en`)
-  전부에서 036 `prompt.ts`가 낸 금동이 프롬프트가 my-ollama `buildCandidate('E2SN', …)`
-  출력과 바이트 단위로 일치한다.
-- **SC-002**: `buildPrompt()`가 6케이스 전부에서 `promptPrefix('quiet')`로 시작한다
-  (018 P8 유지).
+- **SC-001**: 세 한국어 캐릭터(quiet·narrative·imaginative) × 6케이스(`empty`/
+  `photos-places`/`truncated`/`day-open`/`caption-ko`/`caption-en`) = 18프롬프트가 036
+  `prompt.ts`에서 my-ollama `buildCandidate('E2SN', …)` 출력과 바이트 단위로 일치한다.
+- **SC-001a**: chinese·english × 6케이스 = 12프롬프트가 036 `prompt.ts`에서 구현 전
+  출력과 바이트 동일하다(두 캐릭터 회귀 없음).
+- **SC-002**: `buildPrompt()`가 세 한국어 캐릭터 × 6케이스 전부에서 `promptPrefix(character,
+  customNames)`로 시작한다(018 P8 유지).
 - **SC-003**: 기기 없는 테스트(`npm test`)와 lint(eslint·tsc·헌법 검사·prettier)가
   전부 통과한다. `acceptance.ts`는 diff 0줄이다.
 - **SC-004**: 실기기에서 금동이로 사진 없는 날 3편, 사진 있는 날 3편을 생성해 저장
   성공률이 현행 대비 떨어지지 않고(`unfinished`·`echo` 거부가 늘지 않고), 6편 모두
   마지막 문단이 "못 봤다/기록이 없다" 진술로 끝나지 않는다(§7-7).
-- **SC-005**: 실기기 일기 6편 중 어느 것도 기록에 없는 사람·관계를 단언하지 않는다
-  (짐작 어미 없는 인물형 지어내기 0편). 짐작 어미가 붙은 장소 추측은 헌법 1.5.0이
-  용인한 것이므로 감점하지 않는다.
+- **SC-004a**: 루이(narrative)·오드(imaginative)로 사용자 선택 경로에서 각 1편씩
+  생성해 (a) 저장이 되는가(`unfinished`·`echo` 거부 여부), (b) E2SN 머리에서 어떤
+  일기가 나오는가를 **관측만 기록한다**(채점 없음, 원칙 IV). 리포트 §5.5가 두
+  캐릭터를 안 재봤으므로 이 관측이 로드맵 14번의 입력이 된다.
+- **SC-005**: 실기기 일기 6편(금동이) 중 어느 것도 기록에 없는 사람·관계를 단언하지
+  않는다(짐작 어미 없는 인물형 지어내기 0편). 짐작 어미가 붙은 장소 추측은 헌법
+  1.5.0이 용인한 것이므로 감점하지 않는다.
 - **SC-006**: 사용자 지정 이름(`customNames.quiet = '복실이'`)으로 프롬프트를 만들면
   호칭 줄이 그 이름을 쓰고, 나머지 머리 줄은 이름 미지정일 때와 같다.
 - **SC-007**: 생성 시간(writingMs)이 현행 대비 줄어든다 — E2SN 출력 중앙값 416자
@@ -288,9 +334,9 @@ KV 캐시 프리필(018)도 빗나간다.
   `concept-candidates.ts`·`gen-baseline.ts`·`concept-cases.ts`를 읽을 수 있다.
 - 루이·오드로 자동 생성을 하지 않는다는 것은 배선 계층(`resolve-generation.ts`,
   029)에서 이미 정해진다. 이 스펙은 프롬프트만 바꾸며 캐릭터 선택 로직은 건드리지
-  않는다 — 다만 루이·오드가 수동 선택으로 `buildPrompt()`에 닿으면 **새 머리를
-  받는다**(문장형 신호는 한국어라 세 한국어 캐릭터 모두 유효). 톤 줄만 금동이
-  한정이다.
+  않는다 — 다만 루이·오드가 수동 선택으로 `buildPrompt()`에 닿으면 **E2SN 머리 +
+  문장형 신호를 받는다**(Clarification Q1 = B). 톤 줄은 금동이만(FR-004). 두 캐릭터가
+  짐작 중심 머리에서 어떻게 쓰는지는 미검증이며 SC-004a에서 관측만 남긴다.
 - `src/diary/character-name.ts`의 `displayNameOf`와 `CustomNames` 타입은 035에서
   이미 있다. 이 스펙은 그 함수를 새 머리에서 계속 쓸 뿐 고치지 않는다.
 - 캡션 언어가 영어라 감싼 틀("내가 N시에 담은 장면:")은 한국어이고 그 안의 캡션은

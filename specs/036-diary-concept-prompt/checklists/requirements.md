@@ -40,6 +40,13 @@
 - [x] Feature meets measurable outcomes defined in Success Criteria
 - [x] No implementation details leak into specification — 위에 적은 의도된 예외 외에는.
 
+## Clarifications 반영 (Session 2026-09-08)
+
+- **Q1 = B**: 세 한국어 캐릭터 모두 E2SN 머리 + 문장형 신호. → FR-000 추가, FR-001·
+  004·006 범위 명시, Edge Cases·Assumptions·SC-004a 갱신.
+- **Q2 = B**: 바이트 일치 검증은 세 한국어 캐릭터 × 6 = 18. chinese·english × 6 = 12는
+  회귀 검증. → FR-024·024a·025, SC-001·001a 갱신.
+
 ## Notes
 
 - 기술 용어(함수명·상수명)를 남긴 것은 의도적이다. 이 스펙은 새 기능이 아니라
@@ -48,4 +55,5 @@
   같아야 한다"는 이 작업의 유일한 성공 기준을 표현할 수 없다.
 - `/speckit-plan`으로 진행 가능. 계획 단계에서 확인할 것: `sentenceSignalLines()`가
   받는 `ConceptCase` 타입과 alpharium `DaySignals`·`DiaryRequest`의 매핑, `koHour` 등
-  헬퍼를 alpharium에 옮길지 인라인할지.
+  헬퍼를 alpharium에 옮길지 인라인할지, `fixedHead()`/`signalLines()`/`visionLines()`가
+  언어로 분기하는 자리를 어떻게 둘지(FR-000).
