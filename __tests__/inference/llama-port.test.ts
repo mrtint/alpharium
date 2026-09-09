@@ -22,6 +22,10 @@ import { judgeServerOutput, serverRequestFor } from "../../src/inference/desktop
 import { SAMPLING } from "../../src/inference/sampling";
 import { richDay } from "../../src/signals/fake";
 import { createLlamaEngine, endingOf } from "../../src/inference/llama-port";
+import { FUTURE_CHARACTER } from "../future-character";
+
+/** 로스터에 있는 캐릭터. 한 캐릭터만 필요한 자리에 쓴다. */
+const QUIET = "quiet" as const;
 
 const pathFor = async (character: Character) => `/models/${character}.bin`;
 
@@ -200,7 +204,7 @@ describe("지표가 경계를 넘지 못한다 (원칙 IV) ★", () => {
         pathFor,
       );
 
-    for (const character of ["quiet", "chinese", "english"] as const) {
+    for (const character of [QUIET, FUTURE_CHARACTER] as const) {
       const engine = makeEngine();
       await engine.load(character);
       await engine.run("같은 프롬프트", { timeoutMs: 1000 });
@@ -240,7 +244,7 @@ describe("적재와 정리 (E1·E2)", () => {
     const engine = createLlamaEngine(loader, pathFor);
 
     await engine.load("quiet");
-    await engine.load("narrative");
+    await engine.load(FUTURE_CHARACTER);
 
     // **두 번째를 열기 전에 첫 번째가 닫혔다** — GB 둘이 동시에 열리면 기기가 죽는다.
     expect(state.opened).toBe(2);
@@ -346,7 +350,7 @@ describe("콜드/핫 판정 — warm (016, research.md §1)", () => {
     const engine = createLlamaEngine(loader, pathFor);
 
     await engine.load("quiet");
-    const second = await engine.load("narrative");
+    const second = await engine.load(FUTURE_CHARACTER);
 
     expect(second).toEqual({ ok: true, warm: false });
   });
@@ -582,12 +586,12 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     const { calls, loader } = recordingLoader();
     const engine = createLlamaEngine(loader, pathFor);
 
-    await engine.load("narrative");
-    await engine.prewarm("narrative", promptPrefix("narrative"));
+    await engine.load(QUIET);
+    await engine.prewarm(QUIET, promptPrefix(QUIET));
 
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({
-      messages: [{ role: "user", content: promptPrefix("narrative") }],
+      messages: [{ role: "user", content: promptPrefix(QUIET) }],
       jinja: true,
       n_predict: 1,
     });
@@ -597,15 +601,15 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     const { loader } = recordingLoader();
     const engine = createLlamaEngine(loader, pathFor);
 
-    await engine.load("narrative");
-    expect(await engine.prewarm("narrative", promptPrefix("narrative"))).toBeUndefined();
+    await engine.load(QUIET);
+    expect(await engine.prewarm(QUIET, promptPrefix(QUIET))).toBeUndefined();
   });
 
   it("E9: load() 없이 부르면 네이티브를 건드리지 않고 조용히 끝난다", async () => {
     const { calls, loader } = recordingLoader();
     const engine = createLlamaEngine(loader, pathFor);
 
-    await expect(engine.prewarm("narrative", promptPrefix("narrative"))).resolves.toBeUndefined();
+    await expect(engine.prewarm(QUIET, promptPrefix(QUIET))).resolves.toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 
@@ -614,7 +618,7 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     const engine = createLlamaEngine(loader, pathFor);
 
     await engine.load("quiet");
-    await expect(engine.prewarm("narrative", promptPrefix("narrative"))).resolves.toBeUndefined();
+    await expect(engine.prewarm(FUTURE_CHARACTER, promptPrefix(QUIET))).resolves.toBeUndefined();
     expect(calls).toHaveLength(0);
   });
 
@@ -640,7 +644,7 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
       };
     }, pathFor);
 
-    await engine.load("narrative");
-    await expect(engine.prewarm("narrative", promptPrefix("narrative"))).resolves.toBeUndefined();
+    await engine.load(QUIET);
+    await expect(engine.prewarm(QUIET, promptPrefix(QUIET))).resolves.toBeUndefined();
   });
 });

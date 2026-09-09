@@ -414,9 +414,9 @@ describe("018 — prepare()/release()", () => {
     const { calls, engine } = countingEngine();
     const backend = createOnDeviceBackend(async () => [], engine);
 
-    await backend.prepare?.("narrative");
+    await backend.prepare?.("quiet");
 
-    expect(calls).toEqual(["load:narrative", "prewarm:narrative"]);
+    expect(calls).toEqual(["load:quiet", "prewarm:quiet"]);
     expect(calls).not.toContain("unload");
   });
 
@@ -424,12 +424,12 @@ describe("018 — prepare()/release()", () => {
     const { calls, engine } = countingEngine();
     const backend = createOnDeviceBackend(async () => [], engine);
 
-    await backend.prepare?.("narrative");
+    await backend.prepare?.("quiet");
     const loadCallsBeforeGenerate = calls.filter((c) => c.startsWith("load:")).length;
 
     const request: DiaryRequest = {
       signals: emptyDay("2026-08-26"),
-      character: "narrative",
+      character: "quiet",
       vision: "none",
       dayStillOpen: false,
     };
@@ -449,7 +449,7 @@ describe("018 — prepare()/release()", () => {
 
     const request: DiaryRequest = {
       signals: emptyDay("2026-08-26"),
-      character: "narrative",
+      character: "quiet",
       vision: "none",
       dayStillOpen: false,
     };
@@ -463,14 +463,14 @@ describe("018 — prepare()/release()", () => {
     setLoadResult({ ok: false, reason: "not-found" });
     const backend = createOnDeviceBackend(async () => [], engine);
 
-    await expect(backend.prepare?.("narrative")).resolves.toBeUndefined();
+    await expect(backend.prepare?.("quiet")).resolves.toBeUndefined();
   });
 
   it("E14: release()가 열린 것을 닫는다", async () => {
     const { calls, engine } = countingEngine();
     const backend = createOnDeviceBackend(async () => [], engine);
 
-    await backend.prepare?.("narrative");
+    await backend.prepare?.("quiet");
     await backend.release?.();
 
     expect(calls).toContain("unload");
@@ -491,7 +491,7 @@ describe("018 — prepare()/release()", () => {
   it("엔진이 없으면 prepare()/release()가 조용히 끝난다", async () => {
     const backend = createOnDeviceBackend(async () => []);
 
-    await expect(backend.prepare?.("narrative")).resolves.toBeUndefined();
+    await expect(backend.prepare?.("quiet")).resolves.toBeUndefined();
     await expect(backend.release?.()).resolves.toBeUndefined();
   });
 });

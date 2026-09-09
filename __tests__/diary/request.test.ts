@@ -36,13 +36,13 @@ describe("buildRequest — 요청을 만든다", () => {
   });
 
   it("신호가 전부 unknown → ok (FR-005b)", () => {
-    const result = buildRequest(unknownDay("2026-08-12"), "narrative", "none");
+    const result = buildRequest(unknownDay("2026-08-12"), "quiet", "none");
 
     expect(result.ok).toBe(true);
   });
 
   it("신호가 전부 none → ok (FR-005b)", () => {
-    const result = buildRequest(emptyDay("2026-08-12"), "narrative", "none");
+    const result = buildRequest(emptyDay("2026-08-12"), "quiet", "none");
 
     expect(result.ok).toBe(true);
   });

@@ -32,6 +32,7 @@ import { resolveSelection } from "../../src/app/selection";
 import type { PipelineResult } from "../../src/diary/pipeline";
 import type { DiaryEntry } from "../../src/diary/types";
 import { partiallyUnknownDay } from "../../src/signals/fake";
+import { FUTURE_CHARACTER } from "../future-character";
 
 const DAY = "2026-08-16";
 
@@ -840,11 +841,13 @@ describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)"
 /** 007 FR-005a — 옮겨졌다는 사실이 화면까지 온다 */
 describe("옮김 알림이 값으로 전해진다 (FR-005a, SC-003a)", () => {
   it("movedFrom이 있으면 무엇에서 무엇으로 바뀌었는지 안다", () => {
-    const state = resolveSelection("quiet", ["narrative"]);
+    // 037 — 로스터가 하나여서 "옮겨 갈 다른 캐릭터"가 없다. 옮김 자체는 캐릭터
+    // 식별자 둘만 있으면 성립하므로 FUTURE_CHARACTER로 시험한다(FR-014).
+    const state = resolveSelection("quiet", [FUTURE_CHARACTER]);
 
     expect(state).toEqual({
       kind: "selected",
-      character: "narrative",
+      character: FUTURE_CHARACTER,
       movedFrom: "quiet",
     });
   });

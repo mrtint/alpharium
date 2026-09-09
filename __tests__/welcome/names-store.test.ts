@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { NAME_MAX_LENGTH } from "../../src/welcome/naming";
 import {
+import { FUTURE_CHARACTER } from "../future-character";
   loadCustomNames,
   saveCustomNames,
   type CharacterNamesPort,
@@ -112,10 +113,12 @@ describe("N9·W19 — 저장은 이름만 담는다", () => {
 
   it("W19 — 빈 값은 키째 빠진다", async () => {
     const port = memoryPort();
-    await saveCustomNames(port, { quiet: "복실이", narrative: "" });
+    // 037 — 빈 값이 키째 빠지는 성질에 둘째 키가 필요하다. 로스터에 없는 자리로
+    // 시험한다 — 검사하는 것은 "빈 문자열은 저장하지 않는다"이지 캐릭터가 아니다.
+    await saveCustomNames(port, { quiet: "복실이", [FUTURE_CHARACTER]: "" });
     const stored = JSON.parse(port.stored ?? "{}") as { names: Record<string, string> };
     expect(stored.names).toEqual({ quiet: "복실이" });
-    expect("narrative" in stored.names).toBe(false);
+    expect(FUTURE_CHARACTER in stored.names).toBe(false);
   });
 
   it("W19 — 이름을 지우면 기본 이름으로 되돌아간다 (키 제거)", async () => {
