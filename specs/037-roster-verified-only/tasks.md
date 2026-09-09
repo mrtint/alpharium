@@ -158,14 +158,14 @@ index로 고르므로 길이 5→1에 무관하다. 조립부가 만드는 배�
 
 ⚠️ **release 빌드를 만들지 않는다**(2026-09-09 저장소 소유자 지시).
 
-- [ ] T046 Metro 기동(`EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`) + `adb reverse tcp:8081 tcp:8081` + 기기 잠금 해제 확인
-- [ ] T047 D1 — 설정 탭에 캐릭터가 금동이 하나만 보인다. 다운로드 관리 섹션도 한 줄 (SC-001)
-- [ ] T048 D2 — 사진 없는 날 3회 연속 생성·저장. `writingMs`가 036 범위(19~22초)에서 크게 벗어나지 않는다 (SC-003·SC-007)
-- [ ] T049 D3 ★ — 037 측정이 남긴 오드 일기(`2026-09-08.json`)가 목록·상세에서 정상 표시된다. `authorName`을 지운 사본으로 **없는 갈래도** 확인한다 (SC-002)
-- [ ] T050 D4 — 이름 바꾸기 후 생성 시 새 이름이 화면과 저장된 일기에 나타난다. ⚠️ Maestro가 이 자리 좌표를 잘못 볼 수 있다(035) — raw `adb input tap`으로 갈음 (SC-004)
-- [ ] T051 D5 — `selected-character.json`에 로스터 밖 값이 있어도 앱이 정상 실행되고 금동이가 쓴다 (FR-009)
-- [ ] T052 Maestro 회귀 — `node scripts/run-device-tests.mjs`. ⚠️ `unified-permission-onboarding.yml`은 `pm clear`로 모델·일기를 전부 날리므로 **맨 마지막에** 돌린다(T049의 재료가 사라진다)
-- [ ] T053 실기기 관측을 `specs/037-roster-verified-only/`에 기록한다 — 세션 로그 또는 findings
+- [X] T046 Metro 기동(`EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client --clear`) + `adb reverse tcp:8081 tcp:8081` + 기기 잠금 해제 확인
+- [X] T047 D1 — 설정 탭에 캐릭터가 금동이 하나만 보인다. 다운로드 관리 섹션도 한 줄 (SC-001)
+- [X] T048 D2 — 사진 없는 날 3회 연속 생성·저장. `writingMs`가 036 범위(19~22초)에서 크게 벗어나지 않는다 (SC-003·SC-007)
+- [X] T049 D3 ★ — 037 측정이 남긴 오드 일기(`2026-09-08.json`)가 목록·상세에서 정상 표시된다. `authorName`을 지운 사본으로 **없는 갈래도** 확인한다 (SC-002)
+- [X] T050 D4 — 이름 바꾸기 후 생성 시 새 이름이 화면과 저장된 일기에 나타난다. ⚠️ Maestro가 이 자리 좌표를 잘못 볼 수 있다(035) — raw `adb input tap`으로 갈음 (SC-004)
+- [X] T051 D5 — `selected-character.json`에 로스터 밖 값이 있어도 앱이 정상 실행되고 금동이가 쓴다 (FR-009)
+- [X] T052 Maestro 회귀 — `node scripts/run-device-tests.mjs`. ⚠️ `unified-permission-onboarding.yml`은 `pm clear`로 모델·일기를 전부 날리므로 **맨 마지막에** 돌린다(T049의 재료가 사라진다)
+- [X] T053 실기기 관측을 `specs/037-roster-verified-only/`에 기록한다 — 세션 로그 또는 findings
 
 ---
 

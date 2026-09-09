@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 import { displayNameOf, type CustomNames } from "../../src/diary/character-name";
 import { PERSONA_NAMES, personaOf } from "../../src/diary/persona";
-import { CHARACTERS } from "../../src/diary/types";
+import { CHARACTERS, type Character } from "../../src/diary/types";
 
 /**
  * 사용자 지정 캐릭터 이름 해석의 계약 테스트.
@@ -133,5 +133,29 @@ describe("037 C3 — personaOf()는 로스터 밖을 모른다", () => {
   it("C3 — PERSONA_NAMES도 로스터 밖에는 undefined다", () => {
     expect(PERSONA_NAMES["imaginative"]).toBeUndefined();
     expect(PERSONA_NAMES["quiet"]).toBe(personaOf("quiet").name);
+  });
+});
+
+/**
+ * 037 계약 C4 — **이름을 되짚는 자리가 전부 로스터 밖을 견딘다** (FR-008).
+ *
+ * ★ 실기기에서 두 번째 자리가 드러났다(T049). `DiaryDetailScreen`만 고치고
+ * `DiaryHomeScreen`의 `nameOf()`를 놓쳐, 로스터를 나간 캐릭터가 쓴 일기의 상세를
+ * 열자 `personaOf() → undefined.name`으로 화면이 멈췄다.
+ *
+ * **화면별 렌더 테스트로는 이 계열을 다 못 잡는다** — 되짚는 자리가 어디에
+ * 몇 개인지를 세는 검사가 필요하다. 아래가 그것이다: `personaOf(...).name`을
+ * 직접 부르는 화면 코드가 있으면 그 자리는 로스터 밖에서 멈춘다.
+ */
+describe("037 C4 — 이름 되짚기가 로스터 밖을 견딘다", () => {
+  const UI_FILES = ["DiaryDetailScreen.tsx", "DiaryHomeScreen.tsx"];
+
+  it.each(UI_FILES)("%s — personaOf(...).name을 직접 부르지 않는다", (file) => {
+    const source = readFileSync(join(__dirname, "../../src/ui/", file), "utf8");
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+    // 로스터 밖 캐릭터에서 undefined가 되는 형태. `PERSONA_NAMES`(옵셔널 조회)를
+    // 쓰면 타입이 "없을 수 있다"를 말해 주므로 이 검사에 걸리지 않는다.
+    expect(code).not.toMatch(/personaOf\([^)]*\)\.name/);
   });
 });
