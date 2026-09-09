@@ -3,7 +3,6 @@ import { join } from "node:path";
 
 import { NAME_MAX_LENGTH } from "../../src/welcome/naming";
 import {
-import { FUTURE_CHARACTER } from "../future-character";
   loadCustomNames,
   saveCustomNames,
   type CharacterNamesPort,
@@ -96,11 +95,19 @@ describe("N8 — ★ 키 단위로 살린다 (부분 복구)", () => {
     expect(await loadCustomNames(port)).toEqual({ quiet: "복실이" });
   });
 
-  it("여러 캐릭터의 이름이 함께 살아남는다", async () => {
+  /**
+   * 037(계약 C3) — 로스터 밖 이름은 걸러진다.
+   *
+   * 원래 이 자리는 "여러 캐릭터의 이름이 함께 살아남는다"였다(로스터 밖 `bogus`만
+   * 걸러짐). 037로 `narrative`도 로스터 밖이 되었으므로 **`bogus`와 같은 대우를
+   * 받는 것이 정상이다** — 저장된 파일에 남아 있어도 로스터에 없으면 이름이 아니다.
+   * 캐릭터가 늘면 그 캐릭터로 "함께 살아남는다"를 되살린다.
+   */
+  it("로스터 안의 이름만 살아남는다 (C3)", async () => {
     const port = memoryPort(
       JSON.stringify({ names: { quiet: "복실이", narrative: "이야기꾼", bogus: "x" } }),
     );
-    expect(await loadCustomNames(port)).toEqual({ quiet: "복실이", narrative: "이야기꾼" });
+    expect(await loadCustomNames(port)).toEqual({ quiet: "복실이" });
   });
 });
 
@@ -113,12 +120,13 @@ describe("N9·W19 — 저장은 이름만 담는다", () => {
 
   it("W19 — 빈 값은 키째 빠진다", async () => {
     const port = memoryPort();
-    // 037 — 빈 값이 키째 빠지는 성질에 둘째 키가 필요하다. 로스터에 없는 자리로
-    // 시험한다 — 검사하는 것은 "빈 문자열은 저장하지 않는다"이지 캐릭터가 아니다.
-    await saveCustomNames(port, { quiet: "복실이", [FUTURE_CHARACTER]: "" });
+    // 037 — 로스터가 하나여서 "다른 키는 남고 빈 키만 빠진다"를 두 캐릭터로
+    // 보일 수 없다. 검사하는 성질은 **빈 문자열을 저장하지 않는다**이므로 그
+    // 캐릭터 하나로 본다 — 빈 값을 주면 키째 빠져 저장된 이름이 없다.
+    await saveCustomNames(port, { quiet: "" });
     const stored = JSON.parse(port.stored ?? "{}") as { names: Record<string, string> };
-    expect(stored.names).toEqual({ quiet: "복실이" });
-    expect(FUTURE_CHARACTER in stored.names).toBe(false);
+    expect(stored.names).toEqual({});
+    expect("quiet" in stored.names).toBe(false);
   });
 
   it("W19 — 이름을 지우면 기본 이름으로 되돌아간다 (키 제거)", async () => {

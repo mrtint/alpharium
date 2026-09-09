@@ -26,6 +26,7 @@ import type {
 } from "../../src/inference/engine-port";
 import { isGenerationFailure } from "../../src/inference/types";
 import { richDay } from "../../src/signals/fake";
+import { FUTURE_CHARACTER } from "../future-character";
 
 const DAY = "2026-08-16";
 const GOOD_KO = "오늘 주인은 어딘가로 나섰다. 사진 세 장이 남았고 나는 그것만 안다.";
@@ -103,11 +104,13 @@ describe("E-1 한 번에 하나만 열린다 (FR-008)", () => {
     const fake = fakeEngine();
     const backend = backendWith(fake.engine);
 
+    // 037 — 로스터가 하나여서 두 캐릭터를 실제로 부를 수 없다. 식별자가 다르면
+    // 각각 load된다는 성질을 FUTURE_CHARACTER로 시험한다(FR-014).
     await backend.generate(requestFor("quiet"));
-    await backend.generate(requestFor("narrative"));
+    await backend.generate(requestFor(FUTURE_CHARACTER));
 
     expect(fake.calls).toContain("load:quiet");
-    expect(fake.calls).toContain("load:narrative");
+    expect(fake.calls).toContain(`load:${FUTURE_CHARACTER}`);
     // **두 모델이 동시에 열린 순간이 없어야 한다** — GB 둘이면 기기가 죽는다.
     expect(fake.maxOpen).toBeLessThanOrEqual(1);
   });

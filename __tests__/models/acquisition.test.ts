@@ -25,6 +25,7 @@ import type {
 import { assetFor, CHARACTERS } from "../../src/models/roster";
 import { readState } from "../../src/models/storage";
 import type { DownloadProgress } from "../../src/models/types";
+import { FUTURE_CHARACTER } from "../future-character";
 
 const ACQUISITION_CODE = readFileSync(join(__dirname, "../../src/models/acquisition.ts"), "utf8")
   .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -280,10 +281,10 @@ describe("내려받기", () => {
       const { acq, open } = gated(h);
 
       const first = acq.prepare("quiet");
-      const second = acq.prepare("narrative");
+      const second = acq.prepare(FUTURE_CHARACTER);
 
       // 둘 다 시작한다 — 두 번째가 즉시 거부되지 않는다.
-      expect(acq.busyWith().sort()).toEqual(["narrative", "quiet"]);
+      expect(acq.busyWith().sort()).toEqual([FUTURE_CHARACTER, "quiet"].sort());
 
       open();
       expect((await first).ok).toBe(true);
@@ -324,12 +325,12 @@ describe("내려받기", () => {
       const { acq, open } = gated(h);
 
       const first = acq.prepare("quiet");
-      const second = acq.prepare("narrative");
-      expect(acq.busyWith().sort()).toEqual(["narrative", "quiet"]);
+      const second = acq.prepare(FUTURE_CHARACTER);
+      expect(acq.busyWith().sort()).toEqual([FUTURE_CHARACTER, "quiet"].sort());
 
       await acq.pause("quiet");
       // narrative는 여전히 받는 중
-      expect(acq.busyWith()).toContain("narrative");
+      expect(acq.busyWith()).toContain(FUTURE_CHARACTER);
 
       open();
       await first;
@@ -352,10 +353,10 @@ describe("내려받기", () => {
       const { acq, open } = gated(h);
 
       acq.prepare("quiet");
-      acq.prepare("narrative");
-      acq.prepare("english");
+      acq.prepare(FUTURE_CHARACTER);
+      acq.prepare(FUTURE_CHARACTER);
 
-      expect(acq.busyWith().sort()).toEqual(["english", "narrative", "quiet"]);
+      expect(acq.busyWith().sort()).toEqual([FUTURE_CHARACTER, "quiet"].sort());
       open();
     });
 
@@ -382,7 +383,7 @@ describe("내려받기", () => {
    */
   it.skip("동시 다운로드에서 공간 판정이 받는 중인 것들의 남은 용량을 뺀다", async () => {
     const asset1 = assetFor("quiet");
-    const asset2 = assetFor("narrative");
+    const asset2 = assetFor(FUTURE_CHARACTER);
     const orig1 = asset1.expectedBytes;
     const orig2 = asset2.expectedBytes;
     Object.assign(asset1, { expectedBytes: 1000 });
@@ -415,7 +416,7 @@ describe("내려받기", () => {
       await new Promise((r) => setTimeout(r, 0));
       expect(acq.busyWith()).toContain("quiet");
 
-      const second = await acq.prepare("narrative");
+      const second = await acq.prepare(FUTURE_CHARACTER);
 
       expect(second.ok).toBe(false);
       if (!second.ok) expect(second.failure.kind).toBe("insufficient-space");

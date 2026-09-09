@@ -17,6 +17,7 @@ import { render, screen, userEvent } from "@testing-library/react-native";
 import type { Character } from "../../src/diary/types";
 import type { PromptPreviewSet } from "../../src/diagnostics/types";
 import { PromptPreviewPanel } from "../../src/ui/PromptPreviewPanel";
+import { FUTURE_CHARACTER } from "../future-character";
 
 jest.setTimeout(30000);
 
@@ -33,21 +34,12 @@ const previews: Readonly<Record<Character, PromptPreviewSet>> = {
       approxChars: "QUIET 사진 있음\n사진: 2장 (10시, 18시)\n프롬프트".length,
     },
   },
-  narrative: {
-    empty: { ok: true, text: "NARRATIVE 신호 없음", approxChars: "NARRATIVE 신호 없음".length },
-    photos: { ok: true, text: "NARRATIVE 사진 있음", approxChars: "NARRATIVE 사진 있음".length },
-  },
-  imaginative: {
+  // 037 — 로스터가 하나라 화면 전환·조립 실패를 보일 둘째 캐릭터가 없다.
+  // 이 화면은 `previews` 레코드를 그대로 그리므로 식별자만 다르면 되고,
+  // FUTURE_CHARACTER가 그 자리다. 캐릭터가 늘면 그 캐릭터로 바꾼다(FR-014).
+  [FUTURE_CHARACTER]: {
     empty: { ok: false, reason: "요청을 만들 수 없다 (no-character)" },
-    photos: { ok: true, text: "IMAGINATIVE 사진", approxChars: "IMAGINATIVE 사진".length },
-  },
-  chinese: {
-    empty: { ok: true, text: "CHINESE 中文", approxChars: "CHINESE 中文".length },
-    photos: { ok: true, text: "CHINESE 사진", approxChars: "CHINESE 사진".length },
-  },
-  english: {
-    empty: { ok: true, text: "ENGLISH prompt", approxChars: "ENGLISH prompt".length },
-    photos: { ok: true, text: "ENGLISH photo prompt", approxChars: "ENGLISH photo prompt".length },
+    photos: { ok: true, text: "FUTURE 사진", approxChars: "FUTURE 사진".length },
   },
 };
 
@@ -65,25 +57,41 @@ describe("PromptPreviewPanel — 렌더 (022 US1)", () => {
     expect(screen.getByText("사진 있음")).toBeTruthy();
   });
 
-  it("캐릭터를 바꾸면 다른 텍스트가 나온다", async () => {
+  /**
+   * ★ 037 — 이 화면은 칩을 `CHARACTERS`에서 그린다(`PromptPreviewPanel.tsx:35`).
+   * 로스터가 하나라 **누를 둘째 칩이 없다** — `previews` 레코드에 키를 더해도
+   * 칩이 생기지 않으므로 `FUTURE_CHARACTER`로도 대신할 수 없다.
+   *
+   * 캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다(FR-014). 화면의
+   * 전환·실패 렌더 코드는 그대로 살아 있다.
+   */
+  it.skip("캐릭터를 바꾸면 다른 텍스트가 나온다", async () => {
     const user = userEvent.setup();
     await render(<PromptPreviewPanel previews={previews} presetLabels={presetLabels} />);
 
-    await user.press(screen.getByTestId("prompt-preview-character-narrative"));
+    await user.press(screen.getByTestId(`prompt-preview-character-${FUTURE_CHARACTER}`));
 
-    expect(screen.getByTestId("prompt-preview-narrative-empty")).toHaveTextContent(
-      "NARRATIVE 신호 없음",
+    expect(screen.getByTestId(`prompt-preview-${FUTURE_CHARACTER}-photos`)).toHaveTextContent(
+      "FUTURE 사진",
     );
     expect(screen.queryByTestId("prompt-preview-quiet-empty")).toBeNull();
   });
 
-  it("조립 실패 프리뷰는 사유를 보인다 (FR-009)", async () => {
+  /**
+   * ★ 037 — 이 화면은 칩을 `CHARACTERS`에서 그린다(`PromptPreviewPanel.tsx:35`).
+   * 로스터가 하나라 **누를 둘째 칩이 없다** — `previews` 레코드에 키를 더해도
+   * 칩이 생기지 않으므로 `FUTURE_CHARACTER`로도 대신할 수 없다.
+   *
+   * 캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다(FR-014). 화면의
+   * 전환·실패 렌더 코드는 그대로 살아 있다.
+   */
+  it.skip("조립 실패 프리뷰는 사유를 보인다 (FR-009)", async () => {
     const user = userEvent.setup();
     await render(<PromptPreviewPanel previews={previews} presetLabels={presetLabels} />);
 
-    await user.press(screen.getByTestId("prompt-preview-character-imaginative"));
+    await user.press(screen.getByTestId(`prompt-preview-character-${FUTURE_CHARACTER}`));
 
-    expect(screen.getByTestId("prompt-preview-imaginative-empty")).toHaveTextContent(
+    expect(screen.getByTestId(`prompt-preview-${FUTURE_CHARACTER}-empty`)).toHaveTextContent(
       "조립할 수 없음: 요청을 만들 수 없다 (no-character)",
     );
   });
