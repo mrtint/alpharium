@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { displayNameOf, type CustomNames } from "../../src/diary/character-name";
-import { personaOf } from "../../src/diary/persona";
+import { PERSONA_NAMES, personaOf } from "../../src/diary/persona";
 import { CHARACTERS } from "../../src/diary/types";
 
 /**
@@ -109,5 +109,29 @@ describe("N4 — persona.ts와 roster의 경계", () => {
     for (const character of CHARACTERS) {
       expect(SOURCE).not.toContain(personaOf(character).name);
     }
+  });
+});
+
+/**
+ * 037 계약 C3 — `personaOf()`는 로스터 안만 안다.
+ *
+ * 계약: specs/037-roster-verified-only/contracts/roster-entry.md
+ *
+ * **로스터 밖 캐릭터에 페르소나를 만들어 주지 않는다.** 그 순간 "로스터에 없는데
+ * 성격은 있다"가 되어 원칙 III의 경계가 흐려진다 — `persona.ts`가 캐릭터→이름·소개의
+ * 유일한 통과 지점인 이유다.
+ *
+ * 저장된 옛 일기의 작성자 이름은 `DiaryEntry.authorName`에서 오고, 그것도 없으면
+ * `PERSONA_NAMES`가 `undefined`를 주어 화면이 그 자리를 비운다(FR-008, C4).
+ */
+describe("037 C3 — personaOf()는 로스터 밖을 모른다", () => {
+  it("C3 — 로스터 밖 캐릭터에 페르소나가 없다", () => {
+    const outside = "imaginative" as unknown as Character;
+    expect(personaOf(outside)).toBeUndefined();
+  });
+
+  it("C3 — PERSONA_NAMES도 로스터 밖에는 undefined다", () => {
+    expect(PERSONA_NAMES["imaginative"]).toBeUndefined();
+    expect(PERSONA_NAMES["quiet"]).toBe(personaOf("quiet").name);
   });
 });

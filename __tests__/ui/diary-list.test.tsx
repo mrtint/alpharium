@@ -12,6 +12,9 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { render, screen, userEvent } from "@testing-library/react-native";
 
 import type { DiaryListItem, PhotoHint, WritePrompt } from "../../src/app/state";
@@ -605,5 +608,38 @@ describe("009 US3 — 되돌림 알림 (V5)", () => {
     await userEvent.press(screen.getByTestId("day-2026-08-18"));
 
     expect(picked).toEqual(["2026-08-18"]);
+  });
+});
+
+/**
+ * 037 계약 C4 — 로스터 밖 캐릭터가 쓴 일기도 목록에 나타난다 (FR-008).
+ *
+ * 계약: specs/037-roster-verified-only/contracts/roster-entry.md
+ *
+ * ★ **목록은 구조적으로 이 문제에 걸리지 않는다.** `DiaryListItem`이 `character`를
+ * 담지 않기 때문이다(`app/state.ts` — 날짜·읽기 가능·사진 힌트·제목뿐). 화면이
+ * 캐릭터를 모르므로 로스터가 줄어도 줄이 사라지거나 멈출 자리가 없다.
+ *
+ * 상세 화면은 다르다 — `DiaryEntry.character`로 작성자 이름을 되짚으므로 방어가
+ * 필요했다(`diary-detail.test.tsx`의 C4).
+ *
+ * 이 검사는 그 구조를 잠근다: 목록 항목에 캐릭터가 **들어오면** 같은 방어를
+ * 여기에도 해야 하므로, 그때 이 테스트가 깨져 알려 준다.
+ */
+describe("037 C4 — 목록은 캐릭터를 모른다", () => {
+  it("C4 — DiaryListItem에 캐릭터 필드가 없다", () => {
+    const source = readFileSync(join(__dirname, "../../src/app/state.ts"), "utf8");
+    const start = source.indexOf("export type DiaryListItem = {");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const body = source.slice(start, source.indexOf("};", start));
+
+    expect(body).not.toMatch(/\bcharacter\b/);
+  });
+
+  it("C4 — 어느 캐릭터가 썼든 목록에 그대로 나타난다", async () => {
+    // 캐릭터를 안 담으므로 옛 일기와 새 일기가 구분되지 않는다 — 그것이 방어다.
+    await render(<DiaryListScreen items={[readable("2026-09-08")]} onOpen={noop} onWrite={noop} />);
+
+    expect(screen.getByText("2026-09-08")).toBeTruthy();
   });
 });

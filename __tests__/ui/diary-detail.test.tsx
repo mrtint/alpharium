@@ -387,3 +387,51 @@ describe("★ 화면에 없어야 하는 것", () => {
     }
   });
 });
+
+/**
+ * 037 계약 C4 — 로스터에서 빠진 캐릭터가 쓴 일기를 계속 읽을 수 있다 (FR-008).
+ *
+ * 계약: specs/037-roster-verified-only/contracts/roster-entry.md
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **사용자의 기록을 잃게 하는 것은 어떤 정리 작업으로도 정당화되지 않는다.**
+ *
+ * 로스터가 줄어도 기기에는 빠진 캐릭터가 쓴 일기가 남아 있다. `DiaryEntry.character`는
+ * **파일에서 오는 값**이라 좁아진 타입을 런타임에 만족한다는 보장이 없다 —
+ * 저장된 일기에는 여전히 옛 캐릭터 식별자가 들어 있다.
+ *
+ * 그리고 `authorName`은 **옵셔널이다**(035 이전 일기에는 없다). 그래서 이름을
+ * 되짚을 때 `personaOf(로스터 밖)`이 `undefined`가 되어 화면이 멈출 수 있다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+describe("037 C4 — 로스터 밖 캐릭터가 쓴 옛 일기", () => {
+  /** 로스터에 없는 캐릭터로 저장된 일기. 타입이 아니라 **파일의 현실**이다. */
+  const legacyEntry = (authorName?: string): DiaryEntry =>
+    ({
+      ...entryFor(),
+      character: "imaginative",
+      // 작성자 줄은 `timing`이 있을 때 나온다(017).
+      timing: { writingMs: 5_400 },
+      ...(authorName === undefined ? {} : { authorName }),
+    }) as unknown as DiaryEntry;
+
+  it("C4 — authorName이 있으면 그 이름으로 렌더된다", async () => {
+    await render(<DiaryDetailScreen entry={legacyEntry("오드")} />);
+
+    expect(screen.getByText(DIARY)).toBeTruthy();
+    expect(screen.getByText("오드는 이렇게 일기를 작성했어요.")).toBeTruthy();
+  });
+
+  it("★ C4 — authorName이 없어도 화면이 멈추지 않는다", async () => {
+    // 035 이전에 저장된 일기가 이 갈래다. 이름을 못 찾아도 **본문은 읽혀야 한다.**
+    await render(<DiaryDetailScreen entry={legacyEntry()} />);
+
+    expect(screen.getByText(DIARY)).toBeTruthy();
+  });
+
+  it("C4 — 내부 캐릭터 식별자가 화면에 나오지 않는다", async () => {
+    await render(<DiaryDetailScreen entry={legacyEntry()} />);
+
+    expect(screen.queryByText(/imaginative/)).toBeNull();
+  });
+});

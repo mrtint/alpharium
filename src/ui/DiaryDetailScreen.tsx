@@ -29,7 +29,7 @@ import {
 } from "react-native";
 
 import { topicParticleFor } from "../diary/particle";
-import { personaOf } from "../diary/persona";
+import { PERSONA_NAMES } from "../diary/persona";
 import type { DiaryEntry } from "../diary/types";
 import type { DaySignals, SignalValue } from "../signals/types";
 import { AppText } from "./components/Text";
@@ -163,8 +163,26 @@ function SignalsTitle({
    * 이 일기는 그때 그 이름으로 쓴 것이 사실이다. 스냅샷이 없는 옛 일기만 현재
    * 이름으로 폴백하며, **소급 생성하지 않는다**(원칙 V — 그 시점 이름은 관측된
    * 적이 없다).
+   *
+   * ★ 037 — **로스터에서 빠진 캐릭터가 쓴 일기도 읽혀야 한다**(FR-008, 계약 C4).
+   *
+   * `entry.character`는 파일에서 오는 값이라 로스터에 없는 식별자일 수 있다
+   * (037로 넷이 나갔고, 그 캐릭터들이 쓴 일기는 기기에 그대로 남아 있다).
+   * `authorName`은 옵셔널이므로(035 이전 일기에 없다) 둘이 겹치면 `personaOf()`가
+   * 페르소나를 못 찾는다.
+   *
+   * **`personaOf()`를 고쳐 기본값을 돌려주지 않는다** — 로스터 밖 캐릭터에 페르소나가
+   * 돌아오면 "로스터에 없는데 성격은 있다"가 되어 원칙 III의 경계가 흐려진다.
+   * 방어는 읽는 쪽인 여기에 둔다.
+   *
+   * 이름을 못 찾으면 **작성자 줄만 빼고 나머지(날짜·본문·사진·신호)는 그대로
+   * 보인다** — 사용자의 기록을 잃게 하지 않는 것이 이 방어의 목적이며, 내부
+   * 식별자를 대신 보이거나 이름을 지어내지 않는다.
    */
-  const name = entry.authorName ?? currentAuthorName ?? personaOf(entry.character).name;
+  const persona = PERSONA_NAMES[entry.character];
+  const name = entry.authorName ?? currentAuthorName ?? persona;
+  if (name === undefined) return null;
+
   const particle = topicParticleFor(name);
 
   return (

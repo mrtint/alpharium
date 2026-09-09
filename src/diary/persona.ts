@@ -55,3 +55,27 @@ const PERSONAS: Readonly<Record<Character, Persona>> = {
 export function personaOf(character: Character): Persona {
   return PERSONAS[character];
 }
+
+/**
+ * 로스터 안이면 이름, 밖이면 `undefined` (037 FR-008, 계약 C3·C4).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **왜 `personaOf()`를 고치지 않고 함수를 하나 더 두는가.**
+ *
+ * `personaOf()`는 **로스터 안의 캐릭터만 안다**. 거기서 모르는 캐릭터에 기본
+ * 페르소나를 돌려주면 "로스터에 없는데 성격은 있다"가 되어 원칙 III의 경계가
+ * 흐려진다 — 이 파일이 캐릭터→이름·소개의 유일한 통과 지점인 이유가 그것이다.
+ *
+ * 그런데 **저장된 일기의 `character`는 파일에서 오는 값이라 로스터 밖일 수
+ * 있다**(037로 넷이 나갔고, 그 캐릭터들이 쓴 일기는 기기에 남아 있다). 읽는
+ * 쪽은 "이름이 없을 수 있다"를 알아야 하고, 그것을 타입으로 말하는 것이 이
+ * 함수다. 014의 `character-name.ts`가 "사용자 지정 이름은 비동기라 `personaOf()`의
+ * 동기 시그니처에 못 넣는다"며 함수를 하나 더 둔 것과 같은 구조다.
+ *
+ * **이름을 지어내지 않는다** — 못 찾으면 `undefined`이고, 화면이 그 자리를
+ * 비운다. 내부 식별자를 대신 보이지 않는다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export const PERSONA_NAMES: Readonly<Partial<Record<string, string>>> = Object.fromEntries(
+  Object.entries(PERSONAS).map(([character, persona]) => [character, persona.name]),
+);
