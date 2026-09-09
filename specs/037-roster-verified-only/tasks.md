@@ -48,6 +48,8 @@ description: "Task list — 로스터를 검증된 하나로 축소"
 - [ ] T010 [P] `src/diary/prompt.ts`의 `LANGUAGE` 레코드와 캐릭터별 톤 줄에서 빠진 캐릭터를 걷어낸다. **E2SN 문안·`usesE2SN()` 구조는 건드리지 않는다** (FR-006·FR-015, C6)
 - [ ] T011 [P] `src/diary/acceptance.ts`의 `isWrongLanguage` switch에서 도달 불가 case를 걷어낸다. **판정 갈래는 넷 그대로다** — 줄어드는 것은 한 갈래 안의 캐릭터 분기다 (FR-015, C6)
 - [ ] T012 `src/ui/DiagnosticsScreen.tsx:61`의 `PROBE_CHARACTER`를 로스터에 있는 캐릭터로 바꾼다 (FR-006)
+- [ ] T012a [P] `src/ui/CharacterListScreen.tsx:259`가 `CHARACTERS.map()`으로 캐릭터 줄을 그린다 — 배열 길이에 무관하나 029가 이 화면을 설정 탭으로 흡수했으므로 한 줄로 렌더되는지 확인한다 (FR-006·FR-007)
+- [ ] T012b [P] `src/diagnostics/prompt-preview.ts:149`·`src/diagnostics/report.ts:29-31`이 `CHARACTERS`를 돈다. **`report.ts`는 `Object.fromEntries` + `as` 캐스트라 `tsc`가 조용히 통과할 수 있다** — 캐릭터 하나로 미리보기·모델 이름 표가 정상인지 확인하고, 022의 계약 테스트 PP1이 캐릭터 수에 걸리는지 본다 (FR-006)
 - [ ] T013 `npm run lint`의 `tsc` 오류가 0인지 확인한다 — **이것이 FR-005·006의 완료 조건이다**(plan D1)
 
 **Checkpoint**: `tsc` 0 오류. 테스트는 아직 빨간불일 수 있다(Phase 3~5에서 고친다).
@@ -62,6 +64,7 @@ description: "Task list — 로스터를 검증된 하나로 축소"
 
 ### 계약 테스트 (먼저 쓴다)
 
+- [ ] T013a [US1] `__tests__/models/roster.test.ts`의 **기존 다섯 캐릭터 전제 검사를 갱신한다** — L32 "다섯 캐릭터 각각에 자산이 있다", L70-71 주석("다섯이 다 차면 5/5"), L146 "다섯 캐릭터 모두 표시 이름을 준다". **이걸 빼면 Phase 2 직후 `npm test`가 빨간불로 남는다**
 - [ ] T014 [P] [US1] `__tests__/models/roster.test.ts`에 계약 C1을 더한다 — `PERSONAS`·`ASSETS`·`DISPLAY_NAMES`·`LANGUAGE` 네 레코드의 키 집합이 서로 같다(소스를 `readFileSync`로 읽어 검사, 007 관례)
 - [ ] T015 [P] [US1] `__tests__/models/roster.test.ts`에 계약 C2를 더한다 — 로스터의 각 캐릭터에 관측 근거 주석이 있다. **근거를 코드가 판정하지 않는다**(원칙 IV) — 주석의 존재만 확인한다
 - [ ] T016 [P] [US1] `__tests__/models/roster.test.ts`에 계약 C7을 더한다 — 소스에 로스터 밖 자산을 지우는 코드가 없다 (FR-011)
@@ -96,7 +99,7 @@ description: "Task list — 로스터를 검증된 하나로 축소"
 
 - [ ] T027 [P] [US2] `__tests__/ui/diary-detail.test.tsx`에 계약 C4를 더한다 — `character`가 로스터 밖이고 `authorName`이 **있는** 일기의 상세가 그 이름으로 렌더된다
 - [ ] T028 [US2] `__tests__/ui/diary-detail.test.tsx`에 계약 C4를 더한다 — `character`가 로스터 밖이고 `authorName`이 **없는** 일기의 상세가 **멈추지 않는다**. 내부 식별자(`"imaginative"`)가 화면에 나오지 않는다. **이 테스트는 T029 전에 실패해야 한다**
-- [ ] T029 [US2] `src/ui/DiaryDetailScreen.tsx`의 이름 되짚기를 고쳐 로스터 밖 캐릭터를 방어한다. **`personaOf()`는 고치지 않는다** — 로스터 밖에 페르소나를 돌려주면 원칙 III가 흐려진다(plan D2·R3). 방어는 읽는 쪽에 둔다 (FR-008)
+- [ ] T029 [US2] `src/ui/DiaryDetailScreen.tsx`의 이름 되짚기를 고쳐 로스터 밖 캐릭터를 방어한다. **대체 표시는 이름 자리를 비우고 나머지(날짜·본문·사진·신호)를 그대로 보이는 것이다** — 내부 식별자·대체 문구를 지어내지 않는다. **`personaOf()`는 고치지 않는다** — 로스터 밖에 페르소나를 돌려주면 원칙 III가 흐려진다(plan D2·R3). 방어는 읽는 쪽에 둔다 (FR-008)
 - [ ] T030 [P] [US2] `__tests__/ui/diary-list.test.tsx`에 로스터 밖 캐릭터가 쓴 일기가 목록에 나타나는 검사를 더한다 (FR-008)
 - [ ] T031 [P] [US2] `__tests__/app/selection-store.test.ts`에 계약 C3을 더한다 — `selected-character.json`에 로스터 밖 이름이 들었을 때 `loadSelection()`이 `null`을 돌려준다. **코드 변경 없이 통과해야 한다**(R2) — 통과하지 않으면 R2의 판단이 틀린 것이므로 기록한다 (FR-009)
 - [ ] T032 [P] [US2] `__tests__/diary/character-name.test.ts`에 계약 C3을 더한다 — `personaOf()`가 로스터 밖 캐릭터에 페르소나를 만들어 주지 않는다
@@ -117,7 +120,8 @@ index로 고르므로 길이 5→1에 무관하다. 조립부가 만드는 배�
 - [ ] T033 [P] [US3] `__tests__/ui/author-picker.test.tsx`를 갱신한다 — 한 줄짜리 `options`로 렌더되고 [이름 바꾸기]가 나타난다. **035의 W18·W19(이름 바꾸기 배선)와 리스트 `key`가 위치라는 검사는 그대로 둔다** (FR-012·013, E5)
 - [ ] T034 [US3] `App.tsx`의 작성자 자리 조립이 `CHARACTERS` 하나로 배열을 만드는지 확인하고, 필요하면 고친다 (FR-012)
 - [ ] T035 [P] [US3] `__tests__/app/selection.test.ts`(10곳)를 갱신한다 — **007의 "고른 적 없으면 자동으로 안 고른다"가 캐릭터 하나에서도 성립하는지** 검사한다. 이것이 C5의 되돌릴 길이다 (FR-014)
-- [ ] T036 [US3] 캐릭터가 하나일 때 준비를 잃으면 옮길 곳이 없다 — 말없이 실패하지 않고 준비되지 않았음을 알리는지 확인하고, 안 되면 고친다 (FR-010, data-model 상태 전이)
+- [ ] T036 [US3] **현행 동작을 먼저 읽어 기록한다** — 캐릭터가 하나일 때 준비를 잃으면 007의 "다른 것으로 옮긴다"가 어떻게 되는지 소스에서 확인한다(R2 선례: 읽고 판정한 뒤 작업을 정한다). 결과를 research.md에 한 줄 남긴다 (FR-010)
+- [ ] T036a [US3] T036의 결과가 "말없이 실패"이면 준비되지 않았음을 알리도록 고친다. 이미 알리고 있으면 계약 테스트로 잠그기만 한다 (FR-010, data-model 상태 전이)
 
 **Checkpoint**: 이름 바꾸기가 살아 있다. `npm test` 클린.
 
