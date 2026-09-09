@@ -32,16 +32,18 @@ function requestFor(signals: DaySignals, character: Character = "quiet"): DiaryR
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 036 — 한국어 캐릭터(quiet·narrative·imaginative)는 E2SN 머리·문장형 신호·감싼
-// 캡션으로 바뀌었다(리포트 §5.6, 헌법 1.5.0). 그 계약은 prompt-e2sn.test.ts가
-// 잠근다. 아래 블록 중 **"라벨: 값" 신호 형식·현행 문안·현행 캡션 목록**을 검사하는
-// 것은 chinese·english가 유지하는 경로이므로, 이 파일은 그 캐릭터로 검사한다.
-// (005~017이 세운 비-E2SN 프롬프트 기계가 사라지지 않았다는 회귀 검사.)
+// 036 — 한국어 캐릭터는 E2SN 머리·문장형 신호·감싼 캡션으로 바뀌었다(리포트 §5.6,
+// 헌법 1.5.0). 그 계약은 prompt-e2sn.test.ts가 잠근다.
+//
+// ★ 037 — **비-E2SN(현행) 경로에 닿는 캐릭터가 로스터에 없다.** 문장형 신호가
+// 한국어 숫자 낱말이라 다른 언어에 그대로 못 쓰므로 그 경로는 소스에 남아 있고
+// (FR-014), 외국어 캐릭터가 다시 들어오면 `usesE2SN()`이 자동으로 이어 준다.
+//
+// 그래서 005~017이 세운 프롬프트 기계가 사라지지 않았다는 회귀 검사를 **프롬프트를
+// 조립해 보는 대신 소스에서** 한다. 캐릭터를 인자로 부를 수 없기 때문이지 그 기계가
+// 필요 없어졌기 때문이 아니다 — 캐릭터가 늘면 아래 검사를 조립 검사로 되돌린다.
 // ─────────────────────────────────────────────────────────────────────────────
-const LEGACY = "chinese" as const;
-function legacyRequest(signals: DaySignals): DiaryRequest {
-  return requestFor(signals, LEGACY);
-}
+const PROMPT_SOURCE = readFileSync(join(__dirname, "../../src/diary/prompt.ts"), "utf8");
 
 describe("P-1 화자 규칙이 항상 있다 (FR-013·013a)", () => {
   // 어떤 캐릭터, 어떤 신호에서도 빠지지 않아야 한다. 빠지는 조합이 하나라도 있으면
@@ -104,7 +106,7 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
   //  예시 목록 → "무엇을 먹었는지, 누구를 만났는지" (한 문장, 나열 아님)
   // chinese·english는 현행 문장을 유지한다.
   it("본 것만 쓰라는 지시가 담긴다 (현행: chinese)", () => {
-    expect(buildPrompt(legacyRequest(unknownDay(DAY)))).toMatch(/본 것만|기록에 있는 것만/);
+    expect(PROMPT_SOURCE).toMatch(/본 것만|기록에 있는 것만/);
   });
 
   it("E2SN: 본 것으로 짐작하라는 지시가 담긴다 (한국어)", () => {
@@ -124,7 +126,7 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
   it("모르는 것을 모른다고 쓰는 것이 허용된다는 것이 담긴다 (현행: chinese)", () => {
     // 036 — 한국어 캐릭터에서는 이 문장을 뺐다. "모른다고 쓴 일기가 낫다"가 끝 문단
     // 면책을 만들어서다(헌법 1.5.0 원칙 II 개정, 리포트 §5.4). 대신 짐작을 권한다.
-    expect(buildPrompt(legacyRequest(unknownDay(DAY)))).toMatch(/모른다고|모르는 것을/);
+    expect(PROMPT_SOURCE).toMatch(/모른다고|모르는 것을/);
   });
 
   it("★ 지어내면 안 되는 예가 구체적으로 담긴다", () => {
@@ -178,44 +180,33 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
 });
 
 describe("P-2 캐릭터에서 오는 것은 언어뿐이다 (FR-014·014a·014b)", () => {
-  it("한국어 캐릭터 셋은 한국어로 쓰도록 지시받는다", () => {
-    for (const character of ["quiet", "narrative", "imaginative"] as const) {
+  it("로스터의 캐릭터가 제 출력 언어로 쓰도록 지시받는다", () => {
+    for (const character of CHARACTERS) {
       expect(buildPrompt(requestFor(richDay(DAY), character))).toContain("한국어");
     }
   });
 
-  it("chinese는 중국어로 쓰고 한국어 지시를 받지 않는다", () => {
-    const prompt = buildPrompt(requestFor(richDay(DAY), "chinese"));
-    expect(prompt).toContain("중국어");
-    expect(prompt).not.toContain("한국어");
-  });
+  /**
+   * ★ 037 — 캐릭터가 하나여서 **직접 비교할 수 없게 된 성질**이다.
+   *
+   * 원래 이 자리에는 "언어·이름 문장을 빼면 같은 언어 캐릭터의 프롬프트가 같다"가
+   * 있었다. 성격 지시("짧게 써라", "감정을 얹어라")가 하나라도 들어가면 깨지는
+   * 검사이며, 그것이 FR-014·015(캐릭터에서 오는 것은 이름과 언어뿐)의 핵심
+   * 방어였다 — 성격이 모델이 아니라 우리가 지어낸 것이 되면 로스터의 근거가
+   * 무너진다(헌법 원칙 III).
+   *
+   * **캐릭터가 둘 이상이 되면 그 비교를 되살린다**(037 FR-014). 지금은 같은
+   * 성질을 소스에서 검사한다 — 캐릭터로 갈리는 표가 `LANGUAGE`·`E_TONE` 둘뿐임을
+   * 확인한다. 셋째가 생기면 캐릭터가 언어·톤 밖의 무언가로도 갈린다는 뜻이다.
+   */
+  it("캐릭터로 갈리는 표가 출력 언어와 톤 줄뿐이다 (037 — 비교 대신 소스 검사)", () => {
+    const source = readFileSync(join(__dirname, "../../src/diary/prompt.ts"), "utf8");
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
-  it("english는 영어로 쓰고 한국어 지시를 받지 않는다", () => {
-    const prompt = buildPrompt(requestFor(richDay(DAY), "english"));
-    expect(prompt).toContain("영어");
-    expect(prompt).not.toContain("한국어");
-  });
-
-  it("언어·이름 문장을 빼면 같은 언어 캐릭터의 프롬프트가 같다", () => {
-    // **이것이 FR-014·015의 핵심 검증이다.** 성격 지시("짧게 써라", "감정을 얹어라")가
-    // 하나라도 들어가면 이 테스트가 깨진다 — 그 순간 성격이 모델이 아니라 우리가 지어낸
-    // 것이 되고 로스터의 근거가 무너진다(원칙 III).
-    //
-    // 036 — 프롬프트가 언어로 갈린다(한국어 3캐릭터는 E2SN, 외국어 2캐릭터는 현행).
-    // 그래서 "다섯이 같다"가 아니라 "같은 언어끼리 같다"를 검사한다. 다만 한국어
-    // 캐릭터 중 quiet만 톤 줄이 있으므로(§3.1) narrative·imaginative만 비교한다.
-    const names = CHARACTERS.map((c) => personaOf(c).name).join("|");
-    const strip = (character: Character) =>
-      buildPrompt(requestFor(richDay(DAY), character))
-        .split("\n")
-        .filter((line) => !/한국어|중국어|영어/.test(line))
-        .filter((line) => !new RegExp(names).test(line))
-        .join("\n");
-
-    // 한국어(톤 줄 없는 둘)
-    expect(strip("imaginative")).toBe(strip("narrative"));
-    // 외국어
-    expect(strip("english")).toBe(strip("chinese"));
+    const records = [...code.matchAll(/const (\w+): Readonly<Record<Character,/g)].map(
+      (m) => m[1],
+    );
+    expect(records.sort()).toEqual(["E_TONE", "LANGUAGE"]);
   });
 
   /**
@@ -285,7 +276,7 @@ describe("P-3 신호의 세 갈래가 서로 다른 말이 된다 (FR-012a·b)",
   it("known은 관측된 사실로 적힌다", () => {
     // 036 — 한국어 캐릭터는 문장형("사진은 세 장이 남았다"), 현행은 라벨형("사진: 3장").
     expect(buildPrompt(requestFor(richDay(DAY)))).toMatch(/사진은 세 장이 남았다/);
-    expect(buildPrompt(legacyRequest(richDay(DAY)))).toContain("3"); // 사진 세 장
+    expect(buildPrompt(requestFor(richDay(DAY)))).toMatch(/세 장|3/); // 사진 세 장
   });
 
   it("한 하루 안에서 세 갈래가 섞여도 각각 옳게 나온다", () => {
@@ -322,7 +313,7 @@ describe("P-4 관측의 한계가 함께 간다 (FR-012c·d)", () => {
     // 036 — 한국어 캐릭터는 "이것이 그날 사진의 전부는 아니다. 더 있을 수 있다.",
     // 현행(chinese)은 "사진의 정확한 수를 단언하지 마라".
     expect(buildPrompt(requestFor(truncatedDay()))).toMatch(/전부는 아니다.*더 있을 수 있다/s);
-    expect(buildPrompt(legacyRequest(truncatedDay()))).toMatch(/정확한 수|수를 단언/);
+    expect(PROMPT_SOURCE).toMatch(/정확한 수|수를 단언/);
   });
 
   it("잘리지 않은 하루에는 그 경고가 붙지 않는다", () => {
@@ -351,13 +342,11 @@ describe("P-4 관측의 한계가 함께 간다 (FR-012c·d)", () => {
         },
       },
     };
-    // 036 — 한국어 캐릭터는 한국어 숫자 낱말("사진 열 장 중 두 장에서 얻은 자리다"),
-    // 현행(chinese)은 아라비아 숫자("사진 10장 중 2장에서 얻었다").
+    // 036 — 한국어 캐릭터는 한국어 숫자 낱말("사진 열 장 중 두 장에서 얻은 자리다").
+    // 037 — 아라비아 숫자를 쓰는 현행 경로는 닿는 캐릭터가 없어 소스로 확인한다.
     const ko = buildPrompt(requestFor(signals));
     expect(ko).toContain("열 장 중 두 장");
-    const legacy = buildPrompt(legacyRequest(signals));
-    expect(legacy).toContain("2");
-    expect(legacy).toContain("10");
+    expect(PROMPT_SOURCE).toMatch(/photosWithLocation|장 중/);
   });
 });
 
@@ -589,171 +578,46 @@ describe("012 — DAY_STILL_OPEN, 하루가 아직 끝나지 않았다는 문장
  * 이것이 깨지면 010까지의 검증이 전부 흔들린다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-describe("011 — 캡션이 프롬프트에 들어간다", () => {
-  const caption = (hour: number, text: string) => ({
-    photoId: `p${hour}`,
-    takenAt: new Date(2026, 7, 20, hour, 0, 0),
-    text,
+/**
+ * 011 — 캡션이 프롬프트에 들어간다.
+ *
+ * ★ 037 — **이 블록이 검사하던 현행 캡션 목록 형식("사진에 담긴 것:", "- N시:")에
+ * 닿는 캐릭터가 로스터에 없다.** 한국어 캐릭터는 036의 감싼 캡션("내가 N시에 담은
+ * 장면:")을 쓰고, 그 계약은 `prompt-e2sn.test.ts`의 E3가 잠근다.
+ *
+ * 현행 경로는 소스에 그대로 남아 있다(FR-014) — 문장형 신호가 한국어 숫자 낱말이라
+ * 다른 언어에 못 쓰므로, 외국어 캐릭터가 로스터에 들어오면 `usesE2SN()`이 자동으로
+ * 이어 준다. 아래는 그 기계가 사라지지 않았다는 소스 회귀 검사다.
+ *
+ * **캐릭터가 늘면 이 블록을 조립 검사로 되돌린다** — 지운 것이 아니라 지금 부를 수
+ * 없을 뿐이다.
+ */
+describe("011 — 캡션 기계가 소스에 남아 있다 (037 — 닿는 캐릭터 없음)", () => {
+  it("현행 캡션 목록 문안이 남아 있다", () => {
+    expect(PROMPT_SOURCE).toContain("사진에 담긴 것:");
   });
 
-  const seen = (
-    captions: ReturnType<typeof caption>[],
-    considered = captions.length,
-    available = considered,
-  ) => ({ captions, considered, available });
-
-  // 036 — 감싼 캡션("내가 N시에 담은 장면:")은 한국어 캐릭터의 계약이며
-  // prompt-e2sn.test.ts E3가 잠근다. 이 블록은 현행 캡션 목록("사진에 담긴 것:",
-  // "- N시:")을 유지하는 chinese·english 경로의 회귀 검사다.
-  const dayWithPhotos = (): DiaryRequest => requestFor(partiallyUnknownDay("2026-08-20"), LEGACY);
-
-  // ★ P-1 — SC-002의 방어.
-  it("P-1. vision이 없으면 005와 바이트 단위로 같다", () => {
-    const request = dayWithPhotos();
-    expect(buildPrompt(request, undefined)).toBe(buildPrompt(request));
+  it("캡션의 한계 문구(전부가 아니다 / 일부만 읽음)가 남아 있다", () => {
+    expect(PROMPT_SOURCE).toMatch(/전부가 아니|VISION_PARTIAL/);
   });
 
-  it("P-2. 캡션 줄에 시각이 붙는다 (FR-007b)", () => {
-    const prompt = buildPrompt(
-      dayWithPhotos(),
-      seen([caption(8, "창가의 커피잔"), caption(20, "불 켜진 실내")]),
-    );
-
-    expect(prompt).toContain("- 8시: 창가의 커피잔");
-    expect(prompt).toContain("- 20시: 불 켜진 실내");
-  });
-
-  it("캡션이 신호 뒤, 마지막 지시 앞에 온다", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")]));
-
-    expect(prompt.indexOf("사진에 담긴 것:")).toBeGreaterThan(prompt.indexOf("네가 본 것:"));
-    expect(prompt.indexOf("사진에 담긴 것:")).toBeLessThan(prompt.indexOf("일기를 써라"));
-  });
-
-  // ★ P-3 — 사용자가 clarify에서 확정한 것이다.
-  it("P-3. 캡션에 짐작 표시·한계 문구를 붙이지 않는다 (FR-011)", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "창가의 커피잔")]));
-    const line = prompt.split("\n").find((l) => l.includes("커피잔")) ?? "";
-
-    expect(line).toBe("- 8시: 창가의 커피잔");
-    expect(prompt).not.toMatch(/틀릴 수 있|잘못 읽|확신|것 같다고 보인다/);
-  });
-
-  it("P-4. 있는 것 중 일부만 보면 「전부가 아니다」가 붙는다 (SC-007)", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 12));
-    expect(prompt).toMatch(/그날의 전부가 아니다/);
-  });
-
-  it("고른 것 중 일부를 못 읽으면 그렇게 적는다 (FR-006)", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 5));
-    expect(prompt).toContain("일부는 내용을 보지 못했다");
-  });
-
-  /**
-   * ★ P-5 — 원칙 V의 자리다.
-   *
-   * **「사진이 없었다」와 완전히 다른 사실이다.** 004가 값에서 지킨 구분이 한 겹 위에서
-   * 반복되며, 뭉개면 010이 실기기에서 확인한 「없었다 / 모른다」의 성취가 무너진다.
-   */
-  it("P-5. 사진은 있는데 하나도 못 읽으면 「없었다」가 아니다 (SC-006)", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([], 5, 5));
-
-    expect(prompt).toContain("사진은 있었으나 내용을 하나도 보지 못했다");
-    expect(prompt).not.toContain("사진에 담긴 것:");
-  });
-
-  it("P-6. 두 한계가 겹치면 둘 다 나온다", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 20));
-
-    expect(prompt).toMatch(/그날의 전부가 아니다/);
-    expect(prompt).toContain("일부는 내용을 보지 못했다");
-  });
-
-  // ★ P-7 — SC-001a. 구조로 보장되는 것을 검사로 못 박는다.
-  // 036 — 캡션 형식이 언어로 갈린다(한국어=감싼 틀, 외국어=목록). 같은 언어끼리는
-  // 여전히 같다. 한국어 캐릭터의 감싼 캡션 동일성은 prompt-e2sn.test.ts가 잠근다.
-  it("P-7. 같은 언어 캐릭터끼리 캡션 부분이 같다 (FR-013, SC-001a)", () => {
-    const vision = seen([caption(8, "창가의 커피잔"), caption(20, "강가의 산책로")]);
-    const captionPart = (character: Character, marker: string) => {
-      const request = { ...requestFor(partiallyUnknownDay("2026-08-20"), character), character };
-      const prompt = buildPrompt(request, vision);
-      return prompt.slice(prompt.indexOf(marker));
-    };
-    // 외국어 둘
-    expect(captionPart("english", "사진에 담긴 것:")).toBe(
-      captionPart("chinese", "사진에 담긴 것:"),
-    );
-    // 한국어 둘 (톤 줄 없는 narrative·imaginative)
-    expect(captionPart("imaginative", "내가 8시에 담은 장면:")).toBe(
-      captionPart("narrative", "내가 8시에 담은 장면:"),
-    );
-  });
-
-  /**
-   * ★ P-8 — 이것이 빠지면 **성공한 일기가 거부된다.**
-   *
-   * 005가 「신호가 들어간 줄은 넣지 않는다」고 이미 적었고, **캡션은 신호 그 자체다.**
-   * 「창가에 놓인 커피잔」이 일기에 나오는 것은 정확히 우리가 원하는 것이다.
-   */
-  it("P-8. instructionLines가 캡션 본문을 담지 않는다", () => {
-    const vision = seen([caption(8, "창가의 커피잔"), caption(20, "강가의 산책로")]);
-    const lines = instructionLines(dayWithPhotos(), vision);
-
-    for (const line of lines) {
-      expect(line).not.toContain("창가의 커피잔");
-      expect(line).not.toContain("강가의 산책로");
-      expect(line).not.toContain("8시:");
+  it("캡션에 모델 정보를 붙이는 코드가 없다", () => {
+    const code = PROMPT_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    for (const forbidden of ["kanana", "exaone", "gguf", "Q4_K_M"]) {
+      expect(code.toLowerCase()).not.toContain(forbidden.toLowerCase());
     }
-  });
-
-  it("instructionLines가 한계 줄은 담는다 — 지시문이므로 되뱉으면 잡아야 한다", () => {
-    const lines = instructionLines(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 12));
-    expect(lines.some((l) => /그날의 전부가 아니다/.test(l))).toBe(true);
-  });
-
-  it("instructionLines의 모든 줄이 프롬프트에 실제로 들어 있다 (P-7의 성질 유지)", () => {
-    const vision = seen([caption(8, "커피잔")], 5, 12);
-    const request = dayWithPhotos();
-    const prompt = buildPrompt(request, vision);
-
-    for (const line of instructionLines(request, vision)) {
-      expect(prompt).toContain(line);
-    }
-  });
-
-  it("P-9. vision을 넣어도 결정적이다", () => {
-    const vision = seen([caption(8, "커피잔")]);
-    const request = dayWithPhotos();
-
-    expect(buildPrompt(request, vision)).toBe(buildPrompt(request, vision));
-  });
-
-  it("캡션이 없고 고른 것도 없으면 아무 줄도 붙지 않는다", () => {
-    const request = dayWithPhotos();
-    expect(buildPrompt(request, seen([], 0, 0))).toBe(buildPrompt(request));
-  });
-
-  // 원칙 III·IV — 모델 정보와 지표가 프롬프트에 새지 않는다.
-  it("캡션 부분에 모델 정보·시간·토큰이 없다", () => {
-    const prompt = buildPrompt(dayWithPhotos(), seen([caption(8, "커피잔")], 5, 12));
-
-    expect(prompt).not.toMatch(/LFM|SmolVLM|mmproj|gguf|토큰|ms|초 걸/i);
   });
 });
 
-/**
- * 017 — 제목·본문 서두 보강 (contracts/title.md TL2·TL3·TL4·TL7·TL9·TL10·TL11).
- *
- * **지시문 텍스트 자체만 검사한다**(TL6·TL7). 모델 출력을 채점하는 코드는
- * 만들지 않는다 — "우리가 무엇을 요구했는가"이지 "모델이 무엇을 냈는가"가
- * 아니다.
- */
+
 describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", () => {
   // 036 — 한국어 캐릭터의 제목 지시문은 E2_TITLE로 바뀌었다(FR-003): 이름 든 반례·
-  // 기호 나열·"반복하지" 문구를 뺐다(리포트 §5.1·§5.2). 아래는 그 문구들을 유지하는
-  // chinese·english(TITLE_INSTRUCTION)의 회귀 검사다. E2_TITLE 계약은
+  // 기호 나열·"반복하지" 문구를 뺐다(리포트 §5.1·§5.2). E2_TITLE 계약은
   // prompt-e2sn.test.ts E1이 잠근다.
-  const request = requestFor(partiallyUnknownDay(DAY), LEGACY);
+  //
+  // ★ 037 — 그 문구들을 유지하는 `TITLE_INSTRUCTION` 경로에 닿는 캐릭터가 로스터에
+  // 없다. 아래는 조립 대신 소스에서 보는 회귀 검사다(FR-014).
+  const request = requestFor(partiallyUnknownDay(DAY));
 
   it("재조합 패턴을 금지하는 구체적 예시를 포함한다 (TL2)", () => {
     const lines = instructionLines(request);
@@ -772,13 +636,15 @@ describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", 
     expect(titleLines).toMatch(/제목.*짐작|짐작.*제목/s);
   });
 
-  it("마크다운 서식 기호를 쓰지 말라는 구체적 예시를 포함한다 (TL9)", () => {
+  it("마크다운 서식 기호를 쓰지 말라는 지시를 포함한다 (TL9, 036 이후)", () => {
     const lines = instructionLines(request);
     const titleLines = lines.join("\n");
 
-    // "#"·"*"·"**"·"-" 같은 기호를 구체적으로 나열한다.
-    expect(titleLines).toContain("#");
-    expect(titleLines).toContain("*");
+    // 036 — 기호 나열("#, *, **, -")을 "서식 기호"로 뭉뚱그렸다. 기호를 보여 주면
+    // 모델이 `#없음 *없음`을 베낀다(리포트 §5.2). 037 — 나열을 유지하는 현행 경로에
+    // 닿는 캐릭터가 없으므로 그 문안은 소스에서 확인한다.
+    expect(titleLines).toMatch(/서식 기호/);
+    expect(PROMPT_SOURCE).toContain("#");
   });
 
   it("'빈 줄'이라는 낱말이 지시문 문자열에 없다 (TL10 역검증)", () => {
@@ -788,11 +654,14 @@ describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", 
     expect(titleLines).not.toContain("빈 줄");
   });
 
-  it("본문이 날짜·제목을 반복하지 말고 바로 시작하라는 지시를 포함한다 (TL11)", () => {
+  it("본문 서두 지시를 포함한다 (TL11, 036 이후)", () => {
     const lines = instructionLines(request);
     const titleLines = lines.join("\n");
 
-    expect(titleLines).toMatch(/반복하지|다시.*(쓰지|적지)|날짜.*시작하지/);
+    // 036 — E2_TITLE은 "반복하지"를 뺐다(되뇜의 재료가 된다). 대신 본문 첫 문장을
+    // 무엇으로 시작할지 직접 말한다. 037 — "반복하지" 문안은 현행 경로에 남아 있다.
+    expect(titleLines).toMatch(/본문 첫 문장|반복하지|다시.*(쓰지|적지)/);
+    expect(PROMPT_SOURCE).toMatch(/반복하지/);
   });
 
   it("완성된 제목 형태의 긍정 예시가 없다 (TL3 역검증)", () => {
@@ -819,16 +688,16 @@ describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", 
         (line) => line.includes("제목") && line.startsWith("첫 줄에"),
       );
 
-    // 한국어 셋 (E2_TITLE — quiet 톤 줄과 무관하게 제목 지시문 자체는 같다)
-    for (const c of ["quiet", "narrative", "imaginative"] as const) {
+    // 037 — 로스터의 캐릭터가 하나라 "같은 언어끼리 같다"를 직접 비교할 수 없다.
+    // 제목 지시문이 캐릭터가 아니라 **언어**로 갈린다는 성질은 소스에서 본다 —
+    // 캐릭터가 늘면 위 비교를 되살린다(FR-014).
+    for (const c of CHARACTERS) {
       expect(titleOf(c)).toBeDefined();
       expect(titleOf(c)).toBe(titleOf("quiet"));
     }
-    // 외국어 둘 (TITLE_INSTRUCTION)
-    expect(titleOf("english")).toBeDefined();
-    expect(titleOf("english")).toBe(titleOf("chinese"));
-    // 두 지시문은 서로 다르다 (036 언어 분기 확인)
-    expect(titleOf("quiet")).not.toBe(titleOf("chinese"));
+    // 037 — 언어로 갈린다는 성질은 소스에서 본다(닿는 외국어 캐릭터가 없다).
+    expect(PROMPT_SOURCE).toContain("TITLE_INSTRUCTION");
+    expect(PROMPT_SOURCE).toContain("E2_TITLE");
   });
 });
 
@@ -850,7 +719,7 @@ describe("018 — 고정 접두사 (contracts/prompt-prefix.md)", () => {
   });
 
   it("P10: 접두사에 날마다 바뀌는 것이 섞이지 않는다", () => {
-    const prefix = promptPrefix("narrative");
+    const prefix = promptPrefix("quiet");
     expect(prefix).not.toMatch(/\d{4}-\d{2}-\d{2}/); // 날짜
     expect(prefix).not.toContain("에 네가 본 것"); // 신호 절 머리
     expect(prefix).not.toContain("사진");
@@ -898,8 +767,10 @@ describe("035 — 사용자 지정 이름이 호칭 줄에 흐른다 (N14~N17)",
   });
 
   it("지정하지 않은 캐릭터는 기본 이름 그대로다", () => {
-    const prompt = buildPrompt({ ...requestFor(richDay(DAY), "narrative"), customNames: CUSTOM });
-    expect(prompt).toContain("너는 '루이'이라 불린다.");
+    // 037 — 로스터가 하나라 "다른 캐릭터에는 안 번진다"를 캐릭터로 비교할 수 없다.
+    // 대신 **이 캐릭터의 이름을 지정하지 않았을 때** 기본 이름이 오는 것을 본다.
+    const prompt = buildPrompt({ ...requestFor(richDay(DAY), "quiet"), customNames: {} });
+    expect(prompt).toContain("너는 '금동이'이라 불린다.");
   });
 
   it("customNames가 없으면 035 이전과 바이트 단위로 같다", () => {
@@ -917,12 +788,18 @@ describe("035 — 사용자 지정 이름이 호칭 줄에 흐른다 (N14~N17)",
     expect(promptPrefix("quiet", CUSTOM)).not.toBe(promptPrefix("quiet"));
   });
 
-  it("★ N16: 호칭 줄이 접두사에 남아 있어 한국어 캐릭터 셋이 서로 다르다", () => {
-    // 호칭 줄을 접두사에서 빼면 quiet·narrative·imaginative가 전부 같은
-    // 접두사가 되고(셋 다 한국어) P11이 막으려던 상황이 정확히 발생한다.
-    const korean = ["quiet", "narrative", "imaginative"] as const;
-    const prefixes = korean.map((c) => promptPrefix(c));
-    expect(new Set(prefixes).size).toBe(korean.length);
+  it("★ N16: 호칭 줄이 접두사에 남아 있다 (037 — 소스 검사)", () => {
+    // 원래는 "한국어 캐릭터 셋의 접두사가 서로 다르다"를 셌다. 호칭 줄을 접두사에서
+    // 빼면 같은 언어의 캐릭터가 전부 같은 접두사가 되고, 018 P11이 막으려던
+    // "캐릭터를 바꿔도 이전 캐릭터의 KV 캐시를 재사용한다"가 정확히 발생한다.
+    //
+    // ★ 037 — 로스터가 하나라 **접두사를 서로 비교할 대상이 없다.** 캐릭터가 둘
+    // 이상이 되면 위 비교를 되살린다(FR-014). 지금은 접두사에 호칭 줄이 실제로
+    // 들어 있는지를 본다 — 그 줄이 캐릭터별 유일성의 유일한 재료다.
+    const prefix = promptPrefix("quiet");
+    expect(prefix).toContain("금동이");
+    // 이름을 바꾸면 접두사도 바뀐다 = 호칭 줄이 접두사 안에 있다는 증거.
+    expect(promptPrefix("quiet", CUSTOM)).not.toBe(prefix);
   });
 
   it("N15/P10: 이름이 있어도 접두사에 날마다 바뀌는 것은 없다", () => {

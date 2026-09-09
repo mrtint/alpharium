@@ -23,11 +23,11 @@ description: "Task list — 로스터를 검증된 하나로 축소"
 **Purpose**: 코드보다 헌법이 먼저다(Governance MUST). 이 단계가 끝나기
 전에는 `src/`를 건드리지 않는다.
 
-- [ ] T001 `.specify/memory/constitution.md`의 「로스터」 절에서 exaone·hyperclovax·qwen3·gemma3 조항과 "qwen과 gemma를 한국어에서 제외하는 근거" 문단을 걷어내고 kanana 조항만 남긴다 (FR-001)
-- [ ] T002 `.specify/memory/constitution.md`의 「로스터」 절에서 "「상상을 섞는다」는 hyperclovax만의 성질이 아니다" 문단을 **남기되** 빠진 캐릭터 이름을 걷어낸 문장으로 다듬는다 — 방어선이 프롬프트이고 판정 갈래를 늘리지 않는다는 결론은 그대로다 (FR-003)
-- [ ] T003 `.specify/memory/constitution.md`의 원칙 III에 로스터 진입 기준 조항을 더한다: 이 저장소의 프롬프트로 저장 가능한 일기를 안정적으로 내는 것이 실기기에서 관측되어야 한다(MUST) + 로스터는 검증을 감당할 수 있는 크기로 유지한다(SHOULD) (FR-002)
-- [ ] T004 `.specify/memory/constitution.md`의 버전을 1.6.0으로 올리고 Last Amended를 2026-09-09로 바꾼다. 개정 기록에 캐릭터별 삭제 근거를 출처와 함께 남긴다 — narrative(024 T034·§10), imaginative(037 실기기 3/3), chinese·english(028), 리포트 222런 (FR-001·SC-005)
-- [ ] T005 헌법 개정만 담은 커밋을 만든다 — `src/` 변경이 섞이면 안 된다 (FR-004)
+- [X] T001 `.specify/memory/constitution.md`의 「로스터」 절에서 exaone·hyperclovax·qwen3·gemma3 조항과 "qwen과 gemma를 한국어에서 제외하는 근거" 문단을 걷어내고 kanana 조항만 남긴다 (FR-001)
+- [X] T002 `.specify/memory/constitution.md`의 「로스터」 절에서 "「상상을 섞는다」는 hyperclovax만의 성질이 아니다" 문단을 **남기되** 빠진 캐릭터 이름을 걷어낸 문장으로 다듬는다 — 방어선이 프롬프트이고 판정 갈래를 늘리지 않는다는 결론은 그대로다 (FR-003)
+- [X] T003 `.specify/memory/constitution.md`의 원칙 III에 로스터 진입 기준 조항을 더한다: 이 저장소의 프롬프트로 저장 가능한 일기를 안정적으로 내는 것이 실기기에서 관측되어야 한다(MUST) + 로스터는 검증을 감당할 수 있는 크기로 유지한다(SHOULD) (FR-002)
+- [X] T004 `.specify/memory/constitution.md`의 버전을 1.6.0으로 올리고 Last Amended를 2026-09-09로 바꾼다. 개정 기록에 캐릭터별 삭제 근거를 출처와 함께 남긴다 — narrative(024 T034·§10), imaginative(037 실기기 3/3), chinese·english(028), 리포트 222런 (FR-001·SC-005)
+- [X] T005 헌법 개정만 담은 커밋을 만든다 — `src/` 변경이 섞이면 안 된다 (FR-004)
 
 **Checkpoint**: `grep -n "Version.*1.6.0" .specify/memory/constitution.md`이 맞고, 커밋이 코드보다 먼저 있다.
 
@@ -41,16 +41,16 @@ description: "Task list — 로스터를 검증된 하나로 축소"
 ⚠️ 이 단계가 끝나기 전에는 `npm run lint`가 빨간불이다 — 정상이다. `tsc`
 오류 목록이 곧 T007~T012의 작업 지시다.
 
-- [ ] T006 `src/diary/types.ts`의 `Character` 유니온을 `"quiet"`로, `CHARACTERS` 배열을 `["quiet"]`로 좁힌다 (FR-005, E1)
-- [ ] T007 `npm run lint`를 돌려 `tsc` 오류 목록을 받아 적는다 — 이것이 T008~T012의 대상 목록이다(plan D1). 오류가 예상 자리(persona·roster·prompt·acceptance·DiagnosticsScreen) 밖으로 나오면 plan에 없던 소비 지점이므로 기록한다
-- [ ] T008 [P] `src/diary/persona.ts`의 `PERSONAS`에서 루이·오드·샤오바이·모카를 걷어내고 금동이만 남긴다 (FR-006, E2)
-- [ ] T009 [P] `src/models/roster.ts`의 `ASSETS`·`DISPLAY_NAMES`에서 a2~a5를 걷어낸다 (FR-006, E2)
-- [ ] T010 [P] `src/diary/prompt.ts`의 `LANGUAGE` 레코드와 캐릭터별 톤 줄에서 빠진 캐릭터를 걷어낸다. **E2SN 문안·`usesE2SN()` 구조는 건드리지 않는다** (FR-006·FR-015, C6)
-- [ ] T011 [P] `src/diary/acceptance.ts`의 `isWrongLanguage` switch에서 도달 불가 case를 걷어낸다. **판정 갈래는 넷 그대로다** — 줄어드는 것은 한 갈래 안의 캐릭터 분기다 (FR-015, C6)
-- [ ] T012 `src/ui/DiagnosticsScreen.tsx:61`의 `PROBE_CHARACTER`를 로스터에 있는 캐릭터로 바꾼다 (FR-006)
-- [ ] T012a [P] `src/ui/CharacterListScreen.tsx:259`가 `CHARACTERS.map()`으로 캐릭터 줄을 그린다 — 배열 길이에 무관하나 029가 이 화면을 설정 탭으로 흡수했으므로 한 줄로 렌더되는지 확인한다 (FR-006·FR-007)
-- [ ] T012b [P] `src/diagnostics/prompt-preview.ts:149`·`src/diagnostics/report.ts:29-31`이 `CHARACTERS`를 돈다. **`report.ts`는 `Object.fromEntries` + `as` 캐스트라 `tsc`가 조용히 통과할 수 있다** — 캐릭터 하나로 미리보기·모델 이름 표가 정상인지 확인하고, 022의 계약 테스트 PP1이 캐릭터 수에 걸리는지 본다 (FR-006)
-- [ ] T013 `npm run lint`의 `tsc` 오류가 0인지 확인한다 — **이것이 FR-005·006의 완료 조건이다**(plan D1)
+- [X] T006 `src/diary/types.ts`의 `Character` 유니온을 `"quiet"`로, `CHARACTERS` 배열을 `["quiet"]`로 좁힌다 (FR-005, E1)
+- [X] T007 `npm run lint`를 돌려 `tsc` 오류 목록을 받아 적는다 — 이것이 T008~T012의 대상 목록이다(plan D1). 오류가 예상 자리(persona·roster·prompt·acceptance·DiagnosticsScreen) 밖으로 나오면 plan에 없던 소비 지점이므로 기록한다
+- [X] T008 [P] `src/diary/persona.ts`의 `PERSONAS`에서 루이·오드·샤오바이·모카를 걷어내고 금동이만 남긴다 (FR-006, E2)
+- [X] T009 [P] `src/models/roster.ts`의 `ASSETS`·`DISPLAY_NAMES`에서 a2~a5를 걷어낸다 (FR-006, E2)
+- [X] T010 [P] `src/diary/prompt.ts`의 `LANGUAGE` 레코드와 캐릭터별 톤 줄에서 빠진 캐릭터를 걷어낸다. **E2SN 문안·`usesE2SN()` 구조는 건드리지 않는다** (FR-006·FR-015, C6)
+- [X] T011 [P] `src/diary/acceptance.ts`의 `isWrongLanguage` switch에서 도달 불가 case를 걷어낸다. **판정 갈래는 넷 그대로다** — 줄어드는 것은 한 갈래 안의 캐릭터 분기다 (FR-015, C6)
+- [X] T012 `src/ui/DiagnosticsScreen.tsx:61`의 `PROBE_CHARACTER`를 로스터에 있는 캐릭터로 바꾼다 (FR-006)
+- [X] T012a [P] `src/ui/CharacterListScreen.tsx:259`가 `CHARACTERS.map()`으로 캐릭터 줄을 그린다 — 배열 길이에 무관하나 029가 이 화면을 설정 탭으로 흡수했으므로 한 줄로 렌더되는지 확인한다 (FR-006·FR-007)
+- [X] T012b [P] `src/diagnostics/prompt-preview.ts:149`·`src/diagnostics/report.ts:29-31`이 `CHARACTERS`를 돈다. **`report.ts`는 `Object.fromEntries` + `as` 캐스트라 `tsc`가 조용히 통과할 수 있다** — 캐릭터 하나로 미리보기·모델 이름 표가 정상인지 확인하고, 022의 계약 테스트 PP1이 캐릭터 수에 걸리는지 본다 (FR-006)
+- [X] T013 `npm run lint`의 `tsc` 오류가 0인지 확인한다 — **이것이 FR-005·006의 완료 조건이다**(plan D1)
 
 **Checkpoint**: `tsc` 0 오류. 테스트는 아직 빨간불일 수 있다(Phase 3~5에서 고친다).
 

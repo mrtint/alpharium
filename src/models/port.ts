@@ -57,7 +57,7 @@ export interface ModelFilePort {
  * 검증 결과와 중단 상태를 담는 파일.
  *
  * **한 파일에 모은다**(research.md §4). 002의 일기는 항목이 계속 늘어나 날짜별로
- * 쪼갰지만, 여기는 캐릭터가 다섯으로 고정이고 늘 전부를 조회하므로 모으는 쪽이 낫다.
+ * 쪼갰지만, 여기는 캐릭터 수가 적고 늘 전부를 조회하므로 모으는 쪽이 낫다.
  */
 export interface MetadataPort {
   /** 없으면 null. 읽을 수 없는 파일도 null로 다룬다 */

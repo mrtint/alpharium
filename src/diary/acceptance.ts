@@ -109,9 +109,12 @@ function isEcho(text: string, instructions: string[]): boolean {
  * **불리언의 조합이지 비율이 아니다.** "한국어다움 70%"를 재지 않는다.
  *
  * **비대칭이 의도적이다**: 한국어 캐릭터는 다른 문자를 금지하지 않는다 — 고유명사와
- * 영어 낱말이 섞이는 것은 정상이다. 반대로 `chinese`·`english`는 한글을 금지한다.
- * **헌법이 그 방향만 못 박았기 때문이다**("한국어로는 쓰지 않는다 MUST NOT").
- * 헌법이 말하지 않은 것을 우리가 더 금지하지 않는다.
+ * 영어 낱말이 섞이는 것은 정상이다. **헌법이 그 방향만 못 박았기 때문이며**, 헌법이
+ * 말하지 않은 것을 우리가 더 금지하지 않는다.
+ *
+ * 037(헌법 1.6.0)로 로스터가 한국어 하나가 되어 갈래가 하나로 줄었다. **판정 갈래
+ * 넷은 그대로다**(원칙 IV) — 줄어든 것은 `language` 한 갈래 안의 캐릭터 분기다.
+ * 다른 언어의 캐릭터가 로스터에 들어오면 이 `switch`에 갈래가 다시 는다.
  */
 function isWrongLanguage(text: string, character: Character): boolean {
   const hangul = HANGUL.test(text);
@@ -120,14 +123,8 @@ function isWrongLanguage(text: string, character: Character): boolean {
 
   switch (character) {
     case "quiet":
-    case "narrative":
-    case "imaginative":
       // 한글이 있으면 된다. 다른 문자가 섞이는 것은 막지 않는다.
       return !hangul;
-    case "chinese":
-      return !hanja || hangul;
-    case "english":
-      return !latin || hangul || hanja;
   }
 }
 

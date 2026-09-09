@@ -29,8 +29,12 @@ const ROSTER_CODE = ROSTER_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/
 
 describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
   // R1
-  it("다섯 캐릭터 각각에 자산이 있다", () => {
-    expect(CHARACTERS).toHaveLength(5);
+  //
+  // **개수를 못 박지 않는다**(037). 로스터 크기는 헌법 「로스터」 절의 확정 값이며
+  // 진입 기준(원칙 III, 1.6.0)을 통과한 캐릭터가 들어오면 는다. 여기서 세어야 할
+  // 것은 "몇이냐"가 아니라 **"자리마다 자산이 있느냐"**다.
+  it("로스터의 캐릭터마다 자산이 있다", () => {
+    expect(CHARACTERS.length).toBeGreaterThan(0);
     for (const character of CHARACTERS) {
       expect(assetFor(character)).toBeDefined();
     }
@@ -67,8 +71,8 @@ describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
   /**
    * 지금 몇 개가 채워졌는지 드러낸다.
    *
-   * **통과·실패를 가르지 않고 사실만 남긴다.** 다섯이 다 차면 이 줄이 "5/5"를 보고하고,
-   * 그때 위 검사가 다섯 개 전부에 실제로 걸린다.
+   * **통과·실패를 가르지 않고 사실만 남긴다.** 로스터가 다 차면 위 검사가 자리
+   * 전부에 실제로 걸린다.
    */
   it("지문이 몇 개 채워졌는지 드러난다", () => {
     const measured = CHARACTERS.filter((c) => assetFor(c).md5 !== "").length;
@@ -143,11 +147,84 @@ describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
  * 부르고, `src/ui/`는 여전히 이 파일 전체를 import할 수 없다(007 헌법 검사).
  */
 describe("진단 전용 모델 표시 이름 (014 FR-017)", () => {
-  it("다섯 캐릭터 모두 빈 문자열이 아닌 표시 이름을 준다", () => {
+  it("로스터의 캐릭터 모두 빈 문자열이 아닌 표시 이름을 준다", () => {
     for (const character of CHARACTERS) {
       const name = displayName(character);
       expect(typeof name).toBe("string");
       expect(name.trim().length).toBeGreaterThan(0);
     }
+  });
+});
+
+/**
+ * 037 — 로스터 진입과 축소의 계약 (C1·C2·C7).
+ *
+ * 계약: specs/037-roster-verified-only/contracts/roster-entry.md
+ *
+ * **이 묶음이 잠그는 것은 로스터의 크기가 아니라 무엇이 들어올 수 있는가다.**
+ * 크기는 헌법 「로스터」 절의 확정 값이며 기준을 적용한 결과다.
+ */
+describe("037 — 로스터 진입과 축소", () => {
+  /**
+   * C1 — 캐릭터에 딸린 레코드들의 키 집합이 서로 같다.
+   *
+   * `tsc`가 `Record<Character, …>`로 이미 강제하나 **jest는 타입을 지운다**(007).
+   * 한 레코드에만 캐릭터를 더하는 위반은 소스를 읽어야 잡힌다.
+   */
+  it("C1 — 캐릭터 레코드 넷의 키 집합이 같다", () => {
+    const keysOf = (source: string, declaration: string): readonly string[] => {
+      const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+      const start = code.indexOf(declaration);
+      expect(start).toBeGreaterThanOrEqual(0);
+      const open = code.indexOf("{", start);
+      const close = code.indexOf("\n};", open);
+      expect(close).toBeGreaterThan(open);
+      const body = code.slice(open, close);
+      return [...body.matchAll(/^\s{2}([a-z]+)\s*:/gm)].map((m) => m[1]).sort();
+    };
+
+    const read = (path: string): string => readFileSync(join(__dirname, path), "utf8");
+
+    const assets = keysOf(ROSTER_SOURCE, "const ASSETS");
+    const displayNames = keysOf(ROSTER_SOURCE, "const DISPLAY_NAMES");
+    const personas = keysOf(read("../../src/diary/persona.ts"), "const PERSONAS");
+    const language = keysOf(read("../../src/diary/prompt.ts"), "const LANGUAGE");
+
+    const expected = [...CHARACTERS].sort();
+    expect(assets).toEqual(expected);
+    expect(displayNames).toEqual(expected);
+    expect(personas).toEqual(expected);
+    expect(language).toEqual(expected);
+  });
+
+  /**
+   * C2 — 로스터의 캐릭터에 관측 근거가 남아 있다.
+   *
+   * 헌법 원칙 III(1.6.0)이 "실기기에서 관측되어야 한다(MUST)"와 "근거를 코드나
+   * 문서에 남긴다(MUST)"를 요구한다.
+   *
+   * **근거의 내용을 코드가 판정하지 않는다**(원칙 IV) — "안정적인가"는 사람이
+   * 로그를 읽어 정한다. 여기서 세는 것은 **근거가 적혀 있는가**뿐이다.
+   */
+  it("C2 — 로스터 캐릭터마다 관측 근거 주석이 있다", () => {
+    for (const character of CHARACTERS) {
+      const key = assetFor(character).key;
+      const at = ROSTER_SOURCE.indexOf(`key: "${key}"`);
+      expect(at).toBeGreaterThanOrEqual(0);
+      // 자산 블록 앞뒤로 실측을 가리키는 주석이 있어야 한다.
+      const around = ROSTER_SOURCE.slice(Math.max(0, at - 800), at + 800);
+      expect(around).toMatch(/실측|관측/);
+    }
+  });
+
+  /**
+   * C7 — 로스터 밖 자산을 지우는 코드가 없다 (FR-011).
+   *
+   * 로스터에서 빠진 캐릭터의 모델 파일은 사용자의 저장 공간에 남는다. **앱이
+   * 자동으로 지우지 않는다** — "로스터에 없으니 지운다"는 판단을 코드가 하게 된다.
+   * 008이 남긴 "받다 만 모델은 앱으로 못 지운다"와 같은 계열의 알려진 빈자리다.
+   */
+  it("C7 — 로스터가 자산을 지우는 경로를 갖지 않는다", () => {
+    expect(ROSTER_CODE).not.toMatch(/delete|remove|unlink|prune/i);
   });
 });

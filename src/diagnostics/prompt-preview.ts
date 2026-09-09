@@ -137,7 +137,7 @@ export const PRESET_LABELS: Readonly<Record<string, string>> = Object.fromEntrie
 );
 
 /**
- * 다섯 캐릭터 × 모든 프리셋의 미리보기 (022 FR-005·FR-007, PP4).
+ * 로스터의 캐릭터 × 모든 프리셋의 미리보기 (022 FR-005·FR-007, PP4).
  *
  * **035 — `customNames`를 받아 호칭 줄에 흐르게 한다**(FR-018). 안 주면 코드 기본
  * 이름으로 조립된다(옛 호출자가 안 깨지도록 옵셔널).
