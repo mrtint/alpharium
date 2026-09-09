@@ -45,7 +45,7 @@ import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
 import { dayOf, isDayWritable, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import { pickMonologue } from "../diary/monologue";
-import { personaOf } from "../diary/persona";
+import { PERSONA_NAMES } from "../diary/persona";
 import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
@@ -123,8 +123,8 @@ export type DiaryHomeScreenProps = {
 function nameOf(
   character: Character,
   names: Readonly<Partial<Record<Character, string>>> | undefined,
-): string {
-  return names?.[character] ?? personaOf(character).name;
+): string | undefined {
+  return names?.[character] ?? PERSONA_NAMES[character];
 }
 
 export function DiaryHomeScreen({

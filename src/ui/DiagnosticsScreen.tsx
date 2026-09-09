@@ -56,9 +56,11 @@ const generation = createAppPipeline(currentEnvironment());
  * 그것이 정상이다. 캐릭터 목록에서 준비 상태를 보고 고르는 것은 사용자 화면의 몫이며,
  * 진단은 하나를 골라 두고 눌러 보기만 한다.
  *
- * 2026-08-17 실기기에 받아 둔 것이 `imaginative`이므로 그것으로 둔다.
+ * 037(헌법 1.6.0)로 로스터가 `quiet` 하나가 됐다. **`CHARACTERS[0]`으로 쓰지 않고
+ * 식별자를 직접 적는다** — 목록 순서에 기대면 캐릭터가 늘 때 진단이 조용히 다른
+ * 캐릭터를 시험하게 된다.
  */
-const PROBE_CHARACTER: Character = "imaginative";
+const PROBE_CHARACTER: Character = "quiet";
 
 /**
  * 035 — `characterNames`가 프롬프트 미리보기의 호칭 줄에 흐른다(FR-018). 안 주면

@@ -20,15 +20,21 @@ import { join } from "node:path";
 
 import type { Character } from "../../src/diary/types";
 import { personaOf } from "../../src/diary/persona";
+import { CHARACTERS } from "../../src/diary/types";
 import { CharacterPicker } from "../../src/ui/CharacterPicker";
 
 const noop = () => {};
 
 /** 준비된 것과 아닌 것을 섞어 만든다 */
+/**
+ * 037 — 로스터에서 온다.
+ *
+ * ★ `CharacterPicker`는 029 이후 **어느 화면도 렌더하지 않는다**(홈에서 위젯이
+ * 빠지며 `AuthorPicker`가 그 자리를 맡았다). 컴포넌트와 이 계약은 남아 있으므로
+ * 로스터에 맞춰 유지한다 — 지우는 것은 이 스펙의 범위 밖이다.
+ */
 function entries(ready: Character[]): { character: Character; ready: boolean }[] {
-  return (["quiet", "narrative", "imaginative", "chinese", "english"] as const).map(
-    (character) => ({ character, ready: ready.includes(character) }),
-  );
+  return CHARACTERS.map((character) => ({ character, ready: ready.includes(character) }));
 }
 
 async function renderPicker(
@@ -43,7 +49,7 @@ async function renderPicker(
 
 describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
   it("1. 준비된 것이 둘이고 하나가 골라져 있으면 어느 것인지 보인다(FR-002)", async () => {
-    await renderPicker(["quiet", "narrative"], "quiet");
+    await renderPicker(["quiet"], "quiet");
 
     // 고른 것이 눌린 상태로 표시된다 — 접근성 상태로 검사하므로 스타일에 묶이지 않는다.
     // 014 — 버튼의 접근성 이름이 내부 식별자가 아니라 persona 이름으로 바뀐다.
@@ -52,31 +58,31 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
   });
 
   it("2. 준비되지 않은 캐릭터는 고를 수 있는 것으로 보이지 않는다(FR-004)", async () => {
-    await renderPicker(["quiet"], "quiet");
+    await renderPicker([], null); // 037 — 준비된 것이 없다
 
     const notReady = screen.getByRole("button", {
-      name: new RegExp(personaOf("narrative").name),
+      name: new RegExp(personaOf("quiet").name),
     });
     expect(notReady.props.accessibilityState?.disabled).toBe(true);
   });
 
   it("3. 준비된 것을 누르면 그 캐릭터로 onSelect가 불린다(FR-001)", async () => {
     const picked: Character[] = [];
-    await renderPicker(["quiet", "narrative"], "quiet", (c) => picked.push(c));
+    await renderPicker(["quiet"], "quiet", (c) => picked.push(c));
 
     await userEvent.press(
-      screen.getByRole("button", { name: new RegExp(personaOf("narrative").name) }),
+      screen.getByRole("button", { name: new RegExp(personaOf("quiet").name) }),
     );
 
-    expect(picked).toEqual(["narrative"]);
+    expect(picked).toEqual(["quiet"]);
   });
 
   it("4. 준비되지 않은 것을 누르면 onSelect가 불리지 않는다(FR-004)", async () => {
     const picked: Character[] = [];
-    await renderPicker(["quiet"], "quiet", (c) => picked.push(c));
+    await renderPicker([], null, (c) => picked.push(c)); // 037 — 준비된 것이 없다
 
     await userEvent.press(
-      screen.getByRole("button", { name: new RegExp(personaOf("english").name) }),
+      screen.getByRole("button", { name: new RegExp(personaOf("quiet").name) }),
     );
 
     // **고를 수 없는 것을 고른 상태로 만들지 않는다** — 쓰려다 실패하게 된다.
@@ -90,7 +96,7 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
    * 그것으로 모델을 역추적할 수 있다.
    */
   it("5. 모델 식별자·크기·속도가 화면에 없다(FR-007, SC-011)", async () => {
-    await renderPicker(["quiet", "narrative", "imaginative", "chinese", "english"], "quiet");
+    await renderPicker(["quiet"], "quiet");
 
     const rendered = JSON.stringify(screen.toJSON());
     for (const forbidden of [
@@ -129,10 +135,12 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
    * 「상상을 섞는다」는 사실 자체를 뒷받침한다(같은 하루에 quiet 0건,
    * imaginative 2건 지어냄).
    */
-  it("7. imaginative의 소개가 「상상을 섞는다」 고지를 겸한다(헌법 로스터 1.1.1)", async () => {
-    await renderPicker(["imaginative"], "imaginative");
+  // ★ 037 — 「상상을 섞는다」 고지 조항은 그 캐릭터와 함께 헌법에서 나갔다(1.6.0).
+  // 남은 성질(소개가 화면에 보인다)은 아래 "persona.ts의 소개가 보인다"가 검사한다.
+  it("7. 고른 캐릭터의 소개가 보인다", async () => {
+    await renderPicker(["quiet"], "quiet");
 
-    expect(screen.getByText(personaOf("imaginative").tagline)).toBeTruthy();
+    expect(screen.getByText(personaOf("quiet").tagline)).toBeTruthy();
   });
 
   /**
@@ -144,31 +152,31 @@ describe("CharacterPicker (007 contracts/selection.md §4 검증 표)", () => {
    * 값이 화면에 연결됐다(원칙 III).
    */
   it("다섯 자리 모두 persona.ts의 소개가 보인다(014 FR-001)", async () => {
-    await renderPicker(["quiet", "narrative", "chinese", "english"], "quiet");
+    await renderPicker(["quiet"], "quiet");
 
-    for (const character of ["quiet", "narrative", "chinese", "english"] as const) {
+    for (const character of CHARACTERS) {
       expect(screen.getByText(new RegExp(personaOf(character).tagline))).toBeTruthy();
     }
   });
 
   it("다섯 자리가 처음부터 전부 보인다(003 FR-005a를 이어받는다)", async () => {
-    await renderPicker([], null);
+    await renderPicker(["quiet"], null);
 
-    for (const character of ["quiet", "narrative", "imaginative", "chinese", "english"] as const) {
+    for (const character of CHARACTERS) {
       expect(screen.getByText(new RegExp(personaOf(character).name))).toBeTruthy();
     }
   });
 
   it("내부 식별자가 화면에 노출되지 않는다(014 FR-004)", async () => {
-    await renderPicker(["quiet", "narrative", "imaginative", "chinese", "english"], "quiet");
+    await renderPicker(["quiet"], "quiet");
 
-    for (const character of ["quiet", "narrative", "imaginative", "chinese", "english"]) {
+    for (const character of CHARACTERS) {
       expect(screen.queryByText(new RegExp(`^${character}$`))).toBeNull();
     }
   });
 
   it("추천 표시가 없다 — 다섯이 같은 자격으로 보인다(FR-008)", async () => {
-    await renderPicker(["quiet", "narrative"], null);
+    await renderPicker(["quiet"], null);
 
     const rendered = JSON.stringify(screen.toJSON());
     expect(rendered).not.toContain("추천");

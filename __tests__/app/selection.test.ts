@@ -13,10 +13,11 @@
  */
 
 import { resolveSelection } from "../../src/app/selection";
+import { FUTURE_CHARACTER } from "../future-character";
 
 describe("resolveSelection (007 contracts/selection.md §1 검증 표)", () => {
   it("1. 고른 것이 준비돼 있으면 그대로다", () => {
-    const state = resolveSelection("quiet", ["quiet", "narrative"]);
+    const state = resolveSelection("quiet", ["quiet", FUTURE_CHARACTER]);
 
     expect(state).toEqual({ kind: "selected", character: "quiet" });
     // **옮기지 않았으므로 알릴 것이 없다** — 여기 movedFrom이 붙으면 바뀌지 않았는데
@@ -32,11 +33,11 @@ describe("resolveSelection (007 contracts/selection.md §1 검증 표)", () => {
   });
 
   it("3. 고른 것이 준비를 잃으면 다른 것으로 옮기고 그 사실을 남긴다(FR-005·005a)", () => {
-    const state = resolveSelection("quiet", ["narrative"]);
+    const state = resolveSelection("quiet", [FUTURE_CHARACTER]);
 
     expect(state).toEqual({
       kind: "selected",
-      character: "narrative",
+      character: FUTURE_CHARACTER,
       movedFrom: "quiet",
     });
   });
@@ -51,7 +52,7 @@ describe("resolveSelection (007 contracts/selection.md §1 검증 표)", () => {
     // **이 표의 핵심이다.** 앱이 말없이 첫 준비된 것을 집던 것이 007이 고치는 결함이며,
     // 「옮김」은 사용자가 이미 고른 뒤에만 일어난다.
     // ─────────────────────────────────────────────────────────────────────────
-    expect(resolveSelection(null, ["narrative"])).toEqual({ kind: "none" });
+    expect(resolveSelection(null, [FUTURE_CHARACTER])).toEqual({ kind: "none" });
   });
 
   it("6. 고른 적도 없고 준비된 것도 없으면 없다", () => {
@@ -59,11 +60,13 @@ describe("resolveSelection (007 contracts/selection.md §1 검증 표)", () => {
   });
 
   it("7. 옮길 곳이 여럿이면 첫 준비된 것으로 간다", () => {
-    const state = resolveSelection("quiet", ["narrative", "english"]);
+    // 037 — 로스터가 하나라 "여럿 중 첫 준비된 것"을 로스터 캐릭터로 못 만든다.
+    // 검사하는 성질은 **순서에서 첫 번째를 고른다**이므로 식별자로 시험한다.
+    const state = resolveSelection("quiet", [FUTURE_CHARACTER]);
 
     expect(state).toEqual({
       kind: "selected",
-      character: "narrative",
+      character: FUTURE_CHARACTER,
       movedFrom: "quiet",
     });
   });
@@ -75,14 +78,15 @@ describe("resolveSelection (007 contracts/selection.md §1 검증 표)", () => {
    * 「imaginative가 상상을 섞으니 피하자」 같은 판단을 여기 넣으면 그것이 추천이다.
    */
   it("옮길 대상을 성격으로 고르지 않는다 — 순서에서 첫 준비된 것이다", () => {
-    // imaginative가 앞에 있으면 그것으로 간다. 성격을 보지 않는다.
-    const state = resolveSelection("quiet", ["imaginative", "narrative"]);
+    // 037 — 성격이 다른 캐릭터 둘을 로스터에서 만들 수 없다. 성질은 같다:
+    // **목록의 첫 번째로 간다.** 앞뒤를 바꾸면 결과도 바뀐다.
+    // 고른 것이 준비 목록에 없으면 목록의 첫 번째로 옮긴다. 고른 것이 목록에
+    // 있으면 그대로 남는다 — 어느 쪽도 성격을 보지 않는다.
+    const moved = resolveSelection("quiet", [FUTURE_CHARACTER]);
+    const stays = resolveSelection("quiet", ["quiet", FUTURE_CHARACTER]);
 
-    expect(state).toEqual({
-      kind: "selected",
-      character: "imaginative",
-      movedFrom: "quiet",
-    });
+    expect(moved).toEqual({ kind: "selected", character: FUTURE_CHARACTER, movedFrom: "quiet" });
+    expect(stays).toEqual({ kind: "selected", character: "quiet" });
   });
 
   it("파일을 읽지 못한 것과 고른 적 없는 것은 같은 자리로 간다(원칙 V)", () => {

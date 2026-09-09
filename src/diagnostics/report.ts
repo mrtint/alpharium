@@ -20,7 +20,7 @@ import { checkStorage } from "./storage-check";
 import type { DiagnosticReport, Failure } from "./types";
 
 /**
- * 다섯 캐릭터의 모델 표시 이름 (014 FR-017).
+ * 로스터 캐릭터의 모델 표시 이름 (014 FR-017).
  *
  * `roster.ts`의 `displayName()`을 부르는 유일한 자리다. `src/ui/`는 이 값을
  * `DiagnosticReport`를 통해서만 받고, `roster.ts`를 직접 import할 수 없다

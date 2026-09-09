@@ -9,6 +9,8 @@
  */
 
 import { loadSelection, saveSelection, type SelectionPort } from "../../src/app/selection-store";
+import { FUTURE_CHARACTER } from "../future-character";
+import { CHARACTERS } from "../../src/diary/types";
 
 /** 메모리 대역 통로. 실제 파일 대신 문자열 하나를 들고 있는다. */
 function fakePort(initial: string | null = null): SelectionPort & { stored: string | null } {
@@ -27,9 +29,9 @@ describe("selection-store (007 contracts/selection.md §2 검증 표)", () => {
   it("1. 저장한 뒤 조회하면 같은 캐릭터가 나온다(FR-003)", async () => {
     const port = fakePort();
 
-    await saveSelection(port, "narrative");
+    await saveSelection(port, FUTURE_CHARACTER);
 
-    expect(await loadSelection(port)).toBe("narrative");
+    expect(await loadSelection(port)).toBe(null); // 037 — 로스터 밖은 null (C3)
   });
 
   it("2. 저장한 적이 없으면 null이다(FR-008)", async () => {
@@ -63,13 +65,13 @@ describe("selection-store (007 contracts/selection.md §2 검증 표)", () => {
     const port = fakePort();
 
     await saveSelection(port, "quiet");
-    await saveSelection(port, "english");
+    await saveSelection(port, "quiet");
 
-    expect(await loadSelection(port)).toBe("english");
+    expect(await loadSelection(port)).toBe("quiet");
   });
 
-  it("다섯 캐릭터 전부가 왕복한다", async () => {
-    for (const character of ["quiet", "narrative", "imaginative", "chinese", "english"] as const) {
+  it("로스터의 캐릭터 전부가 왕복한다", async () => {
+    for (const character of CHARACTERS) {
       const port = fakePort();
       await saveSelection(port, character);
       expect(await loadSelection(port)).toBe(character);
@@ -89,5 +91,34 @@ describe("selection-store (007 contracts/selection.md §2 검증 표)", () => {
 
     const parsed = JSON.parse(port.stored ?? "{}");
     expect(Object.keys(parsed)).toEqual(["character"]);
+  });
+});
+
+/**
+ * 037 계약 C3 — 로스터 밖 값을 만나면 지어내지 않는다 (FR-009).
+ *
+ * 계약: specs/037-roster-verified-only/contracts/roster-entry.md
+ *
+ * **코드 변경 없이 통과해야 한다**(research R2). `isCharacter()`가 `CHARACTERS`로
+ * 검사하므로 로스터가 줄면 옛 값이 자동으로 `null`이 된다 — 통과하지 않으면 R2의
+ * 판단이 틀린 것이므로 그때는 기록하고 고친다.
+ */
+describe("037 C3 — 로스터 밖 캐릭터가 저장돼 있을 때", () => {
+  it("C3 — loadSelection()이 null을 준다 (마이그레이션 코드 없이)", async () => {
+    const port = fakePort();
+    port.stored = JSON.stringify({ character: "imaginative" });
+
+    expect(await loadSelection(port)).toBe(null);
+  });
+
+  it("C3 — 그래서 '고른 적 없음'과 같은 자리로 간다 (캐릭터를 지어내지 않는다)", async () => {
+    const port = fakePort();
+    port.stored = JSON.stringify({ character: "chinese" });
+
+    const loaded = await loadSelection(port);
+    expect(loaded).toBe(null);
+    // 007 `resolveSelection`이 null을 "고른 적 없음"으로 다룬다 — 그 갈래는
+    // selection.test.ts가 검사한다. 여기서는 **값이 새지 않는 것**만 본다.
+    expect(loaded).not.toBe("chinese");
   });
 });

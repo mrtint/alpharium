@@ -18,11 +18,17 @@ import { join } from "node:path";
 
 import { buildPrompt, instructionLines, promptPrefix } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
-import type { Character, CustomNames, DiaryRequest } from "../../src/diary/types";
+import {
+  CHARACTERS,
+  type Character,
+  type CustomNames,
+  type DiaryRequest,
+} from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 
 const DAY = "2026-01-15";
-const KO_CHARACTERS: readonly Character[] = ["quiet", "narrative", "imaginative"];
+// 037 — 로스터의 한국어 캐릭터. 로스터가 늘면 자동으로 는다(FR-014).
+const KO_CHARACTERS: readonly Character[] = CHARACTERS;
 const PROMPT_SRC = readFileSync(join(__dirname, "../../src/diary/prompt.ts"), "utf8");
 /** 주석을 걷어낸 소스 — 이 저장소 주석은 무엇을 왜 금지하는지 적으므로 금지어가 등장한다. */
 const PROMPT_CODE = PROMPT_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
@@ -117,7 +123,7 @@ describe("E1 — 한국어 캐릭터 E2SN 머리", () => {
   });
 
   it("면책 유발 문장·예시 나열이 없다 (FR-002, 헌법 1.5.0)", () => {
-    const prefix = promptPrefix("narrative");
+    const prefix = promptPrefix("quiet");
     expect(prefix).not.toContain("모른다고 쓴 일기가 지어낸 일기보다 낫다");
     expect(prefix).not.toContain("예를 들어 날씨, 주인이 먹은 것, 만난 사람, 집에서 한 일은");
   });
@@ -264,27 +270,33 @@ describe("E5 — instructionLines 한국어 분기", () => {
 
 /* ═══════════════════ E6 — 외국어 캐릭터 현행 유지 ═══════════════════ */
 
-describe("E6 — chinese·english 현행 유지", () => {
-  it("promptPrefix('chinese')가 현행 SPEAKER_RULES 형식", () => {
-    const prefix = promptPrefix("chinese");
-    expect(prefix).toContain("너는 주인의 휴대폰이다. 이 글의 '나'는 휴대폰이며 주인이 아니다.");
-    expect(prefix).toContain("모른다고 쓴 일기가 지어낸 일기보다 낫다"); // 현행 문장 유지
-    expect(prefix).toContain("너는 '샤오바이'이라 불린다.");
-    expect(prefix).toContain("중국어로 써라.");
-    expect(prefix).not.toContain("본 것으로 주인의 하루를 짐작하는 글이다"); // E2_RULES 아님
+/**
+ * ★ 037 — 외국어 캐릭터가 로스터에 없어 **현행(비-E2SN) 경로를 부를 수 없다.**
+ *
+ * 그 경로는 소스에 그대로 있다(FR-014) — 문장형 신호가 한국어 숫자 낱말이라
+ * 다른 언어에 못 쓰므로, 외국어 캐릭터가 들어오면 `usesE2SN()`이 언어를 보고
+ * 자동으로 이어 준다. 아래는 그 기계가 사라지지 않았다는 소스 검사다.
+ *
+ * **캐릭터가 늘면 조립 검사로 되돌린다.**
+ */
+describe("E6 — 현행 경로가 소스에 남아 있다 (037 — 닿는 캐릭터 없음)", () => {
+  const SOURCE = readFileSync(join(__dirname, "../../src/diary/prompt.ts"), "utf8");
+
+  it("현행 화자 규칙(SPEAKER_RULES)과 그 문안이 남아 있다", () => {
+    expect(SOURCE).toContain("SPEAKER_RULES");
+    expect(SOURCE).toContain("모른다고 쓴 일기가 지어낸 일기보다 낫다");
   });
 
-  it("buildPrompt(chinese)에 현행 날짜 머리줄이 있다", () => {
-    const p = buildPrompt(req(EMPTY, "chinese"));
-    expect(p).toContain("2026-01-15에 네가 본 것:");
-    expect(p).toContain("사진: 없었다.");
+  it("현행 날짜 머리줄·라벨형 신호가 남아 있다", () => {
+    expect(SOURCE).toContain("에 네가 본 것:");
   });
 
-  it("buildPrompt(english) 캡션이 현행 목록 형식", () => {
-    const vision = { captions: [caption(12, "A menu.")], considered: 1, available: 1 };
-    const p = buildPrompt(req(TRUNCATED, "english"), vision);
-    expect(p).toContain("사진에 담긴 것:");
-    expect(p).toContain("- 12시: A menu.");
+  it("현행 캡션 목록 형식이 남아 있다", () => {
+    expect(SOURCE).toContain("사진에 담긴 것:");
+  });
+
+  it("언어로 갈래를 정하는 usesE2SN()이 남아 있다", () => {
+    expect(SOURCE).toContain("function usesE2SN");
   });
 });
 
@@ -334,8 +346,10 @@ describe("E8 — 톤 줄은 quiet만", () => {
     expect(promptPrefix("quiet")).toContain("담담하게, 짧게 쓴다.");
   });
 
-  it("narrative·imaginative 머리에 톤 줄이 없고 빈 줄도 안 생긴다", () => {
-    for (const c of ["narrative", "imaginative"] as const) {
+  // 037 — 톤 줄이 없는 캐릭터가 로스터에 없다. `E_TONE`이 빈 문자열이면 그 줄을
+  // 아예 안 넣는 구조(조건부 spread)는 그대로다 — 캐릭터가 늘면 되살린다.
+  it.skip("톤 줄이 없는 캐릭터의 머리에 빈 줄이 안 생긴다", () => {
+    for (const c of [] as readonly Character[]) {
       const prefix = promptPrefix(c);
       expect(prefix).not.toContain("담담하게, 짧게 쓴다.");
       // E2_RULES 마지막 줄 다음이 바로 E2_TITLE (빈 줄 없음)
@@ -347,10 +361,9 @@ describe("E8 — 톤 줄은 quiet만", () => {
     }
   });
 
-  it("narrative 머리 배열이 quiet보다 한 줄 짧다", () => {
-    expect(promptPrefix("narrative").split("\n").length).toBe(
-      promptPrefix("quiet").split("\n").length - 1,
-    );
+  // 037 — 톤 줄 없는 둘째 캐릭터가 로스터에 없어 길이를 비교할 대상이 없다.
+  it.skip("톤 줄 없는 캐릭터의 머리가 quiet보다 한 줄 짧다", () => {
+    expect(true).toBe(true);
   });
 });
 
@@ -371,9 +384,18 @@ describe("US3 — 사용자 지정 이름이 새 머리 호칭 줄에 흐른다"
     expect(promptPrefix("quiet").split("\n")[0]).toContain("'금동이'");
   });
 
-  it("018 P11 — 세 한국어 캐릭터 접두사가 서로 다르다", () => {
+  /**
+   * 018 P11 — 캐릭터마다 접두사가 다르다.
+   *
+   * 접두사가 같아지면 "캐릭터를 바꿔도 이전 캐릭터의 KV 캐시를 재사용한다"가
+   * 발생한다. 한국어 캐릭터의 접두사에서 갈리는 것은 **이름 한 줄뿐**이므로
+   * 호칭 줄을 빼면 즉시 깨진다(AGENTS.md가 이 자리를 못 박았다).
+   *
+   * 037 — 개수를 못 박지 않는다. 캐릭터가 늘면 자동으로 는다.
+   */
+  it("018 P11 — 캐릭터마다 접두사가 다르다", () => {
     const prefixes = KO_CHARACTERS.map((c) => promptPrefix(c));
-    expect(new Set(prefixes).size).toBe(3);
+    expect(new Set(prefixes).size).toBe(KO_CHARACTERS.length);
   });
 });
 
@@ -400,9 +422,11 @@ describe("위반 주입 — 방어가 실제로 잡는가", () => {
     expect(buildPrompt(req(EMPTY, "quiet"))).not.toContain("에 네가 본 것:");
   });
 
-  it("narrative에 톤 줄이 붙으면 E8이 잡는다", () => {
-    expect(promptPrefix("narrative")).not.toContain("담담하게");
-    expect(promptPrefix("narrative")).not.toContain("하루의 결을 짚되");
+  // 037 — 톤 줄이 없어야 할 둘째 캐릭터가 로스터에 없다. 근거 없는 톤 줄을 두지
+  // 않는다는 성질은 `E_TONE`에 실측 근거 주석이 있는 캐릭터만 문자열을 갖는 것으로
+  // 지킨다(prompt.test.ts가 표 자체를 검사한다).
+  it.skip("톤 줄이 없어야 할 캐릭터에 톤 줄이 붙으면 E8이 잡는다", () => {
+    expect(true).toBe(true);
   });
 
   it("머리에 인물 조항이 들어가면 E4가 잡는다", () => {

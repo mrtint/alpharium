@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 /**
  * 출력 판정 계약 테스트.
  *
@@ -18,7 +21,7 @@
 
 import { judge, REJECT_REASONS, type Verdict } from "../../src/diary/acceptance";
 import type { Ending } from "../../src/inference/engine-port";
-import type { Character } from "../../src/diary/types";
+import { CHARACTERS, type Character } from "../../src/diary/types";
 
 const EOS: Ending = { kind: "eos" };
 
@@ -54,15 +57,9 @@ describe("A-6 정상 일기는 통과한다", () => {
     expect(ask(GOOD_KO).ok).toBe(true);
   });
 
-  it("중국어 캐릭터 + 중국어 글 → ok", () => {
-    expect(ask("今天主人出门了。我只看到了三张照片。", EOS, "chinese").ok).toBe(true);
-  });
-
-  it("영어 캐릭터 + 영어 글 → ok", () => {
-    expect(ask("My owner went out today. I only saw three photographs.", EOS, "english").ok).toBe(
-      true,
-    );
-  });
+  // 037 — 외국어 캐릭터가 로스터에 없어 "제 언어로 쓰면 통과한다"를 그 언어로
+  // 시험할 수 없다. 판정 코드(`isWrongLanguage`)의 다른 언어 갈래는 캐릭터가
+  // 들어오면 되살아난다 — 판정 갈래 넷은 그대로다(A-7이 센다).
 });
 
 describe("A-2 되뱉기는 거부된다 (FR-016b-1)", () => {
@@ -116,8 +113,8 @@ describe("A-3 언어 판정 (FR-016c)", () => {
   const CHINESE = "今天很安静。";
   const ENGLISH = "It was a quiet day.";
 
-  describe("한국어 캐릭터 셋 — 한글이 있어야 한다", () => {
-    it.each(["quiet", "narrative", "imaginative"] as const)("%s", (character) => {
+  describe("한국어 캐릭터 — 한글이 있어야 한다", () => {
+    it.each(CHARACTERS)("%s", (character) => {
       expect(ask(KOREAN, EOS, character).ok).toBe(true);
 
       const chinese = ask(CHINESE, EOS, character);
@@ -141,30 +138,18 @@ describe("A-3 언어 판정 (FR-016c)", () => {
       expect(ask("주인은 오늘 cafe에 갔다. 나는 그것만 안다.").ok).toBe(true);
     });
 
-    it("chinese는 한글이 섞이면 거부된다", () => {
-      // 헌법: "한국어로는 쓰지 않는다(MUST NOT)"
-      const verdict = ask("今天주인은 나갔다。", EOS, "chinese");
-      expect(verdict.ok).toBe(false);
-      if (!verdict.ok) expect(verdict.why).toBe("language");
+    /**
+     * ★ 037 — 반대 방향("외국어 캐릭터는 한글을 금지한다")을 시험할 캐릭터가
+     * 로스터에 없다. 헌법이 그 캐릭터들과 함께 그 조항도 거둬들였다(1.6.0).
+     *
+     * `isWrongLanguage`의 다른 언어 갈래는 캐릭터가 들어오면 다시 는다 — 그때
+     * 이 검사들을 되살린다(FR-014). **판정 갈래 넷은 이 변화와 무관하다**(A-7).
+     */
+    it("037 — 판정이 언어로 갈리는 구조가 남아 있다", () => {
+      const source = readFileSync(join(__dirname, "../../src/diary/acceptance.ts"), "utf8");
+      expect(source).toContain("isWrongLanguage");
+      expect(source).toMatch(/switch \(character\)/);
     });
-
-    it("english는 한글이 섞이면 거부된다", () => {
-      const verdict = ask("Today my owner 나갔다.", EOS, "english");
-      expect(verdict.ok).toBe(false);
-      if (!verdict.ok) expect(verdict.why).toBe("language");
-    });
-
-    it("english는 한자가 섞이면 거부된다", () => {
-      expect(ask("Today my owner went to 韓國.", EOS, "english").ok).toBe(false);
-    });
-  });
-
-  it("chinese가 한자 없이 영어만 쓰면 거부된다", () => {
-    expect(ask("It was a quiet day.", EOS, "chinese").ok).toBe(false);
-  });
-
-  it("english가 라틴 문자 없이 쓰면 거부된다", () => {
-    expect(ask("今天很安静。", EOS, "english").ok).toBe(false);
   });
 });
 

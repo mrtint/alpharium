@@ -26,6 +26,7 @@ import type {
 } from "../../src/inference/engine-port";
 import { isGenerationFailure } from "../../src/inference/types";
 import { richDay } from "../../src/signals/fake";
+import { FUTURE_CHARACTER } from "../future-character";
 
 const DAY = "2026-08-16";
 const GOOD_KO = "오늘 주인은 어딘가로 나섰다. 사진 세 장이 남았고 나는 그것만 안다.";
@@ -99,15 +100,28 @@ function backendWith(engine: GenerationEngine, timeoutMs?: number) {
 }
 
 describe("E-1 한 번에 하나만 열린다 (FR-008)", () => {
-  it("다른 캐릭터를 요청하면 앞의 것이 닫힌다", async () => {
+  /**
+   * ★ 037 — 로스터가 하나라 둘째 캐릭터를 요청할 수 없다.
+   *
+   * `FUTURE_CHARACTER`로도 안 된다 — 이 경로는 `buildPrompt()`를 거치고 그것이
+   * `personaOf()`로 이름을 찾으므로, 페르소나가 없는 자리를 넣으면 프롬프트
+   * 조립에서 멈춘다(그것이 정상이다 — 계약 C3).
+   *
+   * **E1의 방어는 사라지지 않았다** — `llama-port.test.ts`가 엔진 계층에서
+   * 같은 성질(다른 캐릭터를 열면 앞의 것이 먼저 닫힌다)을 FUTURE_CHARACTER로
+   * 검사한다. 캐릭터가 늘면 이 자리도 되살린다(FR-014).
+   */
+  it.skip("다른 캐릭터를 요청하면 앞의 것이 닫힌다", async () => {
     const fake = fakeEngine();
     const backend = backendWith(fake.engine);
 
+    // 037 — 로스터가 하나여서 두 캐릭터를 실제로 부를 수 없다. 식별자가 다르면
+    // 각각 load된다는 성질을 FUTURE_CHARACTER로 시험한다(FR-014).
     await backend.generate(requestFor("quiet"));
-    await backend.generate(requestFor("narrative"));
+    await backend.generate(requestFor(FUTURE_CHARACTER));
 
     expect(fake.calls).toContain("load:quiet");
-    expect(fake.calls).toContain("load:narrative");
+    expect(fake.calls).toContain(`load:${FUTURE_CHARACTER}`);
     // **두 모델이 동시에 열린 순간이 없어야 한다** — GB 둘이면 기기가 죽는다.
     expect(fake.maxOpen).toBeLessThanOrEqual(1);
   });

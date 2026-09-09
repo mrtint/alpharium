@@ -25,6 +25,7 @@ import type {
 import { assetFor, CHARACTERS } from "../../src/models/roster";
 import { readState } from "../../src/models/storage";
 import type { DownloadProgress } from "../../src/models/types";
+import { FUTURE_CHARACTER } from "../future-character";
 
 const ACQUISITION_CODE = readFileSync(join(__dirname, "../../src/models/acquisition.ts"), "utf8")
   .replace(/\/\*[\s\S]*?\*\//g, "")
@@ -135,14 +136,14 @@ describe("내려받기", () => {
   });
 
   // A2
-  it("다른 캐릭터의 파일이 생기지 않는다", async () => {
+  it("고른 캐릭터의 파일만 생긴다 (037 — 로스터가 하나)", async () => {
     const h = harness();
     await createAcquisition(h.ports).prepare("quiet");
 
-    const others = (["narrative", "imaginative", "chinese", "english"] as const).map(
-      (c) => assetFor(c).key,
-    );
-    for (const key of others) expect(h.created).not.toContain(key);
+    // 037 — 로스터에 다른 캐릭터가 없어 "다른 캐릭터의 파일이 안 생긴다"를 자산으로
+    // 비교할 수 없다. 대신 **고른 것 하나만** 생겼는지 본다. 캐릭터가 늘면 원래
+    // 비교(다른 자산 키가 h.created에 없다)로 되돌린다.
+    expect(h.created).toEqual([assetFor("quiet").key]);
   });
 
   // A3 — GB 단위 데이터를 사용자 모르게 쓰지 않는다
@@ -264,15 +265,26 @@ describe("내려받기", () => {
       return { acq: createAcquisition({ ...h.ports, download }), open: () => open() };
     }
 
-    it("서로 다른 캐릭터는 동시에 받는다 (더 이상 busy 거부가 아니다)", async () => {
+    /**
+     * ★ 037 — 로스터가 하나여서 **동시 내려받기를 시험할 대상이 없다.**
+     *
+     * 이 계약들(026 A13·FR-004·A3)은 없어진 것이 아니라 부를 캐릭터가 없을 뿐이다.
+     * 두 캐릭터가 **각자의 모델 자산**을 가져야 성립하므로 `FUTURE_CHARACTER`
+     * (식별자만 있는 자리)로는 대신할 수 없다 — `assetFor()`가 자산을 못 찾는다.
+     *
+     * **캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다**(037 FR-014).
+     * 그때까지 이 자리가 "아직 둘째가 없다"를 드러낸다. `acquisition.ts`의 동시
+     * 다운로드 코드는 그대로 살아 있다.
+     */
+    it.skip("서로 다른 캐릭터는 동시에 받는다 (더 이상 busy 거부가 아니다)", async () => {
       const h = harness();
       const { acq, open } = gated(h);
 
       const first = acq.prepare("quiet");
-      const second = acq.prepare("narrative");
+      const second = acq.prepare(FUTURE_CHARACTER);
 
       // 둘 다 시작한다 — 두 번째가 즉시 거부되지 않는다.
-      expect(acq.busyWith().sort()).toEqual(["narrative", "quiet"]);
+      expect(acq.busyWith().sort()).toEqual([FUTURE_CHARACTER, "quiet"].sort());
 
       open();
       expect((await first).ok).toBe(true);
@@ -297,32 +309,54 @@ describe("내려받기", () => {
       await first;
     });
 
-    it("한 캐릭터를 멈춰도 다른 캐릭터는 계속된다 (FR-004)", async () => {
+    /**
+     * ★ 037 — 로스터가 하나여서 **동시 내려받기를 시험할 대상이 없다.**
+     *
+     * 이 계약들(026 A13·FR-004·A3)은 없어진 것이 아니라 부를 캐릭터가 없을 뿐이다.
+     * 두 캐릭터가 **각자의 모델 자산**을 가져야 성립하므로 `FUTURE_CHARACTER`
+     * (식별자만 있는 자리)로는 대신할 수 없다 — `assetFor()`가 자산을 못 찾는다.
+     *
+     * **캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다**(037 FR-014).
+     * 그때까지 이 자리가 "아직 둘째가 없다"를 드러낸다. `acquisition.ts`의 동시
+     * 다운로드 코드는 그대로 살아 있다.
+     */
+    it.skip("한 캐릭터를 멈춰도 다른 캐릭터는 계속된다 (FR-004)", async () => {
       const h = harness();
       const { acq, open } = gated(h);
 
       const first = acq.prepare("quiet");
-      const second = acq.prepare("narrative");
-      expect(acq.busyWith().sort()).toEqual(["narrative", "quiet"]);
+      const second = acq.prepare(FUTURE_CHARACTER);
+      expect(acq.busyWith().sort()).toEqual([FUTURE_CHARACTER, "quiet"].sort());
 
       await acq.pause("quiet");
       // narrative는 여전히 받는 중
-      expect(acq.busyWith()).toContain("narrative");
+      expect(acq.busyWith()).toContain(FUTURE_CHARACTER);
 
       open();
       await first;
       expect((await second).ok).toBe(true);
     });
 
-    it("busyWith()가 받는 중인 전부를 배열로 준다 (A3)", async () => {
+    /**
+     * ★ 037 — 로스터가 하나여서 **동시 내려받기를 시험할 대상이 없다.**
+     *
+     * 이 계약들(026 A13·FR-004·A3)은 없어진 것이 아니라 부를 캐릭터가 없을 뿐이다.
+     * 두 캐릭터가 **각자의 모델 자산**을 가져야 성립하므로 `FUTURE_CHARACTER`
+     * (식별자만 있는 자리)로는 대신할 수 없다 — `assetFor()`가 자산을 못 찾는다.
+     *
+     * **캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다**(037 FR-014).
+     * 그때까지 이 자리가 "아직 둘째가 없다"를 드러낸다. `acquisition.ts`의 동시
+     * 다운로드 코드는 그대로 살아 있다.
+     */
+    it.skip("busyWith()가 받는 중인 전부를 배열로 준다 (A3)", async () => {
       const h = harness();
       const { acq, open } = gated(h);
 
       acq.prepare("quiet");
-      acq.prepare("narrative");
-      acq.prepare("english");
+      acq.prepare(FUTURE_CHARACTER);
+      acq.prepare(FUTURE_CHARACTER);
 
-      expect(acq.busyWith().sort()).toEqual(["english", "narrative", "quiet"]);
+      expect(acq.busyWith().sort()).toEqual([FUTURE_CHARACTER, "quiet"].sort());
       open();
     });
 
@@ -344,9 +378,12 @@ describe("내려받기", () => {
   });
 
   // A6 — 026: 동시 공간 판정은 이미 받는 중인 것들의 남은 용량을 여유에서 뺀다 (FR-007).
-  it("동시 다운로드에서 공간 판정이 받는 중인 것들의 남은 용량을 뺀다", async () => {
+  /**
+   * ★ 037 — 위와 같은 이유로 시험할 둘째 자산이 없다. 캐릭터가 늘면 되살린다.
+   */
+  it.skip("동시 다운로드에서 공간 판정이 받는 중인 것들의 남은 용량을 뺀다", async () => {
     const asset1 = assetFor("quiet");
-    const asset2 = assetFor("narrative");
+    const asset2 = assetFor(FUTURE_CHARACTER);
     const orig1 = asset1.expectedBytes;
     const orig2 = asset2.expectedBytes;
     Object.assign(asset1, { expectedBytes: 1000 });
@@ -379,7 +416,7 @@ describe("내려받기", () => {
       await new Promise((r) => setTimeout(r, 0));
       expect(acq.busyWith()).toContain("quiet");
 
-      const second = await acq.prepare("narrative");
+      const second = await acq.prepare(FUTURE_CHARACTER);
 
       expect(second.ok).toBe(false);
       if (!second.ok) expect(second.failure.kind).toBe("insufficient-space");

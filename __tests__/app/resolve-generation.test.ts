@@ -8,6 +8,7 @@ import {
   type VisionPreference,
 } from "../../src/app/resolve-generation";
 import type { Character } from "../../src/diary/types";
+import { FUTURE_CHARACTER } from "../future-character";
 
 /**
  * 생성 파라미터 자동 판정의 계약 테스트.
@@ -46,9 +47,10 @@ function params(input: ResolveInput) {
 describe("캐릭터 (R1~R3, C1~C6)", () => {
   it("C1 — 마지막 캐릭터가 준비돼 있으면 그대로", () => {
     expect(
-      params(base({ lastCharacter: "narrative", readyCharacters: ["narrative", "quiet"] }))
-        .character,
-    ).toBe("narrative");
+      params(
+        base({ lastCharacter: FUTURE_CHARACTER, readyCharacters: [FUTURE_CHARACTER, "quiet"] }),
+      ).character,
+    ).toBe(FUTURE_CHARACTER);
   });
 
   it("C2 — 마지막 캐릭터가 없으면 온보딩 기본(quiet)", () => {
@@ -59,23 +61,23 @@ describe("캐릭터 (R1~R3, C1~C6)", () => {
     const p = params(
       base({
         lastCharacter: "quiet",
-        fixedAuthor: "imaginative",
-        readyCharacters: ["quiet", "imaginative"],
+        fixedAuthor: FUTURE_CHARACTER,
+        readyCharacters: ["quiet", FUTURE_CHARACTER],
       }),
     );
-    expect(p.character).toBe("imaginative");
+    expect(p.character).toBe(FUTURE_CHARACTER);
     expect(p.movedFrom).toBeUndefined();
   });
 
   it("C4 — 마지막 캐릭터가 준비를 잃으면 옮기고 movedFrom을 남긴다 (R2)", () => {
-    const p = params(base({ lastCharacter: "narrative", readyCharacters: ["quiet"] }));
+    const p = params(base({ lastCharacter: FUTURE_CHARACTER, readyCharacters: ["quiet"] }));
     expect(p.character).toBe("quiet");
-    expect(p.movedFrom).toBe("narrative");
+    expect(p.movedFrom).toBe(FUTURE_CHARACTER);
   });
 
   it("C5 — 준비된 캐릭터가 하나도 없으면 no-ready-character", () => {
     expect(
-      resolveGenerationParams(base({ lastCharacter: "narrative", readyCharacters: [] })).kind,
+      resolveGenerationParams(base({ lastCharacter: FUTURE_CHARACTER, readyCharacters: [] })).kind,
     ).toBe("no-ready-character");
   });
 
@@ -83,7 +85,7 @@ describe("캐릭터 (R1~R3, C1~C6)", () => {
     const p = params(
       base({
         lastCharacter: "quiet",
-        fixedAuthor: "imaginative",
+        fixedAuthor: FUTURE_CHARACTER,
         readyCharacters: ["quiet"],
       }),
     );
@@ -94,9 +96,9 @@ describe("캐릭터 (R1~R3, C1~C6)", () => {
   // analyze U1 — 옮겨진 값이 배선(T028)에서 기록된다. 여기선 movedFrom과 character가
   // 둘 다 나오는 것만 확인한다.
   it("U1 — 옮겨졌을 때 character는 옮겨진 쪽, movedFrom은 원래", () => {
-    const p = params(base({ lastCharacter: "narrative", readyCharacters: ["quiet"] }));
+    const p = params(base({ lastCharacter: FUTURE_CHARACTER, readyCharacters: ["quiet"] }));
     expect(p.character).toBe("quiet");
-    expect(p.movedFrom).toBe("narrative");
+    expect(p.movedFrom).toBe(FUTURE_CHARACTER);
   });
 });
 

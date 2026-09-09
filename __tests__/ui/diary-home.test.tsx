@@ -59,7 +59,7 @@ const entry: DiaryEntry = {
  * 대부분의 테스트는 quiet·사진 없음·장소명 꺼짐으로 충분하다.
  */
 const resolveQuiet =
-  (over: Partial<{ vision: VisionSetting; movedFrom: "quiet" | "narrative" }> = {}) =>
+  (over: Partial<{ vision: VisionSetting; movedFrom: "quiet" }> = {}) =>
   (day: string): ResolveOutcome => ({
     kind: "resolved",
     params: {

@@ -60,10 +60,24 @@ const REJECT = (why: RejectReason): Verdict => ({ ok: false, why });
 
 /** 한글 음절 */
 const HANGUL = /[가-힣]/;
+
+/**
+ * 한자·라틴 문자.
+ *
+ * ★ 037 — 지금은 **쓰이지 않는다.** 로스터가 한국어 하나가 되며 `isWrongLanguage`의
+ * 다른 언어 갈래가 도달 불가가 됐다(헌법 1.6.0).
+ *
+ * **그래도 지우지 않는다**(037 FR-014). 헌법 원칙 III의 진입 기준을 통과한 외국어
+ * 캐릭터가 들어오면 그 갈래가 `switch`에 다시 붙고, 이 두 범위가 그 판정의 재료다.
+ * 지우면 그때 문자 범위를 다시 정해야 하고, 그것은 이미 정해 둔 것을 다시 정하는
+ * 일이다.
+ */
+/* eslint-disable @typescript-eslint/no-unused-vars -- 037 FR-014: 외국어 캐릭터 복귀 대비 */
 /** 한자 (CJK 통합 한자) */
 const HANJA = /[一-鿿]/;
 /** 라틴 문자 */
 const LATIN = /[A-Za-z]/;
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * 되뱉기 판정에서 비교할 줄의 최소 길이.
@@ -109,25 +123,23 @@ function isEcho(text: string, instructions: string[]): boolean {
  * **불리언의 조합이지 비율이 아니다.** "한국어다움 70%"를 재지 않는다.
  *
  * **비대칭이 의도적이다**: 한국어 캐릭터는 다른 문자를 금지하지 않는다 — 고유명사와
- * 영어 낱말이 섞이는 것은 정상이다. 반대로 `chinese`·`english`는 한글을 금지한다.
- * **헌법이 그 방향만 못 박았기 때문이다**("한국어로는 쓰지 않는다 MUST NOT").
- * 헌법이 말하지 않은 것을 우리가 더 금지하지 않는다.
+ * 영어 낱말이 섞이는 것은 정상이다. **헌법이 그 방향만 못 박았기 때문이며**, 헌법이
+ * 말하지 않은 것을 우리가 더 금지하지 않는다.
+ *
+ * 037(헌법 1.6.0)로 로스터가 한국어 하나가 되어 갈래가 하나로 줄었다. **판정 갈래
+ * 넷은 그대로다**(원칙 IV) — 줄어든 것은 `language` 한 갈래 안의 캐릭터 분기다.
+ * 다른 언어의 캐릭터가 로스터에 들어오면 이 `switch`에 갈래가 다시 는다.
  */
 function isWrongLanguage(text: string, character: Character): boolean {
   const hangul = HANGUL.test(text);
-  const hanja = HANJA.test(text);
-  const latin = LATIN.test(text);
+
+  // 037 — `HANJA`·`LATIN`은 다른 언어 캐릭터의 갈래가 쓰던 것이다. 상수는 남겨
+  // 둔다(FR-014) — 캐릭터가 들어오면 그 갈래가 다시 이 `switch`에 붙는다.
 
   switch (character) {
     case "quiet":
-    case "narrative":
-    case "imaginative":
       // 한글이 있으면 된다. 다른 문자가 섞이는 것은 막지 않는다.
       return !hangul;
-    case "chinese":
-      return !hanja || hangul;
-    case "english":
-      return !latin || hangul || hanja;
   }
 }
 
