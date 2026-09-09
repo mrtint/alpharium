@@ -166,3 +166,49 @@ Render Error가 났다.
   012 기준상 dev 1회로 충분하나, release 잔여 위험은 다음 release 세션에서 닫힌다.
 - **`parallel-model-download.yml`** — 로스터가 둘 이상이 될 때까지 검증 불가.
 - **교체 후보 실측** — 다음 스펙(리포트가 조건과 첫 확인 대상만 지목).
+
+---
+
+# 재검증 세션 (같은 날 2차) — 커밋 `de3e220` 상태로 다시 확인
+
+converge까지 끝난 코드로 **처음부터 다시** 돌렸다. 1차는 구현 중간중간 확인한
+것이라, 최종 상태가 그대로 도는지를 따로 본 것이다. 조건 동일(SM-S901N, dev
+debug, Metro `--dev-client`, `adb reverse` 걸림, `deviceLocked=0`).
+
+**결과: 1차와 어긋난 것 없음. 새로 발견된 결함 없음.**
+
+## 다시 확인한 것
+
+| 성공 기준 | 무엇을 봤나 | 결과 |
+|---|---|---|
+| SC-001 | 설정 탭 「일기 작성자」·「캐릭터」 | 금동이 한 줄뿐. **로스터 밖 이름 4종 노출 0건, 모델 식별자 13종 노출 0건**(UI 트리 전수 grep) |
+| SC-002 갈래 1 | 오드 일기(`imaginative`, `authorName` 있음) 상세 | 제목·본문·**"오드는 이렇게 일기를 작성했어요."**·신호·소요 시간 정상. Render Error 0 |
+| SC-002 갈래 2 | 같은 일기에서 `authorName` **제거** 후 재실행 | **멈추지 않는다.** 본문·신호·소요 시간 그대로, **작성자 줄만 빠짐**(FR-008 설계 그대로). 검증 후 원본 복원 |
+| SC-003·007 | 2026-09-09 생성 | 저장 성공, `writingMs` **24.2초** — 036(19~22초)·1차(24.7·31.6초) 범위. 회귀 없음 |
+| SC-004 | `character-names.json`에 `"복실이"` | 설정 탭이 **"복실이"**로 바뀌고 "금동이"는 사라짐. **저장된 일기는 `authorName`을 그대로 유지**(이름 바꾸기가 과거를 고쳐 쓰지 않는다) |
+| FR-009 | `selected-character.json` = `"imaginative"`(로스터 밖) | 앱 정상 실행 → 쓰면 **`character: "quiet"`, `authorName: "금동이"`**. 생성 성공 후 파일이 `{"character":"quiet"}`로 자기 교정(029 FR-008a) |
+
+## 생성물 (원칙 II 확인)
+
+금동이 2026-09-09 본문이 **전부 짐작 어미**다 — "나섰을 것이다", "가능성이
+높다", "것 같다", "**정확한 장소나 시간은 알 수 없다**", "확률이 크다".
+단정 0건.
+
+**같은 화면에서 오드 일기와 나란히 볼 수 있다** — 오드 쪽은 "밖에 나갔다",
+"누군가를 만났다", "간식을 샀다"로 전부 단정형이다. 로스터가 좁아진 이유가
+두 일기의 대비로 화면에 그대로 남아 있다.
+
+## Maestro (5흐름)
+
+`diary-character-select`·`prompt-preview`·`model-acquisition`(037 갱신) +
+`writing-flow-simplified`·`diary-user-path`(회귀) — **전부 COMPLETED, FAILED·
+ERROR 0건.**
+
+`parallel-model-download.yml`·`unified-permission-onboarding.yml`은 1차와 같은
+이유로 돌리지 않았다(전자는 로스터가 하나인 동안 구조적 불가, 후자는 `pm clear`).
+
+## 기기 상태
+
+검증에 쓴 것을 전부 되돌렸다 — `selected-character.json` = `quiet`,
+`character-names.json` = `{}`, 09-08 오드 일기 원본 복원(`authorName` 포함),
+`/data/local/tmp` 임시 파일 삭제. 일기 6건(09-02·05·06·07·08·09).
