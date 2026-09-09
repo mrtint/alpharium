@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { displayNameOf, type CustomNames } from "../../src/diary/character-name";
@@ -148,9 +148,31 @@ describe("037 C3 — personaOf()는 로스터 밖을 모른다", () => {
  * 직접 부르는 화면 코드가 있으면 그 자리는 로스터 밖에서 멈춘다.
  */
 describe("037 C4 — 이름 되짚기가 로스터 밖을 견딘다", () => {
-  const UI_FILES = ["DiaryDetailScreen.tsx", "DiaryHomeScreen.tsx"];
+  /**
+   * **저장된 일기의 캐릭터를 받는 자리는 예외가 될 수 없다.**
+   *
+   * 아래 둘은 `CHARACTERS`를 돌며 만든 값만 받으므로 로스터 밖이 들어올 수
+   * 없다 — 그래서 `personaOf(...).name`이 안전하다. **근거를 여기 적어 두는
+   * 것이 예외의 조건이다**: 새 화면이 목록에 빠져 조용히 통과하는 일을 막으려고
+   * 파일 목록이 아니라 디렉터리 전수 훑기로 검사한다(037 converge T056).
+   *
+   *  - `CharacterListScreen.tsx` — `CHARACTERS.map()`이 그린 줄의 캐릭터
+   *  - `CharacterPicker.tsx` — 부모가 `CHARACTERS`로 만든 `characters` prop
+   *
+   * 이 목록에 더하려면 **그 자리가 로스터 밖 값을 받을 수 없다는 것을 근거와
+   * 함께** 적는다. 저장된 `DiaryEntry.character`를 받는 자리는 예외가 아니다.
+   */
+  const SAFE_BY_CONSTRUCTION = ["CharacterListScreen.tsx", "CharacterPicker.tsx"];
 
-  it.each(UI_FILES)("%s — personaOf(...).name을 직접 부르지 않는다", (file) => {
+  const uiFiles = readdirSync(join(__dirname, "../../src/ui")).filter(
+    (f) => f.endsWith(".tsx") && !SAFE_BY_CONSTRUCTION.includes(f),
+  );
+
+  it("검사 대상이 비어 있지 않다 (전수 훑기가 실제로 돈다)", () => {
+    expect(uiFiles.length).toBeGreaterThan(0);
+  });
+
+  it.each(uiFiles)("%s — personaOf(...).name을 직접 부르지 않는다", (file) => {
     const source = readFileSync(join(__dirname, "../../src/ui/", file), "utf8");
     const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 

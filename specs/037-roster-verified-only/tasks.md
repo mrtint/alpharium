@@ -212,3 +212,14 @@ US2도 P1인 이유다.
 ## 완료 판정
 
 [quickstart.md §6](./quickstart.md)의 체크리스트를 따른다.
+
+---
+
+## Phase 9: Convergence
+
+**Purpose**: `/speckit-converge`가 스펙·plan·헌법 대비 현재 코드에서 찾은 남은
+일이다. 요구사항 22개·plan 결정 5개·헌법 원칙 5개를 확인해 둘이 남았다.
+
+- [X] T054 `src/schedule/lock.ts`의 `STALE_LOCK_MS` 근거 주석을 갱신한다 per plan D4 (partial) — 31~43줄이 "`narrative`(exaone, **로스터에서 가장 느린 캐릭터**)"와 "`narrative`는 `quiet`보다 느리므로 이 값은 5분 아래로 내려가지 않는다"를 유지하나 그 캐릭터는 헌법 1.6.0에서 로스터를 나갔다. **살아 있는 상수의 근거가 사실과 어긋난다**(원칙 V). **값 6분은 그대로 둔다** — 줄이려면 재측정이 필요하고 안 잰 값을 쓰는 것이 원칙 V 위반이다(024 실측 170초·헤드리스 52.5초는 그대로 유효한 관측이므로 지우지 않고 "그때 가장 느린 캐릭터였다"로 문맥을 옮긴다)
+- [X] T055 `src/onboarding/essential-assets.ts:33`의 기본 캐릭터 선정 근거 주석을 갱신한다 per plan D4 (partial) — "narrative(exaone)는 …이므로 기본값이 될 수 없다"가 로스터 밖 캐릭터를 견주고 있다
+- [X] T056 `__tests__/diary/character-name.test.ts`의 계약 C4를 **파일 목록이 아니라 `src/ui/` 전수 훑기**로 바꾼다 per FR-008 (partial) — 지금은 `UI_FILES`에 두 화면만 손으로 적어 두었다. `CharacterListScreen:288`·`CharacterPicker:78`도 `personaOf(...).name`을 부르며, **둘 다 `CHARACTERS`에서 온 값만 받으므로 현재는 안전하다** — 그 안전의 근거를 예외 목록에 주석으로 남기고, 새 화면이 목록에서 빠지는 일이 없게 한다. T049가 실기기에서 잡은 결함이 정확히 "한 자리만 보고 있었다"는 모양이었다
