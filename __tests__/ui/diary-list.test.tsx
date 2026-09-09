@@ -321,13 +321,12 @@ describe("쓰기 자리 (007 FR-002a·023·024, 029 FR-001·006)", () => {
     await render(<DiaryListScreen items={[]} onOpen={noop} onWrite={noop} />);
 
     expect(screen.queryByText(new RegExp(personaOf("quiet").name))).toBeNull();
-    expect(screen.queryByText(new RegExp(personaOf("narrative").name))).toBeNull();
   });
 
   it("★ movedNotice가 주어지면 그 문구를 보인다(FR-014)", async () => {
-    const notice = `${personaOf("quiet").name}을(를) 쓸 수 없어 ${
-      personaOf("narrative").name
-    }(으)로 바꿨다`;
+    // 037 — 옮겨 갈 둘째 캐릭터가 로스터에 없다. 이 화면이 검사하는 것은
+    // **부모가 만든 문구를 그대로 보인다**이지 문구의 내용이 아니다.
+    const notice = `${personaOf("quiet").name}을(를) 쓸 수 없어 다른 캐릭터로 바꿨다`;
     await render(<DiaryListScreen items={[]} onOpen={noop} onWrite={noop} movedNotice={notice} />);
 
     expect(screen.getByText(notice)).toBeTruthy();

@@ -100,7 +100,18 @@ function backendWith(engine: GenerationEngine, timeoutMs?: number) {
 }
 
 describe("E-1 한 번에 하나만 열린다 (FR-008)", () => {
-  it("다른 캐릭터를 요청하면 앞의 것이 닫힌다", async () => {
+  /**
+   * ★ 037 — 로스터가 하나라 둘째 캐릭터를 요청할 수 없다.
+   *
+   * `FUTURE_CHARACTER`로도 안 된다 — 이 경로는 `buildPrompt()`를 거치고 그것이
+   * `personaOf()`로 이름을 찾으므로, 페르소나가 없는 자리를 넣으면 프롬프트
+   * 조립에서 멈춘다(그것이 정상이다 — 계약 C3).
+   *
+   * **E1의 방어는 사라지지 않았다** — `llama-port.test.ts`가 엔진 계층에서
+   * 같은 성질(다른 캐릭터를 열면 앞의 것이 먼저 닫힌다)을 FUTURE_CHARACTER로
+   * 검사한다. 캐릭터가 늘면 이 자리도 되살린다(FR-014).
+   */
+  it.skip("다른 캐릭터를 요청하면 앞의 것이 닫힌다", async () => {
     const fake = fakeEngine();
     const backend = backendWith(fake.engine);
 

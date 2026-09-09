@@ -203,9 +203,7 @@ describe("P-2 캐릭터에서 오는 것은 언어뿐이다 (FR-014·014a·014b)
     const source = readFileSync(join(__dirname, "../../src/diary/prompt.ts"), "utf8");
     const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
-    const records = [...code.matchAll(/const (\w+): Readonly<Record<Character,/g)].map(
-      (m) => m[1],
-    );
+    const records = [...code.matchAll(/const (\w+): Readonly<Record<Character,/g)].map((m) => m[1]);
     expect(records.sort()).toEqual(["E_TONE", "LANGUAGE"]);
   });
 
@@ -608,7 +606,6 @@ describe("011 — 캡션 기계가 소스에 남아 있다 (037 — 닿는 캐�
     }
   });
 });
-
 
 describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", () => {
   // 036 — 한국어 캐릭터의 제목 지시문은 E2_TITLE로 바뀌었다(FR-003): 이름 든 반례·

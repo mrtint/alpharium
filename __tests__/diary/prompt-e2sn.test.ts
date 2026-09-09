@@ -18,7 +18,12 @@ import { join } from "node:path";
 
 import { buildPrompt, instructionLines, promptPrefix } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
-import { CHARACTERS, type Character, type CustomNames, type DiaryRequest } from "../../src/diary/types";
+import {
+  CHARACTERS,
+  type Character,
+  type CustomNames,
+  type DiaryRequest,
+} from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 
 const DAY = "2026-01-15";

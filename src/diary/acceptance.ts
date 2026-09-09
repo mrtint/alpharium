@@ -60,10 +60,24 @@ const REJECT = (why: RejectReason): Verdict => ({ ok: false, why });
 
 /** 한글 음절 */
 const HANGUL = /[가-힣]/;
+
+/**
+ * 한자·라틴 문자.
+ *
+ * ★ 037 — 지금은 **쓰이지 않는다.** 로스터가 한국어 하나가 되며 `isWrongLanguage`의
+ * 다른 언어 갈래가 도달 불가가 됐다(헌법 1.6.0).
+ *
+ * **그래도 지우지 않는다**(037 FR-014). 헌법 원칙 III의 진입 기준을 통과한 외국어
+ * 캐릭터가 들어오면 그 갈래가 `switch`에 다시 붙고, 이 두 범위가 그 판정의 재료다.
+ * 지우면 그때 문자 범위를 다시 정해야 하고, 그것은 이미 정해 둔 것을 다시 정하는
+ * 일이다.
+ */
+/* eslint-disable @typescript-eslint/no-unused-vars -- 037 FR-014: 외국어 캐릭터 복귀 대비 */
 /** 한자 (CJK 통합 한자) */
 const HANJA = /[一-鿿]/;
 /** 라틴 문자 */
 const LATIN = /[A-Za-z]/;
+/* eslint-enable @typescript-eslint/no-unused-vars */
 
 /**
  * 되뱉기 판정에서 비교할 줄의 최소 길이.
@@ -118,8 +132,9 @@ function isEcho(text: string, instructions: string[]): boolean {
  */
 function isWrongLanguage(text: string, character: Character): boolean {
   const hangul = HANGUL.test(text);
-  const hanja = HANJA.test(text);
-  const latin = LATIN.test(text);
+
+  // 037 — `HANJA`·`LATIN`은 다른 언어 캐릭터의 갈래가 쓰던 것이다. 상수는 남겨
+  // 둔다(FR-014) — 캐릭터가 들어오면 그 갈래가 다시 이 `switch`에 붙는다.
 
   switch (character) {
     case "quiet":

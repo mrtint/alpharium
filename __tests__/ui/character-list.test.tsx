@@ -26,10 +26,14 @@ import { personaOf } from "../../src/diary/persona";
 import { resolveDownloadView } from "../../src/models/download-view";
 import type { DownloadProgress, DownloadRejection, ModelReadiness } from "../../src/models/types";
 import { CharacterListScreen } from "../../src/ui/CharacterListScreen";
+import { CHARACTERS as ROSTER_CHARACTERS } from "../../src/diary/types";
+import { FUTURE_CHARACTER } from "../future-character";
 
 const noop = () => {};
 
-const CHARACTERS = ["quiet", "narrative", "imaginative", "chinese", "english"] as const;
+// 037 — 로스터에서 온다. 화면이 `CHARACTERS`를 돌아 줄을 그리므로 이 목록이
+// 로스터와 어긋나면 검사가 화면과 다른 것을 본다.
+const CHARACTERS = ROSTER_CHARACTERS;
 
 /** 전부 「받아야 함」인 기본 상태. 필요한 것만 덮어쓴다 */
 function readinessWith(
@@ -70,7 +74,7 @@ async function renderList(options: {
 
 describe("거부 안내 (FR-001·002·003)", () => {
   const receiving: DownloadProgress = { character: "quiet", fraction: 0.4 };
-  const rejection: DownloadRejection = { requested: "narrative", busyWith: "quiet" };
+  const rejection: DownloadRejection = { requested: FUTURE_CHARACTER, busyWith: "quiet" };
 
   // V10 — 무엇을 멈춰야 하는지 알아야 한다
   it("★ 안내가 받는 중인 캐릭터를 말한다(V10)", async () => {
@@ -114,7 +118,14 @@ describe("거부 안내 (FR-001·002·003)", () => {
    * 거부는 그 캐릭터의 **준비 상태를 바꾸지 않았다.** 「받아야 함」이던 것은 그대로
    * 「받아야 함」이며, 받는 중으로도 실패로도 보이지 않는다.
    */
-  it("★ 거부당한 줄이 평소대로다(V13)", async () => {
+  /**
+   * ★ 037 — 이 화면은 줄을 `CHARACTERS`에서 그린다. 로스터가 하나라 **둘째 줄이
+   * 렌더되지 않아** 동시 다운로드·거부 표시를 볼 수 없다(`FUTURE_CHARACTER`로도
+   * 줄이 안 생긴다). 화면 코드와 026의 동시 다운로드 로직은 그대로다.
+   *
+   * 캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다(FR-014).
+   */
+  it.skip("★ 거부당한 줄이 평소대로다(V13)", async () => {
     await renderList({ active: receiving, rejection });
 
     const row = screen.getByTestId("character-row-narrative");
@@ -128,7 +139,7 @@ describe("거부 안내 (FR-001·002·003)", () => {
 
 describe("진행 표시 (FR-008·009·017)", () => {
   const receiving: DownloadProgress = { character: "quiet", fraction: 0.42 };
-  const rejection: DownloadRejection = { requested: "narrative", busyWith: "quiet" };
+  const rejection: DownloadRejection = { requested: FUTURE_CHARACTER, busyWith: "quiet" };
 
   // V8 — 진행률이 보인다
   it("받는 중인 줄에 진행률이 보인다(V8)", async () => {
@@ -199,11 +210,18 @@ describe("진행 표시 (FR-008·009·017)", () => {
 /* ─────────────── 026 — 여러 캐릭터 동시 진행 표시 (US1) ─────────────── */
 
 describe("동시 다운로드 표시 (026 FR-005)", () => {
-  it("여러 줄에 동시에 진행률과 멈추기가 보인다", async () => {
+  /**
+   * ★ 037 — 이 화면은 줄을 `CHARACTERS`에서 그린다. 로스터가 하나라 **둘째 줄이
+   * 렌더되지 않아** 동시 다운로드·거부 표시를 볼 수 없다(`FUTURE_CHARACTER`로도
+   * 줄이 안 생긴다). 화면 코드와 026의 동시 다운로드 로직은 그대로다.
+   *
+   * 캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다(FR-014).
+   */
+  it.skip("여러 줄에 동시에 진행률과 멈추기가 보인다", async () => {
     await renderList({
       active: [
         { character: "quiet", fraction: 0.3 },
-        { character: "narrative", fraction: 0.7 },
+        { character: FUTURE_CHARACTER, fraction: 0.7 },
       ],
     });
 
@@ -213,26 +231,40 @@ describe("동시 다운로드 표시 (026 FR-005)", () => {
     expect(screen.getByTestId("pause-narrative")).toBeTruthy();
   });
 
-  it("멈추기가 어느 캐릭터인지 인자로 넘긴다", async () => {
+  /**
+   * ★ 037 — 이 화면은 줄을 `CHARACTERS`에서 그린다. 로스터가 하나라 **둘째 줄이
+   * 렌더되지 않아** 동시 다운로드·거부 표시를 볼 수 없다(`FUTURE_CHARACTER`로도
+   * 줄이 안 생긴다). 화면 코드와 026의 동시 다운로드 로직은 그대로다.
+   *
+   * 캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다(FR-014).
+   */
+  it.skip("멈추기가 어느 캐릭터인지 인자로 넘긴다", async () => {
     const onPause = jest.fn();
     await renderList({
       active: [
         { character: "quiet", fraction: 0.3 },
-        { character: "narrative", fraction: 0.7 },
+        { character: FUTURE_CHARACTER, fraction: 0.7 },
       ],
       onPause,
     });
 
     await userEvent.press(screen.getByTestId("pause-narrative"));
 
-    expect(onPause).toHaveBeenCalledWith("narrative");
+    expect(onPause).toHaveBeenCalledWith(FUTURE_CHARACTER);
   });
 
-  it("받는 중이 아닌 줄에는 멈추기가 없다 (동시 다운로드 중에도)", async () => {
+  /**
+   * ★ 037 — 이 화면은 줄을 `CHARACTERS`에서 그린다. 로스터가 하나라 **둘째 줄이
+   * 렌더되지 않아** 동시 다운로드·거부 표시를 볼 수 없다(`FUTURE_CHARACTER`로도
+   * 줄이 안 생긴다). 화면 코드와 026의 동시 다운로드 로직은 그대로다.
+   *
+   * 캐릭터가 로스터에 늘면 `it.skip`을 풀고 그 캐릭터로 바꾼다(FR-014).
+   */
+  it.skip("받는 중이 아닌 줄에는 멈추기가 없다 (동시 다운로드 중에도)", async () => {
     await renderList({
       active: [
         { character: "quiet", fraction: 0.3 },
-        { character: "narrative", fraction: 0.7 },
+        { character: FUTURE_CHARACTER, fraction: 0.7 },
       ],
     });
 
@@ -273,7 +305,7 @@ describe("원칙 III — 모델 정보가 새지 않는다 (FR-004, V14)", () =>
   it("★ 화면 어디에도 모델 정보가 없다(V14)", async () => {
     await renderList({
       active: { character: "quiet", fraction: 0.4 },
-      rejection: { requested: "narrative", busyWith: "quiet" },
+      rejection: { requested: FUTURE_CHARACTER, busyWith: "quiet" },
     });
 
     const text = JSON.stringify(screen.toJSON());

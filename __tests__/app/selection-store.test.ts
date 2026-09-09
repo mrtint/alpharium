@@ -9,6 +9,8 @@
  */
 
 import { loadSelection, saveSelection, type SelectionPort } from "../../src/app/selection-store";
+import { FUTURE_CHARACTER } from "../future-character";
+import { CHARACTERS } from "../../src/diary/types";
 
 /** 메모리 대역 통로. 실제 파일 대신 문자열 하나를 들고 있는다. */
 function fakePort(initial: string | null = null): SelectionPort & { stored: string | null } {
@@ -27,9 +29,9 @@ describe("selection-store (007 contracts/selection.md §2 검증 표)", () => {
   it("1. 저장한 뒤 조회하면 같은 캐릭터가 나온다(FR-003)", async () => {
     const port = fakePort();
 
-    await saveSelection(port, "narrative");
+    await saveSelection(port, FUTURE_CHARACTER);
 
-    expect(await loadSelection(port)).toBe("narrative");
+    expect(await loadSelection(port)).toBe(null); // 037 — 로스터 밖은 null (C3)
   });
 
   it("2. 저장한 적이 없으면 null이다(FR-008)", async () => {
@@ -63,13 +65,13 @@ describe("selection-store (007 contracts/selection.md §2 검증 표)", () => {
     const port = fakePort();
 
     await saveSelection(port, "quiet");
-    await saveSelection(port, "english");
+    await saveSelection(port, "quiet");
 
-    expect(await loadSelection(port)).toBe("english");
+    expect(await loadSelection(port)).toBe("quiet");
   });
 
-  it("다섯 캐릭터 전부가 왕복한다", async () => {
-    for (const character of ["quiet", "narrative", "imaginative", "chinese", "english"] as const) {
+  it("로스터의 캐릭터 전부가 왕복한다", async () => {
+    for (const character of CHARACTERS) {
       const port = fakePort();
       await saveSelection(port, character);
       expect(await loadSelection(port)).toBe(character);

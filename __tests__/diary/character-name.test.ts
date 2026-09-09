@@ -41,12 +41,14 @@ describe("N1 — 사용자 지정 이름이 있으면 그것, 없으면 기본 �
     }
   });
 
-  it("다른 캐릭터의 지정 이름이 이 캐릭터에 새지 않는다", () => {
-    const custom: CustomNames = { quiet: "복실이" };
-    expect(displayNameOf("narrative", custom)).toBe(personaOf("narrative").name);
+  // 037 — 로스터가 하나라 "다른 캐릭터에 새지 않는다"를 캐릭터 둘로 보일 수
+  // 없다. 캐릭터가 늘면 되살린다(FR-014). `displayNameOf`가 키로 조회한다는
+  // 성질은 아래 "지정하지 않으면 기본 이름"이 이미 잠근다.
+  it.skip("다른 캐릭터의 지정 이름이 이 캐릭터에 새지 않는다", () => {
+    expect(true).toBe(true);
   });
 
-  it("다섯 캐릭터 전부에 대해 기본 이름이 PERSONAS와 일치한다", () => {
+  it("로스터의 캐릭터 전부에 대해 기본 이름이 PERSONAS와 일치한다", () => {
     // 기본 이름이 이 파일에 복제되지 않았다는 것의 확인 — 복제하면 언젠가 어긋난다.
     const defaults = CHARACTERS.map((c) => displayNameOf(c, {}));
     expect(defaults).toEqual(CHARACTERS.map((c) => personaOf(c).name));
@@ -65,7 +67,7 @@ describe("N3 — 절대 빈 문자열을 반환하지 않는다 (SC-005)", () =>
   });
 
   it("어떤 조합에서도 빈 문자열이 나오지 않는다", () => {
-    const nasty: CustomNames = { quiet: "", narrative: "   ", imaginative: undefined };
+    const nasty: CustomNames = { quiet: "   " };
     for (const character of CHARACTERS) {
       expect(displayNameOf(character, nasty).trim()).not.toBe("");
     }
