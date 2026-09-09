@@ -34,13 +34,6 @@ const previews: Readonly<Record<Character, PromptPreviewSet>> = {
       approxChars: "QUIET 사진 있음\n사진: 2장 (10시, 18시)\n프롬프트".length,
     },
   },
-  // 037 — 로스터가 하나라 화면 전환·조립 실패를 보일 둘째 캐릭터가 없다.
-  // 이 화면은 `previews` 레코드를 그대로 그리므로 식별자만 다르면 되고,
-  // FUTURE_CHARACTER가 그 자리다. 캐릭터가 늘면 그 캐릭터로 바꾼다(FR-014).
-  [FUTURE_CHARACTER]: {
-    empty: { ok: false, reason: "요청을 만들 수 없다 (no-character)" },
-    photos: { ok: true, text: "FUTURE 사진", approxChars: "FUTURE 사진".length },
-  },
 };
 
 const presetLabels = { empty: "신호 없음", photos: "사진 있음" };
