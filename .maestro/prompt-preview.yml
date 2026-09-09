@@ -72,17 +72,21 @@ appId: com.anonymous.alpharium
     timeout: 20000
 
 # ★ D1 — 캐릭터를 바꾸면 프롬프트가 다시 조립된다.
-#    위로 올라가 chinese 칩을 누른다. chinese는 마지막 줄이 "중국어로 써라."다
-#    (prompt.ts LANGUAGE).
+#
+# ★ 037(헌법 1.6.0) — **로스터가 하나라 바꿔 누를 칩이 없다.** 이 패널은 칩을
+# `CHARACTERS`에서 그리므로(PromptPreviewPanel.tsx) 칩이 하나다. 캐릭터가 늘면
+# 그 칩을 눌러 마지막 줄(출력 언어)이 바뀌는지 보는 원래 검사를 되살린다.
+#
+# 지금은 하나뿐인 칩이 실제로 있고, 그 캐릭터의 출력 언어 줄이 나오는지 본다.
 - scrollUntilVisible:
     element:
-      id: "prompt-preview-character-chinese"
+      id: "prompt-preview-character-quiet"
     direction: UP
     timeout: 20000
 - tapOn:
-    id: "prompt-preview-character-chinese"
+    id: "prompt-preview-character-quiet"
 - scrollUntilVisible:
     element:
-      text: ".*중국어로 써라.*"
+      text: ".*한국어로 써라.*"
     direction: DOWN
     timeout: 20000

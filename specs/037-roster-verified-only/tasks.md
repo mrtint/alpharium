@@ -132,10 +132,10 @@ index로 고르므로 길이 5→1에 무관하다. 조립부가 만드는 배�
 **Purpose**: 새 규칙을 세울 때마다 어겨 보고 잡히는지 확인한다(007~014 관례).
 각각 고친 뒤 **되돌린다**.
 
-- [ ] T037 V1 — `CHARACTERS`에 검증 안 된 캐릭터를 되살린다 → `tsc` + C1이 잡는지 확인 후 되돌린다
-- [ ] T038 V2 — `personaOf()`가 모르는 캐릭터에 기본값을 돌려주게 한다 → C3이 잡는지 확인 후 되돌린다
-- [ ] T039 V3 — `DiaryDetailScreen`의 로스터 밖 방어를 뺀다 → C4(`authorName` 없는 케이스)가 잡는지 확인 후 되돌린다
-- [ ] T040 V4 — `resolveSelection`이 캐릭터 하나면 자동으로 고르게 한다 → 007 계약 테스트 / C5가 잡는지 확인 후 되돌린다
+- [X] T037 V1 — `CHARACTERS`에 검증 안 된 캐릭터를 되살린다 → `tsc` + C1이 잡는지 확인 후 되돌린다
+- [X] T038 V2 — `personaOf()`가 모르는 캐릭터에 기본값을 돌려주게 한다 → C3이 잡는지 확인 후 되돌린다
+- [X] T039 V3 — `DiaryDetailScreen`의 로스터 밖 방어를 뺀다 → C4(`authorName` 없는 케이스)가 잡는지 확인 후 되돌린다
+- [X] T040 V4 — `resolveSelection`이 캐릭터 하나면 자동으로 고르게 한다 → 007 계약 테스트 / C5가 잡는지 확인 후 되돌린다
 
 **Checkpoint**: 넷 다 잡힌다. **하나라도 안 잡히면 그 방어는 없는 것이다.**
 
@@ -143,11 +143,11 @@ index로 고르므로 길이 5→1에 무관하다. 조립부가 만드는 배�
 
 ## Phase 7: Polish — 흐름·문서
 
-- [ ] T041 [P] `.maestro/diary-character-select.yml`을 갱신한다 — 다섯 캐릭터 전제를 하나로. 023이 페르소나 이름으로 바꿔 둔 것을 잇는다
-- [ ] T042 [P] `.maestro/`의 나머지 흐름(`prompt-preview.yml`·`photo-vision.yml`·`parallel-model-download.yml`·`writing-monologue*.yml`)에서 빠진 캐릭터 문자열을 확인하고 갱신한다. ⚠️ `download-conflict.yml`은 026 이후 구조적으로 PASS 불가 — 손대지 않는다
-- [ ] T043 `npm run lint`·`npm test` 전체 클린 확인. 테스트 스위트 수가 줄지 않았는지 본다(`jest-projects.test.ts`)
-- [ ] T044 [P] `docs/roadmap/README.md` 14번을 완료로 갱신한다 — 구현 결과와 037 실측을 적고, 교체 후보 실측이 다음 과제로 남는다는 것을 명시한다
-- [ ] T045 [P] `AGENTS.md`에 037 절을 더한다 — 이 저장소의 관례대로 "지금도 유효한 결론"과 "아직 남은 위험"만. 모델 파일을 앱으로 못 지우는 빈자리(FR-011)를 적는다
+- [X] T041 [P] `.maestro/diary-character-select.yml`을 갱신한다 — 다섯 캐릭터 전제를 하나로. 023이 페르소나 이름으로 바꿔 둔 것을 잇는다
+- [X] T042 [P] `.maestro/`의 나머지 흐름(`prompt-preview.yml`·`photo-vision.yml`·`parallel-model-download.yml`·`writing-monologue*.yml`)에서 빠진 캐릭터 문자열을 확인하고 갱신한다. ⚠️ `download-conflict.yml`은 026 이후 구조적으로 PASS 불가 — 손대지 않는다
+- [X] T043 `npm run lint`·`npm test` 전체 클린 확인. 테스트 스위트 수가 줄지 않았는지 본다(`jest-projects.test.ts`)
+- [X] T044 [P] `docs/roadmap/README.md` 14번을 완료로 갱신한다 — 구현 결과와 037 실측을 적고, 교체 후보 실측이 다음 과제로 남는다는 것을 명시한다
+- [X] T045 [P] `AGENTS.md`에 037 절을 더한다 — 이 저장소의 관례대로 "지금도 유효한 결론"과 "아직 남은 위험"만. 모델 파일을 앱으로 못 지우는 빈자리(FR-011)를 적는다
 
 ---
 
