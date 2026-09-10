@@ -110,9 +110,9 @@ adb -s <S928N> shell "cmd uimode night auto"
 - [x] SC-001: S928N 다크 모드 화면 밝은 배경, dimmed 0건 — **확인 완료(2026-09-03 온보딩 3화면 + 2026-09-11 나머지 4화면)**: `night yes`에서 온보딩·목록·상세·설정·생성중·개발자 탭 **6개 화면군 전부** 배경 `rgb(250,250,250)` + 텍스트 검정 + 대비 또렷, `#303030` 재현 0건. 온보딩은 `night no`와 픽셀 동일. 검증용 모델 3개(`a1`·`v1`·`v2`) `run-as` 배치로 에셋 게이트 통과.
 - [x] SC-002: 사진 허용 후 "사진 위치" 단계 안 나옴, 온보딩 4단계 — **확인(2026-09-03)**: `uiautomator dump`로 `photos → location → notifications → battery-exception` 순서 확인, `onboarding-step-photo-location` 부재.
 - [x] SC-003: 새 설치 온보딩 에셋 다운로드까지 도달 — **확인(2026-09-03)**: 4개 권한 단계 전부 [건너뛰기]로 통과 → `onboarding-step-assets` 도달, 갇힘 없음.
-- [~] SC-004: S901N 라이트 모드·온보딩 회귀 0건 — 이 세션은 S928N만. 037 세션(2026-09-09)에서 S901N 라이트 모드 목록·상세·설정·생성중 정상 렌더 기록 있음. `night yes` 대조만 다음 S901N 세션.
+- [x] SC-004: S901N 라이트 모드·온보딩 회귀 0건 — **확인 완료(2026-09-11, SM-S901N One UI 8.0)**: `night no`에서 목록·상세·설정·개발자 탭 아이보리 + 검정 텍스트, 031 전과 동일. `night yes`에서 4화면 픽셀 동일(회귀 0건).
 - [x] SC-005: 온보딩·설정 어디에도 `photo-location` 항목 없음 — **확인 완료**: 온보딩 4단계에 `onboarding-step-photo-location` 부재(SC-002), 설정 "권한" 섹션 행 정확히 4개(`permission-row-photos`·`-location`·`-notifications`·`-battery-exception`), `permission-row-photo-location` 부재(2026-09-11, 소스 grep 0건).
-- [ ] SC-006: 사진 좌표→지명 동작 수정 전후 동일 — **미확인**: 좌표 있는 seed 하루가 필요(`tasks.md` T031). 031의 이 갈래는 `collect.ts` 무변경이라 회귀 위험 낮으나 실측 남음.
+- [x] SC-006: 사진 좌표→지명 동작 수정 전후 동일 — **확인 완료(2026-09-11, SM-S901N)**: `seed:day rich 2026-09-10`(좌표 3장) + 사진 auto로 생성 2회 — 위치 권한 허용 시 `placeName={"kind":"known","value":"중구"}` + 본문 "중구", `pm revoke` 후 `placeName=null` + 본문 지명 없음. `signalsUsed.places`는 두 경우 다 trace 있음(좌표는 사진 EXIF). 021 T030 원래 관측과 동일.
 - [~] release 재확인 1회 (expo-system-ui) — **dev-only 검증 정책상 보류**(2026-09-09 저장소 소유자 지시, PR #56). `expo-system-ui`는 표준 Expo autolinking 모듈이라 minify 생존 위험 낮음(012). release 세션 명시 요청 시 확인.
 - [x] `npm test`·`npm run lint` 클린 — `test:logic` 1825개 통과, lint 0 error, 헌법 검사 위반 0, prettier 클린, `force-light-theme.test.ts` 9개 통과
 

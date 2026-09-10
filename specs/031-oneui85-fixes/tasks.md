@@ -92,10 +92,10 @@ description: "Task list for One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-l
 
 - [x] T021 → **T029로 대체 완료**(2026-09-03 온보딩 3화면 + 2026-09-11 나머지 4화면). 6개 화면군 전부 아이보리 배경 확인, `night auto` 복원.
 - [x] T022 → **T030으로 대체 완료**(2026-09-03 온보딩 4단계 + 2026-09-11 설정 「권한」 4행). `onboarding-step-photo-location`·`permission-row-photo-location` 둘 다 부재 확인.
-- [ ] T023 → **T031로 이어짐**(미완 — 좌표 있는 seed 하루 필요). 다음 세션.
+- [x] T023 → **T031로 대체 완료**(2026-09-11, SM-S901N).
 - [x] T024 → **T032로 대체 완료**(2026-09-11). `unified-permission-onboarding`·`scheduled-diary-notification` PASS. `diary-photo-gallery`는 사진 픽스처 필요로 031 무관.
 - [~] T025 → **T033으로 이어짐** — dev-only 검증 정책상 보류(PR #56).
-- [~] T026 → **T034로 이어짐** — 이 세션은 S928N만. 037 세션 S901N 라이트 모드 정상 기록 있음.
+- [x] T026 → **T034로 대체 완료**(2026-09-11, SM-S901N).
 - [x] T027 로드맵 20번 항목에 결과 문단 추가 완료(2026-09-03 초안 + 2026-09-11 나머지 화면 검증 결과 반영). 6화면 아이보리 배경, 권한 4행, Maestro PASS, 미확인 잔여(신호 수집 회귀·release·S22) 명시. `docs/roadmap/README.md`.
 - [x] T028 `quickstart.md` "완료 기준" 체크박스 채움 완료 — SC-001·002·003·005 [x], SC-004·006·release [~](다음 세션/정책 보류), lint 클린 [x].
 
@@ -135,10 +135,16 @@ description: "Task list for One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-l
 
 - [x] T029 [US1] SM-S928N(One UI 8.5)에 부모 테마 교체 반영 debug APK 설치 후 `cmd uimode night yes`. **✅ 관측(2026-09-03 + 2026-09-11)**: 2026-09-03에 온보딩 1단계·에셋 단계·재게이트 배경 `rgb(250,250,250)`. **2026-09-11 나머지 4화면 완료** — 검증용 모델(a1·v1·v2, `run-as` 배치 + `state.json` verdict 3개) 넣어 온보딩 게이트 통과 후, `night yes`에서 **목록·상세·설정·개발자 탭 전부 아이보리(`rgb(250,250,250)`) + 텍스트 검정 + 대비 또렷**. `#303030` 재현 0건. 온보딩 화면은 `night no`와 픽셀 동일(회귀 없음). 생성중 화면(진행률 숫자·경과 시간 없음)도 아이보리. `cmd uimode night auto` 복원 완료. per FR-001·SC-001
 - [x] T030 [US2] SM-S928N에서 온보딩 흐름 확인(2026-09-03 + 2026-09-11). **✅**: 4단계가 `onboarding-step-photos` → `-location` → `-notifications` → `-battery-exception` 순서, **`onboarding-step-photo-location` 부재**, 진행률 `1/4`~`4/4`. 전부 [건너뛰기] 통과 → `onboarding-step-assets` 도달, 갇힘 없음. **2026-09-11 설정 "권한" 섹션 확인** — 행 정확히 4개(`permission-row-photos`·`-location`·`-notifications`·`-battery-exception`), **`permission-row-photo-location` 부재**(XML 소스 grep 0건). per FR-006·007·009·SC-002·003
-- [ ] T031 [US2] SM-S928N에서 T023을 수행한다 — 사진 좌표 있는 하루 생성 → 위치 권한 허용 시 지명, `adb pm revoke ... ACCESS_FINE_LOCATION` 후 지명 없음, 031 수정 전과 동일. per FR-010·SC-006·OB7, tasks T023 (missing — 기기 미확인)
+- [x] T031 [US2] 신호 수집 회귀 확인 완료(2026-09-11, **SM-S901N** — S928N이 빠져 S901N에서 수행). `npm run seed:day -- rich 2026-09-10`으로 좌표 3장(PLACE_A 37.5665,126.978 / PLACE_B) 심고 사진 설정 `{auto:true}`로 생성 2회:
+  - **위치 권한 허용**: `placeName = {"kind":"known","value":"중구"}`, 본문에 "중구 근처를 이동하며…", `signalsUsed.places` trace 있음(visitCount 3, source photo-exif). `visionMs` 20.4s + `writingMs` 37.2s.
+  - **`pm revoke ACCESS_FINE/COARSE_LOCATION` 후 재생성**: `placeName = null`, 본문에 지명 없음(일반 서술만). `signalsUsed.places`는 여전히 `kind:"known"` + trace(**좌표는 사진 EXIF에서 오므로 위치 권한과 무관**).
+  - **021 T030 원래 관측과 동일** — `reverseGeocodeAsync`는 위치 권한 필요, 없으면 `geocoding-port.ts`가 예외 삼킴 → `placeName` null. **`collect.ts` 무변경이라 031이 이 갈래를 안 건드렸음**이 확인됐다. 검증 후 seed 사진·일기·설정 원복. per FR-010·SC-006·OB7
 - [x] T032 SM-S928N에서 Maestro 수행(2026-09-11). **✅ `unified-permission-onboarding.yml` PASS** — 4단계 갱신본, `onboarding-step-photo-location` 부재 assert, 로스터 모델명(kanana·exaone·hyperclovax·qwen·gemma·GGUF·Q4) 미노출 assert, 에셋 단계 도달까지 전부 COMPLETED. **✅ `scheduled-diary-notification.yml` PASS**(온보딩 게이트 통과 후 재실행) — 설정 탭 자동 생성 섹션, `.*무렵.*`·`.*배터리 설정.*` 보임, `.*정각.*`·`.*매일 7시.*` 미노출. ⚠️ `diary-photo-gallery.yml`은 **사진 있는 일기가 전제**(`.*사진 [1-9]장.*`)라 새 설치에서 실행 불가 — 031 무관, 023 계열 픽스처 필요. per FR-012·quickstart Maestro
 - [~] T033 [US1] release 재확인 — **dev-only 검증 정책상 보류**(PR #56, 2026-09-09 저장소 소유자 지시). `expo-system-ui`는 표준 Expo autolinking 모듈이라 minify 생존 위험이 낮으나(012 기준) 미확인. 스펙 「미확인 잔여」에 한 줄로 기록하고 완료 처리. 저장소 소유자가 release 세션을 명시 요청하면 그때 확인. per FR-001·research R3
-- [~] T034 [P] SM-S901N(One UI 7) S22 회귀 — 이 세션은 S928N만 붙어 있어 미수행. 단 **037 세션(2026-09-09) S901N 실기기 검증에서 라이트 모드 목록·상세·설정·생성중이 정상 렌더**됐음이 기록돼 있고(회귀 없음), 031의 테마 교체는 시스템 night 모드에서만 발현하는 갈래라 One UI 7 라이트 평시에는 영향 없음. 다음 S901N 세션에서 `night yes` 대조만 남음. per FR-013·SC-004
+- [x] T034 [P] SM-S901N(**One UI 8.0**, `ro.build.version.oneui=80000`) S22 회귀 완료(2026-09-11). `night no`/`night yes` 대조:
+  - **라이트(`night no`)**: 목록·상세·설정·개발자 탭 전부 아이보리(`rgb(250,250,250)`) + 검정 텍스트 — 031 전과 동일, 회귀 0건.
+  - **다크(`night yes`)**: 같은 4화면이 **라이트와 픽셀 동일** — 아이보리 유지, `#303030` 재현 0건. 037 세션의 로스터 밖 일기(09-08 오드, `character:"imaginative"`)도 다크에서 정상 렌더("오드는 이렇게 일기를 작성했어요.").
+  - 031의 `AppTheme` 부모 교체가 One UI 8.0에서도 성립. `cmd uimode night auto` 복원. per FR-013·SC-004
 - [~] T035 [US2] `.maestro/unified-permission-onboarding.yml` — 현재 `id: onboarding-step-.*` 긍정 assert + `assertNotVisible: onboarding-step-photo-location`로 4단계임을 간접 확인. 흐름은 첫 단계가 기기 권한 상태에 따라 달라져(021 실측) 특정 스텝 id를 박지 않는다 — 이 생략이 의도임을 흐름 주석에 이미 명시. 2026-09-11 S928N에서 4단계 순서를 `uiautomator dump`로 직접 확인해 흐름의 간접 확인을 보강. per tasks T020
-- [~] T036 `docs/roadmap/README.md` 로드맵 20번에 "✅ 스펙 031에서 수정 (2026-09-03)" 결과 문단 추가 완료(원인 정정 + 온보딩 4단계·다크 모드 3화면 관측값 + 미확인 잔여 명시), `quickstart.md` "완료 기준" 체크박스에 부분 실측 반영 완료. **잔여**: 목록·상세·설정·개발자 탭 다크 모드, 설정 "권한" 4행, release 재확인, S22 회귀 — 다음 세션에서 채운다. per tasks T027·T028
+- [x] T036 `docs/roadmap/README.md` §20 + `quickstart.md` 완료 기준 갱신 완료. 2026-09-11에 나머지 화면 다크 모드·권한 4행·Maestro(S928N)·T031 신호 수집 회귀·T034 S22 대조(S901N)까지 반영. **남은 잔여는 T033 release 재확인 하나**(dev-only 정책상 보류).
 - [x] T037 **다음 실기기 세션(= 2026-09-11 이 세션)**: 검증용 모델 3개(`a1`·`v1`·`v2`, `run-as` 배치 + `state.json` verdict) 배치 완료 → `cmd uimode night yes` → **목록·상세·설정·개발자 탭 4화면 전부 아이보리 배경 + 대비**(`#303030` 아님) 확인 ✅ → 설정 "권한" 섹션 행 4개, `permission-row-photo-location` 부재 확인 ✅ → Maestro `unified-permission-onboarding`·`scheduled-diary-notification` PASS ✅. **잔여**: T031(신호 수집 회귀 — 좌표 있는 seed 하루 필요), T033(release — dev-only 정책 보류). per T029·T030
