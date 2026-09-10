@@ -150,12 +150,17 @@ modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
 
 | batteryException | targetHour | roundStartedAt | triggerEnteredAt | delayFromTargetMin | standbyBucket | minLatencyReported | screenTouchedDuringRound | coldOrWarm | notes |
 |---|---|---|---|---|---|---|---|---|---|
-| _(실기기 대기)_ true | | | | | | | | | |
+| true | 9 | 2026-09-11 07:56:24 | ~08:00:19 | — (무효) | 5 | +14m59s991ms | **true** | cold(visionMs 25.9s + writingMs 35.9s) | SM-S928N. 화면이 08:00:00 `USER_PRESENT`로 깨어나 무효 라운드. 배터리 예외 부여 상태에서 백그라운드 태스크가 등록·발화·완주(`Worker result SUCCESS`)하고 `2026-09-10.json` 정상 저장(`character:quiet`, 판정 통과, 사진 있는 날이라 VLM도 돎) — **경로는 돈다**. 다만 목표 시각 09:00 이전에 발화한 것은 020 `retry.ts`(자동 생성 ON이면 마지막 닫힌 날을 목표 시각과 무관하게 씀), delay 측정에는 부적합. |
 
 **판정 (contracts BS2)**:
-- [ ] SC-001 MUST: 유효한 모든 라운드에서 `delayFromTargetMin <= 60` — _(미판정)_
-- [ ] SHOULD: 유효 라운드 `>= 3`이면 과반 `<= 40` — _(미측정, `< 3`이면
-  원시값 + "best-effort" 라벨)_
+- [ ] SC-001 MUST: 유효한 모든 라운드에서 `delayFromTargetMin <= 60` — _(미판정 — 유효 라운드 0회)_
+- [ ] SHOULD: 유효 라운드 `>= 3`이면 과반 `<= 40` — _(미측정)_
+- **부분 관측 (2026-09-11, SM-S928N)**: 배터리 예외 상태에서 헤드리스
+  자동 생성 1회가 등록→발화→완주→저장까지 돎을 확인. 그러나 그 라운드에서
+  화면이 깨어(`USER_PRESENT` 08:00:00) `screenTouchedDuringRound: true` —
+  **delay 측정값으로 못 씀**. 이 기기(S928N)는 소크 중 반복적으로 깨어나
+  (다른 앱 위젯·워커 다수) Doze 유지가 어려웠다. 유효 라운드 3회 수집은
+  다음 세션으로 이월. 019 표본 2회(10분·32분)가 여전히 유일한 대조군.
 - 019 표본 2회(10분·32분)와 대조.
 
 ---
@@ -169,10 +174,15 @@ modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
 
 | batteryException | targetHour | roundStartedAt | observedHours | attemptCount | firstTriggerEnteredAt | standbyBucket | minLatencyReported | screenTouchedDuringRound | notes |
 |---|---|---|---|---|---|---|---|---|---|
-| _(실기기 대기)_ false | | | | | | | | false | 24h 소크 |
+| _(실기기 대기)_ false | | | | | | | | false | 24h 소크 — 시작 못 함 (아래) |
+
+**§2를 이 세션에서 시작하지 못한 이유**: §2는 §1과 정반대 조건(`whitelist -`,
+24시간+ 무조작)이 필요한데, 세션이 S928N 하나로 031 다크 모드 검증 + §1을
+먼저 돌렸고, §1 라운드가 화면 깨어남으로 무효가 나면서 시간이 부족했다.
+§2는 세션 밖 24h+ 방치라 **다음 세션 시작 시 첫 작업으로** 건다(quickstart §2).
 
 **판정 (contracts BS4)**:
-- [ ] SC-002 MUST: `observedHours >= 24` 안에 `attemptCount >= 1` — _(미판정)_
+- [ ] SC-002 MUST: `observedHours >= 24` 안에 `attemptCount >= 1` — _(미판정 — 소크 미시작)_
 - [ ] `observedHours < 24`면 "부분 판정 — N시간 관측 후 M회" + 원시값
 - [ ] `Minimum latency` 15분(`+14m59s...`) 전달 확인 (억제 원인이 OS) —
   `observedHours`와 무관하게 항상 기록 — _(미측정)_
