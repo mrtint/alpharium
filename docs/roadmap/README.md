@@ -27,7 +27,7 @@
 - [~] **입력 프롬프트 텍스트 최적화** (`prompt.ts` — 14번[자동 생성용 모델 재검토]과 합류. **알파리움에서는 컨셉만 정립**하고 실제 프롬프트·페르소나 후보 실험은 `my-ollama`에서 API로 진행 — 온디바이스는 후보 하나 도는 데 최대 240초라 반복이 안 됨. 2026-09-03 핸드오프 문서 작성·push 완료: `033-diary-concept-prompt-handoff` 브랜치 `docs/superpowers/specs/2026-09-03-diary-concept-prompt-experiment-handoff-design.md` — 컨셉 고정 뼈대[화자=표면 제3자·실체 휴대폰, 아는 범위=권한만큼, 사진 속 인물 정체 불명, 독백], 페르소나가 톤·태도를 프롬프트에서 지시하도록 원칙 III 완화[헌법 개정 선행], 로스터 5개 전부 재평가 대상, 현재 지시문 8+6+5줄의 스펙별 출처·근거, 불변 제약 6가지, 프롬프트 후보 3개 스케치. **`my-ollama`의 실험 리포트(§8 계약)가 오면 그걸 근거로 별도 speckit 스펙에서 `prompt.ts`·`persona.ts`·헌법을 고친다** — 아직 미완료.)
 - [ ] **모델 준비 완료 연출 + 캐릭터 작명** (16번 후속 — 헌법 페르소나 조항 개정 동반)
 - [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: 근본 원인 정정[force-dark 반전 아님, `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`], photo-location: 판정 불가능한 단계라 온보딩에서 제거. One UI 8.5 실기기 debug 검증. 목록·상세·설정·개발자 탭·release·S22는 다음 세션[`tasks.md` T037])
-- [~] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (033에서 구현 — 아래 상세 참조)
+- [x] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (033 — `CharacterListScreen`·`DayPicker` 토큰·`ListRow` 이관, 눌림 피드백 `scale 0.97`. 실기기 debug 검증 완료 2026-09-07. release 눌림 반응·SM-S928N 육안은 별도 잔여)
 - [x] **엔드유저 화면 전체를 NativeWind/토큰으로 이관** (034 — `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection` 4개 이관, `App.tsx` 설정 탭 여백 1곳. `Card`·`SectionHeader` 첫 실사용. 실기기 debug 검증·PR #51 머지 완료. `AutoDiaryTriggerButton`·`PermissionPanel`은 개발자 탭 전용이라 범위 밖)
 - [ ] **완성된 일기 첫 표시를 타자기 연출로** (생성 직후 `written` 화면에서 제목+본문이 글자 단위로 흐른다. 화면 탭 시 즉시 전체. 이미 저장·판정 통과한 본문이므로 "생성 중인 글 미노출"[005 FR-028b]과 무관 — 다만 실시간 생성처럼 보이면 안 됨. 아래 23번 상세)
 
@@ -290,7 +290,7 @@
   - **실기기 관측 (SM-S928N/One UI 8.5, `cmd uimode night yes`, debug)**: 온보딩 1단계·에셋 다운로드 단계·"1/4" 재게이트 전부 배경 `rgb(250,250,250)` + 텍스트 검정 + 대비 또렷 — 어제 22:03·22:28 dimmed(`#303030`) 재현 **0건**. `cmd uimode night no`에서도 `rgb(250,250,250)` 동일(회귀 없음). 온보딩 4단계가 `photos → location → notifications → battery-exception` 순서로 정확히 나오고 `photo-location` 단계 **부재**, 4개 전부 [건너뛰기]로 통과 → 에셋 다운로드 단계 도달(**갇힘 없음**). `cmd uimode night auto` 복원 완료.
   - **미확인 잔여**: 목록·상세·설정·개발자 탭의 다크 모드 화면(에셋 ~2GB 모델 미준비로 온보딩 게이트를 못 넘음 — 다음 세션에서 모델 배치 후), 설정 "권한" 섹션 행 4개 확인, release APK 재확인(`expo-system-ui` minify 생존, 012), S22(One UI 8 이하) 회귀. 상세는 `specs/031-oneui85-fixes/tasks.md` Phase 6.
 
-### 21. 032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션 — 🔄 033에서 구현 (2026-09-07, 실기기 대기)
+### 21. 032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션 — ✅ 033에서 구현 (2026-09-07, 실기기 debug 검증 완료)
 
 - **배경** (2026-09-05 제안): 032가 NativeWind + 디자인 토큰 + 재사용 컴포넌트 7종을 도입하고 핵심 화면 5개를 이관했지만, 두 갈래가 미완으로 남았다.
   1. **미이관 화면·미적용 컴포넌트** — `CharacterListScreen.tsx`가 여전히 `StyleSheet` + 원시 hex(`#fdf3d8` 등)로 남아 있다(T063, SHOULD로 미룸). 032가 만든 `Card`·`ListRow`·`Toggle`·`Section` 컴포넌트는 계약 테스트는 통과하지만 **어느 화면에도 실제로 안 쓰인다** — 기존 화면 구조(다중 행·상태별 버튼 하나·저장 공간 표시)가 안 맞아 만들고 안 썼다(032 T062 판단). `ListRow`는 `CharacterListScreen`의 행 구조(label=이름+소개, value=상태, right=action 버튼)와 형태가 가장 가까워 보인다 — 이관 시 실측이 필요하다.
@@ -299,8 +299,8 @@
   - `CharacterListScreen`을 토큰·`ListRow`(또는 다른 032 컴포넌트)로 이관해 032의 톤을 완성한다. 기존 동작 계약(원칙 III — 모델 정보 안 새게 하는 코드 주석들, FR-004~006 등)과 `character-row-*`·`action-*`·`pause-*` testID는 무변경.
   - reanimated로 버튼 눌림 피드백, 화면 전환 트랜지션, 새로고침 인디케이터 같은 가벼운 인터랙션을 추가한다. **생성 중인 글을 보여주지 않는다는 원칙 IV, 진행률 숫자를 노출하지 않는다는 제약은 애니메이션을 더해도 유지**해야 한다(005 FR-028b) — 진행 "표시"의 부드러움을 더하는 것과 진행 "수치"를 드러내는 것은 다르다.
 - **선행 확인 필요**: SM-S928N 육안·release 빌드 재확인(032가 이월한 잔여)을 이 스펙에서 함께 닫을지, 별도로 유지할지. `CharacterListScreen`은 032 스펙이 명시적으로 범위 밖(T063 SHOULD)이라 표시했던 화면이라, 이관 시 032의 계약(`contracts/screen-migration.md`)을 그대로 재사용할 수 있는지부터 확인한다.
-- **🔄 033에서 구현 — 코드 완료, 실기기 검증 대기**(2026-09-07,
-  `specs/033-character-screen-press-feedback/`). 위 다섯 물음의 답:
+- **✅ 033에서 구현 — 실기기 debug 검증 완료**(2026-09-07, SM-S901N/Galaxy S22,
+  One UI 7 / Android 16, `specs/033-character-screen-press-feedback/`). 위 다섯 물음의 답:
   1. **`CharacterListScreen` 이관** — `ListRow`로 이관했다. `label`을
      `string | ReactNode`로 넓히자(순수 확장, 기존 6개 테스트 무수정 GREEN)
      032 T062의 "구조가 안 맞는다"는 전제가 사라졌다. 032
@@ -320,8 +320,18 @@
   없었다.** reanimated 4.x는 이것 없이 worklet이 컴파일되지 않는데, 실패가
   조용하다(오류 없이 애니메이션만 안 돎). 032가 남긴 "이 플러그인이 설치돼
   있지 않다"는 주석이 스테일이었다 — 실제로는 설치돼 있었다. 033이 활성화했다.
-- **남은 것**: 실기기 검증(SM-S901N debug) — 화면 이관 육안, **눌림 반응 육안**,
-  생성 중 화면 미노출, Maestro 흐름 셋 무갱신 PASS.
+- **✅ 실기기 검증 결과**(2026-09-07): 눌림 반응 실측 — 버튼 내부 노드가
+  평상시 117×66 → 누른 채 **113×64**(비율 0.966/0.970, `PRESS.scale = 0.97`과
+  일치), 바깥 `action-*` bounds는 불변(transform만 바뀌어 주변이 안 밀림).
+  logcat에 `libworklets.so`·`libreanimated.so` 적재 확인 — T001(babel worklets
+  플러그인)이 유효했다. 화면 이관 육안(아이보리 톤·문안·testID 전부 이관 전과
+  동일, 모델 식별자 0건), 생성 중 화면 텍스트 5개뿐(금지어 7종 0건),
+  Maestro `photo-vision.yml`·`parallel-model-download.yml` 무갱신 PASS.
+  ⚠️ `download-conflict.yml`은 026이 「한 번에 하나」 제약을 풀어 구조적으로
+  PASS 불가 — 로드맵 이관(SC-004 부분 미충족). 검증 중 stale 결함 셋을 함께
+  고쳤다(023·025·020 계열, 033 회귀 아님).
+- **미확인 잔여**: release 빌드에서의 눌림 반응(dev-only 검증 정책상 요청 시에만,
+  PR #56), One UI 8.5(SM-S928N) 육안(032 이월 잔여 (1), 재현 기기 필요).
 
 ### 22. 엔드유저 화면 전체를 NativeWind/토큰으로 이관 (033 후속)
 
