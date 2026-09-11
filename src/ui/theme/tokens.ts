@@ -101,6 +101,22 @@ export const PRESS = {
 } as const;
 
 /**
+ * 038 — 일기 첫 표시 타자기 연출의 글자당 노출 간격.
+ *
+ * **사람이 정한 값이다**(012 `USER_VISIBLE_SIGNAL_AXES`, 021
+ * `PERMISSION_REQUIREMENTS`, 033 `PRESS`가 선례) — 코드가 재서 정하지 않는다
+ * (원칙 V). "기다림"보다 "드러남"에 가깝게 빠른 편을 기본으로 한다(FR-010).
+ *
+ * **화면에 노출하지 않는다**(원칙 IV) — `TypewriterText`가 이 값을 입력
+ * prop으로만 받고, 렌더 출력 어디에도 이 숫자가 텍스트로 나타나지 않는다.
+ * 실기기에서 느리거나 빠르게 느껴지면 이 한 줄만 고친다.
+ */
+export const REVEAL = {
+  /** 글자당 노출 간격 (ms) */
+  charMs: 15,
+} as const;
+
+/**
  * WCAG 상대 명암비 — `(L1 + 0.05) / (L2 + 0.05)`.
  *
  * 순수 함수. 팔레트 값이 AA를 넘는지 **빌드 시** 검증하는 용도이지(theme-tokens.

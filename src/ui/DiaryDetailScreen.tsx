@@ -33,7 +33,8 @@ import { PERSONA_NAMES } from "../diary/persona";
 import type { DiaryEntry } from "../diary/types";
 import type { DaySignals, SignalValue } from "../signals/types";
 import { AppText } from "./components/Text";
-import { COLORS, RADIUS } from "./theme/tokens";
+import { TypewriterText } from "./components/TypewriterText";
+import { COLORS, RADIUS, REVEAL } from "./theme/tokens";
 
 /**
  * 032 — 풀스크린 사진 뷰어의 배경/글자.
@@ -69,6 +70,15 @@ export type DiaryDetailScreenProps = {
    * 방금 쓴 것이 아니므로 기본값이 `false`다.
    */
   overwrote?: boolean;
+  /**
+   * 생성 직후 첫 표시인가 (038 FR-001, contracts/diary-reveal.md A).
+   *
+   * **`{ kind: "written" }` 케이스에서만 참으로 전달된다** — 목록에서 연
+   * `{ kind: "detail" }` 경로는 이 prop을 안 넘긴다(FR-007, SC-004 회귀).
+   * 참이면 제목→본문을 글자 단위로 노출하고, 본문 노출이 끝나기 전에는
+   * "이 일기가 본 것" 절·사진 슬라이더·갤러리가 화면에 없다(FR-003).
+   */
+  reveal?: boolean;
 };
 
 /**
@@ -423,6 +433,7 @@ export function DiaryDetailScreen({
   currentAuthorName,
   saved = true,
   overwrote = false,
+  reveal = false,
 }: DiaryDetailScreenProps) {
   // 025 — 갤러리 표시 상태. 화면 로컬이며 파일·스토리지에 저장하지 않는다(SC-006).
   // 회전·백그라운드 전환에서 React state가 유지되므로 갤러리가 같은 사진에서
@@ -430,6 +441,32 @@ export function DiaryDetailScreen({
   const [gallery, setGallery] = useState<GalleryState>({ open: false });
   const photos = entry.photos;
   const hasPhotos = photos !== undefined && photos.length > 0;
+
+  const hasTitle = entry.title !== undefined;
+
+  /*
+   * 038 — 첫 표시 타자기 연출(data-model.md §2, contracts/diary-reveal.md A).
+   *
+   * `reveal`이 거짓이면(목록 재진입 `detail` 경로) 둘 다 초기값부터 `true`라
+   * 이 기능 도입 전과 100% 동일하게 렌더된다(SC-004 회귀) — 코드 추가 없이
+   * 초기값 계산만으로 성립한다(009 FR-008 대응, T026).
+   *
+   * 제목이 없으면 `titleDone`이 처음부터 `true`라 본문부터 시작한다(FR-002).
+   */
+  const [titleDone, setTitleDone] = useState(!(reveal && hasTitle));
+  const [revealDone, setRevealDone] = useState(!reveal);
+
+  /*
+   * skip 시 두 상태를 함께 설정한다(U1, analyze 지적) — 제목이 아직 안 끝난
+   * 시점에 탭해도 본문 `TypewriterText`가 다음 렌더에서 `skipToEnd=true`로
+   * 첫 마운트되어 즉시 전체로 이어진다("한 박자 늦게 채워짐" 방지).
+   */
+  const onSkip = () => {
+    setTitleDone(true);
+    setRevealDone(true);
+  };
+
+  const showBottomSection = revealDone;
 
   return (
     <ScrollView
@@ -439,19 +476,62 @@ export function DiaryDetailScreen({
     >
       <AppText variant="caption">{entry.date}</AppText>
 
-      {/* 014 — 제목이 있으면 날짜 아래에 보인다(FR-011). 없으면 아무것도 없다 */}
-      {entry.title !== undefined && <AppText variant="title">{entry.title}</AppText>}
+      {/* 014 — 제목이 있으면 날짜 아래에 보인다(FR-011). 없으면 아무것도 없다.
+          038 — reveal 중에는 타자기로, 아니면(또는 완료 후) 즉시 전체. */}
+      {hasTitle &&
+        (reveal ? (
+          <TypewriterText
+            text={entry.title as string}
+            charMs={REVEAL.charMs}
+            skipToEnd={titleDone}
+            onDone={() => setTitleDone(true)}
+            variant="title"
+          />
+        ) : (
+          <AppText variant="title">{entry.title}</AppText>
+        ))}
 
-      {/* **저장하지 못했으면 남지 않는다는 것을 말한다**(FR-012b) */}
+      {/* **저장하지 못했으면 남지 않는다는 것을 말한다**(FR-012b). 038 —
+          reveal 여부와 무관하게 즉시 렌더(FR-012, C18) — 사용자가 즉시 알아야
+          하는 정보다. */}
       {!saved && <AppText variant="body">저장하지 못했다. 앱을 나가면 이 일기는 사라진다</AppText>}
 
-      {/* **덮어썼다는 사실을 알린다**(FR-034) — 사라진 일기는 되돌릴 수 없다 */}
+      {/* **덮어썼다는 사실을 알린다**(FR-034) — 사라진 일기는 되돌릴 수 없다.
+          038 — 마찬가지로 reveal과 무관하게 즉시. */}
       {overwrote && <AppText variant="caption">이전 일기를 덮어썼다</AppText>}
 
-      {/* 일기가 길면 스크롤된다 */}
-      <AppText variant="body" style={{ fontSize: 16, lineHeight: 26 }}>
-        {entry.text}
-      </AppText>
+      {/* 일기가 길면 스크롤된다. 038 — reveal 중이고 제목이 아직 안 끝났으면
+          본문은 렌더하지 않는다(제목 먼저, C3). 제목이 끝났으면(또는 제목이
+          없으면) 본문을 타자기로, reveal이 없으면 즉시 전체(회귀). */}
+      {(!reveal || titleDone) &&
+        (reveal ? (
+          <TypewriterText
+            text={entry.text}
+            charMs={REVEAL.charMs}
+            skipToEnd={revealDone}
+            onDone={() => setRevealDone(true)}
+            variant="body"
+            style={{ fontSize: 16, lineHeight: 26 }}
+          />
+        ) : (
+          <AppText variant="body" style={{ fontSize: 16, lineHeight: 26 }}>
+            {entry.text}
+          </AppText>
+        ))}
+
+      {/* 038 — reveal 중이고 아직 안 끝났으면(revealDone === false) 화면을
+          덮는 투명 오버레이로 탭 건너뛰기를 받는다(U2, analyze 지적). 루트
+          `ScrollView`를 통째로 `Pressable`로 감싸지 않는다 — 스크롤 제스처
+          충돌을 피한다. 완료되면 렌더 자체가 사라져 슬라이더·갤러리 탭이
+          정상 도달한다(FR-006). */}
+      {reveal && !revealDone && (
+        <Pressable
+          testID="diary-reveal-skip"
+          accessibilityRole="button"
+          onPress={onSkip}
+          style={StyleSheet.absoluteFill}
+        />
+      )}
 
       {/*
         025 — VLM이 실제로 분석한 사진들을 가로 슬라이더로 보인다(FR-001).
@@ -462,8 +542,11 @@ export function DiaryDetailScreen({
         `screen.kind === "writing"`(생성 중)은 `DiaryHomeScreen`의 별도 `View`라
         이 화면(따라서 슬라이더·갤러리)을 거치지 않는다 — 생성 중 미노출은
         구조적으로 성립한다(FR-017, SC-005).
+
+        038 — reveal 중 본문 노출이 끝나기 전에는(showBottomSection === false)
+        렌더하지 않는다(FR-003, SC-002) — `hidden`이 아니라 부재 자체다.
       */}
-      {hasPhotos && (
+      {hasPhotos && showBottomSection && (
         <PhotoSlider photos={photos} onOpen={(index) => setGallery({ open: true, index })} />
       )}
 
@@ -472,7 +555,7 @@ export function DiaryDetailScreen({
           않는다 — 닫으면 상세 화면으로 돌아온다(FR-013). 갤러리가 열린 채
           부모가 리렌더돼도(회전·백그라운드) `gallery.open`이 유지되므로 모달과
           그 내부 상태가 살아남는다(FR-015a, C18a). */}
-      {hasPhotos && gallery.open && (
+      {hasPhotos && showBottomSection && gallery.open && (
         <PhotoGalleryModal
           photos={photos}
           initialIndex={gallery.index}
@@ -482,26 +565,29 @@ export function DiaryDetailScreen({
 
       {/*
         무엇을 보고 썼는가(002 FR-011). **모르는 것과 없는 것이 구분된다**(원칙 V).
+        038 — reveal 중 본문 노출이 끝나기 전에는 이 절 전체가 없다(FR-003).
       */}
-      <View style={styles.signals}>
-        <SignalsTitle currentAuthorName={currentAuthorName} entry={entry} />
-        {signalLines(entry.signalsUsed, entry.placeName)
-          // 017 — `timing.visionMs`가 있으면 아래 TimingLines의 "사진을 N장을
-          // 분석하는 데 ..." 문장이 이미 장수를 말하므로 "사진: N장" 줄은
-          // 같은 사실의 중복이다(사용자 실기기 확인). visionMs가 없을 때만
-          // (사진 0장·옛 일기) 여기가 유일한 정보원이므로 남긴다.
-          .filter((line) => !(line.label === "사진" && entry.timing?.visionMs !== undefined))
-          .map((line) => (
-            <AppText key={line.label} variant="body" style={{ opacity: 0.8 }}>
-              {line.label}: {line.value}
-            </AppText>
-          ))}
-        {/*
-          017 US3 — 소요 시간 사후 기록(헌법 1.2.0). `entry.timing`이 없으면
-          (옛 일기) 문장 자체가 없다(FR-018, 회귀 없음).
-        */}
-        <TimingLines entry={entry} />
-      </View>
+      {showBottomSection && (
+        <View style={styles.signals}>
+          <SignalsTitle currentAuthorName={currentAuthorName} entry={entry} />
+          {signalLines(entry.signalsUsed, entry.placeName)
+            // 017 — `timing.visionMs`가 있으면 아래 TimingLines의 "사진을 N장을
+            // 분석하는 데 ..." 문장이 이미 장수를 말하므로 "사진: N장" 줄은
+            // 같은 사실의 중복이다(사용자 실기기 확인). visionMs가 없을 때만
+            // (사진 0장·옛 일기) 여기가 유일한 정보원이므로 남긴다.
+            .filter((line) => !(line.label === "사진" && entry.timing?.visionMs !== undefined))
+            .map((line) => (
+              <AppText key={line.label} variant="body" style={{ opacity: 0.8 }}>
+                {line.label}: {line.value}
+              </AppText>
+            ))}
+          {/*
+            017 US3 — 소요 시간 사후 기록(헌법 1.2.0). `entry.timing`이 없으면
+            (옛 일기) 문장 자체가 없다(FR-018, 회귀 없음).
+          */}
+          <TimingLines entry={entry} />
+        </View>
+      )}
     </ScrollView>
   );
 }

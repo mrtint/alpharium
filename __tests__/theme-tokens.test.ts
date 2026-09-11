@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { COLORS, RADIUS, TYPE, contrastRatio } from "../src/ui/theme/tokens";
+import { COLORS, RADIUS, REVEAL, TYPE, contrastRatio } from "../src/ui/theme/tokens";
 
 const TOKENS_SRC = readFileSync(join(__dirname, "../src/ui/theme/tokens.ts"), "utf8");
 const TAILWIND_SRC = readFileSync(join(__dirname, "../tailwind.config.js"), "utf8");
@@ -143,5 +143,23 @@ describe("DT6 — 다크 값 없음 (spec FR-003·FR-019)", () => {
     for (const forbidden of ["COLORS_DARK", "darkColors", "useColorScheme", "Appearance"]) {
       expect(TOKENS_SRC).not.toContain(forbidden);
     }
+  });
+});
+
+describe("DT7 — REVEAL 상수 (038 spec FR-010, T003)", () => {
+  it("REVEAL.charMs가 양수 readonly 상수다", () => {
+    expect(REVEAL).toBeDefined();
+    expect(typeof REVEAL.charMs).toBe("number");
+    expect(REVEAL.charMs).toBeGreaterThan(0);
+  });
+
+  it("소스에 `export const REVEAL = { ... } as const`로 선언돼 있다", () => {
+    const decl = /export const REVEAL = \{[\s\S]*?\} as const;/.exec(TOKENS_SRC);
+    expect(decl).not.toBeNull();
+  });
+
+  it("화면에 노출되지 않는다 — 소스에 charMs를 JSX 텍스트로 렌더하는 코드가 없다(원칙 IV)", () => {
+    // tokens.ts 자체에는 렌더 코드가 없다. 이 파일이 값 상수만 갖는지 확인.
+    expect(TOKENS_SRC).not.toMatch(/<[A-Za-z]/); // JSX 태그 없음
   });
 });

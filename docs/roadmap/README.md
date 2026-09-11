@@ -29,7 +29,7 @@
 - [x] **One UI 8.5+ 다크 모드 dimmed + 온보딩 photo-location 무반응** (031 — 다크 모드: `AppTheme` 부모 `DayNight` → `Light` 교체 + `expo-system-ui`, photo-location: 판정 불가능한 단계라 온보딩에서 제거. 실기기 검증 완료: S928N One UI 8.5 6화면 다크 모드·권한 4행·Maestro / S901N One UI 8.0 S22 회귀·신호 수집 회귀. release 재확인만 dev-only 정책상 보류[PR #56])
 - [x] **032 후속 — 미이관 화면 마무리 + 새 인터랙션/애니메이션** (033 — `CharacterListScreen`·`DayPicker` 토큰·`ListRow` 이관, 눌림 피드백 `scale 0.97`. 실기기 debug 검증 완료 2026-09-07. release 눌림 반응·SM-S928N 육안은 별도 잔여)
 - [x] **엔드유저 화면 전체를 NativeWind/토큰으로 이관** (034 — `AuthorPicker`·`BuildErrorScreen`·`OverwriteConfirmScreen`·`PermissionsSection` 4개 이관, `App.tsx` 설정 탭 여백 1곳. `Card`·`SectionHeader` 첫 실사용. 실기기 debug 검증·PR #51 머지 완료. `AutoDiaryTriggerButton`·`PermissionPanel`은 개발자 탭 전용이라 범위 밖)
-- [ ] **완성된 일기 첫 표시를 타자기 연출로** (생성 직후 `written` 화면에서 제목+본문이 글자 단위로 흐른다. 화면 탭 시 즉시 전체. 이미 저장·판정 통과한 본문이므로 "생성 중인 글 미노출"[005 FR-028b]과 무관 — 다만 실시간 생성처럼 보이면 안 됨. 아래 23번 상세)
+- [x] **완성된 일기 첫 표시를 타자기 연출로** (038 — 실기기 검증까지 완료. 아래 23번 상세)
 - [ ] **초기 권한 획득 UI/UX 개선 + 작명·에셋 다운로드·첫 일기 병렬화** (「시작하기 전에」를 전체화면 로고 + 목적 설명 위 자동 권한 팝업 흐름으로. **권한 획득 이후 곧바로 19번(모델 준비 연출·작명)으로 이어져** — 백그라운드에서 LLM·VLM 모델을 받는 동안 포어그라운드에서 캐릭터 작명을 하고, 작명이 끝나면 다운로드 완료까지 대기했다가 **첫 일기를 자동 작성**한다. 021·029·031·035 후속. 원칙 I의 「건너뛰기」·OS의 제스처 없는 연속 팝업 허용 여부·배터리 예외 인텐트·029 에셋 단계(건너뛰기 불가)와 035 환영/작명·liveness 게이트의 재배치가 설계 긴장. 11·22번 이후. 아래 24번 상세)
 
 ---
@@ -488,6 +488,77 @@
     `detail` = 즉시 전체. 재생 안 됨(의도).
 - **선행 확인** — 21번(033)의 reanimated·눌림 피드백 작업과 겹치지 않는다(이건
   `setState` 타이핑, reanimated 안 씀). 순서 무관.
+
+- **✅ 038에서 구현 (2026-09-11, 실기기 검증 완료)**:
+  - **접근 A안 그대로 채택.** `DiaryDetailScreen`에 옵셔널 `reveal?: boolean` prop을
+    더해 `DiaryHomeScreen`의 `case "written"`에서만 전달한다(`case "detail"`·
+    `case "writing"` 무변경). `reveal`이 참이면 `titleDone`·`revealDone` 두
+    로컬 state로 제목→본문 순서를 관리하고, 본문 완료 전에는 "이 일기가 본 것"
+    절·사진 슬라이더·갤러리를 **렌더 자체를 안 한다**(숨김이 아니라 부재).
+  - **`TypewriterText`는 `key={text}` 리마운트로 리셋한다** — 처음엔 렌더 중
+    `useRef` 비교로 리셋을 시도했으나 eslint `react-hooks/refs`("렌더 중 ref
+    접근 금지")에 걸렸고, effect 안에서 무조건 `setCount(0)`을 부르는 대안도
+    `react-hooks/set-state-in-effect`에 걸렸다(둘 다 실측) — **React 공식
+    패턴("Resetting state with a key")이 진짜 해법**이었다. 새 `text`마다
+    완전히 새 인스턴스로 시작해 초기값 계산만으로 리셋이 성립한다.
+  - **탭 건너뛰기는 `ScrollView` 안 투명 `Pressable` 오버레이 하나**
+    (`testID="diary-reveal-skip"`, `revealDone === false`일 때만 렌더) —
+    루트 `ScrollView` 자체를 `Pressable`로 감싸면 스크롤 제스처와 충돌한다.
+    `onSkip`이 `setTitleDone(true)`·`setRevealDone(true)`를 **함께** 설정해,
+    제목이 아직 안 끝난 시점에 탭해도 본문이 다음 렌더에서 `skipToEnd=true`로
+    첫 마운트되어 즉시 전체로 이어진다("한 박자 늦게 채워짐" 없음).
+  - **글자 경계는 `graphemeSlice`(`Array.from` 기반) 순수 유틸**
+    (`src/ui/text/grapheme-slice.ts`)로 코드포인트 단위 분할 — 서로게이트
+    쌍(대부분의 이모지)을 반으로 안 자른다.
+  - **★ 완료 판정 타이밍 버그를 구현 중 실측·수정했다**: `setInterval`
+    콜백에서 `setCount`의 updater 함수 **안에** `onDone()`(부모 setState
+    경유)을 부르면 React가 "Cannot update a component while rendering a
+    different component"를 경고했다 — `DiaryDetailScreen`이 제목→본문 두
+    `TypewriterText`를 이어 붙일 때만 드러났고(단일 컴포넌트 테스트로는
+    안 잡힘), 첫 수정 시도(클로저 플래그로 updater 밖에서 호출)는 fake
+    timer 환경에서 updater가 동기 실행을 보장 안 해 `onDone`이 아예 안
+    불리는 회귀를 냈다. 최종 해법은 완료 판정을 `count` 값을 관찰하는
+    **별도 effect**로 분리하는 것이었다.
+  - **회귀 발견 둘 — 038과 무관한 기존 결함**: (1) `__tests__/jest-projects.test.ts`
+    의 자체 glob 매칭 헬퍼가 2단계 깊이 테스트 경로(`__tests__/ui/text/
+    grapheme-slice.test.ts`)를 잘못 매칭했다 — `**/`→`(?:.*/)?` 치환보다
+    `*`→`[^/]*` 치환이 먼저 실행돼 전자를 오염시켰다(순서 문제, 실제 jest는
+    정상 인식). (2) 033의 `press-feedback.test.tsx` PF2가
+    `src/ui/components/`를 7개로 못박아 뒀는데, `TypewriterText.tsx`는
+    "쓰지 않는 컴포넌트"가 아니라 실제로 쓰이는 필수 컴포넌트라 8개로 갱신.
+  - 기기 없는 테스트 142 스위트 전부 GREEN(신규 `grapheme-slice.test.ts` 9개·
+    `typewriter-text.test.tsx` 14개·`diary-reveal.test.tsx` 15개, 기존
+    `photo-gallery`·`diary-detail`·`diary-home` 등 112개 무수정 회귀 통과).
+    `git diff --stat`으로 `src/diary/`·`src/inference/`·`src/vision/`·
+    `src/app/state.ts` 0줄 확인(SC-006). lint(eslint 0 error·tsc·헌법 검사
+    위반 0·prettier) 클린.
+  - **Maestro 조사 결과 — 스텝 추가 불필요**: 로드맵 원 계획이 "생성 후 상세
+    보는 흐름에 화면 탭 스텝을 넣는다"였으나, 실제로 조사해 보니 "일기
+    쓰기"를 부르는 흐름 9개 전부가 "쓰고 있다"가 사라지는 것과 실패 문자열
+    부재만 확인하고 곧장 다른 탭으로 이동해 — **`written` 화면의 본문
+    텍스트를 직접 assert하는 흐름이 하나도 없었다.** `FLOWS` 목록·기존 흐름
+    파일 전부 무변경.
+  - **실기기 검증 완료(2026-09-11, SM-S901N/Galaxy S22, dev)**. 010
+    `seed:day rich`로 2026-09-08~09-10에 사진 3장씩 심어 사진 있는 하루로
+    검증(캡션 단계를 거친 더 긴 본문에서 타이핑 체감을 확인하려는 목적).
+    quickstart.md 2-1~2-6 전부 육안 확인: 첫 표시에서 제목→본문 순서로 글자
+    단위 노출(SC-001), 타이핑 도중 탭하면 즉시 전문(SC-003), 목록 재진입은
+    타이핑 없이 즉시 전문(SC-004), 옛 일기는 이전과 동일(FR-007), 생성 중
+    화면은 회전 표시·독백 한 줄·그만두기만 그대로(SC-005).
+  - **Maestro 회귀(2-6)**: `node scripts/run-device-tests.mjs`로 전체 18흐름
+    실행. **038이 직접 관련된 흐름(`generate-diary`·`diary-user-path`·
+    `today-diary`·`writing-flow-simplified`·`diary-body-screen`) 전부 PASS —
+    038 회귀 없음.** 실패 6개는 전부 038과 무관: `download-conflict`·
+    `parallel-model-download`는 037이 이미 기록한 로스터-하나 구조적 실패,
+    나머지 넷(`prompt-preview`·`photo-selection-over-limit`·
+    `diary-photo-gallery`·`welcome-naming`)은 `unified-permission-onboarding.yml`
+    의 `pm clear`가 앱 데이터를 초기화해 온보딩이 재노출된 상태에서 그 뒤
+    흐름들이 "일기" 탭을 못 찾은 것 — 024가 이미 기록한 "021 흐름은 pm
+    clear로 앱 데이터를 전부 날린다" 상호 오염과 동일 원인(스크린샷으로
+    "시작하기 전에" 4/4 온보딩 화면 확인). **흐름 실행 순서 문제이지 038
+    코드 결함이 아니다.**
+  - release 재확인 불필요(새 네이티브 모듈 0, 012).
+  - 상세: `specs/038-typewriter-diary-reveal/`.
 
 ### 24. 초기 권한 획득 UI/UX 개선 — 로고 + 자동 권한 요청 + 작명·다운로드·첫 일기 병렬화
 
