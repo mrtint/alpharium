@@ -46,6 +46,21 @@
   넣으면 즉시 EOS를 낸다 — `completion({ messages: [...], jinja: true })`로 보낸다.
 - **`stopCompletion()`은 거부시키지 않는다.** `interrupted: true`로 정상
   resolve되므로 `try/catch`로 끊김을 잡으려 하면 놓친다.
+- **★ React Native의 `fetch`는 응답 스트림을 주지 않는다 — `res.body`가 언제나
+  `undefined`다**(041 실측). 전역 `fetch`는 `whatwg-fetch` 폴리필이고
+  (`Libraries/Core/setUpXHR.js:27` → `Libraries/Network/fetch.js:15`), 그 `Body`에는
+  **`body` 속성 자체가 없다**(XHR 기반이라 `ReadableStream`이 존재하지 않는다).
+  그러므로 `res.body.getReader()`로 큰 파일을 스트리밍하려는 코드는 **웹에서 옳고
+  여기서 조용히 반대 갈래를 탄다** — 026이 쓴 `if (!res.body) { arrayBuffer() }`
+  폴백이 늘 참이 되어 구간 하나(약 380MB)를 통째로 힙에 올렸고, 4구간이 동시에
+  그것을 해 `OutOfMemoryError`가 났다(힙 한계 268MB). **그 아래 스트리밍 루프는 한
+  번도 실행된 적이 없는 죽은 코드였다.** 011의 `has_media=0`, 013의 URI 계약 불일치,
+  020의 헤드리스 `defineTask` 미등록과 같은 계열이며, **jest 대역은 `body`를 주므로
+  기기 없는 테스트가 오히려 죽은 쪽을 검증한다** — 소스를 읽어 "쓰지 않아야 할 API"를
+  잠그는 계약 테스트(`__tests__/models/download-memory.test.ts`)가 유일한 통로다.
+  큰 파일을 받을 때는 `fetch`가 아니라 **`expo-file-system`의 `DownloadTask`에
+  `headers: { Range: ... }`를 준다** — 네이티브가 디스크에 직접 쓰므로 바이트가 JS
+  힙에 올라올 자리 자체가 없다.
 - **release는 `run-as`가 안 된다**(`package not debuggable`). 파일 검증은 화면
   관찰이나 debug 빌드로 갈음한다.
 - **서명이 다르면 덮어 설치가 거부되고, 지우면 일기·모델이 함께 사라진다**
@@ -1110,6 +1125,35 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
 - 미확인: FR-009의 거부 판정 갈래, liveness 실패 갈래(위 이유로 유도 불가 —
   035 계약 테스트로 갈음), Maestro `first-run-flow.yml` 자동화(`clearState`
   직후 Maestro 기기 서버가 죽는다 — F1~F5는 손으로 전부 확인).
+
+### 041 — 모델 내려받기 OOM 해소 (2026-09-11)
+
+040이 실기기에서 발견하고 "별도 스펙"으로 남긴 OOM을 같은 브랜치에서 고쳤다.
+**040의 결함이 아니라 026이 남긴 것**이며(`src/models/`는 040에서 변경 0건),
+로스터가 하나인 지금 이 다운로드가 막히면 앱이 아무것도 못 하므로 미룰 수 없었다.
+
+- **원인은 "어느 조건에서 `res.body`가 null이 되는가"가 아니라 "언제나"였다** —
+  위 「실측 규칙」의 RN `fetch` 항목이 그 결론이다. 040이 `arrayBuffer()` 폴백을
+  의심 지점으로 지목한 것은 맞았고, 남은 질문의 답이 "항상 그 폴백을 탄다"였다.
+- **고친 자리는 `expo-port.ts`의 `fetchRange` 하나다.** `RangeFetchPort` 계약,
+  `src/models/segmented/`(순수 코어), `port.ts`는 **한 줄도 안 고쳤다** — 원인이
+  기기 통로의 구현에 있었지 계획·조립에 있지 않았기 때문이다. 026의 계약 테스트가
+  전부 그대로 통과하는 것이 그 증거다.
+- **구간마다 임시 파일로 받고 1MiB씩 옮겨 붙인다.** 네이티브 `DownloadTask`가
+  `<key>.bin.seg<i>`에 직접 쓰고, 다 받으면 `FileHandle.offset`을 옮겨
+  `COPY_CHUNK_BYTES`씩 최종 파일의 제자리로 복사한다. **상주 메모리가 파일 크기와
+  무관하게 청크 하나로 고정된다** — "메모리에 담지 않는다"가 주석의 약속이 아니라
+  구조가 된다(예전 코드는 그 약속을 주석으로만 갖고 있었다).
+- **`remove()`·`bytesUsed()`가 구간 임시 파일도 본다**(`leftoverNamesFor`).
+  수신 도중 앱이 죽으면 구간 파일이 남는데, 이 목록에 없으면 GB 단위가 사용자
+  눈에 안 보이는 채로 남는다 — 008의 "받다 만 모델은 앱으로 못 지운다"를 되풀이하지
+  않으려는 것이다.
+- **`tsc`가 또 한 번 원인을 정확히 짚었다** — `FileMode.Read`는 없는 멤버이고
+  실제는 `ReadOnly`다. 손으로 쓴 구조적 타입 대신 `expo-file-system`의 실제 타입을
+  빌리자(`InstanceType<...["File"]>`) 잡혔다. 007·014의 교훈과 같은 자리다.
+- 기기 없는 테스트 153 스위트 / 2741개 통과, lint·헌법 검사(위반 0)·prettier 클린.
+  위반 주입(`arrayBuffer()` 되살리기)이 계약 테스트에 잡히는 것을 확인했다.
+- 상세: `specs/041-model-download-oom/`.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
