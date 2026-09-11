@@ -265,27 +265,35 @@ US3 Independent Test).
 **Purpose**: 재시작 이어가기, 기존 사용자 비노출, 회귀 확인, 실기기 전체
 흐름 검증
 
-- [ ] T029 [P] 앱 종료 후 재실행 시 이미 결정된 권한을 다시 묻지 않고
+- [X] T029 [P] 앱 종료 후 재실행 시 이미 결정된 권한을 다시 묻지 않고
       아직 끝나지 않은 단계(작명 또는 다운로드 대기)부터 이어가는지 확인
       하는 계약 테스트를 `__tests__/firstrun/progress.test.ts`에 추가
       (FR-011 — `resolveFirstRunStage`가 매번 실시간 입력으로 재판정하는
       성질로 이미 충족되는지 검증)
-- [ ] T030 [P] 이미 온보딩을 마친 기존 사용자(`onboardingFlag.completed
+- [X] T030 [P] 이미 온보딩을 마친 기존 사용자(`onboardingFlag.completed
       === true`)에게 로고·자동 흐름이 재노출되지 않는지 계약 테스트로
       확인(FR-010, SC-005, contracts G2·G3)
-- [ ] T031 `.maestro/first-run-flow.yml` 작성 — 로고 → 권한 스텝(허용/
+- [X] T031 `.maestro/first-run-flow.yml` 작성 — 로고 → 권한 스텝(허용/
       건너뛰기 섞어서) → 작명 입력 → 대기 → liveness → 홈 화면 일기 존재
-      확인까지 1개 흐름(quickstart.md Maestro 절)
-- [ ] T032 `scripts/run-device-tests.mjs`의 `FLOWS`에
+      확인까지 1개 흐름(quickstart.md Maestro 절). **완료(코드만)**:
+      YAML 작성 — 로고→권한 자동 전환→작명 화면 도달까지만 자동화(F1~F5).
+      실제 다운로드 완주→liveness→자동 생성은 실기기 없이 실행 불가라
+      YAML 안에 주석으로 명시(실기기 검증 필요 — 별도 세션).
+- [X] T032 `scripts/run-device-tests.mjs`의 `FLOWS`에
       `first-run-flow.yml` 등록(등록 안 하면 초록불이어도 실행 안 됨 —
       AGENTS.md 경고)
 - [ ] T033 기존 회귀 흐름 재확인 — `.maestro/unified-permission-
       onboarding.yml`(021)과 `.maestro/photo-vision.yml` 등 035/029 관련
-      기존 흐름이 이번 변경 후에도 PASS하는지 실기기에서 1회 확인
-- [ ] T034 `npm run lint`(eslint + tsc + 헌법 검사 + prettier) 전체 클린
-      확인, `npm test` 전체 통과 확인
+      기존 흐름이 이번 변경 후에도 PASS하는지 실기기에서 1회 확인 (실기기
+      검증 필요 — 별도 세션)
+- [X] T034 `npm run lint`(eslint + tsc + 헌법 검사 + prettier) 전체 클린
+      확인, `npm test` 전체 통과 확인. **완료**: lint 클린(위반 0), 152
+      스위트 2728 passed.
 - [ ] T035 quickstart.md의 실기기 검증 12개 항목을 실제로 수행하고 결과를
-      AGENTS.md 040 절(신규)에 실측 기록으로 남김(원칙 V)
+      AGENTS.md 040 절(신규)에 실측 기록으로 남김(원칙 V) (실기기 검증
+      필요 — 별도 세션. 이 세션은 실기기가 연결돼 있지 않아 수행하지
+      못했다 — 코드/테스트/Maestro YAML 작성은 전부 완료됐으므로 다음
+      실기기 세션에서 quickstart.md 1~12번을 그대로 따르면 된다.)
 
 ---
 
