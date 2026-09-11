@@ -99,10 +99,10 @@ Independent Test).
 
 ### Tests for User Story 1
 
-- [ ] T011 [P] [US1] `LogoScreen` 렌더 계약 테스트를
+- [X] T011 [P] [US1] `LogoScreen` 렌더 계약 테스트를
       `__tests__/ui/LogoScreen.test.tsx`에 작성 — `onboardingNeeded: true`
       일 때만 렌더, 일정 시간 후 또는 확인 콜백으로 다음 단계 진입
-- [ ] T012 [P] [US1] `OnboardingScreen`의 스텝 자동 전환 계약 테스트를
+- [X] T012 [P] [US1] `OnboardingScreen`의 스텝 자동 전환 계약 테스트를
       `__tests__/ui/OnboardingScreen.test.tsx`에 추가 — 스텝 진입 시 목적
       설명이 렌더되고, 타이머 경과 후 시스템 요청 함수가 자동 호출되는지
       (`jest.useFakeTimers()`로 검증), 언마운트 시 타이머가 정리되는지,
@@ -118,21 +118,21 @@ Independent Test).
 
 ### Implementation for User Story 1
 
-- [ ] T013 [US1] `src/ui/LogoScreen.tsx` 신규 작성 — 전체화면 로고,
+- [X] T013 [US1] `src/ui/LogoScreen.tsx` 신규 작성 — 전체화면 로고,
       `testID="first-run-logo"`, T011 통과
-- [ ] T014 [US1] `src/ui/OnboardingScreen.tsx` 수정 — 스텝 컴포넌트 진입
+- [X] T014 [US1] `src/ui/OnboardingScreen.tsx` 수정 — 스텝 컴포넌트 진입
       시 목적 설명 렌더 직후 고정 지연(`setTimeout`, 화면 계층 상수)으로
       시스템 권한 요청 자동 호출, 언마운트 시 clean-up, 배터리 예외
       스텝(`battery-exception`)은 이 자동 타이머 대상에서 제외하고 기존
       [설정 열기]/[건너뛰기] 버튼 유지(research.md #1·#2, T012 통과)
-- [ ] T015 [US1] `App.tsx`의 게이트 로직에 `shouldShowLogo` 연결 —
+- [X] T015 [US1] `App.tsx`의 게이트 로직에 `shouldShowLogo` 연결 —
       `onboardingNeeded && !onboardingStarted`일 때 `LogoScreen` 렌더,
       확인/타임아웃 후 `onboardingStarted`(세션 로컬 상태, 비영구)를 true로
       설정하고 `OnboardingScreen`으로 전환(research.md #6, contracts G3)
 - [ ] T016 [US1] 기존 021 `.maestro/unified-permission-onboarding.yml`이
       이번 변경(스텝 자동 전환)으로 깨지는지 실기기에서 확인하고, 깨졌다면
       흐름을 새 자동 전환 타이밍에 맞게 수정(고정 지연만큼
-      `waitForAnimationToEnd` 또는 대기 시간 조정)
+      `waitForAnimationToEnd` 또는 대기 시간 조정) (실기기 검증 필요 — 별도 세션)
 
 **Checkpoint**: 로고→권한 자동 순차 흐름이 단독으로 동작·검증 가능
 

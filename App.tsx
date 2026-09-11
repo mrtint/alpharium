@@ -44,6 +44,8 @@ import { shouldShowWelcome } from "./src/welcome/decision";
 import { validateCharacterName } from "./src/welcome/naming";
 import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/welcome/names-port";
 import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
+import { shouldShowLogo } from "./src/firstrun/logo";
+import { LogoScreen } from "./src/ui/LogoScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { PermissionsSection } from "./src/ui/PermissionsSection";
@@ -252,6 +254,19 @@ function AppFrame() {
   const onboardingFlagPort = useMemo(() => expoOnboardingFlagPort(), []);
   const [onboardingFlag, setOnboardingFlag] = useState<OnboardingFlag | null>(null);
   const [forceOnboarding, setForceOnboarding] = useState(false);
+
+  /**
+   * 040 — 이번 세션에 로고를 이미 지났는가.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * **세션 로컬 상태이며 영구 저장하지 않는다**(research.md #6, contracts G3).
+   * `onboarding.json`에 필드를 추가하면 021의 `FLAG_GROWS_HISTORY` 검사가
+   * 막아온 패턴(boolean 이력이 아닌 세션성 상태를 영구 파일에 쌓는 것)에
+   * 가까워진다 — 앱을 껐다 켜면 다시 로고부터 보여도 spec과 상충하지 않는다
+   * (Edge Case가 막는 것은 "권한 재질문"이지 "로고 1회성 보장"이 아니다).
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const [onboardingStarted, setOnboardingStarted] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -527,7 +542,26 @@ function AppFrame() {
 
   // 029 — 진입 게이트: shouldShowOnboarding(flag, essentialsReady). `completed`가
   // true여도 필수 에셋이 준비 안 됐으면 온보딩(에셋 단계)이 다시 뜬다(FR-020).
-  if (shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding) {
+  const onboardingNeeded = shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding;
+
+  /*
+   * 040 — 로고는 온보딩이 필요하고 아직 이번 세션에서 스텝을 시작하지
+   * 않았을 때만(FR-001, research.md #6, contracts G3). `shouldShowLogo`는
+   * `onboardingNeeded`만 보고, "이미 시작했는가"는 `App.tsx`가 소유하는
+   * 세션 로컬 상태로 가른다 — `forceOnboarding`([온보딩 다시 하기])으로
+   * 재진입해도 `onboardingStarted`가 이미 true이므로 로고를 다시 보여주지
+   * 않는다(설정에서 다시 보기는 권한 스텝만 다시 보는 것이 자연스럽다).
+   */
+  if (onboardingNeeded && shouldShowLogo(onboardingNeeded) && !onboardingStarted) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <LogoScreen onDone={() => setOnboardingStarted(true)} />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  if (onboardingNeeded) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <OnboardingScreen

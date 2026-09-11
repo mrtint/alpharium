@@ -8,7 +8,7 @@ import { shouldAutoGenerate } from "../../src/firstrun/auto-diary";
  *       spec.md FR-008·FR-008a
  */
 
-describe("shouldAutoGenerate — livenessOutcome===\"ok\" && dayWritable일 때만 true", () => {
+describe('shouldAutoGenerate — livenessOutcome==="ok" && dayWritable일 때만 true', () => {
   it("ok + writable → true", () => {
     expect(shouldAutoGenerate({ livenessOutcome: "ok", dayWritable: true })).toBe(true);
   });

@@ -20,7 +20,7 @@ const root = join(__dirname, "../..");
 describe("checkFirstRunFile — src/firstrun/ 밖 파일은 대상이 아니다", () => {
   it("다른 축이 파이프라인을 부르는 것은 정상이다 — 이 규칙은 firstrun/만 본다", () => {
     expect(
-      checkFirstRunFile("src/app/wiring.ts", 'pipeline.run({ day, now, character, vision });'),
+      checkFirstRunFile("src/app/wiring.ts", "pipeline.run({ day, now, character, vision });"),
     ).toEqual([]);
   });
 });

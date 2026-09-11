@@ -34,9 +34,9 @@ describe("우선순위 판정 6가지", () => {
   });
 
   it("2. 온보딩이 필요하고 이미 시작됨 → onboarding", () => {
-    expect(
-      resolveFirstRunStage({ ...BASE, onboardingNeeded: true, onboardingStarted: true }),
-    ).toBe("onboarding");
+    expect(resolveFirstRunStage({ ...BASE, onboardingNeeded: true, onboardingStarted: true })).toBe(
+      "onboarding",
+    );
   });
 
   it("3. 온보딩 끝났지만 작명 미완 → naming (다운로드 상태 무관)", () => {
@@ -131,7 +131,12 @@ describe("G4 — 작명은 다운로드 완료를 기다리지 않는다", () =>
 
 describe("G1 — 순수 함수다", () => {
   it("같은 입력에 같은 출력", () => {
-    const input = { ...BASE, namingDone: true, downloadReady: true, livenessOutcome: "ok" as const };
+    const input = {
+      ...BASE,
+      namingDone: true,
+      downloadReady: true,
+      livenessOutcome: "ok" as const,
+    };
     expect(resolveFirstRunStage(input)).toBe(resolveFirstRunStage(input));
   });
 

@@ -1,9 +1,11 @@
 /**
- * 통합 권한 온보딩 화면 (021).
+ * 통합 권한 온보딩 화면 (021, ★ 040 — 스텝 자동 전환 추가).
  *
  * 계약: specs/021-unified-permission-onboarding/contracts/onboarding-screen.md
  *       S1
  *       spec.md FR-005~FR-008·FR-013·FR-015·FR-016, SC-001·SC-003·SC-008
+ *       specs/040-onboarding-parallel-setup/research.md #1·#2
+ *       specs/040-onboarding-parallel-setup/spec.md FR-001~FR-003
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **판정은 화면이 하지 않는다.** `planOnboardingSteps`·`nextStep`(순수)이 정하고,
@@ -16,6 +18,19 @@
  * **생성 트리거·진행률 없음**(원칙 IV) — 이 화면은 권한만 다룬다.
  *
  * **모델 정보 없음**(원칙 III) — `expo-*`를 직접 import하지 않고 통로를 주입받는다.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 040 — 스텝 진입 시 목적 설명을 렌더한 직후 고정 지연으로 시스템 권한
+ * 요청을 자동 호출한다**(FR-001). 사용자가 [허용]을 눌러도 되고, 누르지 않아도
+ * 지연 후 같은 요청이 자동으로 나간다 — 둘 다 같은 `allow()`를 부르므로 중복
+ * 호출 방지(`busy` 플래그)가 그대로 방어한다.
+ *
+ * **배터리 예외 스텝은 자동 타이머 대상이 아니다**(research.md #2, FR-002) —
+ * 조회 API가 없어 사용자가 설정에서 돌아왔는지 자동으로 알 수 없으므로, 이
+ * 스텝만 [설정 열기]/[건너뛰기]를 사용자가 직접 눌러야 한다.
+ *
+ * **지연값은 화면 계층 상수다**(research.md #1) — `onboarding/decision.ts`
+ * (순수 판정)에 시간 관련 로직을 두지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -58,6 +73,14 @@ export type OnboardingPorts = {
   /** 029 — 필수 에셋(공용 사진 모델 + 기본 캐릭터) 다운로드 통로 (FR-015). */
   essentialAssets: EssentialAssetsPort;
 };
+
+/**
+ * 목적 설명을 보여준 뒤 시스템 권한 요청을 자동 호출하기까지의 고정 지연
+ * (research.md #1, FR-001). 화면 계층 상수 — 순수 판정 파일에 두지 않는다.
+ *
+ * `battery-exception` 스텝에는 적용하지 않는다(research.md #2).
+ */
+export const ONBOARDING_STEP_AUTO_ADVANCE_MS = 1500;
 
 export type OnboardingScreenProps = {
   platform: "android" | "ios";
@@ -188,6 +211,33 @@ export function OnboardingScreen({
     },
     [busy, ports, refresh],
   );
+
+  /*
+   * ★ 040 — 스텝 진입 시 목적 설명을 렌더한 직후, 고정 지연으로 시스템 권한
+   * 요청을 자동 호출한다(FR-001, research.md #1). `battery-exception`은
+   * 제외한다(research.md #2) — 조회 API가 없어 사용자가 설정에서 돌아왔는지
+   * 자동으로 알 수 없다.
+   *
+   * `current?.requirement.key`가 바뀔 때마다(=스텝이 바뀔 때마다) 새 타이머를
+   * 걸고, 언마운트·스텝 변경 시 정리한다 — 이전 스텝의 타이머가 살아남아
+   * 엉뚱한 스텝에서 `allow()`를 부르는 것을 막는다(T012 clean-up 검증 대상).
+   *
+   * `current.status`가 `blocked`면 [허용]이 아니라 [설정 열기]가 유효한
+   * 경로이므로 자동 타이머를 걸지 않는다 — OS 설정은 화면 버튼으로만 연다.
+   */
+  useEffect(() => {
+    if (current === null) return;
+    if (current.requirement.key === "battery-exception") return;
+    if (current.status === "blocked") return;
+
+    const step = current;
+    const timer = setTimeout(() => {
+      void allow(step);
+    }, ONBOARDING_STEP_AUTO_ADVANCE_MS);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.requirement.key]);
 
   const openSettings = useCallback(
     async (step: OnboardingStep) => {

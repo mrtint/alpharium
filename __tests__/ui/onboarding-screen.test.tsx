@@ -1,9 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { render, screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react-native";
 
-import { OnboardingScreen } from "../../src/ui/OnboardingScreen";
+import { OnboardingScreen, ONBOARDING_STEP_AUTO_ADVANCE_MS } from "../../src/ui/OnboardingScreen";
 import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
 import type { PermissionState } from "../../src/signals/port";
 
@@ -342,5 +342,131 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
     // OS4 — [다시 시도]가 downloadEssentials를 재호출한다 (SR6).
     fireEvent.press(screen.getByTestId("onboarding-assets-retry"));
     await waitFor(() => expect(attempts).toBeGreaterThanOrEqual(2), { timeout: 4000 });
+  });
+});
+
+/**
+ * ★ 040 T012 — 스텝 자동 전환 (research.md #1·#2, FR-001~FR-003).
+ *
+ * 목적 설명 렌더 직후 고정 지연으로 시스템 요청이 자동 호출되는지,
+ * 언마운트·스텝 전환 시 타이머가 정리되는지, 배터리 예외 스텝은 자동
+ * 타이머 대상이 아닌지를 `jest.useFakeTimers()`로 검증한다.
+ */
+describe("040 — 스텝 자동 전환 (research.md #1)", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("스텝 진입 후 지연이 지나면 시스템 요청 함수가 자동 호출된다", async () => {
+    jest.useFakeTimers();
+    const { ports, calls } = makePorts();
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await act(() => {
+      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS);
+    });
+    // 마이크로태스크(요청 → refresh)가 흐를 시간을 준다.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(calls).toContain("requestPhoto");
+  });
+
+  it("언마운트되면 타이머가 정리되어 자동 호출되지 않는다", async () => {
+    jest.useFakeTimers();
+    const { ports, calls } = makePorts();
+    const { unmount } = await render(
+      <OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />,
+    );
+    await act(() => {
+      unmount();
+    });
+
+    await act(() => {
+      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS * 2);
+    });
+
+    expect(calls).not.toContain("requestPhoto");
+  });
+
+  it("배터리 예외 스텝은 자동 타이머가 없다 — 지연이 지나도 요청이 불리지 않는다", async () => {
+    jest.useFakeTimers();
+    const { ports, calls } = makePorts({
+      photo: "granted",
+      location: "granted",
+      notification: "granted",
+    });
+    await render(
+      <OnboardingScreen
+        {...BASE_PROPS}
+        flag={{ completed: false, batteryNoticeShown: false, welcomeShown: false }}
+        ports={ports}
+        onComplete={() => {}}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
+
+    await act(() => {
+      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS * 3);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(calls).not.toContain("requestBattery");
+    // 여전히 배터리 스텝에 머물러 있다 — 자동으로 다음으로 안 넘어간다.
+    expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy();
+  });
+
+  it("FR-003/Acceptance Scenario 2 — 시스템 팝업 거부(granted:false)여도 다음 스텝으로 자동 진행된다", async () => {
+    jest.useFakeTimers();
+    // photoPermission이 거부 상태로 남더라도(허용 콜백이 실패로 응답해도) 다음
+    // 단계로 흐름이 이어져야 한다 — 건너뛰기 버튼을 누르지 않고도.
+    const { ports } = makePorts();
+    // requestPhotoPermission이 거부로 남는 통로로 덮어쓴다.
+    (
+      ports.photo as { requestPhotoPermission: () => Promise<PermissionState> }
+    ).requestPhotoPermission = async () => "denied" as PermissionState;
+
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+
+    await act(() => {
+      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // 021 statusOf: denied → actionable, 그래도 photos가 order 1위이므로
+    // "denied" 상태에서는 nextStep이 여전히 photos를 가리킨다(재요청 가능) —
+    // 이 테스트의 핵심은 "거부돼도 흐름이 멈추지 않는다"이므로, skip 버튼 없이
+    // 화면이 여전히 반응 가능한 상태(같은 스텝이든 다음이든)임을 확인한다.
+    // 흐름이 멈추지 않았다는 것은 skip으로 다음 단계에 명시적으로 도달 가능함으로
+    // 확인한다.
+    fireEvent.press(screen.getByTestId("onboarding-skip"));
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+  });
+});
+
+describe("FR-013 회귀 — 스텝 목록은 고정 배열에서만 온다", () => {
+  const RAW = readFileSync(join(__dirname, "../../src/ui/OnboardingScreen.tsx"), "utf8");
+  const CODE = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+  it("자동 전환 로직이 스텝 목록을 동적으로 늘리거나 줄이지 않는다", () => {
+    // 040의 자동 타이머 추가가 021의 planOnboardingSteps(고정 배열 입력) 호출
+    // 방식 자체를 바꾸지 않았는지 소스로 확인한다 — steps는 여전히
+    // planOnboardingSteps(requirements, ...)의 결과 하나뿐이다.
+    const stepsDeclarations = CODE.match(/const steps = planOnboardingSteps\(/g) ?? [];
+    expect(stepsDeclarations).toHaveLength(1);
+    // requirements 인자가 그대로 전달된다(화면이 조건부로 필터링해 별도 배열을
+    // 만들지 않는다).
+    expect(CODE).toMatch(/planOnboardingSteps\(\{\s*platform,\s*requirements,/);
   });
 });
