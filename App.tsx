@@ -490,9 +490,39 @@ function AppFrame() {
    * 건드리지 않는다.
    * ───────────────────────────────────────────────────────────────────────────
    */
-  const [namingDone, setNamingDone] = useState(false);
+  const [namingDoneThisSession, setNamingDoneThisSession] = useState(false);
   const [livenessOutcome, setLivenessOutcome] = useState<"ok" | "failed" | null>(null);
 
+  /**
+   * 작명이 끝났는가 — 이번 세션에 끝냈거나(`namingDoneThisSession`), 이전
+   * 세션에 이미 끝낸 적이 있으면(`onboardingFlag.welcomeShown === true`)
+   * 참이다.
+   *
+   * ★ **시드하지 않으면 재실행마다 작명 화면이 다시 뜬다.** 앱을 재시작하면
+   * `namingDoneThisSession`이 `false`로 초기화되는데, `onboardingFlag.
+   * welcomeShown`을 함께 보지 않으면 `firstRunStage`가 매번 `"naming"`으로
+   * 되돌아간다 — `permissionStepsDecided`를 `flag.completed`로 시드한 것과
+   * 같은 이유(FR-011, 위 주석 참조).
+   */
+  const namingDone = namingDoneThisSession || onboardingFlag?.welcomeShown === true;
+
+  /**
+   * 035의 게이트 함수(W1~W3 계약)를 여전히 부른다 — "언제 작명이 한 번이라도
+   * 필요한가"의 1차 판정은 이 함수가 갖고 있다(원칙 III 경계는 035가 소유,
+   * `checkWelcomeFile`이 이 모듈의 순수성을 지킨다).
+   *
+   * ★ 040 — **다만 어느 화면을 렌더할지는 이 값만으로 가르지 않는다** —
+   * 아래 `firstRunStage`가 대신한다. `welcomeShown`이 `finishWelcome()`에서
+   * 작명 직후 곧바로 `true`가 되므로(W9), `welcomeNeeded`만으로 렌더
+   * 분기를 가르면 다운로드/liveness가 아직 안 끝났는데도 대기·확인
+   * 화면을 건너뛰는 결함이 생긴다(아래 렌더 게이트 주석 참조) —
+   * `firstRunStage`는 위에서 시드된 `namingDone`으로 판정하므로 이 문제가
+   * 없다.
+   */
+  // 040: 렌더 분기는 firstRunStage가 대신하지만, 035의 shouldShowWelcome
+  // (W1~W3 계약)을 여전히 호출해 App.tsx가 그 게이트를 우회하지 않았음을
+  // 소스 검사(위 FR-005 테스트)로 확인할 수 있게 값을 남긴다.
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const welcomeNeeded =
     onboardingFlag !== null &&
     shouldShowWelcome({
@@ -643,7 +673,7 @@ function AppFrame() {
         setCustomNames(names);
         void saveCustomNames(characterNamesPort, names).catch(() => {});
       }
-      setNamingDone(true);
+      setNamingDoneThisSession(true);
       setOnboardingFlag((prev) => {
         if (prev === null) return prev;
         const next = { ...prev, welcomeShown: true };
@@ -768,16 +798,23 @@ function AppFrame() {
 
   /*
    * ★ 040 — 진입 게이트의 세 번째 단: 온보딩(권한) → **작명 ∥ 다운로드** →
-   * liveness 확인 → 홈. `welcomeNeeded`가 `onboardingNeeded`를 인자로
-   * 받으므로(W2) 위 분기와 순서가 어긋날 수 없다. **이 자리 밖에서
-   * `WelcomeScreen`을 그리지 않는다**(W5) — 설정 탭에서 캐릭터를 새로
-   * 받아도 연출은 뜨지 않는다(FR-002a).
+   * liveness 확인 → 홈. `firstRunStage`(=`resolveFirstRunStage`의 결과)로
+   * 직접 가른다 — `welcomeNeeded`(`shouldShowWelcome`)는 위
+   * `onboardingGateNeeded`/029 FR-020 보호막에서 이미 걸러지지 않는 나머지
+   * 경우(최초 실행 전체)를 대표하는 가드로만 쓰고, **어느 화면을 보여줄지는
+   * `firstRunStage`가 정한다.**
    *
-   * `firstRunStage`가 `"waiting-for-download"`면 작명은 이미 끝났으므로
-   * `WelcomeScreen` 대신 `WaitingForDownloadScreen`을 보인다(FR-006,
-   * 그만두기 경로 없음).
+   * ⚠️ **`welcomeNeeded`만으로 이 갈래들을 가르면 안 된다** — `finishWelcome()`
+   * 이 `onboardingFlag.welcomeShown`을 즉시 `true`로 저장하므로(W9), 작명을
+   * 마친 바로 다음 렌더에서 `welcomeNeeded`(`!welcomeShown`)가 `false`가
+   * 되어 아직 다운로드/liveness가 안 끝났는데도 대기·확인 화면을 건너뛰고
+   * 탭 UI로 떨어지는 결함이 여기서 실제로 재현됐었다(이 방식으로 고쳤다) —
+   * `firstRunStage`는 `namingDone`(로컬 상태)로 판정하므로 이 문제가 없다.
+   *
+   * **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(W5) — 설정 탭에서
+   * 캐릭터를 새로 받아도 연출은 뜨지 않는다(FR-002a).
    */
-  if (welcomeNeeded && firstRunStage === "waiting-for-download") {
+  if (firstRunStage === "waiting-for-download") {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <WaitingForDownloadScreen fraction={essentialDownloadFraction(essentialDownloadParts)} />
@@ -786,7 +823,7 @@ function AppFrame() {
     );
   }
 
-  if (welcomeNeeded) {
+  if (firstRunStage === "naming" || firstRunStage === "liveness") {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <WelcomeScreen

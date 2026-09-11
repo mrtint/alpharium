@@ -108,8 +108,10 @@ describe("T027a — 자동 생성 실패가 수동 재시도를 막지 않는다
 });
 
 describe("FR-007 — 다운로드가 먼저 끝나도 작명을 재촉하지 않는다", () => {
-  it("namingDone은 오직 finishWelcome()에서만 true로 설정된다(자동 타이머·다운로드 완료 콜백에서 세우지 않음)", () => {
-    const setters = [...APP_SOURCE.matchAll(/setNamingDone\(([^)]*)\)/g)].map((m) => m[1]);
+  it("namingDoneThisSession은 오직 finishWelcome()에서만 true로 설정된다(자동 타이머·다운로드 완료 콜백에서 세우지 않음)", () => {
+    const setters = [...APP_SOURCE.matchAll(/setNamingDoneThisSession\(([^)]*)\)/g)].map(
+      (m) => m[1],
+    );
     expect(setters.length).toBeGreaterThan(0);
     for (const arg of setters) {
       expect(arg.trim()).toBe("true");
@@ -119,6 +121,6 @@ describe("FR-007 — 다운로드가 먼저 끝나도 작명을 재촉하지 않
       /const finishWelcome = useCallback\(([\s\S]*?)\[characterNamesPort/,
     );
     expect(fnBody).not.toBeNull();
-    expect(fnBody?.[1]).toMatch(/setNamingDone\(true\)/);
+    expect(fnBody?.[1]).toMatch(/setNamingDoneThisSession\(true\)/);
   });
 });
