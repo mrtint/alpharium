@@ -455,6 +455,35 @@ function AppFrame() {
     [onboardingFlagPort, refreshEssentialsReady],
   );
 
+  /**
+   * ★ 040 — 권한 스텝이 전부 결정된 순간(FR-004) 온보딩 화면을 떠나면서
+   * **`completed: true`를 함께 저장한다**.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * 021에서는 마지막 [시작하기] 버튼이 `onComplete`를 불러 이 플래그를
+   * 세웠는데, 040은 권한 결정 직후 작명 화면으로 전환하므로 **그 버튼에
+   * 도달하지 않는다** — 저장하지 않으면 `completed`가 영원히 `false`로 남아
+   * 앱을 다시 열 때마다 권한 온보딩이 재노출된다(FR-010·FR-011 위반).
+   *
+   * 실기기에서 실제로 관측된 결함이다(2026-09-11, SM-S901N): 배터리 예외를
+   * 건너뛰고 작명·자동 생성까지 정상 완주했는데, 재시작하면 배터리 스텝
+   * 4/4로 되돌아갔다. `onboarding.json`이 `{"completed":false,...}`였다.
+   *
+   * `batteryNoticeShown`은 `OnboardingScreen`이 세션 안에서 갱신하는 값이라
+   * 여기서는 현재 플래그의 것을 그대로 넘긴다 — 배터리 안내를 실제로 본
+   * 경우의 저장은 021의 기존 경로(`onComplete`)가 여전히 담당한다.
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const onAllPermissionStepsDecided = useCallback(() => {
+    setPermissionStepsDecided(true);
+    setOnboardingFlag((prev) => {
+      if (prev === null || prev.completed === true) return prev;
+      const next = { ...prev, completed: true };
+      void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
+      return next;
+    });
+  }, [onboardingFlagPort, setPermissionStepsDecided]);
+
   /* ─────────────────── 035 — 환영 연출 (게이트 세 번째 단) ─────────────────── */
 
   /**
@@ -772,7 +801,7 @@ function AppFrame() {
           flag={onboardingFlag}
           ports={onboardingPorts}
           onComplete={onOnboardingComplete}
-          onAllStepsDecided={() => setPermissionStepsDecided(true)}
+          onAllStepsDecided={onAllPermissionStepsDecided}
         />
         <StatusBar style="auto" />
       </SafeAreaView>

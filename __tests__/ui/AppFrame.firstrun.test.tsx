@@ -107,6 +107,38 @@ describe("T027a — 자동 생성 실패가 수동 재시도를 막지 않는다
   });
 });
 
+describe("FR-010·FR-011 — 권한 결정이 끝나면 completed를 저장한다", () => {
+  /*
+   * ★ 실기기에서만 드러난 결함(2026-09-11, SM-S901N). 021은 마지막
+   * [시작하기] 버튼이 `onComplete`로 `completed: true`를 세웠는데, 040은
+   * 권한 결정 직후 작명 화면으로 전환해 **그 버튼에 도달하지 않는다** —
+   * 저장하지 않으면 앱을 다시 열 때마다 권한 온보딩이 재노출된다.
+   * 기기 없는 테스트는 이 결함을 못 잡았다(플래그 저장은 파일 통로라
+   * 소스 검사로 배선 존재만 확인한다).
+   */
+  it("onAllStepsDecided 핸들러가 completed: true를 저장한다", () => {
+    const handler = APP_SOURCE.match(
+      /const onAllPermissionStepsDecided = useCallback\(([\s\S]*?)\}, \[/,
+    );
+    expect(handler).not.toBeNull();
+    // 세션 상태만 세우고 끝나면 안 된다 — 파일에도 남겨야 한다.
+    expect(handler?.[1]).toMatch(/setPermissionStepsDecided\(true\)/);
+    expect(handler?.[1]).toMatch(/completed:\s*true/);
+    expect(handler?.[1]).toMatch(/saveOnboardingFlag/);
+  });
+
+  it("OnboardingScreen의 onAllStepsDecided에 그 핸들러가 연결된다", () => {
+    expect(APP_SOURCE).toMatch(/onAllStepsDecided=\{onAllPermissionStepsDecided\}/);
+  });
+
+  it("이미 completed === true면 다시 저장하지 않는다(불필요한 쓰기 방지)", () => {
+    const handler = APP_SOURCE.match(
+      /const onAllPermissionStepsDecided = useCallback\(([\s\S]*?)\}, \[/,
+    );
+    expect(handler?.[1]).toMatch(/prev\.completed === true/);
+  });
+});
+
 describe("FR-007 — 다운로드가 먼저 끝나도 작명을 재촉하지 않는다", () => {
   it("namingDoneThisSession은 오직 finishWelcome()에서만 true로 설정된다(자동 타이머·다운로드 완료 콜백에서 세우지 않음)", () => {
     const setters = [...APP_SOURCE.matchAll(/setNamingDoneThisSession\(([^)]*)\)/g)].map(
