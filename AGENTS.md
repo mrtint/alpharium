@@ -1050,6 +1050,59 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
 - 상세: `specs/037-roster-verified-only/`. 실측 근거: 024 T034·§10(narrative),
   028(chinese·english), 037 실기기 3회(imaginative), my-ollama 리포트 222런.
 
+### 040 — 초기 권한 획득과 첫 실행 흐름 재설계 (2026-09-11)
+
+로드맵 20번. 021(권한 온보딩)·029(필수 에셋)·035(환영·작명)를 흡수해 첫 실행을
+**로고 → 권한 자동 순차 → (작명 ∥ 다운로드) → liveness → 자동 첫 일기**로
+재배치했다. 새 `src/firstrun/`(순수 판정)과 `checkFirstRunFile` 경계 검사가
+021·035와 같은 패턴으로 생겼다.
+
+- **021·035·029의 순수 로직은 그대로 재사용한다** — `requirements.ts`·
+  `essential-assets.ts`·`liveness.ts`·`naming.ts` 무변경. 040이 만든 것은
+  그 조립 순서(`App.tsx` 게이트)와 `src/firstrun/`의 판정 셋
+  (`resolveFirstRunStage`·`shouldShowLogo`·`shouldAutoGenerate`)뿐이다.
+- **자동 생성은 `schedule/task.ts`의 `runAutoDiaryTask`를 재사용하지 않는다**
+  — 그 함수는 `settings.enabled`와 목표 시각 창을 본다. 040의 트리거는 "설정을
+  막 끝낸" 1회성 이벤트라 그 설정과 무관하게 항상 시도해야 한다.
+  `app/wiring.ts`의 `triggerFirstRunAutoDiary()`가 `pipeline.run()`을 직접
+  부른다(`src/firstrun/`은 "시도해야 하는가"만 답한다 — G7).
+- **★ 실기기에서만 드러난 결함 둘**(2026-09-11, SM-S901N, dev). 기기 없는
+  테스트 2700여 개가 통과한 채로 둘 다 통과했다 — 011의 `has_media=0`,
+  013의 URI 계약 불일치, 020의 헤드리스 `defineTask` 미등록과 같은 계열이다.
+  - **권한 결정 후 `completed`가 저장되지 않았다.** 021은 마지막 [시작하기]
+    버튼이 `onComplete`로 플래그를 세웠는데, 040은 권한 결정 직후 작명
+    화면으로 전환해 **그 버튼에 도달하지 않는다.** 배터리 예외를 건너뛰고
+    작명·자동 생성까지 정상 완주했는데도 앱을 다시 열면 배터리 스텝 4/4로
+    되돌아갔다. **화면을 떠나는 자리가 바뀌면 그 화면이 저장하던 것도 함께
+    옮겨야 한다** — `onAllStepsDecided`가 세션 상태만 세우고 파일에는 아무것도
+    남기지 않은 것이 원인이다.
+  - **자동 생성이 끝나도 홈 화면이 목록을 다시 읽지 않았다.**
+    `DiaryHomeScreen`은 마운트·`AppState` 변화·**자기가 돌린** 생성에서만
+    `refresh()`를 부르는데, 040의 자동 트리거는 그 셋 중 어디에도 해당하지
+    않는다 — 파일에는 일기가 있는데 화면은 "아직 일기가 없다"로 남아 앱을
+    껐다 켜야 보였다. 트리거 완료 후(`finally`) 토큰을 올려 `DiarySection`을
+    재마운트시켜 고쳤다.
+- **로고는 1.5초라 스크린샷으로 놓치기 쉽다**(`LOGO_DISPLAY_MS`). 실기기에서
+  확인하려면 상수를 일시적으로 6000으로 올려 관찰하고 되돌린다 — 1초 간격
+  연속 캡처로도 빈 화면(플래그 로드 전 조기 반환)만 잡혔다.
+- **`clearState`는 앱 데이터만 지우고 OS 권한은 그대로 둔다.** 사진·위치·알림이
+  이미 부여된 기기에서는 그 스텝들이 자동으로 지나가고 배터리 예외만 남는다 —
+  "새 설치 = 권한 4개를 다 묻는다"가 아니다(021이 이미 기록한 것과 같은 계열).
+- **`assertNotVisible`은 `timeout`을 받지 않는다**(Maestro 2.8.0 실측,
+  "Unknown Property: timeout"으로 흐름 자체가 파싱되지 않는다). 사라짐을
+  기다리려면 `extendedWaitUntil`의 `notVisible`을 쓴다 — 기존 흐름들의
+  `timeout`은 전부 `scrollUntilVisible`에 붙은 것이었다.
+- **a1(1.5GB) 다운로드 중 OOM으로 앱이 죽는다 — 040의 결함이 아니다.**
+  `java.lang.OutOfMemoryError`(힙 한계 268MB, OkHttp 스레드, 1.39GB 지점).
+  `src/models/`와 `essential-assets-port.ts`는 040에서 변경 0건이고 마지막
+  변경은 026이다. `expo-port.ts`의 `arrayBuffer()` 폴백이 구간 하나(4분할이라
+  약 380MB)를 통째로 메모리에 올리는 것이 의심 지점 — **어느 조건에서
+  `res.body`가 null이 되는가**가 다음 조사 대상이다. 크래시 후 재시작해도
+  이어받지 못했다. 별도 스펙에서 다룬다.
+- 미확인: FR-006(대기 화면 — 2차 라운드에서는 모델이 완비돼 그 단계를 안
+  지났다), FR-009의 거부 판정 갈래, Maestro `first-run-flow.yml` 자동화
+  (`clearState` 직후 Maestro 기기 서버가 죽는다 — F1~F5는 손으로 전부 확인).
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만
