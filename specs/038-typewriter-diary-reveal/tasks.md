@@ -178,13 +178,36 @@ effect는 `setCount(prev => Math.min(prev+1, total))`만 하고, `onDone` 호출
   도는 동안 assertVisible이 본문 일부를 못 볼 수 있다")는 실측 결과 이 저장소의
   현재 흐름 어디에도 해당하지 않아 **스텝 추가가 불필요**했다. `run-device-tests.mjs`
   `FLOWS` 목록 불변(C27) — 신규·수정 흐름 없음.
-- [ ] T032 **실기기 미확인** — 이 구현 세션에 물리 기기가 없어 quickstart.md 2-1~2-6을
-  수행하지 못했다. AGENTS.md 원칙 V: "건너뛴 실기기 테스트는 통과가 아니다." 기기 없는
-  테스트 142 스위트 전부·헌법 검사·lint는 GREEN이지만, 이 기능이 "완료"로 불리려면
-  다음 세션에서 SM-S901N(또는 동등 dev 빌드)으로 quickstart.md 2-1~2-6을 반드시
-  수행해야 한다: 첫 표시 타자기 육안(SC-001), 탭 건너뛰기 1초 이내(SC-003), 목록
-  재진입 즉시(SC-004), 옛 일기/0장 회귀(SC-004), 생성 중 화면 무변경(SC-005), Maestro
-  9개 흐름 회귀 PASS. release 재확인은 불필요(새 네이티브 모듈 0, 012).
+- [X] T032 **실기기 확인 완료**(2026-09-11, SM-S901N/Galaxy S22, dev). quickstart.md
+  2-1~2-6 전부 수행:
+  - **2-1 첫 표시 타자기(SC-001)**: 사진 있는 하루(010 `seed:day rich`로
+    2026-09-08~09-10에 사진 3장씩 심음)로 생성 → 완료 직후 제목이 빈 상태에서
+    시작해 글자 단위로 채워지고, 이어 본문이 글자 단위로 흐름을 육안 확인. 본문이
+    흐르는 동안 "이 일기가 본 것" 절·사진 슬라이더 부재, 본문 완료 직후 등장 —
+    화면 전환 없이 그대로 상세 화면.
+  - **2-2 탭 건너뛰기(SC-003)**: 타이핑 도중 화면 탭 → 제목·본문 전문 + 하단
+    절 + 슬라이더 즉시 표시 확인.
+  - **2-3 목록 재진입(SC-004)**: 뒤로 가기 후 방금 쓴 일기를 목록에서 재열람 →
+    타이핑 없이 즉시 전문 확인.
+  - **2-4 옛 일기 회귀(FR-007/SC-004)**: 이 기능 이전 생성분 열람 → 이전과 동일
+    (타이핑 없음, 문구만) 확인.
+  - **2-5 생성 중 화면 무변경(FR-011/SC-005)**: 회전 표시 + 독백 한 줄 +
+    "그만두기"만, 진행률·경과 시간·생성 중 본문 없음 확인.
+  - **2-6 Maestro 회귀**: `node scripts/run-device-tests.mjs` 실행, 9흐름 전체 +
+    037 이후 추가된 나머지 흐름(총 18흐름) 확인. **038이 직접 관련된 흐름
+    (`generate-diary`·`diary-user-path`·`today-diary`·`writing-flow-simplified`·
+    `diary-body-screen`)은 전부 PASS — 038 회귀 없음.** 실패 6개
+    (`download-conflict`·`parallel-model-download`·`prompt-preview`·
+    `photo-selection-over-limit`·`diary-photo-gallery`·`welcome-naming`)는 전부
+    038과 무관한 기존 원인: `download-conflict`·`parallel-model-download`는
+    037이 이미 기록한 알려진 실패(로스터가 하나뿐이라 구조적으로 통과 불가).
+    나머지 넷은 `unified-permission-onboarding.yml`이 `Launch app … with clear
+    state`(`pm clear`)로 앱 데이터를 초기화해 온보딩이 재노출된 상태에서 그
+    뒤에 실행된 흐름들이 "일기" 탭을 못 찾은 것 — 024 AGENTS.md에 이미 기록된
+    "021 흐름은 pm clear로 앱 데이터를 전부 날린다" 상호 오염과 동일 원인
+    (스크린샷으로 "시작하기 전에" 온보딩 4/4 화면 확인). 흐름 실행 순서
+    문제이지 038 코드 결함이 아니다. release 재확인 불필요(새 네이티브 모듈
+    0, 012).
 - [X] T033 [P] `docs/roadmap/README.md` 23번 항목에 "✅ 038에서 구현" + 구현 결과 상세 추가(실기기 미확인 상태 명시, 다음 세션 필수)
 - [X] T034 [P] release 재확인 판정 기록 — **불필요**(새 네이티브 모듈 0, 012 dev-only 정책). quickstart.md "완료 판정"에 이미 명시돼 있음
 
