@@ -160,3 +160,33 @@ describe("FR-011 — 재시작 이어가기: 실시간 재판정으로 이미 �
     expect(resolveFirstRunStage(afterNaming)).toBe("waiting-for-download");
   });
 });
+
+describe("FR-010/SC-005 — 이미 온보딩을 마친 기존 사용자에게 재노출되지 않는다", () => {
+  it("완료된 사용자(작명·다운로드·liveness 전부 통과)는 매 재계산에서 항상 done", () => {
+    const completedUser = {
+      onboardingNeeded: false,
+      onboardingStarted: true,
+      namingDone: true,
+      downloadReady: true,
+      livenessOutcome: "ok" as const,
+    };
+    // 여러 번(예: 앱 업데이트 후 재실행 시뮬레이션) 재계산해도 항상 done —
+    // logo/onboarding/naming/waiting-for-download/liveness로 절대 안 돌아간다.
+    for (let i = 0; i < 5; i += 1) {
+      expect(resolveFirstRunStage(completedUser)).toBe("done");
+    }
+  });
+
+  it("onboardingNeeded가 애초에 false(021 completed===true)면 onboardingStarted 값과 무관하게 logo가 안 나온다", () => {
+    for (const onboardingStarted of [true, false]) {
+      const stage = resolveFirstRunStage({
+        onboardingNeeded: false,
+        onboardingStarted,
+        namingDone: true,
+        downloadReady: true,
+        livenessOutcome: "ok",
+      });
+      expect(stage).toBe("done");
+    }
+  });
+});

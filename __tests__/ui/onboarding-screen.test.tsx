@@ -470,3 +470,9 @@ describe("FR-013 회귀 — 스텝 목록은 고정 배열에서만 온다", () 
     expect(CODE).toMatch(/planOnboardingSteps\(\{\s*platform,\s*requirements,/);
   });
 });
+
+// ★ 040 — onAllStepsDecided(FR-004) 계약 테스트는 __tests__/ui/onboarding-all-steps-decided.test.tsx로
+// 분리했다 — 이 파일의 "스텝 자동 전환" describe(fake timers)와 같은 파일에
+// 두면 jest-expo RNTL의 screen 싱글톤이 이전 테스트의 렌더 트리를 참조한 채
+// 남아 다음 render()가 반영되지 않는 오염이 재현됐다(순서 의존 실패, 격리
+// 시도로 해소 안 됨 — 별도 파일이 가장 확실한 방어).

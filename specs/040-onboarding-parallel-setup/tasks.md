@@ -150,34 +150,41 @@ Independent Test).
 
 ### Tests for User Story 2
 
-- [ ] T017 [P] [US2] `App.tsx`의 게이트 배선이 `resolveFirstRunStage`를
+- [X] T017 [P] [US2] `App.tsx`의 게이트 배선이 `resolveFirstRunStage`를
       호출해 `"naming"`/`"waiting-for-download"`/`"liveness"` 단계에 맞는
       화면을 렌더하는지 `__tests__/ui/AppFrame.firstrun.test.tsx`(또는
       기존 App 테스트 파일 확장)에 작성 — namingDone=false·
       downloadReady=true 조합에서 여전히 작명 화면이 뜨는지(G4), 작명 완료
       후 다운로드 미완료면 대기 화면으로 전환되는지(FR-006) 검증
-- [ ] T018 [P] [US2] 대기 화면(다운로드 진행 중, 그만두기 없음) 렌더
+- [X] T018 [P] [US2] 대기 화면(다운로드 진행 중, 그만두기 없음) 렌더
       계약 테스트를 `__tests__/ui/WaitingForDownloadScreen.test.tsx`에
       작성 — 그만두기/취소 버튼이 없음을 확인(clarify 답변, FR-006)
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] `src/ui/WaitingForDownloadScreen.tsx` 신규 작성 — 진행률
+- [X] T019 [US2] `src/ui/WaitingForDownloadScreen.tsx` 신규 작성 — 진행률
       표시(029 `essentialDownloadFraction` 재사용), 그만두기 경로 없음,
       T018 통과
-- [ ] T020 [US2] `App.tsx` 게이트에 `resolveFirstRunStage` 연결 — 권한
+- [X] T020 [US2] `App.tsx` 게이트에 `resolveFirstRunStage` 연결 — 권한
       결정 완료 직후 `"naming"`이면 `WelcomeScreen`(035, T010에서 조건
       완화됨)을, `"waiting-for-download"`면 `WaitingForDownloadScreen`을,
       `"liveness"`면 기존 035 liveness 흐름을 렌더(T017 통과)
-- [ ] T021 [US2] 권한 결정 완료 시점에 `essential-assets-port.ts`의
+- [X] T021 [US2] 권한 결정 완료 시점에 `essential-assets-port.ts`의
       `downloadEssentials()`를 화면 조작과 별도로(사용자가 작명 화면에
       머물든 나가든) 시작하도록 `App.tsx`/`src/app/wiring.ts` 배선 확인·
       수정 — 029가 이미 갖고 있을 가능성이 높으므로 우선 현재 트리거
-      시점을 실기기로 확인 후 필요한 경우만 수정(FR-004)
+      시점을 실기기로 확인 후 필요한 경우만 수정(FR-004). **완료**: 029의
+      다운로드 시작은 `OnboardingScreen` 안 [내려받기] 버튼(사용자 조작)에
+      묶여 있었다 — 040은 `permissionStepsDecided`가 true가 되는 순간
+      `App.tsx`의 새 effect가 `onboardingPorts.essentialAssets.
+      downloadEssentials()`를 직접, 자동으로 시작한다(세션 ref로 중복
+      방지). `OnboardingScreen`의 "필수 에셋 다운로드" 단계 UI는 이제
+      이 배선상 도달하지 않는다(021 단독 사용 시에는 여전히 유효, 하위
+      호환).
 - [ ] T022 [US2] 실기기에서 US2 Independent Test 수행 — 권한 결정 직후
       작명 화면이 수 초 이내에 뜨는지, 이름을 천천히 입력하는 동안
       다운로드가 계속 진행되는지, 다운로드가 먼저 끝나도 작명 화면이
-      바뀌지 않는지 관찰(quickstart.md 5~7번)
+      바뀌지 않는지 관찰(quickstart.md 5~7번) (실기기 검증 필요 — 별도 세션)
 
 **Checkpoint**: 권한→(작명 ∥ 다운로드)→대기 흐름이 US1과 결합해 동작
 
@@ -194,15 +201,18 @@ US3 Independent Test).
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] `app/wiring.ts`의 자동 생성 트리거가 liveness 통과
+- [X] T023 [P] [US3] `app/wiring.ts`의 자동 생성 트리거가 liveness 통과
       직후 정확히 1회만 `pipeline.run()`을 호출하는지(리렌더로 중복 호출
       안 됨, contracts G6), liveness 실패 시 호출하지 않는지(FR-008a),
       `dayWritable=false`(정오 이전)면 호출하지 않는지(FR-008 단서) —
-      `__tests__/app/auto-diary-trigger.test.ts`에 mock pipeline으로 작성
+      `__tests__/app/auto-diary-trigger.test.ts`에 mock pipeline으로 작성.
+      **완료**: `triggerFirstRunAutoDiary()` 자체의 mock pipeline 호출·예외
+      삼킴은 이 파일이, 게이팅(done+ok일 때만/dayWritable)은
+      `AppFrame.firstrun.test.tsx`(소스 검사)가 검증한다.
 
 ### Implementation for User Story 3
 
-- [ ] T024 [US3] `src/app/wiring.ts`에 자동 생성 트리거 추가 —
+- [X] T024 [US3] `src/app/wiring.ts`에 자동 생성 트리거 추가 —
       `shouldAutoGenerate` 결과가 true면 세션 스코프 중복 방지 플래그
       확인 후 `createAppPipeline(environment).pipeline.run({ day: today,
       now, character: ONBOARDING_DEFAULT_CHARACTER, vision })` 1회 호출
@@ -211,28 +221,39 @@ US3 Independent Test).
       세션 스코프 플래그는 자동 트리거의 중복 호출만 막아야 하며, 기존
       "일기 쓰기" 버튼이 부르는 수동 `pipeline.run()` 경로에는 전혀
       영향을 주지 않는다**(FR-009 — 자동 생성이 실패하거나 스킵돼도 수동
-      경로는 이 플래그와 무관하게 항상 동작해야 한다, T027a에서 검증)
-- [ ] T025 [US3] `App.tsx`가 liveness 통과(`"done"` 단계 진입) 직후
+      경로는 이 플래그와 무관하게 항상 동작해야 한다, T027a에서 검증).
+      **완료**: `triggerFirstRunAutoDiary(resolution, input, deps?)`를
+      `src/app/wiring.ts`에 추가(테스트용 `deps.pipeline` 주입 지점 포함).
+      세션 스코프 dedup ref(`autoGenerateTried`)는 `App.tsx`에 있다(T025).
+- [X] T025 [US3] `App.tsx`가 liveness 통과(`"done"` 단계 진입) 직후
       T024의 트리거를 부수 효과로 호출하도록 연결 — 트리거 결과를 화면에
       노출하지 않는다(새 배너·실패 안내 UI를 만들지 않음, research.md #5,
       FR-009는 기존 "일기 쓰기" 경로로 충족)
 - [ ] T026 [US3] 실기기에서 US3 Independent Test 수행 — liveness 통과 후
       자동으로 그날 일기가 생성/저장되어 홈 화면에 보이는지, "일기
-      쓰기"를 누르지 않았는지 확인(quickstart.md 8번)
+      쓰기"를 누르지 않았는지 확인(quickstart.md 8번) (실기기 검증 필요 —
+      별도 세션)
 - [ ] T027 [US3] 실기기에서 liveness 실패 케이스(모델 파일 일부만 배치 등
       가능한 방법으로 유도) 확인 — 035 기존 실패 안내가 뜨고 자동 생성이
-      시도되지 않는지(quickstart.md 9번, FR-008a)
-- [ ] T027a [US3] FR-009/SC-004 회귀 확인 — 자동 생성이 거부 판정(4갈래
+      시도되지 않는지(quickstart.md 9번, FR-008a) (실기기 검증 필요 — 별도
+      세션)
+- [X] T027a [US3] FR-009/SC-004 회귀 확인 — 자동 생성이 거부 판정(4갈래
       중 하나, 합성 하루 등으로 유도 가능하면) 또는 liveness 실패로
       시도되지 않은 뒤, 홈 화면의 기존 "일기 쓰기" 버튼이 평소와 동일하게
       눌려서 수동 생성이 되는지 실기기 또는 계약 테스트(수동 트리거 경로가
       T024의 세션 스코프 중복 방지 플래그에 막히지 않는지 mock으로 확인)로
       검증한다 — 자동 생성 실패가 이후의 정상적인 수동 재시도를 막지
-      않아야 한다(막다른 화면이 없다는 것의 핵심 근거)
-- [ ] T028 [US3] 정오 이전 시각 재현이 가능하면(기기 시각 변경 등) US3
+      않아야 한다(막다른 화면이 없다는 것의 핵심 근거). **완료**(계약
+      테스트로): `AppFrame.firstrun.test.tsx`가 `autoGenerateTried`가
+      `DiaryHomeScreen.tsx`(수동 경로)에 전혀 없음을 소스 검사로 확인.
+      실기기 확인은 별도 세션.
+- [X] T028 [US3] 정오 이전 시각 재현이 가능하면(기기 시각 변경 등) US3
       시나리오 3(자동 생성 미시도 + 기존 정오 게이트 안내) 확인 — 재현
       불가하면 기기 없는 계약 테스트(T023의 `dayWritable=false` 케이스)로
-      갈음하고 quickstart.md에 미확인으로 기록(quickstart.md 10번)
+      갈음하고 quickstart.md에 미확인으로 기록(quickstart.md 10번).
+      **완료**: 기기 시각 변경 불가(원칙, 016/025의 선례) — `T008`
+      `__tests__/firstrun/auto-diary.test.ts`의 `dayWritable: false` 케이스로
+      갈음. 실기기 재현은 하지 않음(기록됨).
 
 **Checkpoint**: 전체 흐름(로고→권한→작명∥다운로드→liveness→자동 생성)이
 완결된 최초 실행 경험으로 동작

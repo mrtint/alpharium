@@ -57,10 +57,29 @@ describe("★ 온보딩 완료 게이트 (029 버그 수정)", () => {
     expect(deps?.[1]).toMatch(/\brefreshEssentialsReady\b/);
   });
 
-  it("진입 게이트는 여전히 shouldShowOnboarding(flag, essentialsReady)로 판정한다", () => {
-    // 게이트를 지우거나 바꾸는 것으로 우회하지 않았는지 — 029 FR-020 유지.
+  /*
+   * ★ 040 — `OnboardingScreen` 렌더 게이트 자체는 더 이상 `shouldShowOnboarding
+   * (flag, essentialsReady)`를 직접 호출하지 않는다(권한 결정만 보도록
+   * research.md #3에 따라 분리됨, `onboardingGateNeeded` 참조). 대신 029
+   * FR-020("완료했지만 에셋이 없는 사용자는 온보딩 화면 없이도 방치되지
+   * 않는다")의 보호는 별도 경로로 유지된다 — 아래 테스트가 그 경로를
+   * 확인한다(완전히 같은 표현식이 아니라 같은 결과를 내는지).
+   */
+  it("040 — 완료된 사용자인데 에셋이 준비 안 됐으면 대기 화면으로 보호한다(029 FR-020 계승)", () => {
+    // permissionStepsDecided(완료된 사용자는 시드로 즉시 true) && !essentialsReady
+    // && welcomeShown===true 조합에서 WaitingForDownloadScreen을 그리는 분기가
+    // 있는지 소스로 확인한다.
     expect(APP_SOURCE).toMatch(
-      /shouldShowOnboarding\(onboardingFlag,\s*essentialsReady\)\s*\|\|\s*forceOnboarding/,
+      /permissionStepsDecided\s*&&\s*!essentialsReady\s*&&\s*onboardingFlag\.welcomeShown\s*===\s*true/,
+    );
+    expect(APP_SOURCE).toMatch(/<WaitingForDownloadScreen/);
+  });
+
+  it("040 — permissionStepsDecided가 completed===true인 기존 사용자에게 시드된다", () => {
+    // 시드하지 않으면 완료된 사용자가 OnboardingScreen도 WelcomeScreen도 못 보고
+    // 곧장 깨진 탭 UI로 떨어진다(본문 주석 참조).
+    expect(APP_SOURCE).toMatch(
+      /permissionStepsDecidedThisSession\s*\|\|\s*onboardingFlag\?\.completed\s*===\s*true/,
     );
   });
 });

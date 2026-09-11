@@ -90,6 +90,16 @@ export type OnboardingScreenProps = {
   ports: OnboardingPorts;
   /** 모든 단계를 마치거나 건너뛰고 [시작하기]를 누르면. batteryNoticeShown 최종값 포함. */
   onComplete: (flag: OnboardingFlag) => void;
+  /**
+   * ★ 040 — 권한 스텝이 전부 결정됐다(`current === null`, FR-004). 필수 에셋
+   * 준비 여부와 **무관하다** — 040은 이 시점에 내려받기를 백그라운드로
+   * 시작하고 작명 화면으로 바로 넘어간다(이 화면 안의 "필수 에셋 다운로드"
+   * 단계 UI는 이 콜백이 있으면 `App.tsx`가 그 전에 화면을 이미 전환하므로
+   * 사실상 도달하지 않는다). 옵셔널이라 021 단독 사용(콜백 없이 이 화면
+   * 안에서 에셋 단계까지 마치는 흐름)과 호환된다. **매 렌더마다 안정적인
+   * 함수가 아니어도 되도록 값(불리언) 변화 시에만 1회 호출한다.**
+   */
+  onAllStepsDecided?: () => void;
 };
 
 /** 사진·위치·알림 권한을 한 번에 조회한다 (battery는 조회 대상이 아님). */
@@ -110,6 +120,7 @@ export function OnboardingScreen({
   flag,
   ports,
   onComplete,
+  onAllStepsDecided,
 }: OnboardingScreenProps) {
   const [states, setStates] = useState<Partial<Record<PermissionKey, PermissionState>>>({});
   const [skipped, setSkipped] = useState<PermissionKey[]>([]);
@@ -182,6 +193,25 @@ export function OnboardingScreen({
     skippedThisSession: skipped,
   });
   const current = nextStep(steps);
+
+  /*
+   * ★ 040 — 권한 스텝이 전부 결정되는 순간(에셋 준비와 무관) 한 번만
+   * `onAllStepsDecided`를 부른다(FR-004). `current`가 `null`이 된 이후에도
+   * 리렌더가 여러 번 있을 수 있으므로(예: `refresh` 폴링) ref로 1회만
+   * 보장한다 — `App.tsx`가 이 콜백에서 화면을 전환하면 이 컴포넌트가
+   * 언마운트되므로 정상적으로는 문제되지 않지만, 콜백 없이 021 단독으로
+   * 쓰이는 자리(온보딩만 있는 기존 화면)에서도 안전하게 멱등이어야 한다.
+   */
+  const decidedRef = useRef(false);
+  useEffect(() => {
+    if (current === null && !decidedRef.current) {
+      decidedRef.current = true;
+      onAllStepsDecided?.();
+    }
+    if (current !== null) {
+      decidedRef.current = false;
+    }
+  }, [current, onAllStepsDecided]);
 
   const allow = useCallback(
     async (step: OnboardingStep) => {
