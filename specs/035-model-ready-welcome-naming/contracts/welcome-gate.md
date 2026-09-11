@@ -45,6 +45,17 @@ export type OnboardingFlag = {
 | `false` | `true` | `true` | `false` |
 | `false` | `true` | `false` | **`true`** |
 
+> **★ 040 예외**(2026-09-11, `specs/040-onboarding-parallel-setup/research.md`
+> #3) — 위 둘째 행("에셋 미준비 → false")은 040에서 완화됐다. 040은 작명
+> 화면을 모델 다운로드와 **병렬로** 보여주므로(다운로드 완료를 기다리지
+> 않는다), 지금 판정은 `essentialAssetsReady`를 더 이상 보지 않는다 — 결과는
+> `onboardingNeeded === false && welcomeShown === false`뿐이다. liveness
+> 확인(원래 이 게이트의 다음 단계)은 040에서 `src/firstrun/progress.ts`의
+> `resolveFirstRunStage`가 작명 **완료** + 다운로드 **완료** 이후로 미뤄
+> 대신 수행한다. `essentialAssetsReady` 인자 자체는 시그니처 호환을 위해
+> 남아 있으나 판정에 쓰이지 않는다. 상세는 040
+> `contracts/first-run-gate.md` G4·G5.
+
 **W4. `shouldShowWelcome()`은 순수 함수다** (021·029 관례).
 `new Date()`·파일·권한을 읽지 않는다. `day-boundary.ts`·`schedule/decision.ts`·
 `onboarding/decision.ts`가 전부 이 규칙을 지킨다.

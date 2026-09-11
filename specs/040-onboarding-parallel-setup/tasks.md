@@ -27,16 +27,16 @@ contracts/first-run-gate.md, quickstart.md
 
 **Purpose**: 새 모듈 골격과 헌법 검사 확장
 
-- [ ] T001 `src/firstrun/` 디렉터리 생성, 빈 배럴 없이 개별 파일로 시작
+- [X] T001 `src/firstrun/` 디렉터리 생성, 빈 배럴 없이 개별 파일로 시작
       (진행 시 T010~T014가 채움)
-- [ ] T002 [P] `scripts/constitution-rules.ts`에 `checkFirstRunFile` 규칙
+- [X] T002 [P] `scripts/constitution-rules.ts`에 `checkFirstRunFile` 규칙
       추가 — `src/firstrun/**`에서 `models/roster`·`ModelAsset`·
       `assetFor`·`diary/prompt`·`buildPrompt`·`diary/acceptance` import,
       `backend.generate()`류 직접 호출, `elapsed*`·`durationMs`·`timings`·
       `tokens_*`·`Date.now`·`performance.now` 토큰을 차단(021
       `checkOnboardingFile`/035 `checkWelcomeFile`과 동일 패턴 재사용,
       contracts/first-run-gate.md G7·G8)
-- [ ] T003 [P] `checkFirstRunFile`이 실제로 위반 3종(제품 계층 직접 import
+- [X] T003 [P] `checkFirstRunFile`이 실제로 위반 3종(제품 계층 직접 import
       / 시간 측정 토큰 / `diary/pipeline.run()` 직접 호출)을 잡는지 위반
       주입으로 확인하는 계약 테스트를
       `__tests__/constitution/first-run-boundary.test.ts`에 작성
@@ -52,32 +52,35 @@ contracts/first-run-gate.md, quickstart.md
 
 **⚠️ CRITICAL**: 이 phase 완료 전까지 Phase 3+ 화면 작업을 시작하지 않는다
 
-- [ ] T004 [P] `resolveFirstRunStage` 계약 테스트를
+- [X] T004 [P] `resolveFirstRunStage` 계약 테스트를
       `__tests__/firstrun/progress.test.ts`에 작성(data-model.md
       `FirstRunStage`, contracts/first-run-gate.md G1·G2·G4·G5 — 우선순위
       6가지 케이스 + 되돌아가지 않음 불변식 + 작명이 다운로드 완료를
       기다리지 않는 케이스)
-- [ ] T005 `resolveFirstRunStage`를 `src/firstrun/progress.ts`에 구현
+- [X] T005 `resolveFirstRunStage`를 `src/firstrun/progress.ts`에 구현
       (data-model.md 명세, 순수 함수 — `now`/`Date`/파일 접근 없음, T004
       통과)
-- [ ] T006 [P] `shouldShowLogo` 계약 테스트를
+- [X] T006 [P] `shouldShowLogo` 계약 테스트를
       `__tests__/firstrun/logo.test.ts`에 작성(contracts/first-run-gate.md
       G3 — `onboardingNeeded: false`면 항상 false)
-- [ ] T007 `shouldShowLogo`를 `src/firstrun/logo.ts`에 구현(research.md #6,
+- [X] T007 `shouldShowLogo`를 `src/firstrun/logo.ts`에 구현(research.md #6,
       T006 통과)
-- [ ] T008 [P] `shouldAutoGenerate` 계약 테스트를
+- [X] T008 [P] `shouldAutoGenerate` 계약 테스트를
       `__tests__/firstrun/auto-diary.test.ts`에 작성(data-model.md
       `AutoDiaryAttempt`, `livenessOutcome==="ok" && dayWritable`일 때만
       true, 그 외 4가지 조합에서 false)
-- [ ] T009 `shouldAutoGenerate`를 `src/firstrun/auto-diary.ts`에 구현
+- [X] T009 `shouldAutoGenerate`를 `src/firstrun/auto-diary.ts`에 구현
       (research.md #4, T008 통과)
-- [ ] T010 035 `src/welcome/decision.ts`의 `shouldShowWelcome`을 확장 —
+- [X] T010 035 `src/welcome/decision.ts`의 `shouldShowWelcome`을 확장 —
       `essentialAssetsReady` 인자 없이도(다운로드 미완료 상태에서도)
       `onboardingNeeded===false && welcomeShown===false`면 true를 내도록
       조건 완화(research.md #3). 기존 035 계약 테스트(W1~W20)가 깨지지
       않는지 `npm run test:logic`으로 확인 — 깨지면 어떤 W번호가 이
       완화와 충돌하는지 먼저 분석 후 해당 계약 문서에 040 예외를 명시하고
-      진행
+      진행. **완료**: W3 둘째 행("에셋 미준비 → false")이 충돌해
+      `specs/035-model-ready-welcome-naming/contracts/welcome-gate.md`에
+      040 예외 명시, `__tests__/welcome/decision.test.ts` 해당 행 갱신.
+      나머지 W1~W20은 무변경으로 통과.
 
 **Checkpoint**: `FirstRunStage` 판정 전체가 순수 로직으로 완성되고 테스트로
 방어됨 — 이제 화면 배선(US1~US3)을 시작할 수 있다
