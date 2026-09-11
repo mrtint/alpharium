@@ -30,14 +30,21 @@ describe("W3 — 판정 진리표", () => {
     ).toBe(false);
   });
 
-  it("에셋이 준비 안 됐으면 false", () => {
+  /*
+   * ★ 040 research.md #3 — 이 행이 바뀌었다. 035 원안은 "에셋이 준비 안 됐으면
+   * false"였으나(연출=작명+liveness가 한 화면이었을 때), 040은 작명을 다운로드와
+   * 병렬로 보여준다 — 온보딩이 끝나고 아직 작명을 안 봤으면 에셋 준비 여부와
+   * 무관하게 true다. liveness는 이제 별도 단계(firstrun/progress.ts)가 다운로드
+   * 완료 후에 확인한다.
+   */
+  it("★ 040 — 에셋이 준비 안 됐어도 true (작명은 다운로드를 기다리지 않는다)", () => {
     expect(
       shouldShowWelcome({
         onboardingNeeded: false,
         essentialAssetsReady: false,
         welcomeShown: false,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it("이미 연출을 봤으면 false", () => {
@@ -72,7 +79,12 @@ describe("W2 — onboardingNeeded가 다른 인자를 이긴다 (순서 강제)"
     }
   });
 
-  it("여덟 조합 중 true는 정확히 하나다", () => {
+  /*
+   * ★ 040 — `essentialAssetsReady`가 더 이상 판정에 쓰이지 않으므로(research.md
+   * #3), 여덟 조합 중 true는 이제 둘이다(`essentialAssetsReady` true/false
+   * 각각 한 번씩, onboardingNeeded: false && welcomeShown: false일 때).
+   */
+  it("여덟 조합 중 true는 정확히 둘이다 (essentialAssetsReady는 더 이상 판정에 안 쓰인다)", () => {
     const results: boolean[] = [];
     for (const onboardingNeeded of [true, false]) {
       for (const essentialAssetsReady of [true, false]) {
@@ -81,7 +93,7 @@ describe("W2 — onboardingNeeded가 다른 인자를 이긴다 (순서 강제)"
         }
       }
     }
-    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter(Boolean)).toHaveLength(2);
   });
 });
 

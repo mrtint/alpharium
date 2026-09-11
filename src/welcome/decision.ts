@@ -26,12 +26,27 @@
  */
 
 /**
- * 환영 연출을 띄워야 하는가 (W3).
+ * 환영 연출(작명)을 띄워야 하는가 (W3, ★ 040 research.md #3로 조건 완화).
  *
- * 셋이 **전부** 참이어야 한다:
+ * 둘만 참이면 된다:
  *  - 온보딩이 끝났다 (`onboardingNeeded === false`)
- *  - 필수 에셋이 준비됐다 — 확인할 모델이 실제로 있어야 한다
- *  - 아직 연출을 보지 않았다
+ *  - 아직 연출(작명)을 보지 않았다
+ *
+ * **★ 040 — `essentialAssetsReady`를 더 이상 요구하지 않는다.** 035의 원래
+ * 규칙(W3 옛 표)은 "확인할 모델이 있어야 연출할 것도 있다"는 전제로
+ * `essentialAssetsReady`를 필수로 뒀다 — liveness 확인이 이 화면(당시
+ * `WelcomeScreen`)의 첫 단계였기 때문이다.
+ *
+ * 040은 작명을 모델 다운로드와 **병렬로** 보여준다(FR-005~007) — 사용자가
+ * 기다리는 동안 이름을 짓게 해 체감 대기 시간을 줄이는 것이 이 기능의 핵심이다.
+ * liveness 확인은 이제 작명 **이후**, 다운로드 완료 **이후**에 별도로 돈다
+ * (`src/firstrun/progress.ts`의 `resolveFirstRunStage`가 그 순서를 조율한다) —
+ * 이 함수는 여전히 "작명 화면을 보여줘도 되는가"만 답하고, "언제 liveness를
+ * 확인하는가"는 모른다(035의 "화면은 판정 결과만 받는다" 경계 유지).
+ *
+ * `essentialAssetsReady`가 `true`인 채로 호출해도(에셋이 이미 준비된 경우)
+ * 결과는 그대로 `true`다 — 인자 자체는 하위 호환을 위해 남겨 두되 판정에
+ * 쓰지 않는다.
  *
  * `welcomeShown`은 `onboarding.json`에서 온다. **없으면(옛 사용자) 「안 봤다」이며**
  * 부르는 쪽이 `flag.welcomeShown === true`로 좁혀 넘긴다.
@@ -43,7 +58,5 @@ export function shouldShowWelcome(input: {
 }): boolean {
   // 온보딩이 먼저다 — 나머지와 무관하게 막는다(W2).
   if (input.onboardingNeeded) return false;
-  // 확인할 모델이 없으면 연출할 것도 없다.
-  if (!input.essentialAssetsReady) return false;
   return !input.welcomeShown;
 }

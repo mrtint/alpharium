@@ -801,6 +801,67 @@ export function checkPromptFile(fileName: string, contents: string): Violation[]
   return violations;
 }
 
+/* ─────────────────── 첫 실행 조율 계층 경계 검사 (040) ─────────────────── */
+
+/**
+ * 첫 실행 조율 계층이 제품 계층에 닿는 것과 시간·진행 지표를 재는 것을 잡는다
+ * (040, contracts/first-run-gate.md G7·G8, spec.md FR-012).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * `src/firstrun/`는 021(온보딩)·029(필수 에셋)·035(환영 연출)가 각자 내는 판정을
+ * 조합해 "다음에 무엇을 보여줄지"만 답하는 조율 계층이다. 021의
+ * `checkOnboardingFile`, 035의 `checkWelcomeFile`과 같은 성격의 방어다.
+ *
+ * **막는 것**:
+ *  - `models/roster`·`ModelAsset`·`assetFor`·`diary/prompt`(`buildPrompt`)·
+ *    `diary/acceptance` — 이 계층은 캐릭터가 무슨 모델을 쓰는지, 일기가 어떻게
+ *    조립되는지 몰라도 된다(원칙 III).
+ *  - `diary/pipeline.run(` 직접 호출 — `resolveFirstRunStage`·`shouldAutoGenerate`는
+ *    "시도해야 하는가"라는 불리언만 답한다. 실제 실행은 `app/wiring.ts`에만
+ *    있어야 한다(research.md #4, G7) — 타입 참조(`import type`)는 허용한다.
+ *  - 시간·진행 지표 어휘(`elapsed*`·`durationMs`·`timings`·`tokens_*`·
+ *    `Date.now`·`performance.now`) — SC-002의 "수 초 이내"는 코드에 임계값을
+ *    두지 않고 실기기 관찰로 확인한다(G8, 원칙 IV).
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+const FIRSTRUN_TOUCHES_PRODUCT_LAYER =
+  /\bfrom\s+["'][^"']*(?:(?:models\/|\.\.?\/)roster|diary\/(?:prompt|acceptance))["']|\bassetFor\b|\bModelAsset\b|\bbuildPrompt\b|\bpipeline\s*\.\s*run\s*\(/;
+
+/** 시간·진행 지표를 재는 어휘 (G8, 원칙 IV). */
+const FIRSTRUN_MEASURES_TIME =
+  /\b(?:elapsed\w*|durationMs|timings|tokens_\w+|Date\.now|performance\.now)\b/;
+
+/** 첫 실행 조율 계층 파일인지 보고, 맞으면 위 규칙을 적용한다. */
+export function checkFirstRunFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/firstrun/")) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+
+    if (FIRSTRUN_TOUCHES_PRODUCT_LAYER.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "첫 실행 조율 계층이 로스터·프롬프트·판정에 닿거나 파이프라인을 직접 실행한다 (040 G7, 원칙 III)",
+      });
+    }
+
+    if (FIRSTRUN_MEASURES_TIME.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "첫 실행 조율 계층이 시간·진행 지표를 잰다 (040 G8, 원칙 IV)",
+      });
+    }
+  }
+
+  return violations;
+}
+
 /** 실패 출력 — 어느 파일의 어느 설정이 왜 걸렸는지 지목한다(FR-029). */
 export function formatViolations(violations: Violation[]): string {
   if (violations.length === 0) return "헌법 검사 통과 — 위반 0건";

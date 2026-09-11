@@ -2,7 +2,7 @@
 // 이 줄이 없으면 런타임에 tailwind base/유틸리티가 실리지 않는다(BC4).
 import "./global.css";
 import { StatusBar } from "expo-status-bar";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
@@ -28,9 +28,9 @@ import {
 import { applyTargetHour, applyToggleOff, applyToggleOn } from "./src/schedule/settings-effects";
 import { expoPhotoPort } from "./src/signals/expo-port";
 import { loadOnboardingFlag, saveOnboardingFlag, type OnboardingFlag } from "./src/onboarding/flag";
-import { shouldShowOnboarding } from "./src/onboarding/decision";
 import {
   essentialAssetsReady,
+  essentialDownloadFraction,
   ONBOARDING_DEFAULT_CHARACTER,
 } from "./src/onboarding/essential-assets";
 import { expoEssentialAssetsPort } from "./src/app/essential-assets-port";
@@ -44,7 +44,12 @@ import { shouldShowWelcome } from "./src/welcome/decision";
 import { validateCharacterName } from "./src/welcome/naming";
 import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/welcome/names-port";
 import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
+import { shouldShowLogo } from "./src/firstrun/logo";
+import { resolveFirstRunStage } from "./src/firstrun/progress";
+import { shouldAutoGenerate } from "./src/firstrun/auto-diary";
+import { LogoScreen } from "./src/ui/LogoScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
+import { WaitingForDownloadScreen } from "./src/ui/WaitingForDownloadScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { PermissionsSection } from "./src/ui/PermissionsSection";
 import { AppText } from "./src/ui/components/Text";
@@ -61,8 +66,8 @@ import {
   saveVisionSetting,
   type VisionPreference,
 } from "./src/app/vision-setting-store";
-import { dayBounds, selectableDays } from "./src/config/day-boundary";
-import { createAppPipeline } from "./src/app/wiring";
+import { dayBounds, dayOf, isDayWritable, selectableDays } from "./src/config/day-boundary";
+import { createAppPipeline, triggerFirstRunAutoDiary } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { expoFileSystemPort, fileStore } from "./src/diary/store";
@@ -253,6 +258,46 @@ function AppFrame() {
   const [onboardingFlag, setOnboardingFlag] = useState<OnboardingFlag | null>(null);
   const [forceOnboarding, setForceOnboarding] = useState(false);
 
+  /**
+   * 040 — 이번 세션에 로고를 이미 지났는가.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * **세션 로컬 상태이며 영구 저장하지 않는다**(research.md #6, contracts G3).
+   * `onboarding.json`에 필드를 추가하면 021의 `FLAG_GROWS_HISTORY` 검사가
+   * 막아온 패턴(boolean 이력이 아닌 세션성 상태를 영구 파일에 쌓는 것)에
+   * 가까워진다 — 앱을 껐다 켜면 다시 로고부터 보여도 spec과 상충하지 않는다
+   * (Edge Case가 막는 것은 "권한 재질문"이지 "로고 1회성 보장"이 아니다).
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const [onboardingStarted, setOnboardingStarted] = useState(false);
+
+  /**
+   * 040 — 권한 스텝이 전부 결정됐는가(에셋 준비와 무관, FR-004).
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * `OnboardingScreen`의 `onAllStepsDecided`가 세운다 — 021의 `shouldShowOnboarding`
+   * (에셋 준비까지 요구)과 달리, 이 값은 **권한 결정만** 본다. 이것이 true가
+   * 되면 `App.tsx`는 `OnboardingScreen`(그 안의 "필수 에셋 다운로드" 단계 UI
+   * 포함)을 떠나 작명 화면으로 전환하고, 다운로드는 백그라운드로 계속된다
+   * (research.md #3 — `shouldShowWelcome`이 `essentialAssetsReady`를 더 이상
+   * 요구하지 않는 것과 같은 판단).
+   *
+   * ★ **이미 온보딩을 완료한 기존 사용자**(`flag.completed === true`)는 이
+   * 세션에서 권한 스텝을 한 번도 안 밟아도 권한 결정이 이미 끝난 것과 같다
+   * — 아래 `useEffect`가 플래그 로드 직후 이 값을 `true`로 시드한다. 시드하지
+   * 않으면 `flag.completed === true`인데 에셋만 없는 사용자(028/029가 고친
+   * 결함)가 `OnboardingScreen`도 `WelcomeScreen`도 못 보고 곧장 깨진 탭
+   * UI로 떨어진다 — 반드시 시드해야 한다.
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const [permissionStepsDecidedThisSession, setPermissionStepsDecidedThisSession] = useState(false);
+  // 플래그 로드 결과가 이미 "완료"라면 이번 세션에서 권한 스텝을 밟지
+  // 않아도 결정된 것과 같다 — 렌더 중 파생값으로 합쳐 effect의
+  // setState-in-effect 경고(react-hooks/set-state-in-effect)를 피한다.
+  const permissionStepsDecided =
+    permissionStepsDecidedThisSession || onboardingFlag?.completed === true;
+  const setPermissionStepsDecided = setPermissionStepsDecidedThisSession;
+
   useEffect(() => {
     let alive = true;
     void loadOnboardingFlag(onboardingFlagPort).then((flag) => {
@@ -325,6 +370,47 @@ function AppFrame() {
     };
   }, [onboardingPorts]);
 
+  /**
+   * ★ 040 — 필수 에셋 내려받기를 화면 조작과 별도로 백그라운드에서
+   * 시작한다(FR-004). `permissionStepsDecided`가 true가 되는 순간(=권한
+   * 스텝 전부 결정) 1회 트리거하며, 사용자가 작명 화면에 머물든 나가든
+   * 계속된다 — `OnboardingScreen` 자체의 "필수 에셋 다운로드" 단계는 이제
+   * `App.tsx`가 그 화면을 이미 떠난 뒤라 도달하지 않는다(위
+   * `onboardingGateNeeded` 주석).
+   *
+   * 세션 스코프 `useRef`로 중복 시작을 막는다 — `essentialsReady`가 이미
+   * true(재개 등)이거나 이미 시작한 뒤에는 다시 부르지 않는다.
+   */
+  const essentialDownloadStarted = useRef(false);
+  const [essentialDownloadParts, setEssentialDownloadParts] = useState<
+    readonly { receivedBytes: number; totalBytes: number }[]
+  >([]);
+
+  useEffect(() => {
+    if (!permissionStepsDecided) return;
+    if (essentialsReady === null || essentialsReady === true) return;
+    if (essentialDownloadStarted.current) return;
+    essentialDownloadStarted.current = true;
+
+    void onboardingPorts.essentialAssets
+      .downloadEssentials((fraction) => {
+        // essentialDownloadFraction의 역함수를 만들 필요 없이, 합산 fraction
+        // 하나를 total=1 파트 하나로 표현한다 — WaitingForDownloadScreen은
+        // essentialDownloadFraction()을 그대로 재사용하므로 입력 모양만
+        // 맞추면 된다(029가 이미 낸 값 하나를 재포장).
+        setEssentialDownloadParts([{ receivedBytes: fraction, totalBytes: 1 }]);
+      })
+      .then(() => refreshEssentialsReady())
+      .catch(() => {
+        // 실패해도 조용히 감춘다 — 021 OnboardingScreen의 실패 안내·재시도
+        // UI는 이제 이 경로에서 쓰이지 않는다. WaitingForDownloadScreen은
+        // 그만두기가 없으므로(FR-006), essentialsReady가 계속 false로
+        // 남으면 대기 화면에 머무른다 — 사용자는 앱을 나갔다 재실행하면
+        // 이 effect가 다시 시도한다(essentialDownloadStarted가 컴포넌트
+        // 재마운트로 초기화되므로).
+      });
+  }, [permissionStepsDecided, essentialsReady, onboardingPorts, refreshEssentialsReady]);
+
   const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
 
   /**
@@ -369,6 +455,35 @@ function AppFrame() {
     [onboardingFlagPort, refreshEssentialsReady],
   );
 
+  /**
+   * ★ 040 — 권한 스텝이 전부 결정된 순간(FR-004) 온보딩 화면을 떠나면서
+   * **`completed: true`를 함께 저장한다**.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * 021에서는 마지막 [시작하기] 버튼이 `onComplete`를 불러 이 플래그를
+   * 세웠는데, 040은 권한 결정 직후 작명 화면으로 전환하므로 **그 버튼에
+   * 도달하지 않는다** — 저장하지 않으면 `completed`가 영원히 `false`로 남아
+   * 앱을 다시 열 때마다 권한 온보딩이 재노출된다(FR-010·FR-011 위반).
+   *
+   * 실기기에서 실제로 관측된 결함이다(2026-09-11, SM-S901N): 배터리 예외를
+   * 건너뛰고 작명·자동 생성까지 정상 완주했는데, 재시작하면 배터리 스텝
+   * 4/4로 되돌아갔다. `onboarding.json`이 `{"completed":false,...}`였다.
+   *
+   * `batteryNoticeShown`은 `OnboardingScreen`이 세션 안에서 갱신하는 값이라
+   * 여기서는 현재 플래그의 것을 그대로 넘긴다 — 배터리 안내를 실제로 본
+   * 경우의 저장은 021의 기존 경로(`onComplete`)가 여전히 담당한다.
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  const onAllPermissionStepsDecided = useCallback(() => {
+    setPermissionStepsDecided(true);
+    setOnboardingFlag((prev) => {
+      if (prev === null || prev.completed === true) return prev;
+      const next = { ...prev, completed: true };
+      void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
+      return next;
+    });
+  }, [onboardingFlagPort, setPermissionStepsDecided]);
+
   /* ─────────────────── 035 — 환영 연출 (게이트 세 번째 단) ─────────────────── */
 
   /**
@@ -391,38 +506,106 @@ function AppFrame() {
   }, [characterNamesPort]);
 
   /**
-   * 지금 어느 단계인가 (035 W12). **영속하지 않는다**(FR-009) — 연출 도중 앱이
-   * 죽으면 다음 진입에서 확인부터 다시 한다.
+   * ★ 040 — 작명이 다운로드와 병렬로 뜨도록, 035의 "확인 먼저 → 작명" 순서를
+   * "작명 먼저 → (작명+다운로드 완료 후) 확인"으로 뒤집는다.
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * `namingDone`(사용자가 이름을 확정하거나 건너뛰었다)과 `livenessOutcome`
+   * (아직 안 돎/성공/실패)을 각자 상태로 두고, `resolveFirstRunStage`가 이
+   * 둘과 다운로드 완료 여부를 합쳐 "지금 무엇을 보여줄지"를 판정한다
+   * (research.md #3·#4, contracts G4·G5). `WelcomeScreen`(035 원본)은
+   * 여전히 `checking`/`welcome`/`failed` 세 갈래만 받는다 — 040은 그
+   * `phase` 값을 `firstRunStage`에서 파생시킬 뿐, 035의 화면 계약 자체는
+   * 건드리지 않는다.
+   * ───────────────────────────────────────────────────────────────────────────
    */
-  const [welcomePhase, setWelcomePhase] = useState<WelcomePhase>("checking");
+  const [namingDoneThisSession, setNamingDoneThisSession] = useState(false);
+  const [livenessOutcome, setLivenessOutcome] = useState<"ok" | "failed" | null>(null);
 
+  /**
+   * 작명이 끝났는가 — 이번 세션에 끝냈거나(`namingDoneThisSession`), 이전
+   * 세션에 이미 끝낸 적이 있으면(`onboardingFlag.welcomeShown === true`)
+   * 참이다.
+   *
+   * ★ **시드하지 않으면 재실행마다 작명 화면이 다시 뜬다.** 앱을 재시작하면
+   * `namingDoneThisSession`이 `false`로 초기화되는데, `onboardingFlag.
+   * welcomeShown`을 함께 보지 않으면 `firstRunStage`가 매번 `"naming"`으로
+   * 되돌아간다 — `permissionStepsDecided`를 `flag.completed`로 시드한 것과
+   * 같은 이유(FR-011, 위 주석 참조).
+   */
+  const namingDone = namingDoneThisSession || onboardingFlag?.welcomeShown === true;
+
+  /**
+   * 035의 게이트 함수(W1~W3 계약)를 여전히 부른다 — "언제 작명이 한 번이라도
+   * 필요한가"의 1차 판정은 이 함수가 갖고 있다(원칙 III 경계는 035가 소유,
+   * `checkWelcomeFile`이 이 모듈의 순수성을 지킨다).
+   *
+   * ★ 040 — **다만 어느 화면을 렌더할지는 이 값만으로 가르지 않는다** —
+   * 아래 `firstRunStage`가 대신한다. `welcomeShown`이 `finishWelcome()`에서
+   * 작명 직후 곧바로 `true`가 되므로(W9), `welcomeNeeded`만으로 렌더
+   * 분기를 가르면 다운로드/liveness가 아직 안 끝났는데도 대기·확인
+   * 화면을 건너뛰는 결함이 생긴다(아래 렌더 게이트 주석 참조) —
+   * `firstRunStage`는 위에서 시드된 `namingDone`으로 판정하므로 이 문제가
+   * 없다.
+   */
+  // 040: 렌더 분기는 firstRunStage가 대신하지만, 035의 shouldShowWelcome
+  // (W1~W3 계약)을 여전히 호출해 App.tsx가 그 게이트를 우회하지 않았음을
+  // 소스 검사(위 FR-005 테스트)로 확인할 수 있게 값을 남긴다.
+  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   const welcomeNeeded =
     onboardingFlag !== null &&
-    essentialsReady !== null &&
     shouldShowWelcome({
-      onboardingNeeded: shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding,
-      essentialAssetsReady: essentialsReady,
+      // 040 — 권한 스텝이 전부 결정돼야(에셋 준비와 무관) 여기로 넘어온다
+      // (research.md #3).
+      onboardingNeeded: !permissionStepsDecided,
+      essentialAssetsReady: essentialsReady ?? false,
       welcomeShown: onboardingFlag.welcomeShown === true,
     });
+
+  /**
+   * 040 — 이 세션의 첫 실행 단계(작명↔다운로드 병렬 조율, contracts G4·G5).
+   *
+   * `onboardingNeeded`는 **권한 결정만** 본다(`!permissionStepsDecided`) —
+   * 029의 `essentialAssetsReady`를 더 이상 포함하지 않는다(research.md #3과
+   * 같은 판단, 위 `permissionStepsDecided` 주석 참조).
+   */
+  const firstRunStage =
+    onboardingFlag !== null && essentialsReady !== null
+      ? resolveFirstRunStage({
+          onboardingNeeded: !permissionStepsDecided,
+          onboardingStarted,
+          namingDone,
+          downloadReady: essentialsReady,
+          livenessOutcome,
+        })
+      : null;
+
+  /** `resolveFirstRunStage`가 낸 단계를 035 `WelcomeScreen`의 `phase`로 옮긴다. */
+  const welcomePhase: WelcomePhase =
+    firstRunStage === "liveness"
+      ? livenessOutcome === "failed"
+        ? "failed"
+        : "checking"
+      : "welcome";
 
   /**
    * 정상 동작 확인을 **정확히 한 번** 돌린다 (035 L12).
    *
    * 자동 재시도 루프를 만들지 않는다 — 루프를 두면 "몇 번 만에 성공했나"가
    * 생기고 그것이 지표다(원칙 IV). 실패하면 사용자가 [다시 시도]를 눌러야 한다.
+   *
+   * **040 — 시작 조건이 바뀌었다**: 035 원본은 온보딩 직후 바로 돌았지만,
+   * 040은 작명 완료 + 다운로드 완료 **이후**로 미룬다(`firstRunStage ===
+   * "liveness"`이고 아직 실패로 확정되지 않았을 때만, research.md #3,
+   * contracts G5).
    */
   const [retryToken, setRetryToken] = useState(0);
+  const livenessShouldRun = firstRunStage === "liveness" && livenessOutcome !== "failed";
 
   useEffect(() => {
-    if (!welcomeNeeded) return;
+    if (!livenessShouldRun) return;
     let alive = true;
 
-    /*
-     * **비동기 콜백에서만 상태를 옮긴다.** 효과 본문에서 동기적으로
-     * `setWelcomePhase("checking")`을 부르면 연쇄 렌더가 생기고
-     * `react-hooks/set-state-in-effect`가 잡는다 — `"checking"`은 이미
-     * 초기값이고, 재시도는 아래 `onRetry`가 상태를 되돌린다.
-     */
     async function check() {
       // 어댑터는 `createAppPipeline`에서만 온다(006 FR-026) — 직접 만들지 않는다.
       const wiring = createAppPipeline(environment);
@@ -437,10 +620,10 @@ function AppFrame() {
 
     void check()
       .then((outcome) => {
-        if (alive) setWelcomePhase(outcome === "ok" ? "welcome" : "failed");
+        if (alive) setLivenessOutcome(outcome);
       })
       .catch(() => {
-        if (alive) setWelcomePhase("failed");
+        if (alive) setLivenessOutcome("failed");
       });
 
     return () => {
@@ -448,21 +631,94 @@ function AppFrame() {
     };
     // `retryToken`이 바뀌면 확인을 다시 돌린다(L12 — 자동 루프가 아니라
     // 사용자가 [다시 시도]를 누른 것이다).
-  }, [welcomeNeeded, environment, retryToken]);
+  }, [livenessShouldRun, environment, retryToken]);
 
   /** 사용자가 [다시 시도]를 눌렀다. **연출 완료 플래그를 쓰지 않는다**(W9). */
   const retryLivenessCheck = useCallback(() => {
-    setWelcomePhase("checking");
+    setLivenessOutcome(null);
     setRetryToken((n) => n + 1);
   }, []);
 
-  /** 연출을 통과했다 (W9) — 이름 확정·건너뛰기·실패 후 건너뛰기 셋뿐이다. */
+  /**
+   * ★ 040 US3 — liveness 통과 직후 그날 첫 일기를 자동 생성한다(FR-008·
+   * FR-008a·FR-009).
+   *
+   * ───────────────────────────────────────────────────────────────────────────
+   * `shouldAutoGenerate()`(순수 판정)가 `livenessOutcome === "ok" &&
+   * dayWritable`을 확인하고, 참이면 `triggerFirstRunAutoDiary()`(조립 계층,
+   * `pipeline.run()`을 직접 부르는 유일한 자리)를 1회 호출한다.
+   *
+   * **세션 스코프 `useRef`로 중복 호출을 막는다**(contracts G6) —
+   * `firstRunStage`가 리렌더마다 다시 `"done"`으로 계산돼도 생성은 1회만
+   * 시도된다. **이 플래그는 자동 트리거만 막는다** — 홈 화면의 기존 "일기
+   * 쓰기" 버튼이 부르는 수동 `pipeline.run()` 경로(`DiaryHomeScreen`의
+   * `generate()`)는 이 ref와 전혀 무관하다(FR-009 — 자동 생성이 실패·스킵돼도
+   * 수동 경로는 항상 동작해야 한다).
+   *
+   * **트리거 결과를 화면에 노출하지 않는다**(research.md #5) — 성공하면
+   * 일기가 저장돼 홈 화면에 보이고, 실패하면 조용히 아무 일도 없던 것처럼
+   * 남는다(SC-004, 새 실패 배너를 만들지 않는다).
+   * ───────────────────────────────────────────────────────────────────────────
+   */
+  /**
+   * 040 — 자동 첫 일기 생성이 끝났음을 홈 화면에 알리는 토큰(SC-003).
+   * 값이 바뀌면 `DiaryHomeScreen`이 새로 마운트되어 목록을 다시 읽는다.
+   * 값 자체에 의미는 없다(횟수를 세는 지표가 아니다 — 원칙 IV).
+   */
+  const [autoGeneratedToken, setAutoGeneratedToken] = useState(0);
+
+  const autoGenerateTried = useRef(false);
+  useEffect(() => {
+    if (firstRunStage !== "done") return;
+    if (livenessOutcome !== "ok") return;
+    if (autoGenerateTried.current) return;
+
+    const now = new Date();
+    const day = dayOf(now);
+    if (!shouldAutoGenerate({ livenessOutcome, dayWritable: isDayWritable(day, now) })) return;
+
+    autoGenerateTried.current = true;
+    void triggerFirstRunAutoDiary(environment, {
+      day,
+      now,
+      character: ONBOARDING_DEFAULT_CHARACTER,
+      // 사진 신호 유무를 여기서 미리 구하지 않는다 — 최초 실행은 아직 홈
+      // 화면에 진입한 적이 없어 photoDays 캐시가 없다. "quick"으로 고정해도
+      // 안전하다 — 011 "VLM 안 열기": 사진이 실제로 0장이면 파이프라인이
+      // 스스로 캡션 단계를 건너뛰고 "사진 없음"으로 정직하게 처리한다
+      // (원칙 V, 과장 없음). vision 설정을 "auto"로 미리 조회해 맞추는
+      // 대신 이 방식이 최초 실행 1회성 트리거를 단순하게 유지한다.
+      vision: "quick",
+    })
+      // ★ 생성이 끝나면 홈 화면을 다시 마운트해 목록을 읽게 한다(SC-003).
+      //   `DiaryHomeScreen`은 마운트·`AppState` 변화·자기가 돌린 생성에서만
+      //   `refresh()`를 부르는데, 이 트리거는 그 셋 중 어디에도 해당하지
+      //   않아 **파일에는 일기가 있는데 화면은 "아직 일기가 없다"로 남았다**
+      //   (2026-09-11 실기기 관측). 성공·실패 어느 쪽이든 한 번 다시 읽으면
+      //   되므로 `finally`에 둔다 — 실패 시에도 화면이 최신 목록을 보는 것이
+      //   맞다(FR-009, 새 실패 UI를 만들지 않는다).
+      .catch(() => {})
+      .finally(() => setAutoGeneratedToken((n) => n + 1));
+  }, [firstRunStage, livenessOutcome, environment]);
+
+  /**
+   * 작명 화면을 마쳤다(W9) — 이름 확정·건너뛰기·실패 후 건너뛰기 셋뿐이다.
+   *
+   * ★ 040 — `namingDone`도 함께 세운다. 035 원본은 이 시점이 곧 연출 전체의
+   * 끝(liveness는 이미 먼저 통과한 뒤였다)이었지만, 040은 이 시점이 아직
+   * liveness 확인 **전**일 수 있다(`resolveFirstRunStage`가 다음에
+   * `"waiting-for-download"` 또는 `"liveness"`로 판정) — `welcomeShown`을
+   * 영구 플래그로 미리 남겨도 무방한 이유는 W9이 이미 "셋 다 사용자의
+   * 행동"이라 정의했기 때문이다(작명을 다시 보여줄 필요가 없다, 이후는
+   * 대기/확인 화면이 이어받는다).
+   */
   const finishWelcome = useCallback(
     (names?: CustomNames) => {
       if (names !== undefined) {
         setCustomNames(names);
         void saveCustomNames(characterNamesPort, names).catch(() => {});
       }
+      setNamingDoneThisSession(true);
       setOnboardingFlag((prev) => {
         if (prev === null) return prev;
         const next = { ...prev, welcomeShown: true };
@@ -525,9 +781,34 @@ function AppFrame() {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
   }
 
-  // 029 — 진입 게이트: shouldShowOnboarding(flag, essentialsReady). `completed`가
-  // true여도 필수 에셋이 준비 안 됐으면 온보딩(에셋 단계)이 다시 뜬다(FR-020).
-  if (shouldShowOnboarding(onboardingFlag, essentialsReady) || forceOnboarding) {
+  /*
+   * ★ 040 — `OnboardingScreen`(권한 스텝) 렌더 게이트는 **권한 결정만**
+   * 본다 — 029의 `essentialAssetsReady`를 더 이상 포함하지 않는다
+   * (research.md #3, `permissionStepsDecided` 주석 참조). `flag.completed
+   * !== true`(한 번도 완료한 적 없음)이거나 `forceOnboarding`([온보딩
+   * 다시 하기])이면 시작하되, `onAllStepsDecided`가 이 세션에서 이미
+   * 불렸으면(=`permissionStepsDecided`) 에셋 준비와 무관하게 이 화면을
+   * 떠난다.
+   */
+  const onboardingGateNeeded =
+    (onboardingFlag.completed !== true || forceOnboarding) && !permissionStepsDecided;
+
+  /*
+   * 로고는 온보딩이 필요하고 아직 이번 세션에서 스텝을 시작하지 않았을
+   * 때만(FR-001, research.md #6, contracts G3). `shouldShowLogo`는
+   * `onboardingGateNeeded`만 보고, "이미 시작했는가"는 `App.tsx`가 소유하는
+   * 세션 로컬 상태로 가른다.
+   */
+  if (onboardingGateNeeded && shouldShowLogo(onboardingGateNeeded) && !onboardingStarted) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <LogoScreen onDone={() => setOnboardingStarted(true)} />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  if (onboardingGateNeeded) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <OnboardingScreen
@@ -536,6 +817,7 @@ function AppFrame() {
           flag={onboardingFlag}
           ports={onboardingPorts}
           onComplete={onOnboardingComplete}
+          onAllStepsDecided={onAllPermissionStepsDecided}
         />
         <StatusBar style="auto" />
       </SafeAreaView>
@@ -543,13 +825,50 @@ function AppFrame() {
   }
 
   /*
-   * 035 — 진입 게이트의 세 번째 단: 온보딩 → **환영 연출** → 홈.
-   *
-   * `shouldShowWelcome()`이 `onboardingNeeded`를 인자로 받으므로(W2) 위 분기와
-   * 순서가 어긋날 수 없다. **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(W5)
-   * — 설정 탭에서 캐릭터를 새로 받아도 연출은 뜨지 않는다(FR-002a).
+   * ★ 029 FR-020 보호막 — 권한 스텝을 이미 마쳤고(`permissionStepsDecided`)
+   * 작명 화면도 이미 봤던(`welcomeShown === true`) 기존 사용자인데, 필수
+   * 에셋이 아직(또는 다시) 준비되지 않았으면(모델 파일이 지워진 028 계열
+   * 결함 포함) 이름을 다시 묻지 않고 곧바로 대기 화면을 보인다 — `namingDone`
+   * 로컬 상태가 이 세션에서 `false`라 `welcomeNeeded`(`shouldShowWelcome`)
+   * 만으로는 이 경우를 못 잡는다(옛 `welcomeShown: true`가 이미 있으므로).
    */
-  if (welcomeNeeded) {
+  if (permissionStepsDecided && !essentialsReady && onboardingFlag.welcomeShown === true) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <WaitingForDownloadScreen fraction={essentialDownloadFraction(essentialDownloadParts)} />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  /*
+   * ★ 040 — 진입 게이트의 세 번째 단: 온보딩(권한) → **작명 ∥ 다운로드** →
+   * liveness 확인 → 홈. `firstRunStage`(=`resolveFirstRunStage`의 결과)로
+   * 직접 가른다 — `welcomeNeeded`(`shouldShowWelcome`)는 위
+   * `onboardingGateNeeded`/029 FR-020 보호막에서 이미 걸러지지 않는 나머지
+   * 경우(최초 실행 전체)를 대표하는 가드로만 쓰고, **어느 화면을 보여줄지는
+   * `firstRunStage`가 정한다.**
+   *
+   * ⚠️ **`welcomeNeeded`만으로 이 갈래들을 가르면 안 된다** — `finishWelcome()`
+   * 이 `onboardingFlag.welcomeShown`을 즉시 `true`로 저장하므로(W9), 작명을
+   * 마친 바로 다음 렌더에서 `welcomeNeeded`(`!welcomeShown`)가 `false`가
+   * 되어 아직 다운로드/liveness가 안 끝났는데도 대기·확인 화면을 건너뛰고
+   * 탭 UI로 떨어지는 결함이 여기서 실제로 재현됐었다(이 방식으로 고쳤다) —
+   * `firstRunStage`는 `namingDone`(로컬 상태)로 판정하므로 이 문제가 없다.
+   *
+   * **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(W5) — 설정 탭에서
+   * 캐릭터를 새로 받아도 연출은 뜨지 않는다(FR-002a).
+   */
+  if (firstRunStage === "waiting-for-download") {
+    return (
+      <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+        <WaitingForDownloadScreen fraction={essentialDownloadFraction(essentialDownloadParts)} />
+        <StatusBar style="auto" />
+      </SafeAreaView>
+    );
+  }
+
+  if (firstRunStage === "naming" || firstRunStage === "liveness") {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <WelcomeScreen
@@ -604,6 +923,9 @@ function AppFrame() {
 
       {tab === "diary" ? (
         <DiarySection
+          // ★ 040 — 자동 첫 일기 생성이 끝나면 다시 마운트해 목록을 읽게
+          //   한다(SC-003, 위 `autoGeneratedToken` 주석 참조).
+          key={`diary-${autoGeneratedToken}`}
           onGoToSettings={() => setTab("settings")}
           // 020 — 알림을 눌러 열렸으면 그 하루의 상세로 바로 간다(FR-006).
           initialDay={pendingRoute?.day ?? null}

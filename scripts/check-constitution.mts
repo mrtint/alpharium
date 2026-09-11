@@ -16,6 +16,7 @@ import { join } from "node:path";
 
 import {
   checkEnvFile,
+  checkFirstRunFile,
   checkMonologueFile,
   checkOnboardingFile,
   checkPhotoPortFile,
@@ -82,6 +83,9 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 035 — 반대 방향. 일기 프롬프트가 연출 계층을 참조하지 못하게 막는다.
       // 한쪽만 막으면 prompt.ts가 확인용 문자열을 끌어올 수 있다(L7).
       violations.push(...checkPromptFile(child, contents));
+      // 040 — 첫 실행 조율 계층이 로스터·프롬프트·판정·시간 지표에 닿지 못하게.
+      // checkFirstRunFile이 경로로 대상(src/firstrun/)을 정한다.
+      violations.push(...checkFirstRunFile(child, contents));
     }
   }
 

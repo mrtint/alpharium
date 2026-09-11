@@ -45,6 +45,46 @@ const STATE_FILE = "state.json";
 const fileNameFor = (key: AssetKey) => `${key}.bin`;
 /** 받다 만 파일. 지울 때 함께 지워야 공간이 실제로 빈다(FR-029) */
 const partialNameFor = (key: AssetKey) => `${key}.bin.part`;
+/**
+ * 구간 하나가 받는 동안 쓰는 임시 파일 (041).
+ *
+ * 네이티브 `DownloadTask`가 목적지에 직접 쓰므로, 구간들이 같은 파일을 동시에
+ * 건드리지 않게 구간마다 갈라 둔다. 수신이 끝나면 최종 파일로 옮겨 붙이고 지운다.
+ */
+const segmentNameFor = (key: AssetKey, index: number) => `${key}.bin.seg${index}`;
+
+/**
+ * 옮겨 붙일 때 한 번에 드는 바이트 (041).
+ *
+ * **사람이 정한 상수다**(원칙 V) — 파일 크기·구간 크기로 계산하지 않는다. 이 값이
+ * 곧 이 경로의 상주 메모리 상한이며, 구간이 380MB이든 1.5GB이든 힙에 올라오는 것은
+ * 언제나 이만큼뿐이다. 1MiB는 복사 횟수와 건당 비용이 모두 적당한 자리다.
+ */
+const COPY_CHUNK_BYTES = 1024 * 1024;
+
+/**
+ * 이 자산이 디스크에 남길 수 있는 모든 이름 (041).
+ *
+ * 최종 파일 + 003의 부분 파일 + 구간 임시 파일들. 지우기(FR-029)와 용량 합산
+ * (FR-028)이 같은 목록을 봐야 한 쪽만 갱신되어 어긋나지 않는다.
+ *
+ * 구간 수는 `SEGMENT_COUNT`가 아니라 **저장 당시 값일 수 있다**(재개는 저장된
+ * `segmentCount`로 계획을 복원한다). 상수가 나중에 줄어도 예전 구간 파일이 남지
+ * 않도록 넉넉한 상한까지 훑는다 — 없는 파일은 조용히 건너뛴다.
+ */
+function leftoverNamesFor(key: AssetKey): string[] {
+  const names = [fileNameFor(key), partialNameFor(key)];
+  for (let i = 0; i < MAX_TRACKED_SEGMENTS; i++) names.push(segmentNameFor(key, i));
+  return names;
+}
+
+/**
+ * 정리·합산이 훑는 구간 파일 개수의 상한.
+ *
+ * **사람이 정한 상수다**(원칙 V). `SEGMENT_COUNT`(현재 4)보다 넉넉히 잡아, 그 값이
+ * 나중에 줄어도 예전에 만들어진 구간 파일이 지워지지 않고 남는 일이 없게 한다.
+ */
+const MAX_TRACKED_SEGMENTS = 16;
 
 async function openDirectory() {
   const { Directory, File, FileMode, Paths } = await import("expo-file-system");
@@ -77,20 +117,27 @@ export function expoModelFilePort(): ModelFilePort {
       return info.exists ? (info.md5 ?? null) : null;
     },
 
-    /** 모델 파일과 **부분 파일을 함께** 지운다(FR-029). 없으면 조용히 넘어간다 */
+    /**
+     * 모델 파일과 **부분 파일·구간 임시 파일을 함께** 지운다(FR-029, 041 FR-005).
+     * 없으면 조용히 넘어간다.
+     */
     async remove(key) {
       const { dir, File } = await openDirectory();
-      for (const name of [fileNameFor(key), partialNameFor(key)]) {
+      for (const name of leftoverNamesFor(key)) {
         const file = new File(dir, name);
         if (file.exists) file.delete();
       }
     },
 
-    /** 부분 파일도 합산한다 — 사용자가 보는 것은 "지금 차지하는 자리"다(FR-028) */
+    /**
+     * 부분 파일·구간 임시 파일도 합산한다 — 사용자가 보는 것은 "지금 차지하는
+     * 자리"다(FR-028). 앱이 수신 도중 죽으면 구간 파일이 남으므로 여기 포함되지
+     * 않으면 GB 단위가 사용자 눈에 안 보이는 채로 남는다(041).
+     */
     async bytesUsed(key) {
       const { dir, File } = await openDirectory();
       let total = 0;
-      for (const name of [fileNameFor(key), partialNameFor(key)]) {
+      for (const name of leftoverNamesFor(key)) {
         const file = new File(dir, name);
         if (file.exists) total += file.size ?? 0;
       }
@@ -203,6 +250,24 @@ export function expoRangeFetchPort(): RangeFetchPort {
       }
     },
 
+    /**
+     * 한 구간을 받아 최종 파일의 `segment.start` 오프셋에 놓는다 (041).
+     *
+     * ─────────────────────────────────────────────────────────────────────────
+     * **바이트가 JS 힙을 거치지 않는다.** 네이티브 `DownloadTask`에 `Range` 헤더를
+     * 주어 구간 요청 자체를 네이티브가 수행하고, 받은 바이트를 곧바로 임시 파일에
+     * 쓴다. 다 받으면 `FileHandle`로 청크(`COPY_CHUNK_BYTES`)씩 최종 파일의 제자리로
+     * 옮겨 붙인다 — 옮기는 동안에도 힙에 올라오는 것은 청크 하나뿐이다.
+     *
+     * **왜 `fetch`를 쓰지 않는가** (041 근본 원인): RN 0.86의 전역 `fetch`는
+     * `whatwg-fetch` 폴리필이고 그 응답에는 `body` 속성이 **아예 없다**(XHR 기반이라
+     * `ReadableStream`이 없다). 그래서 예전 코드의 `if (!res.body)` 분기가 언제나
+     * 참이 되어 모든 구간이 `arrayBuffer()`로 약 380MB를 통째로 힙에 올렸고,
+     * 4구간이 동시에 그것을 시도해 `OutOfMemoryError`가 났다(힙 한계 268MB 관측).
+     * 그 아래 스트리밍 루프는 **한 번도 실행된 적이 없는 죽은 코드**였다 —
+     * 011의 `has_media=0`, 013의 URI 계약 불일치와 같은 계열의 조용한 실패다.
+     * ─────────────────────────────────────────────────────────────────────────
+     */
     async fetchRange(
       key: AssetKey,
       url: string,
@@ -211,52 +276,90 @@ export function expoRangeFetchPort(): RangeFetchPort {
       signal?: AbortSignal,
     ): Promise<RangeOutcome> {
       const { dir, File, FileMode } = await openDirectory();
+      const { DownloadTask } = await import("expo-file-system");
+
       const target = new File(dir, fileNameFor(key));
       if (!target.exists) target.create();
 
-      // 파일 핸들을 열어 `offset`을 이 구간의 시작으로 옮긴 뒤 받은 청크를 이어 쓴다
-      // (expo-file-system 57 `File.open()` → `FileHandle`, T-Q0 실측 확인 대상).
-      const handle = target.open(FileMode.ReadWrite);
-      handle.offset = segment.start;
+      // 구간마다 제 임시 파일로 받는다 — 네이티브가 목적지에 직접 쓰므로
+      // 구간들이 같은 파일을 동시에 건드리지 않게 갈라 둔다.
+      const scratch = new File(dir, segmentNameFor(key, segment.index));
+      if (scratch.exists) scratch.delete();
+
       try {
-        const res = await fetch(url, {
+        // 이 구간이 이미 보고한 바이트. 네이티브 진행 보고는 누적값이므로
+        // 증분으로 바꿔 `onBytes(delta)` 계약을 지킨다(FR-002).
+        let reported = 0;
+        const task = new DownloadTask(url, scratch, {
           headers: { Range: `bytes=${segment.start}-${segment.end}` },
           signal,
+          onProgress: ({ bytesWritten }: TransferProgress) => {
+            const delta = bytesWritten - reported;
+            if (delta > 0) {
+              reported = bytesWritten;
+              onBytes(delta);
+            }
+          },
         });
-        if (!res.ok && res.status !== 206) {
-          return { kind: "failed", reason: `HTTP ${res.status}` };
-        }
-        if (!res.body) {
-          const buf = new Uint8Array(await res.arrayBuffer());
-          handle.writeBytes(buf);
-          onBytes(buf.byteLength);
-          return { kind: "completed" };
-        }
 
-        // 스트림으로 받아 이어 쓴다 — 구간 전체를 메모리에 담지 않는다.
-        const reader = res.body.getReader();
-        for (;;) {
-          if (signal?.aborted) {
-            await reader.cancel().catch(() => {});
-            return { kind: "aborted" };
-          }
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value && value.byteLength > 0) {
-            handle.writeBytes(value);
-            onBytes(value.byteLength);
-          }
-        }
+        const downloaded = await task.downloadAsync();
+        if (downloaded === null) return { kind: "aborted" };
+        if (signal?.aborted) return { kind: "aborted" };
+
+        // 받은 구간을 최종 파일의 제자리로 옮겨 붙인다. 진행 보고는 수신
+        // 단계에서 이미 끝났으므로 여기서는 보고하지 않는다.
+        copyInto(target, scratch, segment.start, FileMode);
         return { kind: "completed" };
       } catch (error) {
         if (signal?.aborted) return { kind: "aborted" };
+        // `AbortSignal`로 취소되면 네이티브가 AbortError로 거부한다.
+        if (error instanceof Error && error.name === "AbortError") return { kind: "aborted" };
         return { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
       } finally {
-        handle.close();
+        // 성공·실패·취소 어느 경로에서도 임시 파일을 남기지 않는다(FR-005).
+        if (scratch.exists) scratch.delete();
       }
     },
   };
 }
+
+/**
+ * 받아 둔 구간 파일을 최종 파일의 `offset` 자리로 옮겨 붙인다 (041).
+ *
+ * **청크 단위로 옮긴다** — `COPY_CHUNK_BYTES`씩 읽어 쓰므로 구간이 아무리 커도
+ * 힙에 올라오는 것은 청크 하나뿐이다. 이것이 FR-001을 성립시키는 자리다.
+ *
+ * 두 핸들 모두 `finally`에서 닫는다 — 열어 둔 채 예외가 나면 파일 서술자가 샌다.
+ */
+function copyInto(
+  target: ExpoFile,
+  source: ExpoFile,
+  offset: number,
+  FileMode: ExpoFileModeEnum,
+): void {
+  const reader = source.open(FileMode.ReadOnly);
+  let writer: ReturnType<ExpoFile["open"]> | null = null;
+  try {
+    writer = target.open(FileMode.ReadWrite);
+    writer.offset = offset;
+    for (;;) {
+      const chunk = reader.readBytes(COPY_CHUNK_BYTES);
+      if (chunk.byteLength === 0) break;
+      writer.writeBytes(chunk);
+    }
+  } finally {
+    reader.close();
+    writer?.close();
+  }
+}
+
+/**
+ * `openDirectory()`가 내주는 `File`·`FileMode`의 타입.
+ *
+ * 모듈을 지연 import 하므로(파일 머리 주석) 값은 런타임에 오고 타입만 여기서 빌린다.
+ */
+type ExpoFile = InstanceType<Awaited<typeof import("expo-file-system")>["File"]>;
+type ExpoFileModeEnum = Awaited<typeof import("expo-file-system")>["FileMode"];
 
 export function expoDownloadPort(range: RangeFetchPort = expoRangeFetchPort()): DownloadPort {
   const wrap = (

@@ -1,0 +1,110 @@
+# 실기기 자동 테스트 — 초기 권한 획득과 첫 실행 흐름 재설계 (040)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **로고 → 권한 스텝 자동 순차 → (작명 병렬 다운로드) → 홈까지, 앱 데이터가
+# 없는 새 설치에서 크래시 없이 도달하는가**를 본다.
+#
+# 검증 항목:
+#   040 FR-001          로고 화면이 뜬다                              (F1)
+#   040 FR-001·FR-003   권한 스텝에 커스텀 "다음" 버튼이 없다          (F2)
+#   040 FR-002·FR-003   배터리 예외 스텝만 [설정 열기]/[건너뛰기]다    (F3)
+#   040 FR-004·FR-005   권한 결정 직후 작명 화면이 뜬다(다운로드 대기X) (F4)
+#   040 FR-012          어디에도 모델 식별자·진행 속도 지표가 없다     (F5)
+#
+# **여기서 자동화하지 않는 것** — quickstart.md 1~12:
+#   실제 다운로드 완주(수 GB) → liveness → 자동 첫 일기 생성(항목 8~9) —
+#     ~2GB 다운로드 + 온디바이스 추론이 필요하다. 사람이 한다.
+#   SC-002(작명이 수 초 이내에 뜨는가, 체감 시간)         — 사람이 스톱워치로 잰다.
+#   정오 이전 시각 재현(항목 10)                          — 기기 시각을 바꿀 수 없다.
+#   재시작 이어가기(항목 11)                              — 앱 종료·재실행 타이밍.
+#   기존 사용자 비노출(항목 12)                           — 이미 완료된 계정이 필요하다.
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V). 새 설치 상태(앱 데이터
+# 삭제)에서 돌려야 F1~F4가 의미를 갖는다.
+#
+# ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다(008 실측).
+# ⚠️ 단계·버튼은 testID로 짚는다(R8·ProGuard 생존, 007 실측).
+# ⚠️ 어느 권한 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다(021 실측) —
+#    특정 단계 id를 박지 않고 정규식으로 짚는다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp:
+    clearState: true
+
+# ★ F1 — **로고 화면이 뜬다**(FR-001). 고정 지연 후 자동으로 사라진다 —
+#   커스텀 "다음" 버튼을 누르지 않는다.
+#   ⚠️ `assertNotVisible`은 `timeout`을 지원하지 않는다(Maestro 2.8.0 실측,
+#      "Unknown Property: timeout") — 사라짐을 기다리려면
+#      `extendedWaitUntil`의 `notVisible`을 쓴다.
+- assertVisible:
+    id: "first-run-logo"
+- extendedWaitUntil:
+    notVisible:
+      id: "first-run-logo"
+    timeout: 5000
+
+# ★ F1/F2 — 로고 다음 권한 스텝이 자동으로 뜬다(사용자 조작 없이).
+- assertVisible:
+    id: "onboarding-step-.*"
+
+# ★ F5 — 문안에 모델 정보·진행 속도 지표가 없다(원칙 III·IV).
+- assertNotVisible:
+    text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
+- assertNotVisible:
+    text: ".*(tokens/s|토큰/초|Mbps|kbps).*"
+
+# ── 권한 단계를 순서대로 지나간다 ────────────────────────────────────────
+#   FR-001은 "타이머로 자동 전환"이지만, 시스템 팝업이 실제로 뜨면 Maestro가
+#   그 팝업을 직접 조작해야 흐름이 막히지 않는다 — [건너뛰기]로 이 흐름은
+#   빠르게 진행한다(수동 배선 확인은 quickstart.md 3·4번이 사람이 본다).
+- repeat:
+    while:
+      visible:
+        id: "onboarding-skip"
+    commands:
+      - tapOn:
+          id: "onboarding-skip"
+
+# ★ F3 — 배터리 예외 스텝만 남았다면 [설정 열기]/[건너뛰기]로 처리한다
+#   (자동 타이머가 없는 유일한 스텝, research.md #2).
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-battery-exception"
+    commands:
+      - assertVisible:
+          id: "onboarding-open-settings"
+
+# 에셋 다운로드 단계 UI(021 원본)는 040 배선에서 이제 도달하지 않는다 —
+# 권한 결정 직후 곧바로 작명 화면으로 넘어간다(FR-004). 혹시 남아 있다면
+# (예: 021 단독 경로로 되돌아간 회귀) 여기서 진행만 시켜 흐름이 막히지
+# 않게 한다.
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-assets-download"
+    commands:
+      - tapOn:
+          id: "onboarding-assets-download"
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-start"
+    commands:
+      - tapOn:
+          id: "onboarding-start"
+
+# ★ F4 — **권한 결정 직후 작명 화면이 뜬다**(FR-004·FR-005) — 다운로드
+#   완료를 기다리는 진행률 전용 화면이 먼저 뜨지 않는다. `welcome-screen`은
+#   035가 이미 세운 testID다.
+- assertVisible:
+    id: "welcome-screen"
+
+# 작명 화면에도 모델 정보가 없다(FR-012).
+- assertNotVisible:
+    text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
+
+# 여기서 흐름을 마친다 — 실제 이름 확정 → 다운로드 완주 → liveness →
+# 자동 첫 일기 생성(quickstart.md 6~9번)은 수 GB 다운로드와 온디바이스
+# 추론이 필요해 사람이 확인한다(원칙 V, "건너뛴 것은 통과가 아니다").

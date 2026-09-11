@@ -46,6 +46,21 @@
   넣으면 즉시 EOS를 낸다 — `completion({ messages: [...], jinja: true })`로 보낸다.
 - **`stopCompletion()`은 거부시키지 않는다.** `interrupted: true`로 정상
   resolve되므로 `try/catch`로 끊김을 잡으려 하면 놓친다.
+- **★ React Native의 `fetch`는 응답 스트림을 주지 않는다 — `res.body`가 언제나
+  `undefined`다**(041 실측). 전역 `fetch`는 `whatwg-fetch` 폴리필이고
+  (`Libraries/Core/setUpXHR.js:27` → `Libraries/Network/fetch.js:15`), 그 `Body`에는
+  **`body` 속성 자체가 없다**(XHR 기반이라 `ReadableStream`이 존재하지 않는다).
+  그러므로 `res.body.getReader()`로 큰 파일을 스트리밍하려는 코드는 **웹에서 옳고
+  여기서 조용히 반대 갈래를 탄다** — 026이 쓴 `if (!res.body) { arrayBuffer() }`
+  폴백이 늘 참이 되어 구간 하나(약 380MB)를 통째로 힙에 올렸고, 4구간이 동시에
+  그것을 해 `OutOfMemoryError`가 났다(힙 한계 268MB). **그 아래 스트리밍 루프는 한
+  번도 실행된 적이 없는 죽은 코드였다.** 011의 `has_media=0`, 013의 URI 계약 불일치,
+  020의 헤드리스 `defineTask` 미등록과 같은 계열이며, **jest 대역은 `body`를 주므로
+  기기 없는 테스트가 오히려 죽은 쪽을 검증한다** — 소스를 읽어 "쓰지 않아야 할 API"를
+  잠그는 계약 테스트(`__tests__/models/download-memory.test.ts`)가 유일한 통로다.
+  큰 파일을 받을 때는 `fetch`가 아니라 **`expo-file-system`의 `DownloadTask`에
+  `headers: { Range: ... }`를 준다** — 네이티브가 디스크에 직접 쓰므로 바이트가 JS
+  힙에 올라올 자리 자체가 없다.
 - **release는 `run-as`가 안 된다**(`package not debuggable`). 파일 검증은 화면
   관찰이나 debug 빌드로 갈음한다.
 - **서명이 다르면 덮어 설치가 거부되고, 지우면 일기·모델이 함께 사라진다**
@@ -1049,6 +1064,96 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   필요하고 **안 잰 값을 쓰는 것이 원칙 V 위반**이다. 주석만 갱신했다.
 - 상세: `specs/037-roster-verified-only/`. 실측 근거: 024 T034·§10(narrative),
   028(chinese·english), 037 실기기 3회(imaginative), my-ollama 리포트 222런.
+
+### 040 — 초기 권한 획득과 첫 실행 흐름 재설계 (2026-09-11)
+
+로드맵 20번. 021(권한 온보딩)·029(필수 에셋)·035(환영·작명)를 흡수해 첫 실행을
+**로고 → 권한 자동 순차 → (작명 ∥ 다운로드) → liveness → 자동 첫 일기**로
+재배치했다. 새 `src/firstrun/`(순수 판정)과 `checkFirstRunFile` 경계 검사가
+021·035와 같은 패턴으로 생겼다.
+
+- **021·035·029의 순수 로직은 그대로 재사용한다** — `requirements.ts`·
+  `essential-assets.ts`·`liveness.ts`·`naming.ts` 무변경. 040이 만든 것은
+  그 조립 순서(`App.tsx` 게이트)와 `src/firstrun/`의 판정 셋
+  (`resolveFirstRunStage`·`shouldShowLogo`·`shouldAutoGenerate`)뿐이다.
+- **자동 생성은 `schedule/task.ts`의 `runAutoDiaryTask`를 재사용하지 않는다**
+  — 그 함수는 `settings.enabled`와 목표 시각 창을 본다. 040의 트리거는 "설정을
+  막 끝낸" 1회성 이벤트라 그 설정과 무관하게 항상 시도해야 한다.
+  `app/wiring.ts`의 `triggerFirstRunAutoDiary()`가 `pipeline.run()`을 직접
+  부른다(`src/firstrun/`은 "시도해야 하는가"만 답한다 — G7).
+- **★ 실기기에서만 드러난 결함 둘**(2026-09-11, SM-S901N, dev). 기기 없는
+  테스트 2700여 개가 통과한 채로 둘 다 통과했다 — 011의 `has_media=0`,
+  013의 URI 계약 불일치, 020의 헤드리스 `defineTask` 미등록과 같은 계열이다.
+  - **권한 결정 후 `completed`가 저장되지 않았다.** 021은 마지막 [시작하기]
+    버튼이 `onComplete`로 플래그를 세웠는데, 040은 권한 결정 직후 작명
+    화면으로 전환해 **그 버튼에 도달하지 않는다.** 배터리 예외를 건너뛰고
+    작명·자동 생성까지 정상 완주했는데도 앱을 다시 열면 배터리 스텝 4/4로
+    되돌아갔다. **화면을 떠나는 자리가 바뀌면 그 화면이 저장하던 것도 함께
+    옮겨야 한다** — `onAllStepsDecided`가 세션 상태만 세우고 파일에는 아무것도
+    남기지 않은 것이 원인이다.
+  - **자동 생성이 끝나도 홈 화면이 목록을 다시 읽지 않았다.**
+    `DiaryHomeScreen`은 마운트·`AppState` 변화·**자기가 돌린** 생성에서만
+    `refresh()`를 부르는데, 040의 자동 트리거는 그 셋 중 어디에도 해당하지
+    않는다 — 파일에는 일기가 있는데 화면은 "아직 일기가 없다"로 남아 앱을
+    껐다 켜야 보였다. 트리거 완료 후(`finally`) 토큰을 올려 `DiarySection`을
+    재마운트시켜 고쳤다.
+- **로고는 1.5초라 스크린샷으로 놓치기 쉽다**(`LOGO_DISPLAY_MS`). 실기기에서
+  확인하려면 상수를 일시적으로 6000으로 올려 관찰하고 되돌린다 — 1초 간격
+  연속 캡처로도 빈 화면(플래그 로드 전 조기 반환)만 잡혔다.
+- **`clearState`는 앱 데이터만 지우고 OS 권한은 그대로 둔다.** 사진·위치·알림이
+  이미 부여된 기기에서는 그 스텝들이 자동으로 지나가고 배터리 예외만 남는다 —
+  "새 설치 = 권한 4개를 다 묻는다"가 아니다(021이 이미 기록한 것과 같은 계열).
+- **`assertNotVisible`은 `timeout`을 받지 않는다**(Maestro 2.8.0 실측,
+  "Unknown Property: timeout"으로 흐름 자체가 파싱되지 않는다). 사라짐을
+  기다리려면 `extendedWaitUntil`의 `notVisible`을 쓴다 — 기존 흐름들의
+  `timeout`은 전부 `scrollUntilVisible`에 붙은 것이었다.
+- **a1(1.5GB) 다운로드 중 OOM으로 앱이 죽는다 — 040의 결함이 아니다.**
+  `java.lang.OutOfMemoryError`(힙 한계 268MB, OkHttp 스레드, 1.39GB 지점).
+  `src/models/`와 `essential-assets-port.ts`는 040에서 변경 0건이고 마지막
+  변경은 026이다. `expo-port.ts`의 `arrayBuffer()` 폴백이 구간 하나(4분할이라
+  약 380MB)를 통째로 메모리에 올리는 것이 의심 지점 — **어느 조건에서
+  `res.body`가 null이 되는가**가 다음 조사 대상이다. 크래시 후 재시작해도
+  이어받지 못했다. 별도 스펙에서 다룬다.
+- **잘린 모델 파일은 로드 전에 크기 검증에서 걸러진다** — liveness 실패를
+  유도하려고 a1을 50MB로 잘랐더니 앱이 재다운로드로 넘어갔고 liveness까지
+  도달하지 않았다. 덕분에 FR-006 대기 화면("잠시만요 / … 마저 내려받는
+  중이에요" + 진행률, 그만두기 버튼 없음)을 관측했다.
+- **021 Maestro 흐름은 M1~M4가 통과한다** — 040의 자동 전환(1.5초 타이머)이
+  기존 흐름을 깨지 않는다. M5("에셋 미준비로 재실행하면 온보딩이 다시 뜬다")만
+  실패하는데 그 흐름 주석이 스스로 명시한 예외다 — **모델을 미리 받아 둔
+  기기에서는 그 assert가 성립하지 않는다.**
+- 미확인: FR-009의 거부 판정 갈래, liveness 실패 갈래(위 이유로 유도 불가 —
+  035 계약 테스트로 갈음), Maestro `first-run-flow.yml` 자동화(`clearState`
+  직후 Maestro 기기 서버가 죽는다 — F1~F5는 손으로 전부 확인).
+
+### 041 — 모델 내려받기 OOM 해소 (2026-09-11)
+
+040이 실기기에서 발견하고 "별도 스펙"으로 남긴 OOM을 같은 브랜치에서 고쳤다.
+**040의 결함이 아니라 026이 남긴 것**이며(`src/models/`는 040에서 변경 0건),
+로스터가 하나인 지금 이 다운로드가 막히면 앱이 아무것도 못 하므로 미룰 수 없었다.
+
+- **원인은 "어느 조건에서 `res.body`가 null이 되는가"가 아니라 "언제나"였다** —
+  위 「실측 규칙」의 RN `fetch` 항목이 그 결론이다. 040이 `arrayBuffer()` 폴백을
+  의심 지점으로 지목한 것은 맞았고, 남은 질문의 답이 "항상 그 폴백을 탄다"였다.
+- **고친 자리는 `expo-port.ts`의 `fetchRange` 하나다.** `RangeFetchPort` 계약,
+  `src/models/segmented/`(순수 코어), `port.ts`는 **한 줄도 안 고쳤다** — 원인이
+  기기 통로의 구현에 있었지 계획·조립에 있지 않았기 때문이다. 026의 계약 테스트가
+  전부 그대로 통과하는 것이 그 증거다.
+- **구간마다 임시 파일로 받고 1MiB씩 옮겨 붙인다.** 네이티브 `DownloadTask`가
+  `<key>.bin.seg<i>`에 직접 쓰고, 다 받으면 `FileHandle.offset`을 옮겨
+  `COPY_CHUNK_BYTES`씩 최종 파일의 제자리로 복사한다. **상주 메모리가 파일 크기와
+  무관하게 청크 하나로 고정된다** — "메모리에 담지 않는다"가 주석의 약속이 아니라
+  구조가 된다(예전 코드는 그 약속을 주석으로만 갖고 있었다).
+- **`remove()`·`bytesUsed()`가 구간 임시 파일도 본다**(`leftoverNamesFor`).
+  수신 도중 앱이 죽으면 구간 파일이 남는데, 이 목록에 없으면 GB 단위가 사용자
+  눈에 안 보이는 채로 남는다 — 008의 "받다 만 모델은 앱으로 못 지운다"를 되풀이하지
+  않으려는 것이다.
+- **`tsc`가 또 한 번 원인을 정확히 짚었다** — `FileMode.Read`는 없는 멤버이고
+  실제는 `ReadOnly`다. 손으로 쓴 구조적 타입 대신 `expo-file-system`의 실제 타입을
+  빌리자(`InstanceType<...["File"]>`) 잡혔다. 007·014의 교훈과 같은 자리다.
+- 기기 없는 테스트 153 스위트 / 2741개 통과, lint·헌법 검사(위반 0)·prettier 클린.
+  위반 주입(`arrayBuffer()` 되살리기)이 계약 테스트에 잡히는 것을 확인했다.
+- 상세: `specs/041-model-download-oom/`.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

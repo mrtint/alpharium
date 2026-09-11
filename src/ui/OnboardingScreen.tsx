@@ -1,9 +1,11 @@
 /**
- * 통합 권한 온보딩 화면 (021).
+ * 통합 권한 온보딩 화면 (021, ★ 040 — 스텝 자동 전환 추가).
  *
  * 계약: specs/021-unified-permission-onboarding/contracts/onboarding-screen.md
  *       S1
  *       spec.md FR-005~FR-008·FR-013·FR-015·FR-016, SC-001·SC-003·SC-008
+ *       specs/040-onboarding-parallel-setup/research.md #1·#2
+ *       specs/040-onboarding-parallel-setup/spec.md FR-001~FR-003
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **판정은 화면이 하지 않는다.** `planOnboardingSteps`·`nextStep`(순수)이 정하고,
@@ -16,6 +18,19 @@
  * **생성 트리거·진행률 없음**(원칙 IV) — 이 화면은 권한만 다룬다.
  *
  * **모델 정보 없음**(원칙 III) — `expo-*`를 직접 import하지 않고 통로를 주입받는다.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **★ 040 — 스텝 진입 시 목적 설명을 렌더한 직후 고정 지연으로 시스템 권한
+ * 요청을 자동 호출한다**(FR-001). 사용자가 [허용]을 눌러도 되고, 누르지 않아도
+ * 지연 후 같은 요청이 자동으로 나간다 — 둘 다 같은 `allow()`를 부르므로 중복
+ * 호출 방지(`busy` 플래그)가 그대로 방어한다.
+ *
+ * **배터리 예외 스텝은 자동 타이머 대상이 아니다**(research.md #2, FR-002) —
+ * 조회 API가 없어 사용자가 설정에서 돌아왔는지 자동으로 알 수 없으므로, 이
+ * 스텝만 [설정 열기]/[건너뛰기]를 사용자가 직접 눌러야 한다.
+ *
+ * **지연값은 화면 계층 상수다**(research.md #1) — `onboarding/decision.ts`
+ * (순수 판정)에 시간 관련 로직을 두지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -59,6 +74,14 @@ export type OnboardingPorts = {
   essentialAssets: EssentialAssetsPort;
 };
 
+/**
+ * 목적 설명을 보여준 뒤 시스템 권한 요청을 자동 호출하기까지의 고정 지연
+ * (research.md #1, FR-001). 화면 계층 상수 — 순수 판정 파일에 두지 않는다.
+ *
+ * `battery-exception` 스텝에는 적용하지 않는다(research.md #2).
+ */
+export const ONBOARDING_STEP_AUTO_ADVANCE_MS = 1500;
+
 export type OnboardingScreenProps = {
   platform: "android" | "ios";
   requirements: readonly PermissionRequirement[];
@@ -67,6 +90,16 @@ export type OnboardingScreenProps = {
   ports: OnboardingPorts;
   /** 모든 단계를 마치거나 건너뛰고 [시작하기]를 누르면. batteryNoticeShown 최종값 포함. */
   onComplete: (flag: OnboardingFlag) => void;
+  /**
+   * ★ 040 — 권한 스텝이 전부 결정됐다(`current === null`, FR-004). 필수 에셋
+   * 준비 여부와 **무관하다** — 040은 이 시점에 내려받기를 백그라운드로
+   * 시작하고 작명 화면으로 바로 넘어간다(이 화면 안의 "필수 에셋 다운로드"
+   * 단계 UI는 이 콜백이 있으면 `App.tsx`가 그 전에 화면을 이미 전환하므로
+   * 사실상 도달하지 않는다). 옵셔널이라 021 단독 사용(콜백 없이 이 화면
+   * 안에서 에셋 단계까지 마치는 흐름)과 호환된다. **매 렌더마다 안정적인
+   * 함수가 아니어도 되도록 값(불리언) 변화 시에만 1회 호출한다.**
+   */
+  onAllStepsDecided?: () => void;
 };
 
 /** 사진·위치·알림 권한을 한 번에 조회한다 (battery는 조회 대상이 아님). */
@@ -87,6 +120,7 @@ export function OnboardingScreen({
   flag,
   ports,
   onComplete,
+  onAllStepsDecided,
 }: OnboardingScreenProps) {
   const [states, setStates] = useState<Partial<Record<PermissionKey, PermissionState>>>({});
   const [skipped, setSkipped] = useState<PermissionKey[]>([]);
@@ -160,6 +194,25 @@ export function OnboardingScreen({
   });
   const current = nextStep(steps);
 
+  /*
+   * ★ 040 — 권한 스텝이 전부 결정되는 순간(에셋 준비와 무관) 한 번만
+   * `onAllStepsDecided`를 부른다(FR-004). `current`가 `null`이 된 이후에도
+   * 리렌더가 여러 번 있을 수 있으므로(예: `refresh` 폴링) ref로 1회만
+   * 보장한다 — `App.tsx`가 이 콜백에서 화면을 전환하면 이 컴포넌트가
+   * 언마운트되므로 정상적으로는 문제되지 않지만, 콜백 없이 021 단독으로
+   * 쓰이는 자리(온보딩만 있는 기존 화면)에서도 안전하게 멱등이어야 한다.
+   */
+  const decidedRef = useRef(false);
+  useEffect(() => {
+    if (current === null && !decidedRef.current) {
+      decidedRef.current = true;
+      onAllStepsDecided?.();
+    }
+    if (current !== null) {
+      decidedRef.current = false;
+    }
+  }, [current, onAllStepsDecided]);
+
   const allow = useCallback(
     async (step: OnboardingStep) => {
       if (busy) return;
@@ -188,6 +241,33 @@ export function OnboardingScreen({
     },
     [busy, ports, refresh],
   );
+
+  /*
+   * ★ 040 — 스텝 진입 시 목적 설명을 렌더한 직후, 고정 지연으로 시스템 권한
+   * 요청을 자동 호출한다(FR-001, research.md #1). `battery-exception`은
+   * 제외한다(research.md #2) — 조회 API가 없어 사용자가 설정에서 돌아왔는지
+   * 자동으로 알 수 없다.
+   *
+   * `current?.requirement.key`가 바뀔 때마다(=스텝이 바뀔 때마다) 새 타이머를
+   * 걸고, 언마운트·스텝 변경 시 정리한다 — 이전 스텝의 타이머가 살아남아
+   * 엉뚱한 스텝에서 `allow()`를 부르는 것을 막는다(T012 clean-up 검증 대상).
+   *
+   * `current.status`가 `blocked`면 [허용]이 아니라 [설정 열기]가 유효한
+   * 경로이므로 자동 타이머를 걸지 않는다 — OS 설정은 화면 버튼으로만 연다.
+   */
+  useEffect(() => {
+    if (current === null) return;
+    if (current.requirement.key === "battery-exception") return;
+    if (current.status === "blocked") return;
+
+    const step = current;
+    const timer = setTimeout(() => {
+      void allow(step);
+    }, ONBOARDING_STEP_AUTO_ADVANCE_MS);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.requirement.key]);
 
   const openSettings = useCallback(
     async (step: OnboardingStep) => {

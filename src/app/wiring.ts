@@ -250,3 +250,52 @@ export function createAppPipeline(
     store,
   };
 }
+
+/**
+ * 040 — liveness 통과 직후 그날 첫 일기를 자동 생성한다 (US3, FR-008·FR-009).
+ *
+ * 계약: specs/040-onboarding-parallel-setup/research.md #4
+ *       contracts/first-run-gate.md G6·G7
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * `src/firstrun/`의 `shouldAutoGenerate()`가 "시도해야 하는가"만 답하고,
+ * 실제 `pipeline.run()` 호출은 여기(조립 계층)에 있다(G7) — firstrun/이
+ * 파이프라인을 직접 부르지 않는다.
+ *
+ * **`schedule/task.ts`의 `runAutoDiaryTask`를 재사용하지 않는다**(research.md
+ * #4 근거) — 그 함수는 `settings.enabled`(사용자가 설정 탭에서 켠 자동 생성
+ * 여부)와 목표 시각 근접 창을 검사한다. 040의 트리거는 최초 실행 1회성
+ * 이벤트이며 그 설정과 무관하게 항상 시도해야 한다.
+ *
+ * **`Pipeline.run()`을 그대로 호출할 뿐, 결과를 저장하지 않는다**(research.md
+ * #5) — 성공하면 `pipeline.run()`이 이미 일기를 저장하고, 실패(거부 4갈래)
+ * 하면 아무것도 저장하지 않는다. 호출자(`App.tsx`)는 반환값을 화면에
+ * 노출하지 않는다(FR-009 — 실패해도 평소 "일기 쓰기" 경로가 살아있는 것으로
+ * 충분하다).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export async function triggerFirstRunAutoDiary(
+  resolution: EnvironmentResolution,
+  input: { day: DayDate; now: Date; character: Character; vision: VisionSetting },
+  /** 테스트가 갈아끼우는 자리 — 주지 않으면 `createAppPipeline(resolution)`. */
+  deps: { pipeline?: Pick<Pipeline, "run"> } = {},
+): Promise<void> {
+  let pipeline = deps.pipeline;
+  if (pipeline === undefined) {
+    const wiring = createAppPipeline(resolution);
+    if (!wiring.ok) return;
+    pipeline = wiring.pipeline;
+  }
+
+  await pipeline
+    .run({
+      day: input.day,
+      now: input.now,
+      character: input.character,
+      vision: input.vision,
+    })
+    .catch(() => {
+      // 조용히 삼킨다 — 실패해도 평소 "일기 쓰기" 수동 경로가 살아있다
+      // (FR-009, SC-004). 새 실패 안내 UI를 만들지 않는다(research.md #5).
+    });
+}
