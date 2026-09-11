@@ -559,6 +559,24 @@
     코드 결함이 아니다.**
   - release 재확인 불필요(새 네이티브 모듈 0, 012).
   - 상세: `specs/038-typewriter-diary-reveal/`.
+- **✅ 039에서 확장 (2026-09-11, 사용자 요청)**: 038 실기기 검증 직후
+  "생성 중 화면의 독백 문구에도 같은 타이핑 연출을 넣어 달라"는 요청으로
+  이어진 후속 스펙. `case "writing"`의 `screen.line`(단계별 독백 문구)을
+  038의 `TypewriterText`·`REVEAL.charMs`로 그대로 감싸는 최소 변경 —
+  새 컴포넌트·새 상태·`AppScreen` 타입 확장 없음. 탭 건너뛰기는 넣지
+  않는다(US2, 독백은 실질 정보가 없는 분위기 연출이므로). `onDone`은
+  무시 — 완료 후 정지 상태는 `TypewriterText` 기존 동작으로 자연 성립.
+  기존 015·016 `diary-home.test.tsx` 테스트 8개가 "쓰고 있다"를
+  `getByText`로 즉시 조회하다 깨졌는데, `findByText`(비동기 대기)로
+  갱신해 해결 — 즉시 렌더를 전제한 테스트가 타이핑 연출과 만나면 흔히
+  겪는 회귀다. **Maestro 조사에서 038과 다른 위험 발견**:
+  `writing-monologue.yml`·`writing-monologue-expansion.yml`이
+  `runFlow: when: visible: "쓰고 있다"`(정확한 전체 문자열, 재시도 없는
+  1회성 체크로 추정)로 매칭하는데, 완성까지 최대 75ms(`REVEAL.charMs`
+  ×5글자) 걸리는 타이핑과 매칭 시점이 겹치면 검증 블록 전체가 SKIPPED될
+  이론적 위험이 있다 — 흐름은 아직 수정하지 않고 실기기 검증(T020)에서
+  실제 발생 여부를 먼저 관찰하기로 함(추측으로 고치지 않는다, 원칙 V).
+  상세: `specs/039-writing-monologue-typewriter/`.
 
 ### 24. 초기 권한 획득 UI/UX 개선 — 로고 + 자동 권한 요청 + 작명·다운로드·첫 일기 병렬화
 

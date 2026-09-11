@@ -706,14 +706,19 @@ describe("015 — 쓰는 중 독백", () => {
     expect(typeof receivedOnProgress).toBe("function");
   });
 
+  /*
+   * 039 — 독백 문구가 TypewriterText(글자 단위 노출)로 바뀌면서, `act()` 직후
+   * 곧바로 `getByText`로 전체 문구를 찾을 수 없다(타이핑이 실시간으로
+   * 진행 중이므로). `findByText`(자동 재시도)로 완료를 기다린다 — 039
+   * 이전에는 즉시 렌더였으므로 이 대기가 새로 필요해졌다.
+   */
   it("onProgress('vision')이 오면 「쓰고 있다」에서 다른 문구로 바뀐다", async () => {
     const pipeline = progressPipeline();
     await startWriting(pipeline);
 
     await act(async () => pipeline.onProgress("vision"));
 
-    expect(screen.queryByText("쓰고 있다")).toBeNull();
-    expect(screen.getByText(/중…/)).toBeTruthy();
+    expect(await screen.findByText(/중…/)).toBeTruthy();
   });
 
   it("onProgress('vision')이 연달아 여러 번 오면 매번 직전과 다른 문구가 보인다 (FR-014)", async () => {
@@ -723,6 +728,7 @@ describe("015 — 쓰는 중 독백", () => {
     const seen: string[] = [];
     for (let i = 0; i < 5; i++) {
       await act(async () => pipeline.onProgress("vision"));
+      await screen.findByText(/중…/);
       const rendered = JSON.stringify(screen.toJSON());
       seen.push(rendered);
       if (i > 0) expect(seen[i]).not.toBe(seen[i - 1]);
@@ -744,9 +750,10 @@ describe("015 — 쓰는 중 독백", () => {
     await startWriting(pipeline);
 
     // screen.toJSON() 전체(스타일 수치 포함)가 아니라 실제로 보이는 문구만 본다.
+    // 039 — 타이핑 완료를 기다린 뒤(findByText) 완성된 문구로 검사한다.
     for (const stage of ["signals", "vision", "generation"] as const) {
       await act(async () => pipeline.onProgress(stage));
-      const line = screen.getByText(/중…/);
+      const line = await screen.findByText(/중…/);
       expect(String(line.props.children)).not.toMatch(/\d/);
     }
   });
@@ -824,18 +831,25 @@ describe("016 — 모델 로드 독백", () => {
     expect(rendered).not.toBe(beforeLoad);
   });
 
+  /*
+   * 039 — 타이핑 완료를 기다린 뒤(findByText로 문구 전체가 나타날 때까지)
+   * 스냅샷을 뜬다. 완료 전 스냅샷을 비교하면 진행 중인 글자 수 차이만으로
+   * 우연히 "다르다"고 나올 수 있어 신뢰할 수 없다.
+   */
   it("콜드 스타트 문구와 핫 스타트 문구는 서로 다른 풀에서 온다", async () => {
     let sawDifference = false;
     for (let i = 0; i < 10 && !sawDifference; i++) {
       const c = loadProgressPipeline();
       await startWriting(c);
       await act(async () => c.onProgress("load", "cold"));
-      const cr = JSON.stringify(screen.toJSON());
+      const coldLine = await screen.findByText(/중…/);
+      const cr = String(coldLine.props.children);
 
       const h = loadProgressPipeline();
       await startWriting(h);
       await act(async () => h.onProgress("load", "hot"));
-      const hr = JSON.stringify(screen.toJSON());
+      const hotLine = await screen.findByText(/중…/);
+      const hr = String(hotLine.props.children);
 
       if (cr !== hr) sawDifference = true;
     }
@@ -847,12 +861,14 @@ describe("016 — 모델 로드 독백", () => {
     await startWriting(pipeline);
 
     await act(async () => pipeline.onProgress("load", "cold"));
-    const loadRendered = JSON.stringify(screen.toJSON());
+    const loadLine = await screen.findByText(/중…/);
+    const loadText = String(loadLine.props.children);
 
     await act(async () => pipeline.onProgress("generation"));
-    const generationRendered = JSON.stringify(screen.toJSON());
+    const generationLine = await screen.findByText(/중…/);
+    const generationText = String(generationLine.props.children);
 
-    expect(generationRendered).not.toBe(loadRendered);
+    expect(generationText).not.toBe(loadText);
   });
 });
 
@@ -863,14 +879,14 @@ describe("016 — 모델 로드 독백", () => {
  *       specs/016-writing-monologue-expansion/contracts/monologue-branch.md
  */
 describe("016 — 사진 보기 갈래(많음/보통)", () => {
+  // 039 — 타이핑 완료를 findByText로 기다린다(위 015·모델 로드 독백과 동일 이유).
   it("onProgress('vision', 'normal')을 받으면 '보통' 갈래 문구가 보인다", async () => {
     const pipeline = loadProgressPipeline();
     await startWriting(pipeline);
 
     await act(async () => pipeline.onProgress("vision", "normal"));
 
-    expect(screen.queryByText("쓰고 있다")).toBeNull();
-    expect(screen.getByText(/중…/)).toBeTruthy();
+    expect(await screen.findByText(/중…/)).toBeTruthy();
   });
 
   it("onProgress('vision', 'many')를 받으면 '많음' 갈래 문구가 보인다", async () => {
@@ -879,8 +895,7 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
 
     await act(async () => pipeline.onProgress("vision", "many"));
 
-    expect(screen.queryByText("쓰고 있다")).toBeNull();
-    expect(screen.getByText(/중…/)).toBeTruthy();
+    expect(await screen.findByText(/중…/)).toBeTruthy();
   });
 
   it("렌더된 사진 보기 문구 어디에도 정확한 장수(숫자)가 없다 (FR-007)", async () => {
@@ -890,7 +905,7 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
 
       await act(async () => pipeline.onProgress("vision", branch));
 
-      const line = screen.getByText(/중…/);
+      const line = await screen.findByText(/중…/);
       expect(String(line.props.children)).not.toMatch(/\d/);
     }
   });

@@ -56,7 +56,8 @@ import { DiaryDetailScreen } from "./DiaryDetailScreen";
 import { DiaryListScreen } from "./DiaryListScreen";
 import { OverwriteConfirmScreen } from "./OverwriteConfirmScreen";
 import { AppText } from "./components/Text";
-import { COLORS } from "./theme/tokens";
+import { TypewriterText } from "./components/TypewriterText";
+import { COLORS, REVEAL } from "./theme/tokens";
 
 export type DiaryHomeScreenProps = {
   resolution: EnvironmentResolution;
@@ -453,18 +454,36 @@ export function DiaryHomeScreen({
         </Frame>
       );
 
-    case "writing":
+    case "writing": {
       // 032 — 표현만 바꿨다. 회전 표시 + "그만두기"만. 진행률 숫자·경과 시간·
       // 생성 중인 글은 여전히 없다(005 FR-028b, 015·016, SM3).
+      //
+      // 039 — 독백 문구도 038의 TypewriterText로 글자 단위 노출한다. `key`를
+      // 문구 문자열 자체로 줘서, `line`이 바뀔 때마다(단계 전환 또는 같은
+      // 단계 안에서 branch만 바뀌는 경우) 리마운트되어 처음부터 다시
+      // 타이핑한다(FR-002) — 이어서 채우지 않는다. `skipToEnd`는 항상
+      // `false`(탭 건너뛰기 없음, US2, FR-004). `onDone`은 무시한다 — 이
+      // 화면에 완료를 관찰해 분기하는 로직이 없다(research 결정 3).
+      // 완료 후에는 `TypewriterText` 자체가 이미 완성된 텍스트를 계속
+      // 렌더하므로 별도 처리 없이 정지 상태가 유지된다(FR-002a).
+      const monologueLine = screen.line ?? "쓰고 있다";
       return (
         <View className="flex-1 items-center justify-center bg-bg" style={styles.center}>
           <ActivityIndicator accessibilityLabel="쓰고 있다" size="large" color={COLORS.accent} />
-          <AppText variant="body">{screen.line ?? "쓰고 있다"}</AppText>
+          <TypewriterText
+            key={monologueLine}
+            text={monologueLine}
+            charMs={REVEAL.charMs}
+            skipToEnd={false}
+            onDone={() => {}}
+            variant="body"
+          />
           <Pressable accessibilityRole="button" onPress={() => void cancel()} style={styles.link}>
             <AppText variant="body">그만두기</AppText>
           </Pressable>
         </View>
       );
+    }
 
     case "written":
       // 038 — 생성 직후 첫 표시에서만 타자기 연출(FR-001). 목록에서 여는
