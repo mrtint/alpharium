@@ -83,10 +83,16 @@ describe("PF1 — 세기·시간은 토큰 한 곳의 상수다", () => {
 });
 
 describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
-  it("★ src/ui/components/의 파일이 7개 그대로다", () => {
+  it("★ src/ui/components/의 파일이 8개다(033 7개 + 038 TypewriterText)", () => {
     // 032가 만들고 안 쓴 컴포넌트 4개를 남긴 것이 이 스펙의 존재 이유다.
     // 같은 실패(쓸 자리 없는 추상을 먼저 만듦)를 되풀이하지 않는다.
-    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(7);
+    //
+    // 038 — `TypewriterText.tsx`가 여덟 번째로 늘었다. 이건 032의 "만들고 안
+    // 쓴" 패턴이 아니다 — 실제로 `DiaryDetailScreen`이 쓰고(첫 표시 타자기
+    // 연출), data-model.md·contracts/typewriter-text.md가 계약을 미리 못
+    // 박은 필수 컴포넌트다. 이 숫자는 "새 컴포넌트를 함부로 늘리지 않는다"는
+    // 규칙을 지키되, 실제로 쓰이는 새 컴포넌트까지 막지는 않는다.
+    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(8);
   });
 });
 

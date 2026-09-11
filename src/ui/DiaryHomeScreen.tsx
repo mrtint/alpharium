@@ -467,6 +467,9 @@ export function DiaryHomeScreen({
       );
 
     case "written":
+      // 038 — 생성 직후 첫 표시에서만 타자기 연출(FR-001). 목록에서 여는
+      // `case "detail"`은 `reveal`을 넘기지 않아 이 기능 도입 전과 동일하다
+      // (FR-007, SC-004).
       return (
         <Frame onBack={() => void backToList()}>
           <DiaryDetailScreen
@@ -474,6 +477,7 @@ export function DiaryHomeScreen({
             entry={screen.entry}
             saved={screen.saved}
             overwrote={screen.overwrote}
+            reveal
           />
         </Frame>
       );
