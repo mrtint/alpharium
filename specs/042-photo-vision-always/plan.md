@@ -97,7 +97,9 @@ specs/042-photo-vision-always/
 ```text
 src/
 ├── diary/
-│   └── types.ts                     ★ VisionSetting 축소 — 여기서 tsc가 시작한다
+│   ├── types.ts                     ★ VisionSetting 축소 — 여기서 tsc가 시작한다
+│   ├── request.ts · pipeline.ts     타입만 좁음
+│   └── prompt.ts                    「없었다」/「모른다」 두 문구 유지 확인 (FR-003)
 ├── vision/
 │   ├── types.ts                     VisionDepth 축소 + VisionOutcome의 skipped 제거
 │   └── vision-port.ts               IMAGE_TOKENS 축소
@@ -110,8 +112,6 @@ src/
 │   └── wiring.ts                    vision 배선 정리
 ├── schedule/
 │   └── task.ts                      ★ 강제 none 분기 제거 (FR-004, 이 기능의 실질)
-├── diary/
-│   ├── request.ts · pipeline.ts     타입만 좁음
 └── ui/
     ├── VisionPicker.tsx             ✗ 파일 삭제
     ├── DiaryHomeScreen.tsx          ★ 018 두 갈래 판별자 교체 (FR-012)

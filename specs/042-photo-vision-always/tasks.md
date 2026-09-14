@@ -48,9 +48,9 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 
 - [ ] T004 `src/diary/types.ts`의 `VisionSetting`을 `"quick"` 하나로, `VISION_SETTINGS`를 `["quick"]`으로 좁힌다. 주석의 "아래 셋으로만 제시한다"를 헌법 v1.7.0 문구로 갱신한다 (E1)
 - [ ] T005 `npx tsc --noEmit`을 돌려 **오류 목록 전체를 파일에 받아 둔다.** 이 목록이 T010~T020의 실제 범위다 — 아래 태스크가 그것과 어긋나면 **목록을 믿는다**(R1)
-- [ ] T006 [P] `src/vision/types.ts`의 `VisionDepth`를 `"quick"` 하나로 좁힌다 (E2, FR-009)
+- [ ] T006 [P] `src/vision/types.ts`의 `VisionDepth`를 `"quick"` 하나로 좁힌다 (E2, FR-006·FR-009)
 - [ ] T007 [P] `src/vision/types.ts`의 `VisionOutcome`에서 `skipped` 갈래를 제거한다 — 제품 코드가 한 번도 반환하지 않으며 설정이 사라져 **도달 불가**가 된다 (R3, E3, C8)
-- [ ] T008 [P] `src/vision/vision-port.ts`의 `IMAGE_TOKENS`를 `{ quick: 256 }` 하나로 좁힌다 (E2, C2)
+- [ ] T008 [P] `src/vision/vision-port.ts`의 `IMAGE_TOKENS`를 `{ quick: 256 }` 하나로 좁힌다 (E2, C2, FR-006·FR-010)
 - [ ] T009 `src/inference/on-device.ts:221`의 `request.vision === "detailed" ? ... : "quick"` 삼항을 제거하고 깊이를 `"quick"` 고정으로 둔다 (T005의 `tsc`가 짚는 자리)
 
 **Checkpoint**: 타입이 좁아졌고 `tsc`가 나머지 자리를 전부 짚었다
@@ -66,8 +66,8 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 
 ### Tests for User Story 1 ⚠️ (먼저 쓰고 실패를 확인한다)
 
-- [ ] T010 [P] [US1] `__tests__/schedule/` 아래에 백그라운드 경로가 **사진 설정을 읽지 않는다**는 계약 테스트를 추가한다 — `task.ts` 소스를 읽어 `loadVisionSetting`·`vision = "none"` 분기가 없음을 확인 (C3, 주석 걷어낸 뒤 검사)
-- [ ] T011 [P] [US1] `__tests__/ui/` 아래에 `GenerationProbeProps`에 `vision` 필드가 **없다**는 계약 테스트를 추가한다 — 선언을 `readFileSync`로 읽어 확인 (C3, FR-004a)
+- [ ] T010 [P] [US1] `__tests__/schedule/background-generation.test.ts`(기존 파일, 024의 B1a가 있는 곳)에 백그라운드 경로가 **사진 설정을 읽지 않는다**는 계약 테스트를 추가한다 — `task.ts` 소스를 읽어 `loadVisionSetting`·`vision = "none"` 분기가 없음을 확인 (C3, 주석 걷어낸 뒤 검사)
+- [ ] T011 [P] [US1] `__tests__/vision/photo-vision-always.test.ts`(T019와 같은 신규 파일)에 `GenerationProbeProps`에 `vision` 필드가 **없다**는 계약 테스트를 추가한다 — 선언을 `readFileSync`로 읽어 확인. **`.ts`이므로 `render()`를 쓰지 않는다**(소스 검사만, jest 프로젝트 분리 규칙) (C3, FR-004a)
 
 ### Implementation for User Story 1
 
@@ -112,8 +112,8 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T019 [P] [US3] `__tests__/` 아래에 C1 계약 테스트를 추가한다 — `src/`에 `VisionPicker`·`vision-setting-store`가 없고, `VisionSetting`의 멤버가 **하나**임을 소스에서 확인. **`tsc`는 유니온을 넓히는 위반을 못 잡으므로 이 테스트가 유일한 방어다** (C1)
-- [ ] T020 [P] [US3] C7 계약 테스트를 추가한다 — `src/`에 `vision-setting.json` 문자열이 없고, 그 파일을 **지우는 코드도 없다**(`delete`·`remove` 호출 없음) (C7, FR-007)
+- [ ] T019 [P] [US3] `__tests__/vision/photo-vision-always.test.ts`(신규)에 C1 계약 테스트를 추가한다 — `src/`에 `VisionPicker`·`vision-setting-store`가 없고, `VisionSetting`의 멤버가 **하나**임을 소스에서 확인(주석은 걷어낸 뒤). **`tsc`는 유니온을 넓히는 위반을 못 잡으므로 이 테스트가 유일한 방어다** (C1, SC-003)
+- [ ] T020 [P] [US3] 같은 파일(`__tests__/vision/photo-vision-always.test.ts`)에 C7 계약 테스트를 추가한다 — `src/`에 `vision-setting.json` 문자열이 없고, 그 파일을 **지우는 코드도 없다**(`delete`·`remove` 호출 없음) (C7, FR-007)
 
 ### Implementation for User Story 3
 
@@ -137,9 +137,9 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 
 ### Tests ⚠️
 
-- [ ] T026 [US1] `__tests__/ui/diary-home.test.tsx`의 018 블록(920·938행)을 **`hasPhotos` 기준으로 재작성**한다 — 이름부터 `vision: none`/`quick/detailed`에 묶여 있어 그대로 못 쓴다. 세 케이스: `hasPhotos:false` → `prepare` 1회·`captionDay` 0회 / `hasPhotos:true` → `captionDay` 먼저, 풀린 **뒤** `prepare` / 캡션 도중 「쓰기」 → 기존 `Promise` 재사용 (C5)
+- [ ] T026 [US1] (SC-007) `__tests__/ui/diary-home.test.tsx`의 018 블록(920·938행)을 **`hasPhotos` 기준으로 재작성**한다 — 이름부터 `vision: none`/`quick/detailed`에 묶여 있어 그대로 못 쓴다. 세 케이스: `hasPhotos:false` → `prepare` 1회·`captionDay` 0회 / `hasPhotos:true` → `captionDay` 먼저, 풀린 **뒤** `prepare` / 캡션 도중 「쓰기」 → 기존 `Promise` 재사용 (C5)
 - [ ] T027 [US1] `__tests__/ui/diary-home.test.tsx:522`의 `it.each(["none","quick","detailed"])`("resolve가 정한 vision이 pipeline.run까지 도달한다")를 **`hasPhotos`가 018 갈래를 가르는지**로 바꾼다. `:543`의 "홈에 사진 설정 선택기가 없다"는 **강화되므로 유지**한다
-- [ ] T028 [P] [US1] C6 계약 테스트를 추가한다 — `DiaryHomeScreenProps` 선언에 `photoSignalPresent` 같은 신호 prop이 **없음**을 소스에서 확인("두 개의 진실" 금지, FR-012a)
+- [ ] T028 [P] [US1] `__tests__/vision/photo-vision-always.test.ts`(T019와 같은 신규 파일)에 C6 계약 테스트를 추가한다 — `DiaryHomeScreenProps` 선언에 `photoSignalPresent` 같은 신호 prop이 **없음**을 소스에서 확인("두 개의 진실" 금지, FR-012a)
 
 ### Implementation
 
@@ -156,7 +156,7 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 - [ ] T030 [P] `src/diary/request.ts`·`src/diary/pipeline.ts`·`src/inference/select.ts`·`src/app/wiring.ts`의 `vision: VisionSetting` 시그니처를 확인한다 — **타입만 좁아지고 구조는 그대로일 것**이다(E6). `DiaryRequest.vision` 필드는 **남긴다**
 - [ ] T031 [P] `__tests__/vision/types.test.ts`를 고친다 — `VisionOutcome` 갈래 수 6→5(`"skipped"` 제거), `VisionDepth` 블록의 주장을 「`quick` 하나뿐이며 `none`이 아니다」로 **반전**한다. **테스트를 지우지 않는다** — 지우면 "깊이가 `none`인 캡션은 뜻이 없다"는 011의 판단이 함께 사라진다 (C2·C8)
 - [ ] T032 [P] `__tests__/vision/engine.test.ts`를 고친다 — 127행 「깊이에 따라 다른 값을 넘긴다」는 **성립 불가**(비교 대상이 없다)이므로 「언제나 256을 넘긴다」로 바꾼다. 141행 「두 번 열면 앞의 것을 먼저 닫는다」는 **깊이와 무관한 E1 계약**이므로 `load("quick")` 두 번으로 바꿔 **살린다**
-- [ ] T033 [P] `__tests__/inference/generate.test.ts`의 005 FR-022 블록(104-141행)을 재구성한다 — `it.each(["quick","detailed"])`가 `"quick"` 하나로, `"none"이면 생성이 진행된다` 케이스는 **그 설정이 없으므로 제거**한다. 「막힌 요청은 모델을 열지도 않는다」는 `"quick"`으로 살린다
+- [ ] T033 [P] `__tests__/inference/generate.test.ts`의 「시각 설정을 조용히 낮추지 않는다」 블록(104-141행, **005 스펙의 FR-022** — 042의 FR이 아니다)을 재구성한다 — `it.each(["quick","detailed"])`가 `"quick"` 하나로, `"none"이면 생성이 진행된다` 케이스는 **그 설정이 없으므로 제거**한다. 「막힌 요청은 모델을 열지도 않는다」는 `"quick"`으로 살린다
 - [ ] T034 [P] `__tests__/app/resolve-generation.test.ts`를 고친다 — `visionPreference` 입력과 R5 케이스(107-124행)를 `hasPhotos` 기준으로 바꾼다 (C6)
 - [ ] T035 [P] `__tests__/inference/on-device.test.ts`의 `vision: "none"` 픽스처들(201·302·365·433·453행)을 `"quick"`으로 바꾼다 — **전부 `signalsWithPhotos([])`/`emptyDay`와 짝이라 의미가 안 바뀐다**(사진이 0장이라 캡션이 안 도는 것은 그대로)
 - [ ] T036 [P] `__tests__/diary/request.test.ts`·`__tests__/diary/pipeline.test.ts`·`__tests__/diary/pipeline.lock.test.ts`·`__tests__/ui/writing-monologue-typewriter.test.tsx`의 `"none"`·`VISION_SETTINGS` 사용을 좁아진 타입에 맞춘다
@@ -182,7 +182,7 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 - [ ] T042 [P] V1: `VisionSetting`에 `"none"` 되살리기 → C1이 잡아야 한다 (**`tsc`는 못 잡는다** — 유니온을 넓히는 것은 타입 오류가 아니다)
 - [ ] T043 [P] V2: `IMAGE_TOKENS`에 `detailed: 1024` 더하기 → `tsc` 잉여 속성
 - [ ] T044 [P] V3: `task.ts`에 `vision = "none"` 분기 되살리기 → C3
-- [ ] T045 [P] V4: 018 두 `useEffect` 조건을 같게 만들기 → C5 세 케이스 (**가장 중요한 주입**)
+- [ ] T045 [P] V4: 018 두 `useEffect` 조건을 같게 만들기 → C5 세 케이스 (**가장 중요한 주입**, SC-007)
 - [ ] T046 [P] V5: 화면에 `photoSignalPresent` prop 더하기 → C6
 - [ ] T047 [P] V6: `VisionOutcome`에 `skipped` 되살리기 → C8
 - [ ] T048 [P] V7: 옛 설정 파일 정리 코드 넣기 → C7
