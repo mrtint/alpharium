@@ -179,12 +179,12 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 **각각 고친 뒤 되돌린다.** 잡히지 않으면 그 계약은 없는 것이다 (quickstart §2).
 
 - [x] T042 [P] V1: `VisionSetting`에 `"none"` 되살리기 → C1이 잡아야 한다 (**`tsc`는 못 잡는다** — 유니온을 넓히는 것은 타입 오류가 아니다)
-- [ ] T043 [P] V2: `IMAGE_TOKENS`에 `detailed: 1024` 더하기 → `tsc` 잉여 속성
+- [x] T043 [P] V2: `IMAGE_TOKENS`에 `detailed: 1024` 더하기 → `tsc` 잉여 속성
 - [x] T044 [P] V3: `task.ts`에 `vision = "none"` 분기 되살리기 → C3
 - [x] T045 [P] V4: 018 두 `useEffect` 조건을 같게 만들기 → C5 세 케이스 (**가장 중요한 주입**, SC-007)
-- [ ] T046 [P] V5: 화면에 `photoSignalPresent` prop 더하기 → C6
+- [x] T046 [P] V5: 화면에 `photoSignalPresent` prop 더하기 → C6
 - [x] T047 [P] V6: `VisionOutcome`에 `skipped` 되살리기 → C8
-- [ ] T048 [P] V7: 옛 설정 파일 정리 코드 넣기 → C7
+- [x] T048 [P] V7: 옛 설정 파일 정리 코드 넣기 → C7
 
 ---
 
@@ -207,10 +207,10 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 
 ## Phase 11: 마무리
 
-- [ ] T058 `npm run lint && npm test` 최종 확인 — `tsc` 0, eslint 0 error, 헌법 검사 위반 0, prettier 클린
-- [ ] T059 [P] `specs/042-photo-vision-always/`에 실측을 적는다 — D2·D5·D6의 `has_media` 관측과 소요 시간. **256과 1024의 차이는 재지 않았음을 명시**한다(원칙 V)
-- [ ] T060 [P] `AGENTS.md`에 042 절을 더한다 — 백그라운드가 사진을 안 보고 있었다는 사실, `skipped` 갈래가 죽은 코드였다는 사실, `tsc`가 유니온 확장을 못 잡는다는 것
-- [ ] T061 [P] `docs/roadmap/README.md`의 25번을 완료로 표시하고 결과를 적는다
+- [x] T058 `npm run lint && npm test` 최종 확인 — `tsc` 0, eslint 0 error, 헌법 검사 위반 0, prettier 클린
+- [x] T059 [P] `specs/042-photo-vision-always/`에 실측을 적는다 — D2·D5·D6의 `has_media` 관측과 소요 시간. **256과 1024의 차이는 재지 않았음을 명시**한다(원칙 V)
+- [x] T060 [P] `AGENTS.md`에 042 절을 더한다 — 백그라운드가 사진을 안 보고 있었다는 사실, `skipped` 갈래가 죽은 코드였다는 사실, `tsc`가 유니온 확장을 못 잡는다는 것
+- [x] T061 [P] `docs/roadmap/README.md`의 25번을 완료로 표시하고 결과를 적는다
 
 ---
 
