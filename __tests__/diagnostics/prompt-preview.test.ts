@@ -43,7 +43,7 @@ describe("PP1 — 미리보기 문자열은 buildPrompt()의 출력과 바이트
         const request = buildRequest(
           preset.signals,
           character,
-          "none",
+          "quick",
           preset.signals.date,
           PREVIEW_NOW,
         );

@@ -96,16 +96,12 @@ describe("PhotoVision — 세 수가 함께 다닌다 (FR-006)", () => {
 describe("VisionOutcome — 대체가 타입 수준에서 불가능하다 (원칙 I)", () => {
   const declaration = declarationOf("VisionOutcome");
 
-  it("갈래가 여섯이다", () => {
+  // 042 — `skipped`("사진 설정이 「보지 않음」이라 시작하지 않았다")가 빠져 다섯이다.
+  // 그 설정이 사라져 **도달할 수 없는 갈래**가 됐고, 도달 못 하는 상태를 타입에 남기면
+  // 그것은 계약이 아니라 거짓말이다. 「볼 것이 없었다」는 `no-photos`가 이미 말한다.
+  it("갈래가 다섯이다", () => {
     const kinds = [...declaration.matchAll(/kind:\s*"([a-z-]+)"/g)].map((m) => m[1]);
-    expect(kinds.sort()).toEqual([
-      "cancelled",
-      "failed",
-      "no-photos",
-      "not-ready",
-      "seen",
-      "skipped",
-    ]);
+    expect(kinds.sort()).toEqual(["cancelled", "failed", "no-photos", "not-ready", "seen"]);
   });
 
   it("seen과 no-photos가 갈린다 — 「보았다」와 「볼 것이 없었다」는 다르다", () => {
@@ -120,12 +116,14 @@ describe("VisionOutcome — 대체가 타입 수준에서 불가능하다 (원�
   });
 });
 
-describe("VisionDepth — none이 들어오지 못한다", () => {
+describe("VisionDepth — 하나뿐이고 none이 들어오지 못한다", () => {
   const declaration = declarationOf("VisionDepth");
 
-  it("quick과 detailed 둘뿐이다", () => {
+  // 042 — 헌법 v1.7.0 「보는 깊이는 하나로 고정한다(MUST)」. 옛 주장("quick과 detailed
+  // 둘뿐이다")은 뒤집혔다 — **재지 않은 값을 선택지로 내놓지 않는다**(원칙 V).
+  it("quick 하나뿐이다", () => {
     expect(declaration).toContain('"quick"');
-    expect(declaration).toContain('"detailed"');
+    expect(declaration).not.toContain('"detailed"');
   });
 
   // 「깊이가 none인 캡션」은 뜻이 없는 상태다.

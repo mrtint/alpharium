@@ -47,15 +47,15 @@ npm test            # 두 프로젝트 전부
 
 각각 고친 뒤 **되돌린다.** 잡히지 않으면 그 계약은 없는 것이다.
 
-| # | 주입 | 잡아야 할 것 |
-|---|---|---|
-| V1 | `VisionSetting`에 `"none"` 되살리기 | C1 (**`tsc`는 못 잡는다** — 유니온을 넓히는 것은 타입 오류가 아니다) |
-| V2 | `IMAGE_TOKENS`에 `detailed: 1024` 더하기 | `tsc` 잉여 속성 |
-| V3 | `task.ts`에 `vision = "none"` 분기 되살리기 | C3 |
-| V4 | 018 두 `useEffect` 조건을 같게 만들기 | C5 세 케이스 |
-| V5 | 화면에 `photoSignalPresent` prop 더하기 | C6 |
-| V6 | `VisionOutcome`에 `skipped` 되살리기 | C8 |
-| V7 | 옛 설정 파일 정리 코드 넣기 | C7 |
+| #   | 주입                                        | 잡아야 할 것                                                         |
+| --- | ------------------------------------------- | -------------------------------------------------------------------- |
+| V1  | `VisionSetting`에 `"none"` 되살리기         | C1 (**`tsc`는 못 잡는다** — 유니온을 넓히는 것은 타입 오류가 아니다) |
+| V2  | `IMAGE_TOKENS`에 `detailed: 1024` 더하기    | `tsc` 잉여 속성                                                      |
+| V3  | `task.ts`에 `vision = "none"` 분기 되살리기 | C3                                                                   |
+| V4  | 018 두 `useEffect` 조건을 같게 만들기       | C5 세 케이스                                                         |
+| V5  | 화면에 `photoSignalPresent` prop 더하기     | C6                                                                   |
+| V6  | `VisionOutcome`에 `skipped` 되살리기        | C8                                                                   |
+| V7  | 옛 설정 파일 정리 코드 넣기                 | C7                                                                   |
 
 **V1과 V4가 이 기능의 핵심이다** — 나머지는 `tsc`가 거드는 자리지만 이 둘은
 타입이 침묵한다.
@@ -100,6 +100,7 @@ adb logcat -c && adb logcat | grep -iE "has_media|loadPrompt|mtmd"
 ```
 
 **기대**:
+
 - `has_media=1` — VLM이 사진을 IMAGE 청크로 디코드했다
 - 생성 화면에 「사진들을 훑어보는 중…」이 뜬다
 - 저장된 일기에 **사진 분석 소요 시간**이 있고 본문이 사진 내용을 반영한다
@@ -112,6 +113,7 @@ adb logcat -c && adb logcat | grep -iE "has_media|loadPrompt|mtmd"
 사진이 없는 하루를 골라 「일기 쓰기」.
 
 **기대**:
+
 - `has_media` 로그가 **없다**, VLM 로드 로그가 없다
 - 일기에 사진 분석 소요 시간이 **없다**
 - 본문이 「사진: 없었다」 쪽으로 정직하다 — 사진 내용을 단정하지 않는다

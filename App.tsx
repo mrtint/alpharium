@@ -60,12 +60,6 @@ import {
   saveGeocodingSetting,
   type GeocodingPreference,
 } from "./src/app/geocoding-setting-store";
-import {
-  expoVisionSettingPort,
-  loadVisionSetting,
-  saveVisionSetting,
-  type VisionPreference,
-} from "./src/app/vision-setting-store";
 import { dayBounds, dayOf, isDayWritable, selectableDays } from "./src/config/day-boundary";
 import { createAppPipeline, triggerFirstRunAutoDiary } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
@@ -87,7 +81,6 @@ import {
 } from "./src/vision/acquisition";
 import { CharacterListScreen } from "./src/ui/CharacterListScreen";
 import { AuthorPicker } from "./src/ui/AuthorPicker";
-import { VisionPicker } from "./src/ui/VisionPicker";
 import { GeocodingSettingToggle } from "./src/ui/GeocodingSettingToggle";
 import { personaOf } from "./src/diary/persona";
 import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
@@ -1010,23 +1003,20 @@ function DiarySection({
   const selectionPort = useMemo(() => expoSelectionPort(), []);
 
   /**
-   * 029 — 설정 탭의 세 선호. 홈의 위젯이 사라졌으므로 여기서 읽어 자동 판정
+   * 029 — 설정 탭의 선호. 홈의 위젯이 사라졌으므로 여기서 읽어 자동 판정
    * (`resolveGenerationParams`)에 넘긴다. `AppState active`에서 다시 읽는다 —
    * 설정 탭에서 바꾸고 일기 탭으로 돌아오면 반영돼야 한다.
+   *
+   * **042 — 「사진 보기」가 빠졌다.** 고를 것이 없어졌으므로 읽을 설정도 없다.
    */
-  const visionPort = useMemo(() => expoVisionSettingPort(), []);
   const geocodingSettingPort = useMemo(() => expoGeocodingSettingPort(), []);
-  const [visionPreference, setVisionPreference] = useState<VisionPreference>("auto");
   const [geocodingPreference, setGeocodingPreference] = useState<GeocodingPreference>("auto");
   const [locationPermission, setLocationPermission] = useState(false);
 
   useEffect(() => {
     let alive = true;
     async function readPrefs() {
-      const [v, g] = await Promise.all([
-        loadVisionSetting(visionPort).catch(() => "auto" as const),
-        loadGeocodingSetting(geocodingSettingPort).catch(() => "auto" as const),
-      ]);
+      const g = await loadGeocodingSetting(geocodingSettingPort).catch(() => "auto" as const);
       let loc = false;
       try {
         const Location = await import("expo-location");
@@ -1036,7 +1026,6 @@ function DiarySection({
         // 통로가 없는 환경 — 권한 없음으로 다룬다.
       }
       if (alive) {
-        setVisionPreference(v);
         setGeocodingPreference(g);
         setLocationPermission(loc);
       }
@@ -1049,7 +1038,7 @@ function DiarySection({
       alive = false;
       sub.remove();
     };
-  }, [visionPort, geocodingSettingPort]);
+  }, [geocodingSettingPort]);
 
   /**
    * 029 — 최근 3일 중 사진 신호가 1장 이상인 하루들 (FR-010, 임계값 없음).
@@ -1153,10 +1142,9 @@ function DiarySection({
         // 029 — 그 날 사진 신호가 1장 이상인가. 임계값 없음(FR-010).
         photoSignalPresent: photoDays.has(day),
         locationPermission,
-        visionPreference,
         geocodingPreference,
       }),
-    [stored, ready, photoDays, locationPermission, visionPreference, geocodingPreference],
+    [stored, ready, photoDays, locationPermission, geocodingPreference],
   );
 
   /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
@@ -1543,13 +1531,11 @@ function AutoDiarySection({
   const [settings, setSettings] = useState<AutoDiarySettings | null>(null);
   const [notificationDenied, setNotificationDenied] = useState(false);
 
-  /* ── 029 — "일기 작성자"·"사진 보기"·"장소명" 섹션 ─────────────────────── */
+  /* ── 029 — "일기 작성자"·"장소명" 섹션 (042에서 「사진 보기」가 빠졌다) ─── */
   const selectionPort = useMemo(() => expoSelectionPort(), []);
-  const visionPort = useMemo(() => expoVisionSettingPort(), []);
   const geoPort = useMemo(() => expoGeocodingSettingPort(), []);
   const [author, setAuthor] = useState<Character | null>(null);
   const [readyChars, setReadyChars] = useState<readonly Character[]>([]);
-  const [visionPref, setVisionPref] = useState<VisionPreference>("auto");
   const [geoPref, setGeoPref] = useState<GeocodingPreference>("auto");
 
   useEffect(() => {
@@ -1557,19 +1543,17 @@ function AutoDiarySection({
     void Promise.all([
       loadSelection(selectionPort).catch(() => null),
       readyCharacters(),
-      loadVisionSetting(visionPort).catch(() => "auto" as const),
       loadGeocodingSetting(geoPort).catch(() => "auto" as const),
-    ]).then(([a, r, v, g]) => {
+    ]).then(([a, r, g]) => {
       if (!alive) return;
       setAuthor(a);
       setReadyChars(r);
-      setVisionPref(v);
       setGeoPref(g);
     });
     return () => {
       alive = false;
     };
-  }, [selectionPort, visionPort, geoPort]);
+  }, [selectionPort, geoPort]);
 
   const onSelectAuthor = useCallback(
     (index: number) => {
@@ -1579,14 +1563,6 @@ function AutoDiarySection({
       void saveSelection(selectionPort, character).catch(() => {});
     },
     [readyChars, selectionPort],
-  );
-
-  const onSelectVisionPref = useCallback(
-    (v: VisionPreference) => {
-      setVisionPref(v);
-      void saveVisionSetting(visionPort, v).catch(() => {});
-    },
-    [visionPort],
   );
 
   const onSelectGeoPref = useCallback(
@@ -1707,11 +1683,6 @@ function AutoDiarySection({
                 }
           }
         />
-      </View>
-
-      {/* 029 — 사진 보기 (FR-024). 자동/보지 않음/빠르게 봄/자세히 봄. */}
-      <View style={styles.settingsSection}>
-        <VisionPicker selected={visionPref} onSelect={onSelectVisionPref} />
       </View>
 
       {/* 029 — 장소명 (FR-025). 자동/켬/끔. */}

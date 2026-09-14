@@ -38,7 +38,7 @@ function req(
   character: Character = "quiet",
   opts: { day?: string; now?: Date; customNames?: CustomNames; placeName?: string } = {},
 ): DiaryRequest {
-  const r = buildRequest(signals, character, "none", opts.day, opts.now, opts.customNames);
+  const r = buildRequest(signals, character, "quick", opts.day, opts.now, opts.customNames);
   if (!r.ok) throw new Error("테스트 준비 실패");
   return opts.placeName ? { ...r.request, placeName: opts.placeName } : r.request;
 }

@@ -24,7 +24,7 @@ import { AppState, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { latestClosedDay } from "../config/day-boundary";
 import type { Pipeline } from "../diary/pipeline";
-import type { Character, VisionSetting } from "../diary/types";
+import type { Character } from "../diary/types";
 import { describeStage } from "../app/failure-text";
 
 export type GenerationProbeProps = {
@@ -37,7 +37,6 @@ export type GenerationProbeProps = {
   /** 끊을 수 있으면 쓴다(005 FR-021b). 없어도 시간 한도가 결국 끊는다 */
   stop?: () => Promise<void>;
   character: Character;
-  vision?: VisionSetting;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
   now?: () => Date;
 };
@@ -46,7 +45,6 @@ export function GenerationProbe({
   pipeline,
   stop,
   character,
-  vision = "none",
   now = () => new Date(),
 }: GenerationProbeProps) {
   /**
@@ -113,7 +111,11 @@ export function GenerationProbe({
         day: latestClosedDay(at),
         now: at,
         character,
-        vision,
+        // ★ 042 — **진단 경로도 제품과 같은 규칙이다.** 이 자리는 기본값이 "none"이라
+        // 개발자 탭의 「지금 생성」이 사진을 한 장도 안 보고 있었다. 검증 경로가 제품과
+        // 다르게 동작하면 그 검증은 제품을 재현하지 못한다(Governance — 예외를 코드에
+        // 몰래 두지 않는다). 고를 인자를 두지 않는 것이 방어다.
+        vision: "quick",
       });
 
       if (result.ok) {
@@ -146,7 +148,7 @@ export function GenerationProbe({
       // **성공·실패 어느 쪽으로 끝나도 표시가 사라진다**(FR-028c).
       setBusy(false);
     }
-  }, [pipeline, character, vision, now]);
+  }, [pipeline, character, now]);
 
   return (
     <View style={styles.panel}>

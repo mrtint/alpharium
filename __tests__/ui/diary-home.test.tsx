@@ -20,7 +20,7 @@ import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { Pipeline, PipelineInput, PipelineResult } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
-import type { DiaryEntry, VisionSetting } from "../../src/diary/types";
+import type { DiaryEntry } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 
@@ -59,13 +59,13 @@ const entry: DiaryEntry = {
  * 대부분의 테스트는 quiet·사진 없음·장소명 꺼짐으로 충분하다.
  */
 const resolveQuiet =
-  (over: Partial<{ vision: VisionSetting; movedFrom: "quiet" }> = {}) =>
+  (over: Partial<{ hasPhotos: boolean; movedFrom: "quiet" }> = {}) =>
   (day: string): ResolveOutcome => ({
     kind: "resolved",
     params: {
       character: "quiet",
       day: day as never,
-      vision: over.vision ?? "none",
+      hasPhotos: over.hasPhotos ?? false,
       geocodingEnabled: false,
       ...(over.movedFrom ? { movedFrom: over.movedFrom } : {}),
     },
@@ -518,16 +518,17 @@ describe("029 — 자동 판정한 사진 설정이 파이프라인까지 간다
     };
   }
 
-  // ★ 029 — vision은 `resolve(day)`가 정한다(FR-010). 홈에 VisionPicker가 없다(FR-001).
-  it.each(["none", "quick", "detailed"] as const)(
-    "★ resolve가 정한 %s이 pipeline.run까지 도달한다",
-    async (vision) => {
+  // ★ 042 — 고를 설정이 사라졌다. 화면이 파이프라인에 넘기는 값은 **언제나 하나**이며,
+  // 사진을 실제로 볼지는 파이프라인이 그 하루의 신호로 정한다(011).
+  it.each([false, true])(
+    "★ hasPhotos=%s여도 화면은 언제나 같은 시각 설정을 넘긴다",
+    async (hasPhotos) => {
       const seen: PipelineInput[] = [];
       await render(
         <DiaryHomeScreen
           pipeline={recordingPipeline(seen)}
           resolution={resolved}
-          resolve={resolveQuiet({ vision })}
+          resolve={resolveQuiet({ hasPhotos })}
           store={memoryStore()}
         />,
       );
@@ -535,7 +536,7 @@ describe("029 — 자동 판정한 사진 설정이 파이프라인까지 간다
       await userEvent.press(await screen.findByText("일기 쓰기"));
 
       expect(seen).toHaveLength(1);
-      expect(seen[0].vision).toBe(vision);
+      expect(seen[0].vision).toBe("quick");
     },
   );
 
@@ -917,7 +918,7 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
  * 계약: specs/018-prompt-prefix-prewarm/contracts/prewarm-engine.md
  */
 describe("018 — prepare()/release() 트리거", () => {
-  it("사진 없는 날(vision: none)에서 캐릭터가 정해지면 prepare()를 부른다", async () => {
+  it("사진 없는 날(hasPhotos: false)에서 캐릭터가 정해지면 prepare()를 부른다", async () => {
     const prepared: string[] = [];
     await render(
       <DiaryHomeScreen
@@ -935,9 +936,11 @@ describe("018 — prepare()/release() 트리거", () => {
     await waitFor(() => expect(prepared).toEqual(["quiet"]));
   });
 
-  it("사진 있는 날(vision: quick/detailed)에서는 1단계 트리거가 prepare()를 부르지 않는다", async () => {
+  // 042 — 판별자가 `hasPhotos`로 바뀌었다(FR-012). 두 갈래가 **서로 다른 갈래로**
+  // 유지되는지가 이 계약의 핵심이며, 합쳐지면 오류 없이 조용히 깨진다(C5).
+  it("사진 있는 날(hasPhotos: true)에서는 1단계 트리거가 prepare()를 부르지 않는다", async () => {
     const prepared: string[] = [];
-    for (const vision of ["quick", "detailed"] as const) {
+    {
       await render(
         <DiaryHomeScreen
           pipeline={hangingPipeline()}
@@ -945,7 +948,7 @@ describe("018 — prepare()/release() 트리거", () => {
             prepared.push(character);
           }}
           resolution={resolved}
-          resolve={resolveQuiet({ vision })}
+          resolve={resolveQuiet({ hasPhotos: true })}
           store={memoryStore()}
         />,
       );
@@ -1108,7 +1111,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         pipeline={recordingPipeline()}
         prepare={prepare}
         resolution={resolved}
-        resolve={resolveQuiet({ vision: "quick" })}
+        resolve={resolveQuiet({ hasPhotos: true })}
         store={memoryStore()}
       />,
     );
@@ -1144,7 +1147,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        resolve={resolveQuiet({ vision: "quick" })}
+        resolve={resolveQuiet({ hasPhotos: true })}
         store={memoryStore()}
       />,
     );
@@ -1172,7 +1175,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        resolve={resolveQuiet({ vision: "quick" })}
+        resolve={resolveQuiet({ hasPhotos: true })}
         store={memoryStore()}
       />,
     );
@@ -1225,7 +1228,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
         now={at}
         pipeline={pipeline}
         resolution={resolved}
-        resolve={resolveQuiet({ vision: "quick" })}
+        resolve={resolveQuiet({ hasPhotos: true })}
         store={memoryStore()}
       />,
     );

@@ -32,11 +32,6 @@ import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createAppPipeline } from "../app/wiring";
 import { loadSelection, expoSelectionPort } from "../app/selection-store";
-import {
-  loadVisionSetting,
-  expoVisionSettingPort,
-  type VisionPreference,
-} from "../app/vision-setting-store";
 import type { Character } from "../diary/types";
 import { decideSchedule } from "./decision";
 import { decideNotify } from "./notify";
@@ -70,8 +65,6 @@ export type AutoDiaryTaskDeps = {
   /** 저장된 일기 날짜들. 주지 않으면 `createAppPipeline`의 store에서 읽는다 */
   listDiaryDays?: () => Promise<readonly DayDate[]>;
   loadCharacter?: () => Promise<Character | null>;
-  /** 029 — "auto"이거나 고정값. 백그라운드는 "auto"를 "none"으로 다룬다(위 주석). */
-  loadVision?: () => Promise<VisionPreference | null>;
   /** 파이프라인 조립. 주지 않으면 `createAppPipeline(resolution)` */
   makePipeline?: typeof createAppPipeline;
 };
@@ -130,20 +123,26 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       return "skipped";
     }
 
-    // 029 — 사진 설정이 "auto"이거나 없으면 백그라운드에서는 "none"으로 둔다.
-    // 자동 판정("auto" → 사진 있으면 quick)은 화면의 "일기 쓰기" 흐름 것이며
-    // (resolve-generation.ts), 백그라운드는 그 날 신호를 미리 읽지 않는다. 사용자가
-    // 설정 탭에서 "빠르게 봄"·"자세히 봄"을 명시적으로 고르면 그 값은 그대로 쓴다.
-    const visionPreference = deps.loadVision
-      ? await deps.loadVision()
-      : await loadVisionSetting(expoVisionSettingPort());
-    const vision =
-      visionPreference === "quick" || visionPreference === "detailed" ? visionPreference : "none";
+    // ★ 042 — **백그라운드도 사진을 본다.**
+    //
+    // 029가 여기서 "auto"·설정 없음을 전부 "none"으로 떨궜다. 그래서 **기본 설정으로
+    // 자동 생성을 쓰는 사용자의 일기는 사진이 아무리 많아도 한 장도 보지 않았다.**
+    // 근거는 "백그라운드는 그 날 신호를 미리 읽지 않는다"였는데, 그것은 **미리 읽을
+    // 필요가 없다**는 011의 사실로 이미 해소돼 있었다 — 파이프라인이 신호를 읽어
+    // 0장이면 캡션 단계를 스스로 건너뛴다.
+    //
+    // 헌법 v1.7.0: 「사진 접근이 허용되어 있으면 그 하루의 사진은 반드시 본다(MUST).」
+    // 화면 경로와 **같은 판정**이어야 하므로 분기 자체가 없다.
 
     // B2-7 — 잠금은 pipeline.run() 안에서 취득한다(wiring.ts가 "background"
     // owner로 배선). 취득 실패로 인한 already-running 결과는 "skipped"로
     // 매핑한다(다음 콜백 재시도, FR-013 경로와 합류).
-    const result = await app.pipeline.run({ day: decision.day, now, character, vision });
+    const result = await app.pipeline.run({
+      day: decision.day,
+      now,
+      character,
+      vision: "quick",
+    });
 
     if (result.ok) {
       await sendCompletionNotification(decision.day, deps);

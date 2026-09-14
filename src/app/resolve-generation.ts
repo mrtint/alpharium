@@ -22,12 +22,9 @@
  */
 
 import type { DayDate } from "../config/day-boundary";
-import type { Character, VisionSetting } from "../diary/types";
+import type { Character } from "../diary/types";
 
 import { resolveSelection } from "./selection";
-
-/** 설정 탭 "사진 보기"가 돌려주는 값 (contracts/settings-sections.md S2). */
-export type VisionPreference = "auto" | VisionSetting;
 
 /** 설정 탭 "장소명"이 돌려주는 값 (contracts/settings-sections.md S3). */
 export type GeocodingPreference = "auto" | "on" | "off";
@@ -47,8 +44,6 @@ export type ResolveInput = {
   photoSignalPresent: boolean;
   /** 위치 런타임 권한이 부여됐는가 (FR-011). */
   locationPermission: boolean;
-  /** 설정 탭 "사진 보기" (FR-012·024). */
-  visionPreference: VisionPreference;
   /** 설정 탭 "장소명" (FR-012·025). */
   geocodingPreference: GeocodingPreference;
 };
@@ -56,7 +51,18 @@ export type ResolveInput = {
 export type ResolvedParams = {
   character: Character;
   day: DayDate;
-  vision: VisionSetting;
+  /**
+   * 이 하루에 사진이 있는가 (042 FR-012a).
+   *
+   * **입력 `photoSignalPresent`와 이름이 다른 까닭**: 저것은 배선이 신호에서 계산해
+   * 넣는 **입력**이고, 이것은 판정이 내놓는 **결론**이다. 같은 이름이면 「입력을 그대로
+   * 통과시킨 것」과 「판정한 것」이 구분되지 않는다 — 지금 값이 같은 것은 R5가 단순해서지
+   * 같아야 해서가 아니다.
+   *
+   * **화면은 이 값으로 018의 두 준비 갈래를 가른다.** 신호를 화면에 따로 내려보내지
+   * 않는다(029 경계 유지, "두 개의 진실" 금지).
+   */
+  hasPhotos: boolean;
   geocodingEnabled: boolean;
   /** 캐릭터가 준비를 잃어 옮겨졌으면 (FR-014). 화면이 알린다. */
   movedFrom?: Character;
@@ -85,14 +91,17 @@ export function resolveGenerationParams(input: ResolveInput): ResolveOutcome {
     return { kind: "no-ready-character" };
   }
 
-  // ── 사진 설정 (R5) ─────────────────────────────────────────────────────
-  // 고정값 우선. "auto"면 사진 신호 유무만 본다 — 최소 장수 임계값 없음(원칙 V).
-  const vision: VisionSetting =
-    input.visionPreference === "auto"
-      ? input.photoSignalPresent
-        ? "quick"
-        : "none"
-      : input.visionPreference;
+  // ── 사진 유무 (R5, 042에서 개정) ────────────────────────────────────────
+  //
+  // **설정을 보지 않는다.** 헌법 v1.7.0이 「사용자가 끄는 경로를 두지 않는다(MUST NOT)」
+  // 로 못 박아 고를 것이 사라졌다. 남는 것은 **그 하루에 사진이 있는가** 하나이며,
+  // 그것은 018의 두 준비 갈래를 가르는 데 쓰인다(화면이 이 값으로 가른다).
+  //
+  // **임계값 없음**(원칙 V) — `photoSignalPresent`는 boolean 하나다.
+  //
+  // ⚠️ 이 값은 「캡션을 돌릴까」를 정하지 **않는다.** 그 판정은 파이프라인이 실제
+  // 신호를 읽어서 한다(011) — 여기 값은 화면의 미리 읽기 갈래용 근사치다.
+  const hasPhotos = input.photoSignalPresent;
 
   // ── 장소명 (R6) ────────────────────────────────────────────────────────
   const geocodingEnabled =
@@ -108,7 +117,7 @@ export function resolveGenerationParams(input: ResolveInput): ResolveOutcome {
       character: selection.character,
       // R4: 하루는 인자로 받은 것 그대로 — 이 함수는 재계산하지 않는다.
       day: input.chosenDay,
-      vision,
+      hasPhotos,
       geocodingEnabled,
       ...(selection.movedFrom !== undefined ? { movedFrom: selection.movedFrom } : {}),
     },

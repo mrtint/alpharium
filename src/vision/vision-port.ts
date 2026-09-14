@@ -48,7 +48,6 @@ import type { VisionDepth } from "./types";
  */
 const IMAGE_TOKENS: Readonly<Record<VisionDepth, number>> = {
   quick: 256,
-  detailed: 1024,
 };
 
 /**

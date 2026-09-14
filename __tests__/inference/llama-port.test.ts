@@ -478,7 +478,7 @@ function countingLoaderStub() {
 
 describe("FR-005 — 두 경로가 같은 프롬프트·샘플링을 쓴다 ★", () => {
   function requestFor(character: Character = "quiet") {
-    const built = buildRequest(richDay("2026-08-16"), character, "none");
+    const built = buildRequest(richDay("2026-08-16"), character, "quick");
     if (!built.ok) throw new Error("테스트 준비 실패");
     return built.request;
   }

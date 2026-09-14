@@ -34,17 +34,40 @@ const GOOD_KO = "오늘 주인은 어딘가로 나섰다. 사진 세 장이 남�
 /**
  * 요청 하나를 만든다. buildRequest를 거쳐 실제 경로와 같은 모양을 쓴다.
  *
- * **시각 설정 기본값이 `"none"`이다** — 005 FR-022가 나머지 둘을 막으므로, 생성 경로를
- * 보려면 `none`이어야 한다.
+ * **042 — 시각 설정이 하나뿐이라 기본값도 하나다.** 옛 주석의 "기본값이 none"은
+ * 그 값이 사라져 성립하지 않는다. 생성 경로만 보려는 테스트는 `fakeVision()`을
+ * 주입해 사진 통로를 준다.
  */
 function requestFor(
   day: DaySignals = richDay("2026-08-12"),
-  vision: VisionSetting = "none",
+  vision: VisionSetting = "quick",
 ): DiaryRequest {
   const result = buildRequest(day, "quiet", vision);
   if (!result.ok) throw new Error("테스트 준비 실패: 요청을 만들지 못했다");
   return result.request;
 }
+
+/**
+ * 사진 통로 대역 — **모듈 스코프**.
+ *
+ * **042 — 이제 모든 요청이 사진을 본다.** 통로가 없으면 `not-implemented`로 즉시
+ * 돌아와(원칙 I) 생성 경로에 닿지 못한다. 아래 describe들이 각자 가진 `fakeVision`은
+ * 블록 스코프라 여기서 안 보이므로, **사진에 관심이 없는 테스트가 쓸 통로 하나**를
+ * 모듈 스코프에 둔다.
+ */
+const anyVision = () => ({
+  engine: {
+    async load() {
+      return { ok: true as const };
+    },
+    async caption() {
+      return { text: "사진 한 장" };
+    },
+    async stop() {},
+    async unload() {},
+  },
+  resolvePath: async (photo: { id: string }) => `/photo/${photo.id}.jpg`,
+});
 
 /** 늘 통과할 글을 돌려주는 엔진 대역 */
 const goodEngine = (): GenerationEngine => ({
@@ -62,7 +85,7 @@ const goodEngine = (): GenerationEngine => ({
 describe("005 — 온디바이스가 실제로 생성한다 (FR-001·004) ★", () => {
   it("엔진이 있으면 일기가 나온다", async () => {
     // **002 이후 처음이다.** 이 어댑터는 지금까지 not-implemented만 돌려줬다.
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
     const result = await backend.generate(requestFor());
 
@@ -71,7 +94,7 @@ describe("005 — 온디바이스가 실제로 생성한다 (FR-001·004) ★", 
 
   it("신호가 비어도 생성한다 (002 FR-005a·b)", async () => {
     // 휴대폰이 아무것도 보지 못한 것 자체가 일기의 내용이 된다(원칙 II).
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
     expect(await backend.generate(requestFor(emptyDay("2026-08-12")))).toEqual(
       expect.objectContaining({ text: GOOD_KO }),
@@ -101,27 +124,24 @@ describe("005 — 엔진이 없으면 정직하게 말한다 (원칙 I)", () => 
   });
 });
 
+/**
+ * 005 — 시각 설정을 조용히 낮추지 않는다 (FR-022, SC-009).
+ *
+ * **042에서 이 블록의 전제가 바뀌었다.** 옛 「none이면 생성이 진행된다」 케이스는
+ * 그 설정 자체가 사라져 제거했다 — 이제 **언제나 사진을 보므로**, 볼 수단이 없으면
+ * 언제나 정직하게 못 한다고 말한다. 「조용히 낮추지 않는다」는 방어는 그대로다.
+ */
 describe("005 — 시각 설정을 조용히 낮추지 않는다 (FR-022, SC-009)", () => {
-  it("none이면 생성이 진행된다", async () => {
+  it("사진을 볼 수단이 없으면 사진을 보지 않은 일기가 대신 나오지 않는다", async () => {
+    // **조용히 낮추면 사용자가 요청하지 않은 일기가 나온다.**
+    // 사진 통로를 **주지 않는다** — 그것이 이 테스트의 전제다.
     const backend = createOnDeviceBackend(async () => ({}), goodEngine());
 
-    expect(await backend.generate(requestFor(richDay("2026-08-12"), "none"))).toEqual(
-      expect.objectContaining({ text: GOOD_KO }),
-    );
+    const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
+
+    expect("text" in result).toBe(false);
+    if ("kind" in result) expect(result.kind).toBe("not-implemented");
   });
-
-  it.each(["quick", "detailed"] as const)(
-    "%s면 사진을 보지 않은 일기가 대신 나오지 않는다",
-    async (vision) => {
-      // **`none`으로 조용히 낮추면 사용자가 요청하지 않은 일기가 나온다.**
-      const backend = createOnDeviceBackend(async () => ({}), goodEngine());
-
-      const result = await backend.generate(requestFor(richDay("2026-08-12"), vision));
-
-      expect("text" in result).toBe(false);
-      if ("kind" in result) expect(result.kind).toBe("not-implemented");
-    },
-  );
 
   it("막힌 요청은 모델을 열지도 않는다", async () => {
     // 열고 닫는 것은 비싸다. 어차피 못 할 일이면 시작하지 않는다.
@@ -135,7 +155,7 @@ describe("005 — 시각 설정을 조용히 낮추지 않는다 (FR-022, SC-009
     };
 
     await createOnDeviceBackend(async () => ({}), engine).generate(
-      requestFor(richDay("2026-08-12"), "detailed"),
+      requestFor(richDay("2026-08-12"), "quick"),
     );
 
     expect(loaded).toBe(false);
@@ -190,7 +210,7 @@ describe("실패 결과에 텍스트가 없다 (002 FR-016, SC-004) — 원칙 I
         return { text: "이 글은 거부되어야 한다", ending: { kind: "length" } };
       },
     };
-    const backend = createOnDeviceBackend(async () => ({}), rejecting);
+    const backend = createOnDeviceBackend(async () => ({}), rejecting, 180_000, anyVision());
 
     const result = await backend.generate(requestFor());
 
@@ -203,7 +223,7 @@ describe("어느 어댑터도 예외를 던지지 않는다 (002 FR-019)", () =>
   const backends: readonly { name: string; make: () => InferenceBackend }[] = [
     {
       name: "온디바이스(엔진 있음)",
-      make: () => createOnDeviceBackend(async () => ({}), goodEngine()),
+      make: () => createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision()),
     },
     { name: "온디바이스(엔진 없음)", make: () => createOnDeviceBackend(async () => ({})) },
     {
@@ -230,7 +250,7 @@ describe("어느 어댑터도 예외를 던지지 않는다 (002 FR-019)", () =>
         throw new Error("네이티브가 무너졌다");
       },
     };
-    const backend = createOnDeviceBackend(async () => ({}), throwing);
+    const backend = createOnDeviceBackend(async () => ({}), throwing, 180_000, anyVision());
 
     const result = await backend.generate(requestFor());
 
@@ -342,7 +362,10 @@ describe("011 — 사진을 읽는다", () => {
     expect(prompts[0]).toMatch(/내가 \d+시에 담은 장면: /);
   });
 
-  it("「보지 않음」이면 캡션이 프롬프트에 없다 (FR-003, SC-002)", async () => {
+  // ★ 042 — 옛 이름은 「보지 않음」이면…이었다. 그 설정이 사라졌으므로(헌법 v1.7.0
+  // MUST NOT) **남는 전제는 「볼 것이 없으면」**이다 — 0장인 하루는 여전히 엔진을
+  // 열지 않고 캡션도 프롬프트에 없다(FR-002).
+  it("사진이 0장이면 캡션이 프롬프트에 없다 (FR-003, SC-002, 042 FR-002)", async () => {
     const prompts: string[] = [];
     const opened: string[] = [];
     const backend = createOnDeviceBackend(
@@ -352,7 +375,7 @@ describe("011 — 사진을 읽는다", () => {
       fakeVision(opened),
     );
 
-    await backend.generate(requestFor(richDay("2026-08-12"), "none"));
+    await backend.generate(requestFor(emptyDay("2026-08-12"), "quick"));
 
     expect(prompts[0]).not.toMatch(/내가 \d+시에 담은 장면: /);
     expect(prompts[0]).not.toContain("사진에 담긴 것:");
@@ -453,6 +476,7 @@ describe("011 — 사진을 읽는다", () => {
     expect(result).toEqual({ kind: "vision-failed", reason: "failed" });
   });
 
+  // 사진 통로를 **주지 않는다** — 그것이 이 테스트의 전제다(시뮬레이터·웹).
   it("사진을 읽을 수단이 없으면 여전히 not-implemented다", async () => {
     const backend = createOnDeviceBackend(async () => ({}), goodEngine());
     const result = await backend.generate(requestFor(richDay("2026-08-12"), "quick"));
@@ -469,16 +493,9 @@ describe("011 — 사진을 읽는다", () => {
       fakeVision(quick),
     ).generate(requestFor(richDay("2026-08-12"), "quick"));
 
-    const detailed: string[] = [];
-    await createOnDeviceBackend(
-      async () => ({}),
-      goodEngine(),
-      180_000,
-      fakeVision(detailed),
-    ).generate(requestFor(richDay("2026-08-12"), "detailed"));
-
+    // 042 — 깊이가 하나뿐이라 「깊이마다 다르게 연다」는 비교 대상이 없다.
+    // 남는 계약은 **연다면 그 하나로 연다**이다.
     expect(quick).toContain("vision:load:quick");
-    expect(detailed).toContain("vision:load:detailed");
   });
 
   // FR-009 — 그만두면 거기까지 읽은 것을 버린다.
@@ -567,7 +584,7 @@ describe("015 — onStage 진행 신호", () => {
       async stop() {},
       async unload() {},
     };
-    const backend = createOnDeviceBackend(async () => ({}), engine);
+    const backend = createOnDeviceBackend(async () => ({}), engine, 180_000, anyVision());
 
     await backend.generate(requestFor(), (stage) => stages.push(stage));
 
@@ -575,7 +592,7 @@ describe("015 — onStage 진행 신호", () => {
   });
 
   it("onStage를 안 넘겨도 기존 성공 경로가 그대로 동작한다 (옵셔널 확장)", async () => {
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
     const result = await backend.generate(requestFor());
 
@@ -673,7 +690,7 @@ describe("016 — onStage 모델 로드 신호", () => {
       async stop() {},
       async unload() {},
     };
-    const backend = createOnDeviceBackend(async () => ({}), engine);
+    const backend = createOnDeviceBackend(async () => ({}), engine, 180_000, anyVision());
 
     await backend.generate(requestFor(), (stage, branch) => signals.push([stage, branch]));
 
@@ -682,7 +699,7 @@ describe("016 — onStage 모델 로드 신호", () => {
 
   it("로드 성공(warm: false)이면 그 직후 onStage가 ('load', 'cold')로 불린다", async () => {
     const signals: Signal[] = [];
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
     await backend.generate(requestFor(), (stage, branch) => signals.push([stage, branch]));
 
@@ -703,7 +720,7 @@ describe("016 — onStage 모델 로드 신호", () => {
       async stop() {},
       async unload() {},
     };
-    const backend = createOnDeviceBackend(async () => ({}), engine);
+    const backend = createOnDeviceBackend(async () => ({}), engine, 180_000, anyVision());
 
     await backend.generate(requestFor(), (stage, branch) => signals.push([stage, branch]));
 
@@ -724,7 +741,7 @@ describe("016 — onStage 모델 로드 신호", () => {
       async stop() {},
       async unload() {},
     };
-    const backend = createOnDeviceBackend(async () => ({}), engine);
+    const backend = createOnDeviceBackend(async () => ({}), engine, 180_000, anyVision());
 
     const result = await backend.generate(requestFor(), (stage, branch) =>
       signals.push([stage, branch]),
@@ -738,7 +755,7 @@ describe("016 — onStage 모델 로드 신호", () => {
   });
 
   it("onStage를 안 넘겨도 로드 경로가 그대로 동작한다 (옵셔널 확장)", async () => {
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
     const result = await backend.generate(requestFor());
 
@@ -777,9 +794,13 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
         unloaded = true;
       },
     };
-    const backend = createOnDeviceBackend(async () => ({}), engine);
+    const backend = createOnDeviceBackend(async () => ({}), engine, 180_000, anyVision());
 
-    const generatePromise = backend.generate(requestFor(), (stage, branch) =>
+    // ★ 042 — **사진이 없는 하루를 쓴다.** 사진이 있으면 취소가 캡션 단계에서 먼저
+    // 걸려 `vision-failed`로 끝나고, 캐릭터 모델은 애초에 열리지 않아 unload할 것도
+    // 없다(그것은 결함이 아니라 정상이다). 이 테스트가 잠그는 것은 **캐릭터 모델
+    // 로드 도중의 취소**이므로 캡션 단계를 지나가게 둔다.
+    const generatePromise = backend.generate(requestFor(emptyDay("2026-08-12")), (stage, branch) =>
       signals.push([stage, branch]),
     );
     // 로드 시작 직후, 완료되기 전에 그만두기를 누른 것을 흉내낸다.
@@ -795,7 +816,7 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
 
   it("취소하지 않으면 기존 시나리오와 동일하게 동작한다 (회귀 확인)", async () => {
     const signals: [string, string | undefined][] = [];
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
     const result = await backend.generate(requestFor(), (stage, branch) =>
       signals.push([stage, branch]),
@@ -890,14 +911,35 @@ describe("016 — 사진 보기 갈래(많음/보통) 신호", () => {
     expect(signals).not.toContainEqual(["vision", "many"]);
   });
 
-  it("사진이 0장이거나 vision이 꺼져 있으면 vision 신호 자체가 없다 (015 계약 유지)", async () => {
+  /**
+   * ★ 042 — 이 테스트의 전제 절반이 사라졌다.
+   *
+   * 옛 이름은 「사진이 0장이거나 **vision이 꺼져 있으면**」이었고, 실제로는 사진이
+   * **3장 있는** 하루에 `vision: "none"`을 줘서 신호가 없는 것을 확인했다. 끄는 길이
+   * 사라졌으므로(헌법 v1.7.0 MUST NOT) 그 절반은 성립하지 않는다.
+   *
+   * **남는 절반이 FR-002다** — 볼 것이 없으면 열지 않는다. 그것만 확인한다.
+   */
+  it("사진이 0장이면 vision 신호 자체가 없다 (015 계약 유지, 042 FR-002)", async () => {
     const signals: [string, string | undefined][] = [];
-    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, fakeVision());
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
 
-    await backend.generate(requestFor(dayWithPhotos(3), "none"), (stage, branch) =>
+    await backend.generate(requestFor(dayWithPhotos(0), "quick"), (stage, branch) =>
       signals.push([stage, branch]),
     );
 
     expect(signals.filter(([s]) => s === "vision")).toHaveLength(0);
+  });
+
+  // 042 FR-001 — 반대 갈래: 사진이 있으면 **반드시** 본다. 설정으로 끌 수 없다.
+  it("★ 042 — 사진이 있으면 vision 신호가 반드시 온다 (FR-001)", async () => {
+    const signals: [string, string | undefined][] = [];
+    const backend = createOnDeviceBackend(async () => ({}), goodEngine(), 180_000, anyVision());
+
+    await backend.generate(requestFor(dayWithPhotos(3), "quick"), (stage, branch) =>
+      signals.push([stage, branch]),
+    );
+
+    expect(signals.filter(([s]) => s === "vision").length).toBeGreaterThan(0);
   });
 });
