@@ -1009,10 +1009,39 @@ findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지�
   다음 실기기 세션(027 US1·US2, 로드맵 14·17번)은 `npx expo run:android`로
   dev 빌드 재설치 + 모델 재배치부터 시작해야 한다(`run-as`·개발자 탭 필요).
   `a1.bin`(quiet)만 백업돼 있다.
-- **남은 것**: US1(배터리 예외 소크, SC-001, 15분+ 주기)·US2(무예외 24h
-  소크, SC-002, 비동기). 024 `findings.md` §2 표의 두 소크 행이 이것을
-  기다린다. 로드맵 14·17번 세션과 함께.
-- 상세: `specs/027-024-residual-verification/` (`findings.md` §3·§4).
+- **US1 — 배터리 예외 라운드 소크**(SC-001, **충족**, 2026-09-14 SM-S901N):
+  유효 라운드 1회에서 목표 시각(12:00) → 발화 **12:12:33**(+13분) → 완주
+  12:13:54(81초, `writingMs` 69.4초) → `2026-09-14.json` 저장·완료 알림.
+  019 표본(10분·32분)과 같은 대역. 표본 1회라 SHOULD(3회 과반 ≤40분)는 미충족.
+- **★ 소크 라운드를 무효로 만드는 조건이 둘이다 — 실기기 3라운드로 분리했다.**
+  이것이 이 세션의 진짜 수확이며, 다음 소크에서 같은 함정을 반복하지 않게 한다.
+  1. **Doze가 깨진다**(019 §7 — 화면이 켜지면 잡 억제 조건이 바뀐다).
+  2. **★ 앱이 전경으로 돌아오면 태스크가 아예 실행되지 않는다.**
+     `BackgroundTaskScheduler.runTasks()`가 `inForeground == true`면
+     `runTasks: App is in the foreground`만 찍고 재예약한다
+     (`BackgroundTaskScheduler.kt:221-228` — 전경에서 무거운 작업을 돌리지
+     않으려는 **설계**다). 그 플래그는 `BackgroundTaskModule.kt:48-54`의
+     `OnActivityEntersForeground`/`Background`가 세우며 **Activity의
+     start/stop에 반응한다 — 화면 on/off가 아니다.**
+     - **화면을 끄는 것만으로는 부족하다.** 전원 버튼을 눌러 화면이 꺼져도
+       `wm_on_stop_called`이 뒤따라야 `inForeground = false`가 된다.
+     - **`dumpsys activity`의 `ResumedActivity`를 판정에 쓰지 않는다** —
+       화면이 꺼진 뒤에도 스테일하게 그 앱을 가리키고, 프로세스도
+       `TPSL(top-sleeping)`로 남는다. **라이프사이클 로그가 유일한 신호다**
+       (`wm_on_stop_called` 뒤에 `wm_on_resume_called`이 없어야 유효).
+- **★ `"skipped"`는 로그상 정상 완주와 구분되지 않는다.** `runAutoDiaryTask`는
+  `ran`/`skipped`/`failed`를 **로그로 남기지 않고**(원칙 IV — 검증 전용 로그
+  모듈을 만들지 않는다), `"skipped"`도 설계상 `Worker result SUCCESS`로
+  매핑된다(020 B6). 첫 라운드가 `selected-character.json` 부재로 조용히
+  `"skipped"`됐고(75ms 완주·일기 없음으로만 드러남), **소크 판정 시
+  `files/diary/`를 반드시 함께 본다.**
+- **US2 — 무예외 24h 소크**(SC-002): **접었다**(2026-09-14, 저장소 소유자
+  결정). 24시간 이상 기기를 사실상 못 쓰는 대가이고, 019가 같은 조건을 이미
+  실측했다(15분 등록 → 실제 19시간 33분 간격, 약 78배 억제. 억제 주체는 앱이
+  아니라 OS). **SC-002는 미판정으로 남는다** — 019 값은 다른 세션 것이라
+  대신 채우지 않았다(원칙 V). 되살리는 절차는 027 `findings.md` §2에 있다.
+- 상세: `specs/027-024-residual-verification/`
+  (`findings.md` §1·§2·§3·§4).
 
 ### 037 — 로스터를 검증된 하나로 (2026-09-09)
 

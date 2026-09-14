@@ -17,12 +17,27 @@
 >   - **T028·T029** 완료(기기 없는 게이트·코드 대조 0줄).
 >   - **T031·T032 부분** — 024 `findings.md` §2·§11 + AGENTS.md 027 절에
 >     US3·US4분 반영 완료. 배터리 소크 문단만 US1·US2 대기.
-> **남은 것 (US1·US2 세션)** — T007(합성 하루), US1(T010~T013 배터리 예외
-> 소크 — 15분+ 주기), US2(T014~T018 무예외 24h 소크 — **비동기**), T031·T032
-> 소크 문단 갱신, T033 최종 커밋. SM-S901N, 로드맵 14·17번 세션과 함께.
-> **⚠️ 실기기가 release 빌드로 바뀜** — dev 빌드 재설치(`npx expo
-> run:android`) + 모델 재배치부터(`a1.bin`만 백업됨). `findings.md` "실기기
-> 상태 정리 메모" 참조.
+> **진행 상태 추가(2026-09-14, SM-S901N dev debug)** — **스펙 종결.**
+> - ✅ **US1 완료** (T010~T013) — 배터리 예외 라운드 소크. 유효 라운드 1회,
+>   목표 12:00 → 발화 12:12:33(**+13분**) → 완주 81초 → `2026-09-14.json`
+>   저장·알림. **SC-001 충족.** 표본 1회라 SHOULD(3회 과반 ≤40분)는 미충족.
+> - ⛔ **US2 접음** (T014~T018) — 무예외 24h 소크. 저장소 소유자 결정
+>   (24시간 기기 사용 포기가 대가, 019가 같은 조건 실측). **SC-002는
+>   미판정으로 남는다** — 019 값을 대신 쓰지 않는다(원칙 V).
+> - ✅ **T031·T032 완료** — 024 `findings.md` §2 + AGENTS.md 027 절에
+>   소크 결과 반영.
+> - **T007 미수행** — 합성 하루 없이도 US1이 성립했다(사진 0장인 하루로
+>   생성). 필요 없어졌다.
+> - **★ 이 세션의 진짜 수확은 무효화 조건 둘의 분리다** — (1) Doze가 깨진다,
+>   (2) **앱이 전경으로 돌아오면 태스크가 아예 실행되지 않는다**(화면 on/off가
+>   아니라 Activity start/stop에 반응). 라운드 3회 중 2회가 각각 다른 이유로
+>   무효였고, 그 과정에서 **`"skipped"`가 `Worker result SUCCESS`로 매핑돼
+>   로그만으론 정상 완주와 구분되지 않는다**는 것도 드러났다.
+> - **코드 변경 0줄** — 이 스펙은 끝까지 측정만 했다.
+> **⚠️ 실기기 상태(2026-09-14 종료 시)** — dev debug 빌드, 모델 `a1`·`v1`·`v2`
+> 배치됨. **자동 생성 ON(목표 12시)·배터리 예외 등재·작성자 금동이를 그대로
+> 둔다**(저장소 소유자가 계속 쓰기로 함) — 다음 세션이 "왜 켜져 있지"로
+> 오해하지 않도록 남긴다.
 
 **Input**: Design documents from `/specs/027-024-residual-verification/`
 
@@ -144,7 +159,7 @@ findings 뼈대 준비.
 `BackgroundTaskConsumer: Executing task 'alpharium-auto-diary'` 시각 수집 →
 `delayFromTargetMin` 기록. 다른 US에 의존하지 않는다.
 
-- [ ] T010 [US1] quickstart §1 절차 1~4를 수행한다 — `deviceidle whitelist
+- [X] T010 [US1] quickstart §1 절차 1~4를 수행한다 — `deviceidle whitelist
   +com.anonymous.alpharium`, `am get-standby-bucket` → `5` 확인,
   `dumpsys jobscheduler | grep -A30 alpharium` → `Minimum latency:
   +14m59s...` 확인, 자동 생성 ON + 목표 시각, `KEYCODE_POWER` →
@@ -153,15 +168,15 @@ findings 뼈대 준비.
   Executing task 'alpharium-auto-diary'`를 제안하나 더 이른 신호가 보이면
   그것으로 정하고 `findings.md`에 grep 문자열을 못박는다(이후 T011·T015·T016이
   같은 문자열을 쓴다).
-- [ ] T011 [US1] quickstart §1 절차 5~6을 수행한다 — 15분+ 주기로
+- [X] T011 [US1] quickstart §1 절차 5~6을 수행한다 — 15분+ 주기로
   `adb logcat -d -v time -b all`을 스크래치에 덤프하며 `task-entered` 대용
   신호 시각을 모은다. 최소 1회, SHOULD 3회(각 시도 후 목표 시각을 다음 시로
   옮기거나 다음 콜백 대기).
-- [ ] T012 [US1] contracts BS2로 판정한다 — 유효한 모든 라운드에서
+- [X] T012 [US1] contracts BS2로 판정한다 — 유효한 모든 라운드에서
   `delayFromTargetMin <= 60`(MUST). 라운드 `>= 3`이면 과반 `<= 40` 여부,
   `< 3`이면 원시값 + "best-effort, 표본 N회" 라벨(019 표본 2회 10·32분과
   대조). `screenTouchedDuringRound: true`인 라운드는 무효 처리하고 다시.
-- [ ] T013 [US1] 024 `findings.md` §2 표 `batteryException: true` 행을
+- [X] T013 [US1] 024 `findings.md` §2 표 `batteryException: true` 행을
   채운다 — `targetHour`·`triggerEnteredAt`·`delayFromTargetMin`·
   `standbyBucket: 5`·`minLatencyReported`·`screenTouchedDuringRound`·`notes`
   (data-model §1). SC-001 판정(충족/실패)을 명시.
@@ -180,26 +195,26 @@ findings 뼈대 준비.
 `logcat -d -b all` 덤프 → 24시간+ 뒤 `task-entered` 흔적. **비동기** — 세션
 안에서 "시작"만.
 
-- [ ] T014 [US2] quickstart §2 "시작 절차"를 수행한다 — `deviceidle
+- [~] T014 [US2] **(접음 — 2026-09-14 저장소 소유자 결정. SC-002 미판정.)** quickstart §2 "시작 절차"를 수행한다 — `deviceidle
   whitelist -com.anonymous.alpharium`, `am get-standby-bucket` → `10` 이상
   확인, 자동 생성 ON + 목표 시각, `roundStartedAt` 기록, `KEYCODE_POWER` →
   `deviceLocked=1`. **이후 24시간+ 화면 조작 금지, 조회는 `logcat -d`만**
   (contracts BS3, 019 §6a·§7).
-- [ ] T015 [US2] 방치 중 2~4시간마다 `adb logcat -d -b all > dump_<ts>.txt`로
+- [~] T015 [US2] **(접음 — 2026-09-14 저장소 소유자 결정. SC-002 미판정.)** 방치 중 2~4시간마다 `adb logcat -d -b all > dump_<ts>.txt`로
   버퍼를 스크래치에 보존한다(링 버퍼 넘침 대비). **세션이 끝나도 기기는
   방치 상태 유지** — 다음 접속 때 이어받는다.
-- [ ] T016 [US2] (24시간+ 뒤, 세션 밖 후속 — **`/speckit-implement`는 이
+- [~] T016 [US2] **(접음 — 2026-09-14 저장소 소유자 결정. SC-002 미판정.)** (24시간+ 뒤, 세션 밖 후속 — **`/speckit-implement`는 이
   태스크를 "차단됨: 24h 경과 대기"로 두고 다음 세션에서 이어받는다**)
   quickstart §2 "확인 절차"를 수행한다 — 쌓인 덤프에서 `task-entered` 대용
   신호 흔적을 찾아 `observedHours`·`attemptCount` 계산. `dumpsys jobscheduler`의
   `Minimum latency`가 15분 전달됐는지(억제 원인이 OS). 세션이 24시간 창을
   못 채우면 T017의 "부분 판정" 경로로 간다.
-- [ ] T017 [US2] contracts BS4로 판정한다 — `observedHours >= 24` 안에
+- [~] T017 [US2] **(접음 — 2026-09-14 저장소 소유자 결정. SC-002 미판정.)** contracts BS4로 판정한다 — `observedHours >= 24` 안에
   `attemptCount >= 1`이면 SC-002 충족. `< 24`면 `{ observedHours,
   attemptCount }` 원시값 + "부분 판정 — N시간 관측 후 M회" 라벨(024
   Clarifications 허용). `Minimum latency` 15분 확인은 `observedHours`와
   무관하게 항상 기록.
-- [ ] T018 [US2] 024 `findings.md` §2 표 `batteryException: false` 행을
+- [~] T018 [US2] **(접음 — 2026-09-14 저장소 소유자 결정. SC-002 미판정.)** 024 `findings.md` §2 표 `batteryException: false` 행을
   채운다 — `standbyBucket`(10+)·`observedHours`·`attemptCount`·
   `minLatencyReported`·`screenTouchedDuringRound: false`·`notes`
   (data-model §1). SC-002 판정(충족/부분 판정)을 명시.
@@ -299,18 +314,23 @@ verify` → Metro 없이 설치 → 설정 탭 진입 잡 등록 확인 → 배�
   0줄(T025 미발동)이고 024 §7이 020·021·023 흐름을 이미 돌렸다. 새 실패가
   날 소스 변경이 없다. (US1·US2 세션에서 dev 빌드 재설치 후 형식적으로
   한 번 돌리는 것은 무방하나 판정에 불필요.)
-- [~] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7). **US3·US4분
+- [X] T031 024 `findings.md`를 갱신한다(FR-011, quickstart §7). **US3·US4분
   완료** (2026-09-01) — §2 절에 삼성 One UI 화면 경로(027 US3) 기록 + "이관"
   포인터, §11에 "잔여 위험 닫힘" 절(027 US4) 추가, 상단 배너·"남은 것"
   목록에서 삼성 화면·release 헤드리스 두 줄 해소 표기, 배터리 소크 두 줄은
-  "027로 이관"으로. **남은 부분** — §2 표의 `batteryException: true`/`false`
-  두 행(027 US1·US2 대기).
-- [~] T032 AGENTS.md에 027 절 추가(FR-010, quickstart §7). **US3·US4분
+  "027로 이관"으로. **소크 부분 완료** (2026-09-14) — §2 표의 두 행을
+  US1 유효 라운드(13분)와 US2 접음으로 채우고, MUST 판정에서 SC-003을
+  충족으로, SC-002를 "미판정으로 남긴다"로 확정. 상단 배너와 "이관" 문단도
+  종결 표기. **무효화 조건 둘**(Doze / 전경 복귀)을 §2에 추가.
+- [X] T032 AGENTS.md에 027 절 추가(FR-010, quickstart §7). **US3·US4분
   완료** (2026-09-01) — 025 절 뒤에 "### 027 —" 절 신규: minify OFF 발견,
   US3 삼성 One UI 4탭 경로, US4 release 헤드리스 확인(`No task registered`
   부재 + `Worker result SUCCESS`, 코드 0줄), Metro 함정 재확인, 실기기
-  상태 변경, 남은 US1·US2. **남은 부분** — US1·US2 판정 후 그 문단 갱신.
-- [ ] T033 `git branch --show-current`로 `027-024-residual-verification`
+  상태 변경, 남은 US1·US2. **소크 부분 완료** (2026-09-14) — "남은 것"
+  문단을 US1 충족(+13분)·US2 접음으로 교체하고, **소크 무효화 조건 둘**과
+  **`"skipped"`가 `Worker result SUCCESS`와 구분되지 않는다**는 실측 규칙을
+  추가했다(다음 소크 세션이 같은 함정을 반복하지 않게).
+- [X] T033 `git branch --show-current`로 `027-024-residual-verification`
   브랜치임을 확인한 뒤 커밋한다 — 한국어 메시지(헌법 「개발 방식」),
   `main` 직접 커밋 금지(`.githooks/pre-commit`이 막음). 기본 경로면
   "027: 실측 마무리 — 배터리 소크·삼성 One UI 화면·release 헤드리스 확인
