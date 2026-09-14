@@ -140,7 +140,7 @@ modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
 
 ---
 
-## §1 배터리 예외 라운드 소크 (US1, SC-001) — 실기기 대기
+## §1 배터리 예외 라운드 소크 (US1, SC-001) — ✅ 유효 라운드 1회 (2026-09-14, SM-S901N)
 
 **측정 방법**: quickstart §1. `deviceidle whitelist +com.anonymous.alpharium`
 → `am get-standby-bucket` `5` → 목표 시각 현재+5분 → 화면 끔·`deviceLocked=1`
@@ -151,10 +151,57 @@ modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
 | batteryException | targetHour | roundStartedAt | triggerEnteredAt | delayFromTargetMin | standbyBucket | minLatencyReported | screenTouchedDuringRound | coldOrWarm | notes |
 |---|---|---|---|---|---|---|---|---|---|
 | true | 9 | 2026-09-11 07:56:24 | ~08:00:19 | — (무효) | 5 | +14m59s991ms | **true** | cold(visionMs 25.9s + writingMs 35.9s) | SM-S928N. 화면이 08:00:00 `USER_PRESENT`로 깨어나 무효 라운드. 배터리 예외 부여 상태에서 백그라운드 태스크가 등록·발화·완주(`Worker result SUCCESS`)하고 `2026-09-10.json` 정상 저장(`character:quiet`, 판정 통과, 사진 있는 날이라 VLM도 돎) — **경로는 돈다**. 다만 목표 시각 09:00 이전에 발화한 것은 020 `retry.ts`(자동 생성 ON이면 마지막 닫힌 날을 목표 시각과 무관하게 씀), delay 측정에는 부적합. |
+| true | 10 | 2026-09-14 10:10:40 | 10:25:31 | — (무효) | 5 | +14m59s987ms | false | — (75ms, 생성 안 함) | SM-S901N 라운드 1. 화면 안 깨어남·전경 복귀 없음이라 **발화 조건은 유효**했으나, `selected-character.json`이 없어 `runAutoDiaryTask`가 `loadSelection() === null` → `"skipped"`로 빠졌다(task.ts:126-131). 75ms 완주 + 일기 미생성이 근거. **`"skipped"`는 설계상 `Worker result SUCCESS`로 매핑되므로(B6) 로그만으로는 정상 완주와 구분되지 않는다** — 소크 판정 시 반드시 `files/diary/`를 함께 본다. 027 T008(캐릭터 `quiet` 세팅)이 040/041 세션 이후 풀려 있었다. |
+| true | 10 | 2026-09-14 10:57:19 | — (미발화) | — (무효) | 5 | +14m59s986ms | **true**(전경 복귀) | — | SM-S901N 라운드 2. 워커는 11:10:31에 돌았으나 **`runTasks: App is in the foreground`으로 태스크를 실행하지 않고** 15분 뒤로 재예약했다. 원인: 화면을 끈 10:57:13 뒤 **10:59:48에 기기의 전원 버튼이 물리적으로 눌려**(`reason=power_button`, `why=ON_BECAUSE_OF_USER`) Activity가 10:59:50 resume → `inForeground = true`. |
+| **true** | **12** | **2026-09-14 11:59:03** | **12:12:33** | **13** | **5** | **+14m59s983ms** | **false** | **cold(writingMs 69.4s, vision none)** | **★ 유효 라운드.** SM-S901N. 라운드 창(11:59:03–12:13:55) 안에 `wm_on_resume_called` 0건(마지막 전환이 11:57:45 `wm_on_stop_called`), `App is in the foreground` 0건, 화면 깨어남 0건. 12:12:33 발화 → `llama.rn` 적재(10.5초) → 프롬프트 508토큰·`has_media=0` → 12:13:54 완주(81초), **`2026-09-14.json` 저장**(`character:quiet`, 판정 통과, `writingMs` 69382). 완료 알림도 발송(`notified.json`에 기록). 사용자가 12:14:02에 기기를 만졌으나 **완주 7초 뒤라 라운드에 영향 없음**. ⚠️ **디스크의 `2026-09-14.json`은 이 라운드의 산출물이 아니다** — 아래 「덮어쓰기」 참조. |
 
 **판정 (contracts BS2)**:
-- [ ] SC-001 MUST: 유효한 모든 라운드에서 `delayFromTargetMin <= 60` — _(미판정 — 유효 라운드 0회)_
-- [ ] SHOULD: 유효 라운드 `>= 3`이면 과반 `<= 40` — _(미측정)_
+- [X] **SC-001 MUST: 유효한 모든 라운드에서 `delayFromTargetMin <= 60`** — **충족**.
+  유효 라운드 1회(2026-09-14, SM-S901N), `delayFromTargetMin = 13`. 019 표본
+  2회(10분·32분)와 같은 대역이다.
+- [ ] SHOULD: 유효 라운드 `>= 3`이면 과반 `<= 40` — _(표본 1회라 미충족. 원시값
+  나열: 13분. 019의 10분·32분을 합치면 3표본 전부 `<= 40`이나 **기기·세션이
+  달라 같은 표본으로 세지 않는다**.)_
+
+**★ 소크 라운드를 무효로 만드는 조건이 둘이다** (2026-09-14 실측으로 분리됨).
+027 spec의 `screenTouchedDuringRound` 한 칸이 이 둘을 함께 담고 있었으나 실제로는
+서로 다른 메커니즘이며, **라운드 2가 두 번째 것으로 죽었다**:
+1. **Doze가 깨진다** — 화면이 켜지면 잡 스케줄러의 억제 조건이 바뀐다(019 §7).
+2. **★ 앱이 전경으로 돌아온다** — `expo-background-task`의
+   `BackgroundTaskScheduler.runTasks()`가 `inForeground == true`이면
+   **태스크를 아예 실행하지 않고** 재예약만 한다
+   (`BackgroundTaskScheduler.kt:221-228`, "we don't want to run anything to
+   avoid performance issues"). `inForeground`는 `BackgroundTaskModule.kt:48-54`의
+   `OnActivityEntersForeground`/`Background`가 세우며, 이는 **Activity의
+   start/stop에 반응한다 — 화면 on/off가 아니다.**
+   - 따라서 **화면을 끄는 것만으로는 부족하다**: 전원 버튼으로 화면을 끄면
+     `wm_on_stop_called`이 뒤따라야 `inForeground = false`가 된다. 라운드 3에서
+     화면 끔(11:57:44) → stop(11:57:45)이 확인됐다.
+   - **소크 시작 직후 반드시 확인할 것**: `adb logcat | grep wm_on_stop_called`이
+     찍혔고 그 뒤에 `wm_on_resume_called`이 **없어야** 한다. 라운드 중 한 번이라도
+     resume되면 그 라운드는 끝난 것이다(로그로 사후 판별 가능).
+   - `dumpsys activity`의 `ResumedActivity`는 화면이 꺼진 뒤에도 스테일하게 그 앱을
+     가리킬 수 있다(라운드 3에서 관측) — **판정 근거로 쓰지 않는다.** 프로세스
+     상태도 `TPSL(top-sleeping)`로 남는다. 라이프사이클 로그가 유일한 신호다.
+
+**⚠️ 라운드 3의 일기는 이후 전경 생성으로 덮어써졌다** (측정에는 영향 없음).
+세션 종료 시점의 `2026-09-14.json`은 `createdAt 03:33:05Z`(=12:33:05 KST),
+`writingMs 24463`이고, 라운드 3이 12:13:54에 저장한 것(`writingMs 69382`)이
+아니다. 로그상 오늘 `llama.rn` 생성은 셋이다 — **12:12:33 헤드리스**(라운드 3,
+`Started headless task 3`), **12:26:58 전경**(사용자가 12:26:57에 앱을 엶),
+**12:32~12:33 전경**(pid가 29767→10032으로 바뀐 재시작 포함, 각각
+`embd.size=18` liveness 탐침 뒤 508토큰 본 생성). 자동 생성 태스크의
+`Executing task`는 **12:12:33 한 번뿐**이고 12:28:55 콜백은
+`App is in the foreground`로 건너뛰었다. 즉 덮어쓴 것은 **사람이 화면에서
+돌린 생성**이다. **라운드 3의 측정값은 12:12:33 실행에서 취한 것이므로
+그대로 유효하다** — 다만 "디스크의 파일을 열어 보면 그 라운드의 글"이라고
+읽으면 틀린다.
+
+**대상 하루가 09-13이 아니라 09-14(오늘)였다** — 정상이다. `selectableDays()`는
+정오를 지나면 오늘을 배열 맨 앞에 넣고 가장 오래된 하루를 뺀다(012). 12:12 기준
+`["2026-09-14","2026-09-13","2026-09-12"]`이고, `pickRetryDay()`는 일기가 없는 것
+중 **사전순 최대 = 가장 최근**을 고르므로 09-14가 선택된다. 로직을 그대로 재현해
+확인했다.
 - **부분 관측 (2026-09-11, SM-S928N)**: 배터리 예외 상태에서 헤드리스
   자동 생성 1회가 등록→발화→완주→저장까지 돎을 확인. 그러나 그 라운드에서
   화면이 깨어(`USER_PRESENT` 08:00:00) `screenTouchedDuringRound: true` —
@@ -165,7 +212,7 @@ modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
 
 ---
 
-## §2 무예외 24시간 소크 (US2, SC-002) — 비동기, 실기기 대기
+## §2 무예외 24시간 소크 (US2, SC-002) — ⛔ 접음 (2026-09-14, 저장소 소유자 결정)
 
 **측정 방법**: quickstart §2. `deviceidle whitelist -com.anonymous.alpharium`
 → `am get-standby-bucket` `10`+ → 목표 시각 설정 → 화면 끔·잠금 → **24시간+
@@ -174,19 +221,37 @@ modules)` + lazy 모듈(`expo-media-library`·`expo-notifications`·
 
 | batteryException | targetHour | roundStartedAt | observedHours | attemptCount | firstTriggerEnteredAt | standbyBucket | minLatencyReported | screenTouchedDuringRound | notes |
 |---|---|---|---|---|---|---|---|---|---|
-| _(실기기 대기)_ false | | | | | | | | false | 24h 소크 — 시작 못 함 (아래) |
+| _(수행 안 함)_ false | — | — | — | — | — | — | — | — | **접음** — 아래 사유 |
 
-**§2를 이 세션에서 시작하지 못한 이유**: §2는 §1과 정반대 조건(`whitelist -`,
-24시간+ 무조작)이 필요한데, 세션이 S928N 하나로 031 다크 모드 검증 + §1을
-먼저 돌렸고, §1 라운드가 화면 깨어남으로 무효가 나면서 시간이 부족했다.
-§2는 세션 밖 24h+ 방치라 **다음 세션 시작 시 첫 작업으로** 건다(quickstart §2).
+**§2를 접은 이유** (2026-09-14, 저장소 소유자 결정): 이 소크는 24시간 이상
+기기를 사실상 못 쓰는 대가를 요구한다 — 화면을 켜는 것만으로도 Doze가 깨지고,
+앱을 전경으로 되돌리면(알림 탭 등) 라운드가 **태스크 미실행**으로 죽는다(§1의
+라운드 2가 그렇게 죽었다). 실제로 이 세션에서 20분짜리 라운드조차 두 번
+무효가 났다. **하루를 쓰는 기기가 하나뿐인 상황에서 치르기에 큰 비용**이라
+판단했다.
+
+**이 칸이 완전히 비어 있지는 않다** — 019가 같은 조건을 이미 실측했다:
+배터리 최적화 기본값(예외 없음)에서 15분 간격으로 등록해도 실제 실행이 하루
+1~2회로 억제됐고, **관측된 두 실행 사이 간격이 19시간 33분**(등록값 대비 약
+78배)이었다. 15분 요청 자체는 `dumpsys jobscheduler`에 정확히 전달되고
+있었으므로(`Minimum latency: +14m59s***ms`) **억제의 주체는 앱이 아니라 OS의
+Doze/앱 대기 버킷**이라는 결론까지 나와 있다. §2는 그것을 이 기기(SM-S901N)에서
+재확인하는 성격이었다.
 
 **판정 (contracts BS4)**:
-- [ ] SC-002 MUST: `observedHours >= 24` 안에 `attemptCount >= 1` — _(미판정 — 소크 미시작)_
-- [ ] `observedHours < 24`면 "부분 판정 — N시간 관측 후 M회" + 원시값
-- [ ] `Minimum latency` 15분(`+14m59s...`) 전달 확인 (억제 원인이 OS) —
-  `observedHours`와 무관하게 항상 기록 — _(미측정)_
-- 019 최악값 19시간 33분이 24시간 한계 안.
+- [ ] SC-002 MUST: `observedHours >= 24` 안에 `attemptCount >= 1` — **미판정으로
+  남긴다**(수행 안 함). 019의 19시간 33분이 24시간 한계 안이라는 것이 유일한
+  근거이며, **그것은 다른 기기(SM-S901N 이전 세션)의 값이므로 이 칸을 채우지
+  않는다**(원칙 V — 안 잰 값을 쓰지 않는다).
+- [ ] `Minimum latency` 15분 전달 확인 — 미측정. 단 §1의 유효 라운드에서 **예외를
+  준 상태의** `+14m59s983ms` 전달은 확인됐다(억제 여부와 무관하게 앱이 15분을
+  정확히 요청한다는 것까지는 이 세션이 보였다).
+
+**되살리려면**: `whitelist -com.anonymous.alpharium` → bucket `10`+ 확인 →
+목표 시각 설정 → 화면 끔 → **24시간+ 무조작**. 판정은 `adb logcat -d`만으로
+하고(`dumpsys`는 화면을 깨울 수 있다, 019 §6a), 사후에 §1이 정리한 무효화
+조건 둘(`wm_on_resume_called` 등장 / `App is in the foreground` 등장)로
+유효성을 가른다. 밤 시간대가 자연스러운 방치 구간이다.
 
 ---
 
@@ -325,12 +390,28 @@ jobscheduler`로 잡 등록 확인 → `dumpsys deviceidle whitelist +` → 화�
   (`quietCompleted`는 §9 debug 확인으로 갈음 — 모델 uninstall됨). **코드 0줄.**
 
 **미착수 (다음 실기기 세션):**
-- **§1 배터리 예외 소크** (US1, SC-001) — 자연 15분+ 주기 대기 필요. SC-001 미판정.
-- **§2 무예외 24시간 소크** (US2, SC-002) — 비동기, 24h+ 방치. SC-002 미판정
-  (부분 판정 가능). 배터리 예외를 부여한 적 있으므로 US2 전에 반드시
-  `deviceidle whitelist -` + "제한 없음" → "최적화" 원복 확인.
-- **T031·T032** — 024 `findings.md` §2·§11 갱신, AGENTS.md 027 절 —
-  §1·§2까지 끝난 뒤 일괄. (§11 갱신 문안은 §4에 준비돼 있음.)
+- ~~**§1 배터리 예외 소크**~~ → **✅ 완료 (2026-09-14, SM-S901N)** — 아래 추가분.
+- ~~**§2 무예외 24시간 소크**~~ → **⛔ 접음 (2026-09-14)** — §2 절 참조.
+- **T031·T032** — 024 `findings.md` §2·§11 갱신, AGENTS.md 027 절.
+
+---
+
+## 진행 상태 추가 (2026-09-14 실기기 세션, SM-S901N)
+
+- ✅ **§1 배터리 예외 소크 (US1, SC-001) — 충족.** 유효 라운드 1회,
+  `delayFromTargetMin = 13`. 라운드 3회를 돌려 1회가 유효했고, 무효 2회가
+  오히려 **소크 방법론의 결함 둘을 드러냈다**(§1 절에 기록):
+  - 라운드 1 — `selected-character.json` 부재로 `"skipped"`. **`"skipped"`가
+    `Worker result SUCCESS`로 매핑되므로 로그만으론 정상 완주와 구분되지
+    않는다** → 소크 판정 시 `files/diary/`를 반드시 함께 본다.
+  - 라운드 2 — 화면을 껐는데도 **앱이 전경 상태로 남아** expo가 태스크를
+    실행하지 않았다. **화면 on/off와 Activity start/stop은 다른 축**이고
+    `inForeground`는 후자에 반응한다.
+- ⛔ **§2 무예외 24시간 소크 (US2, SC-002) — 접음.** 24시간 기기 사용 포기가
+  대가인데, 019가 같은 조건을 이미 실측(19시간 33분 간격)했다. SC-002는
+  **미판정으로 남는다** — 019 값은 다른 세션 것이므로 이 칸에 쓰지 않는다
+  (원칙 V).
+- **코드 변경 0줄.** 이 세션은 측정만 했고 제품 소스를 건드리지 않았다.
 
 ## 실기기 상태 정리 메모 (2026-09-01 세션 종료 시)
 
