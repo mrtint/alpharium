@@ -193,15 +193,15 @@ description: "Task list for 042 — 사진이 있는 하루는 VLM을 반드시 
 **전제**: SM-S901N / dev debug / 모델 `a1`·`v1`·`v2` 배치됨 / `run-as` 가능.
 **T002의 보존 조건을 지킨다.**
 
-- [ ] T049 `adb shell dumpsys trust | grep deviceLocked`(0), `adb reverse tcp:8081 tcp:8081`, `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client`로 준비한다
-- [ ] T050 D1 — 설정 탭을 끝까지 훑어 「사진 보기」 섹션과 네 선택지가 **없음**을 확인한다. 사진 모델 준비 상태는 **있고** 모델명·크기가 없음을 함께 본다 (FR-005·FR-008, SC-004)
-- [ ] T051 D2 ★ — 사진 있는 하루를 **설정 조작 없이** 쓴다. `adb logcat | grep -iE "has_media"`에서 `has_media=1`, 일기에 사진 분석 소요 시간, 본문이 사진 내용 반영 (FR-001, SC-001)
-- [ ] T052 D3 — 사진 0장인 하루를 쓴다. `has_media` 로그 **없음**, VLM 로드 없음, 소요 시간에 사진 항목 없음, 본문이 사진을 단정하지 않음 (FR-002, SC-002)
-- [ ] T053 D4 — 사진 권한을 회수한 상태로 쓴다(`pm revoke READ_MEDIA_IMAGES`). 「사진 없음」과 **다른 문구**인지 D3과 견준다. **확인 후 `pm grant`로 되돌린다** (FR-003, SC-005). ⚠️ `pm revoke`는 앱 프로세스를 즉시 kill한다(024 실측)
-- [ ] T054 D5 ★★ — 백그라운드 자동 생성이 사진을 보는지 확인한다(개발자 탭 「지금 자동 생성 트리거」 또는 `cmd jobscheduler run -f`). `has_media=1`. **지금은 이 경로가 사진을 한 장도 안 본다** — 이 기능의 실질을 보는 자리다 (FR-004, SC-001)
-- [ ] T055 D6 — 개발자 탭 「지금 생성」으로 사진 있는 하루를 쓴다. `has_media=1`. **지금은 이 버튼도 사진을 안 본다** (FR-004a)
-- [ ] T056 D7 — 이전 버전에 쓴 일기 몇 개를 연다. 전부 정상, 사진 슬라이더·갤러리(025) 회귀 없음 (FR-013, SC-006)
-- [ ] T057 `node scripts/run-device-tests.mjs`로 `photo-vision.yml`(재작성분)·`generate-diary.yml`·`diary-photo-gallery.yml` PASS를 확인한다. **`unified-permission-onboarding.yml`은 제외**(T002)
+- [x] T049 `adb shell dumpsys trust | grep deviceLocked`(0), `adb reverse tcp:8081 tcp:8081`, `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client`로 준비한다
+- [x] T050 D1 — 설정 탭을 끝까지 훑어 「사진 보기」 섹션과 네 선택지가 **없음**을 확인한다. 사진 모델 준비 상태는 **있고** 모델명·크기가 없음을 함께 본다 (FR-005·FR-008, SC-004)
+- [x] T051 D2 ★ — 사진 있는 하루를 **설정 조작 없이** 쓴다. `adb logcat | grep -iE "has_media"`에서 `has_media=1`, 일기에 사진 분석 소요 시간, 본문이 사진 내용 반영 (FR-001, SC-001)
+- [x] T052 D3 — 사진 0장인 하루를 쓴다. `has_media` 로그 **없음**, VLM 로드 없음, 소요 시간에 사진 항목 없음, 본문이 사진을 단정하지 않음 (FR-002, SC-002)
+- [x] T053 D4 — 사진 권한을 회수한 상태로 쓴다(`pm revoke READ_MEDIA_IMAGES`). 「사진 없음」과 **다른 문구**인지 D3과 견준다. **확인 후 `pm grant`로 되돌린다** (FR-003, SC-005). ⚠️ `pm revoke`는 앱 프로세스를 즉시 kill한다(024 실측)
+- [ ] T054 D5 ★★ — 백그라운드 자동 생성이 사진을 보는지 확인한다(개발자 탭 「지금 자동 생성 트리거」 또는 `cmd jobscheduler run -f`). `has_media=1`. **지금은 이 경로가 사진을 한 장도 안 본다** — 이 기능의 실질을 보는 자리다 (FR-004, SC-001) — **미수행(2026-09-14): 목표 12시의 창 `[12,15)` 밖(17시)이라 `decideSchedule`이 `not-near-target`으로 건너뛴다. 개발자 탭 트리거가 `결과: skipped`를 표시했다. `targetHour`는 T002 보존 조건이라 바꾸지 않았다 — 12:00~14:59에 재시도한다**
+- [x] T055 D6 — 개발자 탭 「지금 생성」으로 사진 있는 하루를 쓴다. `has_media=1`. **지금은 이 버튼도 사진을 안 본다** (FR-004a)
+- [x] T056 D7 — 이전 버전에 쓴 일기 몇 개를 연다. 전부 정상, 사진 슬라이더·갤러리(025) 회귀 없음 (FR-013, SC-006)
+- [x] T057 `node scripts/run-device-tests.mjs`로 `photo-vision.yml`(재작성분)·`generate-diary.yml`·`diary-photo-gallery.yml` PASS를 확인한다. **`unified-permission-onboarding.yml`은 제외**(T002) — **수행(2026-09-14): 세 흐름 전부 PASS.** `photo-vision.yml`(재작성분, assert 30개)·`diary-photo-gallery.yml`(025 회귀)·`generate-diary.yml`(exit 0). 실행기 전체(`run-device-tests.mjs`)가 아니라 세 흐름을 개별 실행했다 — `FLOWS`에 `unified-permission-onboarding.yml`(`pm clear`)이 있어 T002 보존 조건과 충돌한다
 
 ---
 
