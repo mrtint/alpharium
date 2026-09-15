@@ -43,7 +43,7 @@ const entry: DiaryEntry = {
 
 const resolveStub = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, vision: "none", geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
 });
 
 async function renderWith(

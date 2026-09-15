@@ -25,14 +25,27 @@ import type {
   RunResult,
 } from "../../src/inference/engine-port";
 import { isGenerationFailure } from "../../src/inference/types";
-import { richDay } from "../../src/signals/fake";
+import { emptyDay, richDay } from "../../src/signals/fake";
 import { FUTURE_CHARACTER } from "../future-character";
 
 const DAY = "2026-08-16";
 const GOOD_KO = "오늘 주인은 어딘가로 나섰다. 사진 세 장이 남았고 나는 그것만 안다.";
 
+/**
+ * 042 — 사진이 없는 하루의 요청.
+ *
+ * 사진이 있으면 캡션이 프롬프트에 더해지므로(그것이 이 기능의 목적이다) 「조립한
+ * 프롬프트가 그대로 `run()`에 가는가」를 글자 단위로 견주려면 **볼 것이 없는 하루**여야
+ * 한다.
+ */
+function requestForEmptyDay(character: Character = "quiet"): DiaryRequest {
+  const result = buildRequest(emptyDay(DAY), character, "quick");
+  if (!result.ok) throw new Error("테스트 준비 실패");
+  return result.request;
+}
+
 function requestFor(character: Character = "quiet"): DiaryRequest {
-  const result = buildRequest(richDay(DAY), character, "none");
+  const result = buildRequest(richDay(DAY), character, "quick");
   if (!result.ok) throw new Error("테스트 준비 실패");
   return result.request;
 }
@@ -94,9 +107,31 @@ function fakeEngine(
   };
 }
 
+/**
+ * 사진 통로 대역.
+ *
+ * **042 — 이제 모든 요청이 사진을 본다.** 통로가 없으면 `not-implemented`로 즉시
+ * 돌아와(원칙 I — 못 하는 것을 못 한다고 말한다) 이 파일이 보려는 **생성 경로**에
+ * 닿지 못한다. 이 파일의 관심사는 엔진 열고 닫기이지 사진이 아니므로, 사진은
+ * 「있다」고만 해 두고 지나간다.
+ */
+const passThroughVision = () => ({
+  engine: {
+    async load() {
+      return { ok: true as const };
+    },
+    async caption() {
+      return { text: "사진 한 장" };
+    },
+    async stop() {},
+    async unload() {},
+  },
+  resolvePath: async (photo: { id: string }) => `/photo/${photo.id}.jpg`,
+});
+
 /** 대역 엔진을 쓰는 온디바이스 어댑터 */
 function backendWith(engine: GenerationEngine, timeoutMs?: number) {
-  return createOnDeviceBackend(async () => ({}), engine, timeoutMs);
+  return createOnDeviceBackend(async () => ({}), engine, timeoutMs, passThroughVision());
 }
 
 describe("E-1 한 번에 하나만 열린다 (FR-008)", () => {
@@ -326,7 +361,11 @@ describe("어댑터가 프롬프트를 그대로 넘긴다", () => {
         return { text: GOOD_KO, ending: { kind: "eos" } };
       },
     });
-    const request = requestFor();
+    // 042 — **사진이 없는 하루를 쓴다.** 사진이 있으면 캡션이 프롬프트에 더해지므로
+    // (그것이 이 기능의 목적이다) `buildPrompt(request)`와 글자 그대로 같을 수 없다.
+    // 이 테스트가 잠그는 것은 「어댑터가 프롬프트를 **그대로** 넘기는가」이지
+    // 「캡션이 안 붙는가」가 아니다.
+    const request = requestForEmptyDay();
     await backendWith(fake.engine).generate(request);
 
     expect(seen).toBe(buildPrompt(request));

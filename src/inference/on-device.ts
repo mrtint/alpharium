@@ -217,8 +217,8 @@ async function readPhotos(
     return { kind: "no-photos" };
   }
 
-  // 깊이는 설정에서 온다. `none`은 위에서 걸러졌다.
-  const depth: VisionDepth = request.vision === "detailed" ? "detailed" : "quick";
+  // 042 — 깊이는 하나뿐이다(헌법 v1.7.0 MUST). 고를 것이 없으므로 설정을 보지 않는다.
+  const depth: VisionDepth = "quick";
 
   const loaded = await vision.engine.load(depth);
   if (!loaded.ok) {
@@ -490,25 +490,32 @@ export function createOnDeviceBackend(
        */
       alreadySeen?: PhotoVision,
     ): Promise<GenerationResult> {
-      // 0. 시각 설정 — 사진을 보겠다고 했는데 보지 않은 일기를 주지 않는다(FR-022).
-      //
-      // **`none`으로 조용히 낮추지 않는다.** 낮추는 한 줄이 들어가면 다음 기능까지 남아
-      // 「본다고 했는데 안 보는」 버그가 된다(001 FR-009c·003 FR-008a와 같은 판단).
-      //
-      // **011이 이 자리를 채웠다.** 사진 읽기를 붙일 수단이 없으면 여전히 거부한다 —
-      // 시뮬레이터·웹에서 네이티브가 없는 경우이며, 그때는 못 한다고 말하는 것이 정직하다.
-      if (request.vision !== "none" && vision === undefined) {
-        return { kind: "not-implemented" };
-      }
-
       // 새 요청이 시작되므로 지난 요청의 그만두기 신호를 물려받지 않는다.
       cancel = { cancelled: false };
 
+      // ★ 042 — **없는 것을 순서대로 말한다**(원칙 I).
+      //
+      // 추론 엔진이 없는 것이 더 근본적인 부재다. 사진 통로 판정을 먼저 두면
+      // 시뮬레이터·웹에서 「네이티브 추론 모듈이 없다」가 「사진을 못 본다」에 가려져
+      // **덜 정확한 이유가 사용자에게 간다.** 041 이전에는 사진 설정이 `none`인 요청이
+      // 이 자리를 그냥 지나쳤기 때문에 순서가 드러나지 않았다 — 「언제나 본다」가 되면서
+      // 비로소 보이게 된 자리다.
       if (engine === undefined) {
         return {
           kind: "backend-unavailable",
           reason: "네이티브 추론 모듈이 없어 생성을 시도하지 않았다",
         };
+      }
+
+      // 사진을 보겠다고 했는데 보지 않은 일기를 주지 않는다(011 FR-022).
+      //
+      // **조용히 낮추지 않는다.** 낮추는 한 줄이 들어가면 다음 기능까지 남아 「본다고
+      // 했는데 안 보는」 버그가 된다(001 FR-009c·003 FR-008a와 같은 판단).
+      //
+      // **042 — 「사진 설정이 `none`이 아니면」 조건이 사라졌다.** 이제 언제나 사진을
+      // 보므로, 볼 수단이 없으면(시뮬레이터·웹) **언제나** 못 한다고 말한다.
+      if (vision === undefined) {
+        return { kind: "not-implemented" };
       }
 
       // ─────────────────────────────────────────────────────────────────────
@@ -532,7 +539,10 @@ export function createOnDeviceBackend(
       // 018 — 화면이 미리 읽어 둔 것이 있으면 다시 읽지 않는다. 이 호출에서는
       // 사진을 읽지 않았으므로 visionMs를 대입하지 않는다(FR-010, 기존 T4
       // 불변식의 자연스러운 결과 — "안 한 일은 0초 걸린 일이 아니다").
-      if (alreadySeen === undefined && request.vision !== "none" && vision !== undefined) {
+      // 042 — 사진 설정 조건이 빠졌다. **「볼 것이 없으면 열지 않는다」는 여기가 아니라
+      // `readPhotos()` 안에 있다**(011) — 그 함수가 `photos` 신호를 보고 0장·권한없음이면
+      // 엔진을 열지 않고 `no-photos`로 즉시 돌아온다. 설정이 사라져도 그 방어는 그대로다.
+      if (alreadySeen === undefined && vision !== undefined) {
         const visionStart = Date.now();
         const outcome = await readPhotos(vision, request, cancel, onStage);
 
@@ -547,7 +557,7 @@ export function createOnDeviceBackend(
         if (outcome.kind === "failed") return { kind: "vision-failed", reason: "failed" };
         if (outcome.kind === "cancelled") return { kind: "vision-failed", reason: "cancelled" };
 
-        // `skipped`·`no-photos`는 실패가 아니다 — 볼 것이 없었을 뿐이며 일기는 나온다.
+        // `no-photos`는 실패가 아니다 — 볼 것이 없었을 뿐이며 일기는 나온다.
         if (outcome.kind === "seen") seen = outcome.vision;
 
         // 017 — **그날 사진이 0장이면 재지 않는다**(contracts/elapsed-time.md

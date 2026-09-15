@@ -21,20 +21,19 @@ import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { Pipeline, PipelineResult } from "../../src/diary/pipeline";
 import { memoryStore } from "../../src/diary/store";
-import type { VisionSetting } from "../../src/diary/types";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 import { REVEAL } from "../../src/ui/theme/tokens";
 
 const resolved: EnvironmentResolution = { ok: true, environment: "dev" };
 
 const resolveQuiet =
-  (over: Partial<{ vision: VisionSetting }> = {}) =>
+  (over: Partial<{ hasPhotos: boolean }> = {}) =>
   (day: string): ResolveOutcome => ({
     kind: "resolved",
     params: {
       character: "quiet",
       day: day as never,
-      vision: over.vision ?? "none",
+      hasPhotos: over.hasPhotos ?? false,
       geocodingEnabled: false,
     },
   });

@@ -56,7 +56,6 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
       },
       listDiaryDays: async () => [] as string[],
       loadCharacter: async () => "quiet" as const,
-      loadVision: async () => "none" as const,
       makePipeline: (() => ({
         ok: true,
         pipeline: { run: pipelineRun },
@@ -80,7 +79,7 @@ describe("B2 — 판정 순서", () => {
     expect(result).toBe("ran");
     expect(pipelineRun).toHaveBeenCalledTimes(1);
     expect(pipelineRun).toHaveBeenCalledWith(
-      expect.objectContaining({ day: "2026-08-27", character: "quiet", vision: "none" }),
+      expect.objectContaining({ day: "2026-08-27", character: "quiet", vision: "quick" }),
     );
   });
 

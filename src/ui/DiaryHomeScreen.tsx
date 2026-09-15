@@ -227,7 +227,10 @@ export function DiaryHomeScreen({
     const { day } = writePromptFor(screen.items, now(), chosenDay);
     const outcome = resolve(day);
     if (outcome.kind !== "resolved") return;
-    if (outcome.params.vision !== "none") return;
+    // 042 — 판별자가 「사진 설정이 none인가」에서 「이 하루에 사진이 있는가」로 바뀌었다.
+    // 설정이 사라져도 **두 갈래는 그대로 갈려야 한다**(FR-011) — 합쳐지면 사진을 미리
+    // 읽지 않거나(느려질 뿐 오류 없음), 캡션 전에 모델을 열어 018 E1이 깨진다.
+    if (outcome.params.hasPhotos) return;
 
     const key = `${outcome.params.character}@${day}`;
     if (preparedFor.current === key) return;
@@ -249,12 +252,12 @@ export function DiaryHomeScreen({
     const { day } = writePromptFor(screen.items, now(), chosenDay);
     const outcome = resolve(day);
     if (outcome.kind !== "resolved") return;
-    if (outcome.params.vision === "none") return;
+    // 042 — 위 1단계와 정확히 반대 갈래다(FR-011·FR-012).
+    if (!outcome.params.hasPhotos) return;
     if (captionRef.current?.day === day) return;
 
     const character = outcome.params.character;
-    const vision = outcome.params.vision;
-    const promise = captionDay(day, character, vision);
+    const promise = captionDay(day, character, "quick");
     captionRef.current = { day, promise };
 
     void promise
@@ -312,7 +315,8 @@ export function DiaryHomeScreen({
             day: params.day,
             now: at,
             character: params.character,
-            vision: params.vision,
+            // 042 — 값이 하나뿐이다. 사진을 볼지는 파이프라인이 그 하루의 신호로 정한다.
+            vision: "quick",
             ...(seenVision !== undefined ? { seen: seenVision } : {}),
             // 035 — 프롬프트의 호칭 줄과 저장될 작성자 이름이 같은 값에서 나온다
             // ("두 개의 진실" 금지). 없으면 코드 안 기본 이름이 쓰인다.

@@ -183,7 +183,7 @@ const resolveQuiet =
   () =>
   (day: string): ResolveOutcome => ({
     kind: "resolved",
-    params: { character: "quiet", day: day as never, vision: "none", geocodingEnabled: false },
+    params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
   });
 
 /** 부를 때까지 끝나지 않는 파이프라인 (diary-home.test.tsx 패턴 재사용). */

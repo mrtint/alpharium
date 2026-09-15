@@ -5,7 +5,6 @@ import {
   resolveGenerationParams,
   type GeocodingPreference,
   type ResolveInput,
-  type VisionPreference,
 } from "../../src/app/resolve-generation";
 import type { Character } from "../../src/diary/types";
 import { FUTURE_CHARACTER } from "../future-character";
@@ -31,7 +30,6 @@ function base(over: Partial<ResolveInput> = {}): ResolveInput {
     chosenDay: DAY,
     photoSignalPresent: false,
     locationPermission: false,
-    visionPreference: "auto",
     geocodingPreference: "auto",
     ...over,
   };
@@ -102,36 +100,30 @@ describe("캐릭터 (R1~R3, C1~C6)", () => {
   });
 });
 
-describe("사진 설정 (R5, C7~C10)", () => {
-  it("C7 — auto + 사진 있음 → quick", () => {
-    expect(params(base({ visionPreference: "auto", photoSignalPresent: true })).vision).toBe(
-      "quick",
-    );
+/**
+ * 042 — R5가 「설정을 본다」에서 「사진이 있는가」로 바뀌었다.
+ *
+ * 헌법 v1.7.0이 「사용자가 끄는 경로를 두지 않는다(MUST NOT)」로 못 박아 고정값
+ * 갈래(옛 C9·C10)가 사라졌다. 남는 것은 사진 유무 하나이며, 그 값은 **캡션을
+ * 돌릴까**가 아니라 **화면의 018 미리 읽기 갈래**를 가른다.
+ */
+describe("사진 유무 (R5, 042 개정)", () => {
+  it("C7 — 사진 있음 → hasPhotos true", () => {
+    expect(params(base({ photoSignalPresent: true })).hasPhotos).toBe(true);
   });
 
-  it("C8 — auto + 사진 없음 → none", () => {
-    expect(params(base({ visionPreference: "auto", photoSignalPresent: false })).vision).toBe(
-      "none",
-    );
+  it("C8 — 사진 없음 → hasPhotos false", () => {
+    expect(params(base({ photoSignalPresent: false })).hasPhotos).toBe(false);
   });
 
-  it("C9 — 고정값이 auto를 덮어쓴다 (사진 있어도 none)", () => {
-    expect(params(base({ visionPreference: "none", photoSignalPresent: true })).vision).toBe(
-      "none",
-    );
-  });
-
-  it("C10 — 고정값 detailed", () => {
-    expect(params(base({ visionPreference: "detailed", photoSignalPresent: false })).vision).toBe(
-      "detailed",
-    );
+  it("★ 042 — 판정 결과에 사진 설정이 없다 (FR-005, 끄는 경로 없음)", () => {
+    const p = params(base({ photoSignalPresent: true }));
+    expect("vision" in p).toBe(false);
   });
 
   it("사진 신호는 boolean 하나 — 임계값 없음 (FR-010)", () => {
-    // 1장이든 100장이든 photoSignalPresent가 true면 quick.
-    expect(params(base({ visionPreference: "auto", photoSignalPresent: true })).vision).toBe(
-      "quick",
-    );
+    // 1장이든 100장이든 photoSignalPresent가 true면 hasPhotos도 true다.
+    expect(params(base({ photoSignalPresent: true })).hasPhotos).toBe(true);
   });
 });
 
@@ -195,9 +187,7 @@ describe("R7 — 소스 불변식", () => {
 });
 
 // 타입 존재 확인 (tsc).
-const _v: VisionPreference = "auto";
 const _g: GeocodingPreference = "auto";
 const _c: Character = "quiet";
-void _v;
 void _g;
 void _c;

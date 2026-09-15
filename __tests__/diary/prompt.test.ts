@@ -26,7 +26,7 @@ const DAY = "2026-08-16";
 
 /** 요청 하나를 만든다. buildRequest를 거쳐 실제 경로와 같은 모양을 쓴다. */
 function requestFor(signals: DaySignals, character: Character = "quiet"): DiaryRequest {
-  const result = buildRequest(signals, character, "none");
+  const result = buildRequest(signals, character, "quick");
   if (!result.ok) throw new Error("테스트 준비 실패: 요청을 만들지 못했다");
   return result.request;
 }

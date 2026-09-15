@@ -36,13 +36,13 @@ describe("buildRequest — 요청을 만든다", () => {
   });
 
   it("신호가 전부 unknown → ok (FR-005b)", () => {
-    const result = buildRequest(unknownDay("2026-08-12"), "quiet", "none");
+    const result = buildRequest(unknownDay("2026-08-12"), "quiet", "quick");
 
     expect(result.ok).toBe(true);
   });
 
   it("신호가 전부 none → ok (FR-005b)", () => {
-    const result = buildRequest(emptyDay("2026-08-12"), "quiet", "none");
+    const result = buildRequest(emptyDay("2026-08-12"), "quiet", "quick");
 
     expect(result.ok).toBe(true);
   });
@@ -55,12 +55,12 @@ describe("신호의 양으로 거부하지 않는다 (FR-005a)", () => {
    */
   it("네 가지 신호 모양 모두 요청이 만들어진다", () => {
     for (const make of [richDay, emptyDay, unknownDay, partiallyUnknownDay]) {
-      const result = buildRequest(make("2026-08-12"), "quiet", "none");
+      const result = buildRequest(make("2026-08-12"), "quiet", "quick");
       expect(result.ok).toBe(true);
     }
   });
 
-  it("캐릭터 다섯과 시각설정 셋의 모든 조합에서 요청이 만들어진다", () => {
+  it("캐릭터와 시각설정의 모든 조합에서 요청이 만들어진다 (042 — 각각 하나뿐이다)", () => {
     for (const character of CHARACTERS) {
       for (const vision of VISION_SETTINGS) {
         const result = buildRequest(emptyDay("2026-08-12"), character, vision);
@@ -81,7 +81,7 @@ describe("012 — buildRequest가 dayStillOpen을 채운다 (research.md §8)", 
     const result = buildRequest(
       richDay("2026-08-20"),
       "quiet",
-      "none",
+      "quick",
       "2026-08-20",
       new Date("2026-08-21T09:00:00"),
     );
@@ -94,7 +94,7 @@ describe("012 — buildRequest가 dayStillOpen을 채운다 (research.md §8)", 
     const result = buildRequest(
       richDay("2026-08-21"),
       "quiet",
-      "none",
+      "quick",
       "2026-08-21",
       new Date("2026-08-21T12:00:00"),
     );
@@ -108,7 +108,7 @@ describe("012 — buildRequest가 dayStillOpen을 채운다 (research.md §8)", 
     const day = "2026-08-21";
     const expected = !isDayClosed(day, now);
 
-    const result = buildRequest(richDay(day), "quiet", "none", day, now);
+    const result = buildRequest(richDay(day), "quiet", "quick", day, now);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.request.dayStillOpen).toBe(expected);
   });
@@ -135,7 +135,7 @@ describe("요청에 모델 식별자가 없다 (FR-008, SC-005, 원칙 III)", ()
 
   it("요청을 직렬화해도 모델 이름이 나오지 않는다", () => {
     for (const character of CHARACTERS) {
-      const result = buildRequest(richDay("2026-08-12"), character, "detailed");
+      const result = buildRequest(richDay("2026-08-12"), character, "quick");
       expect(result.ok).toBe(true);
       if (!result.ok) continue;
 

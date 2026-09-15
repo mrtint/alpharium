@@ -124,26 +124,30 @@ describe("load — 본체를 열고 mmproj를 붙인다", () => {
     expect(JSON.stringify(result)).not.toMatch(/models|gguf|v1|LFM|mmproj/i);
   });
 
-  it("깊이에 따라 다른 값을 넘긴다 (research §4)", async () => {
-    const quick: Call[] = [];
-    await createVisionEngine(loaderFor(quick), paths).load("quick");
-    const detailed: Call[] = [];
-    await createVisionEngine(loaderFor(detailed), paths).load("detailed");
+  // 042 — 깊이가 하나로 고정됐다(헌법 v1.7.0 MUST). 「깊이에 따라 다른 값을 넘긴다」는
+  // **비교 대상이 없어져 성립할 수 없다** — 고쳐 쓰는 것이 아니라 주장을 바꾼다.
+  it("언제나 같은 한 값을 넘긴다 (042, 깊이는 하나)", async () => {
+    const calls: Call[] = [];
+    await createVisionEngine(loaderFor(calls), paths).load("quick");
 
-    const tokensOf = (calls: Call[]) =>
-      (calls.find((c) => c.kind === "initMultimodal")?.detail as { image_max_tokens: number })
-        .image_max_tokens;
+    const tokens = (
+      calls.find((c) => c.kind === "initMultimodal")?.detail as {
+        image_max_tokens: number;
+      }
+    ).image_max_tokens;
 
-    expect(tokensOf(quick)).not.toBe(tokensOf(detailed));
-    expect(tokensOf(detailed)).toBeGreaterThan(tokensOf(quick));
+    expect(tokens).toBe(256);
   });
 
   it("두 번 열면 앞의 것을 먼저 닫는다 — 컨텍스트가 하나뿐이다", async () => {
     const calls: Call[] = [];
     const engine = createVisionEngine(loaderFor(calls), paths);
 
+    // 042 — 깊이가 하나뿐이라 같은 값으로 두 번 연다. **이 계약은 깊이와 무관하다** —
+    // 「컨텍스트가 하나뿐이라 두 번째가 첫 번째를 닫는다」는 E1이며, 깊이가 줄었다고
+    // 사라지면 안 된다.
     await engine.load("quick");
-    await engine.load("detailed");
+    await engine.load("quick");
 
     // 두 번째 load 앞에 release가 있어야 한다.
     const secondLoad = calls.map((c) => c.kind).lastIndexOf("load");

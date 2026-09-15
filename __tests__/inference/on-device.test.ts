@@ -198,7 +198,7 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
     const request: DiaryRequest = {
       signals: signalsWithPhotos([]),
       character: "quiet",
-      vision: "none",
+      vision: "quick",
       dayStillOpen: false,
     };
     const result = await backend.generate(request);
@@ -299,7 +299,7 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
     const request: DiaryRequest = {
       signals: signalsWithPhotos([]),
       character: "quiet",
-      vision: "none",
+      vision: "quick",
       dayStillOpen: false,
     };
     const result = await backend.generate(request);
@@ -362,7 +362,7 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
     const request: DiaryRequest = {
       signals: signalsWithPhotos([]),
       character: "quiet",
-      vision: "none",
+      vision: "quick",
       dayStillOpen: false,
     };
     const result = await backend.generate(request);
@@ -378,6 +378,27 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
 /**
  * 018 — prepare()/release() (contracts/prewarm-engine.md E12~E14).
  */
+/**
+ * 사진 통로 대역 — **이 describe 전용**.
+ *
+ * **042 — 이제 모든 요청이 사진을 본다.** 통로가 없으면 `not-implemented`로 즉시
+ * 돌아와(원칙 I) 이 블록이 보려는 **prepare/unload 경로**에 닿지 못한다. 다른
+ * describe의 `visionSupportWith`는 블록 스코프라 여기서 안 보인다.
+ */
+const prewarmVision = (): VisionSupport => ({
+  engine: {
+    async load(): Promise<VisionLoadResult> {
+      return { ok: true };
+    },
+    async caption(): Promise<VisionRunResult> {
+      return { text: "사진 한 장" };
+    },
+    async stop() {},
+    async unload() {},
+  },
+  resolvePath: async (photo) => `/photo/${photo.id}.jpg`,
+});
+
 describe("018 — prepare()/release()", () => {
   function countingEngine() {
     const calls: string[] = [];
@@ -412,7 +433,7 @@ describe("018 — prepare()/release()", () => {
 
   it("E12: prepare() 뒤 engine.unload()가 불리지 않는다", async () => {
     const { calls, engine } = countingEngine();
-    const backend = createOnDeviceBackend(async () => [], engine);
+    const backend = createOnDeviceBackend(async () => [], engine, 180_000, prewarmVision());
 
     await backend.prepare?.("quiet");
 
@@ -422,7 +443,7 @@ describe("018 — prepare()/release()", () => {
 
   it("prepare() 뒤의 generate()는 네이티브 로더를 다시 부르지 않는다 (재사용)", async () => {
     const { calls, engine } = countingEngine();
-    const backend = createOnDeviceBackend(async () => [], engine);
+    const backend = createOnDeviceBackend(async () => [], engine, 180_000, prewarmVision());
 
     await backend.prepare?.("quiet");
     const loadCallsBeforeGenerate = calls.filter((c) => c.startsWith("load:")).length;
@@ -430,7 +451,7 @@ describe("018 — prepare()/release()", () => {
     const request: DiaryRequest = {
       signals: emptyDay("2026-08-26"),
       character: "quiet",
-      vision: "none",
+      vision: "quick",
       dayStillOpen: false,
     };
     await backend.generate(request);
@@ -445,12 +466,12 @@ describe("018 — prepare()/release()", () => {
 
   it("generate()는 prepare()가 있었든 없었든 끝나면 여전히 unload한다 (E2 유지)", async () => {
     const { calls, engine } = countingEngine();
-    const backend = createOnDeviceBackend(async () => [], engine);
+    const backend = createOnDeviceBackend(async () => [], engine, 180_000, prewarmVision());
 
     const request: DiaryRequest = {
       signals: emptyDay("2026-08-26"),
       character: "quiet",
-      vision: "none",
+      vision: "quick",
       dayStillOpen: false,
     };
     await backend.generate(request);

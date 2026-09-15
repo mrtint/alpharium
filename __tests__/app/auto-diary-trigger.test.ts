@@ -38,7 +38,7 @@ describe("triggerFirstRunAutoDiary — mock pipeline 호출", () => {
     const now = new Date("2026-09-11T13:00:00.000Z");
     await triggerFirstRunAutoDiary(
       resolved,
-      { day: "2026-09-11", now, character: "quiet", vision: "none" },
+      { day: "2026-09-11", now, character: "quiet", vision: "quick" },
       { pipeline },
     );
 
@@ -48,7 +48,7 @@ describe("triggerFirstRunAutoDiary — mock pipeline 호출", () => {
         day: "2026-09-11",
         now,
         character: "quiet",
-        vision: "none",
+        vision: "quick",
       }),
     );
   });
@@ -62,7 +62,7 @@ describe("triggerFirstRunAutoDiary — mock pipeline 호출", () => {
     await expect(
       triggerFirstRunAutoDiary(
         resolved,
-        { day: "2026-09-11", now: new Date(), character: "quiet", vision: "none" },
+        { day: "2026-09-11", now: new Date(), character: "quiet", vision: "quick" },
         { pipeline },
       ),
     ).resolves.toBeUndefined();
@@ -77,7 +77,7 @@ describe("triggerFirstRunAutoDiary — mock pipeline 호출", () => {
     await expect(
       triggerFirstRunAutoDiary(
         resolved,
-        { day: "2026-09-11", now: new Date(), character: "quiet", vision: "none" },
+        { day: "2026-09-11", now: new Date(), character: "quiet", vision: "quick" },
         { pipeline },
       ),
     ).resolves.toBeUndefined();

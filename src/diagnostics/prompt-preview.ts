@@ -117,7 +117,9 @@ export function buildPreview(
   const request = buildRequest(
     preset.signals,
     character,
-    "none",
+    // 042 — 값이 하나뿐이다. 미리보기는 프롬프트 문자열만 조립하며 시각 엔진을
+    // 열지 않으므로(`buildPrompt`만 부른다) 이 값이 동작을 바꾸지 않는다.
+    "quick",
     preset.signals.date,
     PREVIEW_NOW,
     customNames,
