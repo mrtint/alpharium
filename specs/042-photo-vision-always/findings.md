@@ -67,7 +67,7 @@
 | D2 ★    | ✅ 통과 | `has_media=1` **3회**, `visionMs` 19453, 본문이 사진 내용 반영           |
 | D3      | ✅ 통과 | `has_media`·`tokenizeWithMedia`·`processMedia` **전부 0**, 모델 적재 1회 |
 | D4      | ✅ 통과 | 같은 하루가 `none`→「사진: 없었다」 / `unknown`→「사진: 모른다」         |
-| D5 ★★   | ✅ 통과 | 백그라운드가 `has_media=1` **3회**, `visionMs` 17996 (2026-09-15 12:22)  |
+| D5 ★★   | ✅ 통과 | 트리거·**완전 헤드리스** 양쪽에서 `has_media=1` **3회** (12:22 / 13:47)  |
 | D6      | ✅ 통과 | 개발자 탭 「지금 생성」에서 `has_media=1` **3회**, `visionMs` 20154      |
 | D7      | ✅ 통과 | 042 이전 일기(09-11)가 사진 슬라이더까지 정상                            |
 | Maestro | ✅ 통과 | 세 흐름 전부 PASS(`photo-vision`·`diary-photo-gallery`·`generate-diary`) |
@@ -176,10 +176,38 @@
 D5 판정에 쓰지 않았다(내 트리거는 12:20:49였고 그때는 이미 쓰여 있어
 `결과: skipped`가 정상이었다).
 
-**재지 않은 것**: 잡 스케줄러가 스스로 깨워 도는 완전 헤드리스 실행(화면 꺼짐·
-잠김)은 이 세션에서 보지 않았다 — 개발자 탭 트리거가 `runAutoDiaryTask()`를
-그대로 부르므로 **판정·생성 경로는 같지만**, Doze 아래의 실행은 다른 축이다
-(019·024·027이 그 축을 따로 다뤘다).
+#### 완전 헤드리스 라운드 (2026-09-15 13:47, 추가 수행)
+
+**잡 스케줄러가 스스로 깨워서 도는 것까지 확인했다.** 화면 꺼짐·앱 전경 아님.
+
+```
+13:32:15  앱을 한 번 열어 defineTask 재등록 → 워커 15분 지연으로 enqueue
+          (홈으로 나가고 화면 끔 — force-stop 하지 않는다)
+13:47:15  BackgroundTaskWork: doWork: Running worker
+          runTasks → Executing task 'alpharium-auto-diary' → Started headless task
+13:47:37  has_media=1  (278 토큰)
+13:47:46  has_media=1  (260)
+13:47:52  has_media=1  (260)
+13:48:03  has_media=0  (704)  ← VLM 닫고 캐릭터 모델
+13:50:20  2026-09-14.json 저장, 잠금 해제
+```
+
+- 저장된 일기 `createdAt` **04:47:15Z(=13:47:15 KST)** — `doWork` 시각과 일치.
+  `visionMs` **33348**, `writingMs` **137479**, 사진 3장, `places.kind: "known"`.
+- **라운드 유효성**: 13:32~13:51에 `wm_on_resume_called` **0건**,
+  `runTasks: App is in the foreground` **0건**, `mWakefulness=Dozing` 유지.
+- **헤드리스가 포그라운드보다 느리다** — 같은 하루·같은 사진인데 `writingMs`가
+  36.8초(12:22 트리거) → **137.5초**(13:47 헤드리스)로 약 3.7배,
+  `visionMs`도 18.0초 → 33.3초. 024가 관측한 "헤드리스 ~3배"와 같은 대역이며
+  `GENERATION_TIMEOUT_MS`(180초, `writingMs` 구간) 여유가 그만큼 좁다.
+
+> **★ `am force-stop`은 WorkManager 잡을 함께 취소한다.** 첫 시도(12:50~13:31,
+> 41분)는 `inForeground`를 내리려고 `force-stop`을 썼는데 그 순간 잡이 사라져
+> **41분 동안 발화할 잡이 없었다**(`dumpsys jobscheduler` 항목 0개). 화면·
+> 라이프사이클은 멀쩡했으므로 **로그만 보면 「안 돌았다」로 오독하기 쉽다.**
+> 전경을 벗어나려면 **홈 버튼**을 쓴다 — Activity만 stop되고(`inForeground=false`)
+> 프로세스와 잡은 산다. 앱을 다시 열면 `defineTask`가 재등록·재예약한다
+> (`didRegister: alpharium-auto-diary`, 024 §3·§9).
 
 **부수 관측**: `places.kind`가 `known`인데 `placeName`이 `null`이었다(전날 세션의
 한 라운드와 동일). 역지오코딩 변동이며 042 범위 밖이다.

@@ -1254,8 +1254,21 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   12초 뒤 그쪽이 먼저 그날 일기를 썼고(사진 3장 캡션), 그 바람에 직후의 수동
   트리거가 `all-written`으로 `skipped`가 됐다 — **트리거 결과를 시각으로
   귀속시키지 않으면 오판한다.**
-- **남은 것은 완전 헤드리스(화면 꺼짐·잠김에서 잡 스케줄러가 깨우는) 실행뿐이다** —
-  판정·생성 경로는 트리거와 동일하고, Doze 축은 019·024·027이 따로 다뤘다.
+- **완전 헤드리스도 확인했다**(2026-09-15 13:47). 앱을 한 번 열어 재등록시킨 뒤
+  **홈으로 나가고 화면을 끄면**, 15분 뒤 잡이 스스로 깨어 `doWork: Running worker`
+  → `Executing task 'alpharium-auto-diary'` → `has_media=1` 3회 → 일기 저장까지
+  간다. 저장된 `createdAt`이 `doWork` 시각과 일치하고, 그 구간에
+  `wm_on_resume_called`·`App is in the foreground`가 **0건**이다.
+- **★ `am force-stop`은 WorkManager 잡을 함께 취소한다** — 전경을 벗어나려고
+  이것을 쓰면 잡이 사라져 **아무것도 안 도는 채로 시간만 흐른다**(첫 시도 41분을
+  그렇게 날렸고, `dumpsys jobscheduler`에 항목이 0개인 것으로만 드러났다).
+  **홈 버튼을 쓴다** — Activity만 stop되고 프로세스·잡은 산다. 027이 적은
+  "`inForeground`는 화면 on/off가 아니라 Activity start/stop에 반응한다"의 반대편
+  함정이다.
+- **헤드리스는 포그라운드보다 느리다** — 같은 하루·같은 사진에서 `writingMs`가
+  36.8초 → **137.5초**(약 3.7배), `visionMs` 18.0초 → 33.3초. 024의 "~3배"와 같은
+  대역이며, `GENERATION_TIMEOUT_MS`(180초, `writingMs` 구간)에 대한 여유가 그만큼
+  좁다는 뜻이다.
 - 상세: `specs/042-photo-vision-always/`(`findings.md` §3).
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)

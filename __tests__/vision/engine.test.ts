@@ -130,9 +130,11 @@ describe("load — 본체를 열고 mmproj를 붙인다", () => {
     const calls: Call[] = [];
     await createVisionEngine(loaderFor(calls), paths).load("quick");
 
-    const tokens = (calls.find((c) => c.kind === "initMultimodal")?.detail as {
-      image_max_tokens: number;
-    }).image_max_tokens;
+    const tokens = (
+      calls.find((c) => c.kind === "initMultimodal")?.detail as {
+        image_max_tokens: number;
+      }
+    ).image_max_tokens;
 
     expect(tokens).toBe(256);
   });
