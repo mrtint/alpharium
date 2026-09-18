@@ -56,3 +56,10 @@
   질문해 바로잡았고, 배터리 예외도 다섯 단계 연속 호출에 포함시키되
   "승인 여부 조회 불가"라는 기존 제약(020/021)에 따라 결과를 기다리지
   않는 것으로 FR-007a·FR-007b·FR-008을 재정정했다.
+- context7로 `expo-intent-launcher` 공식 문서를 확인하는 과정에서 021의
+  기존 결함을 하나 더 발견했다 — `requirements.ts`의 `battery-exception`
+  항목이 `platforms: ["android", "ios"]`로 선언돼 있는데, 그 요청에 쓰는
+  `expo-intent-launcher`는 iOS를 지원하지 않는다("동등한 API 없음", 공식
+  README). Android 전용 저장소라 지금까지 드러나지 않았다. 사용자 승인
+  하에 이번 043에서 `["android"]`로 정정하기로 FR-017에 반영했다 — 로직
+  계층 무변경 원칙(FR-014)의 유일한 예외, 값 한 줄 수정에 한정.
