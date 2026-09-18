@@ -219,12 +219,17 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
 - **FR-012**: 새 팔레트의 모든 텍스트/배경 조합은 기존 WCAG AA 대비 검증
   (`theme-tokens.test.ts` DT4, 본문 4.5:1 / 큰 텍스트 3:1)을 통과해야
   한다. `/speckit-plan` research 단계에서 `contrastRatio()`로 실측한 결과
-  (research.md R2), `accentForeground`(흰 글자) vs `accent`(#ec3013) 조합이
-  구조적으로 4.5:1을 채우지 못해(순백 4.20:1) — `Button` `primary`
+  (research.md R2), `accentForeground` vs `accent`(#ec3013) 조합은 DT4가
+  `COLORS` 값 자체를 직접 비교하는 테스트라 실사용처와 무관하게 항상
+  검사되며, 흰색(4.20:1)은 물론 어두운 중간값(#201e1d, 3.95:1)도
+  기준(4.5:1)을 못 채운다 — **순검정(#000000, 5.00:1)만 충족한다.**
+  `accentForeground`는 `#000000`으로 확정하되, `Button` `primary`
   variant의 배경색을 `accent`에서 `danger`(#ae1800, 마크업 accent-700)로
-  바꾸어 문제 조합 자체를 없앤다. `textMuted`도 원본(#7d7979, 3.85:1)에서
-  `#6b6767`(5.00:1)로 근소 조정한다. `accent`(#ec3013) 원본 값은 배경/
-  블록(로고 마크 등 텍스트가 얹히지 않는 면적)에 그대로 유지한다.
+  바꾸어 이 조합을 실제로 렌더하는 컴포넌트가 이번 스펙 범위에는 없게
+  한다(값은 DT4 통과 전용, 032 원본 팔레트에서도 같은 역할이었다).
+  `textMuted`도 원본(#7d7979, 3.85:1)에서 `#6b6767`(5.00:1)로 근소
+  조정한다. `accent`(#ec3013) 원본 값은 배경/블록(로고 마크 등 텍스트가
+  얹히지 않는 면적)에 그대로 유지한다.
   **정정(analyze 재검토)**: `Button` `primary` variant는 온보딩 화면
   뿐 아니라 `AutoDiarySettingsScreen`·`CharacterListScreen`·
   `WelcomeScreen` 등 **범위 밖 화면에서도** variant 미지정(기본값)으로
@@ -347,9 +352,12 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
   블록(버튼 배경, 로고 마크 등)에는 원본 #ec3013을 유지하고, 텍스트로
   쓰일 때만 더 어두운 변형(#ae1800, 마크업의 accent-700)을 사용해 대비
   기준을 만족시킨다. `/speckit-plan` research 단계(R2)에서 실측 결과 —
-  `accentForeground`(흰 글자) vs `accent` 조합 자체가 구조적으로 미달이라
-  (순백 4.20:1), 이 조합을 쓰는 `Button` `primary` variant의 배경을
-  `accent`에서 `danger`(#ae1800)로 바꾸는 것으로 확정했다(FR-012).
+  `accentForeground` vs `accent` 조합은 DT4가 값 자체를 직접 검사하므로
+  실사용처를 없애는 것만으로는 부족하다는 것을 2차 재검토(analyze)에서
+  확인했다. 순검정(#000000, 5.00:1)만 4.5:1을 충족해 `accentForeground`
+  값을 `#000000`으로 확정하고, 그 조합을 실제로 렌더하는 `Button`
+  `primary` variant의 배경은 `accent`에서 `danger`(#ae1800)로 바꿔
+  화면에는 노출되지 않게 했다(FR-012).
   `textMuted`도 원본(3.85:1 미달)에서 `#6b6767`(5.00:1)로 조정했다.
 - Q: 사용자가 안드로이드에서 권한을 "다시 묻지 않음"으로 거부한 뒤 앱으로
   돌아오면 그 단계를 어떻게 처리하는가? → A: 021의 기존 처리를 그대로

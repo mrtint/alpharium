@@ -27,7 +27,7 @@
 - [ ] T002 `src/ui/theme/tokens.ts`의 `COLORS` 값을 data-model.md 표대로
       전면 교체한다(키 9개 이름 불변, 값만 교체: bg=#f3f2f2,
       surface=#eae9e9, border=rgba(32,30,29,0.4), text=#201e1d,
-      textMuted=#6b6767, accent=#ec3013, accentForeground=#201e1d,
+      textMuted=#6b6767, accent=#ec3013, accentForeground=#000000,
       danger=#ae1800, dangerForeground=#f3f2f2). 상단 주석("032 —
       알파리움 디자인 토큰")도 043 Modernist 팔레트로 갱신한다.
 - [ ] T003 같은 파일의 `RADIUS`를 `{ card: 0, pill: 0 }`으로 교체한다.

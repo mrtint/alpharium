@@ -84,8 +84,20 @@ npm run test:device   # .maestro/unified-permission-onboarding.yml 등
 node -e '
 function relLum(hex){const c=hex.replace("#","");const ch=[0,2,4].map(i=>{const s=parseInt(c.slice(i,i+2),16)/255;return s<=0.03928?s/12.92:Math.pow((s+0.055)/1.055,2.4)});return 0.2126*ch[0]+0.7152*ch[1]+0.0722*ch[2]}
 function ratio(a,b){const la=relLum(a),lb=relLum(b);return (Math.max(la,lb)+0.05)/(Math.min(la,lb)+0.05)}
-console.log("text/bg", ratio("#201e1d","#f3f2f2").toFixed(2));
-console.log("textMuted/bg", ratio("#6b6767","#f3f2f2").toFixed(2));
-console.log("accentForeground/accent(as danger)", ratio("#f3f2f2","#ae1800").toFixed(2));
+const pairs = [
+  ["text","#201e1d","bg","#f3f2f2",4.5],
+  ["text","#201e1d","surface","#eae9e9",4.5],
+  ["textMuted","#6b6767","bg","#f3f2f2",4.5],
+  ["accentForeground","#000000","accent","#ec3013",4.5],
+  ["dangerForeground","#f3f2f2","danger","#ae1800",4.5],
+  ["danger","#ae1800","bg","#f3f2f2",3.0],
+];
+for (const [an,a,bn,b,min] of pairs) {
+  const r = ratio(a,b);
+  console.log(`${an} vs ${bn}: ${r.toFixed(2)} (min ${min}) -> ${r>=min?"PASS":"FAIL"}`);
+}
 '
 ```
+
+**기대 결과**: 6개 쌍 전부 PASS(2026-09-18 재계산 확인 완료 — DT4와 정확히
+일치하는 조합).

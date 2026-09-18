@@ -37,7 +37,7 @@ battery-exception` **4개**다.
 | `text` | `#201e1d` | `--color-text` |
 | `textMuted` | `#6b6767` | neutral-600 근사 조정값(아래 근거) |
 | `accent` | `#ec3013` | `--color-accent` |
-| `accentForeground` | `#201e1d` | (아래 근거 — 흰색 대신 text 재사용) |
+| `accentForeground` | `#000000` | (아래 근거 — DT4가 값 자체를 검사, 순검정만 4.5:1 충족) |
 | `danger` | `#ae1800` | accent-700 |
 | `dangerForeground` | `#f3f2f2` | |
 
@@ -49,22 +49,28 @@ battery-exception` **4개**다.
 - `textMuted`(#6b6767) vs `bg`(#f3f2f2) = **5.00:1** — DT4
   `["textMuted","bg",4.5]` 충족. 원본 마크업 값(#7d7979)은 3.85:1로 미달이라
   근소하게 어둡게 조정했다(아래 근거).
-- `accentForeground`(#201e1d) vs `accent`(#ec3013) = **3.95:1** — DT4
-  `["accentForeground","accent",4.5]`에는 **여전히 못 미친다**. 순백(4.20)·
-  순검정(5.00) 모두 계산해봤고 순검정만 4.5:1을 넘는다 — 그런데 검정
-  텍스트는 accent 배경 위에서 Modernist 원본 미감과 크게 어긋난다.
-  **최종 결정: accent 배경 위 텍스트에는 `accentForeground` 대신 이미 있는
-  `dangerForeground`(#f3f2f2, 흰색)를 쓰지 않고, `Button` 컴포넌트의
-  `primary` variant 배경색 자체를 `accent`(#ec3013)에서 `danger`(#ae1800)로
-  바꾼다** — `dangerForeground`(#f3f2f2) vs `danger`(#ae1800) = 6.41:1로
-  이미 DT4를 충족하는 기존 조합이다. `accent`(#ec3013)는 배경 블록(로고
-  마크 등 텍스트가 얹히지 않는 면적)에만 쓰고, 텍스트가 얹히는 강조 버튼은
-  `danger` 색상(#ae1800, 마크업의 accent-700)을 쓴다 — 이는 Clarifications가
-  이미 합의한 "텍스트에는 어두운 변형을 쓴다" 원칙과 정확히 같은 논리를
-  버튼 배경에도 적용한 것이다. `accentForeground`는 `text`(#201e1d)로 통일해
-  DT4 기존 테스트 키 이름과 구조를 그대로 두되 실사용처를 없앤다(이번 스펙
-  범위에서 `accent` 배경 위에 `accentForeground` 텍스트를 얹는 컴포넌트가
-  없어지므로 시각적으로 문제되지 않는다).
+- `accentForeground` vs `accent`(#ec3013) — **DT4는 `COLORS.accentForeground`와
+  `COLORS.accent`의 값을 직접 비교하는 값 레벨 테스트다**(실사용처
+  유무와 무관하게 항상 실행된다) — 실사용처를 없애는 것만으로는 이
+  테스트 자체가 통과하지 않는다(1차 재검토에서 "text(#201e1d)로 통일하면
+  실사용처가 없어지니 문제없다"고 판단했던 것은 **오류**였다 — 재계산
+  결과 `#201e1d` vs `#ec3013` = 3.95:1로 여전히 미달, 2차 analyze
+  재검토에서 발견). 값 자체가 4.5:1을 충족해야 하며, 순백(4.20:1)·
+  근사 어두운 값(#201e1d, 3.95:1) 모두 미달이고 **순검정(#000000,
+  5.00:1)만 충족한다**. **최종 결정: `accentForeground = #000000`**.
+  화면 렌더 측면에서는 `Button` `primary` variant 배경 자체를 `accent`
+  에서 `danger`로 바꾸므로(아래) `accentForeground`를 실제로 accent
+  배경 위에 렌더하는 컴포넌트가 이번 스펙 범위에는 없다 — 값은 DT4
+  통과만을 위해 존재하는 상태가 되며, 이는 기존 032 팔레트에서도
+  `accentForeground`가 정확히 이 역할(accent 배경 위 대비 보장용
+  상수)이었던 것과 같은 성격이다.
+  `Button` 컴포넌트의 `primary` variant 배경색 자체도 `accent`(#ec3013)
+  에서 `danger`(#ae1800)로 바꾼다 — `dangerForeground`(#f3f2f2) vs
+  `danger`(#ae1800) = 6.41:1로 이미 DT4를 충족하는 기존 조합이다.
+  `accent`(#ec3013)는 배경 블록(로고 마크 등 텍스트가 얹히지 않는
+  면적)에만 쓰고, 텍스트가 얹히는 강조 버튼은 `danger` 색상(#ae1800,
+  마크업의 accent-700)을 쓴다 — Clarifications가 이미 합의한 "텍스트에는
+  어두운 변형을 쓴다" 원칙과 같은 논리를 버튼 배경에도 적용한 것이다.
 - `dangerForeground`(#f3f2f2) vs `danger`(#ae1800) = **6.41:1** — DT4
   `["dangerForeground","danger",4.5]` 충족(기존 그대로).
 - `danger`(#ae1800) vs `bg`(#f3f2f2) = **6.41:1** — DT4

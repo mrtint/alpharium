@@ -68,7 +68,7 @@ type OnboardingStep = {
 | `text` | `#2A2521` | `#201e1d` |
 | `textMuted` | `#6E6459` | `#6b6767` (research R2 — 원본 #7d7979에서 대비 조정) |
 | `accent` | `#A8552F` | `#ec3013` |
-| `accentForeground` | `#FFF8F2` | `#201e1d` (research R2 — 흰색은 accent 위에서 대비 미달) |
+| `accentForeground` | `#FFF8F2` | `#000000` (research R2 — accent 배경 위 4.5:1을 충족하는 값은 순검정뿐, 실사용처 없음) |
 | `danger` | `#8F3A2C` | `#ae1800` |
 | `dangerForeground` | `#FFF6F3` | `#f3f2f2` |
 
