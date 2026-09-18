@@ -124,6 +124,14 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
       - `onboarding-skip`은 배터리 단계에서만 렌더됨을 확인하는 테스트
         추가(FR-008 — 사진·위치·알림은 거부가 곧 건너뛰기이므로 버튼
         자체가 없다).
+      - **★ CRITICAL 케이스**: `requestPhotoPermission`이 `"denied"`를
+        반환하도록 mock한 뒤, 자동 타이머(`ONBOARDING_STEP_AUTO_ADVANCE_MS`)
+        경과 후 화면이 **자동으로** 다음 단계(`onboarding-step-location`)
+        로 전환되는지 확인한다 — 기존 테스트(현 파일 426~455줄)처럼
+        `onboarding-skip`을 수동으로 눌러야 넘어가는 것은 이제 FR-008
+        위반이다(버튼 자체가 없으므로 누를 수도 없다). `blocked` 반환
+        시에는 자동 전환하지 않고 `onboarding-open-settings`가 계속
+        뜨는 것(FR-008a)과 대조되는 케이스로 함께 작성한다.
       - `blocked`(다시 묻지 않음) 상태에서는 사진·위치·알림 단계에도
         `onboarding-open-settings`가 여전히 뜨는지 확인(FR-008a, 기존
         S1.1 테스트 유지).
@@ -142,6 +150,21 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
 ### Implementation for User Story 2
 
 - [ ] T014 [US2] `src/ui/OnboardingScreen.tsx`를 재작성한다:
+      - **★ CRITICAL — 거부 시 자동 건너뛰기 로직 추가(FR-008 핵심)**:
+        `decision.ts`의 `statusOf()`는 `denied` 상태를 `actionable`로
+        반환한다(`blocked`가 아닌 한) — 즉 `nextStep()`은 거부 후에도
+        **같은 단계를 계속 가리킨다**. 021 원본은 이것이 문제가 아니었다
+        (화면에 [건너뛰기] 버튼이 있어 사용자가 명시적으로 `skip(key)`를
+        불렀다 — 실제로 기존 `onboarding-screen.test.tsx`의 "FR-003/
+        Acceptance Scenario 2" 테스트가 거부 후 `onboarding-skip`을 눌러야
+        다음 단계로 가는 것을 이미 검증하고 있다). 이번 FR-008
+        ("거부는 곧 건너뛰기, 화면에 버튼을 두지 않는다")은 이 설계를
+        뒤집으므로, 사진·위치·알림 단계의 `allow()` 호출 결과를 확인해
+        허용되지 않았으면(`refresh()` 후 해당 키의 상태가
+        `granted`/`limited`가 아니면) **자동으로 `skip(step.requirement.key)`
+        를 호출**하는 로직을 추가해야 한다 — 그래야 OS 다이얼로그
+        거부만으로 실제 다음 단계 전환이 일어난다(`blocked` 상태는
+        예외 — 이미 [설정 열기]로 처리되므로 skip 호출 안 함).
       - 사진·위치·알림(`battery-exception`이 아닌 모든 단계) 진입 시
         설명 카드 JSX(`rationale`/`ifDenied`/`허용`/`건너뛰기` 버튼)를
         렌더하지 않는다 — 대신 스플래시와 동일한 Modernist 배경만 그린
