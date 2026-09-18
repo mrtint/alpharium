@@ -220,18 +220,30 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
   (`theme-tokens.test.ts` DT4, 본문 4.5:1 / 큰 텍스트 3:1)을 통과해야
   한다. `/speckit-plan` research 단계에서 `contrastRatio()`로 실측한 결과
   (research.md R2), `accentForeground`(흰 글자) vs `accent`(#ec3013) 조합이
-  구조적으로 4.5:1을 채우지 못해(순백 4.20:1) — 이 조합을 실제로 쓰는
-  유일한 자리인 `Button` `primary` variant의 배경색을 `accent`에서
-  `danger`(#ae1800, 마크업 accent-700)로 바꾸어 문제 조합 자체를 없앤다.
-  `textMuted`도 원본(#7d7979, 3.85:1)에서 `#6b6767`(5.00:1)로 근소 조정한다.
-  `accent`(#ec3013) 원본 값은 배경/블록(로고 마크 등 텍스트가 얹히지 않는
-  면적)에 그대로 유지한다.
+  구조적으로 4.5:1을 채우지 못해(순백 4.20:1) — `Button` `primary`
+  variant의 배경색을 `accent`에서 `danger`(#ae1800, 마크업 accent-700)로
+  바꾸어 문제 조합 자체를 없앤다. `textMuted`도 원본(#7d7979, 3.85:1)에서
+  `#6b6767`(5.00:1)로 근소 조정한다. `accent`(#ec3013) 원본 값은 배경/
+  블록(로고 마크 등 텍스트가 얹히지 않는 면적)에 그대로 유지한다.
+  **정정(analyze 재검토)**: `Button` `primary` variant는 온보딩 화면
+  뿐 아니라 `AutoDiarySettingsScreen`·`CharacterListScreen`·
+  `WelcomeScreen` 등 **범위 밖 화면에서도** variant 미지정(기본값)으로
+  쓰인다 — "유일한 자리"라는 서술은 사실 오류였다. `Button`은 `src/ui/
+  components/`의 전역 공유 컴포넌트라 이 변경은 범위 밖 화면의 버튼
+  색에도 파급된다. FR-013이 이를 허용 범위로 명시한다.
 - **FR-013**: 이번 스펙은 `src/ui/` 중 스플래시 화면과 온보딩(권한 요청)
   화면 두 개의 시각 구현만 새로 작성한다. 그 외 화면(`DiaryHomeScreen`,
   `DiaryListScreen`, `DiaryDetailScreen`, `DayPicker`, `CharacterListScreen`,
   `AuthorPicker`, `AutoDiarySettingsScreen`, `DiagnosticsScreen`,
-  `WelcomeScreen`, `WaitingForDownloadScreen` 등)은 토큰 값 교체가
-  자동으로 상속되는 것 외에 레이아웃을 변경하지 않는다.
+  `WelcomeScreen`, `WaitingForDownloadScreen` 등)은 **레이아웃(구조·배치)을
+  변경하지 않는다.** "토큰 값 교체의 자동 상속"에는 `COLORS`/`RADIUS` 값
+  변경뿐 아니라, `src/ui/components/`의 전역 공유 컴포넌트(`Button` 등)의
+  색 매핑 변경도 포함된다 — `Button`은 온보딩 화면 전용이 아니라 위
+  화면들에서도 쓰이므로(FR-012 정정 참고), `primary` variant 배경이
+  `accent`→`danger`로 바뀌면 그 화면들의 버튼 색도 함께 바뀐다. 이는
+  레이아웃 변경이 아니라 공유 컴포넌트의 색 값 변경이 자연히 전파된
+  것이므로 이 요구사항 위반이 아니다 — 단, 그 화면들의 JSX 구조·배치·
+  문구는 이번 스펙에서 한 줄도 손대지 않는다.
 - **FR-014**: `src/onboarding/decision.ts`(권한 상태 판정)를 포함해
   `src/diary/`, `src/models/`, `src/firstrun/`, `src/schedule/`,
   `src/signals/`, `src/vision/`, `src/inference/`, `src/app/` 등 순수

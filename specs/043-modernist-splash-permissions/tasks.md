@@ -35,10 +35,20 @@
       `COLORS.accent`에서 `COLORS.danger`로 변경한다(research R2 — accent
       배경 위 흰 글자가 구조적으로 WCAG AA 미달이라 강조 버튼은 danger
       배경을 쓴다). `CLASS.primary`의 tailwind 클래스(`bg-accent`)도
-      `bg-danger`로 맞춘다.
+      `bg-danger`로 맞춘다. **주의(analyze 재검토)**: `Button`은 전역
+      공유 컴포넌트라 이 변경이 `AutoDiarySettingsScreen`·
+      `CharacterListScreen`·`WelcomeScreen` 등 범위 밖 화면의 `primary`
+      버튼 색에도 파급된다 — FR-013이 이를 허용 범위로 명시하므로
+      의도된 영향이다. 그 화면들의 JSX·문구·레이아웃은 절대 수정하지
+      않는다.
 - [ ] T005 `npm run test:logic`을 돌려 `__tests__/theme-tokens.test.ts`의
       DT1~DT7이 전부 통과하는지 확인한다(DT4 6개 쌍 특히 확인). 미달이면
       T002 값을 재조정한다.
+- [ ] T005a `npm run test:ui`로 `AutoDiarySettingsScreen`·
+      `CharacterListScreen`·`WelcomeScreen` 등 T004의 영향을 받는 기존
+      화면 테스트가 색상 하드코딩 어서션 없이 여전히 통과하는지 확인한다
+      (버튼 배경색을 직접 단정하는 기존 테스트가 있다면 `COLORS.danger`
+      기준으로 갱신, 구조·문구 관련 테스트는 그대로 통과해야 함 — FR-013).
 - [ ] T006 `src/onboarding/requirements.ts`의 `battery-exception` 항목
       `platforms` 필드를 `["android", "ios"]`에서 `["android"]`로
       수정한다(FR-017, 이번 스펙의 유일한 로직 계층 변경). 항목 옆 주석에
