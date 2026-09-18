@@ -82,3 +82,23 @@
   않는다"는 사용자의 명시적 정책 결정이 근거다. User Story 2·Acceptance
   Scenarios·Edge Cases·FR-007a/007c/008/008a/009·SC-003·Assumptions·
   Clarifications 전체를 이 방향으로 재정렬했다.
+- `/speckit-plan`~`/speckit-analyze`~수정 반복(2026-09-18)에서 발견·
+  수정한 사실 오류 4건 — 체크리스트 항목 자체의 통과 상태는 바뀌지
+  않았으나(모호성·미완성 문제가 아니라 계산·소스 확인 착오였음) 기록:
+  1. 권한 요구사항이 "5단계(사진·사진 위치·위치·알림·배터리)"라는
+     서술이 031 변경(photo-location 항목 제거)을 반영하지 못한 사실
+     오류였다 — "3단계(사진·위치·알림)+배터리 1단계"로 정정(FR-007).
+  2. FR-008("거부는 곧 건너뛰기")이 요구하는 동작이 `decision.ts`의
+     `statusOf()`(denied→actionable) 특성상 화면의 명시적 자동 skip
+     호출 없이는 실제로 성립하지 않는다는 로직 갭을 발견해 FR-008에
+     "구현 함의" 문단과 tasks.md T014에 CRITICAL 주석을 추가했다.
+  3. `Button` `primary` variant 배경 변경(accent→danger)의 영향
+     범위를 "온보딩 화면 유일"이라고 서술했으나 실제로는
+     `AuthorPicker`·`AutoDiarySettingsScreen`·`SelectRow`도 `accent`를
+     텍스트 색으로 직접 써서(회귀 위험) FR-012·FR-013에 정정 반영,
+     tasks.md T005b·T005c 추가.
+  4. **가장 심각했던 오류**: `accentForeground`를 `#201e1d`로 정하면
+     DT4가 통과한다고 1차 판단했으나, 재계산 결과 3.95:1로 여전히
+     4.5:1 미달이었다(DT4는 실사용처와 무관하게 `COLORS` 값 자체를
+     비교하는 테스트라는 점을 놓쳤음). 순검정(#000000, 5.00:1)으로
+     최종 확정, DT4 6쌍 전체를 node로 재계산해 전부 PASS 확인.
