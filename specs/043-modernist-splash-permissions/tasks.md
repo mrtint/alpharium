@@ -49,6 +49,18 @@
       화면 테스트가 색상 하드코딩 어서션 없이 여전히 통과하는지 확인한다
       (버튼 배경색을 직접 단정하는 기존 테스트가 있다면 `COLORS.danger`
       기준으로 갱신, 구조·문구 관련 테스트는 그대로 통과해야 함 — FR-013).
+- [ ] T005b [P] **★ CRITICAL — analyze 2차 재검토에서 발견**: `accent`를
+      텍스트 색으로 직접 쓰는 자리 3곳의 `color: COLORS.accent`를
+      `color: COLORS.danger`로 바꾼다(FR-012 추가 발견, SC-005) —
+      `src/ui/AuthorPicker.tsx`(108·125·156줄, "작성자"·"이름 바꾸기"
+      라벨), `src/ui/AutoDiarySettingsScreen.tsx`(78줄, 캡션 라벨),
+      `src/ui/components/SelectRow.tsx`(93줄, 선택 라벨). **테두리색으로
+      쓰이는 `COLORS.accent`(`ROW_SELECTED`, `rowSelected`,
+      `hourCellSelected` 등, border는 텍스트가 아니므로 DT4 대상 아님)는
+      바꾸지 않는다** — 텍스트 색 용도만 교체한다. JSX 구조·문구는
+      한 글자도 바꾸지 않는다(FR-013).
+- [ ] T005c `npm run test:ui`로 T005b가 건드린 세 파일의 기존 테스트가
+      여전히 통과하는지 확인한다(구조 변경 없음을 재확인).
 - [ ] T006 `src/onboarding/requirements.ts`의 `battery-exception` 항목
       `platforms` 필드를 `["android", "ios"]`에서 `["android"]`로
       수정한다(FR-017, 이번 스펙의 유일한 로직 계층 변경). 항목 옆 주석에

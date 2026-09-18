@@ -231,6 +231,16 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
   쓰인다 — "유일한 자리"라는 서술은 사실 오류였다. `Button`은 `src/ui/
   components/`의 전역 공유 컴포넌트라 이 변경은 범위 밖 화면의 버튼
   색에도 파급된다. FR-013이 이를 허용 범위로 명시한다.
+  **추가 발견(analyze 2차 재검토)**: `accent`를 **텍스트 색**으로 직접
+  쓰는 자리가 `Button` 밖에도 있다 — `AuthorPicker.tsx`("작성자"·"이름
+  바꾸기" 라벨), `AutoDiarySettingsScreen.tsx`(캡션 라벨),
+  `SelectRow.tsx`(선택 표시 라벨)가 `AppText style={{ color:
+  COLORS.accent }}`를 쓴다. 이 텍스트들도 새 `accent`(#ec3013) 값에서
+  bg 대비 3.76:1로 AA 미달이 된다 — 이 스펙(T002의 토큰 교체)이 직접
+  유발하는 회귀이므로 SC-005("모든 텍스트/배경 조합이 WCAG AA 통과")
+  범위 안에서 다뤄야 한다. `Button`과 같은 논리로 이 세 파일의
+  `color: COLORS.accent` 값만 `COLORS.danger`로 바꾼다(레이아웃·JSX
+  구조·문구는 무변경이므로 FR-013 위반이 아니다).
 - **FR-013**: 이번 스펙은 `src/ui/` 중 스플래시 화면과 온보딩(권한 요청)
   화면 두 개의 시각 구현만 새로 작성한다. 그 외 화면(`DiaryHomeScreen`,
   `DiaryListScreen`, `DiaryDetailScreen`, `DayPicker`, `CharacterListScreen`,
@@ -297,6 +307,13 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
   (`npm test`, `npm run lint`)가 전부 통과한다.
 - **SC-005**: 새 팔레트의 모든 텍스트/배경 조합이 WCAG AA 대비 기준을
   통과하는 것을 자동화 테스트(`theme-tokens.test.ts`)로 확인할 수 있다.
+  **범위 명시(analyze 재검토)**: `theme-tokens.test.ts`의 DT4는 `COLORS`
+  키 이름 레벨의 6개 고정 조합만 검사한다 — 개별 화면 파일이 `AppText`에
+  인라인으로 `color: COLORS.accent`를 직접 지정하는 실사용처(예:
+  `AuthorPicker.tsx`)의 대비는 DT4가 검사하지 않는다. 이 스펙은 발견된
+  실사용처(FR-012 참고)를 `danger`로 교체해 문제를 없애는 것으로
+  대응하며, 이 화면들 자체의 대비를 검증하는 새 자동화 테스트를 추가하지
+  않는다(범위 밖 화면에 새 테스트 파일을 만들지 않는다, FR-013 정신).
 
 ## Assumptions
 
