@@ -60,6 +60,14 @@
   기존 결함을 하나 더 발견했다 — `requirements.ts`의 `battery-exception`
   항목이 `platforms: ["android", "ios"]`로 선언돼 있는데, 그 요청에 쓰는
   `expo-intent-launcher`는 iOS를 지원하지 않는다("동등한 API 없음", 공식
-  README). Android 전용 저장소라 지금까지 드러나지 않았다. 사용자 승인
-  하에 이번 043에서 `["android"]`로 정정하기로 FR-017에 반영했다 — 로직
-  계층 무변경 원칙(FR-014)의 유일한 예외, 값 한 줄 수정에 한정.
+  README). 사용자 승인 하에 이번 043에서 `["android"]`로 정정하기로
+  FR-017에 반영했다 — 로직 계층 무변경 원칙(FR-014)의 유일한 예외, 값
+  한 줄 수정에 한정.
+- 사용자 정정: "iOS·웹은 이 저장소의 검증 대상이 아니다"(AGENTS.md)는
+  이 코드가 Android 전용으로 작성된다는 뜻이 아니라, 현재 개발 환경
+  (Windows)에서 연결 가능한 기기가 Android뿐이라 이번 검증 범위가
+  거기로 한정된다는 뜻이다 — Mac 환경이면 iOS 검증도 가능하다. 스펙
+  초안이 이 구분을 "Android 전용 저장소"라는 표현으로 흐렸던 것을
+  Assumptions·FR-017·Clarifications 세 곳에서 정정했다. `platforms`
+  필드가 iOS를 잘못 포함한 것은 검증 미비가 아니라 코드 자체의 사실
+  오류(iOS에 대응 API가 없음)라는 점이 핵심이다.
