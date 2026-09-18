@@ -147,6 +147,7 @@ export function OnboardingScreen({
   const [skipped, setSkipped] = useState<PermissionKey[]>([]);
   const [batteryNoticeShown, setBatteryNoticeShown] = useState(flag.batteryNoticeShown);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const alive = useRef(true);
 
   /* ── 029 — 필수 에셋 다운로드 단계 (FR-015~017·022) ──────────────────── */
@@ -246,8 +247,9 @@ export function OnboardingScreen({
    */
   const allow = useCallback(
     async (step: OnboardingStep) => {
-      if (busy) return;
-      setBusy(true);
+      if (busyRef.current) return;
+      busyRef.current = true;
+      if (alive.current) setBusy(true);
       try {
         let result: PermissionState | undefined;
         switch (step.requirement.key) {
@@ -274,10 +276,11 @@ export function OnboardingScreen({
         }
         await refresh();
       } finally {
+        busyRef.current = false;
         if (alive.current) setBusy(false);
       }
     },
-    [busy, ports, refresh, skip],
+    [ports, refresh, skip],
   );
 
   /*
@@ -309,7 +312,7 @@ export function OnboardingScreen({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.requirement.key, current?.status]);
+  }, [allow, current?.requirement.key, current?.status]);
 
   const openSettings = useCallback(
     async (step: OnboardingStep) => {

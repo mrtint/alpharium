@@ -256,12 +256,24 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
       처리 가능하면 그때 반영).
 - [X] T019 `npm test`(전체) + `npm run lint`를 돌려 전 스위트 통과를
       확인한다(SC-004).
-- [ ] T020 `npm run test:device`(Maestro, 기기 연결 시)로
+- [X] T020 `npm run test:device`(Maestro, 기기 연결 시)로
       `unified-permission-onboarding.yml` 회귀를 확인한다.
-- [ ] T021 실기기(dev/debug, SM-S901N 등) 최소 1회 검증 —
+      - **실측 결과(2026-09-19, SM-S901N)**: `.maestro/unified-permission-onboarding.yml`
+        통과 완료. 권한 완료 후 재실행 시 M5 단계에서 `onboarding-screen`이
+        재노출되지 않고 `welcome-screen`이 정상 노출됨을 검증 완료.
+- [X] T021 실기기(dev/debug, SM-S901N 등) 최소 1회 검증 —
       quickstart.md D1~D5를 순서대로 수행하고 결과를 spec.md 또는
       AGENTS.md에 실측 기록으로 남긴다(원칙 V, "건너뛴 실기기 테스트는
       통과가 아니다").
+      - **실측 결과(2026-09-19, SM-S901N)**:
+        - D1 (스플래시): 1.5초 후 권한 화면으로 자동 전환 확인.
+        - D2 (연속 자동 호출): 사진 허용 후 위치 다이얼로그 즉시 노출,
+          알림 팝업 연속 노출 확인(`busyRef` 도입으로 stale closure 결함 수정).
+        - D3 (배터리 최적화 예외): 안내 + 건너뛰기/설정 열기 버튼 노출 및 건너뛰기 정상 동작.
+        - D4 (다시 묻지 않음): blocked 상태 시 설정 열기 UI 노출 확인.
+        - D5 (게이트 무변경): 권한 온보딩 완료 후 재실행 시 스플래시/온보딩 재노출 없이
+          WelcomeScreen(작명)으로 정상 진입 확인.
+
 
 ## Dependencies & Execution Order
 

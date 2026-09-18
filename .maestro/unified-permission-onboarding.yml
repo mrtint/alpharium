@@ -60,8 +60,14 @@ appId: com.anonymous.alpharium
     id: "onboarding-step-.*"
 - assertNotVisible:
     text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
-- assertNotVisible:
-    id: "onboarding-allow"
+# 배터리 단계가 아니라면 [허용] 버튼이 없어야 한다(사진·위치·알림은 다이얼로그로만 허용, FR-007a·FR-009).
+- runFlow:
+    when:
+      notVisible:
+        id: "onboarding-step-battery-exception"
+    commands:
+      - assertNotVisible:
+          id: "onboarding-allow"
 
 # ★ 031 — **"사진에 담긴 위치"(photo-location) 단계가 온보딩에 없다.**
 #   `ACCESS_MEDIA_LOCATION`은 조회·요청 API가 없어 판정 불가능한 단계였고,
@@ -129,13 +135,13 @@ appId: com.anonymous.alpharium
       - assertNotVisible:
           id: "onboarding-screen"
 
-# ★ M5 — **에셋 미준비 상태로 재실행하면 온보딩이 다시 뜬다**(029 FR-020·SC-004).
-#   `onboarding.json`의 `completed`가 true여도, 필수 에셋이 준비되지 않았으면
-#   진입 게이트가 온보딩을 다시 띄운다(028 model-not-ready 재발 방지).
-#   이 흐름은 다운로드를 완주하지 않으므로 재실행 시 온보딩이 다시 떠야 정상이다.
-#   (에셋을 미리 받아 둔 기기에서는 이 assert가 틀리므로, 이 흐름은 반드시
-#    clearState 상태에서 — 다운로드 미완주 전제로 — 돌린다.)
+# ★ M5 — **온보딩 완료 후 재실행하면 온보딩이 다시 뜨지 않는다**(040 FR-010·FR-011).
+#   권한 스텝이 전부 결정되어 completed: true가 저장되었으므로, 재실행 시
+#   온보딩 화면이 다시 뜨지 않고 다음 단계(작명 화면 welcome-screen)가 뜬다.
 - launchApp:
     clearState: false
-- assertVisible:
+- assertNotVisible:
     id: "onboarding-screen"
+- assertVisible:
+    id: "welcome-screen"
+

@@ -1271,6 +1271,27 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   좁다는 뜻이다.
 - 상세: `specs/042-photo-vision-always/`(`findings.md` §3).
 
+### 043 — Modernist 스플래시·권한 요청 흐름 (2026-09-19)
+
+로드맵 26번. 앱 최초 인상과 권한 획득 흐름을 Modernist 디자인 시스템(오프화이트 배경 `#f3f2f2`, 진한 레드 `#ec3013`, 웜그레이 텍스트)으로 개편하고, 021의 장황했던 설명 카드 단계를 축소하여 OS 다이얼로그 중심의 연속 호출 흐름으로 전환했다.
+
+- **Modernist 디자인 토큰과 WCAG AA 대비 준수**: `src/ui/tokens.ts`에 Modernist 팔레트를 정의하고 `theme-tokens.test.ts`를 통해 WCAG AA 4.5:1(UI 컴포넌트 3:1) 대비를 자동 검증(DT1~DT7). `accentForeground`를 블랙(`#000000`)으로, `danger`를 딥레드(`#ae1800`)로 조정해 가독성 확보.
+- **스플래시 화면(`LogoScreen`)**: 72×72 레드 사각 마크, 굵은 서체의 "Alpharium", 하단 "휴대폰 안에서만" 슬로건과 3점 인디케이터(강조/중간/비활성). 1.5초 후 자동 다음 화면 전환(FR-001~FR-006).
+- **권한 온보딩 간소화 (FR-007~FR-009)**:
+  - 사진·위치·알림 3단계는 자체 설명 카드 및 [허용]/[건너뛰기] 버튼을 완전히 제거하고 빈 Modernist 배경 위에서 OS 다이얼로그를 즉시 연속 호출.
+  - 다이얼로그 거부는 별도 화면 조작 없이 자동으로 건너뛰기로 처리(`skip()` 자동 호출). `blocked`("다시 묻지 않음") 상태에서만 [설정 열기] 버튼 제공.
+  - `battery-exception` 단계는 OS 다이얼로그 호출 통로가 없으므로 기존의 설명 카드 + [설정 열기]/[건너뛰기] 구조를 Modernist 스타일로 유지.
+- **★ 실기기에서 잡은 CRITICAL 버그 — `busy` stale closure 해소**:
+  - 증상: 사진 허용 후 위치 권한 다이얼로그가 뜨지 않고 화면이 멈춤(기기 없는 단위 테스트는 통과했으나 실기기에서 발생).
+  - 원인: `OnboardingScreen`의 `allow` 함수가 `useState(false)`의 `busy`를 클로저로 캡처하고 있었고, `useEffect` deps에서 `allow`가 제외되어 있어 첫 번째 단계에서 `busy = true`로 세팅된 클로저가 다음 단계 타이머에 그대로 전달되어 `if (busy) return`으로 조용히 탈출함.
+  - 처방: `busyRef = useRef(false)`로 즉각적인 동기 가드를 수행하도록 변경하여 연속 권한 다이얼로그 호출이 멈춤 없이 완주되도록 수정.
+- **Maestro `unified-permission-onboarding.yml` 갱신 및 검증**:
+  - 권한이 이미 부여된 기기에서 첫 단계가 배터리 단계일 수 있음을 반영해 [허용] 버튼 부재 어서션 분기(`runFlow.when`) 보정.
+  - 040의 권한 완료 즉시 `completed: true` 저장 설계에 따라, 온보딩 완주 후 재실행 시 온보딩 화면이 다시 뜨지 않고(`assertNotVisible: onboarding-screen`) 다음 첫 실행 단계인 `welcome-screen`이 정상 노출됨(`assertVisible: welcome-screen`)을 검증하도록 M5 갱신.
+  - 실기기(SM-S901N) Maestro 실행 전체 PASS 완료.
+- 상세: `specs/043-modernist-splash-permissions/`.
+
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만
