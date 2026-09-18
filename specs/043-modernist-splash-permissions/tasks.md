@@ -83,12 +83,12 @@
       align-items center): 좌측 "휴대폰 안에서만"(11px, letter-spacing
       0.1em, uppercase, `COLORS.textMuted`, font-weight 600) + 우측 점
       3개(6×6 정사각형, radius 0 — 1번째 `COLORS.accent`, 2번째 accent
-      50% opacity, 3번째 `COLORS.border` 계열 아닌 별도 neutral 값 —
-      마크업의 neutral-300 근사는 textMuted보다 밝은 값이 필요하므로
-      `COLORS.border`를 배경 불투명 버전으로 근사하거나 인라인 rgba
-      사용). 구분선(`borderTopWidth: 2, borderTopColor: COLORS.border`,
-      `paddingTop: 12`). `LOGO_DISPLAY_MS` 타이머 로직(`useEffect` +
-      `setTimeout`)은 그대로 유지한다(FR-006).
+      50% opacity, 3번째 마크업 원본 neutral-300 `#d7d3d3`을 `LogoScreen.tsx`
+      파일 로컬 상수로 직접 선언해 사용 — COLORS 9개 역할에 없는 순수
+      장식색이라 토큰화하지 않는다, DT1 "정확히 9개" 제약 보호). 구분선
+      (`borderTopWidth: 2, borderTopColor: COLORS.border`, `paddingTop: 12`).
+      `LOGO_DISPLAY_MS` 타이머 로직(`useEffect` + `setTimeout`)은 그대로
+      유지한다(FR-006).
 - [ ] T010 [US1] T009에서 새로 필요해진 testID(`splash-logo-mark`,
       `splash-loading-dot-0`~`2` 등)를 T008 테스트와 일치시킨다.
 - [ ] T011 [US1] `npm run test:ui`로 T008 테스트가 통과하는지 확인한다.
@@ -144,8 +144,9 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
 - [ ] T014 [US2] `src/ui/OnboardingScreen.tsx`를 재작성한다:
       - 사진·위치·알림(`battery-exception`이 아닌 모든 단계) 진입 시
         설명 카드 JSX(`rationale`/`ifDenied`/`허용`/`건너뛰기` 버튼)를
-        렌더하지 않는다 — 대신 스플래시와 동일한 Modernist 배경(빈 화면
-        또는 최소한의 로딩 표시)만 유지한다.
+        렌더하지 않는다 — 대신 스플래시와 동일한 Modernist 배경만 그린
+        빈 컨테이너(`testID="onboarding-step-<key>"`만 유지, 추가 텍스트·
+        인디케이터 없음)를 유지한다(FR-009 — 시각 교체 대상은 배경뿐).
       - 기존 `useEffect`(`ONBOARDING_STEP_AUTO_ADVANCE_MS` 타이머)는
         그대로 두되, 배터리가 아닌 단계에서는 설명을 보여준 뒤 지연되는
         것이 아니라 스텝 진입과 동시에(설명 렌더 자체가 없으므로) 짧은
