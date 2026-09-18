@@ -75,7 +75,7 @@ export function AutoDiarySettingsScreen({
           <AppText variant="caption">하루가 지나면 휴대폰이 알아서 그 하루를 일기로 쓴다</AppText>
         </View>
         {settings.enabled && (
-          <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+          <AppText variant="caption" style={{ color: COLORS.danger, fontWeight: "600" }}>
             켜짐
           </AppText>
         )}

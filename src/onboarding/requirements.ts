@@ -96,7 +96,10 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     key: "battery-exception",
     order: 4,
     neededBy: "백그라운드 자동 생성(019/020) — 절전 중에도 정한 시간대에 쓴다",
-    platforms: ["android", "ios"],
+    // 043 FR-017 — iOS는 `expo-intent-launcher`를 지원하지 않는다(공식 README:
+    // "동등한 API가 없어 iOS에서는 의미가 없다"). 021이 잘못 ["android","ios"]로
+    // 선언했던 것을 정정 — 검증 환경 제약이 아니라 iOS 자체에 대응 API가 없다.
+    platforms: ["android"],
     rationale: "기기가 절전에 들어가도 정한 시간대에 일기를 쓰도록 허용을 요청합니다.",
     ifDenied: "자동 생성이 정한 시간보다 많이 늦어질 수 있습니다.",
   },

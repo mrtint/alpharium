@@ -105,7 +105,7 @@ export function AuthorPicker({
               )}
             </View>
             {opt.selected && (
-              <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+              <AppText variant="caption" style={{ color: COLORS.danger, fontWeight: "600" }}>
                 작성자
               </AppText>
             )}
@@ -122,7 +122,7 @@ export function AuthorPicker({
               style={RENAME_BUTTON}
               testID={`author-rename-${index}`}
             >
-              <AppText variant="caption" style={{ color: COLORS.accent }}>
+              <AppText variant="caption" style={{ color: COLORS.danger }}>
                 이름 바꾸기
               </AppText>
             </Pressable>
@@ -153,7 +153,7 @@ export function AuthorPicker({
                   style={RENAME_BUTTON}
                   testID={`author-rename-save-${index}`}
                 >
-                  <AppText variant="caption" style={{ color: COLORS.accent }}>
+                  <AppText variant="caption" style={{ color: COLORS.danger }}>
                     저장
                   </AppText>
                 </Pressable>

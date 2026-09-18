@@ -1,7 +1,8 @@
 /**
- * 032 — 알파리움 디자인 토큰 (단일 출처).
+ * 032/043 — 알파리움 디자인 토큰 (단일 출처).
  *
  * 계약: specs/032-nativewind-ui-system/contracts/design-tokens.md
+ *       specs/043-modernist-splash-permissions/data-model.md
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **왜 여기 하나에 모으는가**: 006~017이 화면마다 그때그때 정한 색·간격·타이포가
@@ -19,40 +20,48 @@
  * **서체는 시스템 기본이다**(spec FR-019a). 타이포 토큰은 크기·굵기·행간만 —
  * 폰트 파일을 번들하지 않는다.
  *
- * 팔레트 방향: 따뜻하고 조용한 미니멀 — 아이보리 배경, 테라코타 강조, 벽돌색
- * 위험. 머티리얼 파랑·순수 회색이 아니다. 모든 텍스트 쌍이 WCAG AA(본문 4.5:1,
- * 큰 텍스트 3:1)를 만족한다 — `contrastRatio`로 검증(theme-tokens.test.ts DT4).
+ * **043 — Modernist 팔레트로 전면 교체**: 오프화이트 배경, 단일 레드 강조,
+ * 제로 라디우스. 032의 따뜻한 미니멀(아이보리·테라코타)을 대체했다. 값은
+ * claude.ai/design 리뷰 보드에서 직접 추출했다(043 스펙 research.md R2).
+ * `accentForeground`는 `accent` 배경 위에서 4.5:1을 만족하는 값이 순검정뿐이라
+ * `#000000`으로 정했지만, 이 조합을 실제로 렌더하는 컴포넌트는 없다 —
+ * `Button` `primary` variant는 대신 `danger` 배경을 쓴다(043 research R2).
+ * `textMuted`도 마크업 원본(#7d7979, 3.85:1 미달)에서 `#6b6767`(5.00:1)로
+ * 근소 조정했다. 모든 텍스트 쌍이 WCAG AA(본문 4.5:1, 큰 텍스트 3:1)를
+ * 만족한다 — `contrastRatio`로 검증(theme-tokens.test.ts DT4).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 /** 색 역할 → 값. 키는 역할이지 색 이름이 아니다(다크 대응 시 같은 키에 다른 값). */
 export const COLORS = {
-  /** 화면 배경 — 따뜻한 오프화이트 */
-  bg: "#FBF7F1",
-  /** 카드·행 배경 — 순수 흰색 */
-  surface: "#FFFFFF",
-  /** 구분선·경계 (hairline) — 저채도 웜 그레이 */
-  border: "#E7DFD3",
-  /** 본문 글자 — 브라운블랙 (vs bg 14.2:1) */
-  text: "#2A2521",
-  /** 보조·캡션 — 웜 그레이 (vs bg 5.4:1) */
-  textMuted: "#6E6459",
-  /** 주요 버튼·강조 배경 — 절제된 테라코타 */
-  accent: "#A8552F",
-  /** accent 위 글자 — 오프화이트 (vs accent 5.0:1) */
-  accentForeground: "#FFF8F2",
-  /** 삭제·되돌릴 수 없는 동작 — 차분한 벽돌색 (vs bg 7.0:1) */
-  danger: "#8F3A2C",
-  /** danger 위 글자 — 오프화이트 (vs danger 7.0:1) */
-  dangerForeground: "#FFF6F3",
+  /** 화면 배경 — 오프화이트 (043 Modernist) */
+  bg: "#f3f2f2",
+  /** 카드·행 배경 — 옅은 회색 */
+  surface: "#eae9e9",
+  /** 구분선·경계 (hairline) — 마크업 divider(어두운 텍스트색 40% 불투명도)를
+   *  bg(#f3f2f2) 위에 합성한 불투명 hex 근사(DT1 — COLORS는 #rrggbb만 허용) */
+  border: "#9f9d9d",
+  /** 본문 글자 — 짙은 블랙 (vs bg 14.86:1) */
+  text: "#201e1d",
+  /** 보조·캡션 — 중간 회색, WCAG 대비 위해 원본보다 근소하게 어둡게 조정 (vs bg 5.00:1) */
+  textMuted: "#6b6767",
+  /** 주요 버튼·강조 배경 — 단일 레드 */
+  accent: "#ec3013",
+  /** accent 배경 위 글자용 값 — 4.5:1을 만족하는 값은 순검정뿐(vs accent 5.00:1).
+   *  실제로 이 조합을 렌더하는 컴포넌트는 없다(Button은 danger를 쓴다). */
+  accentForeground: "#000000",
+  /** 삭제·되돌릴 수 없는 동작 + 강조 텍스트/버튼용 진한 레드 (vs bg 6.41:1) */
+  danger: "#ae1800",
+  /** danger 위 글자 — 오프화이트 (vs danger 6.41:1) */
+  dangerForeground: "#f3f2f2",
 } as const;
 
-/** 모서리 반경. tailwind 기본 간격 그리드(4px)는 재정의하지 않는다. */
+/** 모서리 반경. 043 — Modernist는 전 역할 제로 라디우스. */
 export const RADIUS = {
   /** 카드·행·버튼 */
-  card: 12,
+  card: 0,
   /** 알약형 */
-  pill: 999,
+  pill: 0,
 } as const;
 
 /**

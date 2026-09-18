@@ -64,7 +64,7 @@ type OnboardingStep = {
 |---|---|---|
 | `bg` | `#FBF7F1` | `#f3f2f2` |
 | `surface` | `#FFFFFF` | `#eae9e9` |
-| `border` | `#E7DFD3` | `rgba(32, 30, 29, 0.4)` |
+| `border` | `#E7DFD3` | `#9f9d9d` (divider 40% 불투명도를 bg 위에 합성한 불투명 근사, research R3 — DT1이 hex만 허용) |
 | `text` | `#2A2521` | `#201e1d` |
 | `textMuted` | `#6E6459` | `#6b6767` (research R2 — 원본 #7d7979에서 대비 조정) |
 | `accent` | `#A8552F` | `#ec3013` |
@@ -81,11 +81,22 @@ type OnboardingStep = {
 
 ### `Button` `primary` variant 배경 (`src/ui/components/Button.tsx`)
 
-`BG.primary`를 `COLORS.accent`에서 `COLORS.danger`로 변경(research R2) —
-`accentForeground` vs `accent` 조합이 구조적으로 WCAG AA 미달이라, 텍스트가
-얹히는 강조 버튼은 `danger`(#ae1800, 마크업 accent-700) 배경을 쓴다.
-`accent`(#ec3013) 원본 값은 텍스트가 얹히지 않는 배경/블록(로고 마크 등)에
-그대로 남는다.
+**변경 없음** — `BG.primary`는 그대로 `COLORS.accent`다(research R2 최종
+결정). `accentForeground`를 순검정(`#000000`)으로 확정한 순간 `accent`
+배경 + `accentForeground` 글자 조합 자체가 이미 5.00:1로 DT4를 통과하므로
+배경색을 바꿀 필요가 없다. 구현 단계에서 한 차례 `danger`로 바꿨다가
+`primary`·`danger` variant의 배경이 같아져 `button.test.tsx`의 "variant별로
+다른 배경색" 계약이 깨지는 것을 발견해 원래 설계로 되돌렸다.
+
+### `AuthorPicker`·`AutoDiarySettingsScreen`·`SelectRow`의 accent-as-text 교체
+
+`Button` 밖에서 `accent`를 텍스트 색으로 직접 쓰는 세 자리
+(`AuthorPicker.tsx`의 "작성자"·"이름 바꾸기"·"저장" 라벨,
+`AutoDiarySettingsScreen.tsx`의 캡션 라벨, `SelectRow.tsx`의 선택 라벨)는
+`color: COLORS.accent`를 `color: COLORS.danger`로 바꿨다 — 이 텍스트들은
+`bg`(#f3f2f2) 위에 얹히므로 새 `accent` 값에서 대비 3.76:1로 미달이고,
+`Button`과 달리 검정 글자로 바꾸기엔 캡션류 텍스트라 부자연스럽다. `danger`
+(#ae1800) vs `bg` = 6.41:1로 충분하다.
 
 ## 상태 다이어그램 — 스플래시·권한 화면 전환 (변경 없음, 참고용)
 

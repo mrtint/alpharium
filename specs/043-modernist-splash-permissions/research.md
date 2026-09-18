@@ -64,13 +64,18 @@ battery-exception` **4개**다.
   통과만을 위해 존재하는 상태가 되며, 이는 기존 032 팔레트에서도
   `accentForeground`가 정확히 이 역할(accent 배경 위 대비 보장용
   상수)이었던 것과 같은 성격이다.
-  `Button` 컴포넌트의 `primary` variant 배경색 자체도 `accent`(#ec3013)
-  에서 `danger`(#ae1800)로 바꾼다 — `dangerForeground`(#f3f2f2) vs
-  `danger`(#ae1800) = 6.41:1로 이미 DT4를 충족하는 기존 조합이다.
-  `accent`(#ec3013)는 배경 블록(로고 마크 등 텍스트가 얹히지 않는
-  면적)에만 쓰고, 텍스트가 얹히는 강조 버튼은 `danger` 색상(#ae1800,
-  마크업의 accent-700)을 쓴다 — Clarifications가 이미 합의한 "텍스트에는
-  어두운 변형을 쓴다" 원칙과 같은 논리를 버튼 배경에도 적용한 것이다.
+  **구현 단계 재발견(T005 이후 실제 렌더 회귀에서 확인)**: `accentForeground`
+  를 순검정으로 확정한 순간 `accent` 배경 + `accentForeground` 글자 조합
+  자체가 이미 5.00:1로 DT4를 통과한다 — 즉 `Button` `primary` variant의
+  배경을 `danger`로 바꿀 필요가 애초에 없었다. 처음 시도한 대로 `primary`
+  배경을 `danger`로 바꿨더니 기존 계약 테스트(`button.test.tsx`의 "variant별로
+  다른 배경색이 style에 실린다")가 실패했다 — `primary`와 `danger` variant가
+  똑같은 배경색을 갖게 되어 두 variant를 구분할 시각적 차이가 사라졌기
+  때문이다. **최종 결정: `Button` `primary`는 원래 설계(`accent` 배경 +
+  `accentForeground` 글자)를 그대로 유지한다.** `accentForeground`를
+  순검정으로 확정한 것만으로 이 조합이 이미 유효해졌으므로 별도 색 교체가
+  불필요했다 — R2 앞부분의 "Button 배경을 danger로 바꾼다"는 결정은
+  구현 단계에서 폐기됐다.
 - `dangerForeground`(#f3f2f2) vs `danger`(#ae1800) = **6.41:1** — DT4
   `["dangerForeground","danger",4.5]` 충족(기존 그대로).
 - `danger`(#ae1800) vs `bg`(#f3f2f2) = **6.41:1** — DT4
@@ -96,12 +101,16 @@ Modernist 마크업이 accent-700을 "강조 텍스트/블록의 대비 대안"�
 
 ## R3 — RN에서 `color-mix()` 근사
 
-**Decision**: `divider: "rgba(32, 30, 29, 0.4)"` (즉 `#201e1d`를 40% 불투명도
-rgba로 변환).
+**Decision**: `border: "#9f9d9d"` (불투명 hex — 아래 근거로 rgba에서 변경).
 
 **Rationale**: React Native 스타일 시트는 CSS `color-mix()`를 지원하지
-않는다. `#201e1d` = `rgb(32, 30, 29)`이므로 40% 불투명도의 rgba 값이 정확한
-근사다.
+않는다. 처음에는 `#201e1d`를 40% 불투명도로 표현한 `rgba(32, 30, 29, 0.4)`를
+그대로 쓰려 했으나, **구현 착수 후(T005) `__tests__/theme-tokens.test.ts`의
+DT1("각 값이 #rrggbb hex 문자열이다")이 이를 거부한다는 것을 발견했다** —
+`COLORS`의 모든 값은 `/^#[0-9A-Fa-f]{6}$/` 형식이어야 한다(rgba 불허). 마크업의
+divider(`#201e1d` 40% 불투명도)를 `bg`(#f3f2f2) 위에 알파 합성해 얻은 불투명
+근사값이 `#9f9d9d`다(`fg*a + bg*(1-a)` 채널별 계산). 시각적으로 원본과
+거의 동일하되 DT1 계약을 만족한다.
 
 ## R4 — 스플래시 로딩 점 애니메이션 여부
 

@@ -13,7 +13,7 @@
 
 ## Phase 1: Setup
 
-- [ ] T001 `node -e`로 `contrastRatio()` 로직을 재현해 최종 COLORS 후보
+- [X] T001 `node -e`로 `contrastRatio()` 로직을 재현해 최종 COLORS 후보
       값(bg/surface/border/text/textMuted/accent/accentForeground/danger/
       dangerForeground)의 DT4 대상 6개 쌍 대비를 재확인하고 research.md R2
       표와 실제 일치하는지 확정한다(계산 스크립트는
@@ -24,32 +24,33 @@
 **Purpose**: 두 User Story 모두 이 토큰 교체 위에서 동작한다 — 먼저 끝나야
 화면 재작성이 올바른 색으로 렌더된다.
 
-- [ ] T002 `src/ui/theme/tokens.ts`의 `COLORS` 값을 data-model.md 표대로
+- [X] T002 `src/ui/theme/tokens.ts`의 `COLORS` 값을 data-model.md 표대로
       전면 교체한다(키 9개 이름 불변, 값만 교체: bg=#f3f2f2,
-      surface=#eae9e9, border=rgba(32,30,29,0.4), text=#201e1d,
+      surface=#eae9e9, border=#9f9d9d(DT1 hex 전용 제약으로 rgba 대신 불투명
+      근사, research R3), text=#201e1d,
       textMuted=#6b6767, accent=#ec3013, accentForeground=#000000,
       danger=#ae1800, dangerForeground=#f3f2f2). 상단 주석("032 —
       알파리움 디자인 토큰")도 043 Modernist 팔레트로 갱신한다.
-- [ ] T003 같은 파일의 `RADIUS`를 `{ card: 0, pill: 0 }`으로 교체한다.
-- [ ] T004 [P] `src/ui/components/Button.tsx`의 `BG.primary`를
-      `COLORS.accent`에서 `COLORS.danger`로 변경한다(research R2 — accent
-      배경 위 흰 글자가 구조적으로 WCAG AA 미달이라 강조 버튼은 danger
-      배경을 쓴다). `CLASS.primary`의 tailwind 클래스(`bg-accent`)도
-      `bg-danger`로 맞춘다. **주의(analyze 재검토)**: `Button`은 전역
-      공유 컴포넌트라 이 변경이 `AutoDiarySettingsScreen`·
-      `CharacterListScreen`·`WelcomeScreen` 등 범위 밖 화면의 `primary`
-      버튼 색에도 파급된다 — FR-013이 이를 허용 범위로 명시하므로
-      의도된 영향이다. 그 화면들의 JSX·문구·레이아웃은 절대 수정하지
-      않는다.
-- [ ] T005 `npm run test:logic`을 돌려 `__tests__/theme-tokens.test.ts`의
+- [X] T003 같은 파일의 `RADIUS`를 `{ card: 0, pill: 0 }`으로 교체한다.
+- [X] T004 **변경 없음으로 종결** — `src/ui/components/Button.tsx`의
+      `BG.primary`는 그대로 `COLORS.accent`를 쓴다. 처음에는 계획대로
+      `COLORS.danger`로 바꿨으나(당시 근거: accent 배경 위 흰 글자가
+      WCAG AA 미달), `accentForeground`를 순검정(`#000000`)으로 확정한
+      순간 `accent` 배경 + `accentForeground` 글자 조합 자체가 이미
+      5.00:1로 DT4를 통과한다는 것을 뒤늦게 확인했다. `danger`로 바꾼
+      채로 테스트를 돌리자 `button.test.tsx`의 "variant별로 다른
+      배경색이 style에 실린다"가 실패했다(`primary`·`danger`가 같은
+      배경색이 되어 구분이 사라짐) — 이 회귀를 계기로 원래 설계로
+      되돌렸다(research R2 최종 결정, data-model.md).
+- [X] T005 `npm run test:logic`을 돌려 `__tests__/theme-tokens.test.ts`의
       DT1~DT7이 전부 통과하는지 확인한다(DT4 6개 쌍 특히 확인). 미달이면
       T002 값을 재조정한다.
-- [ ] T005a `npm run test:ui`로 `AutoDiarySettingsScreen`·
+- [X] T005a `npm run test:ui`로 `AutoDiarySettingsScreen`·
       `CharacterListScreen`·`WelcomeScreen` 등 T004의 영향을 받는 기존
       화면 테스트가 색상 하드코딩 어서션 없이 여전히 통과하는지 확인한다
       (버튼 배경색을 직접 단정하는 기존 테스트가 있다면 `COLORS.danger`
       기준으로 갱신, 구조·문구 관련 테스트는 그대로 통과해야 함 — FR-013).
-- [ ] T005b [P] **★ CRITICAL — analyze 2차 재검토에서 발견**: `accent`를
+- [X] T005b [P] **★ CRITICAL — analyze 2차 재검토에서 발견**: `accent`를
       텍스트 색으로 직접 쓰는 자리 3곳의 `color: COLORS.accent`를
       `color: COLORS.danger`로 바꾼다(FR-012 추가 발견, SC-005) —
       `src/ui/AuthorPicker.tsx`(108·125·156줄, "작성자"·"이름 바꾸기"
@@ -59,14 +60,14 @@
       `hourCellSelected` 등, border는 텍스트가 아니므로 DT4 대상 아님)는
       바꾸지 않는다** — 텍스트 색 용도만 교체한다. JSX 구조·문구는
       한 글자도 바꾸지 않는다(FR-013).
-- [ ] T005c `npm run test:ui`로 T005b가 건드린 세 파일의 기존 테스트가
+- [X] T005c `npm run test:ui`로 T005b가 건드린 세 파일의 기존 테스트가
       여전히 통과하는지 확인한다(구조 변경 없음을 재확인).
-- [ ] T006 `src/onboarding/requirements.ts`의 `battery-exception` 항목
+- [X] T006 `src/onboarding/requirements.ts`의 `battery-exception` 항목
       `platforms` 필드를 `["android", "ios"]`에서 `["android"]`로
       수정한다(FR-017, 이번 스펙의 유일한 로직 계층 변경). 항목 옆 주석에
       "iOS는 expo-intent-launcher 미지원(공식 README)"이라는 근거를
       한 줄 남긴다.
-- [ ] T007 `npm run test:logic`으로 `requirements.ts` 관련 계약 테스트
+- [X] T007 `npm run test:logic`으로 `requirements.ts` 관련 계약 테스트
       (있다면)가 T006 이후에도 통과하는지 확인한다.
 
 **Checkpoint**: 토큰·색·배터리 platforms 수정이 끝났다 — 이제 화면
@@ -84,7 +85,7 @@
 
 ### Tests for User Story 1
 
-- [ ] T008 [P] [US1] `__tests__/ui/logo-screen.test.tsx` 신규 작성 —
+- [X] T008 [P] [US1] `__tests__/ui/logo-screen.test.tsx` 신규 작성 —
       `LogoScreen`이 `testID="first-run-logo"`를 렌더하고, 로고 마크
       (`testID="splash-logo-mark"` 등 신규 testID)가 72×72 크기와 accent
       배경을 갖는지, "Alpharium" 타이틀 텍스트가 존재하는지, 하단 안내
@@ -96,7 +97,7 @@
 
 ### Implementation for User Story 1
 
-- [ ] T009 [US1] `src/ui/LogoScreen.tsx`를 1k 마크업 구조로 재작성한다 —
+- [X] T009 [US1] `src/ui/LogoScreen.tsx`를 1k 마크업 구조로 재작성한다 —
       배경 `COLORS.bg`, 패딩(70/20/44 근사), 세로 flex-column, 상단
       영역(flex:1, 세로 중앙 정렬, 좌측 정렬, gap 20): 72×72 accent 정사각
       로고 마크(`RADIUS.card`=0 사용) + "Alpharium" 타이틀(font-size 30,
@@ -111,9 +112,9 @@
       (`borderTopWidth: 2, borderTopColor: COLORS.border`, `paddingTop: 12`).
       `LOGO_DISPLAY_MS` 타이머 로직(`useEffect` + `setTimeout`)은 그대로
       유지한다(FR-006).
-- [ ] T010 [US1] T009에서 새로 필요해진 testID(`splash-logo-mark`,
+- [X] T010 [US1] T009에서 새로 필요해진 testID(`splash-logo-mark`,
       `splash-loading-dot-0`~`2` 등)를 T008 테스트와 일치시킨다.
-- [ ] T011 [US1] `npm run test:ui`로 T008 테스트가 통과하는지 확인한다.
+- [X] T011 [US1] `npm run test:ui`로 T008 테스트가 통과하는지 확인한다.
 
 **Checkpoint**: 스플래시 화면이 완성됐다 — User Story 1은 독립적으로
 검증 가능하다(quickstart D1).
@@ -131,7 +132,7 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
 
 ### Tests for User Story 2
 
-- [ ] T012 [P] [US2] `__tests__/ui/onboarding-screen.test.tsx`를 새 동작에
+- [X] T012 [P] [US2] `__tests__/ui/onboarding-screen.test.tsx`를 새 동작에
       맞춰 재작성한다 — 기존 "S1" describe들이 전제하는 `onboarding-allow`/
       `onboarding-skip`이 사진·위치·알림 단계에서는 더 이상 렌더되지
       않으므로:
@@ -162,7 +163,7 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
         회귀 유지).
       - S5(소스 검사 — `expo-*` 미직접 import, 모델 식별자 없음)는
         그대로 유지.
-- [ ] T013 [P] [US2] `__tests__/ui/onboarding-all-steps-decided.test.tsx`를
+- [X] T013 [P] [US2] `__tests__/ui/onboarding-all-steps-decided.test.tsx`를
       새 동작(설명 카드 없이 `onboarding-skip` 대신 무엇으로 스킵을
       트리거하는지)에 맞춰 갱신한다 — 사진·위치·알림 단계는 스킵 버튼이
       없으므로 "건너뛰어 다음으로" 대신 "거부 콜백이 오면 자동으로
@@ -171,7 +172,7 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
 
 ### Implementation for User Story 2
 
-- [ ] T014 [US2] `src/ui/OnboardingScreen.tsx`를 재작성한다:
+- [X] T014 [US2] `src/ui/OnboardingScreen.tsx`를 재작성한다:
       - **★ CRITICAL — 거부 시 자동 건너뛰기 로직 추가(FR-008 핵심)**:
         `decision.ts`의 `statusOf()`는 `denied` 상태를 `actionable`로
         반환한다(`blocked`가 아닌 한) — 즉 `nextStep()`은 거부 후에도
@@ -211,11 +212,25 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
         단계(029, `showAssetsStep`)와 "[시작하기]" 버튼은 이번 스펙
         범위 밖이므로 기존 로직·문구를 그대로 유지한다(스타일만 토큰
         자동 상속).
-- [ ] T015 [US2] T014에서 사진·위치·알림 단계에 남는 배경 뷰에 필요한
+- [X] T015 [US2] T014에서 사진·위치·알림 단계에 남는 배경 뷰에 필요한
       testID(`onboarding-step-<key>`는 컨테이너 식별용으로 유지 — 기존
       Maestro 흐름이 이 접두사로 조회하므로 삭제하지 않는다)를 확인한다.
-- [ ] T016 [US2] `npm run test:ui`로 T012·T013 테스트가 통과하는지
+- [X] T016 [US2] `npm run test:ui`로 T012·T013 테스트가 통과하는지
       확인한다.
+      **구현 중 발견·수정한 CRITICAL 결함 2건**:
+      1. 자동 전환 `useEffect`의 deps가 `current?.requirement.key`뿐이라,
+         초기 렌더 시 `states`가 비어(`{}`) 있어 일시적으로 `actionable`로
+         판정되고 이후 `refresh()`가 실제 상태(`blocked` 등)를 반영해도
+         같은 `requirement.key`면 effect가 재실행되지 않아 이미 걸린
+         타이머가 살아남는 결함을 계약 테스트로 발견 — deps에
+         `current?.status`를 추가해 상태 변화 시 타이머를 재평가하도록
+         고쳤다.
+      2. `__tests__/ui/onboarding-all-steps-decided.test.tsx`의 두 번째
+         테스트("콜백 없는 단독 사용")가 첫 번째(느린 fake-timer 다단계
+         전환) 테스트와 같은 파일에 있으면 jest-expo RNTL의 `screen`
+         싱글톤이 오염돼 실패했다 — 이 파일이 애초에 "파일을 나누면
+         해소된다"고 기록해 둔 것과 같은 계열의 문제라 같은 처방을
+         적용해 `onboarding-standalone-usage.test.tsx`로 분리했다.
 
 **Checkpoint**: 권한 요청 흐름이 완성됐다 — User Story 2는 독립적으로
 검증 가능하다(quickstart D2~D5).
@@ -224,7 +239,7 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
 
 ## Phase 5: Polish & Cross-Cutting Concerns
 
-- [ ] T017 [P] `.maestro/unified-permission-onboarding.yml`을 새 동작에
+- [X] T017 [P] `.maestro/unified-permission-onboarding.yml`을 새 동작에
       맞춰 수정한다 — 현재 M3("권한 단계에 [건너뛰기]가 있다")과 반복
       스킵 루프(`while: visible: id: onboarding-skip`)가 사진·위치·알림
       단계에서는 더 이상 성립하지 않는다(그 버튼이 배터리 단계에만
@@ -235,11 +250,11 @@ D4("다시 묻지 않음")·D5(게이트 무변경).
       "배터리 단계까지 자동 진행을 기다린 뒤 그 단계에서만 스킵"하는
       구조로 바꾼다. 정확한 조회 방식은 실기기에서 확인 후 확정한다
       (실기기 세션에서 조정 예상).
-- [ ] T018 소스 주석에서 040/021 관련 설명 중 "목적 설명 카드" 언급이
+- [X] T018 소스 주석에서 040/021 관련 설명 중 "목적 설명 카드" 언급이
       사진·위치·알림 단계에도 여전히 적용되는 것처럼 읽히는 부분을
       정정한다(`OnboardingScreen.tsx` 파일 상단 doc 주석, T014에서 함께
       처리 가능하면 그때 반영).
-- [ ] T019 `npm test`(전체) + `npm run lint`를 돌려 전 스위트 통과를
+- [X] T019 `npm test`(전체) + `npm run lint`를 돌려 전 스위트 통과를
       확인한다(SC-004).
 - [ ] T020 `npm run test:device`(Maestro, 기기 연결 시)로
       `unified-permission-onboarding.yml` 회귀를 확인한다.

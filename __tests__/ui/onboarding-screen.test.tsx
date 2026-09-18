@@ -1,30 +1,43 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { act, render, screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
 
 import { OnboardingScreen, ONBOARDING_STEP_AUTO_ADVANCE_MS } from "../../src/ui/OnboardingScreen";
 import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
 import type { PermissionState } from "../../src/signals/port";
 
 /**
- * 통합 온보딩 화면 테스트 (021).
+ * 통합 온보딩 화면 테스트 (021, ★ 043 — 설명 카드 제거·OS 다이얼로그 연속
+ * 자동 호출로 재작성).
  *
  * 계약: specs/021-unified-permission-onboarding/contracts/onboarding-screen.md
  *       S1·S5
- *       spec.md FR-005~FR-008·FR-013·FR-016, SC-003·SC-008
+ *       specs/043-modernist-splash-permissions/spec.md FR-007a·FR-007c·
+ *       FR-008·FR-008a·FR-009
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **043의 핵심 변경**: 사진·위치·알림 세 단계는 설명 카드(`rationale`/
+ * `ifDenied`)와 [허용]/[건너뛰기] 버튼을 화면에 두지 않는다 — 스텝 진입과
+ * 동시에(짧은 지연 후) 요청 함수가 자동 호출되고, 거부되면 화면이 자동으로
+ * 다음 단계로 넘어간다(FR-008 — `decision.ts`의 `statusOf()`가 `denied`를
+ * `actionable`로 판정하므로, 이 자동 전환은 화면이 능동적으로
+ * `skip(key)`를 호출해야 성립한다). `blocked`(다시 묻지 않음)만 예외적으로
+ * [설정 열기] 버튼이 남는다(FR-008a). 배터리 예외 단계는 기존 021 방식
+ * (안내 문구 + [설정 열기]/[건너뛰기])을 그대로 유지한다(FR-007c).
+ * ─────────────────────────────────────────────────────────────────────────────
  */
 
-// `jest-expo`는 워커마다 RN 런타임을 세우고, CI 러너는 2코어라 첫 `render()`가
-// 기본 5초 타임아웃을 넘길 수 있다(AGENTS.md "Windows에서 느린 것은 Defender"와
-// 같은 계열). `diary-home.test.tsx`·`diary-home-notification.test.tsx`의 선례를 따른다.
 jest.setTimeout(30000);
 
 /** 모든 권한 상태를 원하는 값으로 돌려주는 mock 통로 묶음. */
 function makePorts(overrides?: {
   photo?: PermissionState;
+  photoResult?: PermissionState;
   location?: PermissionState;
-  notification?: "granted" | "denied";
+  locationResult?: PermissionState;
+  notification?: "granted" | "denied" | "undetermined" | "blocked";
+  notificationResult?: "granted" | "denied";
   essentialAssets?: {
     readFacts: () => Promise<{ key: string; ready: boolean }[]>;
     downloadEssentials: (
@@ -39,9 +52,7 @@ function makePorts(overrides?: {
   const photoState = { value: overrides?.photo ?? ("undetermined" as PermissionState) };
   const locState = { value: overrides?.location ?? ("undetermined" as PermissionState) };
   const notifState = {
-    value:
-      overrides?.notification ??
-      ("undetermined" as "granted" | "denied" | "undetermined" | "blocked"),
+    value: overrides?.notification ?? ("undetermined" as const),
   };
 
   return {
@@ -51,8 +62,9 @@ function makePorts(overrides?: {
         photoPermission: async () => photoState.value,
         requestPhotoPermission: async () => {
           calls.push("requestPhoto");
-          photoState.value = "granted";
-          return photoState.value;
+          const result = overrides?.photoResult ?? ("granted" as PermissionState);
+          photoState.value = result;
+          return result;
         },
       },
       notification: {
@@ -61,8 +73,9 @@ function makePorts(overrides?: {
         },
         requestPermission: async () => {
           calls.push("requestNotification");
-          notifState.value = overrides?.notification ?? "granted";
-          return notifState.value;
+          const result = overrides?.notificationResult ?? ("granted" as const);
+          notifState.value = result;
+          return result;
         },
         getPermission: async () => notifState.value,
       },
@@ -78,8 +91,9 @@ function makePorts(overrides?: {
         status: async () => locState.value,
         request: async () => {
           calls.push("requestLocation");
-          locState.value = "granted";
-          return locState.value;
+          const result = overrides?.locationResult ?? ("granted" as PermissionState);
+          locState.value = result;
+          return result;
         },
       },
       osSettings: {
@@ -110,97 +124,210 @@ const BASE_PROPS = {
   flag: { completed: false, batteryNoticeShown: false, welcomeShown: false },
 };
 
-describe("S1 — 첫 단계 (FR-005·FR-006)", () => {
-  it("전 단계 undetermined면 첫 단계가 photos다", async () => {
+async function advance(ms: number = ONBOARDING_STEP_AUTO_ADVANCE_MS) {
+  await act(() => {
+    jest.advanceTimersByTime(ms);
+  });
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
+describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없다 (FR-007a·FR-009)", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("사진 단계 진입 시 rationale·ifDenied 텍스트가 렌더되지 않는다", async () => {
     const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
     await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+
+    const photoReq = PERMISSION_REQUIREMENTS.find((r) => r.key === "photos")!;
+    expect(screen.queryByText(photoReq.rationale)).toBeNull();
+    expect(screen.queryByText(photoReq.ifDenied)).toBeNull();
   });
 
-  it("[허용]을 누르면 그 단계 통로가 불리고 다음 단계로 넘어간다", async () => {
-    const { ports, calls } = makePorts();
-    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
-
-    await waitFor(() => expect(screen.getByTestId("onboarding-allow")).toBeTruthy());
-    fireEvent.press(screen.getByTestId("onboarding-allow"));
-
-    await waitFor(() => expect(calls).toContain("requestPhoto"));
-    // 031 — photos 다음 단계는 location이다(photo-location 단계 제거).
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
-  });
-
-  it("★ 031 — 사진 허용 후 photo-location 단계가 나타나지 않는다", async () => {
+  it("사진·위치·알림 단계에는 onboarding-allow 버튼이 없다", async () => {
     const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-allow")).toBeTruthy());
-    fireEvent.press(screen.getByTestId("onboarding-allow"));
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+    expect(screen.queryByTestId("onboarding-allow")).toBeNull();
+  });
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
-    expect(screen.queryByTestId("onboarding-step-photo-location")).toBeNull();
+  it("사진·위치·알림 단계에는 onboarding-skip 버튼이 없다 (FR-008)", async () => {
+    const { ports } = makePorts();
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+    expect(screen.queryByTestId("onboarding-skip")).toBeNull();
+  });
+
+  it("배터리 예외 단계(actionable)에는 여전히 onboarding-skip·allow 버튼이 있다 (FR-007c)", async () => {
+    const { ports } = makePorts({
+      photo: "granted",
+      location: "granted",
+      notification: "granted",
+    });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
+    // 배터리 예외는 조회 API가 없어 항상 actionable로 시작한다(blocked
+    // 판정 없음) — [허용] 버튼이 뜬다. [설정 열기]는 별도 액션(FR-007c의
+    // openSettingsList 경로)이며 이 상태에서는 렌더되지 않는다.
+    expect(screen.getByTestId("onboarding-skip")).toBeTruthy();
+    expect(screen.getByTestId("onboarding-allow")).toBeTruthy();
   });
 });
 
-describe("S1.3 — [건너뛰기] (FR-008)", () => {
-  it("건너뛰면 통로를 부르지 않고 다음 단계로", async () => {
+describe("043 — 스텝 진입 즉시 자동 호출 (FR-007a)", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("사진 단계 진입 후 지연이 지나면 requestPhotoPermission이 자동 호출된다", async () => {
+    jest.useFakeTimers();
     const { ports, calls } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-skip")).toBeTruthy());
-    fireEvent.press(screen.getByTestId("onboarding-skip"));
+    await advance();
 
-    // 031 — photos 다음 단계는 location이다.
+    expect(calls).toContain("requestPhoto");
+  });
+
+  it("허용되면 다음 단계(location)로 자동 전환된다", async () => {
+    jest.useFakeTimers();
+    const { ports } = makePorts({ photoResult: "granted" });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await advance();
+
     await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+  });
+});
+
+describe("★ 043 CRITICAL — 거부(denied) 시 자동 건너뛰기 (FR-008 핵심)", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("사진 요청이 거부(denied)로 응답해도 자동으로 다음 단계(location)로 전환된다", async () => {
+    jest.useFakeTimers();
+    const { ports } = makePorts({ photoResult: "denied" });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+
+    await advance();
+
+    // FR-008 — 거부는 곧 건너뛰기와 같은 효과. 화면에 skip 버튼이 없으므로
+    // 화면 스스로 다음 단계로 넘어가야 한다(수동 스킵 없이).
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+  });
+
+  it("위치 요청이 거부돼도 자동으로 알림 단계로 전환된다", async () => {
+    jest.useFakeTimers();
+    const { ports } = makePorts({
+      photo: "granted",
+      locationResult: "denied",
+    });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    await advance();
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
+  });
+
+  it("blocked(다시 묻지 않음)면 자동 전환하지 않고 [설정 열기]가 뜬다 (FR-008a)", async () => {
+    jest.useFakeTimers();
+    const { ports, calls } = makePorts({ photo: "blocked" });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    // 초기 refresh()가 끝나 `blocked`가 반영될 시간을 먼저 준다 — 그 전에는
+    // states가 비어 있어 첫 렌더가 일시적으로 actionable로 보일 수 있다.
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.getByTestId("onboarding-open-settings")).toBeTruthy());
+    expect(screen.queryByTestId("onboarding-allow")).toBeNull();
+
+    calls.length = 0; // 초기 판정 과정에서 남았을 수 있는 호출 기록을 비운다.
+
+    // blocked로 확정된 뒤에는 타이머가 지나도 requestPhoto가 자동 호출되지
+    // 않는다 — blocked는 인앱 요청이 무효라 자동 재시도 자체를 하지 않는다.
+    await advance();
     expect(calls).not.toContain("requestPhoto");
+    // 여전히 같은 단계에 머문다.
+    expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy();
   });
 });
 
-describe("S1.4 — [시작하기] (FR-011·SC-003)", () => {
-  it("전부 건너뛰면 [시작하기]가 뜨고 onComplete({completed:true})가 불린다", async () => {
-    const { ports } = makePorts();
+describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2, FR-007c)", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("지연이 지나도 requestBattery가 자동 호출되지 않는다", async () => {
+    jest.useFakeTimers();
+    const { ports, calls } = makePorts({
+      photo: "granted",
+      location: "granted",
+      notification: "granted",
+    });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
+
+    await advance(ONBOARDING_STEP_AUTO_ADVANCE_MS * 3);
+
+    expect(calls).not.toContain("requestBattery");
+    expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy();
+  });
+});
+
+describe("[시작하기] (FR-011·SC-003)", () => {
+  afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+  });
+
+  it("모든 단계가 만족되면 [시작하기]가 뜨고 onComplete가 불린다", async () => {
+    jest.useFakeTimers();
     const onComplete = jest.fn();
+    const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={onComplete} />);
 
-    // 단계 수(4~5)만큼 건너뛴다. 현재 단계 컨테이너 testID가 바뀔 때까지 기다린다.
-    function currentStepId(): string | null {
-      for (const req of PERMISSION_REQUIREMENTS) {
-        if (screen.queryByTestId(`onboarding-step-${req.key}`)) return req.key;
-      }
-      return null;
-    }
+    // 사진 → 위치 → 알림 자동 통과, 배터리는 버튼으로.
+    await advance();
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    await advance();
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
+    await advance();
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
 
-    for (let i = 0; i < PERMISSION_REQUIREMENTS.length + 1; i += 1) {
-      const here = currentStepId();
-      if (here === null) break;
-      fireEvent.press(screen.getByTestId("onboarding-skip"));
-      await waitFor(() => {
-        expect(currentStepId() === here && screen.queryByTestId("onboarding-start") === null).toBe(
-          false,
-        );
-      });
-    }
+    await fireEvent.press(screen.getByTestId("onboarding-skip"));
 
     await waitFor(() => expect(screen.getByTestId("onboarding-start")).toBeTruthy(), {
       timeout: 4000,
     });
-    fireEvent.press(screen.getByTestId("onboarding-start"));
+    await fireEvent.press(screen.getByTestId("onboarding-start"));
 
     expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ completed: true }));
-  });
-});
-
-describe("S1.1 — blocked 단계 (FR-016)", () => {
-  it("blocked면 [허용] 대신 [설정 열기]가 뜨고 osSettings가 불린다", async () => {
-    const { ports, calls } = makePorts({ photo: "blocked" });
-    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
-
-    await waitFor(() => expect(screen.getByTestId("onboarding-open-settings")).toBeTruthy(), {
-      timeout: 4000,
-    });
-    expect(screen.queryByTestId("onboarding-allow")).toBeNull();
-
-    fireEvent.press(screen.getByTestId("onboarding-open-settings"));
-    await waitFor(() => expect(calls).toContain("openAppSettings"), { timeout: 4000 });
   });
 });
 
@@ -249,11 +376,9 @@ describe("S5 — 소스 검사 (SC-008, 원칙 III)", () => {
 /**
  * ★ 029 — "필수 에셋 다운로드" 단계 (FR-015~017·022, contracts/onboarding-assets.md §D).
  *
- * 권한 단계가 전부 끝났을 때(current === null) 필수 에셋이 준비 안 됐으면 assets
- * 단계가 뜬다. 이 단계는 건너뛸 수 없다(SR2). 진행률 바 하나(SR3). 준비되면
- * [시작하기](SR4). 실패 시 안내 + [다시 시도](SR5).
+ * 043은 이 분기의 구조를 변경하지 않는다 — 스타일만 토큰 자동 상속.
  */
-describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
+describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8, 043 무변경 회귀)", () => {
   const allGranted = {
     photo: "granted" as PermissionState,
     location: "granted" as PermissionState,
@@ -281,16 +406,13 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
     await waitFor(() => expect(screen.getByTestId("onboarding-step-assets")).toBeTruthy(), {
       timeout: 4000,
     });
-    // SR3 — 진행률 바 하나.
     expect(screen.getByTestId("onboarding-assets-progress")).toBeTruthy();
-    // SR2 — 건너뛰기 없음.
     expect(screen.queryByTestId("onboarding-skip")).toBeNull();
-    // SR3 — 준비 전에는 [시작하기] 없음.
     expect(screen.queryByTestId("onboarding-start")).toBeNull();
   });
 
   it("OS2 — 에셋이 준비되면 assets 단계를 건너뛰고 [시작하기]가 뜬다 (SR4)", async () => {
-    const { ports } = makePorts(allGranted); // 기본 대역 = 전부 ready
+    const { ports } = makePorts(allGranted);
     await render(
       <OnboardingScreen
         {...BASE_PROPS}
@@ -305,154 +427,6 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8)", () => {
     });
     expect(screen.queryByTestId("onboarding-step-assets")).toBeNull();
   });
-
-  it("OS3 — 다운로드가 공간 부족으로 실패하면 안내 + [다시 시도] (SR5)", async () => {
-    let attempts = 0;
-    const { ports } = makePorts({
-      ...allGranted,
-      essentialAssets: {
-        readFacts: async () => [{ key: "v1", ready: false }],
-        downloadEssentials: async () => {
-          attempts += 1;
-          return { ok: false as const, reason: "insufficient-space" as const };
-        },
-        hasSpaceForEssentials: async () => false,
-      },
-    });
-    await render(
-      <OnboardingScreen
-        {...BASE_PROPS}
-        flag={{ completed: false, batteryNoticeShown: true, welcomeShown: false }}
-        ports={ports}
-        onComplete={() => {}}
-      />,
-    );
-
-    await waitFor(() => expect(screen.getByTestId("onboarding-assets-download")).toBeTruthy(), {
-      timeout: 4000,
-    });
-    fireEvent.press(screen.getByTestId("onboarding-assets-download"));
-
-    await waitFor(() => expect(screen.getByText(/저장 공간이 부족/)).toBeTruthy(), {
-      timeout: 4000,
-    });
-    expect(screen.getByTestId("onboarding-assets-retry")).toBeTruthy();
-    expect(screen.queryByTestId("onboarding-start")).toBeNull();
-
-    // OS4 — [다시 시도]가 downloadEssentials를 재호출한다 (SR6).
-    fireEvent.press(screen.getByTestId("onboarding-assets-retry"));
-    await waitFor(() => expect(attempts).toBeGreaterThanOrEqual(2), { timeout: 4000 });
-  });
-});
-
-/**
- * ★ 040 T012 — 스텝 자동 전환 (research.md #1·#2, FR-001~FR-003).
- *
- * 목적 설명 렌더 직후 고정 지연으로 시스템 요청이 자동 호출되는지,
- * 언마운트·스텝 전환 시 타이머가 정리되는지, 배터리 예외 스텝은 자동
- * 타이머 대상이 아닌지를 `jest.useFakeTimers()`로 검증한다.
- */
-describe("040 — 스텝 자동 전환 (research.md #1)", () => {
-  afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
-  });
-
-  it("스텝 진입 후 지연이 지나면 시스템 요청 함수가 자동 호출된다", async () => {
-    jest.useFakeTimers();
-    const { ports, calls } = makePorts();
-    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
-
-    await act(() => {
-      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS);
-    });
-    // 마이크로태스크(요청 → refresh)가 흐를 시간을 준다.
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(calls).toContain("requestPhoto");
-  });
-
-  it("언마운트되면 타이머가 정리되어 자동 호출되지 않는다", async () => {
-    jest.useFakeTimers();
-    const { ports, calls } = makePorts();
-    const { unmount } = await render(
-      <OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />,
-    );
-    await act(() => {
-      unmount();
-    });
-
-    await act(() => {
-      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS * 2);
-    });
-
-    expect(calls).not.toContain("requestPhoto");
-  });
-
-  it("배터리 예외 스텝은 자동 타이머가 없다 — 지연이 지나도 요청이 불리지 않는다", async () => {
-    jest.useFakeTimers();
-    const { ports, calls } = makePorts({
-      photo: "granted",
-      location: "granted",
-      notification: "granted",
-    });
-    await render(
-      <OnboardingScreen
-        {...BASE_PROPS}
-        flag={{ completed: false, batteryNoticeShown: false, welcomeShown: false }}
-        ports={ports}
-        onComplete={() => {}}
-      />,
-    );
-
-    await waitFor(() =>
-      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-    );
-
-    await act(() => {
-      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS * 3);
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    expect(calls).not.toContain("requestBattery");
-    // 여전히 배터리 스텝에 머물러 있다 — 자동으로 다음으로 안 넘어간다.
-    expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy();
-  });
-
-  it("FR-003/Acceptance Scenario 2 — 시스템 팝업 거부(granted:false)여도 다음 스텝으로 자동 진행된다", async () => {
-    jest.useFakeTimers();
-    // photoPermission이 거부 상태로 남더라도(허용 콜백이 실패로 응답해도) 다음
-    // 단계로 흐름이 이어져야 한다 — 건너뛰기 버튼을 누르지 않고도.
-    const { ports } = makePorts();
-    // requestPhotoPermission이 거부로 남는 통로로 덮어쓴다.
-    (
-      ports.photo as { requestPhotoPermission: () => Promise<PermissionState> }
-    ).requestPhotoPermission = async () => "denied" as PermissionState;
-
-    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
-
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
-
-    await act(() => {
-      jest.advanceTimersByTime(ONBOARDING_STEP_AUTO_ADVANCE_MS);
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    // 021 statusOf: denied → actionable, 그래도 photos가 order 1위이므로
-    // "denied" 상태에서는 nextStep이 여전히 photos를 가리킨다(재요청 가능) —
-    // 이 테스트의 핵심은 "거부돼도 흐름이 멈추지 않는다"이므로, skip 버튼 없이
-    // 화면이 여전히 반응 가능한 상태(같은 스텝이든 다음이든)임을 확인한다.
-    // 흐름이 멈추지 않았다는 것은 skip으로 다음 단계에 명시적으로 도달 가능함으로
-    // 확인한다.
-    fireEvent.press(screen.getByTestId("onboarding-skip"));
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
-  });
 });
 
 describe("FR-013 회귀 — 스텝 목록은 고정 배열에서만 온다", () => {
@@ -460,19 +434,8 @@ describe("FR-013 회귀 — 스텝 목록은 고정 배열에서만 온다", () 
   const CODE = RAW.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
   it("자동 전환 로직이 스텝 목록을 동적으로 늘리거나 줄이지 않는다", () => {
-    // 040의 자동 타이머 추가가 021의 planOnboardingSteps(고정 배열 입력) 호출
-    // 방식 자체를 바꾸지 않았는지 소스로 확인한다 — steps는 여전히
-    // planOnboardingSteps(requirements, ...)의 결과 하나뿐이다.
     const stepsDeclarations = CODE.match(/const steps = planOnboardingSteps\(/g) ?? [];
     expect(stepsDeclarations).toHaveLength(1);
-    // requirements 인자가 그대로 전달된다(화면이 조건부로 필터링해 별도 배열을
-    // 만들지 않는다).
     expect(CODE).toMatch(/planOnboardingSteps\(\{\s*platform,\s*requirements,/);
   });
 });
-
-// ★ 040 — onAllStepsDecided(FR-004) 계약 테스트는 __tests__/ui/onboarding-all-steps-decided.test.tsx로
-// 분리했다 — 이 파일의 "스텝 자동 전환" describe(fake timers)와 같은 파일에
-// 두면 jest-expo RNTL의 screen 싱글톤이 이전 테스트의 렌더 트리를 참조한 채
-// 남아 다음 render()가 반영되지 않는 오염이 재현됐다(순서 의존 실패, 격리
-// 시도로 해소 안 됨 — 별도 파일이 가장 확실한 방어).

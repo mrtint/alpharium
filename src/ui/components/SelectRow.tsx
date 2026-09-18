@@ -90,7 +90,7 @@ export function SelectRow({
               {opt.hint !== undefined && <AppText variant="caption">{opt.hint}</AppText>}
             </View>
             {selected && (
-              <AppText variant="caption" style={{ color: COLORS.accent, fontWeight: "600" }}>
+              <AppText variant="caption" style={{ color: COLORS.danger, fontWeight: "600" }}>
                 선택
               </AppText>
             )}

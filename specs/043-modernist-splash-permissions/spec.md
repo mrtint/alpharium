@@ -223,42 +223,38 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
   `COLORS` 값 자체를 직접 비교하는 테스트라 실사용처와 무관하게 항상
   검사되며, 흰색(4.20:1)은 물론 어두운 중간값(#201e1d, 3.95:1)도
   기준(4.5:1)을 못 채운다 — **순검정(#000000, 5.00:1)만 충족한다.**
-  `accentForeground`는 `#000000`으로 확정하되, `Button` `primary`
-  variant의 배경색을 `accent`에서 `danger`(#ae1800, 마크업 accent-700)로
-  바꾸어 이 조합을 실제로 렌더하는 컴포넌트가 이번 스펙 범위에는 없게
-  한다(값은 DT4 통과 전용, 032 원본 팔레트에서도 같은 역할이었다).
-  `textMuted`도 원본(#7d7979, 3.85:1)에서 `#6b6767`(5.00:1)로 근소
-  조정한다. `accent`(#ec3013) 원본 값은 배경/블록(로고 마크 등 텍스트가
-  얹히지 않는 면적)에 그대로 유지한다.
-  **정정(analyze 재검토)**: `Button` `primary` variant는 온보딩 화면
-  뿐 아니라 `AutoDiarySettingsScreen`·`CharacterListScreen`·
-  `WelcomeScreen` 등 **범위 밖 화면에서도** variant 미지정(기본값)으로
-  쓰인다 — "유일한 자리"라는 서술은 사실 오류였다. `Button`은 `src/ui/
-  components/`의 전역 공유 컴포넌트라 이 변경은 범위 밖 화면의 버튼
-  색에도 파급된다. FR-013이 이를 허용 범위로 명시한다.
-  **추가 발견(analyze 2차 재검토)**: `accent`를 **텍스트 색**으로 직접
-  쓰는 자리가 `Button` 밖에도 있다 — `AuthorPicker.tsx`("작성자"·"이름
-  바꾸기" 라벨), `AutoDiarySettingsScreen.tsx`(캡션 라벨),
-  `SelectRow.tsx`(선택 표시 라벨)가 `AppText style={{ color:
-  COLORS.accent }}`를 쓴다. 이 텍스트들도 새 `accent`(#ec3013) 값에서
-  bg 대비 3.76:1로 AA 미달이 된다 — 이 스펙(T002의 토큰 교체)이 직접
-  유발하는 회귀이므로 SC-005("모든 텍스트/배경 조합이 WCAG AA 통과")
-  범위 안에서 다뤄야 한다. `Button`과 같은 논리로 이 세 파일의
-  `color: COLORS.accent` 값만 `COLORS.danger`로 바꾼다(레이아웃·JSX
-  구조·문구는 무변경이므로 FR-013 위반이 아니다).
+  `accentForeground`는 `#000000`으로 확정한다. `textMuted`도 원본
+  (#7d7979, 3.85:1)에서 `#6b6767`(5.00:1)로 근소 조정한다. `accent`
+  (#ec3013) 원본 값은 배경/블록(로고 마크 등)에 그대로 유지한다.
+  **최종 결정(구현 단계 재발견)**: `accentForeground`를 순검정으로
+  확정한 순간 `Button` `primary` variant(accent 배경 + accentForeground
+  글자)가 이미 5.00:1로 DT4를 통과하므로, `primary` 배경을 `danger`로
+  바꿀 필요가 애초에 없었다 — 처음에는 그렇게 바꿨지만 기존 계약 테스트
+  (`button.test.tsx`의 "variant별로 다른 배경색이 style에 실린다")가
+  `primary`·`danger` variant의 배경이 같아져 실패하는 것을 구현 단계에서
+  발견해 `Button`은 원래 설계(`accent` 배경 유지)로 되돌렸다.
+  **`Button` 밖에서 `accent`를 텍스트 색으로 직접 쓰는 자리는 여전히
+  회귀 대상이다**(analyze 2차 재검토에서 발견): `AuthorPicker.tsx`
+  ("작성자"·"이름 바꾸기"·"저장" 라벨), `AutoDiarySettingsScreen.tsx`
+  (캡션 라벨), `SelectRow.tsx`(선택 표시 라벨)가 `AppText style={{ color:
+  COLORS.accent }}`를 쓴다 — 이 텍스트들은 `bg`(#f3f2f2) 위에 얹히므로
+  새 `accent` 값에서 대비 3.76:1로 AA 미달이 된다(`Button`과 달리 검정
+  글자를 쓸 처지가 아니다, 캡션류 텍스트라 `accentForeground` 도입은
+  과도함). 이 스펙(T002의 토큰 교체)이 직접 유발하는 회귀이므로
+  SC-005 범위 안에서 다룬다 — 이 세 파일의 `color: COLORS.accent` 값만
+  `COLORS.danger`(#ae1800, bg 대비 6.41:1)로 바꾼다(레이아웃·JSX 구조·
+  문구는 무변경이므로 FR-013 위반이 아니다).
 - **FR-013**: 이번 스펙은 `src/ui/` 중 스플래시 화면과 온보딩(권한 요청)
   화면 두 개의 시각 구현만 새로 작성한다. 그 외 화면(`DiaryHomeScreen`,
   `DiaryListScreen`, `DiaryDetailScreen`, `DayPicker`, `CharacterListScreen`,
   `AuthorPicker`, `AutoDiarySettingsScreen`, `DiagnosticsScreen`,
   `WelcomeScreen`, `WaitingForDownloadScreen` 등)은 **레이아웃(구조·배치)을
-  변경하지 않는다.** "토큰 값 교체의 자동 상속"에는 `COLORS`/`RADIUS` 값
-  변경뿐 아니라, `src/ui/components/`의 전역 공유 컴포넌트(`Button` 등)의
-  색 매핑 변경도 포함된다 — `Button`은 온보딩 화면 전용이 아니라 위
-  화면들에서도 쓰이므로(FR-012 정정 참고), `primary` variant 배경이
-  `accent`→`danger`로 바뀌면 그 화면들의 버튼 색도 함께 바뀐다. 이는
-  레이아웃 변경이 아니라 공유 컴포넌트의 색 값 변경이 자연히 전파된
-  것이므로 이 요구사항 위반이 아니다 — 단, 그 화면들의 JSX 구조·배치·
-  문구는 이번 스펙에서 한 줄도 손대지 않는다.
+  변경하지 않는다.** `COLORS`/`RADIUS` 값 교체는 이 화면들에도 자동
+  상속된다(허용 범위). `AuthorPicker.tsx`·`AutoDiarySettingsScreen.tsx`·
+  `SelectRow.tsx`의 `color: COLORS.accent` → `COLORS.danger` 교체
+  (FR-012)도 값 교체일 뿐 레이아웃 변경이 아니므로 이 요구사항 위반이
+  아니다 — 단, 그 화면들의 JSX 구조·배치·문구는 이번 스펙에서 한 글자도
+  손대지 않는다.
 - **FR-014**: `src/onboarding/decision.ts`(권한 상태 판정)를 포함해
   `src/diary/`, `src/models/`, `src/firstrun/`, `src/schedule/`,
   `src/signals/`, `src/vision/`, `src/inference/`, `src/app/` 등 순수
@@ -355,9 +351,12 @@ claude.ai/design에서 받은 디자인 리뷰 보드(`Alpharium Mobile Screens 
   `accentForeground` vs `accent` 조합은 DT4가 값 자체를 직접 검사하므로
   실사용처를 없애는 것만으로는 부족하다는 것을 2차 재검토(analyze)에서
   확인했다. 순검정(#000000, 5.00:1)만 4.5:1을 충족해 `accentForeground`
-  값을 `#000000`으로 확정하고, 그 조합을 실제로 렌더하는 `Button`
-  `primary` variant의 배경은 `accent`에서 `danger`(#ae1800)로 바꿔
-  화면에는 노출되지 않게 했다(FR-012).
+  값을 `#000000`으로 확정했다 — 이 값 자체가 이미 `accent` 배경 위에서
+  대비를 충족하므로, `Button` `primary` variant는 원래 설계(`accent`
+  배경 유지)를 그대로 쓸 수 있었다(구현 단계에서 `danger`로 바꿨다가
+  `primary`·`danger`가 같은 색이 되는 회귀를 발견해 되돌렸다, FR-012).
+  `Button` 밖에서 `accent`를 텍스트 색으로 쓰는 세 곳(`AuthorPicker`
+  등)은 `bg` 위에 얹히는 캡션류라 여전히 `danger`로 교체했다.
   `textMuted`도 원본(3.85:1 미달)에서 `#6b6767`(5.00:1)로 조정했다.
 - Q: 사용자가 안드로이드에서 권한을 "다시 묻지 않음"으로 거부한 뒤 앱으로
   돌아오면 그 단계를 어떻게 처리하는가? → A: 021의 기존 처리를 그대로
