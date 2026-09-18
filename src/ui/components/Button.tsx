@@ -25,6 +25,13 @@ export type ButtonProps = Omit<PressableProps, "children" | "style"> & {
   testID?: string;
 };
 
+/*
+ * 043 — `accentForeground`는 순검정으로 확정됐다(research.md R2 — 흰
+ * 글자로는 `accent` 배경 위에서 WCAG AA 4.5:1을 구조적으로 못 채우고
+ * 순검정만 충족한다). `primary`는 그대로 `accent` 배경 + `accentForeground`
+ * 글자를 쓴다 — 검정 글자가 이 조합의 대비 기준을 만족시키므로 별도 색으로
+ * 바꿀 필요가 없다.
+ */
 const CLASS: Record<ButtonVariant, string> = {
   primary: "bg-accent",
   secondary: "bg-surface border border-border",

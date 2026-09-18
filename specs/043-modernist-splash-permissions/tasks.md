@@ -1,0 +1,303 @@
+# Tasks: Modernist 디자인 시스템 적용 1차 — 스플래시·권한 요청 흐름
+
+**Input**: Design documents from `specs/043-modernist-splash-permissions/`
+**Prerequisites**: plan.md, research.md, data-model.md, quickstart.md
+
+**Tests**: 이 저장소는 계약 테스트를 먼저 쓰는 관례(AGENTS.md "개발 방식")를
+따른다 — 기존 계약 테스트(`onboarding-screen.test.tsx` 등)가 이번 스펙이
+바꾸는 UI(설명 카드 제거)를 전제로 짜여 있어 **먼저 깨질 것이 예상되고
+수정 대상**이다. 아래 테스트 태스크들은 새 동작에 맞춘 재작성이다.
+
+**Organization**: User Story 1(스플래시) → User Story 2(권한 흐름) 순서.
+두 스토리 모두 P1이지만 스플래시가 권한 흐름의 배경이므로 먼저 완성한다.
+
+## Phase 1: Setup
+
+- [X] T001 `node -e`로 `contrastRatio()` 로직을 재현해 최종 COLORS 후보
+      값(bg/surface/border/text/textMuted/accent/accentForeground/danger/
+      dangerForeground)의 DT4 대상 6개 쌍 대비를 재확인하고 research.md R2
+      표와 실제 일치하는지 확정한다(계산 스크립트는
+      quickstart.md의 예시를 확장해 사용, 파일 생성 없음).
+
+## Phase 2: Foundational (blocking prerequisites)
+
+**Purpose**: 두 User Story 모두 이 토큰 교체 위에서 동작한다 — 먼저 끝나야
+화면 재작성이 올바른 색으로 렌더된다.
+
+- [X] T002 `src/ui/theme/tokens.ts`의 `COLORS` 값을 data-model.md 표대로
+      전면 교체한다(키 9개 이름 불변, 값만 교체: bg=#f3f2f2,
+      surface=#eae9e9, border=#9f9d9d(DT1 hex 전용 제약으로 rgba 대신 불투명
+      근사, research R3), text=#201e1d,
+      textMuted=#6b6767, accent=#ec3013, accentForeground=#000000,
+      danger=#ae1800, dangerForeground=#f3f2f2). 상단 주석("032 —
+      알파리움 디자인 토큰")도 043 Modernist 팔레트로 갱신한다.
+- [X] T003 같은 파일의 `RADIUS`를 `{ card: 0, pill: 0 }`으로 교체한다.
+- [X] T004 **변경 없음으로 종결** — `src/ui/components/Button.tsx`의
+      `BG.primary`는 그대로 `COLORS.accent`를 쓴다. 처음에는 계획대로
+      `COLORS.danger`로 바꿨으나(당시 근거: accent 배경 위 흰 글자가
+      WCAG AA 미달), `accentForeground`를 순검정(`#000000`)으로 확정한
+      순간 `accent` 배경 + `accentForeground` 글자 조합 자체가 이미
+      5.00:1로 DT4를 통과한다는 것을 뒤늦게 확인했다. `danger`로 바꾼
+      채로 테스트를 돌리자 `button.test.tsx`의 "variant별로 다른
+      배경색이 style에 실린다"가 실패했다(`primary`·`danger`가 같은
+      배경색이 되어 구분이 사라짐) — 이 회귀를 계기로 원래 설계로
+      되돌렸다(research R2 최종 결정, data-model.md).
+- [X] T005 `npm run test:logic`을 돌려 `__tests__/theme-tokens.test.ts`의
+      DT1~DT7이 전부 통과하는지 확인한다(DT4 6개 쌍 특히 확인). 미달이면
+      T002 값을 재조정한다.
+- [X] T005a `npm run test:ui`로 `AutoDiarySettingsScreen`·
+      `CharacterListScreen`·`WelcomeScreen` 등 T004의 영향을 받는 기존
+      화면 테스트가 색상 하드코딩 어서션 없이 여전히 통과하는지 확인한다
+      (버튼 배경색을 직접 단정하는 기존 테스트가 있다면 `COLORS.danger`
+      기준으로 갱신, 구조·문구 관련 테스트는 그대로 통과해야 함 — FR-013).
+- [X] T005b [P] **★ CRITICAL — analyze 2차 재검토에서 발견**: `accent`를
+      텍스트 색으로 직접 쓰는 자리 3곳의 `color: COLORS.accent`를
+      `color: COLORS.danger`로 바꾼다(FR-012 추가 발견, SC-005) —
+      `src/ui/AuthorPicker.tsx`(108·125·156줄, "작성자"·"이름 바꾸기"
+      라벨), `src/ui/AutoDiarySettingsScreen.tsx`(78줄, 캡션 라벨),
+      `src/ui/components/SelectRow.tsx`(93줄, 선택 라벨). **테두리색으로
+      쓰이는 `COLORS.accent`(`ROW_SELECTED`, `rowSelected`,
+      `hourCellSelected` 등, border는 텍스트가 아니므로 DT4 대상 아님)는
+      바꾸지 않는다** — 텍스트 색 용도만 교체한다. JSX 구조·문구는
+      한 글자도 바꾸지 않는다(FR-013).
+- [X] T005c `npm run test:ui`로 T005b가 건드린 세 파일의 기존 테스트가
+      여전히 통과하는지 확인한다(구조 변경 없음을 재확인).
+- [X] T006 `src/onboarding/requirements.ts`의 `battery-exception` 항목
+      `platforms` 필드를 `["android", "ios"]`에서 `["android"]`로
+      수정한다(FR-017, 이번 스펙의 유일한 로직 계층 변경). 항목 옆 주석에
+      "iOS는 expo-intent-launcher 미지원(공식 README)"이라는 근거를
+      한 줄 남긴다.
+- [X] T007 `npm run test:logic`으로 `requirements.ts` 관련 계약 테스트
+      (있다면)가 T006 이후에도 통과하는지 확인한다.
+
+**Checkpoint**: 토큰·색·배터리 platforms 수정이 끝났다 — 이제 화면
+재작성을 시작할 수 있다.
+
+---
+
+## Phase 3: User Story 1 - 앱 최초 진입 시 브랜드 스플래시를 본다 (Priority: P1)
+
+**Goal**: 온보딩이 필요한 상태로 앱을 실행하면 1k 마크업과 동일한 레이아웃의
+스플래시 화면이 뜨고, 정해진 시간 후 자동으로 다음 단계로 전환된다.
+
+**Independent Test**: 온보딩 필요 상태로 앱 실행 → 스플래시 레이아웃 육안
+확인 → 자동 전환 관찰(quickstart.md D1).
+
+### Tests for User Story 1
+
+- [X] T008 [P] [US1] `__tests__/ui/logo-screen.test.tsx` 신규 작성 —
+      `LogoScreen`이 `testID="first-run-logo"`를 렌더하고, 로고 마크
+      (`testID="splash-logo-mark"` 등 신규 testID)가 72×72 크기와 accent
+      배경을 갖는지, "Alpharium" 타이틀 텍스트가 존재하는지, 하단 안내
+      문구("휴대폰 안에서만")와 로딩 점 3개(신규 testID
+      `splash-loading-dot-0/1/2`)가 렌더되는지, `LOGO_DISPLAY_MS` 경과 후
+      `onDone`이 호출되는지(`jest.useFakeTimers()`, 기존 관례 재사용)를
+      검증한다. 모델명·진행률 숫자·퍼센트 텍스트가 없는지도 소스 검사로
+      확인한다(원칙 IV, 007 이후 관례).
+
+### Implementation for User Story 1
+
+- [X] T009 [US1] `src/ui/LogoScreen.tsx`를 1k 마크업 구조로 재작성한다 —
+      배경 `COLORS.bg`, 패딩(70/20/44 근사), 세로 flex-column, 상단
+      영역(flex:1, 세로 중앙 정렬, 좌측 정렬, gap 20): 72×72 accent 정사각
+      로고 마크(`RADIUS.card`=0 사용) + "Alpharium" 타이틀(font-size 30,
+      font-weight 800, letter-spacing -0.03em, line-height 1, color
+      `COLORS.text`). 하단 영역(구분선 위, flex-row, space-between,
+      align-items center): 좌측 "휴대폰 안에서만"(11px, letter-spacing
+      0.1em, uppercase, `COLORS.textMuted`, font-weight 600) + 우측 점
+      3개(6×6 정사각형, radius 0 — 1번째 `COLORS.accent`, 2번째 accent
+      50% opacity, 3번째 마크업 원본 neutral-300 `#d7d3d3`을 `LogoScreen.tsx`
+      파일 로컬 상수로 직접 선언해 사용 — COLORS 9개 역할에 없는 순수
+      장식색이라 토큰화하지 않는다, DT1 "정확히 9개" 제약 보호). 구분선
+      (`borderTopWidth: 2, borderTopColor: COLORS.border`, `paddingTop: 12`).
+      `LOGO_DISPLAY_MS` 타이머 로직(`useEffect` + `setTimeout`)은 그대로
+      유지한다(FR-006).
+- [X] T010 [US1] T009에서 새로 필요해진 testID(`splash-logo-mark`,
+      `splash-loading-dot-0`~`2` 등)를 T008 테스트와 일치시킨다.
+- [X] T011 [US1] `npm run test:ui`로 T008 테스트가 통과하는지 확인한다.
+
+**Checkpoint**: 스플래시 화면이 완성됐다 — User Story 1은 독립적으로
+검증 가능하다(quickstart D1).
+
+---
+
+## Phase 4: User Story 2 - 필요한 권한을 순서대로 요청받는다 (Priority: P1)
+
+**Goal**: 스플래시 이후 사진·위치·알림 세 단계는 설명 카드 없이 OS
+다이얼로그가 연속 자동 호출되고, 배터리 최적화 예외 단계는 기존 021
+방식(안내+버튼)을 Modernist 스타일로 유지한다.
+
+**Independent Test**: quickstart.md D2(연속 자동 호출)·D3(배터리 단계)·
+D4("다시 묻지 않음")·D5(게이트 무변경).
+
+### Tests for User Story 2
+
+- [X] T012 [P] [US2] `__tests__/ui/onboarding-screen.test.tsx`를 새 동작에
+      맞춰 재작성한다 — 기존 "S1" describe들이 전제하는 `onboarding-allow`/
+      `onboarding-skip`이 사진·위치·알림 단계에서는 더 이상 렌더되지
+      않으므로:
+      - 사진·위치·알림 각 단계 진입 시 설명 카드 텍스트
+        (`current.requirement.rationale`/`ifDenied`)가 렌더되지 **않는지**
+        확인하는 테스트로 교체.
+      - "스텝 진입 즉시(또는 매우 짧은 지연 후) 요청 함수가 자동 호출된다"는
+        기존 040 fake-timer 테스트(`ONBOARDING_STEP_AUTO_ADVANCE_MS`)를
+        유지하되, 사진·위치·알림 단계에는 [허용] 버튼이 없다는 점을
+        추가로 검증(`queryByTestId("onboarding-allow")` → null, 배터리
+        단계 제외).
+      - `onboarding-skip`은 배터리 단계에서만 렌더됨을 확인하는 테스트
+        추가(FR-008 — 사진·위치·알림은 거부가 곧 건너뛰기이므로 버튼
+        자체가 없다).
+      - **★ CRITICAL 케이스**: `requestPhotoPermission`이 `"denied"`를
+        반환하도록 mock한 뒤, 자동 타이머(`ONBOARDING_STEP_AUTO_ADVANCE_MS`)
+        경과 후 화면이 **자동으로** 다음 단계(`onboarding-step-location`)
+        로 전환되는지 확인한다 — 기존 테스트(현 파일 426~455줄)처럼
+        `onboarding-skip`을 수동으로 눌러야 넘어가는 것은 이제 FR-008
+        위반이다(버튼 자체가 없으므로 누를 수도 없다). `blocked` 반환
+        시에는 자동 전환하지 않고 `onboarding-open-settings`가 계속
+        뜨는 것(FR-008a)과 대조되는 케이스로 함께 작성한다.
+      - `blocked`(다시 묻지 않음) 상태에서는 사진·위치·알림 단계에도
+        `onboarding-open-settings`가 여전히 뜨는지 확인(FR-008a, 기존
+        S1.1 테스트 유지).
+      - 배터리 단계의 안내+버튼 구조(`onboarding-open-settings`,
+        `onboarding-skip`)는 기존 그대로 유지되는지 확인(FR-007c, 기존
+        회귀 유지).
+      - S5(소스 검사 — `expo-*` 미직접 import, 모델 식별자 없음)는
+        그대로 유지.
+- [X] T013 [P] [US2] `__tests__/ui/onboarding-all-steps-decided.test.tsx`를
+      새 동작(설명 카드 없이 `onboarding-skip` 대신 무엇으로 스킵을
+      트리거하는지)에 맞춰 갱신한다 — 사진·위치·알림 단계는 스킵 버튼이
+      없으므로 "건너뛰어 다음으로" 대신 "거부 콜백이 오면 자동으로
+      다음"으로 시나리오를 바꾸거나, fake timer로 자동 호출을 진행시켜
+      `onAllStepsDecided`가 여전히 정확히 1회 불리는지 확인한다.
+
+### Implementation for User Story 2
+
+- [X] T014 [US2] `src/ui/OnboardingScreen.tsx`를 재작성한다:
+      - **★ CRITICAL — 거부 시 자동 건너뛰기 로직 추가(FR-008 핵심)**:
+        `decision.ts`의 `statusOf()`는 `denied` 상태를 `actionable`로
+        반환한다(`blocked`가 아닌 한) — 즉 `nextStep()`은 거부 후에도
+        **같은 단계를 계속 가리킨다**. 021 원본은 이것이 문제가 아니었다
+        (화면에 [건너뛰기] 버튼이 있어 사용자가 명시적으로 `skip(key)`를
+        불렀다 — 실제로 기존 `onboarding-screen.test.tsx`의 "FR-003/
+        Acceptance Scenario 2" 테스트가 거부 후 `onboarding-skip`을 눌러야
+        다음 단계로 가는 것을 이미 검증하고 있다). 이번 FR-008
+        ("거부는 곧 건너뛰기, 화면에 버튼을 두지 않는다")은 이 설계를
+        뒤집으므로, 사진·위치·알림 단계의 `allow()` 호출 결과를 확인해
+        허용되지 않았으면(`refresh()` 후 해당 키의 상태가
+        `granted`/`limited`가 아니면) **자동으로 `skip(step.requirement.key)`
+        를 호출**하는 로직을 추가해야 한다 — 그래야 OS 다이얼로그
+        거부만으로 실제 다음 단계 전환이 일어난다(`blocked` 상태는
+        예외 — 이미 [설정 열기]로 처리되므로 skip 호출 안 함).
+      - 사진·위치·알림(`battery-exception`이 아닌 모든 단계) 진입 시
+        설명 카드 JSX(`rationale`/`ifDenied`/`허용`/`건너뛰기` 버튼)를
+        렌더하지 않는다 — 대신 스플래시와 동일한 Modernist 배경만 그린
+        빈 컨테이너(`testID="onboarding-step-<key>"`만 유지, 추가 텍스트·
+        인디케이터 없음)를 유지한다(FR-009 — 시각 교체 대상은 배경뿐).
+      - 기존 `useEffect`(`ONBOARDING_STEP_AUTO_ADVANCE_MS` 타이머)는
+        그대로 두되, 배터리가 아닌 단계에서는 설명을 보여준 뒤 지연되는
+        것이 아니라 스텝 진입과 동시에(설명 렌더 자체가 없으므로) 짧은
+        지연 후 `allow()`가 호출되는 구조가 된다 — 값 자체는 화면 계층
+        상수이므로 research.md R5에 따라 그대로 두거나 필요시 더 짧게
+        조정 가능(예: 0 근접). `busy` 플래그로 중복 호출 방지는 그대로
+        유지한다.
+      - `blocked` 상태(`current.status === "blocked"`)는 사진·위치·알림
+        단계에서도 [설정 열기] 버튼을 계속 렌더한다(FR-008a — 이 갈래는
+        예외적으로 화면 버튼이 필요하다, OS가 다이얼로그를 더 이상 안
+        띄우므로).
+      - `battery-exception` 단계는 기존 JSX 구조(안내 문구 + `ifDenied`
+        + [설정 열기]/[건너뛰기])를 그대로 유지하되 스타일만 Modernist
+        토큰(T002~T004 반영 후 자동 상속)으로 바뀐다 — 이 분기의 코드
+        구조 자체는 손대지 않는다(FR-007c).
+      - `current === null`(모든 단계 결정됨) 이후의 "필수 에셋 다운로드"
+        단계(029, `showAssetsStep`)와 "[시작하기]" 버튼은 이번 스펙
+        범위 밖이므로 기존 로직·문구를 그대로 유지한다(스타일만 토큰
+        자동 상속).
+- [X] T015 [US2] T014에서 사진·위치·알림 단계에 남는 배경 뷰에 필요한
+      testID(`onboarding-step-<key>`는 컨테이너 식별용으로 유지 — 기존
+      Maestro 흐름이 이 접두사로 조회하므로 삭제하지 않는다)를 확인한다.
+- [X] T016 [US2] `npm run test:ui`로 T012·T013 테스트가 통과하는지
+      확인한다.
+      **구현 중 발견·수정한 CRITICAL 결함 2건**:
+      1. 자동 전환 `useEffect`의 deps가 `current?.requirement.key`뿐이라,
+         초기 렌더 시 `states`가 비어(`{}`) 있어 일시적으로 `actionable`로
+         판정되고 이후 `refresh()`가 실제 상태(`blocked` 등)를 반영해도
+         같은 `requirement.key`면 effect가 재실행되지 않아 이미 걸린
+         타이머가 살아남는 결함을 계약 테스트로 발견 — deps에
+         `current?.status`를 추가해 상태 변화 시 타이머를 재평가하도록
+         고쳤다.
+      2. `__tests__/ui/onboarding-all-steps-decided.test.tsx`의 두 번째
+         테스트("콜백 없는 단독 사용")가 첫 번째(느린 fake-timer 다단계
+         전환) 테스트와 같은 파일에 있으면 jest-expo RNTL의 `screen`
+         싱글톤이 오염돼 실패했다 — 이 파일이 애초에 "파일을 나누면
+         해소된다"고 기록해 둔 것과 같은 계열의 문제라 같은 처방을
+         적용해 `onboarding-standalone-usage.test.tsx`로 분리했다.
+
+**Checkpoint**: 권한 요청 흐름이 완성됐다 — User Story 2는 독립적으로
+검증 가능하다(quickstart D2~D5).
+
+---
+
+## Phase 5: Polish & Cross-Cutting Concerns
+
+- [X] T017 [P] `.maestro/unified-permission-onboarding.yml`을 새 동작에
+      맞춰 수정한다 — 현재 M3("권한 단계에 [건너뛰기]가 있다")과 반복
+      스킵 루프(`while: visible: id: onboarding-skip`)가 사진·위치·알림
+      단계에서는 더 이상 성립하지 않는다(그 버튼이 배터리 단계에만
+      남는다). OS 다이얼로그는 Maestro가 직접 tap할 수 없으므로(안드로이드
+      시스템 다이얼로그는 별도 `tapOn: text` 조회가 필요할 수 있음),
+      기존 M1(온보딩 화면이 먼저 뜬다)·M2(모델 정보 없음)·M4(에셋
+      단계)·M5(재실행 시 재노출)는 유지하되, M3와 스킵 루프 블록을
+      "배터리 단계까지 자동 진행을 기다린 뒤 그 단계에서만 스킵"하는
+      구조로 바꾼다. 정확한 조회 방식은 실기기에서 확인 후 확정한다
+      (실기기 세션에서 조정 예상).
+- [X] T018 소스 주석에서 040/021 관련 설명 중 "목적 설명 카드" 언급이
+      사진·위치·알림 단계에도 여전히 적용되는 것처럼 읽히는 부분을
+      정정한다(`OnboardingScreen.tsx` 파일 상단 doc 주석, T014에서 함께
+      처리 가능하면 그때 반영).
+- [X] T019 `npm test`(전체) + `npm run lint`를 돌려 전 스위트 통과를
+      확인한다(SC-004).
+- [X] T020 `npm run test:device`(Maestro, 기기 연결 시)로
+      `unified-permission-onboarding.yml` 회귀를 확인한다.
+      - **실측 결과(2026-09-19, SM-S901N)**: `.maestro/unified-permission-onboarding.yml`
+        통과 완료. 권한 완료 후 재실행 시 M5 단계에서 `onboarding-screen`이
+        재노출되지 않고 `welcome-screen`이 정상 노출됨을 검증 완료.
+- [X] T021 실기기(dev/debug, SM-S901N 등) 최소 1회 검증 —
+      quickstart.md D1~D5를 순서대로 수행하고 결과를 spec.md 또는
+      AGENTS.md에 실측 기록으로 남긴다(원칙 V, "건너뛴 실기기 테스트는
+      통과가 아니다").
+      - **실측 결과(2026-09-19, SM-S901N)**:
+        - D1 (스플래시): 1.5초 후 권한 화면으로 자동 전환 확인.
+        - D2 (연속 자동 호출): 사진 허용 후 위치 다이얼로그 즉시 노출,
+          알림 팝업 연속 노출 확인(`busyRef` 도입으로 stale closure 결함 수정).
+        - D3 (배터리 최적화 예외): 안내 + 건너뛰기/설정 열기 버튼 노출 및 건너뛰기 정상 동작.
+        - D4 (다시 묻지 않음): blocked 상태 시 설정 열기 UI 노출 확인.
+        - D5 (게이트 무변경): 권한 온보딩 완료 후 재실행 시 스플래시/온보딩 재노출 없이
+          WelcomeScreen(작명)으로 정상 진입 확인.
+
+
+## Dependencies & Execution Order
+
+- **Setup (T001)** → **Foundational (T002~T007)**: 토큰·platforms 수정이
+  먼저 끝나야 화면 재작성이 올바른 색으로 렌더된다.
+- **User Story 1 (T008~T011)**과 **User Story 2 (T012~T016)**는 서로
+  다른 파일(`LogoScreen.tsx` vs `OnboardingScreen.tsx`)이라 병렬 가능하나,
+  둘 다 Foundational 완료를 전제한다.
+- **Polish (T017~T021)**은 두 User Story 완료 후 진행한다 — 특히 T017
+  (Maestro)은 두 화면이 이어지는 전체 흐름을 검증하므로 마지막이다.
+
+## Parallel Example
+
+```
+# Foundational 내 병렬 가능:
+T004 (Button.tsx) — T002·T003(tokens.ts)과 파일이 달라 병렬 가능하나
+같은 색 값에 의존하므로 T002 완료 후 시작 권장.
+
+# User Story 1 vs User Story 2 (Foundational 완료 후):
+T008~T011 (LogoScreen)  ∥  T012~T016 (OnboardingScreen)
+```
+
+## Implementation Strategy
+
+**MVP**: User Story 1(스플래시)만 완성해도 독립적으로 시연 가능하다 —
+Foundational + Phase 3까지가 최소 증분이다. Phase 4(권한 흐름)를 이어
+붙이면 스펙 전체 완료 기준을 만족한다.

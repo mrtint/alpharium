@@ -1,11 +1,14 @@
 /**
- * 통합 권한 온보딩 화면 (021, ★ 040 — 스텝 자동 전환 추가).
+ * 통합 권한 온보딩 화면 (021, ★ 040 — 스텝 자동 전환, ★ 043 — 설명 카드
+ * 제거·OS 다이얼로그 연속 자동 호출로 전면 재작성).
  *
  * 계약: specs/021-unified-permission-onboarding/contracts/onboarding-screen.md
  *       S1
  *       spec.md FR-005~FR-008·FR-013·FR-015·FR-016, SC-001·SC-003·SC-008
  *       specs/040-onboarding-parallel-setup/research.md #1·#2
  *       specs/040-onboarding-parallel-setup/spec.md FR-001~FR-003
+ *       specs/043-modernist-splash-permissions/spec.md FR-007a·FR-007c·
+ *       FR-008·FR-008a·FR-009, research.md R5
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **판정은 화면이 하지 않는다.** `planOnboardingSteps`·`nextStep`(순수)이 정하고,
@@ -20,16 +23,31 @@
  * **모델 정보 없음**(원칙 III) — `expo-*`를 직접 import하지 않고 통로를 주입받는다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **★ 040 — 스텝 진입 시 목적 설명을 렌더한 직후 고정 지연으로 시스템 권한
- * 요청을 자동 호출한다**(FR-001). 사용자가 [허용]을 눌러도 되고, 누르지 않아도
- * 지연 후 같은 요청이 자동으로 나간다 — 둘 다 같은 `allow()`를 부르므로 중복
- * 호출 방지(`busy` 플래그)가 그대로 방어한다.
+ * **★ 043 — 사진·위치·알림 세 단계는 목적 설명 카드·[허용]/[건너뛰기] 버튼을
+ * 화면에 두지 않는다**(FR-007a·FR-009). 스텝 진입 즉시(고정 지연 후) 시스템
+ * 권한 요청 함수가 자동 호출되고, 배경은 스플래시와 같은 Modernist 배경만
+ * 유지한다 — 사용자는 OS 다이얼로그에서 직접 허용·거부한다.
  *
- * **배터리 예외 스텝은 자동 타이머 대상이 아니다**(research.md #2, FR-002) —
+ * **★ 043 — 거부는 곧 건너뛰기다**(FR-008). `decision.ts`의 `statusOf()`는
+ * `denied` 상태를 `blocked`가 아닌 한 `actionable`로 판정하므로(재시도
+ * 가능하다는 뜻), 화면이 아무 조치도 하지 않으면 거부 후에도 `nextStep()`이
+ * 계속 같은 단계를 가리킨다 — 021 원본은 화면의 [건너뛰기] 버튼(사용자가
+ * 명시적으로 `skip(key)`를 호출)으로 이 간극을 메웠는데, 그 버튼을 없애는
+ * 이상 **`allow()`가 허용 결과를 받지 못하면 자동으로 `skip(step.requirement.key)`
+ * 를 호출**해야 한다(`blocked`는 예외 — [설정 열기]로 처리되므로 skip하지
+ * 않는다). 이는 화면 조립 로직 변경이며 `decision.ts`(순수 판정)는 무변경이다.
+ *
+ * **배터리 예외 단계는 기존 021 방식을 그대로 유지한다**(FR-007c) — iOS엔
+ * 대응 API가 없고 안드로이드에서도 제조사마다 결과가 갈려(027 실측, 삼성
+ * One UI가 설정 목록으로 라우팅) 다른 세 단계와 같은 방식으로 통일하지
+ * 않는다. 안내 문구 + [설정 열기]/[건너뛰기] 버튼 구조는 그대로, 시각
+ * 스타일만 Modernist 토큰(자동 상속)이다.
+ *
+ * **배터리 예외 스텝은 자동 타이머 대상이 아니다**(040 research.md #2) —
  * 조회 API가 없어 사용자가 설정에서 돌아왔는지 자동으로 알 수 없으므로, 이
  * 스텝만 [설정 열기]/[건너뛰기]를 사용자가 직접 눌러야 한다.
  *
- * **지연값은 화면 계층 상수다**(research.md #1) — `onboarding/decision.ts`
+ * **지연값은 화면 계층 상수다**(040 research.md #1) — `onboarding/decision.ts`
  * (순수 판정)에 시간 관련 로직을 두지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -75,10 +93,13 @@ export type OnboardingPorts = {
 };
 
 /**
- * 목적 설명을 보여준 뒤 시스템 권한 요청을 자동 호출하기까지의 고정 지연
- * (research.md #1, FR-001). 화면 계층 상수 — 순수 판정 파일에 두지 않는다.
+ * 스텝 진입부터 시스템 권한 요청을 자동 호출하기까지의 고정 지연
+ * (040 research.md #1, FR-001). 043 이전에는 이 시간 동안 목적 설명 카드를
+ * 보여줬지만, 지금은 설명 카드 자체가 없다(FR-007a) — 배경만 유지한 채
+ * 같은 지연 뒤 요청 함수를 호출한다. 화면 계층 상수 — 순수 판정 파일에
+ * 두지 않는다.
  *
- * `battery-exception` 스텝에는 적용하지 않는다(research.md #2).
+ * `battery-exception` 스텝에는 적용하지 않는다(040 research.md #2).
  */
 export const ONBOARDING_STEP_AUTO_ADVANCE_MS = 1500;
 
@@ -126,6 +147,7 @@ export function OnboardingScreen({
   const [skipped, setSkipped] = useState<PermissionKey[]>([]);
   const [batteryNoticeShown, setBatteryNoticeShown] = useState(flag.batteryNoticeShown);
   const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const alive = useRef(true);
 
   /* ── 029 — 필수 에셋 다운로드 단계 (FR-015~017·022) ──────────────────── */
@@ -213,44 +235,67 @@ export function OnboardingScreen({
     }
   }, [current, onAllStepsDecided]);
 
+  const skip = useCallback((key: PermissionKey) => {
+    setSkipped((prev) => (prev.includes(key) ? prev : [...prev, key]));
+  }, []);
+
+  /**
+   * ★ 043 — 요청 결과가 허용(`granted`/`limited`)이 아니면 자동으로
+   * `skip(key)`를 호출한다(FR-008). 사진·위치·알림 세 단계에만 적용 —
+   * `battery-exception`은 결과를 조회할 API가 없어 이 판정 대상이 아니다
+   * (그 분기는 별도로 처리, 아래 switch에서 조기 반환).
+   */
   const allow = useCallback(
     async (step: OnboardingStep) => {
-      if (busy) return;
-      setBusy(true);
+      if (busyRef.current) return;
+      busyRef.current = true;
+      if (alive.current) setBusy(true);
       try {
+        let result: PermissionState | undefined;
         switch (step.requirement.key) {
           case "photos":
-            await ports.photo.requestPhotoPermission();
+            result = await ports.photo.requestPhotoPermission();
             break;
           case "location":
-            await ports.location.request();
+            result = await ports.location.request();
             break;
-          case "notifications":
+          case "notifications": {
             await ports.notification.ensureChannel().catch(() => {});
-            await ports.notification.requestPermission();
+            const notifResult = await ports.notification.requestPermission();
+            result = notifResult === "granted" ? "granted" : "denied";
             break;
+          }
           case "battery-exception":
             await ports.battery.requestException();
             if (alive.current) setBatteryNoticeShown(true);
-            break;
+            await refresh();
+            return;
+        }
+        if (result !== "granted" && result !== "limited" && alive.current) {
+          skip(step.requirement.key);
         }
         await refresh();
       } finally {
+        busyRef.current = false;
         if (alive.current) setBusy(false);
       }
     },
-    [busy, ports, refresh],
+    [ports, refresh, skip],
   );
 
   /*
-   * ★ 040 — 스텝 진입 시 목적 설명을 렌더한 직후, 고정 지연으로 시스템 권한
-   * 요청을 자동 호출한다(FR-001, research.md #1). `battery-exception`은
-   * 제외한다(research.md #2) — 조회 API가 없어 사용자가 설정에서 돌아왔는지
-   * 자동으로 알 수 없다.
+   * ★ 040 — 스텝 진입 후 고정 지연으로 시스템 권한 요청을 자동 호출한다
+   * (FR-001, research.md #1). ★ 043 — 이 지연 동안 화면에 그리는 것은
+   * Modernist 배경뿐이다(설명 카드 없음, FR-007a). `battery-exception`은
+   * 제외한다(040 research.md #2) — 조회 API가 없어 사용자가 설정에서
+   * 돌아왔는지 자동으로 알 수 없다.
    *
-   * `current?.requirement.key`가 바뀔 때마다(=스텝이 바뀔 때마다) 새 타이머를
-   * 걸고, 언마운트·스텝 변경 시 정리한다 — 이전 스텝의 타이머가 살아남아
-   * 엉뚱한 스텝에서 `allow()`를 부르는 것을 막는다(T012 clean-up 검증 대상).
+   * `current?.requirement.key`뿐 아니라 **`current?.status`도 deps에 넣는다**
+   * (043 실기기 대비 계약 테스트에서 발견 — 초기 렌더 시 `states`가 아직
+   * 비어(`{}`) 있어 일시적으로 `actionable`로 판정되고, `refresh()` 완료 후
+   * `blocked`로 바뀌어도 같은 `requirement.key`라면 이 useEffect가 재실행되지
+   * 않아 이미 걸린 타이머가 그대로 살아남는 결함이 있었다 — `status`가 바뀌면
+   * 타이머를 다시 평가해 `blocked`가 됐을 때 클린업으로 취소되게 한다).
    *
    * `current.status`가 `blocked`면 [허용]이 아니라 [설정 열기]가 유효한
    * 경로이므로 자동 타이머를 걸지 않는다 — OS 설정은 화면 버튼으로만 연다.
@@ -267,7 +312,7 @@ export function OnboardingScreen({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.requirement.key]);
+  }, [allow, current?.requirement.key, current?.status]);
 
   const openSettings = useCallback(
     async (step: OnboardingStep) => {
@@ -279,10 +324,6 @@ export function OnboardingScreen({
     },
     [ports],
   );
-
-  const skip = useCallback((key: PermissionKey) => {
-    setSkipped((prev) => (prev.includes(key) ? prev : [...prev, key]));
-  }, []);
 
   const finish = useCallback(() => {
     // 035 — `welcomeShown`은 이 화면이 정하지 않는다. 온보딩을 끝냈다고 해서 연출을
@@ -367,7 +408,9 @@ export function OnboardingScreen({
             </Button>
           </View>
         </View>
-      ) : (
+      ) : current.requirement.key === "battery-exception" ? (
+        // FR-007c — 배터리 최적화 예외는 기존 021 화면 구조(안내 문구 +
+        // [설정 열기]/[건너뛰기])를 그대로 유지한다. 시각 스타일만 토큰 자동 상속.
         <View style={styles.section} testID={`onboarding-step-${current.requirement.key}`}>
           <AppText variant="caption" style={{ opacity: 0.5 }}>
             {Math.min(doneCount + 1, total)} / {total}
@@ -396,6 +439,30 @@ export function OnboardingScreen({
             <AppText variant="caption">건너뛰기</AppText>
           </Pressable>
         </View>
+      ) : (
+        // ★ 043 FR-007a·FR-009 — 사진·위치·알림 세 단계는 설명 카드·버튼 없이
+        // 스플래시와 같은 Modernist 배경만 유지한다. OS 다이얼로그가 이
+        // 컨테이너 위에서 자동으로 뜬다(아래 useEffect). `blocked`("다시 묻지
+        // 않음")만 예외적으로 [설정 열기]가 남는다(FR-008a — OS가 더 이상
+        // 다이얼로그를 띄우지 않으므로 앱 설정으로 안내해야 한다).
+        <View
+          style={styles.permissionBackground}
+          testID={`onboarding-step-${current.requirement.key}`}
+        >
+          {current.status === "blocked" && (
+            <View style={styles.section}>
+              <AppText variant="body">{current.requirement.ifDenied}</AppText>
+              <View style={{ alignSelf: "flex-start" }}>
+                <Button
+                  onPress={() => void openSettings(current)}
+                  testID="onboarding-open-settings"
+                >
+                  설정 열기
+                </Button>
+              </View>
+            </View>
+          )}
+        </View>
       )}
     </ScrollView>
   );
@@ -414,4 +481,7 @@ const styles = StyleSheet.create({
   progressFill: { height: 8, backgroundColor: COLORS.accent },
   section: { gap: 10, marginTop: 8 },
   secondary: { paddingVertical: 8, paddingHorizontal: 4, alignSelf: "flex-start" },
+  // ★ 043 — 사진·위치·알림 단계의 배경 컨테이너. 설명 카드가 없으므로
+  // blocked일 때만 안내+버튼이 뜬다(FR-008a), 그 외엔 빈 배경(FR-009).
+  permissionBackground: { flex: 1, minHeight: 200, justifyContent: "center" },
 });
