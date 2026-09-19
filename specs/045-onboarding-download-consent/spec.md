@@ -290,3 +290,10 @@ Story 1·2가 존재해야 의미가 있는 전제 조건이다. P1 둘보다 �
 - 041이 만든 구간별 다운로드(임시 파일 + 청크 복사) 로직은 이 스펙에서
   변경하지 않는다 — 화면이 소비하는 진행률 값(`essentialDownloadFraction`)
   계약도 그대로 재사용한다.
+- **구현 중 발견**: 다운로드가 완료된 순간(`downloadReady: true`) 곧바로
+  다음 단계로 넘어가면 FR-007의 완료 화면 버튼이 사용자가 누를 틈도 없이
+  사라진다. 이를 막기 위해 "완료 화면의 버튼을 실제로 눌렀는가"라는 별도
+  세션 로컬 상태(`downloadProceedConfirmed`)를 추가했다 — `namingDone`과
+  같은 성격(파일에 저장하지 않음, 009 원칙)이며, `resolveFirstRunStage`는
+  `downloadReady`와 `downloadProceedConfirmed`가 모두 참이어야 다음
+  단계로 넘어간다(data-model.md "구현 중 발견한 갭", 계약 C10).

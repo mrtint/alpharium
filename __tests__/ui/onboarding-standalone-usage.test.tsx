@@ -59,7 +59,12 @@ function makePorts() {
 const BASE_PROPS = {
   platform: "android" as const,
   requirements: PERMISSION_REQUIREMENTS,
-  flag: { completed: false, batteryNoticeShown: false, welcomeShown: false },
+  flag: {
+    completed: false,
+    batteryNoticeShown: false,
+    welcomeShown: false,
+    downloadConsented: false,
+  },
 };
 
 describe("040 — onAllStepsDecided, 콜백 없는 단독 사용", () => {

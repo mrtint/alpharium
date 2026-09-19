@@ -260,6 +260,55 @@ describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)"
 
     expect(checkSourceFile("src/ui/CharacterPicker.tsx", source)).toEqual([]);
   });
+
+  /**
+   * 045 — `ESSENTIAL_ASSET_KEYS`(자산 키 자체)를 이름 기준으로 막는다
+   * (계약 C9). `DownloadConsentDialog`·`DownloadProgressScreen`이 모델
+   * 식별자를 몰라야 화면에 "사진을 읽는 모델" 같은 역할 이름만 남는다.
+   *
+   * **경로 자체(`onboarding/essential-assets`)는 막지 않는다** —
+   * `OnboardingScreen.tsx`(029)가 그 파일의 `essentialAssetsReady()`
+   * (준비 여부 판정, `ModelReadiness`와 같은 성격)를 이미 정당하게
+   * 쓰고 있어, 경로를 막으면 그 기존 코드가 오탐지된다.
+   */
+  it("src/ui가 ESSENTIAL_ASSET_KEYS를 import 하면 잡는다", () => {
+    const violations = checkSourceFile(
+      "src/ui/DownloadConsentDialog.tsx",
+      'import { ESSENTIAL_ASSET_KEYS } from "../onboarding/essential-assets";',
+    );
+
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 III");
+  });
+
+  it("src/ui가 ESSENTIAL_ASSET_KEYS를 쓰면 잡는다 — 경로를 우회해도 마찬가지다", () => {
+    const violations = checkSourceFile("src/ui/Foo.tsx", "const keys = ESSENTIAL_ASSET_KEYS;");
+
+    expect(violations).toHaveLength(1);
+  });
+
+  it("essentialAssetsReady()는 막지 않는다 — 준비 상태 판정이지 자산 키가 아니다(029 OnboardingScreen 선례)", () => {
+    const violations = checkSourceFile(
+      "src/ui/Foo.tsx",
+      'import { essentialAssetsReady } from "../onboarding/essential-assets";\nconst ready = essentialAssetsReady(facts);',
+    );
+
+    expect(violations).toEqual([]);
+  });
+
+  it("실제 DownloadConsentDialog·DownloadProgressScreen은 통과한다", () => {
+    const dialogSource = readFileSync(
+      join(__dirname, "..", "..", "src", "ui", "DownloadConsentDialog.tsx"),
+      "utf8",
+    );
+    const progressSource = readFileSync(
+      join(__dirname, "..", "..", "src", "ui", "DownloadProgressScreen.tsx"),
+      "utf8",
+    );
+
+    expect(checkSourceFile("src/ui/DownloadConsentDialog.tsx", dialogSource)).toEqual([]);
+    expect(checkSourceFile("src/ui/DownloadProgressScreen.tsx", progressSource)).toEqual([]);
+  });
 });
 
 /**

@@ -43,7 +43,8 @@ export type FirstRunStage =
   // "waiting-for-download" 제거 (R4 — DownloadProgressScreen이 대체)
 ```
 
-**판정 함수 시그니처 변경**:
+**판정 함수 시그니처**(구현 중 `downloadProceedConfirmed` 추가 — 아래
+"구현 중 발견한 갭" 참고):
 
 ```ts
 export function resolveFirstRunStage(input: {
@@ -51,6 +52,7 @@ export function resolveFirstRunStage(input: {
   onboardingStarted: boolean;
   downloadConsented: boolean; // 신규
   downloadReady: boolean;
+  downloadProceedConfirmed: boolean; // 신규 (구현 중 추가)
   namingDone: boolean;
   livenessOutcome: LivenessOutcome | "pending" | null;
 }): FirstRunStage;
@@ -61,13 +63,29 @@ export function resolveFirstRunStage(input: {
 1. `onboardingNeeded && !onboardingStarted` → `"logo"`
 2. `onboardingNeeded` → `"onboarding"`
 3. `!downloadConsented && !downloadReady` → `"download-consent"`
-4. `!downloadReady` → `"downloading"` (이 시점에서 `downloadConsented`는 참)
-5. `!namingDone` → `"naming"`
+4. `!downloadReady || !downloadProceedConfirmed` → `"downloading"`
+   (다운로드가 안 끝났거나, 다 받았어도 완료 화면 버튼을 아직 안 눌렀다)
+5. `!namingDone` → `"naming"` (이 시점에서 `downloadReady`·
+   `downloadProceedConfirmed`는 항상 참)
 6. `livenessOutcome !== "ok"` → `"liveness"`
 7. 그 외 → `"done"`
 
 **여전히 순수 함수다** — `Date.now()`·난수·파일을 읽지 않는다(040 원 설계
 유지).
+
+### 구현 중 발견한 갭 — `downloadProceedConfirmed`
+
+계획 단계에서는 `downloadReady`가 `true`가 되는 즉시 `"naming"`으로
+넘어가는 설계였다. 실제 구현에서, `DownloadProgressScreen`의 완료 화면
+("시작할게요" 버튼)이 `downloadReady: true`가 되는 렌더에서 이미
+`firstRunStage`가 `"naming"`으로 넘어가 버려 **사용자가 버튼을 누를 틈도
+없이 화면이 사라지는 것**을 발견했다(spec FR-007 위반 — "이 화면에서
+다음 단계로 넘어갈 수 있는 조작을 제공해야 한다"). `namingDone`과 같은
+세션 로컬 boolean(`downloadProceedConfirmed`)을 추가해 "완료 화면의
+버튼을 실제로 눌렀는가"를 별도로 추적하는 것으로 해소했다 — 파일에
+저장하지 않으며(009 원칙과 동일), 앱 재시작 시 다시 `false`로 시작해
+완료 화면을 한 번 더 보여주되(041 덕에 바이트 자체는 재수신하지 않음),
+이는 spec Edge Cases가 이미 허용한 범위다.
 
 ## SlideStage (신규 — 순수 판정, 파일에 저장하지 않음)
 

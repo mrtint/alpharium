@@ -130,12 +130,26 @@ const DIRECT_BACKEND_FACTORY = /\b(?:onDeviceBackend|createDesktopServerBackend)
  * **「쓸 수 있는가·받는 중인가」이지 모델이 무엇인가가 아니다** — 003의
  * `CharacterListScreen`이 준비 상태를 그리려면 필요하고, 그것을 막으면 화면이
  * 상태를 말할 수 없다. 막아야 할 것은 **자산에 닿는 길**이다.
+ *
+ * **045 — `onboarding/essential-assets`의 경로 자체는 막지 않는다.**
+ * `OnboardingScreen.tsx`(029)가 `essentialAssetsReady()`(자산 준비
+ * 여부 판정 — `ModelReadiness`와 같은 성격, 위 문단 참고)를 이미
+ * 정당하게 쓰고 있다. 막아야 할 것은 **자산 키 자체**(`ESSENTIAL_ASSET_KEYS`,
+ * `v1`·`v2`·`a1`)이지 그 파일에서 오는 판정 함수가 아니다 — 아래
+ * `UI_TOUCHES_ASSET`이 이름 기준으로 그 값만 잡는다(계약 C9,
+ * `DownloadConsentDialog`·`DownloadProgressScreen`이 대상).
  * ─────────────────────────────────────────────────────────────────────────
  */
 const UI_TOUCHES_MODEL = /\bfrom\s+["'][^"']*models\/(?:roster|assets|expo-port|storage)["']/;
 
-/** 자산 자체를 다루는 이름. import 경로를 우회해 닿는 것도 잡는다 */
-const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets)\b/;
+/**
+ * 자산 자체를 다루는 이름. import 경로를 우회해 닿는 것도 잡는다.
+ *
+ * 045 — `ESSENTIAL_ASSET_KEYS`도 같은 이유로 추가했다(계약 C9, 위
+ * `UI_TOUCHES_MODEL` 주석 참고) — 자산 키 이름만 잡고, 그 파일의 판정
+ * 함수(`essentialAssetsReady`)는 잡지 않는다.
+ */
+const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets|ESSENTIAL_ASSET_KEYS)\b/;
 
 /**
  * 화면이 프롬프트 조립에 직접 닿는 것 (022 FR-008, 원칙 II).
@@ -804,13 +818,14 @@ export function checkPromptFile(fileName: string, contents: string): Violation[]
 /* ─────────────────── 첫 실행 조율 계층 경계 검사 (040) ─────────────────── */
 
 /**
- * 첫 실행 조율 계층이 제품 계층에 닿는 것과 시간·진행 지표를 재는 것을 잡는다
- * (040, contracts/first-run-gate.md G7·G8, spec.md FR-012).
+ * 첫 실행 조율 계층이 제품 계층에 닿는 것을 잡는다
+ * (040, contracts/first-run-gate.md G7, spec.md FR-012).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * `src/firstrun/`는 021(온보딩)·029(필수 에셋)·035(환영 연출)가 각자 내는 판정을
- * 조합해 "다음에 무엇을 보여줄지"만 답하는 조율 계층이다. 021의
- * `checkOnboardingFile`, 035의 `checkWelcomeFile`과 같은 성격의 방어다.
+ * `src/firstrun/`는 021(온보딩)·029(필수 에셋)·035(환영 연출)·045(다운로드
+ * 동의)가 각자 내는 판정을 조합해 "다음에 무엇을 보여줄지"만 답하는 조율
+ * 계층이다. 021의 `checkOnboardingFile`, 035의 `checkWelcomeFile`과 같은
+ * 성격의 방어다.
  *
  * **막는 것**:
  *  - `models/roster`·`ModelAsset`·`assetFor`·`diary/prompt`(`buildPrompt`)·
@@ -819,17 +834,20 @@ export function checkPromptFile(fileName: string, contents: string): Violation[]
  *  - `diary/pipeline.run(` 직접 호출 — `resolveFirstRunStage`·`shouldAutoGenerate`는
  *    "시도해야 하는가"라는 불리언만 답한다. 실제 실행은 `app/wiring.ts`에만
  *    있어야 한다(research.md #4, G7) — 타입 참조(`import type`)는 허용한다.
- *  - 시간·진행 지표 어휘(`elapsed*`·`durationMs`·`timings`·`tokens_*`·
- *    `Date.now`·`performance.now`) — SC-002의 "수 초 이내"는 코드에 임계값을
- *    두지 않고 실기기 관찰로 확인한다(G8, 원칙 IV).
+ *
+ * **045에서 「시간·진행 지표 어휘 전면 금지」(옛 G8)를 뺐다**(저장소 소유자
+ * 지시, 2026-09-19). 040은 SC-002의 "수 초 이내"라는 성능 임계값을 코드에
+ * 두지 않는다는 취지로 `elapsed*` 등 어휘 자체를 막았지만, 045의
+ * `resolveSlideStage()`는 성능을 재는 것이 아니라 **장식적 타이머로 슬라이드
+ * 순서를 넘기는 것**이다(원칙 IV가 실제로 금지하는 것은 진행 중 화면에
+ * 정밀한 시간·바이트·퍼센트를 노출하는 것이지, 경과 시간 개념 자체가
+ * 아니다 — 원칙 IV "소요 시간의 사후 기록" 절 참고). 이 성격 차이를 어휘
+ * 정규식 하나로는 구분할 수 없어 규칙 자체를 없앴다 — `tokens_*`·`timings`는
+ * 여전히 `llama-port.ts` 경계(원칙 IV)가 별도로 막는다.
  * ─────────────────────────────────────────────────────────────────────────
  */
 const FIRSTRUN_TOUCHES_PRODUCT_LAYER =
   /\bfrom\s+["'][^"']*(?:(?:models\/|\.\.?\/)roster|diary\/(?:prompt|acceptance))["']|\bassetFor\b|\bModelAsset\b|\bbuildPrompt\b|\bpipeline\s*\.\s*run\s*\(/;
-
-/** 시간·진행 지표를 재는 어휘 (G8, 원칙 IV). */
-const FIRSTRUN_MEASURES_TIME =
-  /\b(?:elapsed\w*|durationMs|timings|tokens_\w+|Date\.now|performance\.now)\b/;
 
 /** 첫 실행 조율 계층 파일인지 보고, 맞으면 위 규칙을 적용한다. */
 export function checkFirstRunFile(fileName: string, contents: string): Violation[] {
@@ -847,14 +865,6 @@ export function checkFirstRunFile(fileName: string, contents: string): Violation
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "첫 실행 조율 계층이 로스터·프롬프트·판정에 닿거나 파이프라인을 직접 실행한다 (040 G7, 원칙 III)",
-      });
-    }
-
-    if (FIRSTRUN_MEASURES_TIME.test(code)) {
-      violations.push({
-        file: `${normalized}:${index + 1}`,
-        key: code.trim(),
-        rule: "첫 실행 조율 계층이 시간·진행 지표를 잰다 (040 G8, 원칙 IV)",
       });
     }
   }

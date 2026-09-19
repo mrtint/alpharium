@@ -14,6 +14,7 @@ import {
  * 계약: specs/021-unified-permission-onboarding/contracts/onboarding-flag.md
  *       F1·F3·F4·F5
  *       spec.md FR-009·FR-010·FR-010a·FR-011·FR-012, 원칙 IV
+ *       specs/045-onboarding-download-consent/contracts/download-consent-gate.md C5
  *
  * 020의 `notified-store.ts`·`settings.ts`와 같은 모양(순수 로드/세이브 + 기기 통로).
  */
@@ -50,7 +51,12 @@ describe("F4 — 시드 (FR-010a)", () => {
       JSON.stringify({ enabled: false, targetHour: 7, batteryExceptionPrompted: true }),
     );
     const flag = await loadOnboardingFlag(port);
-    expect(flag).toEqual({ completed: false, batteryNoticeShown: true, welcomeShown: false });
+    expect(flag).toEqual({
+      completed: false,
+      batteryNoticeShown: true,
+      welcomeShown: false,
+      downloadConsented: false,
+    });
   });
 
   it("onboarding.json 없음 + auto-diary 없음 → 기본값", async () => {
@@ -77,7 +83,12 @@ describe("F4 — 시드 (FR-010a)", () => {
       JSON.stringify({ batteryExceptionPrompted: true }),
     );
     const flag = await loadOnboardingFlag(port);
-    expect(flag).toEqual({ completed: true, batteryNoticeShown: false, welcomeShown: false });
+    expect(flag).toEqual({
+      completed: true,
+      batteryNoticeShown: false,
+      welcomeShown: false,
+      downloadConsented: false,
+    });
     expect(port.autoDiaryReads).toBe(0);
   });
 });
@@ -89,6 +100,7 @@ describe("F3 — loadOnboardingFlag 부분 손상 관대", () => {
       completed: false,
       batteryNoticeShown: true,
       welcomeShown: false,
+      downloadConsented: false,
     });
   });
 
@@ -104,12 +116,13 @@ describe("F3 — loadOnboardingFlag 부분 손상 관대", () => {
 });
 
 describe("F3 — saveOnboardingFlag", () => {
-  it("세 필드만 직렬화한다 (035에서 welcomeShown이 더해졌다)", async () => {
+  it("네 필드만 직렬화한다 (035에서 welcomeShown, 045에서 downloadConsented가 더해졌다)", async () => {
     const port = memoryPort(null, null);
     await saveOnboardingFlag(port, {
       completed: true,
       batteryNoticeShown: true,
       welcomeShown: true,
+      downloadConsented: true,
       // @ts-expect-error — 여분 필드는 버려져야 한다
       extra: 1,
     });
@@ -117,6 +130,7 @@ describe("F3 — saveOnboardingFlag", () => {
       completed: true,
       batteryNoticeShown: true,
       welcomeShown: true,
+      downloadConsented: true,
     });
   });
 
@@ -126,11 +140,13 @@ describe("F3 — saveOnboardingFlag", () => {
       completed: true,
       batteryNoticeShown: false,
       welcomeShown: false,
+      downloadConsented: false,
     });
     expect(await loadOnboardingFlag(port)).toEqual({
       completed: true,
       batteryNoticeShown: false,
       welcomeShown: false,
+      downloadConsented: false,
     });
   });
 });
@@ -186,6 +202,7 @@ describe("W8 — welcomeShown이 없는 옛 파일은 「아직 안 봤다」", 
       completed: true,
       batteryNoticeShown: true,
       welcomeShown: false,
+      downloadConsented: false,
     });
   });
 
@@ -196,7 +213,12 @@ describe("W8 — welcomeShown이 없는 옛 파일은 「아직 안 봤다」", 
   it("auto-diary 시드 경로에서도 연출은 아직 안 본 것이다", async () => {
     const port = memoryPort(null, JSON.stringify({ batteryExceptionPrompted: true }));
     const flag = await loadOnboardingFlag(port);
-    expect(flag).toEqual({ completed: false, batteryNoticeShown: true, welcomeShown: false });
+    expect(flag).toEqual({
+      completed: false,
+      batteryNoticeShown: true,
+      welcomeShown: false,
+      downloadConsented: false,
+    });
   });
 
   it("직렬화 왕복에서 보존된다", async () => {
@@ -205,6 +227,7 @@ describe("W8 — welcomeShown이 없는 옛 파일은 「아직 안 봤다」", 
       completed: true,
       batteryNoticeShown: false,
       welcomeShown: true,
+      downloadConsented: false,
     });
     expect((await loadOnboardingFlag(port)).welcomeShown).toBe(true);
   });
@@ -219,17 +242,19 @@ describe("W7 — 진행 중 상태를 담지 않는다 (FR-009)", () => {
     // 저장된 진행 상태는 곧 거짓이 된다(009가 「고른 하루를 파일에 남기지
     // 않는다」로 배운 것). 연출 도중 앱이 죽으면 처음부터 다시 한다.
     expect(FLAG_CODE).not.toMatch(
-      /\b(?:welcomeStep|livenessChecked|checkAttempts|welcomePhase|retries)\b/,
+      /\b(?:welcomeStep|livenessChecked|checkAttempts|welcomePhase|retries|slideIndex|slideStep)\b/,
     );
   });
 
-  it("필드가 정확히 셋이다", () => {
+  it("필드가 정확히 넷이다 (045에서 downloadConsented가 더해졌다)", () => {
     const declaration = FLAG_CODE.slice(
       FLAG_CODE.indexOf("export type OnboardingFlag"),
       FLAG_CODE.indexOf("export const DEFAULT_ONBOARDING_FLAG"),
     );
     const fields = [...declaration.matchAll(/^\s*(\w+):\s*boolean;/gm)].map((m) => m[1]);
-    expect(new Set(fields)).toEqual(new Set(["completed", "batteryNoticeShown", "welcomeShown"]));
+    expect(new Set(fields)).toEqual(
+      new Set(["completed", "batteryNoticeShown", "welcomeShown", "downloadConsented"]),
+    );
   });
 });
 
@@ -252,6 +277,7 @@ describe("W10 — welcomeShown은 되돌아가지 않는다", () => {
       completed: true,
       batteryNoticeShown: true,
       welcomeShown: true,
+      downloadConsented: false,
     });
     const reloaded = await loadOnboardingFlag(port);
 
@@ -261,12 +287,66 @@ describe("W10 — welcomeShown은 되돌아가지 않는다", () => {
   });
 
   it("OnboardingScreen이 welcomeShown을 스스로 정하지 않는다", () => {
-    // 온보딩을 끝냈다고 연출을 본 것이 아니다 — 순서가 온보딩 → 에셋 → 연출이다.
+    // 온보딩을 끝냈다고 연출을 본 것이 아니다 — 순서가 온보딩 → 동의 →
+    // 다운로드 → 연출이다.
     const screen = readFileSync(join(__dirname, "../../src/ui/OnboardingScreen.tsx"), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
 
     expect(screen).toMatch(/welcomeShown:\s*flag\.welcomeShown/);
     expect(screen).not.toMatch(/welcomeShown:\s*(?:true|false)/);
+  });
+});
+
+/* ──────────────── 045 — 다운로드 동의 플래그 (download-consent-gate.md C5) ──────────────── */
+
+describe("C5 — downloadConsented는 한 번 true가 되면 되돌아가지 않는다", () => {
+  it("저장된 true는 다시 읽어도 true다", async () => {
+    const port = memoryPort(
+      JSON.stringify({
+        completed: true,
+        batteryNoticeShown: true,
+        welcomeShown: true,
+        downloadConsented: true,
+      }),
+      null,
+    );
+    expect((await loadOnboardingFlag(port)).downloadConsented).toBe(true);
+  });
+
+  it("키가 없는 옛 파일(021~044 시절)은 false로 읽는다", async () => {
+    const port = memoryPort(
+      JSON.stringify({ completed: true, batteryNoticeShown: true, welcomeShown: true }),
+      null,
+    );
+    expect((await loadOnboardingFlag(port)).downloadConsented).toBe(false);
+  });
+
+  it("직렬화 왕복에서 보존된다", async () => {
+    const port = memoryPort(null, null);
+    await saveOnboardingFlag(port, {
+      completed: false,
+      batteryNoticeShown: false,
+      welcomeShown: false,
+      downloadConsented: true,
+    });
+    expect((await loadOnboardingFlag(port)).downloadConsented).toBe(true);
+  });
+
+  it("다른 필드 갱신 후 다시 저장해도 유지된다", async () => {
+    const port = memoryPort(null, null);
+    await saveOnboardingFlag(port, {
+      completed: false,
+      batteryNoticeShown: false,
+      welcomeShown: false,
+      downloadConsented: true,
+    });
+    const reloaded = await loadOnboardingFlag(port);
+    await saveOnboardingFlag(port, { ...reloaded, welcomeShown: true });
+    expect((await loadOnboardingFlag(port)).downloadConsented).toBe(true);
+  });
+
+  it("기본값은 「아직 동의 안 함」이다", () => {
+    expect(DEFAULT_ONBOARDING_FLAG.downloadConsented).toBe(false);
   });
 });

@@ -84,6 +84,19 @@ data-model.md·contracts/download-consent-gate.md·quickstart.md 작성 후
 - **신규 위반 없음**: Phase 1 설계가 Constitution Check 결론을 바꾸지
   않았다.
 
+### Post-Implementation Note — 040 G8(시간 어휘 전면 금지) 제거
+
+구현 중 `resolveSlideStage()`가 `elapsedMs`를 받는 설계가 040이 세운
+`checkFirstRunFile`의 "시간·진행 지표 어휘(`elapsed*` 등) 전면 금지"
+검사(G8)와 충돌하는 것을 발견했다. 저장소 소유자 지시(2026-09-19)로 그
+검사 자체를 제거했다 — 헌법 원칙 IV 본문("소요 시간의 사후 기록" 절)은
+"진행 중 화면에 정밀한 시간·바이트·퍼센트를 노출하지 않는다"만 금지하며
+경과 시간 개념 자체를 금지하지 않는다. 040 G8은 이 조항보다 좁게(어휘
+기준) 구현돼 있었고, 045의 경과 시간(장식적 4초 슬라이드 타이머)은 그
+원 조항이 막으려던 성능 지표 노출과 성격이 다르다. 상세:
+`specs/040-onboarding-parallel-setup/contracts/first-run-gate.md` G8
+절의 정정 기록, `contracts/download-consent-gate.md` C6 참고.
+
 ## Project Structure
 
 ### Documentation (this feature)

@@ -33,10 +33,10 @@ data-model.md 우선순위 3·4단계가 `!downloadReady`를 전제하므로 구
 ## C4 — liveness는 여전히 작명 이후에만 (040 G5 계승, 순서만 이동)
 
 `livenessOutcome`을 판정에 쓰는 것은 `namingDone === true`일 때뿐이다.
-040과 다른 점은 그 시점에 `downloadReady`가 **이미 항상 참**이라는 것
-뿐이다(C2에 의해 `"naming"`에 도달하려면 `downloadReady`가 true여야
-하므로) — liveness 계약 자체(035 L12, 자동 1회·재시도는 사용자 트리거)는
-무변경.
+040과 다른 점은 그 시점에 `downloadReady`·`downloadProceedConfirmed`가
+**이미 항상 참**이라는 것뿐이다(C2·C10에 의해 `"naming"`에 도달하려면
+둘 다 true여야 하므로) — liveness 계약 자체(035 L12, 자동 1회·재시도는
+사용자 트리거)는 무변경.
 
 ## C5 — 동의는 한 번만 필요하다
 
@@ -76,4 +76,17 @@ true`이면 `elapsedMs` 값과 무관하게 `{ kind: "complete" }`. 위반 주�
 `DownloadConsentDialog`·`DownloadProgressScreen`은 `essential-assets.ts`의
 `ESSENTIAL_ASSET_KEYS`(문자열 키)를 import하거나 화면에 노출하지
 않는다 — `essentialsReady`(boolean)와 사람이 쓴 고정 문구만 받는다(007
-이후 전 화면의 관례, `checkSourceFile`의 `UI_TOUCHES_MODEL`이 검사).
+이후 전 화면의 관례, `checkSourceFile`의 `UI_TOUCHES_ASSET`이 이름
+기준으로 검사한다 — `essentialAssetsReady()`는 준비 판정 함수라 막지
+않는다, 029 `OnboardingScreen` 선례).
+
+## C10 — 완료 화면은 버튼을 누를 때까지 머무른다 (구현 중 추가)
+
+`downloadReady: true`가 되는 즉시 `"naming"`으로 넘어가면
+`DownloadProgressScreen`의 완료 화면("시작할게요" 버튼)이 사용자가 누를
+틈도 없이 사라진다(FR-007 위반). `downloadProceedConfirmed: false`인
+동안은 `downloadReady` 값과 무관하게 `"downloading"`(완료 뷰)에
+머무른다 — `App.tsx`의 `onProceed` 콜백이 이 값을 `true`로 세운 뒤에만
+`"naming"`으로 전환된다. 위반 주입: 우선순위 4단계에서
+`!downloadProceedConfirmed` 조건을 빼면, `downloadReady: true`가 되는
+즉시 `"naming"`이 반환되는 것을 계약 테스트가 잡는다.

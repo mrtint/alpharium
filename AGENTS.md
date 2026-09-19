@@ -1291,6 +1291,67 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   - 실기기(SM-S901N) Maestro 실행 전체 PASS 완료.
 - 상세: `specs/043-modernist-splash-permissions/`.
 
+### 045 — 필수 자산 다운로드 동의 안내와 진행 슬라이드 (2026-09-19)
+
+로드맵 29번 연장. 사용자가 실기기 육안으로 044(작명 화면 Modernist 이관)를
+검토하다가 043·044 사이에 있어야 할 화면 하나가 통째로 비어 있는 것을
+지적했다 — 권한 확인 직후 다운로드가 사용자 동의 없이 조용히 시작되고,
+그 진행 화면도 리뷰 보드가 이미 설계해 둔 4장 스토리텔링 슬라이드
+(`1o`~`1q`)가 아니라 040이 만든 최소 스피너(`WaitingForDownloadScreen`)
+하나뿐이었다.
+
+- **순서를 정정했다**: 040은 "작명이 다운로드보다 먼저 뜨게 해서 대기
+  체감을 줄인다"는 근거로 작명 ∥ 다운로드 병렬 배치를 설계했었다. 이
+  스펙이 그 순서를 되돌렸다 — `권한 확인(043) → 동의 Dialog → 다운로드
+  진행 슬라이드 → 작명(044)`. `resolveFirstRunStage()`의 우선순위를
+  전면 재작성했다(`"waiting-for-download"` 제거, `"download-consent"`·
+  `"downloading"` 신설).
+- **동의 Dialog는 리뷰 보드 원본에 없던 신규 요소다** — 7개 dv-row
+  섹션(`Launch`·`Onboarding`·`First run`·`Persona picked`·`Home`·
+  `Writing`·`Diary detail`)을 전수 확인했고 VLM·LLM을 고르는 화면도
+  동의를 구하는 화면도 없었다. `DownloadConsentDialog`가 새로 하는
+  일은 VLM·LLM을 선택하게 하는 것이 아니라(029 `ESSENTIAL_ASSET_KEYS`
+  는 그대로 셋 다 받는다) 무엇을 왜 받는지 알리고 [확인/시작] 하나로만
+  진행하게 하는 것이다 — 거부·건너뛰기 조작 자체가 없다(040
+  `WaitingForDownloadScreen`의 "그만두기 경로가 없다"와 같은 논리).
+- **`OnboardingFlag`에 `downloadConsented` 필드가 넷째로 더해졌다** —
+  `welcomeShown`이 035에서 추가된 패턴 그대로(boolean 하나, 되돌리는
+  코드 경로 없음, 새 파일을 만들지 않음).
+- **★ 구현 중 발견한 spec 갭 — `downloadProceedConfirmed`**: 계획
+  단계에서는 `downloadReady`가 `true`가 되는 즉시 `"naming"`으로 넘어가는
+  설계였는데, 실제로 짜 보니 `DownloadProgressScreen`의 완료 화면
+  ("시작할게요" 버튼)이 사용자가 누를 틈도 없이 같은 렌더에서 사라지는
+  것을 발견했다(FR-007 위반). `namingDone`과 같은 세션 로컬 boolean을
+  추가해 "완료 화면 버튼을 실제로 눌렀는가"를 별도로 추적하는 것으로
+  해소했다 — 파일에 저장하지 않는다(009 원칙).
+- **★ 040이 세운 헌법 검사(G8, `elapsed*` 등 시간 어휘 전면 금지)를
+  제거했다**(저장소 소유자 지시). `resolveSlideStage()`가 `elapsedMs`를
+  순수 판정 인자로 받는 설계와 정면 충돌했다 — G8은 040 당시 "SC-002의
+  성능 임계값을 코드에 두지 않는다"는 취지로 어휘 자체를 기계적으로
+  막았지만, 045의 경과 시간은 성능 지표가 아니라 장식적 4초 슬라이드
+  전환 타이머다. 헌법 원칙 IV 본문("소요 시간의 사후 기록" 절)이 실제로
+  금지하는 것은 진행 중 화면에 정밀한 시간·바이트·퍼센트를 노출하는
+  것이지 경과 시간 개념 자체가 아니다 — 어휘 정규식 하나로는 이 성격
+  차이를 구분할 수 없어 검사 자체를 없앴다. `tokens_*`·`timings`는
+  여전히 `llama-port.ts` 경계가 따로 막는다.
+- **`UI_TOUCHES_MODEL`/`UI_TOUCHES_ASSET` 헌법 검사 경계를 다시
+  좁혔다**: 처음엔 `onboarding/essential-assets` 경로 전체를 막았는데,
+  029 `OnboardingScreen.tsx`가 그 파일의 `essentialAssetsReady()`(준비
+  여부 판정, `ModelReadiness`와 같은 성격)를 이미 정당하게 쓰고 있어
+  기존 코드가 오탐지됐다 — 경로 차단을 빼고 `ESSENTIAL_ASSET_KEYS`
+  (자산 키 이름 자체)만 `UI_TOUCHES_ASSET`에 추가하는 것으로 정정했다.
+- **`WaitingForDownloadScreen`을 완전히 삭제했다**(044 세션에서 겪은
+  `CharacterPicker.tsx` 죽은 코드 문제를 반복하지 않기 위함) —
+  `DownloadProgressScreen`이 대체하며 소스·테스트 파일 모두 제거.
+- 기기 없는 테스트 156 스위트 2754개 통과, lint 0 error, 헌법 검사
+  위반 0, prettier 클린.
+- **실기기 검증 미완료** — 이 구현 세션은 물리 기기에 접근할 수 없어
+  quickstart.md D1~D5(동의 Dialog 노출, [확인/시작] 하나뿐, 슬라이드
+  1~4 자동 전환, 완료 화면 버튼, 041 재개 상호작용)를 수행하지 못했다.
+  **건너뛴 실기기 테스트는 통과가 아니다**(원칙 V) — 다음 실기기
+  세션에서 최우선으로 확인한다.
+- 상세: `specs/045-onboarding-download-consent/`.
+
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

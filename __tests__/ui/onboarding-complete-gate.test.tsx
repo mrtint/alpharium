@@ -58,21 +58,18 @@ describe("★ 온보딩 완료 게이트 (029 버그 수정)", () => {
   });
 
   /*
-   * ★ 040 — `OnboardingScreen` 렌더 게이트 자체는 더 이상 `shouldShowOnboarding
-   * (flag, essentialsReady)`를 직접 호출하지 않는다(권한 결정만 보도록
-   * research.md #3에 따라 분리됨, `onboardingGateNeeded` 참조). 대신 029
-   * FR-020("완료했지만 에셋이 없는 사용자는 온보딩 화면 없이도 방치되지
-   * 않는다")의 보호는 별도 경로로 유지된다 — 아래 테스트가 그 경로를
-   * 확인한다(완전히 같은 표현식이 아니라 같은 결과를 내는지).
+   * ★ 045 — 029 FR-020("완료했지만 에셋이 없는 사용자는 온보딩 화면 없이도
+   * 방치되지 않는다")을 위한 별도 보호 분기가 더 이상 없다. 새
+   * `resolveFirstRunStage` 우선순위(C3)에서 `downloadReady`가 `namingDone`
+   * 보다 먼저 검사되므로, `namingDone`(=`welcomeShown`) 값과 무관하게
+   * `downloadReady: false`면 항상 `"downloading"`이 반환된다 — 우선순위
+   * 자체가 이 보호막을 흡수했다(별도 조건식이 코드에 남아 있지 않다).
    */
-  it("040 — 완료된 사용자인데 에셋이 준비 안 됐으면 대기 화면으로 보호한다(029 FR-020 계승)", () => {
-    // permissionStepsDecided(완료된 사용자는 시드로 즉시 true) && !essentialsReady
-    // && welcomeShown===true 조합에서 WaitingForDownloadScreen을 그리는 분기가
-    // 있는지 소스로 확인한다.
-    expect(APP_SOURCE).toMatch(
+  it("045 — 별도 029 FR-020 보호 분기 없이 firstRunStage 우선순위가 그 역할을 흡수한다", () => {
+    expect(APP_SOURCE).not.toMatch(
       /permissionStepsDecided\s*&&\s*!essentialsReady\s*&&\s*onboardingFlag\.welcomeShown\s*===\s*true/,
     );
-    expect(APP_SOURCE).toMatch(/<WaitingForDownloadScreen/);
+    expect(APP_SOURCE).not.toMatch(/WaitingForDownloadScreen/);
   });
 
   it("040 — permissionStepsDecided가 completed===true인 기존 사용자에게 시드된다", () => {

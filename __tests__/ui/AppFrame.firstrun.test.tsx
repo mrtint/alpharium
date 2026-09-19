@@ -1,6 +1,8 @@
 /**
  * 040 — App.tsx 게이트가 resolveFirstRunStage를 호출해 naming/
- * waiting-for-download/liveness 단계에 맞는 화면을 렌더하는지 (US2).
+ * downloading/liveness 단계에 맞는 화면을 렌더하는지 (US2).
+ * ★ 045가 우선순위와 화면 배선을 재작성했다 — 동의(download-consent) →
+ * 다운로드(downloading) → 작명(naming) 순서로 뒤집혔다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * `App.tsx`는 새 네이티브 모듈·통로를 여럿 직접 import해 jest에서 완전히
@@ -8,9 +10,8 @@
  * 선례(소스를 읽어 배선이 있는지 확인)를 그대로 따른다(006·021·029와 같은
  * "렌더보다 소스가 정확한 자리"의 성격, safe-area.test.tsx와 동일한 논리).
  *
- * 계약: specs/040-onboarding-parallel-setup/spec.md FR-005·FR-006·FR-007
- *       contracts/first-run-gate.md G4
- *       tasks.md T017
+ * 계약: specs/045-onboarding-download-consent/contracts/download-consent-gate.md
+ *       C1~C4
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -19,7 +20,7 @@ import { join } from "node:path";
 
 const APP_SOURCE = readFileSync(join(__dirname, "../../App.tsx"), "utf8");
 
-describe("040 — App.tsx가 resolveFirstRunStage를 호출한다", () => {
+describe("040/045 — App.tsx가 resolveFirstRunStage를 호출한다", () => {
   it("resolveFirstRunStage를 import하고 firstRunStage 변수에 결과를 담는다", () => {
     expect(APP_SOURCE).toMatch(
       /import \{ resolveFirstRunStage \} from ".\/src\/firstrun\/progress"/,
@@ -27,32 +28,47 @@ describe("040 — App.tsx가 resolveFirstRunStage를 호출한다", () => {
     expect(APP_SOURCE).toMatch(/const firstRunStage =/);
   });
 
-  it("namingDone·downloadReady(essentialsReady)·livenessOutcome을 함께 넘긴다", () => {
+  it("downloadConsented·downloadReady(essentialsReady)·downloadProceedConfirmed·namingDone·livenessOutcome을 함께 넘긴다", () => {
     const call = APP_SOURCE.match(/resolveFirstRunStage\(\{([\s\S]*?)\}\)/);
     expect(call).not.toBeNull();
-    expect(call?.[1]).toMatch(/namingDone/);
+    expect(call?.[1]).toMatch(/downloadConsented:\s*onboardingFlag\.downloadConsented/);
     expect(call?.[1]).toMatch(/downloadReady:\s*essentialsReady/);
+    expect(call?.[1]).toMatch(/downloadProceedConfirmed/);
+    expect(call?.[1]).toMatch(/namingDone/);
     expect(call?.[1]).toMatch(/livenessOutcome/);
   });
 });
 
-describe('G4 — "waiting-for-download" 단계면 WaitingForDownloadScreen을 그린다(FR-006)', () => {
-  it('firstRunStage === "waiting-for-download" 분기가 WaitingForDownloadScreen을 렌더한다', () => {
+describe('045 C2 — "download-consent"/"downloading" 단계면 각 화면을 그린다', () => {
+  it('firstRunStage === "download-consent" 분기가 DownloadConsentDialog를 렌더한다', () => {
     const region = APP_SOURCE.slice(
-      APP_SOURCE.indexOf('firstRunStage === "waiting-for-download"'),
-      APP_SOURCE.indexOf('firstRunStage === "waiting-for-download"') + 500,
+      APP_SOURCE.indexOf('firstRunStage === "download-consent"'),
+      APP_SOURCE.indexOf('firstRunStage === "download-consent"') + 500,
     );
-    expect(region).toMatch(/<WaitingForDownloadScreen/);
+    expect(region).toMatch(/<DownloadConsentDialog/);
+  });
+
+  it('firstRunStage === "downloading" 분기가 DownloadProgressScreen을 렌더한다', () => {
+    const region = APP_SOURCE.slice(
+      APP_SOURCE.indexOf('firstRunStage === "downloading"'),
+      APP_SOURCE.indexOf('firstRunStage === "downloading"') + 500,
+    );
+    expect(region).toMatch(/<DownloadProgressScreen/);
+  });
+
+  it("WaitingForDownloadScreen을 더 이상 참조하지 않는다(045 R4, 완전히 대체됨)", () => {
+    expect(APP_SOURCE).not.toMatch(/WaitingForDownloadScreen/);
   });
 });
 
-describe("FR-005 — 작명 화면은 다운로드 완료를 기다리지 않는다", () => {
-  it("welcomeNeeded 판정에 essentialsReady/downloadReady 필수 조건이 없다", () => {
+describe("045 FR-008 — 작명 화면은 다운로드 완료 후에만 온다 (040 FR-005를 대체)", () => {
+  it("welcomeNeeded 판정에 essentialsReady/downloadReady 필수 조건이 없다(035 게이트 자체는 무변경)", () => {
     // shouldShowWelcome 호출에서 onboardingNeeded는 permissionStepsDecided만
     // 본다 — essentialAssetsReady를 값으로 넘기긴 하지만(하위 호환), 그 값이
     // 판정에 쓰이지 않는 것은 src/welcome/decision.ts 쪽 계약(W3 040 예외)이
-    // 이미 잠갔다. 여기서는 App.tsx가 그 인자를 essentialsReady 준비 여부로
-    // 게이트를 막는 방식으로 우회하지 않았는지만 확인한다.
+    // 이미 잠갔다. 어느 화면을 렌더할지는 firstRunStage가 정하며(045 C2가
+    // 순서를 뒤집었다), 이 값은 035 게이트를 우회하지 않았음을 확인하는
+    // 소스 검사용으로만 남아 있다.
     const call = APP_SOURCE.match(/const welcomeNeeded =([\s\S]*?);\n\n/);
     expect(call).not.toBeNull();
     expect(call?.[0]).toMatch(/onboardingNeeded:\s*!permissionStepsDecided/);
@@ -166,7 +182,7 @@ describe("FR-010·FR-011 — 권한 결정이 끝나면 completed를 저장한�
   });
 });
 
-describe("FR-007 — 다운로드가 먼저 끝나도 작명을 재촉하지 않는다", () => {
+describe("작명 완료는 오직 사용자 행동으로만 (자동 타이머·다운로드 완료 콜백으로 세우지 않음)", () => {
   it("namingDoneThisSession은 오직 finishWelcome()에서만 true로 설정된다(자동 타이머·다운로드 완료 콜백에서 세우지 않음)", () => {
     const setters = [...APP_SOURCE.matchAll(/setNamingDoneThisSession\(([^)]*)\)/g)].map(
       (m) => m[1],

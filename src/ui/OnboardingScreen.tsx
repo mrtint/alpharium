@@ -328,8 +328,14 @@ export function OnboardingScreen({
   const finish = useCallback(() => {
     // 035 — `welcomeShown`은 이 화면이 정하지 않는다. 온보딩을 끝냈다고 해서 연출을
     // 본 것이 아니다(순서가 온보딩 → 에셋 → 연출이다). 들어온 값을 그대로 넘긴다.
-    onComplete({ completed: true, batteryNoticeShown, welcomeShown: flag.welcomeShown });
-  }, [onComplete, batteryNoticeShown, flag.welcomeShown]);
+    // 045 — `downloadConsented`도 같은 이유로 이 화면이 정하지 않는다.
+    onComplete({
+      completed: true,
+      batteryNoticeShown,
+      welcomeShown: flag.welcomeShown,
+      downloadConsented: flag.downloadConsented,
+    });
+  }, [onComplete, batteryNoticeShown, flag.welcomeShown, flag.downloadConsented]);
 
   const total = steps.length;
   const doneCount = steps.filter(
