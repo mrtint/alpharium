@@ -152,7 +152,7 @@
 
 ## 도구 사용법 — 실기기 검증 전에 (실측으로 얻은 것)
 
-세 가지가 갖춰져야 Maestro 실기기 테스트가 돈다. 하나라도 없으면 화면에 값이
+네 가지가 갖춰져야 Maestro 실기기 테스트가 돈다. 하나라도 없으면 화면에 값이
 멀쩡히 있어도 실패한다.
 
 1. **Metro가 dev 환경으로 떠 있어야 한다** — `EXPO_PUBLIC_APP_ENV=dev npx expo start
@@ -166,6 +166,16 @@
 3. **한글 검증 문구는 `-Dfile.encoding=UTF-8`이 있어야 읽힌다** — 한국어 Windows는
    CP949라서 안 넣으면 문자가 뭉개진 채 기기에 전달된다. `run-device-tests.mjs`가
    이 옵션을 이미 넣으므로 그 실행기를 거치면 신경 쓸 것이 없다.
+4. **테스트 전 앱 초기화 루틴 (버전 확인 없이 대치 + pm clear + 재시작)** —
+   실기기 테스트에 들어가기 전에는 기존 테스트 앱을 반드시 초기화한다.
+   다시 설치(uninstall)하는 것이 아니라(불필요하고 시간이 낭비됨), 버전을
+   확인할 것 없이 테스트를 위한 버전(dev 빌드 APK)으로 대치(replace:
+   `adb install -r`)해버리고, `pm clear`로 내부 데이터를 날린 뒤 앱을 다시 시작한다:
+   ```bash
+   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+   adb shell pm clear com.anonymous.alpharium
+   adb shell am start -n com.anonymous.alpharium/.MainActivity
+   ```
 
 그 외 실측으로 확인된 함정들:
 
@@ -1595,6 +1605,13 @@ cd android && NODE_ENV=production ./gradlew assembleRelease
 **⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야
 돈다.** 등록하지 않으면 파일이 있어도 실행기가 돌리지 않고, 초록불인데 아무것도
 검증되지 않은 상태가 된다.
+
+**★ 테스트 전 앱 초기화 원칙 (대치 + `pm clear` + 재시작)**: 실기기 테스트에
+들어가기 전에는 항상 기존 테스트 앱을 초기화한다. 다시 설치(uninstall)하는 것이
+아니라, 버전을 일일이 확인할 것 없이 테스트를 위한 버전(dev 빌드 APK)으로
+대치(replace, `adb install -r`)하고, `pm clear`로 내부 데이터를 날린 뒤 다시
+시작한다. 이전 세션의 스테일한 상태나 캐시가 검증을 왜곡하는 것을 원천 차단한다.
+`scripts/run-device-tests.mjs`가 기기 연결 시 이 루틴을 자동으로 먼저 수행한다.
 
 ### jest가 두 프로젝트로 나뉜다 — 화면만 RN 런타임을 진다
 

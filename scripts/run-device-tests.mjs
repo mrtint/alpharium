@@ -20,6 +20,7 @@
  */
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 /**
  * 돌릴 흐름들.
@@ -234,6 +235,29 @@ function main() {
   console.log("  이 흐름은 앱이 실기기에서 온디바이스로 도는 것을 검증한다.");
   console.log("  앱이 local 환경(데스크톱 서버)으로 떠 있으면 실패한다 — 그것이 옳다.");
   console.log("  실기기 검증은 dev 환경에서 한다: EXPO_PUBLIC_APP_ENV=dev");
+  console.log("");
+
+  // ── 테스트 전 앱 초기화 루틴 ──────────────────────────────────────────────
+  // 버전 확인할 것 없이 테스트를 위한 버전으로 대치(replace: adb install -r),
+  // pm clear로 날리고 다시 시작한다.
+  const APK_PATH = "android/app/build/outputs/apk/debug/app-debug.apk";
+  const PKG = "com.anonymous.alpharium";
+  const ACTIVITY = `${PKG}/.MainActivity`;
+
+  console.log("▶ 테스트 전 앱 초기화 루틴 (대치 설치 + pm clear + 재시작)");
+  for (const serial of devices) {
+    const sArgs = devices.length > 1 ? ["-s", serial] : [];
+    if (existsSync(APK_PATH)) {
+      console.log(`  - [${serial}] dev 빌드 APK 대치 설치: ${APK_PATH}`);
+      spawnSync("adb", [...sArgs, "install", "-r", APK_PATH], { stdio: "inherit", shell: true });
+    } else {
+      console.log(`  - [${serial}] [안내] ${APK_PATH} 없음 (대치 설치 건너뜀)`);
+    }
+    console.log(`  - [${serial}] 앱 데이터 초기화: pm clear ${PKG}`);
+    spawnSync("adb", [...sArgs, "shell", "pm", "clear", PKG], { stdio: "inherit", shell: true });
+    console.log(`  - [${serial}] 앱 다시 시작: ${ACTIVITY}`);
+    spawnSync("adb", [...sArgs, "shell", "am", "start", "-n", ACTIVITY], { stdio: "inherit", shell: true });
+  }
   console.log("");
 
   // Maestro는 JVM이고, 흐름 파일을 **플랫폼 기본 문자셋**으로 읽는다. 한국어 Windows에서는
