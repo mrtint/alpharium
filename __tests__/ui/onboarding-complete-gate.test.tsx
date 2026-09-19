@@ -80,3 +80,45 @@ describe("★ 온보딩 완료 게이트 (029 버그 수정)", () => {
     );
   });
 });
+
+/*
+ * ★ liveness 실패 화면의 [그냥 시작하기]가 막다른 길이었다 — 실기기에서
+ * 발견(2026-09-19, 045 검증 세션).
+ *
+ * `WelcomeScreen`의 `onSkip`은 작명 단계(`welcome-name-skip`)와 실패 단계
+ * (`welcome-failed-skip`) 양쪽에 재사용되는 콜백인데, `App.tsx`가 이걸
+ * `finishWelcome()` 하나에만 연결하고 있었다. `finishWelcome()`은
+ * `namingDone`만 세우고 `livenessOutcome`은 그대로 두므로,
+ * `resolveFirstRunStage`의 우선순위(`!namingDone` 먼저, `livenessOutcome
+ * !== "ok"` 그다음)상 이미 `namingDone`이 true인 실패 화면에서 이 버튼을
+ * 눌러도 `firstRunStage`가 여전히 `"liveness"`로 남았다(035 계약 W11
+ * "막다른 길을 만들지 않는다" 위반) — 실기기에서 무한정 실패 화면에
+ * 머무르는 것으로 재현됐다.
+ *
+ * 렌더 테스트로 잡기 어렵다(liveness는 실제 엔진 확인을 필요로 한다) —
+ * 소스 검사로 "phase별로 다른 콜백이 연결되는가"만 잠근다.
+ */
+describe("★ liveness 실패 화면의 [그냥 시작하기] 막다른 길 (실기기 발견, 045 검증 세션)", () => {
+  it("welcomePhase가 failed일 때만 onSkipLiveness를 쓴다 — finishWelcome 하나로 통일하지 않는다", () => {
+    expect(APP_SOURCE).toMatch(
+      /onSkip=\{welcomePhase === "failed" \? onSkipLiveness : \(\) => finishWelcome\(\)\}/,
+    );
+  });
+
+  it("onSkipLiveness가 존재하고 livenessSkipped를 세운다", () => {
+    const fn = APP_SOURCE.match(/const onSkipLiveness = useCallback\(\(\) => \{([\s\S]*?)\}, \[/);
+    expect(fn).not.toBeNull();
+    expect(fn?.[1]).toMatch(/finishWelcome\(\)/);
+    expect(fn?.[1]).toMatch(/setLivenessSkipped\(true\)/);
+  });
+
+  it("firstRunStage 계산이 livenessSkipped를 반영한다 — livenessOutcome을 그대로 넘기지 않는다", () => {
+    expect(APP_SOURCE).toMatch(
+      /livenessOutcome:\s*livenessSkipped\s*\?\s*"ok"\s*:\s*livenessOutcome,/,
+    );
+  });
+
+  it('livenessOutcome state 자체를 직접 "ok"로 덮어쓰지 않는다(원칙 I) — setLivenessOutcome("ok") 호출이 없다', () => {
+    expect(APP_SOURCE).not.toMatch(/setLivenessOutcome\(\s*"ok"\s*\)/);
+  });
+});

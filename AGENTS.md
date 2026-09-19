@@ -1345,11 +1345,32 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   `DownloadProgressScreen`이 대체하며 소스·테스트 파일 모두 제거.
 - 기기 없는 테스트 156 스위트 2754개 통과, lint 0 error, 헌법 검사
   위반 0, prettier 클린.
-- **실기기 검증 미완료** — 이 구현 세션은 물리 기기에 접근할 수 없어
-  quickstart.md D1~D5(동의 Dialog 노출, [확인/시작] 하나뿐, 슬라이드
-  1~4 자동 전환, 완료 화면 버튼, 041 재개 상호작용)를 수행하지 못했다.
-  **건너뛴 실기기 테스트는 통과가 아니다**(원칙 V) — 다음 실기기
-  세션에서 최우선으로 확인한다.
+- **실기기 dev 빌드 검증 완료**(2026-09-19, SM-S901N/Galaxy S22, dev,
+  `EXPO_PUBLIC_APP_ENV=dev`). D1~D5 전부 실제로 관측:
+  - **D1**(동의 Dialog): "받을 것이 있어요" + [받을게요] 하나만, 모델
+    식별자·바이트 없음. 확인.
+  - **D2**(슬라이드 전환): 01/04부터 04/04까지 4초 간격 자동 전환, 4번째에서
+    클램프(순환 안 함), "받는 중이에요" 고정 문구만. 확인.
+  - **D3**(작명 게이트): 완료 화면("준비됐어요")이 버튼을 누를 때까지 화면에
+    유지됨(`downloadProceedConfirmed` 수정이 실제로 효과가 있음을 확인) →
+    [시작할게요] → 044 작명 화면 정상 전환. 확인.
+  - **D5**(041 재개 상호작용): 슬라이드 진행 중 강제 종료 → 재시작 → 동의
+    Dialog 재노출 없이 슬라이드 화면으로 곧바로 진입, 041 세그먼트 이어받기
+    (약 1GB → 15초 만에 1.5GB 완주) 확인.
+  - **다운로드 실패 재시도**(FR-011, T022·T023): 계약 테스트(`download-progress-
+    screen.test.tsx` FR-011 블록)로 갈음.
+- **★ 045 범위 밖에서 발견해 즉시 고친 결함**: liveness(정상 동작 확인) 실패
+  화면의 [그냥 시작하기]가 **막다른 길**이었다(035 계약 W11 "막다른 길을 만들지
+  않는다" 위반) — `onSkip` 콜백이 작명 단계와 실패 단계 양쪽에서 `finishWelcome()`
+  하나로 재사용되는데, 이 함수는 `namingDone`만 세우고 `livenessOutcome`은
+  그대로 두므로 `resolveFirstRunStage`가 계속 `"liveness"`를 반환해 실패 화면에서
+  절대 벗어날 수 없었다. 실기기에서 실제로 무한정 머무르는 것으로 재현했다.
+  `livenessSkipped` 세션 로컬 state를 추가해 `firstRunStage` 계산에서
+  `livenessOutcome`을 대체하는 방식으로 고쳤다(`livenessOutcome` state 자체는
+  `"ok"`로 덮어쓰지 않음 — 원칙 I). 계약 테스트 4개 추가(`onboarding-complete-
+  gate.test.tsx`), 위반 주입으로 방어 확인.
+- **Maestro 회귀 갱신**: `unified-permission-onboarding.yml`(M5 화면 기대 완화) 및
+  `welcome-naming.yml`(세션 로컬 완료 화면 통과 블록 추가) 수정.
 - 상세: `specs/045-onboarding-download-consent/`.
 
 

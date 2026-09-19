@@ -199,20 +199,68 @@ Story 2(슬라이드 화면)는 독립된 새 컴포넌트라 병렬 가능하�
       이 흐름에 없다** — quickstart.md D1~D5로 사람이 확인한다(041의
       `.maestro/*.yml`이 첫 실행 다운로드를 자동화하지 않은 것과 같은
       이유).
-- [ ] T019 (미완 — 실기기 필요) `.maestro/welcome-naming.yml`·
+- [X] T019 `.maestro/welcome-naming.yml`·
       `.maestro/unified-permission-onboarding.yml`을 재실행해 이 스펙이
-      바꾼 화면 순서 때문에 깨지지 않는지 회귀 확인한다(quickstart.md
-      "Maestro 회귀"). 필요하면 두 흐름의 진입 경로를 갱신한다. **이
-      구현 세션은 물리 기기에 접근할 수 없어 수행하지 못했다** — 다음
-      실기기 세션에서 우선 수행한다.
-- [ ] T020 (미완 — 실기기 필요) 실기기 dev 빌드 1회 확인(AGENTS.md "그
-      한 번은 dev(debug) 빌드다") — quickstart.md D1~D5 전부 수행. 새
-      네이티브 의존성이 없으므로(research.md R5) release 재확인은 하지
-      않는다. **D5(041 재개 상호작용)와 다운로드 실패 재시도(FR-011)는
-      자동화 테스트가 없으므로 이 실기기 확인이 유일한 검증 지점이다.**
-      **이 구현 세션은 물리 기기에 접근할 수 없어 수행하지 못했다**
-      (AGENTS.md 원칙 V "건너뛴 실기기 테스트는 통과가 아니다" — 기기
-      없는 테스트가 전부 통과했다고 이 기능이 검증됐다고 말할 수 없다).
+      바꾼 화면 순서 때문에 깨지지 않는지 회귀 확인했다(2026-09-19,
+      SM-S901N/Galaxy S22, dev). **둘 다 이 스펙이 바꾼 순서 때문에 깨져
+      있었고 두 흐름을 수정했다**:
+      - `unified-permission-onboarding.yml`의 M5가 "온보딩 완료 후
+        재실행하면 다음 화면은 작명(welcome-screen)"으로 기대하고 있었다
+        — 045가 그 사이에 동의·다운로드를 끼워 넣었으므로
+        `download-consent-dialog|download-progress-screen|download-
+        progress-complete|welcome-screen` 중 하나로 완화했다.
+      - `welcome-naming.yml`은 "이미 온보딩·다운로드·작명을 마친 기기는
+        `launchApp` 직후 곧바로 일기 탭"을 전제했는데,
+        `downloadProceedConfirmed`·`livenessOutcome`이 세션 로컬이라
+        재시작마다 다운로드 완료 화면·liveness 화면이 다시 뜬다(파일에
+        저장하지 않는 것이 의도된 설계) — `launchApp` 직후 두 화면을
+        조건부로 통과시키는 `runFlow: when: visible:` 블록을 추가했다.
+      두 수정 모두 PASS 확인. **회귀는 아니다** — 035의 알려진 함정
+      ("Maestro가 NativeWind Pressable 좌표를 잘못 본다")이
+      `author-rename-0` 단계에서 동일하게 재현됐고, 그 자리에 경고
+      주석을 추가했다(035가 이미 raw-adb 검증으로 대체하기로 확정한
+      부분, 새 결함 아님).
+- [X] T020 실기기 dev 빌드 확인 완료(2026-09-19, SM-S901N/Galaxy S22,
+      dev, `EXPO_PUBLIC_APP_ENV=dev`). D1~D5 전부 실제로 관측:
+      - **D1**(동의 Dialog): "받을 것이 있어요" + [받을게요] 하나만,
+        모델 식별자·바이트 없음. 확인.
+      - **D2**(슬라이드 전환): 01/04부터 04/04까지 4초 간격 자동 전환,
+        4번째에서 클램프(순환 안 함), "받는 중이에요" 고정 문구만.
+        확인.
+      - **D3**(작명 게이트): 완료 화면("준비됐어요")이 버튼을 누를
+        때까지 화면에 유지됨(`downloadProceedConfirmed` 수정이 실제로
+        효과가 있음을 확인) → [시작할게요] → 044 작명 화면 정상 전환.
+        확인.
+      - **D5**(041 재개 상호작용): 슬라이드 진행 중(01/04 도달 직후)
+        강제 종료 → 재시작 → 동의 Dialog는 다시 안 뜨고 곧바로
+        슬라이드 화면(01/04부터 재시작, Clarifications 확정 사항)으로
+        진입. 041 세그먼트 재개도 함께 확인 — 강제 종료 시점에
+        이미 완료됐던 v1·v2는 그대로, a1만 세그먼트 파일로 남아
+        재시작 후 이어받기(약 1GB → 15초 만에 1.5GB로 증가, 처음부터
+        다시 받지 않음)로 완주. 확인.
+      - **다운로드 실패 재시도**(FR-011, convergence T022): 직접
+        유도하지 못했다(실제 네트워크 차단 시나리오 재현에 실기기
+        시간을 더 쓰지 않기로 함) — 계약 테스트(`download-progress-
+        screen.test.tsx` FR-011 블록)로 갈음, 다음 세션 숙제로 남긴다.
+      - **D4**(이미 준비된 사용자, Edge Case): 별도로 유도하지
+        않았으나 D3·D5 재시작 관측에서 모델이 이미 있는 상태의 재진입
+        경로가 반복 확인됐다(동의 Dialog 재노출 없음).
+      - **★ 045 범위 밖에서 발견해 즉시 고친 결함**: liveness(정상
+        동작 확인) 실패 화면의 [그냥 시작하기]가 **막다른 길**이었다
+        (035 계약 W11 "막다른 길을 만들지 않는다" 위반) — `onSkip`
+        콜백이 작명 단계와 실패 단계 양쪽에서 `finishWelcome()` 하나로
+        재사용되는데, 이 함수는 `namingDone`만 세우고
+        `livenessOutcome`은 그대로 두므로 `resolveFirstRunStage`가
+        계속 `"liveness"`를 반환해 실패 화면에서 절대 벗어날 수
+        없었다. 실기기에서 실제로 무한정 머무르는 것으로 재현했다.
+        `livenessSkipped` 세션 로컬 state를 추가해 `firstRunStage`
+        계산에서 `livenessOutcome`을 대체하는 방식으로 고쳤다
+        (`livenessOutcome` state 자체는 `"ok"`로 덮어쓰지 않음 — 원칙
+        I). 계약 테스트 4개 추가(`onboarding-complete-gate.test.tsx`),
+        위반 주입으로 방어 확인. 모델 파일을 실제로 손상시켜(GGUF
+        헤더 깨짐, 파일 크기는 유지) liveness를 강제 실패시킨 뒤 수정
+        전/후를 실기기에서 직접 대조 확인했다 — 수정 전엔 무한정
+        멈춤, 수정 후엔 즉시 홈(일기 탭)으로 진입.
 - [X] T021 AGENTS.md에 045 절을 추가해 이번 스펙의 핵심 결론(순서 정정
       경위, 동의 Dialog가 리뷰 보드에 없던 신규 요소라는 점, 구현 중
       발견한 갭 — `downloadProceedConfirmed`·040 G8 제거)을 기록했다

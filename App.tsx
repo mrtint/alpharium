@@ -541,6 +541,11 @@ function AppFrame() {
    */
   const [namingDoneThisSession, setNamingDoneThisSession] = useState(false);
   const [livenessOutcome, setLivenessOutcome] = useState<"ok" | "failed" | null>(null);
+  /**
+   * 사용자가 liveness 실패 화면에서 [그냥 시작하기]를 눌러 확인 자체를
+   * 건너뛰기로 했다 — 아래 `onSkipLiveness` 정의부의 실기기 결함 설명 참조.
+   */
+  const [livenessSkipped, setLivenessSkipped] = useState(false);
 
   /**
    * ★ 045 — 다운로드 완료 화면("시작할게요")의 버튼을 눌렀다.
@@ -613,7 +618,11 @@ function AppFrame() {
           downloadReady: essentialsReady,
           downloadProceedConfirmed,
           namingDone,
-          livenessOutcome,
+          // `livenessSkipped`(위 onSkipLiveness 주석)는 "확인됐다"가 아니라
+          // "사용자가 [그냥 시작하기]로 확인을 건너뛰기로 했다"는 별개의
+          // 사실이다 — 035 W11 계약이 이 우회 자체를 요구하므로 원칙 I
+          // 위반이 아니다(확인 안 된 것을 확인됐다고 속이는 것과 다르다).
+          livenessOutcome: livenessSkipped ? "ok" : livenessOutcome,
         })
       : null;
 
@@ -783,6 +792,28 @@ function AppFrame() {
   );
 
   /**
+   * 사용자가 liveness 실패 화면에서 [그냥 시작하기]를 눌렀다.
+   *
+   * ★ 실기기에서 발견한 결함(2026-09-19, 045 검증 세션) — `WelcomeScreen`의
+   * `onSkip`이 작명 단계(`welcome-name-skip`)와 실패 단계(`welcome-failed-
+   * skip`) 양쪽에서 재사용되는데, `App.tsx`는 이 콜백을 `finishWelcome()`
+   * 하나에만 연결하고 있었다. `finishWelcome()`은 `namingDone`만 세우고
+   * `livenessOutcome`은 그대로 두므로, `resolveFirstRunStage`의 우선순위
+   * (`!namingDone` 먼저, `livenessOutcome !== "ok"` 그다음)상 실패 화면에서
+   * 이 버튼을 눌러도 `firstRunStage`가 여전히 `"liveness"`로 남아
+   * **막다른 길**이 됐다(035 계약 W11 "막다른 길을 만들지 않는다" 위반).
+   *
+   * `livenessOutcome` state 자체를 `"ok"`로 덮어쓰지 않는다 — 실제로
+   * 확인되지 않은 것을 확인됐다고 기록하면 원칙 I 위반이다. 대신
+   * `livenessSkipped`(위에서 선언, 009·040 `namingDoneThisSession`과 같은
+   * 세션 로컬 패턴)를 별도로 세워 `firstRunStage` 계산에서만 참조한다.
+   */
+  const onSkipLiveness = useCallback(() => {
+    finishWelcome();
+    setLivenessSkipped(true);
+  }, [finishWelcome]);
+
+  /**
    * 준비된 캐릭터의 이름을 바꾼다 (035 FR-022·FR-024·FR-025).
    *
    * **첫 만남과 같은 검증을 쓴다**(W18) — 두 자리에 각각 규칙을 두면 갈라진다.
@@ -930,7 +961,10 @@ function AppFrame() {
         <WelcomeScreen
           characterName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
           onRetry={retryLivenessCheck}
-          onSkip={() => finishWelcome()}
+          // `onSkip`은 `WelcomeScreen` 안에서 "naming"(이름 건너뛰기)과
+          // "failed"(liveness 확인 건너뛰기) 두 자리에 재사용된다 — 실기기
+          // 결함(위 onSkipLiveness 주석)이 이 둘을 구분하지 않고 있었다.
+          onSkip={welcomePhase === "failed" ? onSkipLiveness : () => finishWelcome()}
           onSubmitName={onSubmitWelcomeName}
           phase={welcomePhase}
         />
