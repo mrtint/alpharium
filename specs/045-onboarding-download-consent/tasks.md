@@ -275,3 +275,23 @@ Story 2: T011 → T012 → T013 → T014
   작업 후 PR).
 - `WaitingForDownloadScreen` 삭제(T013)는 044 세션에서 겪은
   `CharacterPicker.tsx` 죽은 코드 문제를 반복하지 않기 위한 것이다.
+
+## Phase 7: Convergence
+
+`/speckit-converge`가 spec.md 대비 실제 코드를 재평가해 발견한 갭.
+
+- [X] T022 FR-011·Edge Cases(다운로드 실패) 재시도 경로를 실제로 만든다
+      (missing, HIGH). 현재 `App.tsx`의 다운로드 `.catch()`가 실패를
+      조용히 삼키고, `DownloadProgressScreen.tsx`에는 실패 안내도
+      재시도 버튼도 없다 — 같은 세션 안에서는 `essentialDownloadStarted`
+      (useRef)가 재시도를 막아 사용자가 앱을 완전히 재시작하는 것 외에
+      취할 조작이 없다(원칙 I "막다른 길을 만들지 않는다" 위반 소지).
+      `App.tsx`가 다운로드 실패 여부를 상태로 노출하고,
+      `DownloadProgressScreen`에 실패 안내 문구 + 재시도 버튼을 추가해
+      같은 세션에서 다시 시도할 수 있게 배선한다. 모델 식별자·오류
+      메시지 원문은 노출하지 않는다(원칙 III, C9와 같은 경계).
+- [X] T023 T022의 계약 테스트를 작성한다(missing, HIGH — T022와 짝).
+      `__tests__/ui/download-progress-screen.test.tsx`에 실패 상태 prop
+      (예: `failed: boolean`)에서 재시도 버튼·안내 문구가 렌더되는지,
+      모델 식별자·원본 오류 메시지가 소스에 없는지 확인하는 케이스를
+      추가한다. 위반 주입(재시도 콜백을 빼먹는 등) 1건으로 방어 확인.

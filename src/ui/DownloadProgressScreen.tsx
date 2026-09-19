@@ -22,6 +22,14 @@
  *
  * **진행 문구는 슬라이드마다 "받는 중이에요" 고정이다**(Clarifications
  * 2026-09-19, FR-006) — 퍼센트·바이트·속도를 계산하지 않는다.
+ *
+ * **★ 재시도 경로(`failed`·`onRetry`)는 convergence에서 추가됐다**(FR-011,
+ * Edge Cases — 원칙 I "막다른 길을 만들지 않는다"). 초기 구현은 다운로드
+ * 실패를 조용히 삼키고 화면이 슬라이드에 영원히 멈춰 있었다 — 사용자가
+ * 앱을 완전히 재시작하는 것 외에 취할 조작이 없었다. `failed: true`일 때
+ * 별도 실패 뷰(고정 안내 문구 + [다시 시도] 버튼)를 보여 같은 세션에서
+ * 재시도할 수 있게 한다. 오류 원문·모델 식별자는 노출하지 않는다(원칙
+ * III, C9와 같은 경계) — 화면은 실패했다는 사실과 재시도 조작만 안다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -38,7 +46,21 @@ export type DownloadProgressScreenProps = {
   downloadReady: boolean;
   /** 완료 화면의 "시작할게요"를 눌렀다. */
   onProceed: () => void;
+  /**
+   * 다운로드가 실패한 상태다(convergence, FR-011) — `true`면 슬라이드
+   * 대신 재시도 뷰를 보인다. 오류 원문은 받지 않는다(원칙 III).
+   */
+  failed: boolean;
+  /** 사용자가 [다시 시도]를 눌렀다. */
+  onRetry: () => void;
 };
+
+/** 실패 안내 문구 — 사람이 쓴 고정 상수, 오류 원문을 담지 않는다(원칙 III). */
+const FAILED_TEXT = {
+  title: "받다가 멈췄어요",
+  body: "네트워크 상태를 확인하고 다시 시도해 주세요.",
+  retry: "다시 시도",
+} as const;
 
 /** 슬라이드 1~4의 사람이 쓴 고정 헤드라인·본문(FR-005). */
 const SLIDES = [
@@ -65,18 +87,38 @@ const PROGRESS_TEXT = "받는 중이에요";
 
 const KICKER = "준비하는 중";
 
-export function DownloadProgressScreen({ downloadReady, onProceed }: DownloadProgressScreenProps) {
+export function DownloadProgressScreen({
+  downloadReady,
+  onProceed,
+  failed,
+  onRetry,
+}: DownloadProgressScreenProps) {
   const [elapsedMs, setElapsedMs] = useState(0);
 
   // 4초마다 경과 시간을 누적한다 — resolveSlideStage가 그 값만으로 슬라이드
-  // 인덱스를 판정한다(C6, 바이트 진행률을 구독하지 않는다).
+  // 인덱스를 판정한다(C6, 바이트 진행률을 구독하지 않는다). 실패했으면
+  // 더 이상 슬라이드를 넘길 필요가 없다 — 재시도 뷰가 대신 보인다.
   useEffect(() => {
-    if (downloadReady) return;
+    if (downloadReady || failed) return;
     const id = setInterval(() => {
       setElapsedMs((prev) => prev + SLIDE_INTERVAL_MS);
     }, SLIDE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [downloadReady]);
+  }, [downloadReady, failed]);
+
+  // 실패는 슬라이드·완료보다 먼저 본다 — 막다른 길을 만들지 않는다(원칙
+  // I, FR-011, convergence T022).
+  if (failed) {
+    return (
+      <View style={CONTAINER} testID="download-progress-failed">
+        <AppText variant="title">{FAILED_TEXT.title}</AppText>
+        <AppText variant="body">{FAILED_TEXT.body}</AppText>
+        <Button onPress={onRetry} testID="download-progress-retry">
+          {FAILED_TEXT.retry}
+        </Button>
+      </View>
+    );
+  }
 
   const stage = resolveSlideStage({ downloadReady, elapsedMs });
 

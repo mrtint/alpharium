@@ -377,8 +377,23 @@ function AppFrame() {
    *
    * 세션 스코프 `useRef`로 중복 시작을 막는다 — `essentialsReady`가 이미
    * true(재개 등)이거나 이미 시작한 뒤에는 다시 부르지 않는다.
+   *
+   * ★ convergence(T022) — **실패를 더 이상 조용히 삼키지 않는다**(FR-011,
+   * 원칙 I). `downloadFailed` 상태가 실패를 화면에 노출하고, [다시 시도]가
+   * `essentialDownloadStarted.current`를 다시 `false`로 되돌려 같은
+   * `useEffect`가 재트리거되게 한다 — 앱을 재시작하지 않아도 같은 세션
+   * 에서 재시도할 수 있다.
    */
   const essentialDownloadStarted = useRef(false);
+  const [downloadFailed, setDownloadFailed] = useState(false);
+
+  /**
+   * [다시 시도]를 누른 횟수 — 값 자체엔 의미가 없고(원칙 IV, 지표 아님)
+   * 아래 `useEffect`를 다시 돌게 하는 신호로만 쓴다. `essentialDownload
+   * Started.current`가 `useRef`라 값 변경만으로는 effect가 재실행되지
+   * 않으므로, 의존성 배열에 넣을 state가 하나 필요하다.
+   */
+  const [downloadRetryToken, setDownloadRetryToken] = useState(0);
 
   useEffect(() => {
     if (!permissionStepsDecided) return;
@@ -386,6 +401,7 @@ function AppFrame() {
     if (essentialsReady === null || essentialsReady === true) return;
     if (essentialDownloadStarted.current) return;
     essentialDownloadStarted.current = true;
+    setDownloadFailed(false);
 
     void onboardingPorts.essentialAssets
       .downloadEssentials(() => {
@@ -394,11 +410,10 @@ function AppFrame() {
       })
       .then(() => refreshEssentialsReady())
       .catch(() => {
-        // 실패해도 조용히 감춘다 — `DownloadProgressScreen`은 그만두기가
-        // 없으므로(FR-011), essentialsReady가 계속 false로 남으면 진행
-        // 화면에 머무른다 — 사용자는 앱을 나갔다 재실행하면 이 effect가
-        // 다시 시도한다(essentialDownloadStarted가 컴포넌트 재마운트로
-        // 초기화되므로).
+        // 오류 원문을 저장하지 않는다(원칙 III) — 실패했다는 사실만
+        // 화면에 노출한다. [다시 시도]가 essentialDownloadStarted를
+        // 되돌려야 이 effect가 다시 돈다(아래 onRetryDownload).
+        setDownloadFailed(true);
       });
   }, [
     permissionStepsDecided,
@@ -406,7 +421,15 @@ function AppFrame() {
     essentialsReady,
     onboardingPorts,
     refreshEssentialsReady,
+    downloadRetryToken,
   ]);
+
+  /** 다운로드 실패 화면의 [다시 시도] — 같은 세션에서 재시도한다(FR-011). */
+  const onRetryDownload = useCallback(() => {
+    essentialDownloadStarted.current = false;
+    setDownloadFailed(false);
+    setDownloadRetryToken((n) => n + 1);
+  }, []);
 
   const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
 
@@ -892,6 +915,9 @@ function AppFrame() {
           // (구현 중 발견한 갭 — 이 플래그 없이는 essentialsReady가 true가
           // 되는 즉시 버튼을 누를 틈도 없이 화면이 사라진다).
           onProceed={() => setDownloadProceedConfirmed(true)}
+          // convergence(T022) — 실패 시 막다른 길 대신 재시도 뷰(FR-011).
+          failed={downloadFailed}
+          onRetry={onRetryDownload}
         />
         <StatusBar style="auto" />
       </SafeAreaView>
