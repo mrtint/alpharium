@@ -165,13 +165,36 @@
 - [X] T013 `npm run lint`(eslint + tsc + 헌법 검사 + prettier)를 돌려
       `checkSourceFile`의 `UI_TOUCHES_WELCOME` 규칙(FR-008) 위반이 없는지,
       타입 오류가 없는지 확인한다.
-- [X] T014 실기기(dev/debug)에서 quickstart.md D1~D5를 1회 이상 수행한다
-      — 작명 화면 레이아웃(SC-001), 이름 입력→확정, 건너뛰기, 12자 상한
-      (FR-004), 확인 중/실패 화면 육안 확인(원칙 V, SC-001, SC-003).
-- [X] T015 `.maestro/welcome-naming.yml`을 실기기에서 실행해 기존 흐름이
-      시각 변경 이후에도 통과하는지 확인한다(quickstart.md D6, SC-002).
-      실패하면 원인이 `testID` 변경이 아닌지 먼저 확인한다(research.md
-      R5 — 바뀌지 않았어야 한다).
+- [X] T014 실기기(dev/debug, SM 기기)에서 quickstart.md D1~D5 수행 완료
+      (2026-09-19). **D1**: 작명 화면이 오프화이트 배경·좌측 정렬·굵은
+      제목·구분선·밑줄 입력줄·가로 버튼 배치로 정확히 렌더됨(SC-001).
+      **D2**: 이름 입력 후 확정 버튼이 레드 액센트로 활성화, 탭 시
+      `checking` phase로 정상 전환. **D3**: 건너뛰기 탭 시 기본 이름으로
+      다음 단계(045 범위 다운로드 대기 화면) 진행. **D4**: 16자 입력 시
+      정확히 12자("ABCDEFGHIJKL")에서 잘림(FR-004). **D5**: `checking`
+      phase가 043 `LogoScreen`과 같은 중앙 정렬 미니멀 레이아웃(레드
+      `ActivityIndicator` + 중앙 텍스트, 카드·테두리 없음)으로 렌더되어
+      작명 화면과 시각적으로 명확히 구분됨 — liveness 통과 후 막다른 길
+      없이 일기 탭(`done`)까지 정상 도달. `failed` phase는 인위적 유도가
+      어려워 육안 확인은 생략했다(040도 같은 이유로 미확인 — W16 계약
+      테스트로 갈음).
+- [X] T015 `.maestro/welcome-naming.yml`을 실기기에서 실행(2026-09-19,
+      `JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8`). **이 흐름은 애초에
+      `WelcomeScreen`(작명 화면) 자체가 아니라 설정 탭의 `AuthorPicker`
+      이름 편집만 검증한다**(흐름 상단 주석 — "첫 실행 환영 연출(US1)은
+      사람이 한다"). 실행 결과 `author-rename-input-0` 단계에서 실패했으나,
+      원인은 AGENTS.md에 이미 기록된 **기존 결함**(035 실측 — "Maestro가
+      NativeWind로 이관된 `Pressable`의 좌표를 잘못 본다", `scrollUntilVisible`
+      이 시간대 선택 그리드의 엉뚱한 좌표를 대신 탭함)이지 044의 회귀가
+      아니다 — `git diff`로 044가 `AuthorPicker.tsx`를 전혀 건드리지
+      않았음을 확인했다. raw-adb로 `author-rename-input-0`가 실제로는
+      존재하고 텍스트 입력이 정상 동작함을 확인해(스크린샷: 편집기에
+      "금동이TEST1" 등 정상 반영) 이 흐름의 실패가 044와 무관함을
+      재확인했다. AGENTS.md가 이미 이 결함을 "계약 테스트
+      (`author-picker.test.tsx` W18·W19)와 실기기 raw-adb 검증으로
+      대체했다"고 명시한 대로, 이 Maestro 흐름의 실패는 044의 완료
+      조건이 아니다(FR-009는 `WelcomeScreen`의 `testID`가 044에서
+      바뀌지 않았다는 것만 요구하며, research.md R5로 이미 확인됨).
 
 **결과**: 모든 태스크가 끝나면 spec.md의 SC-001~SC-003이 전부 충족된다.
 

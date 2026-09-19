@@ -180,6 +180,106 @@ describe("L16·W15·W16 — 문구는 사람이 쓴 고정 상수다", () => {
   });
 });
 
+describe("044 FR-001·SC-001 — 작명 화면이 Modernist 좌측 정렬 카드형이다", () => {
+  it("welcome 컨테이너에 쓰이는 스타일이 좌측 정렬(items-start 계열)이다", () => {
+    // 044 — welcome 블록이 참조하는 스타일 상수 이름을 찾고, 그 상수의
+    // 정의를 소스 전체에서 찾아 값을 확인한다(스타일이 상수로 분리되어
+    // 있으므로 JSX 슬라이스만으로는 값이 보이지 않는다).
+    const jsxSection = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    const styleMatch =
+      /testID="welcome-greeting"[^>]*style=\{(\w+)\}|style=\{(\w+)\}[^>]*testID="welcome-greeting"/.exec(
+        jsxSection,
+      );
+    const constName = styleMatch?.[1] ?? styleMatch?.[2];
+    expect(constName).toBeTruthy();
+    const constDef = CODE.slice(CODE.indexOf(`const ${constName} =`));
+    expect(constDef.slice(0, constDef.indexOf("as const"))).toMatch(/alignItems:\s*"flex-start"/);
+  });
+
+  it("제목이 COLORS.bg 배경 위에서 굵은 타이포그래피를 쓴다", () => {
+    expect(CODE).toMatch(/COLORS\.bg/);
+    expect(CODE).toMatch(/variant="title"/);
+  });
+
+  it("구분선 요소가 COLORS.border를 쓴다", () => {
+    const section = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    const styleMatch = /<View style=\{(\w+)\} \/>/.exec(section);
+    expect(styleMatch).toBeTruthy();
+    const constDef = CODE.slice(CODE.indexOf(`const ${styleMatch?.[1]} =`));
+    expect(constDef.slice(0, constDef.indexOf("as const"))).toMatch(/COLORS\.border/);
+  });
+
+  it("하단 버튼 2개가 가로로 배치된다(flexDirection: row)", () => {
+    const section = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    const rowMatches = [...section.matchAll(/<View style=\{(\w+)\}>/g)];
+    const rowConstName = rowMatches
+      .map((m) => m[1])
+      .find((name) => {
+        const def = CODE.slice(CODE.indexOf(`const ${name} =`));
+        return /flexDirection/.test(def.slice(0, def.indexOf("as const")));
+      });
+    expect(rowConstName).toBeTruthy();
+    const constDef = CODE.slice(CODE.indexOf(`const ${rowConstName} =`));
+    expect(constDef.slice(0, constDef.indexOf("as const"))).toMatch(/flexDirection:\s*"row"/);
+  });
+});
+
+describe("044 FR-002·SC-001 — checking/failed가 중앙 정렬 미니멀이다", () => {
+  it("checking 컨테이너에 쓰이는 스타일이 중앙 정렬이다", () => {
+    const jsxSection = CODE.slice(
+      CODE.indexOf('phase === "checking"'),
+      CODE.indexOf('phase === "welcome"'),
+    );
+    const styleMatch =
+      /testID="welcome-checking"[^>]*style=\{(\w+)\}|style=\{(\w+)\}[^>]*testID="welcome-checking"/.exec(
+        jsxSection,
+      );
+    const constName = styleMatch?.[1] ?? styleMatch?.[2];
+    expect(constName).toBeTruthy();
+    const constDef = CODE.slice(CODE.indexOf(`const ${constName} =`));
+    expect(constDef.slice(0, constDef.indexOf("as const"))).toMatch(/alignItems:\s*"center"/);
+  });
+
+  it("failed 컨테이너도 같은 중앙 정렬 스타일을 쓴다(welcome과는 다른 상수)", () => {
+    const jsxSection = CODE.slice(CODE.indexOf('phase === "failed"'), CODE.lastIndexOf("</View>"));
+    const styleMatch =
+      /testID="welcome-failed"[^>]*style=\{(\w+)\}|style=\{(\w+)\}[^>]*testID="welcome-failed"/.exec(
+        jsxSection,
+      );
+    const constName = styleMatch?.[1] ?? styleMatch?.[2];
+    expect(constName).toBeTruthy();
+    const constDef = CODE.slice(CODE.indexOf(`const ${constName} =`));
+    expect(constDef.slice(0, constDef.indexOf("as const"))).toMatch(/alignItems:\s*"center"/);
+
+    // welcome 블록은 다른 상수(좌측 정렬)를 쓴다 — 두 phase가 같은 스타일을
+    // 공유하지 않는다는 것을 확인한다.
+    const welcomeJsxSection = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    const welcomeStyleMatch =
+      /testID="welcome-greeting"[^>]*style=\{(\w+)\}|style=\{(\w+)\}[^>]*testID="welcome-greeting"/.exec(
+        welcomeJsxSection,
+      );
+    expect(welcomeStyleMatch?.[1] ?? welcomeStyleMatch?.[2]).not.toBe(constName);
+  });
+
+  it("checking에 진행률 수치가 없다(FR-007, 원칙 IV)", async () => {
+    await setup({ phase: "checking" });
+    const rendered = JSON.stringify(screen.getByTestId("welcome-checking"));
+    expect(rendered).not.toMatch(/%|percent|progress/i);
+  });
+});
+
 describe("025 회귀 — 접근성 라벨", () => {
   it("이름 표시에 accessibilityLabel이 있다", async () => {
     // 여러 텍스트 조각이 한 <Text>에 있으면 testID가 접근성 트리에 안 나온다.
