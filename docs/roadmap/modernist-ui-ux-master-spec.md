@@ -288,14 +288,3 @@ stateDiagram-v2
 | **사진 캡션 상한 8장** | `023` | 시간 분포 알고리즘을 거친 최대 8장의 사진만 VLM 캡션 및 상세 슬라이더에 공급 | LLM 컨텍스트(`n_ctx`) 초과 및 생성 타임아웃(180초) 초과 위험 |
 | **작명 인라인 에디터 키** | `035` | `AuthorPicker` 렌더링 시 표시 이름을 키로 쓰지 않고 고정 인덱스(`key={index}`)를 사용 | 이름 수정 타이핑 시 컴포넌트가 리마운트되어 포커스와 상태가 유실됨 |
 | **세그먼트 다운로드** | `026` / `041` | `Range` 헤더 기반 네이티브 `DownloadTask`로 다운로드하여 힙 메모리 OOM을 차단 | 대용량 모델 수신 중 OutOfMemoryError 크래시 재발 |
-
----
-
-## 6. 향후 구현 체크리스트 (046 ~ 051)
-
-- [ ] **046 (로드맵 30번)**: `DiaryListScreen` 및 `DayPicker` Modernist 이관, 상단 날짜 바 및 일기 카드 조판
-- [ ] **047 (로드맵 31번)**: `DiaryHomeScreen` writing 레드 필드 및 독백 타자기 연출, `OverwriteConfirm` 정비
-- [ ] **048 (로드맵 32번)**: `DiaryDetailScreen` 출판 지면 타이포그래피 이관, 타자기 `reveal` 계약 연결
-- [ ] **049 (로드맵 33번)**: `DiaryDetailScreen` 내 코어 RN 8장 가로 슬라이더 및 풀스크린 블랙 갤러리 모달 이관
-- [ ] **050 (로드맵 34번)**: 전역 하단 탭 바 및 `AuthorPicker` 인라인 작명 에디터 Modernist 리스타일링
-- [ ] **051 (로드맵 35번)**: `CharacterListScreen`, `ModelSection`, `PermissionsSection` 설정 관리 UI 완성
