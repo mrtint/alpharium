@@ -30,7 +30,6 @@ import { expoPhotoPort } from "./src/signals/expo-port";
 import { loadOnboardingFlag, saveOnboardingFlag, type OnboardingFlag } from "./src/onboarding/flag";
 import {
   essentialAssetsReady,
-  essentialDownloadFraction,
   ONBOARDING_DEFAULT_CHARACTER,
 } from "./src/onboarding/essential-assets";
 import { expoEssentialAssetsPort } from "./src/app/essential-assets-port";
@@ -49,7 +48,8 @@ import { resolveFirstRunStage } from "./src/firstrun/progress";
 import { shouldAutoGenerate } from "./src/firstrun/auto-diary";
 import { LogoScreen } from "./src/ui/LogoScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
-import { WaitingForDownloadScreen } from "./src/ui/WaitingForDownloadScreen";
+import { DownloadConsentDialog } from "./src/ui/DownloadConsentDialog";
+import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { PermissionsSection } from "./src/ui/PermissionsSection";
 import { AppText } from "./src/ui/components/Text";
@@ -364,45 +364,72 @@ function AppFrame() {
   }, [onboardingPorts]);
 
   /**
-   * ★ 040 — 필수 에셋 내려받기를 화면 조작과 별도로 백그라운드에서
-   * 시작한다(FR-004). `permissionStepsDecided`가 true가 되는 순간(=권한
-   * 스텝 전부 결정) 1회 트리거하며, 사용자가 작명 화면에 머물든 나가든
-   * 계속된다 — `OnboardingScreen` 자체의 "필수 에셋 다운로드" 단계는 이제
-   * `App.tsx`가 그 화면을 이미 떠난 뒤라 도달하지 않는다(위
-   * `onboardingGateNeeded` 주석).
+   * ★ 045 — 필수 에셋 내려받기는 이제 **동의 후에만** 시작한다(FR-002).
+   * `permissionStepsDecided && onboardingFlag.downloadConsented`가 함께
+   * 참이 되는 순간 1회 트리거한다 — 040은 권한 결정만으로 즉시 시작했지만,
+   * 이 스펙이 동의 Dialog를 그 사이에 끼워 넣었다(research.md, spec FR-001·
+   * FR-002).
+   *
+   * **진행률 콜백은 이제 화면에 전달하지 않는다**(원칙 IV, C6) —
+   * `DownloadProgressScreen`은 `essentialsReady`(완료 여부)만 구독하고
+   * 041의 바이트 단위 진행률은 구독하지 않는다. 콜백 자체는 041 API 계약상
+   * 필요해 넘기되 받은 값을 버린다.
    *
    * 세션 스코프 `useRef`로 중복 시작을 막는다 — `essentialsReady`가 이미
    * true(재개 등)이거나 이미 시작한 뒤에는 다시 부르지 않는다.
+   *
+   * ★ convergence(T022) — **실패를 더 이상 조용히 삼키지 않는다**(FR-011,
+   * 원칙 I). `downloadFailed` 상태가 실패를 화면에 노출하고, [다시 시도]가
+   * `essentialDownloadStarted.current`를 다시 `false`로 되돌려 같은
+   * `useEffect`가 재트리거되게 한다 — 앱을 재시작하지 않아도 같은 세션
+   * 에서 재시도할 수 있다.
    */
   const essentialDownloadStarted = useRef(false);
-  const [essentialDownloadParts, setEssentialDownloadParts] = useState<
-    readonly { receivedBytes: number; totalBytes: number }[]
-  >([]);
+  const [downloadFailed, setDownloadFailed] = useState(false);
+
+  /**
+   * [다시 시도]를 누른 횟수 — 값 자체엔 의미가 없고(원칙 IV, 지표 아님)
+   * 아래 `useEffect`를 다시 돌게 하는 신호로만 쓴다. `essentialDownload
+   * Started.current`가 `useRef`라 값 변경만으로는 effect가 재실행되지
+   * 않으므로, 의존성 배열에 넣을 state가 하나 필요하다.
+   */
+  const [downloadRetryToken, setDownloadRetryToken] = useState(0);
 
   useEffect(() => {
     if (!permissionStepsDecided) return;
+    if (onboardingFlag?.downloadConsented !== true) return;
     if (essentialsReady === null || essentialsReady === true) return;
     if (essentialDownloadStarted.current) return;
     essentialDownloadStarted.current = true;
+    setDownloadFailed(false);
 
     void onboardingPorts.essentialAssets
-      .downloadEssentials((fraction) => {
-        // essentialDownloadFraction의 역함수를 만들 필요 없이, 합산 fraction
-        // 하나를 total=1 파트 하나로 표현한다 — WaitingForDownloadScreen은
-        // essentialDownloadFraction()을 그대로 재사용하므로 입력 모양만
-        // 맞추면 된다(029가 이미 낸 값 하나를 재포장).
-        setEssentialDownloadParts([{ receivedBytes: fraction, totalBytes: 1 }]);
+      .downloadEssentials(() => {
+        // 진행률 값을 받지만 쓰지 않는다 — DownloadProgressScreen은 경과
+        // 시간만으로 슬라이드를 판정한다(C6, research.md R3).
       })
       .then(() => refreshEssentialsReady())
       .catch(() => {
-        // 실패해도 조용히 감춘다 — 021 OnboardingScreen의 실패 안내·재시도
-        // UI는 이제 이 경로에서 쓰이지 않는다. WaitingForDownloadScreen은
-        // 그만두기가 없으므로(FR-006), essentialsReady가 계속 false로
-        // 남으면 대기 화면에 머무른다 — 사용자는 앱을 나갔다 재실행하면
-        // 이 effect가 다시 시도한다(essentialDownloadStarted가 컴포넌트
-        // 재마운트로 초기화되므로).
+        // 오류 원문을 저장하지 않는다(원칙 III) — 실패했다는 사실만
+        // 화면에 노출한다. [다시 시도]가 essentialDownloadStarted를
+        // 되돌려야 이 effect가 다시 돈다(아래 onRetryDownload).
+        setDownloadFailed(true);
       });
-  }, [permissionStepsDecided, essentialsReady, onboardingPorts, refreshEssentialsReady]);
+  }, [
+    permissionStepsDecided,
+    onboardingFlag,
+    essentialsReady,
+    onboardingPorts,
+    refreshEssentialsReady,
+    downloadRetryToken,
+  ]);
+
+  /** 다운로드 실패 화면의 [다시 시도] — 같은 세션에서 재시도한다(FR-011). */
+  const onRetryDownload = useCallback(() => {
+    essentialDownloadStarted.current = false;
+    setDownloadFailed(false);
+    setDownloadRetryToken((n) => n + 1);
+  }, []);
 
   const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
 
@@ -514,6 +541,23 @@ function AppFrame() {
    */
   const [namingDoneThisSession, setNamingDoneThisSession] = useState(false);
   const [livenessOutcome, setLivenessOutcome] = useState<"ok" | "failed" | null>(null);
+  /**
+   * 사용자가 liveness 실패 화면에서 [그냥 시작하기]를 눌러 확인 자체를
+   * 건너뛰기로 했다 — 아래 `onSkipLiveness` 정의부의 실기기 결함 설명 참조.
+   */
+  const [livenessSkipped, setLivenessSkipped] = useState(false);
+
+  /**
+   * ★ 045 — 다운로드 완료 화면("시작할게요")의 버튼을 눌렀다.
+   *
+   * `downloadReady`가 `true`가 되는 즉시 `firstRunStage`가 `"naming"`으로
+   * 넘어가면 완료 화면이 사용자가 버튼을 누를 틈도 없이 사라진다(FR-007
+   * 위반, 구현 중 발견). `namingDone`과 같은 세션 로컬 패턴으로 막는다 —
+   * 파일에 저장하지 않는다(009 "고른 하루를 파일에 남기지 않는다"와 같은
+   * 이유, 앱을 재시작하면 다시 한번 완료 화면을 보되 041 덕에 다운로드
+   * 자체를 다시 받지는 않는다).
+   */
+  const [downloadProceedConfirmed, setDownloadProceedConfirmed] = useState(false);
 
   /**
    * 작명이 끝났는가 — 이번 세션에 끝냈거나(`namingDoneThisSession`), 이전
@@ -556,20 +600,29 @@ function AppFrame() {
     });
 
   /**
-   * 040 — 이 세션의 첫 실행 단계(작명↔다운로드 병렬 조율, contracts G4·G5).
+   * ★ 045 — 이 세션의 첫 실행 단계(동의 → 다운로드 → 작명 순서,
+   * download-consent-gate.md C1~C4).
    *
    * `onboardingNeeded`는 **권한 결정만** 본다(`!permissionStepsDecided`) —
-   * 029의 `essentialAssetsReady`를 더 이상 포함하지 않는다(research.md #3과
-   * 같은 판단, 위 `permissionStepsDecided` 주석 참조).
+   * 029의 `essentialAssetsReady`를 포함하지 않는다(040 research.md #3과
+   * 같은 판단, 위 `permissionStepsDecided` 주석 참조). `downloadConsented`는
+   * `onboardingFlag`에서 직접 온다 — 040의 `namingDone`과 달리 세션 로컬
+   * 상태로 따로 두지 않는다(동의는 다시 되돌릴 UI 자체가 없으므로, C5).
    */
   const firstRunStage =
     onboardingFlag !== null && essentialsReady !== null
       ? resolveFirstRunStage({
           onboardingNeeded: !permissionStepsDecided,
           onboardingStarted,
-          namingDone,
+          downloadConsented: onboardingFlag.downloadConsented,
           downloadReady: essentialsReady,
-          livenessOutcome,
+          downloadProceedConfirmed,
+          namingDone,
+          // `livenessSkipped`(위 onSkipLiveness 주석)는 "확인됐다"가 아니라
+          // "사용자가 [그냥 시작하기]로 확인을 건너뛰기로 했다"는 별개의
+          // 사실이다 — 035 W11 계약이 이 우회 자체를 요구하므로 원칙 I
+          // 위반이 아니다(확인 안 된 것을 확인됐다고 속이는 것과 다르다).
+          livenessOutcome: livenessSkipped ? "ok" : livenessOutcome,
         })
       : null;
 
@@ -695,15 +748,31 @@ function AppFrame() {
   }, [firstRunStage, livenessOutcome, environment]);
 
   /**
+   * ★ 045 — 사용자가 동의 Dialog의 [확인/시작]을 눌렀다(FR-002a, C5).
+   *
+   * `downloadConsented: true`를 즉시 저장한다 — 되돌리는 코드 경로가
+   * 없으므로(C5) 이후 재확인·재요청은 일어나지 않는다. 다운로드 자체는
+   * 이 저장이 끝난 뒤 `onboardingFlag` 갱신을 본 `useEffect`(위)가
+   * 트리거한다.
+   */
+  const onConfirmDownloadConsent = useCallback(() => {
+    setOnboardingFlag((prev) => {
+      if (prev === null || prev.downloadConsented === true) return prev;
+      const next = { ...prev, downloadConsented: true };
+      void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
+      return next;
+    });
+  }, [onboardingFlagPort]);
+
+  /**
    * 작명 화면을 마쳤다(W9) — 이름 확정·건너뛰기·실패 후 건너뛰기 셋뿐이다.
    *
-   * ★ 040 — `namingDone`도 함께 세운다. 035 원본은 이 시점이 곧 연출 전체의
-   * 끝(liveness는 이미 먼저 통과한 뒤였다)이었지만, 040은 이 시점이 아직
-   * liveness 확인 **전**일 수 있다(`resolveFirstRunStage`가 다음에
-   * `"waiting-for-download"` 또는 `"liveness"`로 판정) — `welcomeShown`을
-   * 영구 플래그로 미리 남겨도 무방한 이유는 W9이 이미 "셋 다 사용자의
-   * 행동"이라 정의했기 때문이다(작명을 다시 보여줄 필요가 없다, 이후는
-   * 대기/확인 화면이 이어받는다).
+   * ★ 045 — `namingDone`도 함께 세운다. 이 시점엔 다운로드가 **이미 완료된
+   * 상태다**(`firstRunStage`의 우선순위가 동의·다운로드를 작명보다 앞에
+   * 두므로, C2) — 040 시절에는 다운로드가 아직 안 끝났을 수 있었지만 이
+   * 스펙이 그 순서를 뒤집었다. `welcomeShown`을 영구 플래그로 미리 남겨도
+   * 무방한 이유는 W9이 이미 "셋 다 사용자의 행동"이라 정의했기 때문이다
+   * (작명을 다시 보여줄 필요가 없다, 이후는 liveness 확인이 이어받는다).
    */
   const finishWelcome = useCallback(
     (names?: CustomNames) => {
@@ -721,6 +790,28 @@ function AppFrame() {
     },
     [characterNamesPort, onboardingFlagPort],
   );
+
+  /**
+   * 사용자가 liveness 실패 화면에서 [그냥 시작하기]를 눌렀다.
+   *
+   * ★ 실기기에서 발견한 결함(2026-09-19, 045 검증 세션) — `WelcomeScreen`의
+   * `onSkip`이 작명 단계(`welcome-name-skip`)와 실패 단계(`welcome-failed-
+   * skip`) 양쪽에서 재사용되는데, `App.tsx`는 이 콜백을 `finishWelcome()`
+   * 하나에만 연결하고 있었다. `finishWelcome()`은 `namingDone`만 세우고
+   * `livenessOutcome`은 그대로 두므로, `resolveFirstRunStage`의 우선순위
+   * (`!namingDone` 먼저, `livenessOutcome !== "ok"` 그다음)상 실패 화면에서
+   * 이 버튼을 눌러도 `firstRunStage`가 여전히 `"liveness"`로 남아
+   * **막다른 길**이 됐다(035 계약 W11 "막다른 길을 만들지 않는다" 위반).
+   *
+   * `livenessOutcome` state 자체를 `"ok"`로 덮어쓰지 않는다 — 실제로
+   * 확인되지 않은 것을 확인됐다고 기록하면 원칙 I 위반이다. 대신
+   * `livenessSkipped`(위에서 선언, 009·040 `namingDoneThisSession`과 같은
+   * 세션 로컬 패턴)를 별도로 세워 `firstRunStage` 계산에서만 참조한다.
+   */
+  const onSkipLiveness = useCallback(() => {
+    finishWelcome();
+    setLivenessSkipped(true);
+  }, [finishWelcome]);
 
   /**
    * 준비된 캐릭터의 이름을 바꾼다 (035 FR-022·FR-024·FR-025).
@@ -818,44 +909,47 @@ function AppFrame() {
   }
 
   /*
-   * ★ 029 FR-020 보호막 — 권한 스텝을 이미 마쳤고(`permissionStepsDecided`)
-   * 작명 화면도 이미 봤던(`welcomeShown === true`) 기존 사용자인데, 필수
-   * 에셋이 아직(또는 다시) 준비되지 않았으면(모델 파일이 지워진 028 계열
-   * 결함 포함) 이름을 다시 묻지 않고 곧바로 대기 화면을 보인다 — `namingDone`
-   * 로컬 상태가 이 세션에서 `false`라 `welcomeNeeded`(`shouldShowWelcome`)
-   * 만으로는 이 경우를 못 잡는다(옛 `welcomeShown: true`가 이미 있으므로).
+   * ★ 045 — 진입 게이트의 세 번째 단: 온보딩(권한) → **동의 → 다운로드** →
+   * 작명 → liveness 확인 → 홈. `firstRunStage`(=`resolveFirstRunStage`의
+   * 결과)로 직접 가른다 — 040이 "작명이 다운로드보다 먼저 뜨는" 병렬
+   * 배치를 썼던 자리에, 이 스펙은 순서를 되돌려 동의·다운로드가 항상
+   * 먼저 온다(C2). `welcomeNeeded`(`shouldShowWelcome`)는 035의 게이트
+   * 함수를 여전히 호출했음을 소스 검사로 확인할 수 있게 남긴 값일 뿐,
+   * 렌더 분기는 전부 `firstRunStage`가 정한다.
+   *
+   * **029 FR-020 보호막이 더 이상 별도로 필요 없다** — 이전에는 "권한은
+   * 끝났고 작명도 이미 봤는데 에셋이 사라졌다"는 특수 케이스를 여기서
+   * 따로 잡았지만, 새 우선순위(C3)에서는 `downloadReady`가 `namingDone`
+   * 보다 먼저 검사되므로 `namingDone` 값과 무관하게 `"downloading"`이
+   * 자연히 반환된다 — 별도 분기 없이 이 우선순위 자체가 그 보호막이다.
+   *
+   * **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(035 W5) — 설정
+   * 탭에서 캐릭터를 새로 받아도 연출은 뜨지 않는다(040 FR-002a).
    */
-  if (permissionStepsDecided && !essentialsReady && onboardingFlag.welcomeShown === true) {
+  if (firstRunStage === "download-consent") {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <WaitingForDownloadScreen fraction={essentialDownloadFraction(essentialDownloadParts)} />
+        <DownloadConsentDialog onConfirm={onConfirmDownloadConsent} visible={true} />
         <StatusBar style="auto" />
       </SafeAreaView>
     );
   }
 
-  /*
-   * ★ 040 — 진입 게이트의 세 번째 단: 온보딩(권한) → **작명 ∥ 다운로드** →
-   * liveness 확인 → 홈. `firstRunStage`(=`resolveFirstRunStage`의 결과)로
-   * 직접 가른다 — `welcomeNeeded`(`shouldShowWelcome`)는 위
-   * `onboardingGateNeeded`/029 FR-020 보호막에서 이미 걸러지지 않는 나머지
-   * 경우(최초 실행 전체)를 대표하는 가드로만 쓰고, **어느 화면을 보여줄지는
-   * `firstRunStage`가 정한다.**
-   *
-   * ⚠️ **`welcomeNeeded`만으로 이 갈래들을 가르면 안 된다** — `finishWelcome()`
-   * 이 `onboardingFlag.welcomeShown`을 즉시 `true`로 저장하므로(W9), 작명을
-   * 마친 바로 다음 렌더에서 `welcomeNeeded`(`!welcomeShown`)가 `false`가
-   * 되어 아직 다운로드/liveness가 안 끝났는데도 대기·확인 화면을 건너뛰고
-   * 탭 UI로 떨어지는 결함이 여기서 실제로 재현됐었다(이 방식으로 고쳤다) —
-   * `firstRunStage`는 `namingDone`(로컬 상태)로 판정하므로 이 문제가 없다.
-   *
-   * **이 자리 밖에서 `WelcomeScreen`을 그리지 않는다**(W5) — 설정 탭에서
-   * 캐릭터를 새로 받아도 연출은 뜨지 않는다(FR-002a).
-   */
-  if (firstRunStage === "waiting-for-download") {
+  if (firstRunStage === "downloading") {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <WaitingForDownloadScreen fraction={essentialDownloadFraction(essentialDownloadParts)} />
+        <DownloadProgressScreen
+          downloadReady={essentialsReady === true}
+          // 다운로드가 이미 완료된 상태(essentialsReady: true)에서만 이
+          // 완료 화면의 버튼이 보인다(FR-007). 누르면 세션 로컬 플래그를
+          // 세워 firstRunStage가 다음 렌더에서 "naming"으로 넘어가게 한다
+          // (구현 중 발견한 갭 — 이 플래그 없이는 essentialsReady가 true가
+          // 되는 즉시 버튼을 누를 틈도 없이 화면이 사라진다).
+          onProceed={() => setDownloadProceedConfirmed(true)}
+          // convergence(T022) — 실패 시 막다른 길 대신 재시도 뷰(FR-011).
+          failed={downloadFailed}
+          onRetry={onRetryDownload}
+        />
         <StatusBar style="auto" />
       </SafeAreaView>
     );
@@ -867,7 +961,10 @@ function AppFrame() {
         <WelcomeScreen
           characterName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
           onRetry={retryLivenessCheck}
-          onSkip={() => finishWelcome()}
+          // `onSkip`은 `WelcomeScreen` 안에서 "naming"(이름 건너뛰기)과
+          // "failed"(liveness 확인 건너뛰기) 두 자리에 재사용된다 — 실기기
+          // 결함(위 onSkipLiveness 주석)이 이 둘을 구분하지 않고 있었다.
+          onSkip={welcomePhase === "failed" ? onSkipLiveness : () => finishWelcome()}
           onSubmitName={onSubmitWelcomeName}
           phase={welcomePhase}
         />

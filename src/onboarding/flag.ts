@@ -19,6 +19,13 @@
  * 없다. **진행 중 상태(어느 단계인가, 확인을 몇 번 했나)는 담지 않는다**
  * (035 W7, FR-009) — 저장된 진행 상태는 곧 거짓이 되고, 그것이 009가 "고른
  * 하루를 파일에 남기지 않는다"로 배운 것이다.
+ *
+ * **045에서 `downloadConsented`가 넷째로 더해졌다.** 흐름이 온보딩 →
+ * **다운로드 동의** → 에셋 다운로드 → 환영 연출 → 홈으로 확장됐다 —
+ * `welcomeShown`과 같은 이유로 별도 파일을 만들지 않는다(specs/045-
+ * onboarding-download-consent/research.md R1). 이 필드도 boolean 하나뿐이고
+ * 진행 중 상태(어느 슬라이드인가)는 담지 않는다 — 그것은
+ * `src/firstrun/consent.ts`의 순수 판정이 매번 실시간으로 계산한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -42,6 +49,14 @@ export type OnboardingFlag = {
    * 021·029 시절 사용자는 연출을 한 번 본다 — 해가 없고 작명 기회를 준다.
    */
   welcomeShown: boolean;
+  /**
+   * 필수 자산(VLM·LLM) 다운로드에 동의했다 (045 FR-002a).
+   *
+   * **한 번 `true`가 되면 되돌아가지 않는다** — 되돌리는 코드 경로를
+   * 두지 않는다(045 계약 C5). 키가 없는 옛 파일은 `false`로 읽는다
+   * (`welcomeShown`이 035에서 추가됐을 때와 같은 패턴).
+   */
+  downloadConsented: boolean;
 };
 
 /** 파일 없음·손상 시의 값. */
@@ -49,6 +64,7 @@ export const DEFAULT_ONBOARDING_FLAG: OnboardingFlag = {
   completed: false,
   batteryNoticeShown: false,
   welcomeShown: false,
+  downloadConsented: false,
 };
 
 /** 옛 `auto-diary.json`에서 배터리 안내 제시 여부를 시드한다 (FR-010a). */
@@ -62,8 +78,14 @@ function seedFromAutoDiary(raw: string | null): OnboardingFlag {
       (parsed as Record<string, unknown>).batteryExceptionPrompted === true
     ) {
       // 020에서 이미 배터리 예외를 거부·수락한 사용자를 다시 요청하지 않는다.
-      // 연출은 아직 안 봤다 — 035 이전 사용자이므로 한 번 본다.
-      return { completed: false, batteryNoticeShown: true, welcomeShown: false };
+      // 연출은 아직 안 봤고 다운로드 동의도 아직 안 한 것이다 — 035·045
+      // 이전 사용자이므로 둘 다 한 번씩 본다.
+      return {
+        completed: false,
+        batteryNoticeShown: true,
+        welcomeShown: false,
+        downloadConsented: false,
+      };
     }
   } catch {
     // 시드는 편의다 — 깨진 파일이면 기본값.
@@ -99,6 +121,8 @@ export async function loadOnboardingFlag(port: OnboardingFlagPort): Promise<Onbo
         typeof obj.batteryNoticeShown === "boolean" ? obj.batteryNoticeShown : false,
       // 035 — 키가 없는 옛 파일은 「연출을 아직 안 봤다」다.
       welcomeShown: typeof obj.welcomeShown === "boolean" ? obj.welcomeShown : false,
+      // 045 — 키가 없는 옛 파일은 「다운로드 동의를 아직 안 했다」다.
+      downloadConsented: typeof obj.downloadConsented === "boolean" ? obj.downloadConsented : false,
     };
   } catch {
     return { ...DEFAULT_ONBOARDING_FLAG };
@@ -108,7 +132,7 @@ export async function loadOnboardingFlag(port: OnboardingFlagPort): Promise<Onbo
 /**
  * 온보딩 플래그를 담는다 (F3).
  *
- * **세 필드만 직렬화한다** — 여분 필드는 버린다.
+ * **네 필드만 직렬화한다** — 여분 필드는 버린다.
  */
 export async function saveOnboardingFlag(
   port: OnboardingFlagPort,
@@ -119,6 +143,7 @@ export async function saveOnboardingFlag(
       completed: flag.completed,
       batteryNoticeShown: flag.batteryNoticeShown,
       welcomeShown: flag.welcomeShown,
+      downloadConsented: flag.downloadConsented,
     }),
   );
 }

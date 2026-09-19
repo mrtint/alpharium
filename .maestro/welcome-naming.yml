@@ -28,6 +28,30 @@ appId: com.anonymous.alpharium
 ---
 - launchApp
 
+# ★ 045(2026-09-19 실기기 검증 세션) — `downloadProceedConfirmed`·
+# `livenessOutcome`/`livenessSkipped`가 전부 세션 로컬 state라 앱을
+# 재시작할 때마다 다운로드 완료 화면·liveness 확인 화면이 다시 뜬다(둘 다
+# 파일에 저장하지 않는 것이 의도된 설계, App.tsx 주석 참조) — 이미
+# 온보딩·다운로드·작명을 마친 기기에서도 `launchApp` 직후 곧바로 "일기"
+# 탭이 보인다는 이 흐름의 원래 전제가 더 이상 성립하지 않는다. 두 화면을
+# 지나가야 한다면 지나간다(이미 통과한 적 없는 새 기기라면 SKIPPED로
+# 넘어간다).
+- runFlow:
+    when:
+      visible:
+        id: "download-progress-complete"
+    commands:
+      - tapOn:
+          id: "download-progress-proceed"
+
+- runFlow:
+    when:
+      visible:
+        id: "welcome-failed"
+    commands:
+      - tapOn:
+          id: "welcome-failed-skip"
+
 # 일기 탭이 첫 화면이다(006 FR-009 유지). 환영 연출을 이미 통과한 기기가 전제다 —
 # 첫 실행 연출은 quickstart §2-2에서 사람이 본다.
 - assertVisible: "일기"
@@ -56,6 +80,14 @@ appId: com.anonymous.alpharium
     id: "author-rename-0"
 
 # ── 이름 바꾸기 (FR-022) ──────────────────────────────────────────────────
+# ★ 알려진 실패(035 실측, SM-S901N, 재확인 2026-09-19) — AGENTS.md
+# "★ Maestro가 NativeWind로 이관된 Pressable의 좌표를 잘못 볼 수 있다" 절.
+# `scrollUntilVisible` → `tapOn`이 `author-rename-0`의 실제 좌표가 아니라
+# 그 위 시간대 선택 그리드의 엉뚱한 좌표를 눌러 숫자 키보드가 뜬다(회귀가
+# 아니라 이 저장소가 이미 알고 있는 함정) — `adb shell uiautomator dump`로
+# 얻는 좌표로 raw `adb input tap`을 하면 정상 작동한다(035가 이 방식으로
+# 검증을 대체했다). 여기서 이 흐름이 실패하면 계약 테스트
+# (`author-picker.test.tsx` W18·W19)와 실기기 raw-adb 검증으로 갈음한다.
 - tapOn:
     id: "author-rename-0"
 

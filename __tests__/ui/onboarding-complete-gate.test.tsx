@@ -58,21 +58,18 @@ describe("★ 온보딩 완료 게이트 (029 버그 수정)", () => {
   });
 
   /*
-   * ★ 040 — `OnboardingScreen` 렌더 게이트 자체는 더 이상 `shouldShowOnboarding
-   * (flag, essentialsReady)`를 직접 호출하지 않는다(권한 결정만 보도록
-   * research.md #3에 따라 분리됨, `onboardingGateNeeded` 참조). 대신 029
-   * FR-020("완료했지만 에셋이 없는 사용자는 온보딩 화면 없이도 방치되지
-   * 않는다")의 보호는 별도 경로로 유지된다 — 아래 테스트가 그 경로를
-   * 확인한다(완전히 같은 표현식이 아니라 같은 결과를 내는지).
+   * ★ 045 — 029 FR-020("완료했지만 에셋이 없는 사용자는 온보딩 화면 없이도
+   * 방치되지 않는다")을 위한 별도 보호 분기가 더 이상 없다. 새
+   * `resolveFirstRunStage` 우선순위(C3)에서 `downloadReady`가 `namingDone`
+   * 보다 먼저 검사되므로, `namingDone`(=`welcomeShown`) 값과 무관하게
+   * `downloadReady: false`면 항상 `"downloading"`이 반환된다 — 우선순위
+   * 자체가 이 보호막을 흡수했다(별도 조건식이 코드에 남아 있지 않다).
    */
-  it("040 — 완료된 사용자인데 에셋이 준비 안 됐으면 대기 화면으로 보호한다(029 FR-020 계승)", () => {
-    // permissionStepsDecided(완료된 사용자는 시드로 즉시 true) && !essentialsReady
-    // && welcomeShown===true 조합에서 WaitingForDownloadScreen을 그리는 분기가
-    // 있는지 소스로 확인한다.
-    expect(APP_SOURCE).toMatch(
+  it("045 — 별도 029 FR-020 보호 분기 없이 firstRunStage 우선순위가 그 역할을 흡수한다", () => {
+    expect(APP_SOURCE).not.toMatch(
       /permissionStepsDecided\s*&&\s*!essentialsReady\s*&&\s*onboardingFlag\.welcomeShown\s*===\s*true/,
     );
-    expect(APP_SOURCE).toMatch(/<WaitingForDownloadScreen/);
+    expect(APP_SOURCE).not.toMatch(/WaitingForDownloadScreen/);
   });
 
   it("040 — permissionStepsDecided가 completed===true인 기존 사용자에게 시드된다", () => {
@@ -81,5 +78,47 @@ describe("★ 온보딩 완료 게이트 (029 버그 수정)", () => {
     expect(APP_SOURCE).toMatch(
       /permissionStepsDecidedThisSession\s*\|\|\s*onboardingFlag\?\.completed\s*===\s*true/,
     );
+  });
+});
+
+/*
+ * ★ liveness 실패 화면의 [그냥 시작하기]가 막다른 길이었다 — 실기기에서
+ * 발견(2026-09-19, 045 검증 세션).
+ *
+ * `WelcomeScreen`의 `onSkip`은 작명 단계(`welcome-name-skip`)와 실패 단계
+ * (`welcome-failed-skip`) 양쪽에 재사용되는 콜백인데, `App.tsx`가 이걸
+ * `finishWelcome()` 하나에만 연결하고 있었다. `finishWelcome()`은
+ * `namingDone`만 세우고 `livenessOutcome`은 그대로 두므로,
+ * `resolveFirstRunStage`의 우선순위(`!namingDone` 먼저, `livenessOutcome
+ * !== "ok"` 그다음)상 이미 `namingDone`이 true인 실패 화면에서 이 버튼을
+ * 눌러도 `firstRunStage`가 여전히 `"liveness"`로 남았다(035 계약 W11
+ * "막다른 길을 만들지 않는다" 위반) — 실기기에서 무한정 실패 화면에
+ * 머무르는 것으로 재현됐다.
+ *
+ * 렌더 테스트로 잡기 어렵다(liveness는 실제 엔진 확인을 필요로 한다) —
+ * 소스 검사로 "phase별로 다른 콜백이 연결되는가"만 잠근다.
+ */
+describe("★ liveness 실패 화면의 [그냥 시작하기] 막다른 길 (실기기 발견, 045 검증 세션)", () => {
+  it("welcomePhase가 failed일 때만 onSkipLiveness를 쓴다 — finishWelcome 하나로 통일하지 않는다", () => {
+    expect(APP_SOURCE).toMatch(
+      /onSkip=\{welcomePhase === "failed" \? onSkipLiveness : \(\) => finishWelcome\(\)\}/,
+    );
+  });
+
+  it("onSkipLiveness가 존재하고 livenessSkipped를 세운다", () => {
+    const fn = APP_SOURCE.match(/const onSkipLiveness = useCallback\(\(\) => \{([\s\S]*?)\}, \[/);
+    expect(fn).not.toBeNull();
+    expect(fn?.[1]).toMatch(/finishWelcome\(\)/);
+    expect(fn?.[1]).toMatch(/setLivenessSkipped\(true\)/);
+  });
+
+  it("firstRunStage 계산이 livenessSkipped를 반영한다 — livenessOutcome을 그대로 넘기지 않는다", () => {
+    expect(APP_SOURCE).toMatch(
+      /livenessOutcome:\s*livenessSkipped\s*\?\s*"ok"\s*:\s*livenessOutcome,/,
+    );
+  });
+
+  it('livenessOutcome state 자체를 직접 "ok"로 덮어쓰지 않는다(원칙 I) — setLivenessOutcome("ok") 호출이 없다', () => {
+    expect(APP_SOURCE).not.toMatch(/setLivenessOutcome\(\s*"ok"\s*\)/);
   });
 });

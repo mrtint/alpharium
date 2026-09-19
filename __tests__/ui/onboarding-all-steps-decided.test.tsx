@@ -94,7 +94,12 @@ function makePorts(overrides?: {
 const BASE_PROPS = {
   platform: "android" as const,
   requirements: PERMISSION_REQUIREMENTS,
-  flag: { completed: false, batteryNoticeShown: false, welcomeShown: false },
+  flag: {
+    completed: false,
+    batteryNoticeShown: false,
+    welcomeShown: false,
+    downloadConsented: false,
+  },
 };
 
 describe("040 — onAllStepsDecided (FR-004, 043 자동 진행으로 갱신)", () => {

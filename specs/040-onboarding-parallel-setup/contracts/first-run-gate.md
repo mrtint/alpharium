@@ -61,9 +61,20 @@ downloadReady: false, ... })` → `"naming"`. `downloadReady: true`로 바꿔도
 안의 함수는 "자동 생성을 시도해야 하는가"라는 불리언만 답하고, 실행은
 조립 계층의 몫이다.
 
-## G8 — 화면 문구에 모델·진행 지표를 노출하지 않는다
+## G8 — 화면 문구에 모델·진행 지표를 노출하지 않는다 (★ 045에서 검사 제거)
 
 021(`WELCOME_TOUCHES_PRODUCT_LAYER`·`WELCOME_MEASURES_TIME`류)과 같은 패턴을
-`checkFirstRunFile`도 검사한다 — `elapsed*`·`durationMs`·`timings`·
+`checkFirstRunFile`도 검사했다 — `elapsed*`·`durationMs`·`timings`·
 `tokens_*`·`Date.now`·`performance.now` 토큰을 `src/firstrun/` 소스에서
-차단한다(FR-012).
+차단했다(FR-012).
+
+**★ 045(2026-09-19, 저장소 소유자 지시)가 이 어휘 전면 금지 검사를
+제거했다.** 045의 `resolveSlideStage()`가 `elapsedMs`를 순수 판정 인자로
+받는 설계와 이 규칙이 정면 충돌했다 — 이 규칙은 040 당시 "SC-002의 성능
+임계값을 코드에 두지 않는다"는 취지로 어휘 자체를 기계적으로 막았지만,
+045의 경과 시간은 성능 지표가 아니라 장식적 슬라이드 전환 타이머다(헌법
+원칙 IV가 실제로 금지하는 것은 진행 중 화면에 정밀한 시간·바이트·퍼센트를
+노출하는 것이지 경과 시간 개념 자체가 아니다 — 원칙 IV "소요 시간의 사후
+기록" 절 참고). 이 문서는 역사적 기록으로 그대로 두되, 현재 유효한 검사는
+`scripts/constitution-rules.ts`의 `checkFirstRunFile`(G7만 남음)이다.
+`tokens_*`·`timings`는 여전히 `llama-port.ts` 경계가 별도로 막는다.
