@@ -172,6 +172,16 @@ Modernist 시각 언어가 이어지는지 여부가 여기서 갈린다. 043 �
   검증 테스트 재사용).
 - **SC-002**: 기존 자동화 테스트(`npm test`)와 Maestro 회귀 흐름
   (`welcome-naming.yml`)이 시각 변경 이후에도 전부 통과한다.
+  **실기기 검증 결과(2026-09-19)**: `npm test`는 154개 스위트 전부
+  통과했다. `welcome-naming.yml`은 `author-rename-input-0` 단계에서
+  실패했으나, 이 흐름은 애초에 `WelcomeScreen`(작명 화면) 자체가 아니라
+  설정 탭의 `AuthorPicker` 이름 편집만 검증하며(흐름 상단 주석 참고),
+  실패 원인은 044가 건드리지 않은 `AuthorPicker.tsx`에서 이미 AGENTS.md에
+  기록된 기존 결함(035 실측 — Maestro가 NativeWind로 이관된 `Pressable`의
+  좌표를 잘못 본다)이다. `git diff`로 044가 `AuthorPicker.tsx`를 전혀
+  건드리지 않았음을, raw-adb로 해당 요소가 실제로는 정상 동작함을 각각
+  확인했다(상세: `tasks.md` T015). **이 실패는 044의 회귀가 아니므로
+  다음 세션이 SC-002를 재검토할 때 044를 원인으로 재조사할 필요가 없다.**
 - **SC-003**: 실기기에서 이름 입력→확정, 건너뛰기, 확인 실패→재시도 세
   경로를 각각 1회 이상 눈으로 확인해 막다른 길이 없음을 검증한다(원칙 V).
 

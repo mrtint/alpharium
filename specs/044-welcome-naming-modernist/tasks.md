@@ -227,3 +227,20 @@ T009 [P] [US3]  # checking/failed phase 스타일 검사
 하나뿐이므로 실제 구현에서는 세 스토리를 한 번의 편집 세션에서 함께
 끝내는 것이 효율적이다 — Phase 구분은 "무엇을 먼저 검증할 것인가"의
 우선순위이지 별도 커밋 단위를 강제하지 않는다.
+
+## Phase 7: Convergence
+
+- [X] T016 `welcome` phase의 콘텐츠를 `ScrollView`로 감쌌다 per Edge Cases
+      (spec.md:117-120) (partial → 해소). `testID="welcome-greeting"`는
+      바깥 `View`(`WELCOME_OUTER`, `flex: 1`)에 그대로 두고, 실제 좌측
+      정렬 콘텐츠는 안쪽 `ScrollView`의 `contentContainerStyle`
+      (`WELCOME_SECTION`)로 옮겼다 — `keyboardShouldPersistTaps="handled"`
+      로 키보드가 열린 채로도 버튼을 누를 수 있다. 계약 테스트 2건 추가
+      (`<ScrollView` 존재, `contentContainerStyle`의 `alignItems:
+      "flex-start"`) — 31개 전부 통과. 실기기(dev/debug)에서 재확인:
+      레이아웃 시각 변화 없음, 텍스트 입력·확정 버튼 탭 정상 동작.
+- [X] T017 spec.md SC-002 옆에 각주를 추가했다 per SC-002 (partial → 해소).
+      "`.maestro/welcome-naming.yml`의 `author-rename-input-0` 실패는
+      044 무관, 035 실측 Maestro 좌표 결함(AGENTS.md 기록)"이라는 근거를
+      spec.md SC-002 항목 바로 아래에 명시해, 다음 세션이 SC-002를
+      재검토할 때 044 회귀로 오인해 같은 조사를 반복하지 않게 했다.

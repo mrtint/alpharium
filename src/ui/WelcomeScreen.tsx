@@ -35,7 +35,7 @@
  */
 
 import { useState } from "react";
-import { ActivityIndicator, TextInput, View } from "react-native";
+import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
 
 import { Button } from "./components/Button";
 import { AppText } from "./components/Text";
@@ -131,50 +131,55 @@ export function WelcomeScreen({
        * 스타일) → 힌트 → 버튼 2개 가로 배치.
        */}
       {phase === "welcome" && (
-        <View style={WELCOME_SECTION} testID="welcome-greeting">
-          <AppText style={WELCOME_TITLE} variant="title">
-            {TEXT.welcomeTitle}
-          </AppText>
-          <AppText variant="body">{TEXT.welcomeBody}</AppText>
+        // 044 Convergence T016 — 키보드가 화면 대부분을 가리는 좁은 기기에서도
+        // 버튼에 스크롤로 닿을 수 있어야 한다(spec.md Edge Cases). `testID`는
+        // 기존 계약 테스트·Maestro가 조회하는 자리라 바깥 View에 그대로 둔다.
+        <View style={WELCOME_OUTER} testID="welcome-greeting">
+          <ScrollView contentContainerStyle={WELCOME_SECTION} keyboardShouldPersistTaps="handled">
+            <AppText style={WELCOME_TITLE} variant="title">
+              {TEXT.welcomeTitle}
+            </AppText>
+            <AppText variant="body">{TEXT.welcomeBody}</AppText>
 
-          <View style={DIVIDER} />
+            <View style={DIVIDER} />
 
-          <AppText variant="bodyStrong">{TEXT.namePrompt}</AppText>
+            <AppText variant="bodyStrong">{TEXT.namePrompt}</AppText>
 
-          {/*
-           * 025 실측 — 여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가
-           * 접근성 트리에 노출되지 않는다. 입력창은 조각이 하나지만 Maestro가
-           * 확실히 찾도록 `accessibilityLabel`을 함께 준다.
-           */}
-          <TextInput
-            accessibilityLabel={TEXT.namePlaceholder}
-            maxLength={NAME_INPUT_MAX_LENGTH}
-            onChangeText={setDraft}
-            placeholder={TEXT.namePlaceholder}
-            placeholderTextColor={COLORS.textMuted}
-            style={INPUT}
-            testID="welcome-name-input"
-            value={draft}
-          />
-          <AppText variant="caption">{TEXT.nameHint}</AppText>
+            {/*
+             * 025 실측 — 여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가
+             * 접근성 트리에 노출되지 않는다. 입력창은 조각이 하나지만 Maestro가
+             * 확실히 찾도록 `accessibilityLabel`을 함께 준다.
+             */}
+            <TextInput
+              accessibilityLabel={TEXT.namePlaceholder}
+              maxLength={NAME_INPUT_MAX_LENGTH}
+              onChangeText={setDraft}
+              placeholder={TEXT.namePlaceholder}
+              placeholderTextColor={COLORS.textMuted}
+              style={INPUT}
+              testID="welcome-name-input"
+              value={draft}
+            />
+            <AppText variant="caption">{TEXT.nameHint}</AppText>
 
-          <View style={BUTTON_ROW}>
-            {/* 건너뛸 수 있다(FR-014, 원칙 I) — 기본 이름으로 홈에 간다. */}
-            <View style={BUTTON_ROW_ITEM}>
-              <Button onPress={onSkip} testID="welcome-name-skip" variant="secondary">
-                {TEXT.skip}
-              </Button>
+            <View style={BUTTON_ROW}>
+              {/* 건너뛸 수 있다(FR-014, 원칙 I) — 기본 이름으로 홈에 간다. */}
+              <View style={BUTTON_ROW_ITEM}>
+                <Button onPress={onSkip} testID="welcome-name-skip" variant="secondary">
+                  {TEXT.skip}
+                </Button>
+              </View>
+              <View style={BUTTON_ROW_ITEM}>
+                <Button
+                  disabled={!canSubmit}
+                  onPress={() => onSubmitName(draft)}
+                  testID="welcome-name-submit"
+                >
+                  {TEXT.submit}
+                </Button>
+              </View>
             </View>
-            <View style={BUTTON_ROW_ITEM}>
-              <Button
-                disabled={!canSubmit}
-                onPress={() => onSubmitName(draft)}
-                testID="welcome-name-submit"
-              >
-                {TEXT.submit}
-              </Button>
-            </View>
-          </View>
+          </ScrollView>
         </View>
       )}
 
@@ -241,8 +246,15 @@ const CENTERED = { alignItems: "center", justifyContent: "center", gap: 16 } as 
 
 const CENTER_TEXT = { textAlign: "center" } as const;
 
-/** welcome — 리뷰 보드 1a 좌측 정렬 카드형(research.md R2). */
-const WELCOME_SECTION = { alignItems: "flex-start", gap: 20 } as const;
+/**
+ * welcome — 044 Convergence T016. 바깥은 `flex: 1`로 남은 공간을 채우고
+ * (checking/failed와 같은 CONTAINER 리듬 유지), 내부 `ScrollView`의
+ * `contentContainerStyle`이 리뷰 보드 1a 좌측 정렬 카드형(research.md R2)을
+ * 담당한다 — 키보드가 열려도 버튼까지 스크롤할 수 있다(spec.md Edge Cases).
+ */
+const WELCOME_OUTER = { flex: 1 } as const;
+
+const WELCOME_SECTION = { alignItems: "flex-start", gap: 20, flexGrow: 1 } as const;
 
 const WELCOME_TITLE = { fontSize: 24, fontWeight: "800" } as const;
 

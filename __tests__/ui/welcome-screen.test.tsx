@@ -181,22 +181,30 @@ describe("L16·W15·W16 — 문구는 사람이 쓴 고정 상수다", () => {
 });
 
 describe("044 FR-001·SC-001 — 작명 화면이 Modernist 좌측 정렬 카드형이다", () => {
-  it("welcome 컨테이너에 쓰이는 스타일이 좌측 정렬(items-start 계열)이다", () => {
-    // 044 — welcome 블록이 참조하는 스타일 상수 이름을 찾고, 그 상수의
-    // 정의를 소스 전체에서 찾아 값을 확인한다(스타일이 상수로 분리되어
-    // 있으므로 JSX 슬라이스만으로는 값이 보이지 않는다).
+  it("welcome 콘텐츠가 좌측 정렬(items-start 계열)이다", () => {
+    // 044 Convergence T016 — welcome은 `ScrollView`로 감싸져 있어 좌측
+    // 정렬은 바깥 testID 요소가 아니라 `contentContainerStyle`에 있다.
+    // welcome 블록이 참조하는 `contentContainerStyle` 상수 이름을 찾고,
+    // 그 상수의 정의를 소스 전체에서 찾아 값을 확인한다.
     const jsxSection = CODE.slice(
       CODE.indexOf('phase === "welcome"'),
       CODE.indexOf('phase === "failed"'),
     );
-    const styleMatch =
-      /testID="welcome-greeting"[^>]*style=\{(\w+)\}|style=\{(\w+)\}[^>]*testID="welcome-greeting"/.exec(
-        jsxSection,
-      );
-    const constName = styleMatch?.[1] ?? styleMatch?.[2];
+    const styleMatch = /contentContainerStyle=\{(\w+)\}/.exec(jsxSection);
+    const constName = styleMatch?.[1];
     expect(constName).toBeTruthy();
     const constDef = CODE.slice(CODE.indexOf(`const ${constName} =`));
     expect(constDef.slice(0, constDef.indexOf("as const"))).toMatch(/alignItems:\s*"flex-start"/);
+  });
+
+  it("welcome이 ScrollView로 감싸져 키보드가 열려도 버튼까지 스크롤할 수 있다", () => {
+    // 044 Convergence T016 — spec.md Edge Cases: 키보드가 화면 대부분을
+    // 가리는 좁은 기기에서도 버튼에 닿을 수 있어야 한다.
+    const jsxSection = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    expect(jsxSection).toMatch(/<ScrollView/);
   });
 
   it("제목이 COLORS.bg 배경 위에서 굵은 타이포그래피를 쓴다", () => {
