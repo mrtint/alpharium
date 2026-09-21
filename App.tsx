@@ -4,6 +4,7 @@ import "./global.css";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
@@ -116,12 +117,25 @@ import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
  */
 export default function App() {
   return (
-    // 인셋을 재는 자리. 이것이 없으면 아래 `SafeAreaView`가 잴 값을 얻지 못한다.
-    <SafeAreaProvider>
-      <AppFrame />
-    </SafeAreaProvider>
+    // 046 — react-native-reanimated-carousel(다운로드 진행 화면)의 필수
+    // peer dependency인 react-native-gesture-handler가 요구하는 배선.
+    // 공식 가이드가 앱 루트 1회 래핑을 권장한다(research.md R3) — 이
+    // 안의 다른 화면들이 제스처 기반 컴포넌트를 쓸 때도 다시 감쌀 필요가
+    // 없다.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* 인셋을 재는 자리. 이것이 없으면 아래 `SafeAreaView`가 잴 값을 얻지 못한다. */}
+      <SafeAreaProvider>
+        <AppFrame />
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
+
+/**
+ * 다운로드 실패 시 자동 재시도 간격(046 spec Assumptions — 사람이 정한
+ * 고정 값, 원칙 V). 성공할 때까지 이 간격으로 무한 반복한다.
+ */
+const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;
 
 function AppFrame() {
   const environment = currentEnvironment();
@@ -379,21 +393,30 @@ function AppFrame() {
    * true(재개 등)이거나 이미 시작한 뒤에는 다시 부르지 않는다.
    *
    * ★ convergence(T022) — **실패를 더 이상 조용히 삼키지 않는다**(FR-011,
-   * 원칙 I). `downloadFailed` 상태가 실패를 화면에 노출하고, [다시 시도]가
-   * `essentialDownloadStarted.current`를 다시 `false`로 되돌려 같은
-   * `useEffect`가 재트리거되게 한다 — 앱을 재시작하지 않아도 같은 세션
-   * 에서 재시도할 수 있다.
+   * 원칙 I). `downloadFailed` 상태가 실패를 화면에 노출한다.
+   *
+   * ★ 046 — **재시도는 더 이상 사용자 버튼이 아니다.** 실패하면 10초 간격
+   * 자동 재시도 `useEffect`(아래)가 `essentialDownloadStarted.current`를
+   * 스스로 되돌려 이 effect를 재트리거한다(research.md R6, contracts D8 —
+   * 재시도는 화면이 아니라 이 조립 계층의 책임).
    */
   const essentialDownloadStarted = useRef(false);
   const [downloadFailed, setDownloadFailed] = useState(false);
 
   /**
-   * [다시 시도]를 누른 횟수 — 값 자체엔 의미가 없고(원칙 IV, 지표 아님)
-   * 아래 `useEffect`를 다시 돌게 하는 신호로만 쓴다. `essentialDownload
-   * Started.current`가 `useRef`라 값 변경만으로는 effect가 재실행되지
-   * 않으므로, 의존성 배열에 넣을 state가 하나 필요하다.
+   * 자동 재시도를 다시 돌게 하는 신호(046) — 값 자체엔 의미가 없고
+   * (원칙 IV, 지표 아님) 아래 `useEffect`의 의존성 배열용이다.
+   * `essentialDownloadStarted.current`가 `useRef`라 값 변경만으로는
+   * effect가 재실행되지 않으므로 state 하나가 필요하다.
    */
   const [downloadRetryToken, setDownloadRetryToken] = useState(0);
+
+  /**
+   * 필수 자산 합산 진행률(0~1) — `DownloadProgressScreen`의 4분할
+   * 프로그레스 바에 그대로 전달한다(046 FR-005). 화면은 이 값만 받고
+   * 자산 개수·식별자를 모른다(원칙 IV).
+   */
+  const [downloadFraction, setDownloadFraction] = useState(0);
 
   useEffect(() => {
     if (!permissionStepsDecided) return;
@@ -404,15 +427,14 @@ function AppFrame() {
     setDownloadFailed(false);
 
     void onboardingPorts.essentialAssets
-      .downloadEssentials(() => {
-        // 진행률 값을 받지만 쓰지 않는다 — DownloadProgressScreen은 경과
-        // 시간만으로 슬라이드를 판정한다(C6, research.md R3).
+      .downloadEssentials((fraction) => {
+        setDownloadFraction(fraction);
       })
       .then(() => refreshEssentialsReady())
       .catch(() => {
         // 오류 원문을 저장하지 않는다(원칙 III) — 실패했다는 사실만
-        // 화면에 노출한다. [다시 시도]가 essentialDownloadStarted를
-        // 되돌려야 이 effect가 다시 돈다(아래 onRetryDownload).
+        // 화면에 노출한다. 아래 자동 재시도 useEffect가 10초 뒤
+        // essentialDownloadStarted를 되돌려 이 effect를 재트리거한다.
         setDownloadFailed(true);
       });
   }, [
@@ -424,12 +446,21 @@ function AppFrame() {
     downloadRetryToken,
   ]);
 
-  /** 다운로드 실패 화면의 [다시 시도] — 같은 세션에서 재시도한다(FR-011). */
-  const onRetryDownload = useCallback(() => {
-    essentialDownloadStarted.current = false;
-    setDownloadFailed(false);
-    setDownloadRetryToken((n) => n + 1);
-  }, []);
+  /**
+   * ★ 046 — 실패 시 자동 재시도(FR-012, contracts D8). 사용자 조작 없이
+   * 10초 간격으로 계속 시도하며, 성공(또는 화면 이탈)할 때까지 반복한다
+   * (research.md R6 — 재시도 타이머는 조립 계층에 둔다, 화면은 `failed`
+   * boolean만 받는다).
+   */
+  useEffect(() => {
+    if (!downloadFailed) return;
+    const id = setTimeout(() => {
+      essentialDownloadStarted.current = false;
+      setDownloadFailed(false);
+      setDownloadRetryToken((n) => n + 1);
+    }, DOWNLOAD_RETRY_INTERVAL_MS);
+    return () => clearTimeout(id);
+  }, [downloadFailed]);
 
   const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
 
@@ -946,9 +977,11 @@ function AppFrame() {
           // (구현 중 발견한 갭 — 이 플래그 없이는 essentialsReady가 true가
           // 되는 즉시 버튼을 누를 틈도 없이 화면이 사라진다).
           onProceed={() => setDownloadProceedConfirmed(true)}
-          // convergence(T022) — 실패 시 막다른 길 대신 재시도 뷰(FR-011).
+          downloadFraction={downloadFraction}
+          // 046 — 실패해도 막다른 길이 아니라 같은 레이아웃 위 안내
+          // 문구만 바뀐다(FR-011). 재시도는 이 화면이 아니라 위
+          // useEffect(DOWNLOAD_RETRY_INTERVAL_MS)가 자동으로 한다.
           failed={downloadFailed}
-          onRetry={onRetryDownload}
         />
         <StatusBar style="auto" />
       </SafeAreaView>

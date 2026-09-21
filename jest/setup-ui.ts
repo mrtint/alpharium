@@ -52,6 +52,54 @@ jest.mock("react-native-reanimated", () => {
     useAnimatedStyle: () => ({}),
     withTiming: (toValue: unknown) => toValue,
     withSpring: (toValue: unknown) => toValue,
-    Easing: { linear: (t: number) => t, ease: (t: number) => t, out: (f: unknown) => f },
+    // 046 — 프로그레스 바 깜빡임(ProgressSegmentBar)이 쓴다. 목에서는 값
+    // 자체를 검사하지 않으므로(PF7과 같은 논리) 인자를 그대로 통과시키는
+    // 최소 구현으로 충분하다.
+    withRepeat: (toValue: unknown) => toValue,
+    withSequence: (...values: unknown[]) => values[0],
+    Easing: {
+      linear: (t: number) => t,
+      ease: (t: number) => t,
+      out: (f: unknown) => f,
+      inOut: (f: unknown) => f,
+    },
+  };
+});
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 046 — `react-native-reanimated-carousel` 목.
+ *
+ * 이 라이브러리는 내부적으로 `react-native-worklets`를 다시 require해
+ * 위 reanimated 목을 우회하고 같은 `loadUnpackers` 오류로 죽는다(033의
+ * reanimated 목 필요성과 같은 뿌리 — 네이티브 모듈이 jest 환경에 없다).
+ *
+ * 이 목이 흉내내는 것은 딱 하나 — **`data` 배열의 첫 항목에 대해
+ * `renderItem`을 1회 호출해 렌더링한다.** 무한 순환·스와이프·자동 전환
+ * 같은 실제 캐러셀 동작은 이 목으로 검증할 수 없다(033 PF7과 같은 대가) —
+ * 그 부분은 quickstart.md의 실기기 검증으로 보완한다. `testID`만 그대로
+ * 전달해 계약 테스트가 화면 배선(캐러셀이 렌더 트리에 있는지)을 확인할
+ * 수 있게 한다.
+ * ───────────────────────────────────────────────────────────────────────────── */
+jest.mock("react-native-reanimated-carousel", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock 팩토리는 호이스팅되므로 상단 import를 못 쓴다
+  const { createElement } = require("react");
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { View } = require("react-native");
+  return {
+    __esModule: true,
+    Carousel: ({
+      data,
+      renderItem,
+      testID,
+    }: {
+      data: unknown[];
+      renderItem: (info: { item: unknown; index: number }) => unknown;
+      testID?: string;
+    }) =>
+      createElement(
+        View,
+        { testID },
+        data.length > 0 ? renderItem({ item: data[0], index: 0 }) : null,
+      ),
   };
 });
