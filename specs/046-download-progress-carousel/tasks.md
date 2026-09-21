@@ -298,9 +298,59 @@ contracts/download-progress-carousel.md, quickstart.md
       확인 — 특히 `tsc`가 `onRetry` 제거로 인한 `App.tsx` 쪽 타입
       불일치를 전부 잡아내는지
 - [X] T031 `npm test`(전체 스위트) 통과 확인
-- [ ] T032 quickstart.md의 실기기 검증 6단계(캐러셀·프로그레스 바·완료·
+- [X] T032 quickstart.md의 실기기 검증 6단계(캐러셀·프로그레스 바·완료·
       실패/자동재시도)를 dev debug 빌드로 수행(AGENTS.md 원칙 V — 새
-      네이티브 링크 모듈 도입이므로 필수)
+      네이티브 링크 모듈 도입이므로 필수) — **완료, 실기기에서 결함 3건
+      발견·수정 후 재검증 통과, 결함 1건 발견(046 범위 밖으로 확정)**.
+
+      **실기기에서 발견·수정한 결함(SM-S901N, dev debug, 2026-09-21)**:
+      1. **캐러셀 자동 전환이 전혀 동작하지 않음**(FR-004 위반) — 원인:
+         `data={[...SLIDES]}`(매 렌더 새 배열)와 인라인 `renderItem`·
+         `style={CAROUSEL_STYLE(width)}`(매 렌더 새 참조)가
+         `downloadFraction`이 초당 여러 번 갱신될 때마다 재생성되어,
+         라이브러리 내부 `useAutoPlay`의 `play` 콜백 체인이 매번
+         `clearTimeout`+새 `setTimeout`으로 리셋되고 `next()`가 결코
+         호출되지 않았다(011의 `has_media=0`과 같은 계열 — 조용한 실패,
+         jest 목이 렌더를 1회만 하므로 구조적으로 못 잡음). **수정**:
+         캐러셀을 `CarouselSlides`(`React.memo`)로 분리해 부모의 잦은
+         리렌더로부터 격리, `renderItem`을 모듈 스코프 함수로, `style`을
+         `useMemo`로 고정. 수정 후 실기기에서 무한 순환·자동 전환 정상
+         동작 재확인.
+      2. **이미지 슬롯 좌우 여백 비대칭**(레이아웃 버그, 사용자 육안 보고) —
+         원인: `CAROUSEL_STYLE`이 `useWindowDimensions()`의 화면 전체
+         너비를 그대로 캐러셀 폭으로 써서, 부모 `CONTAINER`의
+         `paddingHorizontal: 20`을 무시하고 우측이 화면 끝까지 뻗어나감.
+         **수정**: `CONTAINER_HORIZONTAL_PADDING` 상수를 캐러셀 폭 계산에
+         반영(`width - padding * 2`). 실기기에서 좌우 대칭 재확인.
+      3. **프로그레스 바 깜빡임 애니메이션 누락**(045 원본 마크업의
+         `barblink` 미이식, 사용자 육안 보고) — 폭이 차오르는 애니메이션만
+         있고 "지금 채워지는 중" 구간의 은은한 깜빡임이 없었다. **수정**:
+         `ProgressSegmentBar`에 `withRepeat`+`withSequence` 기반 opacity
+         깜빡임 추가(`0 < fillRatio < 1`인 구간에만 적용).
+         `jest/setup-ui.ts`의 reanimated 목에 `withRepeat`·`withSequence`·
+         `Easing.inOut` 추가. 실기기에서 깜빡임(밝기 변화) 재확인.
+
+      **실기기에서 발견했으나 046 범위 밖으로 확정한 결함**:
+      4. **★ 네트워크 단절이 자동 재시도로 이어지지 않는다**(FR-011·
+         FR-012, 비행기 모드로 재현). 비행기 모드로 다운로드 도중 네트워크를
+         끊었더니 "받는 중이에요" 문구·0% 진행률에서 2분 이상 멈춘 채
+         "받다가 멈췄어요"로 전환되지 않았고, 네트워크를 복구해도(20분
+         대기) 자동으로 재개되지 않았다 — **앱을 강제 재시작해야만** 041
+         세그먼트 이어받기로 다운로드가 재개돼 정상 완료됐다. **근본
+         원인**: `expo-file-system`의 `DownloadTask.downloadAsync()`(041/026
+         기존 구현, 046에서 변경 없음)에 타임아웃 메커니즘이 없어
+         네트워크가 요청을 그냥 삼킨 상태(연결 자체는 성립했으나 응답
+         없음)에서 Promise가 영원히 pending으로 남는다 — `catch`도
+         `finally`도 돌지 않으므로 046이 추가한 `downloadFailed` state와
+         10초 자동 재시도 `useEffect`가 **애초에 트리거될 기회 자체가
+         없다.** FR-011·FR-012는 서버가 즉각 에러를 반환하는 실패(DNS
+         실패 등)에는 정상 작동할 것으로 추정되나 이번 세션에서 그 갈래는
+         재현하지 못했다 — 무기한 pending 갈래만 재현됐다. **046이 만든
+         코드(캐러셀·진행바·`downloadFailed` 배선)에는 결함이 없다** —
+         `essentialAssets.downloadEssentials()`가 resolve/reject 중 하나를
+         반드시 해야 하는데 그 전제 자체가 041/026 계층에서 깨져 있다.
+         **이 저장소 관례대로 별도 스펙에서 다룬다**(041에 네트워크
+         타임아웃 추가 검토) — 046 tasks에 새 항목을 만들지 않는다.
 - [ ] T033 [P] 기존 Maestro 흐름(`unified-permission-onboarding.yml` 등
       온보딩 관련) 회귀 확인 — `GestureHandlerRootView` 추가가 다른
       화면의 터치 조작에 영향 없는지

@@ -52,7 +52,17 @@ jest.mock("react-native-reanimated", () => {
     useAnimatedStyle: () => ({}),
     withTiming: (toValue: unknown) => toValue,
     withSpring: (toValue: unknown) => toValue,
-    Easing: { linear: (t: number) => t, ease: (t: number) => t, out: (f: unknown) => f },
+    // 046 — 프로그레스 바 깜빡임(ProgressSegmentBar)이 쓴다. 목에서는 값
+    // 자체를 검사하지 않으므로(PF7과 같은 논리) 인자를 그대로 통과시키는
+    // 최소 구현으로 충분하다.
+    withRepeat: (toValue: unknown) => toValue,
+    withSequence: (...values: unknown[]) => values[0],
+    Easing: {
+      linear: (t: number) => t,
+      ease: (t: number) => t,
+      out: (f: unknown) => f,
+      inOut: (f: unknown) => f,
+    },
   };
 });
 

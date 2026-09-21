@@ -39,9 +39,15 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { useWindowDimensions, View } from "react-native";
-import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 import { Carousel } from "react-native-reanimated-carousel";
 
 import { progressSegments } from "../firstrun/consent";
@@ -92,6 +98,14 @@ const SLIDES = [
   },
 ] as const;
 
+/**
+ * `Carousel`의 `data` prop에 넘길 mutable 배열 — 모듈 스코프에서 딱 한 번만
+ * 만든다. `data={[...SLIDES]}`로 렌더마다 새 배열을 만들면 `Carousel`이
+ * 매번 "새 데이터"로 인식한다(아래 `CarouselSlides` 분리와 함께 필요 —
+ * 실기기 실측, 2026-09-21 참조).
+ */
+const SLIDE_ITEMS: (typeof SLIDES)[number][] = [...SLIDES];
+
 /** 캐러셀 자동 전환 간격 — 045가 정한 값 그대로 유지(사람이 정한 고정값). */
 const SLIDE_INTERVAL_MS = 4000;
 
@@ -134,25 +148,7 @@ export function DownloadProgressScreen({
         <AppText style={KICKER_TEXT}>{KICKER}</AppText>
       </View>
 
-      <Carousel<(typeof SLIDES)[number]>
-        testID="download-progress-carousel"
-        style={CAROUSEL_STYLE(width)}
-        data={[...SLIDES]}
-        loop
-        autoplay
-        autoplayInterval={SLIDE_INTERVAL_MS}
-        onSnapToItem={setCarouselIndex}
-        renderItem={({ item }) => (
-          <View style={CARD}>
-            {/* 그림 자리 — 실제 이미지 에셋은 후속 스펙(045 research.md R6). */}
-            <View style={IMAGE_SLOT} testID="download-progress-image-slot" />
-            <View style={TEXT_BLOCK}>
-              <AppText variant="title">{item.title}</AppText>
-              <AppText variant="body">{item.body}</AppText>
-            </View>
-          </View>
-        )}
-      />
+      <CarouselSlides width={width} onSnapToItem={setCarouselIndex} />
 
       <View style={PROGRESS_BLOCK}>
         <View style={PROGRESS_BAR_ROW} testID="download-progress-bar">
@@ -167,25 +163,113 @@ export function DownloadProgressScreen({
 }
 
 /**
- * 프로그레스 바 한 구간 — `fillRatio`(0~1)만큼 채워지며, 채워지는 중인
- * 구간(0과 1 사이)은 폭 변화에 애니메이션이 붙는다(research R5, contracts
- * D1~D3의 `progressSegments()` 출력을 그대로 시각화).
+ * 캐러셀 카드 렌더러 — 모듈 스코프 함수라 매 렌더 새로 만들어지지 않는다
+ * (`renderItem` prop이 안정적인 참조를 유지해야 `useAutoPlay`의 콜백 체인이
+ * 리셋되지 않는다).
  */
-function ProgressSegmentBar({ fillRatio }: { fillRatio: number }) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    width: withTiming(`${fillRatio * 100}%`),
-  }));
-
+function renderSlide({ item }: { item: (typeof SLIDES)[number] }) {
   return (
-    <View style={BAR_SEGMENT_TRACK}>
-      <Animated.View style={[BAR_SEGMENT_FILL, animatedStyle]} />
+    <View style={CARD}>
+      {/* 그림 자리 — 실제 이미지 에셋은 후속 스펙(045 research.md R6). */}
+      <View style={IMAGE_SLOT} testID="download-progress-image-slot" />
+      <View style={TEXT_BLOCK}>
+        <AppText variant="title">{item.title}</AppText>
+        <AppText variant="body">{item.body}</AppText>
+      </View>
     </View>
   );
 }
 
+/**
+ * 캐러셀 자체를 부모(`DownloadProgressScreen`)의 리렌더로부터 격리한다
+ * (`memo`, `width`·`onSnapToItem` 외 다른 값이 바뀌어도 리렌더되지 않음).
+ *
+ * **★ 실기기 실측(2026-09-21) — 격리 없이는 자동 전환이 한 번도 일어나지
+ * 않는 조용한 실패였다.** `essentialDownloadFraction()` 콜백이 다운로드
+ * 도중 초당 여러 번 호출돼 `App.tsx` → `DownloadProgressScreen`이 자주
+ * 리렌더된다. 캐러셀이 그 부모 트리 안에서 인라인으로 렌더되면
+ * `style`(`CAROUSEL_STYLE(width)`가 매번 새 객체)·`renderItem`(인라인
+ * 화살표 함수가 매번 새 참조)이 매 렌더 바뀌고, 라이브러리 내부
+ * `useAutoPlay`의 `play` 콜백이 그 값들에 (간접적으로) 의존해 매번
+ * `clearTimeout` 후 `setTimeout`을 다시 건다 — 타이머가 만료되기 전에
+ * 계속 리셋되어 `next()`가 결코 호출되지 않는다(011의 `has_media=0`,
+ * 013의 URI 계약 불일치와 같은 계열 — 조용한 실패, 기기 없는 테스트가
+ * 구조적으로 못 잡는다: jest 목은 `renderItem`을 1회만 호출하고 autoplay
+ * 타이머 자체를 흉내내지 않는다).
+ *
+ * 격리 후에는 `width`(화면 회전 등으로만 바뀜)·`onSnapToItem`(부모의
+ * `useState` setter, 항상 안정적)만 이 컴포넌트를 리렌더시키므로 라이브러리
+ * 내부 참조가 안정적으로 유지된다.
+ */
+const CarouselSlides = memo(function CarouselSlides({
+  width,
+  onSnapToItem,
+}: {
+  width: number;
+  onSnapToItem: (index: number) => void;
+}) {
+  const style = useMemo(() => CAROUSEL_STYLE(width), [width]);
+
+  return (
+    <Carousel<(typeof SLIDES)[number]>
+      testID="download-progress-carousel"
+      style={style}
+      data={SLIDE_ITEMS}
+      loop
+      autoplay
+      autoplayInterval={SLIDE_INTERVAL_MS}
+      onSnapToItem={onSnapToItem}
+      renderItem={renderSlide}
+    />
+  );
+});
+
+/** 깜빡임 한 사이클의 길이 — 045 원본 마크업의 `barblink 1.4s`와 동일. */
+const BLINK_CYCLE_MS = 1400;
+
+/**
+ * 프로그레스 바 한 구간 — `fillRatio`(0~1)만큼 채워지며, 채워지는 중인
+ * 구간(0과 1 사이)은 폭 변화에 애니메이션이 붙는다(research R5, contracts
+ * D1~D3의 `progressSegments()` 출력을 그대로 시각화).
+ *
+ * **★ 지금 채워지고 있는 구간에는 은은한 깜빡임(opacity)도 함께 준다**
+ * (045 원본 마크업의 `barblink` 재현, 사용자 피드백 2026-09-21) — "지금도
+ * 받고 있다"는 인상을 폭 변화만으로는 놓치기 쉽다. 완전히 채워졌거나
+ * (`fillRatio === 1`) 아직 비어 있으면(`fillRatio === 0`) 깜빡이지 않는다 —
+ * 그 구간의 다운로드가 끝났거나 아직 시작되지 않았기 때문이다.
+ */
+function ProgressSegmentBar({ fillRatio }: { fillRatio: number }) {
+  const isActive = fillRatio > 0 && fillRatio < 1;
+
+  const widthStyle = useAnimatedStyle(() => ({
+    width: withTiming(`${fillRatio * 100}%`),
+  }));
+
+  const blinkStyle = useAnimatedStyle(() => ({
+    opacity: isActive
+      ? withRepeat(
+          withSequence(
+            withTiming(0.4, { duration: BLINK_CYCLE_MS / 2, easing: Easing.inOut(Easing.ease) }),
+            withTiming(1, { duration: BLINK_CYCLE_MS / 2, easing: Easing.inOut(Easing.ease) }),
+          ),
+          -1,
+        )
+      : 1,
+  }));
+
+  return (
+    <View style={BAR_SEGMENT_TRACK}>
+      <Animated.View style={[BAR_SEGMENT_FILL, widthStyle, blinkStyle]} />
+    </View>
+  );
+}
+
+/** `CONTAINER`의 좌우 패딩 — `CAROUSEL_STYLE`이 캐러셀 폭 계산에 재사용한다. */
+const CONTAINER_HORIZONTAL_PADDING = 20;
+
 const CONTAINER = {
   flex: 1,
-  paddingHorizontal: 20,
+  paddingHorizontal: CONTAINER_HORIZONTAL_PADDING,
   paddingTop: 70,
   paddingBottom: 44,
   gap: 16,
@@ -206,9 +290,14 @@ const KICKER_TEXT = {
   color: COLORS.textMuted,
 } as const;
 
-/** 캐러셀 루트 스타일 — `width`는 `useWindowDimensions()`로 매 렌더 계산. */
+/**
+ * 캐러셀 루트 스타일 — `width`는 `useWindowDimensions()`(화면 전체 너비)에서
+ * 계산한다. `CONTAINER`의 좌우 패딩(`CONTAINER_HORIZONTAL_PADDING`, 각
+ * 20px)을 빼지 않으면 캐러셀이 부모의 패딩 영역을 무시하고 화면 끝까지
+ * 뻗어나가 우측 여백이 좌측과 비대칭이 된다(실기기 실측, 2026-09-21).
+ */
 function CAROUSEL_STYLE(width: number) {
-  return { width, flex: 1, marginTop: 16 } as const;
+  return { width: width - CONTAINER_HORIZONTAL_PADDING * 2, flex: 1, marginTop: 16 } as const;
 }
 
 /** 캐러셀 각 카드(슬라이드) 내부 레이아웃 — 045의 카드 내부 구조 그대로. */
