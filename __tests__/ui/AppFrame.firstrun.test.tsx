@@ -199,3 +199,41 @@ describe("작명 완료는 오직 사용자 행동으로만 (자동 타이머·�
     expect(fnBody?.[1]).toMatch(/setNamingDoneThisSession\(true\)/);
   });
 });
+
+/**
+ * 046 D8 — 다운로드 실패 시 자동 재시도는 화면(`DownloadProgressScreen`)이
+ * 아니라 이 조립 계층(`App.tsx`)의 책임이다(research.md R6). 재시도
+ * 타이머 자체를 렌더 테스트로 실행하지 않고(App.tsx는 새 네이티브 통로를
+ * 여럿 직접 import해 이 파일 상단 주석대로 전체 렌더가 어렵다), 소스가
+ * `downloadFailed` 상태에 반응해 `DOWNLOAD_RETRY_INTERVAL_MS` 간격으로
+ * 스스로 재시도를 되돌리는 `useEffect`를 갖는지 확인한다.
+ */
+describe("046 D8 — 다운로드 실패 자동 재시도는 App.tsx가 스스로 한다(화면은 failed만 받는다)", () => {
+  it("DOWNLOAD_RETRY_INTERVAL_MS 상수가 10초(10_000ms)로 정의돼 있다", () => {
+    expect(APP_SOURCE).toMatch(/const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;/);
+  });
+
+  it("downloadFailed에 반응하는 useEffect가 essentialDownloadStarted를 리셋하고 재시도 토큰을 올린다", () => {
+    const effectMatch = APP_SOURCE.match(
+      /useEffect\(\(\) => \{\s*if \(!downloadFailed\) return;([\s\S]*?)\}, \[downloadFailed\]\);/,
+    );
+    expect(effectMatch).not.toBeNull();
+    const body = effectMatch?.[1] ?? "";
+    expect(body).toMatch(/setTimeout\(/);
+    expect(body).toMatch(/DOWNLOAD_RETRY_INTERVAL_MS/);
+    expect(body).toMatch(/essentialDownloadStarted\.current = false;/);
+    expect(body).toMatch(/setDownloadFailed\(false\);/);
+    expect(body).toMatch(/setDownloadRetryToken\(\(n\) => n \+ 1\);/);
+    // 타이머를 정리하지 않으면 화면 이탈 후에도 재시도가 계속 돈다.
+    expect(body).toMatch(/return \(\) => clearTimeout\(id\);/);
+  });
+
+  it("DownloadProgressScreen에 onRetry를 더 이상 넘기지 않는다(재시도 콜백 제거, contracts D8)", () => {
+    const region = APP_SOURCE.slice(
+      APP_SOURCE.indexOf("<DownloadProgressScreen"),
+      APP_SOURCE.indexOf("<DownloadProgressScreen") + 800,
+    );
+    expect(region).not.toMatch(/onRetry=/);
+    expect(region).toMatch(/downloadFraction=\{downloadFraction\}/);
+  });
+});

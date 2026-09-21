@@ -43,3 +43,31 @@ export function resolveSlideStage(input: {
   const index = (raw < 0 ? 0 : raw > LAST_SLIDE_INDEX ? LAST_SLIDE_INDEX : raw) as 0 | 1 | 2 | 3;
   return { kind: "slide", index };
 }
+
+/** 4분할 프로그레스 바의 구간 수 — 사람이 정한 고정 값(046, 원칙 V). */
+const SEGMENT_COUNT = 4;
+
+/**
+ * 합산 다운로드 진행률(0~1 연속값, `essentialDownloadFraction()` 029)을
+ * 4개 구간의 채움 비율로 펼친다 (046).
+ *
+ * 계약: specs/046-download-progress-carousel/contracts/download-progress-carousel.md
+ *       D1·D2·D3
+ *
+ * **순수 함수다** — `Date.now()`·난수·파일·네트워크를 쓰지 않는다. 같은
+ * `fraction`을 넣으면 항상 같은 결과(D1). `fraction`이 `[0, 1]` 밖이어도
+ * 결과 각 원소는 항상 `[0, 1]`로 clamp된다(D3).
+ *
+ * `essentialDownloadFraction()`을 여기서 직접 호출하지 않는다 — 그 값을
+ * 계산하는 것은 호출자(화면)의 책임이고, 이 함수는 숫자 하나만 받는다
+ * (원칙 IV 경계 — 자산 개수·식별자를 몰라야 한다).
+ */
+export function progressSegments(fraction: number): readonly [number, number, number, number] {
+  const clamped = fraction < 0 ? 0 : fraction > 1 ? 1 : fraction;
+  const segments: number[] = [];
+  for (let i = 0; i < SEGMENT_COUNT; i++) {
+    const raw = (clamped - i / SEGMENT_COUNT) * SEGMENT_COUNT;
+    segments.push(raw < 0 ? 0 : raw > 1 ? 1 : raw);
+  }
+  return segments as unknown as readonly [number, number, number, number];
+}

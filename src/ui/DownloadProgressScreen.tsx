@@ -1,42 +1,49 @@
 /**
- * 다운로드 진행 슬라이드 + 완료 화면 (045).
+ * 다운로드 진행 캐러셀 + 프로그레스 바 + 완료 화면 (045, ★ 046이 캐러셀·
+ * 진행 바·실패 처리를 재작성).
  *
  * 계약: specs/045-onboarding-download-consent/contracts/download-consent-gate.md
- *       C6·C7·C9
- *       spec.md FR-004~FR-007
+ *       C6·C7·C9 (완료 게이트 D5는 그대로 유지)
+ *       specs/046-download-progress-carousel/contracts/download-progress-carousel.md
+ *       D1~D9
+ *       spec.md(046) FR-002~FR-014
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * 리뷰 보드 dv-row "Onboarding — four feature slides while the modules
  * download" 섹션(화면 ID `1o`~`1s` 슬라이드, `1q` 완료)을 이관한다. **040
- * `WaitingForDownloadScreen`(회전 인디케이터 + 진행바 하나뿐)을 완전히
- * 대체한다**(research.md R4) — 그 파일은 이 스펙에서 삭제됐다.
+ * `WaitingForDownloadScreen`을 045가 이미 대체했고, 046은 045가 만든 정적
+ * 슬라이드를 실제로 움직이는 캐러셀로 완성한다.**
  *
- * **진행률은 `elapsedMs`(경과 시간)만 본다**(원칙 IV, C6) — `essentialDownload
- * Fraction()`(029)의 바이트 진행률을 인자로 받지 않는다. `src/firstrun/
- * consent.ts`의 `resolveSlideStage()`가 순수 판정을 맡고, 이 화면은 4초
- * 타이머로 `elapsedMs`를 추적해 넘길 뿐이다.
+ * **★ 046 — 카드 전환은 이제 `react-native-reanimated-carousel`이 맡는다**
+ * (research R1). `loop`+`autoPlay`+`autoPlayInterval`로 무한 순환·손
+ * 스와이프·자동 전환을 라이브러리에 위임한다 — 045의 `resolveSlideStage()`
+ * (elapsedMs 기반 인덱스 계산)는 더 이상 이 화면에서 호출하지 않는다(그
+ * 함수 자체와 045 계약 테스트는 역사적 기록으로 남는다).
  *
- * **그림 자리는 빈 사각형이다**(research.md R6) — 리뷰 보드의 `image-slot`
- * placeholder에 대응하며, 044가 페르소나 아바타를 범위 밖으로 미룬 것과 같은
- * 판단이다. 실제 이미지 에셋은 후속 스펙에서 다룬다.
+ * **★ 046 — 프로그레스 바는 이제 실제 진행률(`downloadFraction` prop)을
+ * 반영한다**(contracts D4~D7). `progressSegments()`(046,
+ * `src/firstrun/consent.ts`)로 4개 구간의 채움 비율을 계산하고, 캐러셀의
+ * 카드 전환(`carouselIndex` state)과는 완전히 독립된 값이다 — 하나가
+ * 바뀌어도 다른 하나는 영향받지 않는다.
  *
- * **진행 문구는 슬라이드마다 "받는 중이에요" 고정이다**(Clarifications
- * 2026-09-19, FR-006) — 퍼센트·바이트·속도를 계산하지 않는다.
+ * **그림 자리는 빈 사각형이다**(045 research.md R6, 046도 유지) — 실제
+ * 이미지 에셋은 이 스펙의 범위 밖이다.
  *
- * **★ 재시도 경로(`failed`·`onRetry`)는 convergence에서 추가됐다**(FR-011,
- * Edge Cases — 원칙 I "막다른 길을 만들지 않는다"). 초기 구현은 다운로드
- * 실패를 조용히 삼키고 화면이 슬라이드에 영원히 멈춰 있었다 — 사용자가
- * 앱을 완전히 재시작하는 것 외에 취할 조작이 없었다. `failed: true`일 때
- * 별도 실패 뷰(고정 안내 문구 + [다시 시도] 버튼)를 보여 같은 세션에서
- * 재시도할 수 있게 한다. 오류 원문·모델 식별자는 노출하지 않는다(원칙
- * III, C9와 같은 경계) — 화면은 실패했다는 사실과 재시도 조작만 안다.
+ * **★ 046 — 실패 처리 방식이 바뀌었다**(contracts D6·D7, spec FR-011).
+ * 045의 전용 실패 뷰(`download-progress-failed`, [다시 시도] 버튼)를
+ * 제거했다 — 실패해도 캐러셀·프로그레스 바 레이아웃은 그대로 있고, 진행
+ * 바 하단 안내 문구만 실패 문구로 바뀐다. 재시도는 화면이 아니라 조립
+ * 계층(`App.tsx`)이 자동으로(10초 간격) 담당한다(research R6, contracts
+ * D8) — 이 화면은 더 이상 `onRetry` prop을 받지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { useState } from "react";
+import { useWindowDimensions, View } from "react-native";
+import Animated, { useAnimatedStyle, withTiming } from "react-native-reanimated";
+import { Carousel } from "react-native-reanimated-carousel";
 
-import { resolveSlideStage, SLIDE_INTERVAL_MS } from "../firstrun/consent";
+import { progressSegments } from "../firstrun/consent";
 import { Button } from "./components/Button";
 import { AppText } from "./components/Text";
 import { COLORS } from "./theme/tokens";
@@ -44,25 +51,27 @@ import { COLORS } from "./theme/tokens";
 export type DownloadProgressScreenProps = {
   /** 029 `essentialAssetsReady()`의 결과 — 완료 여부 판정에만 쓴다(C6). */
   downloadReady: boolean;
+  /**
+   * 필수 자산의 합산 다운로드 진행률(0~1, 041/029
+   * `essentialDownloadFraction()`이 계산한 값을 그대로 전달받는다, 046
+   * FR-005). 이 화면은 계산하지 않고 받은 값을 `progressSegments()`로
+   * 펼치기만 한다(원칙 IV 경계 — 자산 개수·식별자를 모른다).
+   */
+  downloadFraction: number;
   /** 완료 화면의 "시작할게요"를 눌렀다. */
   onProceed: () => void;
   /**
-   * 다운로드가 실패한 상태다(convergence, FR-011) — `true`면 슬라이드
-   * 대신 재시도 뷰를 보인다. 오류 원문은 받지 않는다(원칙 III).
+   * 다운로드가 실패한 상태다(046 FR-011) — `true`면 캐러셀·프로그레스
+   * 바는 그대로 두고 하단 안내 문구만 바뀐다. 오류 원문은 받지 않는다
+   * (원칙 III). 재시도는 이 화면의 책임이 아니다(contracts D8).
    */
   failed: boolean;
-  /** 사용자가 [다시 시도]를 눌렀다. */
-  onRetry: () => void;
 };
 
-/** 실패 안내 문구 — 사람이 쓴 고정 상수, 오류 원문을 담지 않는다(원칙 III). */
-const FAILED_TEXT = {
-  title: "받다가 멈췄어요",
-  body: "네트워크 상태를 확인하고 다시 시도해 주세요.",
-  retry: "다시 시도",
-} as const;
+/** 실패 시 진행 바 하단에 보일 고정 문구 — 오류 원문을 담지 않는다(원칙 III). */
+const FAILED_PROGRESS_TEXT = "받다가 멈췄어요";
 
-/** 슬라이드 1~4의 사람이 쓴 고정 헤드라인·본문(FR-005). */
+/** 슬라이드 1~4의 사람이 쓴 고정 헤드라인·본문(FR-005, 045 그대로 유지). */
 const SLIDES = [
   {
     title: "쓰지 않아도 남는 하루",
@@ -82,47 +91,26 @@ const SLIDES = [
   },
 ] as const;
 
-/** 진행 문구 — 슬라이드마다 동일한 고정 상수(Clarifications, FR-006). */
+/** 캐러셀 자동 전환 간격 — 045가 정한 값 그대로 유지(사람이 정한 고정값). */
+const SLIDE_INTERVAL_MS = 4000;
+
+/** 진행 문구 — 정상 진행 중 고정 상수(045 Clarifications, FR-006). */
 const PROGRESS_TEXT = "받는 중이에요";
 
 const KICKER = "준비하는 중";
 
 export function DownloadProgressScreen({
   downloadReady,
+  downloadFraction,
   onProceed,
   failed,
-  onRetry,
 }: DownloadProgressScreenProps) {
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const { width } = useWindowDimensions();
+  // 캐러셀이 지금 보여주고 있는 카드 — `onSnapToItem`이 낸 값을 그대로
+  // 신뢰한다(contracts D9, 앱이 인덱스 산술을 직접 하지 않는다).
+  const [carouselIndex, setCarouselIndex] = useState(0);
 
-  // 4초마다 경과 시간을 누적한다 — resolveSlideStage가 그 값만으로 슬라이드
-  // 인덱스를 판정한다(C6, 바이트 진행률을 구독하지 않는다). 실패했으면
-  // 더 이상 슬라이드를 넘길 필요가 없다 — 재시도 뷰가 대신 보인다.
-  useEffect(() => {
-    if (downloadReady || failed) return;
-    const id = setInterval(() => {
-      setElapsedMs((prev) => prev + SLIDE_INTERVAL_MS);
-    }, SLIDE_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [downloadReady, failed]);
-
-  // 실패는 슬라이드·완료보다 먼저 본다 — 막다른 길을 만들지 않는다(원칙
-  // I, FR-011, convergence T022).
-  if (failed) {
-    return (
-      <View style={CONTAINER} testID="download-progress-failed">
-        <AppText variant="title">{FAILED_TEXT.title}</AppText>
-        <AppText variant="body">{FAILED_TEXT.body}</AppText>
-        <Button onPress={onRetry} testID="download-progress-retry">
-          {FAILED_TEXT.retry}
-        </Button>
-      </View>
-    );
-  }
-
-  const stage = resolveSlideStage({ downloadReady, elapsedMs });
-
-  if (stage.kind === "complete") {
+  if (downloadReady) {
     return (
       <View style={CONTAINER} testID="download-progress-complete">
         <AppText variant="title">준비됐어요</AppText>
@@ -134,34 +122,62 @@ export function DownloadProgressScreen({
     );
   }
 
-  const slide = SLIDES[stage.index];
+  // 4개 구간의 채움 비율 — 캐러셀 인덱스(carouselIndex)와 완전히 독립된
+  // 값(downloadFraction)에서만 파생된다(contracts D4).
+  const segments = progressSegments(downloadFraction);
 
   return (
     <View style={CONTAINER} testID="download-progress-screen">
       <View style={HEADER_ROW}>
-        <AppText style={KICKER_TEXT}>{String(stage.index + 1).padStart(2, "0")} / 04</AppText>
+        <AppText style={KICKER_TEXT}>{String(carouselIndex + 1).padStart(2, "0")} / 04</AppText>
         <AppText style={KICKER_TEXT}>{KICKER}</AppText>
       </View>
 
-      {/* 그림 자리 — 실제 이미지 에셋은 후속 스펙(research.md R6). */}
-      <View style={IMAGE_SLOT} testID="download-progress-image-slot" />
-
-      <View style={TEXT_BLOCK}>
-        <AppText variant="title">{slide.title}</AppText>
-        <AppText variant="body">{slide.body}</AppText>
-      </View>
+      <Carousel<(typeof SLIDES)[number]>
+        testID="download-progress-carousel"
+        style={CAROUSEL_STYLE(width)}
+        data={[...SLIDES]}
+        loop
+        autoplay
+        autoplayInterval={SLIDE_INTERVAL_MS}
+        onSnapToItem={setCarouselIndex}
+        renderItem={({ item }) => (
+          <View style={CARD}>
+            {/* 그림 자리 — 실제 이미지 에셋은 후속 스펙(045 research.md R6). */}
+            <View style={IMAGE_SLOT} testID="download-progress-image-slot" />
+            <View style={TEXT_BLOCK}>
+              <AppText variant="title">{item.title}</AppText>
+              <AppText variant="body">{item.body}</AppText>
+            </View>
+          </View>
+        )}
+      />
 
       <View style={PROGRESS_BLOCK}>
-        <View style={PROGRESS_BAR_ROW}>
-          {SLIDES.map((_, i) => (
-            <View
-              key={i}
-              style={[BAR_SEGMENT, i <= stage.index ? BAR_SEGMENT_ON : BAR_SEGMENT_OFF]}
-            />
+        <View style={PROGRESS_BAR_ROW} testID="download-progress-bar">
+          {segments.map((fillRatio, i) => (
+            <ProgressSegmentBar key={i} fillRatio={fillRatio} />
           ))}
         </View>
-        <AppText variant="caption">{PROGRESS_TEXT}</AppText>
+        <AppText variant="caption">{failed ? FAILED_PROGRESS_TEXT : PROGRESS_TEXT}</AppText>
       </View>
+    </View>
+  );
+}
+
+/**
+ * 프로그레스 바 한 구간 — `fillRatio`(0~1)만큼 채워지며, 채워지는 중인
+ * 구간(0과 1 사이)은 폭 변화에 애니메이션이 붙는다(research R5, contracts
+ * D1~D3의 `progressSegments()` 출력을 그대로 시각화).
+ */
+function ProgressSegmentBar({ fillRatio }: { fillRatio: number }) {
+  const animatedStyle = useAnimatedStyle(() => ({
+    width: withTiming(`${fillRatio * 100}%`),
+  }));
+
+  return (
+    <View style={BAR_SEGMENT_TRACK}>
+      <Animated.View style={[BAR_SEGMENT_FILL, animatedStyle]} />
     </View>
   );
 }
@@ -189,6 +205,17 @@ const KICKER_TEXT = {
   color: COLORS.textMuted,
 } as const;
 
+/** 캐러셀 루트 스타일 — `width`는 `useWindowDimensions()`로 매 렌더 계산. */
+function CAROUSEL_STYLE(width: number) {
+  return { width, flex: 1, marginTop: 16 } as const;
+}
+
+/** 캐러셀 각 카드(슬라이드) 내부 레이아웃 — 045의 카드 내부 구조 그대로. */
+const CARD = {
+  flex: 1,
+  gap: 12,
+} as const;
+
 const IMAGE_SLOT = {
   flex: 1,
   minHeight: 280,
@@ -201,8 +228,15 @@ const PROGRESS_BLOCK = { gap: 10 } as const;
 
 const PROGRESS_BAR_ROW = { flexDirection: "row", gap: 4 } as const;
 
-const BAR_SEGMENT = { flex: 1, height: 4 } as const;
+/** 구간 트랙(빈 배경) — 채워지는 부분(`BAR_SEGMENT_FILL`)이 그 위에 겹친다. */
+const BAR_SEGMENT_TRACK = {
+  flex: 1,
+  height: 4,
+  backgroundColor: COLORS.surface,
+  overflow: "hidden",
+} as const;
 
-const BAR_SEGMENT_ON = { backgroundColor: COLORS.accent } as const;
-
-const BAR_SEGMENT_OFF = { backgroundColor: COLORS.surface } as const;
+const BAR_SEGMENT_FILL = {
+  height: 4,
+  backgroundColor: COLORS.accent,
+} as const;
