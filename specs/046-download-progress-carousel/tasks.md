@@ -394,3 +394,14 @@ spec.md의 Independent Test 기준 그대로 유지됨).
   phase로 넘어간다
 - 피할 것: 같은 파일(`DownloadProgressScreen.tsx`)을 여러 User Story가
   동시에 병렬 수정 — 병합 충돌과 계약 회귀(D4·D5·D6 상호 간섭) 위험
+
+---
+
+## Phase 8: Convergence
+
+- [X] T036 `src/ui/DownloadProgressScreen.tsx` 상단 docstring(라인 18
+      부근, "카드 전환은 이제 `react-native-reanimated-carousel`이
+      맡는다" 문단)의 `autoPlay`+`autoPlayInterval`(camelCase) 표기를
+      실제 코드가 쓰는 `autoplay`+`autoplayInterval`(lowercase)로
+      정정한다 — research.md R2가 이미 이 API 표기 정정을 기록했으나
+      소스 docstring에는 반영되지 않았다(partial)

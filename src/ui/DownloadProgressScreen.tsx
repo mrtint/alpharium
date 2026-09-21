@@ -15,8 +15,9 @@
  * 슬라이드를 실제로 움직이는 캐러셀로 완성한다.**
  *
  * **★ 046 — 카드 전환은 이제 `react-native-reanimated-carousel`이 맡는다**
- * (research R1). `loop`+`autoPlay`+`autoPlayInterval`로 무한 순환·손
- * 스와이프·자동 전환을 라이브러리에 위임한다 — 045의 `resolveSlideStage()`
+ * (research R1). `loop`+`autoplay`+`autoplayInterval`(설치된 v5.1.1
+ * 타입 선언은 lowercase, research.md R2)로 무한 순환·손 스와이프·자동
+ * 전환을 라이브러리에 위임한다 — 045의 `resolveSlideStage()`
  * (elapsedMs 기반 인덱스 계산)는 더 이상 이 화면에서 호출하지 않는다(그
  * 함수 자체와 045 계약 테스트는 역사적 기록으로 남는다).
  *
