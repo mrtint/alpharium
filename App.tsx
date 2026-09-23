@@ -366,7 +366,22 @@ function AppFrame() {
    * 단계)이 다시 뜬다. `onboarding.json`에 저장하지 않고 003·011 readiness를
    * 실시간 조회한다(모델을 지우면 즉시 false, 028 결함의 방어).
    */
-  const [essentialsReady, setEssentialsReady] = useState<boolean | null>(null);
+  const [essentialsReady, setEssentialsReadyState] = useState<boolean | null>(null);
+
+  /**
+   * ★ 048 실기기 — 이번 세션에 필수 에셋이 **없는** 것을 한 번이라도 봤는가.
+   *
+   * 다운로드 완료 화면(「준비됐어요 / 시작할게요」)은 **내려받기가 끝난 직후 한 번**만
+   * 뜬다. 이미 모델이 있는 채로 앱을 켜면 이 값이 `false`로 남아 완료 화면을 건너뛴다 —
+   * 045는 이 구분 없이 `downloadProceedConfirmed`(세션 로컬)만 봐서 **재실행할 때마다**
+   * 완료 화면이 먼저 떴다. 파일에 저장하지 않는다(받는 도중 앱이 죽어도 다음 실행에서
+   * 에셋이 없으면 다시 참이 된다).
+   */
+  const [essentialsMissingSeen, setEssentialsMissingSeen] = useState(false);
+  const setEssentialsReady = useCallback((ready: boolean) => {
+    setEssentialsReadyState(ready);
+    if (!ready) setEssentialsMissingSeen(true);
+  }, []);
 
   /**
    * 필수 에셋 준비 여부를 다시 읽어 `essentialsReady`에 반영한다.
@@ -383,7 +398,7 @@ function AppFrame() {
         .readFacts()
         .then((facts) => setEssentialsReady(essentialAssetsReady(facts)))
         .catch(() => setEssentialsReady(false)),
-    [onboardingPorts],
+    [onboardingPorts, setEssentialsReady],
   );
 
   useEffect(() => {
@@ -405,7 +420,7 @@ function AppFrame() {
       live = false;
       sub.remove();
     };
-  }, [onboardingPorts]);
+  }, [onboardingPorts, setEssentialsReady]);
 
   /**
    * ★ 045 — 필수 에셋 내려받기는 이제 **동의 후에만** 시작한다(FR-002).
@@ -670,6 +685,18 @@ function AppFrame() {
    * `onboardingFlag`에서 직접 온다 — 040의 `namingDone`과 달리 세션 로컬
    * 상태로 따로 두지 않는다(동의는 다시 되돌릴 UI 자체가 없으므로, C5).
    */
+  /**
+   * ★ 048 실기기 — 정상 동작 확인은 **이번 세션에 작명을 거친 첫 실행에서만** 돈다.
+   *
+   * 작명을 이미 끝낸 사용자가 앱을 켜면 `livenessOutcome`이 세션 로컬이라 `null`로
+   * 시작해, 045까지는 **재실행할 때마다** 모델을 적재하는 확인 화면을 지나야 홈에
+   * 닿았다. 확인은 첫 만남 연출의 일부(035)이지 매 실행의 관문이 아니다.
+   * `livenessOutcome` state를 `"ok"`로 덮어쓰지 않는다 — 판정 입력에서만 지나간
+   * 것으로 보므로, 040의 첫 일기 자동 생성(`livenessOutcome === "ok"` state를 봄)도
+   * 돌지 않는다.
+   */
+  const livenessPassed = livenessSkipped || !namingDoneThisSession;
+
   const firstRunStage =
     onboardingFlag !== null && essentialsReady !== null
       ? resolveFirstRunStage({
@@ -677,13 +704,14 @@ function AppFrame() {
           onboardingStarted,
           downloadConsented: onboardingFlag.downloadConsented,
           downloadReady: essentialsReady,
-          downloadProceedConfirmed,
+          // 이번 세션에 내려받지 않았으면(이미 모델이 있었다) 완료 화면을 지나간 것으로 본다.
+          downloadProceedConfirmed: downloadProceedConfirmed || !essentialsMissingSeen,
           namingDone,
           // `livenessSkipped`(위 onSkipLiveness 주석)는 "확인됐다"가 아니라
           // "사용자가 [그냥 시작하기]로 확인을 건너뛰기로 했다"는 별개의
           // 사실이다 — 035 W11 계약이 이 우회 자체를 요구하므로 원칙 I
           // 위반이 아니다(확인 안 된 것을 확인됐다고 속이는 것과 다르다).
-          livenessOutcome: livenessSkipped ? "ok" : livenessOutcome,
+          livenessOutcome: livenessPassed ? "ok" : livenessOutcome,
         })
       : null;
 
