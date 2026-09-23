@@ -163,7 +163,9 @@ describe("W13·L15 — props가 모델·확인 내부를 받지 않는다 (원�
 
 describe("L16·W15·W16 — 문구는 사람이 쓴 고정 상수다", () => {
   it("캐릭터 이름만 보간된다", async () => {
-    await setup({ characterName: "복실이" });
+    // 047 — welcome 단계는 1a대로 이름 텍스트를 그리지 않는다(A7). 보간 계약은
+    // 이름을 계속 그리는 failed 단계에서 잠근다.
+    await setup({ phase: "failed", characterName: "복실이" });
     expect(screen.getByTestId("welcome-character-name").props.children).toBe("복실이");
   });
 
@@ -291,12 +293,127 @@ describe("044 FR-002·SC-001 — checking/failed가 중앙 정렬 미니멀이�
 describe("025 회귀 — 접근성 라벨", () => {
   it("이름 표시에 accessibilityLabel이 있다", async () => {
     // 여러 텍스트 조각이 한 <Text>에 있으면 testID가 접근성 트리에 안 나온다.
-    await setup({ characterName: "복실이" });
+    await setup({ phase: "failed", characterName: "복실이" });
     expect(screen.getByTestId("welcome-character-name").props.accessibilityLabel).toBe("복실이");
   });
 
   it("입력창에 accessibilityLabel이 있다", async () => {
     await setup();
     expect(screen.getByTestId("welcome-name-input").props.accessibilityLabel).toBeTruthy();
+  });
+});
+
+describe("047 — 작명 화면이 디자인 보드 1a와 같다 (contracts/welcome-1a.md)", () => {
+  it("A1 — 표지 ALPHARIUM", async () => {
+    await setup();
+    expect(screen.getByTestId("welcome-kicker").props.children).toBe("ALPHARIUM");
+  });
+
+  it("A2 — 얼굴 타일은 하나이고 🤖다", async () => {
+    await setup();
+    expect(screen.getAllByTestId("welcome-face")).toHaveLength(1);
+    expect(screen.getByText("🤖")).toBeTruthy();
+  });
+
+  it("A3 — 문구가 1a KO 문자열과 글자 단위로 같다", async () => {
+    await setup();
+    for (const text of [
+      "깨어났어요. 처음 뵙겠습니다.",
+      "이제부터 제가 주인님의 하루를 사진과 다닌 자리로 읽고, 일기로 적을게요. 모든 일은 이 휴대폰 안에서만 일어나요.",
+      "제 이름을 지어주세요.",
+      "12자까지. 나중에 설정에서 바꿀 수 있어요.",
+      "나중에 할래요",
+    ]) {
+      expect(screen.getByText(text)).toBeTruthy();
+    }
+    expect(screen.getByText(/^이 이름으로 할래요/)).toBeTruthy();
+  });
+
+  it("A7 — welcome에는 하단 캐릭터 이름이 없고 failed에는 있다", async () => {
+    await setup({ phase: "welcome" });
+    expect(screen.queryByTestId("welcome-character-name")).toBeNull();
+  });
+
+  it("A7 — failed에는 하단 캐릭터 이름이 있다", async () => {
+    await setup({ phase: "failed" });
+    expect(screen.queryByTestId("welcome-character-name")).not.toBeNull();
+  });
+
+  it("A8 — 확정 버튼 라벨에 화살표가 붙는다", async () => {
+    await setup();
+    expect(screen.getByText(/이 이름으로 할래요\s*→/)).toBeTruthy();
+  });
+
+  it("A9 — 가운데 묶음이 세로 중앙이다", () => {
+    const section = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    const m =
+      /testID="welcome-center"[^>]*style=\{(\w+)\}|style=\{(\w+)\}[^>]*testID="welcome-center"/.exec(
+        section,
+      );
+    const name = m?.[1] ?? m?.[2];
+    expect(name).toBeTruthy();
+    const def = CODE.slice(CODE.indexOf(`const ${name} =`));
+    expect(def.slice(0, def.indexOf("as const"))).toMatch(/justifyContent:\s*"center"/);
+  });
+
+  it("A11 — 새 하드코딩 색이 없다", () => {
+    expect(CODE).not.toMatch(/#[0-9a-fA-F]{6}\b/);
+  });
+
+  it("A4 — 카운터가 입력 길이를 n/12로 보인다", async () => {
+    await setup();
+    const counter = () => screen.getByTestId("welcome-name-counter").props.children;
+    expect(counter()).toBe("0/12");
+    await fireEvent.changeText(screen.getByTestId("welcome-name-input"), "금동");
+    expect(counter()).toBe("2/12");
+    await fireEvent.changeText(
+      screen.getByTestId("welcome-name-input"),
+      "가나다라마바사아자차카타",
+    );
+    expect(counter()).toBe("12/12");
+  });
+
+  it("A5 — 카운터 분모·힌트·maxLength가 NAME_MAX_LENGTH와 같다", async () => {
+    await setup();
+    expect(screen.getByTestId("welcome-name-counter").props.children).toBe(`0/${NAME_MAX_LENGTH}`);
+    expect(
+      screen.getByText(`${NAME_MAX_LENGTH}자까지. 나중에 설정에서 바꿀 수 있어요.`),
+    ).toBeTruthy();
+    expect(screen.getByTestId("welcome-name-input").props.maxLength).toBe(NAME_MAX_LENGTH);
+    expect(CODE).not.toMatch(/"1[0-9]자까지/);
+  });
+
+  it("A6 — 빈 입력에서 눌러도 확정되지 않는다", async () => {
+    const { props } = await setup();
+    await fireEvent.press(screen.getByTestId("welcome-name-submit"));
+    await fireEvent.changeText(screen.getByTestId("welcome-name-input"), "   ");
+    await fireEvent.press(screen.getByTestId("welcome-name-submit"));
+    expect(props.onSubmitName).not.toHaveBeenCalled();
+  });
+
+  it("A6 — 확정 버튼은 흐려지지 않는다(Button에 disabled를 넘기지 않는다)", () => {
+    const section = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    const submit = section.slice(
+      section.lastIndexOf("<Button", section.indexOf("welcome-name-submit")),
+    );
+    expect(submit.slice(0, submit.indexOf(">"))).not.toMatch(/\bdisabled=/);
+  });
+});
+
+describe("047 A12 — 키보드가 열려도 입력줄과 버튼이 가려지지 않는다 (실기기 T017)", () => {
+  it("welcome이 KeyboardAvoidingView 안에 있고 오프셋이 있다", () => {
+    const section = CODE.slice(
+      CODE.indexOf('phase === "welcome"'),
+      CODE.indexOf('phase === "failed"'),
+    );
+    expect(section).toMatch(/<KeyboardAvoidingView/);
+    expect(section).toMatch(/keyboardVerticalOffset=\{KEYBOARD_OFFSET\}/);
+    expect(CODE).toMatch(/const KEYBOARD_OFFSET = [1-9]\d*;/);
   });
 });

@@ -93,7 +93,10 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled }}
       className={`${CLASS[variant]} px-4 py-3 rounded-card items-center`}
-      disabled={disabled}
+      // 047 — `false`를 그대로 넘기면 RN `Pressable`이 `accessibilityState.disabled`를
+      // `false`로 덮어써, 호출부가 `rest`로 준 접근성 상태(흐려지지 않지만 누를 수
+      // 없음 — `WelcomeScreen` 확정 버튼)가 사라진다. 잠겼을 때만 넘긴다.
+      disabled={disabled || undefined}
       onPress={disabled ? undefined : onPress}
       onPressIn={disabled ? undefined : () => setScale(PRESS.scale)}
       onPressOut={disabled ? undefined : () => setScale(1)}
