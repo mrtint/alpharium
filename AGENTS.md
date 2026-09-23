@@ -1383,6 +1383,47 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   `welcome-naming.yml`(세션 로컬 완료 화면 통과 블록 추가) 수정.
 - 상세: `specs/045-onboarding-download-consent/`.
 
+### 047 — 작명 화면을 디자인 보드 1a와 실제로 맞추기 (2026-09-23)
+
+044가 `1a`를 참조해 작명 화면을 다시 썼지만, 046 머지 후 실기기에서 보니 표지("ALPHARIUM")·
+얼굴 타일·`1a` 문구·세로 중앙 배치·글자 수 카운터가 빠져 있었다. `WelcomeScreen`의 welcome
+단계만 다시 그렸다 — props·조립부(`App.tsx`)·checking/failed 단계는 무변경.
+
+- **"디자인을 참조했다"는 "디자인과 같다"가 아니다.** 044는 계약 테스트가 전부 초록이었는데도
+  제목·본문 문구부터 `1a`와 달랐다. 이번엔 `1a` KO 문자열을 글자 단위로 대조하는 계약(A3)을
+  두었다 — 참조 원본이 있으면 원문을 테스트에 박는다.
+- **빈 입력에서 확정 버튼은 흐려지지 않는다**(Clarification) — `1a`에 비활성 모양이 없다.
+  `Button`에 `disabled`를 넘기지 않고 `onPress`에서 거르며 `accessibilityState`로만 알린다.
+- **★ RN `Pressable`은 `disabled={false}`로 호출부의 `accessibilityState.disabled`를
+  덮어쓴다**(`Pressable.js:235`, `disabled != null`이면 병합). 그래서 공용 `Button`이
+  `disabled={disabled || undefined}`를 넘기게 한 줄 고쳤다 — 잠긴 버튼의 동작은 그대로다.
+- **★ `adjustResize`가 있어도 edge-to-edge(Android 16)에서는 키보드가 레이아웃을 줄이지
+  않는다**(실기기 실측). 1a대로 가운데 묶음을 세로 중앙에 두자 입력줄이 키보드 뒤로 숨어
+  치는 글자가 안 보였다 — 044는 입력줄이 화면 위쪽이라 드러나지 않았다. jest는 키보드가 없어
+  구조적으로 못 잡는다. `KeyboardAvoidingView behavior="padding"`만으로는 버튼 줄이 키보드
+  경계에 반쯤 걸렸고(`height`도 같음), 모자란 높이가 하단 내비게이션 바(48dp)와 맞아
+  `keyboardVerticalOffset={48}`로 해소했다. **키보드 위에 무언가를 두는 화면은 실기기에서
+  키보드를 연 채로 봐야 한다.**
+- **확정 버튼 글자는 검정이다**(`1a`는 오프화이트). accent 위 오프화이트는 약 3.8:1로 AA
+  미달이라 043 R2가 정한 `primary`(accent + 검정)를 그대로 쓴다 — 배경색은 `1a`와 같다.
+- **화살표는 문자(`→`)다** — `Button`이 children을 글자로 감싸므로 SVG를 넣으려면 공용
+  컴포넌트나 새 의존성이 필요하다.
+- 계약 A1~A12(`__tests__/ui/welcome-screen.test.tsx`), 위반 주입 3종(확정 버튼에
+  `disabled` 되살리기·힌트 숫자 하드코딩·hex 색 추가) 전부 잡힘. **주입 첫 회차에 하나가
+  새어 나갔다** — Python 문자열로 테스트를 생성하다 `\b`가 백스페이스 문자로 들어가 정규식이
+  무력해졌다. 정규식이 든 테스트를 스크립트로 만들 때는 결과 파일을 다시 읽어 확인한다.
+- **Maestro `welcome-naming.yml`**: 작명 화면을 지나는 블록을 더했다(없으면 작명 화면에
+  멈춰 `assertVisible: "일기"`에 도달하지 못한다). 실행 시 `author-rename-input-0`에서
+  실패하는데 이는 위 「실측 규칙」의 035 좌표 결함과 같은 자리다(047 회귀 아님).
+- **글꼴 1.3배에서 [나중에 할래요]의 앞 글자가 잘렸다**(실기기) — 가로 버튼 줄은
+  `flexWrap: "wrap"`으로 넘치면 내린다. 기본 글꼴에서만 보면 못 잡는다.
+- **작명 화면에 다시 들어가는 법**(모델·일기 보존): `files/preferences/onboarding.json`의
+  `welcomeShown`만 `false`로 바꾸고 재시작 → 완료 화면 [시작할게요]. `pm clear`는 모델까지
+  지운다. JSON을 `adb shell "echo {...}"`로 쓰면 셸이 중괄호·따옴표를 먹어 깨진다 — 로컬
+  파일을 `adb push /data/local/tmp/` 한 뒤 `cat … | run-as <패키지> sh -c 'cat > …'`로 넣는다.
+- 미확인: 제스처 내비게이션 기기·다른 키보드 앱에서의 키보드 여백.
+- 상세: `specs/047-welcome-naming-1a/`.
+
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

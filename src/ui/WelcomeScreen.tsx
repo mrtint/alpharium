@@ -31,11 +31,16 @@
  * 스타일이 다른 것 자체가 "지금은 입력할 차례" vs "지금은 시스템이 처리 중"을
  * 시각으로 구분해 전달한다(research.md R2·R3). 색은 043이 이미 이관한
  * `COLORS.*` 9개 역할만 쓴다(FR-001, 새 토큰 추가 없음).
+ *
+ * **★ 047 — welcome 단계를 `1a` 원본과 실제로 맞췄다**(specs/047-welcome-naming-1a,
+ * contracts/welcome-1a.md A1~A11). 044 결과물은 실기기에서 표지·얼굴 타일·`1a`
+ * 문구·세로 중앙 배치·글자 수 카운터가 빠져 있었다. 확정 버튼은 빈 입력에서도
+ * 흐려지지 않는다 — 누를 수 없음은 `onPress`와 `accessibilityState`로만 표현한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useState } from "react";
-import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, ScrollView, TextInput, View } from "react-native";
 
 import { Button } from "./components/Button";
 import { AppText } from "./components/Text";
@@ -72,16 +77,33 @@ export type WelcomeScreenProps = {
  */
 const NAME_INPUT_MAX_LENGTH = 12;
 
-/** 문구는 전부 사람이 쓴 고정 상수다 (L16). */
+/**
+ * 문구는 전부 사람이 쓴 고정 상수다 (L16).
+ *
+ * ★ 047 — welcome 단계 문구는 리뷰 보드 `1a`의 KO 문자열 테이블 원문이다
+ * (`welcomeTitle`·`welcomeBody`·`namePrompt`·`nameHint`·`submit`·`skip`).
+ * 힌트의 상한 숫자는 `NAME_INPUT_MAX_LENGTH`에서 보간한다 — 상한이 바뀌면
+ * 문구도 함께 바뀐다(047 A5).
+ */
 const TEXT = {
   checkingTitle: "잠깐만요",
   checkingBody: "새로 온 친구가 깨어나는 중이에요.",
-  welcomeTitle: "오! 주인님, 반가워요",
-  welcomeBody: "이제부터 제가 주인님의 하루를 일기로 적을게요.",
+  /** 마크업은 "Alpharium" + CSS uppercase — RN에는 그 속성이 없어 대문자 원문으로 둔다. */
+  kicker: "ALPHARIUM",
+  /**
+   * 얼굴 타일 — 047 Clarification Q2. 로스터가 금동이 하나(037)이고 어미 변형 없는
+   * 담백한 화자라 `1u`의 🤖와 같다. 캐릭터 심볼을 읽어 고르지 않는다(원칙 III).
+   */
+  face: "🤖",
+  welcomeTitle: "깨어났어요. 처음 뵙겠습니다.",
+  welcomeBody:
+    "이제부터 제가 주인님의 하루를 사진과 다닌 자리로 읽고, 일기로 적을게요. 모든 일은 이 휴대폰 안에서만 일어나요.",
   namePrompt: "제 이름을 지어주세요.",
   namePlaceholder: "이름을 입력하세요",
-  nameHint: "나중에 설정에서 바꿀 수 있어요.",
+  nameHint: `${NAME_INPUT_MAX_LENGTH}자까지. 나중에 설정에서 바꿀 수 있어요.`,
   submit: "이 이름으로 할래요",
+  /** 1a의 화살표 아이콘 자리 — `Button`이 children을 글자로 감싸므로 문자로 둔다(research R3). */
+  submitArrow: "→",
   skip: "나중에 할래요",
   failedTitle: "아직 준비 중이에요",
   failedBody: "친구를 깨우지 못했어요. 잠시 후 다시 시도해 주세요.",
@@ -101,9 +123,10 @@ export function WelcomeScreen({
   // 빈 입력·공백만은 확정할 수 없다(FR-012). 조립부가 다시 검증하지만
   // 화면에서도 버튼을 잠가 사용자가 헛되이 누르지 않게 한다.
   const canSubmit = draft.trim() !== "";
+  const counter = `${draft.length}/${NAME_INPUT_MAX_LENGTH}`;
 
   return (
-    <View style={CONTAINER} testID="welcome-screen">
+    <View style={phase !== "welcome" ? CONTAINER : WELCOME_CONTAINER} testID="welcome-screen">
       {/*
        * ★ 044 — checking/failed는 043 LogoScreen과 같은 중앙 정렬 미니멀
        * (research.md R3). 카드·테두리 없이 로딩 표시/안내 문구가 화면 중앙에
@@ -126,41 +149,84 @@ export function WelcomeScreen({
       )}
 
       {/*
-       * ★ 044 — welcome은 리뷰 보드 1a 레이아웃(research.md R2): 좌측 정렬
-       * 세로 스택 — 제목 → 본문 → 구분선 → 이름 프롬프트 → 입력줄(밑줄
-       * 스타일) → 힌트 → 버튼 2개 가로 배치.
+       * ★ 047 — welcome은 리뷰 보드 `1a` 마크업 그대로(spec.md FR-001~FR-010):
+       * [표지] → [가운데 묶음: 얼굴 타일 → 제목 → 본문 → 구분선 → 프롬프트 →
+       * 입력줄+카운터 → 힌트, 세로 중앙] → [버튼 줄, 화면 아래 오른쪽].
+       * 044는 같은 1a를 참조했지만 표지·얼굴·문구·세로 중앙·카운터가 빠져 있었다.
        */}
       {phase === "welcome" && (
         // 044 Convergence T016 — 키보드가 화면 대부분을 가리는 좁은 기기에서도
         // 버튼에 스크롤로 닿을 수 있어야 한다(spec.md Edge Cases). `testID`는
         // 기존 계약 테스트·Maestro가 조회하는 자리라 바깥 View에 그대로 둔다.
-        <View style={WELCOME_OUTER} testID="welcome-greeting">
+        // ★ 047 실기기 — 매니페스트의 `adjustResize`만으로는 레이아웃이 줄지 않았다
+        // (SM-S901N, Android 16 edge-to-edge). 1a대로 가운데 묶음을 세로 중앙에 두자
+        // 입력줄이 키보드 뒤로 숨어 치는 글자가 안 보였다 — `KeyboardAvoidingView`가
+        // 키보드 높이만큼 줄여 `ScrollView`가 입력줄을 따라 올리게 한다.
+        // 오프셋 없이는 버튼 줄이 키보드 위 경계에 반쯤 걸렸다(모자란 높이 ≈ 하단
+        // 내비게이션 바) — `KEYBOARD_OFFSET` 주석 참고.
+        <KeyboardAvoidingView
+          behavior="padding"
+          keyboardVerticalOffset={KEYBOARD_OFFSET}
+          style={WELCOME_OUTER}
+          testID="welcome-greeting"
+        >
           <ScrollView contentContainerStyle={WELCOME_SECTION} keyboardShouldPersistTaps="handled">
-            <AppText style={WELCOME_TITLE} variant="title">
-              {TEXT.welcomeTitle}
+            <AppText style={KICKER} testID="welcome-kicker">
+              {TEXT.kicker}
             </AppText>
-            <AppText variant="body">{TEXT.welcomeBody}</AppText>
 
-            <View style={DIVIDER} />
+            <View style={WELCOME_CENTER} testID="welcome-center">
+              <View style={FACE_TILE} testID="welcome-face">
+                <AppText style={FACE_TEXT}>{TEXT.face}</AppText>
+              </View>
 
-            <AppText variant="bodyStrong">{TEXT.namePrompt}</AppText>
+              <AppText style={WELCOME_TITLE} variant="title">
+                {TEXT.welcomeTitle}
+              </AppText>
+              <AppText style={WELCOME_BODY} variant="body">
+                {TEXT.welcomeBody}
+              </AppText>
 
-            {/*
-             * 025 실측 — 여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가
-             * 접근성 트리에 노출되지 않는다. 입력창은 조각이 하나지만 Maestro가
-             * 확실히 찾도록 `accessibilityLabel`을 함께 준다.
-             */}
-            <TextInput
-              accessibilityLabel={TEXT.namePlaceholder}
-              maxLength={NAME_INPUT_MAX_LENGTH}
-              onChangeText={setDraft}
-              placeholder={TEXT.namePlaceholder}
-              placeholderTextColor={COLORS.textMuted}
-              style={INPUT}
-              testID="welcome-name-input"
-              value={draft}
-            />
-            <AppText variant="caption">{TEXT.nameHint}</AppText>
+              <View style={DIVIDER} />
+
+              <AppText style={NAME_PROMPT} variant="bodyStrong">
+                {TEXT.namePrompt}
+              </AppText>
+
+              <View style={INPUT_ROW}>
+                {/*
+                 * 025 실측 — 여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가
+                 * 접근성 트리에 노출되지 않는다. 입력창은 조각이 하나지만 Maestro가
+                 * 확실히 찾도록 `accessibilityLabel`을 함께 준다.
+                 */}
+                <TextInput
+                  accessibilityLabel={TEXT.namePlaceholder}
+                  maxLength={NAME_INPUT_MAX_LENGTH}
+                  onChangeText={setDraft}
+                  placeholder={TEXT.namePlaceholder}
+                  placeholderTextColor={COLORS.textMuted}
+                  style={INPUT}
+                  testID="welcome-name-input"
+                  value={draft}
+                />
+                {/*
+                 * 입력 중인 글자 수다 — 원칙 IV가 금지한 측정 지표가 아니다. 셈은
+                 * `maxLength`·`naming.ts`와 같은 `.length`(research R6). 조각을 한
+                 * 문자열로 합쳐 testID가 접근성 트리에 남게 한다(025).
+                 */}
+                <AppText
+                  accessibilityLabel={counter}
+                  style={COUNTER}
+                  testID="welcome-name-counter"
+                  variant="caption"
+                >
+                  {counter}
+                </AppText>
+              </View>
+              <AppText style={HINT} variant="caption">
+                {TEXT.nameHint}
+              </AppText>
+            </View>
 
             <View style={BUTTON_ROW}>
               {/* 건너뛸 수 있다(FR-014, 원칙 I) — 기본 이름으로 홈에 간다. */}
@@ -170,17 +236,25 @@ export function WelcomeScreen({
                 </Button>
               </View>
               <View style={BUTTON_ROW_ITEM}>
+                {/*
+                 * ★ 047 Clarification Q1 — `disabled`를 넘기지 않는다. 넘기면 `Button`이
+                 * 반투명(0.5)으로 흐려지는데 1a에는 그런 모양이 없다. 빈 입력은
+                 * `onPress`에서 걸러 확정되지 않게 하고(035 FR-012), 스크린리더에는
+                 * `accessibilityState`로 여전히 "누를 수 없음"을 알린다(research R2).
+                 */}
                 <Button
-                  disabled={!canSubmit}
-                  onPress={() => onSubmitName(draft)}
+                  accessibilityState={{ disabled: !canSubmit }}
+                  onPress={() => {
+                    if (canSubmit) onSubmitName(draft);
+                  }}
                   testID="welcome-name-submit"
                 >
-                  {TEXT.submit}
+                  {`${TEXT.submit}  ${TEXT.submitArrow}`}
                 </Button>
               </View>
             </View>
           </ScrollView>
-        </View>
+        </KeyboardAvoidingView>
       )}
 
       {phase === "failed" && (
@@ -212,8 +286,11 @@ export function WelcomeScreen({
       {/*
        * 화면 어디에도 캐릭터 이름 말고는 나오지 않는다. 이름은 조립부가
        * `displayNameOf()`로 만든 문자열이며 모델 식별자가 아니다(FR-027).
+       *
+       * ★ 047 — welcome 단계에서는 그리지 않는다(1a에 없음, FR-011). failed
+       * 단계만 예전처럼 그린다(FR-016).
        */}
-      {phase !== "checking" && (
+      {phase === "failed" && (
         <AppText
           accessibilityLabel={characterName}
           style={CENTER_TEXT}
@@ -246,39 +323,124 @@ const CENTERED = { alignItems: "center", justifyContent: "center", gap: 16 } as 
 
 const CENTER_TEXT = { textAlign: "center" } as const;
 
-/**
- * welcome — 044 Convergence T016. 바깥은 `flex: 1`로 남은 공간을 채우고
- * (checking/failed와 같은 CONTAINER 리듬 유지), 내부 `ScrollView`의
- * `contentContainerStyle`이 리뷰 보드 1a 좌측 정렬 카드형(research.md R2)을
- * 담당한다 — 키보드가 열려도 버튼까지 스크롤할 수 있다(spec.md Edge Cases).
+/*
+ * ★ 047 — welcome 단계는 리뷰 보드 `1a` 마크업을 옮긴다(research R4·R7).
+ * 1a 치수는 402×874 iOS 프레임 기준이고 위 70·아래 44에는 상태바·홈 인디케이터가
+ * 들어 있다 — 이 앱은 `App.tsx`의 `SafeAreaView`가 인셋을 이미 빼므로 그만큼 줄였다.
+ * 크기·굵기는 `TYPE`에 없는 값이라 인라인으로 두되 색은 전부 `COLORS.*`다(FR-018).
+ * 마크업의 neutral-700/600은 토큰에 없어 `textMuted`(대비 5.00:1)로 맞췄다.
  */
+
+/** welcome 전용 바깥 여백 — checking/failed의 `CONTAINER`는 건드리지 않는다(FR-016). */
+const WELCOME_CONTAINER = {
+  flex: 1,
+  paddingHorizontal: 20,
+  paddingTop: 20,
+  paddingBottom: 24,
+  backgroundColor: COLORS.bg,
+} as const;
+
+/**
+ * 키보드 회피 추가 여백 (dp) — **실기기에서 잰 값이다**(047 T017, SM-S901N, 3버튼
+ * 내비게이션). 오프셋 0이면 키보드를 연 채 끝까지 스크롤해도 버튼 줄이 키보드 위
+ * 경계에 반쯤 가렸다. 모자란 높이가 하단 내비게이션 바(48dp)와 맞아, edge-to-edge에서
+ * 보고되는 키보드 높이가 그 바를 빼고 오는 것으로 본다. 제스처 내비게이션 기기처럼 바가
+ * 낮으면 버튼 아래 여백이 조금 더 생길 뿐 가려지지 않는다.
+ */
+const KEYBOARD_OFFSET = 48;
+
+/** 바깥은 남은 공간을 채우고 안쪽 `ScrollView`가 키보드에 대응한다(044 T016). */
 const WELCOME_OUTER = { flex: 1 } as const;
 
-const WELCOME_SECTION = { alignItems: "flex-start", gap: 20, flexGrow: 1 } as const;
+/** 스크롤 내용 — [표지] → [가운데 묶음] → [버튼 줄] 세로 스택, 좌측 정렬. */
+const WELCOME_SECTION = { alignItems: "flex-start", flexGrow: 1 } as const;
 
-const WELCOME_TITLE = { fontSize: 24, fontWeight: "800" } as const;
+/** 1a 표지 — 11px / 600 / 자간 .1em / 강조색. */
+const KICKER = {
+  fontSize: 11,
+  lineHeight: 14,
+  fontWeight: "600",
+  letterSpacing: 1.1,
+  color: COLORS.accent,
+} as const;
 
-/** 1a 레이아웃의 구분선 — COLORS.border 2px. */
+/** 1a 가운데 묶음 — `flex: 1` + 세로 중앙, 간격 18(FR-010). */
+const WELCOME_CENTER = {
+  flex: 1,
+  alignSelf: "stretch",
+  justifyContent: "center",
+  gap: 18,
+  paddingVertical: 24,
+} as const;
+
+/** 1a 얼굴 타일 — 56×56, 선택된 페르소나는 강조색 배경. */
+const FACE_TILE = {
+  width: 56,
+  height: 56,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: COLORS.accent,
+} as const;
+
+const FACE_TEXT = { fontSize: 28, lineHeight: 34 } as const;
+
+/** 1a 제목 — 38px / 800 / 줄 간격 촘촘하게 / 자간 -.025em. */
+const WELCOME_TITLE = {
+  fontSize: 38,
+  lineHeight: 42,
+  fontWeight: "800",
+  letterSpacing: -1,
+} as const;
+
+/** 1a 본문 — 16px / line-height 1.5. */
+const WELCOME_BODY = { fontSize: 16, lineHeight: 24, color: COLORS.textMuted } as const;
+
+/** 1a 구분선 — 2px, 위아래 8. */
 const DIVIDER = {
   height: 2,
   width: "100%",
+  marginVertical: 8,
   backgroundColor: COLORS.border,
 } as const;
 
-/** 이름 입력줄 — 전체 테두리 대신 밑줄만(1a 마크업 스타일). */
-const INPUT = {
-  width: "100%",
+/** 1a 이름 프롬프트 — 14px / 600. */
+const NAME_PROMPT = { fontSize: 14, lineHeight: 20, fontWeight: "600" } as const;
+
+/** 1a 입력줄 — 밑줄 2px 본문색, 입력 글자와 카운터가 한 줄 양 끝. */
+const INPUT_ROW = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
   borderBottomWidth: 2,
   borderBottomColor: COLORS.text,
-  paddingVertical: 8,
-  fontSize: 20,
-  fontWeight: "700",
+  paddingTop: 8,
+  paddingBottom: 10,
+} as const;
+
+/** 1a 입력 글자 — 28px / 800. 테두리는 `INPUT_ROW`의 밑줄뿐이다. */
+const INPUT = {
+  flex: 1,
+  padding: 0,
+  fontSize: 28,
+  fontWeight: "800",
   color: COLORS.text,
 } as const;
 
-/** 하단 버튼 2개 가로 배치 — 건너뛰기 좌측·확정 우측(1a 마크업). */
+/** 1a 카운터 — 12px, 흐린 글자. */
+const COUNTER = { fontSize: 12, lineHeight: 16, marginLeft: 8 } as const;
+
+/** 1a 힌트 — 12px, 흐린 글자. */
+const HINT = { fontSize: 12, lineHeight: 16 } as const;
+
+/**
+ * 1a 하단 버튼 줄 — 오른쪽 정렬, 간격 8. 건너뛰기 좌측·확정 우측.
+ *
+ * ★ 047 실기기 — 시스템 글꼴 1.3배에서 두 버튼이 한 줄을 넘쳐 [나중에 할래요]의
+ * 앞 글자가 잘렸다. `flexWrap`으로 넘치면 다음 줄로 내린다(기본 글꼴에서는 한 줄 그대로).
+ */
 const BUTTON_ROW = {
   flexDirection: "row",
+  flexWrap: "wrap",
   gap: 8,
   width: "100%",
   justifyContent: "flex-end",
