@@ -20,7 +20,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 /**
  * 돌릴 흐름들.
@@ -262,7 +264,10 @@ function main() {
     console.log(`  - [${serial}] 앱 데이터 초기화: pm clear ${PKG}`);
     spawnSync("adb", [...sArgs, "shell", "pm", "clear", PKG], { stdio: "inherit", shell: true });
     console.log(`  - [${serial}] 앱 다시 시작: ${ACTIVITY}`);
-    spawnSync("adb", [...sArgs, "shell", "am", "start", "-n", ACTIVITY], { stdio: "inherit", shell: true });
+    spawnSync("adb", [...sArgs, "shell", "am", "start", "-n", ACTIVITY], {
+      stdio: "inherit",
+      shell: true,
+    });
   }
   console.log("");
 
@@ -276,24 +281,46 @@ function main() {
   // 이 줄이 없으면 **흐름 파일에 한글을 쓸 수 없다.** 검증 문구를 영어로 바꿔 우회하지
   // 않는다 — 화면이 한국어이므로 검증도 한국어여야 하고, 우회하면 같은 함정이 다음 흐름에서
   // 되풀이된다.
-  const failed = [];
-  for (const flow of FLOWS) {
-    console.log(`▶ ${flow}`);
-    const run = spawnSync("maestro", ["test", flow], {
+  //
+  // ★ 흐름 전부를 `maestro test` **한 번**에 넘긴다(048 실측, SM-S901N). 흐름마다 따로 부르면
+  // 그때마다 JVM 기동 + 기기 드라이버 재설치·연결로 약 35초씩 기기가 멈춰 있었다 — 흐름
+  // 하나의 명령 실행이 약 40초인데 그만큼을 대기로 더 썼다. 한 번에 넘기면 기동은 한 번이고,
+  // 한 흐름이 실패해도 Maestro가 다음 흐름으로 넘어간다. 드라이버는 이미 깔려 있으면 다시
+  // 깔지 않는다(`--no-reinstall-driver`).
+  //
+  // 인자로 흐름 파일을 주면 그것만 돈다: `node scripts/run-device-tests.mjs .maestro/a.yml`
+  const requested = process.argv.slice(2);
+  const flows = requested.length > 0 ? requested : FLOWS;
+  const junit = join(mkdtempSync(join(tmpdir(), "alpharium-maestro-")), "report.xml");
+
+  console.log(`▶ 흐름 ${flows.length}개를 한 번에 실행`);
+  const run = spawnSync(
+    "maestro",
+    ["test", "--no-reinstall-driver", "--format", "junit", "--output", junit, ...flows],
+    {
       stdio: "inherit",
       shell: true,
       env: { ...process.env, JAVA_TOOL_OPTIONS: "-Dfile.encoding=UTF-8" },
-    });
-    if (run.status !== 0) failed.push(`${flow} (종료 코드 ${run.status})`);
-  }
+    },
+  );
 
-  if (failed.length === 0) {
+  if (run.status === 0) {
     report(PASSED);
     process.exit(0);
   }
 
-  report(FAILED, `실패한 흐름: ${failed.join(", ")}`);
+  report(FAILED, `실패한 흐름: ${failedFlows(junit) ?? `알 수 없음 (종료 코드 ${run.status})`}`);
   process.exit(1);
+}
+
+/** JUnit 보고서에서 실패한 흐름 이름을 모은다. 보고서가 없으면 null. */
+function failedFlows(path) {
+  if (!existsSync(path)) return null;
+  const xml = readFileSync(path, "utf8");
+  const names = [
+    ...xml.matchAll(/<testcase\b[^>]*\bname="([^"]*)"[^>]*>(?:(?!<\/testcase>)[\s\S])*<failure/g),
+  ].map((m) => m[1]);
+  return names.length > 0 ? names.join(", ") : null;
 }
 
 main();
