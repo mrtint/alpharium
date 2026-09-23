@@ -181,3 +181,74 @@ export function selectableDays(now: Date): readonly DayDate[] {
 
   return days;
 }
+
+/**
+ * 홈 스트립의 칸 수 (048).
+ *
+ * **사람이 정한 값이다**(보드 `1d`의 한 주). 고를 수 있는 하루의 개수(`SELECTABLE_DAY_COUNT`)와
+ * 다르다 — 스트립은 **보는** 범위이고 고를 수 있는지는 칸마다 따로 정해진다. 계산이 이 파일에
+ * 있어야 하므로(아래 `stripDays`) 값도 여기 둔다.
+ */
+export const STRIP_DAY_COUNT = 7;
+
+/**
+ * 오늘로 끝나는 7일 (048, contracts/write-prompt.md DB6~DB8).
+ *
+ * **오래된 것이 먼저다** — 보드 `1d`의 스트립은 왼쪽이 과거, 오른쪽 끝이 오늘이다.
+ * `selectableDays()`(최근이 먼저)와 순서가 반대인 것은 의도다.
+ *
+ * **이 계산이 여기 있어야 하는 이유는 `selectableDays()`와 같다.** 「하루씩 빼기」는 04:00을
+ * 알아야 한다 — 부르는 쪽이 `setDate(-1)`을 하면 04:00이 이 파일 밖으로 새어 나간다.
+ */
+export function stripDays(now: Date): readonly DayDate[] {
+  const shifted = new Date(now.getTime());
+  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
+
+  const days: DayDate[] = [];
+  for (let back = STRIP_DAY_COUNT - 1; back >= 0; back -= 1) {
+    const day = new Date(shifted.getTime());
+    // **원본에서 매번 뺀다** — 누적하면 서머타임 등으로 오차가 쌓인다(`selectableDays`와 같다).
+    day.setDate(day.getDate() - back);
+    days.push(formatDay(day));
+  }
+  return days;
+}
+
+/**
+ * 아직 쓸 수 없는 하루가 **쓸 수 있게 되는 시각** (048, contracts/write-prompt.md DB1~DB5·DB10).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **새 판정이 아니다.** `isDayWritable()`의 두 규칙(닫힘 · 오늘의 정오)이 다음에 참이 되는
+ * 시각을 구할 뿐이다. 지금 쓸 수 있으면 `null`이다.
+ *
+ * **★ 쓸 수 없는 오늘은 하루에 두 구간 있다**(048 Clarification Q1):
+ *  - 04:00~12:00 — 그 하루의 정오에 쓸 수 있게 된다
+ *  - 00:00~04:00 — 달력은 이미 다음 날이지만 하루는 아직 안 닫혔고, 정오도 지났다고 보지
+ *    않는다(`isDayWritable`이 `now.getHours()`를 보므로). 그 하루는 **04:00에 닫혀** 쓸 수
+ *    있게 된다. 여기서 정오를 돌려주면 화면이 새벽에 「오후 12시부터」라는 틀린 말을 한다.
+ *
+ * **04와 12를 밖으로 내보내지 않는 대신 이 `Date`를 내보낸다.** 화면은 이것을 사람의 말로
+ * 옮기고 전환 타이머도 같은 값으로 건다 — 문구와 타이머가 서로 다른 시각을 볼 수 없다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export function writableAt(day: DayDate, now: Date): Date | null {
+  if (isDayWritable(day, now)) return null;
+  if (day !== dayOf(now)) return null; // 미래의 날 — 부르는 쪽이 넘기지 않는 갈래(방어)
+
+  const { startMs, endMs } = dayBounds(day);
+  // 하루의 시작(04:00)과 같은 달력일이면 04:00~12:00 구간이다 — 그 하루의 정오.
+  const start = new Date(startMs);
+  if (now.getDate() === start.getDate() && now.getMonth() === start.getMonth()) {
+    return new Date(
+      start.getFullYear(),
+      start.getMonth(),
+      start.getDate(),
+      WRITABLE_FROM_HOUR,
+      0,
+      0,
+      0,
+    );
+  }
+  // 달력이 넘어간 새벽(00:00~04:00) — 하루가 닫히는 시각.
+  return new Date(endMs);
+}

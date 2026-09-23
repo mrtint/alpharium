@@ -21,7 +21,10 @@ appId: com.anonymous.alpharium
 - assertVisible: "일기"
 
 # 029 — 캐릭터 준비는 설정 탭이다.
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 
 # ── 설정 탭 "일기 작성자" 섹션 ──
 #

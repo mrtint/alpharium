@@ -317,10 +317,9 @@ describe('C21·C24 — case "detail"은 무변경(회귀)', () => {
       />,
     );
 
-    // 목록 항목은 `testID`가 없다 — 날짜 텍스트로 찾는다. `DayPicker`(쓰기용
-    // 날짜 셀렉트)도 같은 날짜 문자열을 보이므로 첫 번째(목록 항목)를 누른다.
+    // 048 — 목록 카드에 날짜 testID가 생겼다(`diary-card-<day>`).
     await screen.findByText("일기 쓰기");
-    const listItem = screen.getAllByText("2026-08-19")[0];
+    const listItem = await screen.findByTestId("diary-card-2026-08-19");
     await userEvent.press(listItem);
 
     expect(await screen.findByText(savedEntry.text)).toBeTruthy();

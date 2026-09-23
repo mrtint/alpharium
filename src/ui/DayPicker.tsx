@@ -1,128 +1,64 @@
 /**
- * 하루를 고르는 자리.
+ * 하루를 고르는 자리 — 홈의 7칸 스트립 (048, 보드 `1d`).
  *
- * 계약: specs/009-past-day-diary/contracts/write-prompt.md §3
+ * 계약: specs/048-diary-home-modernist/contracts/home-screen.md S1~S6
+ *       (이전: specs/009-past-day-diary/contracts/write-prompt.md §3 — 세로 목록)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **★ 006이 박아 둔 「어제 하나」를 사용자가 고를 수 있게 만드는 자리다.**
+ * **날짜를 고르는 곳은 여기 한 곳뿐이다**(설계 D7, FR-014). 하단 바의 「n일」은 누를 수 없는
+ * 글자다 — 두 곳이면 어느 쪽이 기준인지 흐려진다.
  *
- * 그 전까지 쓰기 자리에는 「2026-08-20를 쓴다」가 고정으로 있었고 바꿀 길이 없었다 —
- * **하루를 놓치면 영영 못 썼다.** 신호(사진)는 기기에 그대로 남아 있는데도.
+ * **판정하지 않는다.** 어느 칸을 누를 수 있는지·어느 칸이 골라졌는지는 `stripCellsFor()`가
+ * 정해서 넘긴다(009 FR-009d와 같은 원칙). 지금 시각도 읽지 않는다.
  *
- * **판정하지 않는다.** 어느 하루가 골라졌는지도, 되돌려졌는지도 `writePromptFor()`가
- * 정해서 넘겨준다(FR-009d) — 화면이 스스로 이전 값과 비교하면 같은 규칙이 두 곳에
- * 생긴다. 007의 `CharacterPicker`가 `movedFrom`을 받아 그리기만 하는 것과 같다.
+ * **흐린 칸은 눌러도 아무 일도 없다** — 그 날에 쓴 일기가 있어도 마찬가지다. 점은 7칸 전부에
+ * 찍히는 읽기 전용 정보이고, 일기를 여는 것은 아래 목록이 맡는다(설계 §2).
  *
- * **사진 갈래를 그리지 않는다**(FR-011a). **아직 쓰지 않은 하루의 그 값은 알 수
- * 없고**, 알려면 이 화면이 세 하루의 신호를 미리 수집해야 하는데 그것은 범위 밖의
- * 기록 계층을 여는 일이다. 목록의 줄에는 사진 갈래가 계속 보이지만 그것은 **이미 쓴
- * 일기**의 값이라 알려져 있다 — 그 차이가 이 방어의 근거다.
- *
- * **날짜를 그대로 적는다.** 「어제·그저께」로 옮기지 않는다 — 04:00 경계 때문에
- * 새벽에는 「어제」가 달력의 어제와 어긋난다(research §4).
+ * 012가 여기 두었던 정오 이전 안내는 하단 바로 옮겨 갔다 — 아직 쓸 수 없는 오늘은 이제 고를
+ * 수 있고, 무엇을 할 수 없는지는 쓰기 자리가 말한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, View } from "react-native";
+import { Pressable, View, type TextStyle } from "react-native";
 
-import { AppText } from "./components/Text";
-import { COLORS, RADIUS } from "./theme/tokens";
+import { dayParts, type StripCell } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
-import type { SelectableDay } from "../app/state";
+import { AppText } from "./components/Text";
+import { weekdayShort } from "./home-text";
+import { COLORS } from "./theme/tokens";
 
 export type DayPickerProps = {
-  /**
-   * 고를 수 있는 하루들. 최근이 먼저다(FR-001).
-   *
-   * **받는 것이 이것뿐이다** — 사진 갈래·신호 미리보기·예상 크기를 받지 않는다.
-   * 자리가 없으면 그릴 수 없다.
-   */
-  days: readonly SelectableDay[];
-  /** 지금 쓰게 될 하루. **판정이 정한 것이며 화면이 고르지 않는다** */
-  selected: DayDate;
-  /**
-   * 되돌려졌으면 사용자가 원래 고른 하루 (FR-009).
-   *
-   * **다시 고를 때까지 남는다**(FR-009c) — 지우는 코드가 여기 없다. 판정이 매번 다시
-   * 돌므로 유효한 하루를 고르면 다음 렌더에서 저절로 빠진다.
-   */
-  revertedFrom?: DayDate;
-  /**
-   * 정오 전이라 오늘을 아직 쓸 수 없다는 안내 (012, 헌법 원칙 II MUST).
-   *
-   * **문자열이 아니라 `true | undefined`다.** 문구("정오부터 오늘을 쓸 수 있다")는
-   * 화면이 스스로 짓는다 — `WRITABLE_FROM_HOUR`(12)를 문자열로 바꾸는 판정을
-   * 화면 밖(`day-boundary.ts`)에 둘 필요가 없다.
-   *
-   * **`now`를 직접 읽지 않는다** — 이 값을 인자로 받을 뿐이다(계약 §4 금지).
-   */
-  todayNotYetWritable?: boolean;
+  /** 7칸 — 오래된 것이 왼쪽. `stripCellsFor()`가 만든다 */
+  cells: readonly StripCell[];
   onSelect: (day: DayDate) => void;
 };
 
-export function DayPicker({
-  days,
-  selected,
-  revertedFrom,
-  todayNotYetWritable,
-  onSelect,
-}: DayPickerProps) {
+export function DayPicker({ cells, onSelect }: DayPickerProps) {
   return (
-    <View className="gap-2" style={{ gap: 8 }}>
-      <AppText variant="sectionTitle">언제를 쓸까</AppText>
-
-      {/*
-        **말없이 다른 하루를 쓰지 않는다**(FR-009). 쓰기 자리를 열어 둔 채 04:00을
-        넘기면 가장 이른 하루가 범위를 벗어나는데, 그때 조용히 바꾸면 사용자는
-        엉뚱한 하루의 일기를 얻는다. 007이 캐릭터 옮김을 알린 것과 같은 성질이다.
-      */}
-      {revertedFrom !== undefined && (
-        <AppText variant="caption">
-          {revertedFrom}는 이제 쓸 수 없어 {selected}로 바꿨다
-        </AppText>
-      )}
-
-      {/*
-        **012 — 헌법 원칙 II "하루의 끝" MUST**: "왜 아직인지"와 "언제부터"를
-        함께 알린다. `WRITABLE_FROM_HOUR`(12시) 외의 곳에서 시각을 얻지 않는다 —
-        이 문구가 유일하게 "정오"라는 값을 사람이 읽는 말로 바꾸는 자리다.
-      */}
-      {todayNotYetWritable === true && (
-        <AppText variant="caption">
-          오늘은 아직 하루가 끝나지 않아 정오(12시)부터 쓸 수 있다
-        </AppText>
-      )}
-
-      {days.map(({ day, hasDiary }) => {
-        const isSelected = day === selected;
+    <View style={STRIP} testID="day-strip">
+      {cells.map(({ day, hasDiary, selectable, selected }) => {
+        const { date, weekday } = dayParts(day);
+        const fg = selected ? COLORS.accentForeground : COLORS.text;
 
         return (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ selected: isSelected }}
+            accessibilityState={{ selected, disabled: !selectable }}
+            disabled={!selectable}
             key={day}
-            onPress={() => onSelect(day)}
-            className={`flex-row items-center justify-between py-2.5 px-3 rounded-card border ${
-              isSelected ? "border-2 border-accent" : "border-border"
-            }`}
-            style={[ROW, isSelected ? ROW_SELECTED : null]}
-            // **하루마다 따로 준다** — RN은 접근성 트리가 평탄화되어 Maestro의
-            // `childOf`가 통하지 않는다(008 실측). `testID`는 release에서 살아남는다.
+            onPress={selectable ? () => onSelect(day) : undefined}
+            style={[CELL, selected ? CELL_SELECTED : null, selectable ? null : CELL_DIMMED]}
+            // **하루마다 따로 준다** — RN 접근성 트리가 평탄화되어 Maestro의 `childOf`가
+            // 통하지 않는다(008 실측). 009의 `day-<date>` 규칙을 그대로 잇는다(FR-013).
             testID={`day-${day}`}
           >
-            <View className="flex-1 gap-0.5" style={{ flex: 1, gap: 2 }}>
-              {/* 날짜를 그대로 적는다 — 「어제」로 옮기지 않는다 */}
-              <AppText variant="body">{day}</AppText>
-
-              {/*
-                **「일기가 있다」뿐이다**(FR-011a). 사진 몇 장인지·무엇을 보고 썼는지는
-                여기 오지 않는다 — 아직 쓰지 않은 하루에 대해서는 알 수 없는 것이고,
-                이미 쓴 하루에 대해서만 아는 것을 섞으면 줄마다 뜻이 달라진다.
-              */}
-              {hasDiary && <AppText variant="caption">일기가 있다</AppText>}
-            </View>
-
-            {isSelected && <AppText variant="caption">선택</AppText>}
+            <AppText style={[DOW, { color: fg }]}>{weekdayShort(weekday)}</AppText>
+            <AppText style={[NUM, { color: fg }]}>{date}</AppText>
+            {/* 쓴 날의 점 — 흐린 칸에도 찍힌다(읽기 전용). 골라진 칸에서는 글자색으로 보인다. */}
+            <View
+              style={[DOT, hasDiary ? { backgroundColor: selected ? fg : COLORS.accent } : null]}
+              testID={hasDiary ? `day-dot-${day}` : undefined}
+            />
           </Pressable>
         );
       })}
@@ -131,22 +67,33 @@ export function DayPicker({
 }
 
 /**
- * 033 — 색·모서리를 토큰에서 가져온다(`#ccc`·`#333`이던 자리).
- *
- * 032의 "className + 토큰 style 병행" 패턴을 따른다 — NativeWind 변환은 Metro
- * 시점이라 jest에 없으므로 인라인 `style`을 함께 준다. 숫자는 레이아웃 관용값만
- * 두고 **색은 반드시 `COLORS.*`**다.
+ * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(032·047 관례, FR-038). 색은 `COLORS.*`만.
+ * 선택 칸 글자는 `accentForeground`(검정) — accent 위 AA를 만족하는 값은 검정뿐이다(043 R2).
  */
-const ROW = {
+const STRIP = {
   flexDirection: "row",
-  alignItems: "center",
   justifyContent: "space-between",
-  paddingVertical: 10,
-  paddingHorizontal: 12,
-  borderWidth: 1,
-  borderColor: COLORS.border,
-  borderRadius: RADIUS.card,
+  marginTop: 18,
+  borderTopWidth: 2,
+  borderTopColor: COLORS.text,
+  borderBottomWidth: 1,
+  borderBottomColor: COLORS.border,
 } as const;
 
-/** 고른 줄 — 테두리가 굵고 강조색이다(013·009의 "선택" 표식과 같은 성질). */
-const ROW_SELECTED = { borderWidth: 2, borderColor: COLORS.accent } as const;
+const CELL = {
+  flex: 1,
+  alignItems: "center",
+  gap: 6,
+  paddingVertical: 10,
+} as const;
+
+const CELL_SELECTED = { backgroundColor: COLORS.accent } as const;
+
+/** 고를 수 없는 칸 — 흐리게. 누름 자체는 `disabled`가 막는다. */
+const CELL_DIMMED = { opacity: 0.35 } as const;
+
+const DOW = { fontSize: 10, letterSpacing: 0.6, opacity: 0.7 } as const;
+
+const NUM: TextStyle = { fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] };
+
+const DOT = { width: 5, height: 5 } as const;

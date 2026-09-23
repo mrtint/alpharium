@@ -71,7 +71,10 @@ appId: com.anonymous.alpharium
 - assertVisible: "일기"
 
 # 설정 탭으로 간다.
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 
 # ── "일기 작성자" 섹션 (029 → 035) ────────────────────────────────────────
 - scrollUntilVisible:

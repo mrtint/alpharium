@@ -72,6 +72,21 @@ describe("R3 — 문안 규칙 (원칙 II·III, SC-008)", () => {
     }
   });
 
+  /**
+   * 048 FR-015 — 거부 안내는 홈 헤더 캡션에 해요체로 보인다. 문구의 유일한 출처가 여기이므로
+   * 여기서 해요체로 바꾸고, 온보딩·설정 권한 섹션도 같은 값을 보인다(복제하지 않는다).
+   */
+  it("048 — ifDenied는 해요체다 (FR-015)", () => {
+    const byKey = Object.fromEntries(PERMISSION_REQUIREMENTS.map((r) => [r.key, r.ifDenied]));
+    expect(byKey.photos).toBe("사진을 볼 수 없어서 일기는 사진 없이 써요.");
+    expect(byKey.location).toBe("지명을 옮기지 못해서 장소는 비워 둬요.");
+    expect(byKey.notifications).toBe("일기가 완성돼도 바로 알려 드리지 못해요.");
+    expect(byKey["battery-exception"]).toBe(
+      "자동으로 쓰는 시간이 정한 때보다 많이 늦어질 수 있어요.",
+    );
+    for (const r of PERMISSION_REQUIREMENTS) expect(r.ifDenied).not.toMatch(/니다\.$/);
+  });
+
   it("rationale·ifDenied가 비어 있지 않다", () => {
     for (const r of PERMISSION_REQUIREMENTS) {
       expect(r.rationale.trim().length).toBeGreaterThan(0);

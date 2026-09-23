@@ -45,7 +45,10 @@ appId: com.anonymous.alpharium
 - assertNotVisible: "자세히 봄"
 
 # ── 설정 탭으로 간다 ──────────────────────────────────────────────────
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 
 # ★ M1 / 042 FR-005·FR-006·SC-004 — **사진 보기 설정이 통째로 없다.**
 #

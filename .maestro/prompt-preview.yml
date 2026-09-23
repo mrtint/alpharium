@@ -27,7 +27,10 @@ appId: com.anonymous.alpharium
     when:
       visible: "개발자"
     commands:
-      - tapOn: "개발자"
+      - tapOn:
+          id: "home-menu-button"
+      - tapOn:
+          id: "home-menu-developer"
 
 # ★ D1 — 프롬프트 미리보기 패널이 있다.
 #    ⚠️ 패널이 길어 각 요소마다 스크롤한다. `scrollUntilVisible`이 화면에 올린다.

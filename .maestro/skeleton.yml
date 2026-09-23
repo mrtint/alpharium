@@ -30,7 +30,10 @@ appId: com.anonymous.alpharium
     when:
       visible: "개발자"
     commands:
-      - tapOn: "개발자"
+      - tapOn:
+          id: "home-menu-button"
+      - tapOn:
+          id: "home-menu-developer"
 
 # FR-001 — 앱이 죽지 않고 뜨고, 진단 화면이 보인다
 - assertVisible: "환경"

@@ -37,6 +37,8 @@ import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
 import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
+import { toDayPreview } from "./day-preview";
+import type { DayPreview } from "./state";
 import type { VisionOutcome } from "../vision/types";
 import type { LivenessOutcome } from "../welcome/liveness";
 import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
@@ -104,6 +106,14 @@ export type AppPipelineResult =
        * 만드는 자리가 둘이 된다.
        */
       store: DiaryStore;
+      /**
+       * 고른 날의 신호 요약 (048 US3, contracts/write-prompt.md PV).
+       *
+       * **옵셔널이 아니다** — `prepare`·`stop`과 달리 데스크톱 경로에도 있다(FR-022). 파이프라인과
+       * **같은 `loadSignals`**를 부르므로 새 수집 경로가 아니다(PV4). 던지지 않는다 — 실패는
+       * 두 칸 「모름」이다.
+       */
+      previewDay: (day: DayDate) => Promise<DayPreview>;
     }
   | {
       ok: false;
@@ -116,6 +126,7 @@ export type AppPipelineResult =
       captionDay?: undefined;
       checkLiveness?: undefined;
       store?: undefined;
+      previewDay?: undefined;
     };
 
 /** 조립에 필요한 통로. 테스트가 기기 없이 갈아끼운다 */
@@ -179,13 +190,17 @@ export function createAppPipeline(
   resolution: EnvironmentResolution,
   deps: WiringDeps = {},
 ): AppPipelineResult {
+  // 048 — 신호를 읽는 통로는 여기서 **한 번** 정한다. 백엔드(018 captionDay)·파이프라인·
+  // 신호 미리보기(previewDay)가 같은 함수를 쓴다 — 미리보기가 새 수집 경로가 되지 않는다(PV4).
+  const loadSignals = deps.loadSignals ?? deviceSignals;
+
   // **여기서 규칙을 다시 판단하지 않는다.** select.ts가 policy.ts에 물어 정한다.
   // 018 2단계 — captionDay()가 신호를 읽을 수 있도록 같은 loadSignals를 넘긴다.
   const selection = selectBackend(
     resolution,
     undefined,
     desktopInferenceUrl(),
-    deps.loadSignals ?? deviceSignals,
+    loadSignals,
     deps.loadCustomNames ?? deviceCustomNames,
   );
   if (!selection.ok) {
@@ -217,7 +232,7 @@ export function createAppPipeline(
   const pipeline = createPipeline({
     backend: selection.backend,
     store,
-    loadSignals: deps.loadSignals ?? deviceSignals,
+    loadSignals,
     isModelReady: deps.isModelReady,
     // 017 — 설정이 켜져 있을 때만 지오코딩 포트를 만든다. `expoGeocodingPort()`가
     // 스스로 지연 import하므로 여기서 만드는 것 자체는 비용이 없다(011의
@@ -248,6 +263,14 @@ export function createAppPipeline(
     captionDay,
     checkLiveness,
     store,
+    previewDay: async (day: DayDate) => {
+      try {
+        return toDayPreview(day, await loadSignals(day));
+      } catch {
+        // 권한 회수·통로 없음 — 「모른다」로 둔다(원칙 V). 화면까지 예외를 올리지 않는다.
+        return toDayPreview(day, null);
+      }
+    },
   };
 }
 

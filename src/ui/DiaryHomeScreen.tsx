@@ -14,6 +14,10 @@
  * 눌리면 상위(`DiarySection`)가 준 `resolve(day)` 콜백이 배선 계층의 순수 함수
  * (`resolveGenerationParams`)를 불러 네 값을 정한다(FR-007) — 화면은 그 결과만 받아
  * `generate()`에 넘긴다. 날짜 셀렉트(009)와 정오 게이트 안내(012)는 유지한다.
+ *
+ * **048 — 홈이 보드 `1d`가 됐다.** 이 화면은 고른 날의 쓸 수 있음(`writePromptFor`)에 따라
+ * 쓰기를 막고(FR-034 둘째 겹), 쓸 수 있게 되는 시각에 한 번 다시 판정하며(FR-035), 고른 날의
+ * 신호 요약을 읽어 신호 줄에 넘긴다(US3). 고른 날은 밖(`App.tsx`)에서 들고 있을 수 있다(Q4).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -36,13 +40,15 @@ import {
   startWriting,
   toDetail,
   toFailed,
+  stripCellsFor,
   toList,
   writePromptFor,
   type AppScreen,
+  type DayPreview,
   type DiaryListItem,
 } from "../app/state";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
-import { dayOf, isDayWritable, type DayDate } from "../config/day-boundary";
+import type { DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import { pickMonologue } from "../diary/monologue";
 import { PERSONA_NAMES } from "../diary/persona";
@@ -53,7 +59,8 @@ import type { Character, VisionSetting } from "../diary/types";
 import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DiaryDetailScreen } from "./DiaryDetailScreen";
-import { DiaryListScreen } from "./DiaryListScreen";
+import { DiaryListScreen, type PreviewState } from "./DiaryListScreen";
+import type { HomeMenuItem } from "./HomeMenu";
 import { OverwriteConfirmScreen } from "./OverwriteConfirmScreen";
 import { AppText } from "./components/Text";
 import { TypewriterText } from "./components/TypewriterText";
@@ -111,7 +118,32 @@ export type DiaryHomeScreenProps = {
    * 주지 않으면 `personaOf()`의 기본 이름을 쓴다.
    */
   characterNames?: Readonly<Partial<Record<Character, string>>>;
+  /**
+   * 고른 하루를 밖에서 들고 있는다 (048 Clarification Q4, FR-005a).
+   *
+   * 설정·개발자 화면에 다녀오면 이 화면이 언마운트된다. 고른 하루를 여기 로컬 상태에만 두면
+   * 돌아왔을 때 기본값으로 돌아가 [일기 쓰기]가 엉뚱한 날을 쓸 수 있다 — 그래서 `App.tsx`가
+   * 들고 있는다(파일에는 남기지 않는다, 009). **둘 다 주지 않으면 지금처럼 로컬 상태다.**
+   */
+  chosenDay?: DayDate | null;
+  onChooseDay?: (day: DayDate) => void;
+  /**
+   * 고른 날의 신호 요약을 읽는 통로 (048 US3). 조립부가 `wiring.previewDay`를 넘긴다.
+   *
+   * **`DaySignals`가 아니라 개수로 좁혀진 `DayPreview`다**(FR-020). 없으면 신호 줄은 「모름」.
+   */
+  previewDay?: (day: DayDate) => Promise<DayPreview>;
+  /** `⋯` 메뉴 항목 (048 US4). 무엇을 넣을지는 조립부가 환경으로 정한다(FR-003) */
+  menuItems?: readonly HomeMenuItem[];
 };
+
+/**
+ * 쓸 수 있게 되는 시각에 걸린 타이머가 1초 늦게 울리게 한다 (048 R4).
+ *
+ * `setTimeout`이 그 밀리초에 정확히 울리면 `now()`가 아직 11:59:59.999일 수 있다 — 그러면
+ * 다시 판정해도 쓸 수 없어 버튼이 안 나타난다. **사람이 정한 여유다**(원칙 V).
+ */
+const WRITABLE_TIMER_SLACK_MS = 1000;
 
 /**
  * 이 캐릭터를 지금 뭐라 부르는가 (035 FR-018).
@@ -144,6 +176,10 @@ export function DiaryHomeScreen({
   characterNames,
   initialDay,
   onAcknowledge,
+  chosenDay: controlledDay,
+  onChooseDay,
+  previewDay,
+  menuItems,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -152,8 +188,33 @@ export function DiaryHomeScreen({
    * 기본값(마지막으로 닫힌 하루)을 쓴다(FR-007).
    *
    * **파일에 남기지 않는다**(009 FR-010, H6) — 매 렌더 재판정.
+   *
+   * **048 — 밖에서 들고 있을 수 있다**(Q4). `chosenDay` prop이 오면 그것이 기준이고,
+   * 안 오면 로컬 상태를 쓴다(옛 호출자·테스트 무변경).
    */
-  const [chosenDay, setChosenDay] = useState<DayDate | null>(null);
+  const [localDay, setLocalDay] = useState<DayDate | null>(null);
+  const chosenDay = controlledDay !== undefined ? controlledDay : localDay;
+  const setChosenDay = useCallback(
+    (day: DayDate) => {
+      if (onChooseDay !== undefined) onChooseDay(day);
+      else setLocalDay(day);
+    },
+    [onChooseDay],
+  );
+
+  /**
+   * 다시 판정하라는 신호 (048 R4). 쓸 수 있게 되는 시각의 타이머와 `AppState` 복귀가 올린다.
+   *
+   * 판정 자체는 매 렌더 `writePromptFor(now())`가 하므로 **값을 저장하지 않는다** — 렌더를
+   * 일으키기만 하면 된다(009가 되돌림을 저장하지 않은 것과 같은 판단).
+   */
+  const [tick, setTick] = useState(0);
+
+  /**
+   * 신호 줄 (048 US3) — **도착한 마지막 결과**만 담는다. 「읽는 중」은 저장하지 않고 렌더에서
+   * 가른다: 담긴 결과의 날이 지금 고른 날과 다르면 그것은 읽는 중이다(아래 `shownPreview`).
+   */
+  const [preview, setPreview] = useState<DayPreview | undefined>(undefined);
 
   /** 방금 생성에서 캐릭터가 옮겨졌으면 그 안내 문구 (029 FR-014). */
   const [movedNotice, setMovedNotice] = useState<string | undefined>(undefined);
@@ -205,6 +266,9 @@ export function DiaryHomeScreen({
         } else {
           void release?.().catch(() => {});
         }
+      } else {
+        // 048 — 잠든 동안 전환 타이머가 밀렸을 수 있다. 돌아오면 다시 판정한다(FR-035).
+        setTick((t) => t + 1);
       }
     });
     return () => subscription.remove();
@@ -224,7 +288,9 @@ export function DiaryHomeScreen({
     if (screen.kind !== "list") return;
     if (captionDay !== undefined) return; // 사진 있는 날 경로(아래)가 담당
 
-    const { day } = writePromptFor(screen.items, now(), chosenDay);
+    const { day, writable } = writePromptFor(screen.items, now(), chosenDay);
+    // 048 — 쓸 수 없는 날에는 미리 준비하지 않는다(FR-036). 쓸 수 있게 되면 `tick`이 다시 돌린다.
+    if (!writable) return;
     const outcome = resolve(day);
     if (outcome.kind !== "resolved") return;
     // 042 — 판별자가 「사진 설정이 none인가」에서 「이 하루에 사진이 있는가」로 바뀌었다.
@@ -238,7 +304,7 @@ export function DiaryHomeScreen({
 
     void prepare?.(outcome.params.character).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- screen.items는 매 렌더 새 배열이라 넣으면 무한 루프. day 판정 입력만 의존성으로.
-  }, [screen.kind, chosenDay, prepare, resolve, now, captionDay]);
+  }, [screen.kind, chosenDay, prepare, resolve, now, captionDay, tick]);
 
   /**
    * 사진이 있는 날의 미리 읽기 (018 2단계, FR-006).
@@ -249,7 +315,9 @@ export function DiaryHomeScreen({
     if (screen.kind !== "list") return;
     if (captionDay === undefined) return;
 
-    const { day } = writePromptFor(screen.items, now(), chosenDay);
+    const { day, writable } = writePromptFor(screen.items, now(), chosenDay);
+    // 048 — 쓸 수 없는 날에 VLM을 돌리지 않는다(FR-036).
+    if (!writable) return;
     const outcome = resolve(day);
     if (outcome.kind !== "resolved") return;
     // 042 — 위 1단계와 정확히 반대 갈래다(FR-011·FR-012).
@@ -267,7 +335,56 @@ export function DiaryHomeScreen({
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 위와 같은 이유.
-  }, [screen.kind, chosenDay, captionDay, prepare, resolve, now]);
+  }, [screen.kind, chosenDay, captionDay, prepare, resolve, now, tick]);
+
+  /**
+   * 쓸 수 있게 되는 시각의 전환 (048 R4, FR-035).
+   *
+   * **아직 쓸 수 없는 오늘을 보는 동안에만** 그 시각에 한 번 울리는 타이머를 건다. 울리면
+   * `tick`을 올려 다시 판정하게 한다 — 판정은 여전히 `writePromptFor(now())` 하나다. 다른 날을
+   * 고르거나 화면을 떠나면(`screen.kind`가 바뀌거나 언마운트) 정리 함수가 지운다.
+   */
+  const listItems = screen.kind === "list" ? screen.items : null;
+  const listPrompt = listItems !== null ? writePromptFor(listItems, now(), chosenDay) : null;
+  const opensAtMs = listPrompt?.writableAt?.getTime();
+  useEffect(() => {
+    if (opensAtMs === undefined) return;
+    const wait = Math.max(0, opensAtMs - now().getTime()) + WRITABLE_TIMER_SLACK_MS;
+    const timer = setTimeout(() => setTick((t) => t + 1), wait);
+    return () => clearTimeout(timer);
+    // `now`는 주입된 시계 — 바뀌지 않는다. 걸 시각(opensAtMs)과 틱만 본다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opensAtMs, tick]);
+
+  /**
+   * 신호 줄 미리보기 (048 US3, FR-018·019).
+   *
+   * 고른 날이 바뀔 때마다 부른다. **늦게 도착한 이전 날의 결과는 버린다** — 도착한 값의 `day`가
+   * 지금 고른 날과 같을 때만 반영한다. 실패하면 두 칸 「모름」(0으로 채우지 않는다, 원칙 V).
+   * 캐시를 두지 않는다(FR-022).
+   */
+  const previewTarget = listPrompt?.day;
+  const previewFor = useRef<DayDate | undefined>(undefined);
+  useEffect(() => {
+    if (previewTarget === undefined || previewDay === undefined) return;
+    previewFor.current = previewTarget;
+    void previewDay(previewTarget)
+      .catch((): DayPreview => ({
+        day: previewTarget,
+        photos: { kind: "unknown" },
+        places: { kind: "unknown" },
+      }))
+      .then((result) => {
+        if (previewFor.current !== previewTarget || result.day !== previewTarget) return;
+        setPreview(result);
+      });
+  }, [previewTarget, previewDay]);
+  const shownPreview: PreviewState | undefined =
+    previewDay === undefined || previewTarget === undefined
+      ? undefined
+      : preview !== undefined && preview.day === previewTarget
+        ? preview
+        : { kind: "loading", day: previewTarget };
 
   const openItem = useCallback(
     async (item: DiaryListItem) => {
@@ -362,6 +479,14 @@ export function DiaryHomeScreen({
   const write = useCallback(async () => {
     const items = screen.kind === "list" ? screen.items : [];
     const prompt = writePromptFor(items, now(), chosenDay);
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // **048 — 쓸 수 없는 날은 여기서 멈춘다**(FR-034 둘째 겹). 화면은 이 날에 쓰기 버튼을
+    // 그리지 않지만(첫째 겹), 그것에만 기대지 않는다 — 화면만 막고 아래가 뚫린 것이 이
+    // 저장소가 여러 번 겪은 결함이다. 셋째 겹은 파이프라인의 `isDayWritable` 게이트(012).
+    // ─────────────────────────────────────────────────────────────────────────
+    if (!prompt.writable) return;
+
     const outcome = resolve(prompt.day);
 
     if (outcome.kind === "no-ready-character") {
@@ -375,7 +500,7 @@ export function DiaryHomeScreen({
         ? `${nameOf(outcome.params.movedFrom, characterNames)}을(를) 쓸 수 없어 ${nameOf(
             outcome.params.character,
             characterNames,
-          )}(으)로 바꿨다`
+          )}(으)로 바꿨어요`
         : undefined,
     );
 
@@ -412,14 +537,20 @@ export function DiaryHomeScreen({
     case "list":
       return (
         <DiaryListScreen
+          cells={stripCellsFor(
+            screen.items,
+            listPrompt ?? writePromptFor(screen.items, now(), chosenDay),
+            now(),
+          )}
+          deniedNotices={deniedNotices}
           items={screen.items}
+          menuItems={menuItems}
+          movedNotice={movedNotice}
           onOpen={(item) => void openItem(item)}
           onSelectDay={setChosenDay}
           onWrite={() => void write()}
-          todayNotYetWritable={!isDayWritable(dayOf(now()), now())}
-          movedNotice={movedNotice}
-          deniedNotices={deniedNotices}
-          write={writePromptFor(screen.items, now(), chosenDay)}
+          preview={shownPreview}
+          write={listPrompt ?? writePromptFor(screen.items, now(), chosenDay)}
         />
       );
 

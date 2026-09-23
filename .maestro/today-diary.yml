@@ -29,36 +29,20 @@ appId: com.anonymous.alpharium
 
 - assertVisible: "일기"
 
-# ★ M1/M2 — **고르는 자리가 있다.** 정오 전후 어느 쪽이든 셋이 보인다(FR-001a).
-- scrollUntilVisible:
-    element:
-      text: "언제를 쓸까"
-    direction: DOWN
-    timeout: 20000
-
-# ⚠️ **017 — "N를 쓴다"까지 다시 스크롤한다.** 017이 사진 설정·장소명
-# 토글을 더해 화면이 길어지면서, "언제를 쓸까" 타이틀까지만 스크롤하면
-# 아래의 "N를 쓴다" 문구가 아직 화면 밖에 있다(2026-08-24 실측).
-- scrollUntilVisible:
-    element:
-      text: ".*를 쓴다"
-    direction: DOWN
-    timeout: 20000
+# ★ M1/M2 — **고르는 자리가 있다.** 048 — 7칸 스트립(`day-strip`)이고, 처음 골라진
+# 날은 언제나 쓸 수 있는 날이라 하단 바에 [일기 쓰기 │ n일]이 있다(D9).
 - assertVisible:
-    text: ".*를 쓴다"
-- assertVisible: "선택"
+    id: "day-strip"
+- assertVisible:
+    id: "day-.*"
+    selected: true
+- assertVisible:
+    id: "write-day-label"
 
-# ★ FR-002 — **기기 시각이 정오 이전이면 안내가 보인다.** 정오 이후면 이 블록은
-# SKIPPED로 지나간다 — 어느 쪽이든 정상이며, 어느 쪽이 실행됐는지는 사람이
-# quickstart D1·D8에서 확인한다.
-- runFlow:
-    when:
-      visible: ".*(정오|12시).*"
-    commands:
-      - assertVisible:
-          text: ".*(정오|12시).*"
-      # 정오 이전에는 오늘의 testID가 없어야 한다 — 그그제가 대신 보인다.
-      # 오늘 날짜를 미리 알 수 없으므로 "선택"이 그그제류의 닫힌 하루에 붙는 것만 본다.
+# ★ FR-002 → 048 — **정오 전 오늘을 고르면 쓰기 버튼 대신 「… 쓸 수 있어요」가 보인다.**
+# 스트립의 마지막 칸이 오늘이다 — 날짜를 모르므로 「쓸 수 있는 때」 칸으로 가른다:
+# 정오 전이면 기본 선택(어제)의 칸은 「지금」이고, 오늘을 골랐을 때만 시각이 나온다.
+# 오늘 날짜를 미리 알 수 없어 칸을 직접 누르지는 않는다 — quickstart D6이 손으로 본다.
 
 # ★ 축 제외 — **걸음·배터리·연결이 화면 어디에도 없다**(FR-006·007). 목록·고르는
 # 자리·확인 화면 전부에 대한 전역 검사다.
@@ -72,19 +56,14 @@ appId: com.anonymous.alpharium
 - assertNotVisible: "hyperclova"
 - assertNotVisible: "gguf"
 
-# ★ M3 — **이미 있는 하루를 골라 쓰면 확인을 거친다**(FR-011). 「일기가 있다」가
-# 붙은 하루가 하나라도 있으면 그것을 고른다.
+# ★ M3 — **이미 있는 하루를 골라 쓰면 확인을 거친다**(FR-011). 048 — 고른 날에 일기가
+# 있으면 헤더 상태 줄이 「이미 썼어요 · 다시 쓰면 덮어써요」다.
 - runFlow:
     when:
-      visible: "일기가 있다"
+      visible: "이미 썼어요 · 다시 쓰면 덮어써요"
     commands:
-      - tapOn: "일기가 있다"
-      - scrollUntilVisible:
-          element:
-            text: "일기 쓰기"
-          direction: DOWN
-          timeout: 20000
-      - tapOn: "일기 쓰기"
+      - tapOn:
+          id: "write-button"
       # ★ 확인 화면이 뜨고 곧바로 생성되지 않는다.
       - assertVisible: "확인"
       - assertVisible: "취소"
@@ -92,9 +71,10 @@ appId: com.anonymous.alpharium
       - assertNotVisible: "%"
       - assertNotVisible: "kanana"
       - assertNotVisible: "exaone"
-      # 취소하면 목록으로 돌아가고 아무것도 생성되지 않는다.
+      # 취소하면 홈으로 돌아가고 아무것도 생성되지 않는다.
       - tapOn: "취소"
-      - assertVisible: "일기"
+      - assertVisible:
+          id: "day-strip"
 
 # 목록이 아니면 돌아간다.
 - runFlow:
@@ -105,12 +85,10 @@ appId: com.anonymous.alpharium
 
 - runFlow:
     when:
-      notVisible: "언제를 쓸까"
+      notVisible:
+        id: "day-strip"
     commands:
-      - tapOn: "일기"
+      - back
 
-- scrollUntilVisible:
-    element:
-      text: "언제를 쓸까"
-    direction: DOWN
-    timeout: 20000
+- assertVisible:
+    id: "day-strip"

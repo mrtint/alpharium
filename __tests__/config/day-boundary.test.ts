@@ -17,6 +17,9 @@ import {
   isDayWritable,
   latestClosedDay,
   selectableDays,
+  STRIP_DAY_COUNT,
+  stripDays,
+  writableAt,
 } from "../../src/config/day-boundary";
 
 describe("dayOf — 시각이 속한 하루", () => {
@@ -494,5 +497,98 @@ describe("불변식 I1~I5 (data-model.md §6, 012)", () => {
     const today = dayOf(now);
     // 오늘은 아직 열려 있다 — isDayClosed(today, now) === false가 dayStillOpen: true의 원천이다.
     expect(isDayClosed(today, now)).toBe(false);
+  });
+});
+
+/**
+ * 048 — 「쓸 수 있게 되는 시각」과 7칸 스트립 (contracts/write-prompt.md DB1~DB10).
+ *
+ * **04와 12가 이 파일 밖으로 나가지 않게 하는 두 함수다.** 화면은 `Date`만 받아 사람의
+ * 말로 옮기고, 전환 타이머도 같은 `Date`로 건다 — 문구와 타이머가 다른 시각을 볼 수 없다.
+ */
+describe("048 writableAt — 아직 쓸 수 없는 오늘이 쓸 수 있게 되는 시각", () => {
+  it("DB1 — 오전(04:00~12:00)의 오늘은 그 하루의 정오", () => {
+    const at = writableAt("2026-09-24", new Date("2026-09-24T10:00:00"));
+    expect(at?.getTime()).toBe(new Date("2026-09-24T12:00:00").getTime());
+  });
+
+  it("★ DB2 — 새벽(00:00~04:00)의 오늘은 정오가 아니라 하루가 닫히는 04:00 (Clarification Q1)", () => {
+    const at = writableAt("2026-09-24", new Date("2026-09-25T01:00:00"));
+    expect(at?.getTime()).toBe(new Date("2026-09-25T04:00:00").getTime());
+  });
+
+  it("DB3 — 정오가 지난 오늘은 지금 쓸 수 있으므로 null", () => {
+    expect(writableAt("2026-09-24", new Date("2026-09-24T13:00:00"))).toBeNull();
+  });
+
+  it("DB4 — 닫힌 날은 null", () => {
+    expect(writableAt("2026-09-23", new Date("2026-09-24T10:00:00"))).toBeNull();
+  });
+
+  it("DB5 — 03:59:59의 오늘(달력상 전날)은 1초 뒤 04:00", () => {
+    const at = writableAt("2026-09-23", new Date("2026-09-24T03:59:59"));
+    expect(at?.getTime()).toBe(new Date("2026-09-24T04:00:00").getTime());
+  });
+
+  it("DB10 — 스트립의 모든 날에서 writableAt이 null이 아닌 것 ⇔ 지금 쓸 수 없는 것", () => {
+    const instants = [
+      "2026-09-24T00:30:00",
+      "2026-09-24T03:59:59",
+      "2026-09-24T04:00:00",
+      "2026-09-24T11:59:59",
+      "2026-09-24T12:00:00",
+      "2026-09-24T23:59:00",
+    ];
+    for (const instant of instants) {
+      const now = new Date(instant);
+      for (const day of stripDays(now)) {
+        expect(writableAt(day, now) !== null).toBe(!isDayWritable(day, now));
+      }
+    }
+  });
+});
+
+describe("048 stripDays — 오늘로 끝나는 7일", () => {
+  it("DB6 — dayOf(now)로 끝나는 7일, 오래된 것이 먼저", () => {
+    expect(stripDays(new Date("2026-09-24T10:00:00"))).toEqual([
+      "2026-09-18",
+      "2026-09-19",
+      "2026-09-20",
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+    ]);
+  });
+
+  it("DB7 — 새벽 1시의 마지막 칸은 달력상 전날(04:00 경계)", () => {
+    const days = stripDays(new Date("2026-09-25T01:00:00"));
+    expect(days[days.length - 1]).toBe("2026-09-24");
+    expect(days).toHaveLength(STRIP_DAY_COUNT);
+  });
+
+  it("DB8 — 월 경계를 넘는다", () => {
+    expect(stripDays(new Date("2026-10-02T10:00:00"))).toEqual([
+      "2026-09-26",
+      "2026-09-27",
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+    ]);
+  });
+
+  it("칸 수는 7이다 — 사람이 정한 값", () => {
+    expect(STRIP_DAY_COUNT).toBe(7);
+  });
+
+  it("★ DB9 — 04와 12를 담은 두 상수는 여전히 밖으로 나가지 않는다", () => {
+    const source = readFileSync(join(__dirname, "../../src/config/day-boundary.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).not.toMatch(/export\s+const\s+WRITABLE_FROM_HOUR/);
+    expect(source).not.toMatch(/export\s+const\s+DAY_STARTS_AT_HOUR/);
+    expect(source).not.toMatch(/export\s*\{[^}]*(WRITABLE_FROM_HOUR|DAY_STARTS_AT_HOUR)/);
   });
 });

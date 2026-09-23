@@ -1,0 +1,96 @@
+# 실기기 자동 테스트 — 048 일기 홈 1d와 화면 이동 구조
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **홈이 보드 `1d` 구조로 그려지고, 탭 줄 없이 `⋯` 메뉴로 설정에 들어갔다 돌아오는가**를 본다.
+#
+# 검증 항목:
+#   FR-001·009·023  탭 줄 없이 헤더·스트립·신호 줄·하단 바가 보인다        (M1)
+#   FR-002·004      ⋯ → 설정 → 「← 일기」 / 뒤로 가기로 홈 복귀            (M2·M3)
+#   FR-005a         돌아와도 고른 날이 같다                               (M3)
+#   FR-002          메뉴 바깥을 누르면 메뉴만 닫힌다                       (M4)
+#   FR-014·SC-002   하단 바의 「n일」을 눌러도 아무 일도 없다                (M5)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **★ 여기서 자동화하지 않는 것 — quickstart.md §3:**
+#
+#   정오 전 오늘 선택·안내 문구(D6), 12:00 전환(D7)  — 기기 시각을 바꿀 수 없다.
+#   신호 줄 숫자가 합성 하루의 장수와 같은가(D3~D5)   — seed:day와 권한 조작이 필요하다.
+#   prod에서 「개발자」 항목이 없는가(SC-006)         — prod 환경 Metro가 필요하다.
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# ★ M1 — 1d 구조. 탭 줄 대신 하단 바의 ⋯ 메뉴가 있다.
+- assertVisible:
+    id: "home-month"
+- assertVisible:
+    id: "home-day-number"
+- assertVisible:
+    id: "day-strip"
+- assertVisible:
+    id: "signal-row"
+- assertVisible:
+    id: "home-bottom-bar"
+- assertVisible:
+    id: "home-menu-button"
+
+# ★ M2 — ⋯ → 설정 → 「← 일기」
+- copyTextFrom:
+    id: "home-day-number"
+- tapOn:
+    id: "home-menu-button"
+- assertVisible:
+    id: "home-menu-settings"
+- tapOn:
+    id: "home-menu-settings"
+- assertVisible:
+    id: "back-to-home"
+- tapOn:
+    id: "back-to-home"
+- assertVisible:
+    id: "home-day-number"
+
+# ★ M3 — 다시 설정 → 안드로이드 뒤로 가기. 고른 날이 그대로다(Q4).
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
+- assertVisible:
+    id: "back-to-home"
+- back
+- assertVisible:
+    id: "home-day-number"
+    text: ${maestro.copiedText}
+
+# ★ M4 — 메뉴 바깥을 누르면 메뉴만 닫힌다.
+- tapOn:
+    id: "home-menu-button"
+- assertVisible:
+    id: "home-menu-settings"
+- tapOn:
+    id: "home-menu-backdrop"
+- assertNotVisible:
+    id: "home-menu-settings"
+- assertVisible:
+    id: "home-day-number"
+
+# ★ M5 — 하단 바의 날짜 글자는 누를 수 없다 — 쓰기가 시작되지 않고 홈에 그대로다.
+- runFlow:
+    when:
+      visible:
+        id: "write-day-label"
+    commands:
+      - tapOn:
+          id: "write-day-label"
+      - assertVisible:
+          id: "home-day-number"
+      - assertVisible:
+          id: "write-button"
+
+# ★ 원칙 III·IV — 홈 어디에도 모델 정보·진행 지표가 없다.
+- assertNotVisible: "kanana"
+- assertNotVisible: "gguf"
+- assertNotVisible: "%"

@@ -34,7 +34,10 @@ appId: com.anonymous.alpharium
     when:
       visible: "설정"
     commands:
-      - tapOn: "설정"
+      - tapOn:
+          id: "home-menu-button"
+      - tapOn:
+          id: "home-menu-settings"
 
 # ★ M1 — **자동 생성 설정 화면이 있고, 목표 시각·토글이 보인다.**
 - scrollUntilVisible:

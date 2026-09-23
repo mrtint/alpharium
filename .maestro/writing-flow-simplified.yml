@@ -71,12 +71,9 @@ appId: com.anonymous.alpharium
       - assertNotVisible: "장소 이름"
       - assertNotVisible: "상상을 섞어"
 
-      # ★ 029 FR-002 — 쓰게 될 하루가 보인다. "YYYY-MM-DD를 쓴다" 꼴.
-      - scrollUntilVisible:
-          element:
-            text: ".*를 쓴다"
-          direction: DOWN
-          timeout: 20000
+      # ★ 029 FR-002 → 048 — 쓰게 될 하루가 보인다. 하단 바의 「n일」(`write-day-label`).
+      - assertVisible:
+          id: "write-day-label"
 
       # ★ 029 FR-004 — "일기 쓰기" 버튼이 있다(1탭 진입점).
       - scrollUntilVisible:

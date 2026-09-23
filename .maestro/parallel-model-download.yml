@@ -60,7 +60,10 @@ appId: com.anonymous.alpharium
           optional: true
 
 # 029 — 캐릭터 다운로드 관리는 설정 탭이다("캐릭터" 탭 흡수, Q1=A). 첫 화면은 일기(006 FR-009).
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 
 # **스크롤해서 찾는다**: dev 빌드에서는 목록이 아래로 밀린다.
 #
@@ -150,8 +153,13 @@ appId: com.anonymous.alpharium
           id: "pause-chinese"
 
       # ── FR-006 — 탭을 왕복해도 chinese가 여전히 받는 중으로 보인다 ──
-      - tapOn: "일기"
-      - tapOn: "설정"
+      # 048 — 탭 줄이 없다. 설정에서 「← 일기」로 홈에 돌아온다.
+      - tapOn:
+          id: "back-to-home"
+      - tapOn:
+          id: "home-menu-button"
+      - tapOn:
+          id: "home-menu-settings"
       # ⚠️ 탭 왕복 뒤에는 스크롤 위치가 그대로 남아 **이미 보이는 경우**가 있다.
       # `scrollUntilVisible`은 그때 "찾지 못했다"로 실패하므로(025 계열),
       # 보이지 않을 때만 스크롤한다.

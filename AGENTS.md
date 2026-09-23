@@ -1425,6 +1425,57 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
 - 상세: `specs/047-welcome-naming-1a/`.
 
 
+### 048 — 일기 홈 1d와 화면 이동 구조 (2026-09-24)
+
+로드맵 31번. 보드 `1d`(Day-first)를 채택했다(`1e`는 미채택). `1d`는 하단에 쓰기 바가 고정되는
+구조라 맨 위 탭 줄과 공존할 수 없어 **화면 이동 구조를 함께 바꿨다** — 설계 합의:
+`docs/superpowers/specs/2026-09-24-diary-home-modernist-design.md`(D1~D9).
+
+- **탭 줄이 없다.** `App.tsx`의 `tab`이 `route: "home" | "settings" | "developer"`가 됐고, 설정·
+  개발자는 하단 바 `⋯` 메뉴(`HomeMenu`, RN 코어 `Modal`)로 들어가는 하위 화면이다. 돌아오는 길은
+  `SubScreenFrame`의 「← 일기」(`back-to-home`)와 뒤로 가기 — **뒤로 가기는 그 프레임이 마운트된
+  동안만 가로챈다**(홈에서는 OS가 처리). 개발자 항목은 `showsDiagnostics`일 때만 배열에 있다.
+- **Maestro에서 「설정」·「개발자」 탭을 누르던 흐름은 전부 `home-menu-button` →
+  `home-menu-settings`/`home-menu-developer`로, 「일기」 탭 복귀는 `back-to-home`으로 바뀌었다.**
+  새 흐름을 쓸 때 탭 글자를 누르지 않는다.
+- **「고를 수 있다」와 「쓸 수 있다」가 갈렸다.** `SelectableDay.writable`·`WritePrompt.writable`·
+  `writableAt`. 아직 쓸 수 없는 오늘은 `writable: false`로 `selectable` 맨 앞에 붙는다 — 009의
+  「정오 전 selectable은 셋, 오늘 없음」 테스트들을 이 동작으로 고쳤다. 기본 선택은 여전히
+  쓸 수 있는 첫 날(D9).
+- **★ 쓸 수 없는 오늘은 하루에 두 구간이다**(Clarification Q1). 04:00~12:00(정오에 쓸 수 있게
+  됨)만이 아니라 **00:00~04:00도** 그렇다 — `isDayWritable`이 `now.getHours() >= 12`를 보므로
+  자정을 넘기면 오늘(달력상 전날)이 다시 못 쓰게 되고 04:00에 닫혀 풀린다. 설계 문서는 이
+  구간을 놓쳤고, 그대로 만들었으면 새벽에 「오후 12시부터」라는 틀린 말을 했다. 그래서
+  `day-boundary.ts`의 `writableAt(day, now)`가 **다음 전환 시각(`Date`)**을 주고 화면은 그것을
+  「오전 4시」·「오후 12시」로 옮길 뿐이다 — 04·12는 여전히 이 파일 밖으로 안 나간다
+  (`home-text.test.ts` G10이 홈 화면 소스의 「숫자+시」·「정오」를 막는다).
+- **쓸 수 없는 날의 쓰기는 세 겹으로 막는다** — 화면이 버튼을 안 그림(B4·B5) / `DiaryHomeScreen.
+  write()`가 `writable`을 보고 멈춤(B6, `DiaryListScreen`을 `jest.mock` 대역으로 바꿔 `onWrite`를
+  직접 호출해 검증) / 파이프라인의 `isDayWritable` 게이트(012). 018 미리 준비도 쓸 수 없는 날엔
+  안 돈다.
+- **전환 타이머**: 쓸 수 없는 오늘을 보는 동안만 `writableAt + 1초`에 한 번 울려 다시 판정한다
+  (`AppState active`에서도). 012가 「실기기 미확인」으로 남긴 정오 전환을 가짜 타이머로 잠갔다.
+- **신호 줄**: `wiring.previewDay(day)` → `DayPreview`(사진 전체 장수·자리 수, 「없음」/「모름」
+  구분). 파이프라인과 **같은 `loadSignals` 하나**를 나눠 쓴다(PV4가 소스로 잠근다). 좁히는
+  함수는 `app/day-preview.ts`에 따로 있다 — `state.ts`가 신호 타입을 import하면 화면이 그걸
+  거쳐 신호에 닿는다(DP8). 「읽는 중」은 상태로 저장하지 않고 렌더에서 가른다 —
+  `react-hooks/set-state-in-effect`가 effect 안의 동기 `setState`를 오류로 막는다.
+- **고른 날은 `AppFrame`이 들고 있다**(Q4) — 설정 왕복·040 재마운트에도 남고 파일엔 안 남는다.
+- **하단 바의 「n일」은 쓰기 버튼의 형제다** — 보드는 한 버튼처럼 그렸지만 그 안에 두면 날짜를
+  눌러 쓰기가 시작돼 「누를 수 없는 글자」(D7)와 어긋난다(`/speckit-analyze` 2회차가 잡음).
+- **RNTL 14에는 `UNSAFE_root`가 없다** — 「모든 누를 수 있는 것을 눌러 본다」는
+  `screen.queryAllByRole("button")`로, Modal의 `onRequestClose`는 안쪽 노드에서
+  `fireEvent(node, "requestClose")`(핸들러를 찾아 부모로 올라간다)로 쏜다. jest-expo의
+  `AppState.addEventListener` 스파이를 `mockRestore()`하면 이후 테스트의 구독 반환값이
+  `undefined`가 된다 — 복원하지 않는다(diary-home.test와 같다).
+- `requirements.ts`의 `ifDenied` 넷을 해요체로 바꿨다(홈 캡션·온보딩·설정 권한 섹션이 같은 값을 본다).
+- 기기 없는 테스트 162 스위트 / 2873개 통과, lint·헌법 검사·prettier 클린, 위반 주입 9종 전부 잡힘
+  (`specs/048-diary-home-modernist/quickstart.md` §6).
+- **미확인 잔여**: 실기기 dev 검증(quickstart D1~D13)과 Maestro 실행 — 구현 세션에 기기가
+  잠겨(PIN) 있어 돌리지 못했다. **건너뛴 실기기 테스트는 통과가 아니다**(원칙 V). 특히 `⋯` 메뉴
+  목록의 위치(`measureInWindow` 기반 앵커)와 124px 날짜 숫자의 행간은 실기기 육안이 필요하다.
+- 상세: `specs/048-diary-home-modernist/`.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

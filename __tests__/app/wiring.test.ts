@@ -15,8 +15,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { createAppPipeline } from "../../src/app/wiring";
 import type { EnvironmentResolution } from "../../src/config/types";
+import type { DaySignals } from "../../src/signals/types";
 
 const resolved = (environment: "local" | "dev" | "prod"): EnvironmentResolution => ({
   ok: true,
@@ -121,5 +125,97 @@ describe("createAppPipeline — 끊는 통로를 실어 보낸다 (007 §3)", ()
     expect(result.ok).toBe(false);
     expect(result).not.toHaveProperty("pipeline");
     if (!result.ok) expect(result.stop).toBeUndefined();
+  });
+});
+
+/**
+ * 048 — 신호 미리보기 통로 (contracts/write-prompt.md PV1~PV5).
+ *
+ * **새 수집 경로를 만들지 않는다** — 파이프라인에 주입되는 것과 같은 `loadSignals`를 부른다.
+ * 결과는 개수로 좁혀진 `DayPreview`뿐이고, 실패는 밖으로 나오지 않고 「모름」이 된다.
+ */
+describe("048 createAppPipeline — previewDay", () => {
+  const signalsWith = (photos: number, visits: number | null): DaySignals => ({
+    date: "2026-09-23",
+    photos: {
+      kind: "known",
+      value: {
+        photos: Array.from({ length: photos }, (_, i) => ({
+          id: `p${i}`,
+          takenAt: new Date(`2026-09-23T1${i}:00:00`),
+        })),
+        complete: true,
+      },
+    },
+    places:
+      visits === null
+        ? { kind: "unknown", reason: "좌표 없음" }
+        : {
+            kind: "known",
+            value: {
+              trace: { visitCount: visits, approximateDistanceMeters: 0 },
+              source: "photo-exif",
+              photosWithLocation: photos,
+              photosConsidered: photos,
+            },
+          },
+    steps: { kind: "unknown", reason: "-" },
+    battery: { kind: "unknown", reason: "-" },
+    connectivity: { kind: "unknown", reason: "-" },
+  });
+
+  it("PV1·PV4 — 주입된 loadSignals를 불러 개수로 좁힌다", async () => {
+    const loadSignals = jest.fn(async () => signalsWith(2, 1));
+    const result = createAppPipeline(resolved("dev"), { loadSignals });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const preview = await result.previewDay("2026-09-23");
+    expect(loadSignals).toHaveBeenCalledWith("2026-09-23");
+    expect(preview).toEqual({
+      day: "2026-09-23",
+      photos: { kind: "known", count: 2 },
+      places: { kind: "known", count: 1 },
+    });
+  });
+
+  it("PV2 — 신호를 만들지 못하면(null) 둘 다 모름", async () => {
+    const result = createAppPipeline(resolved("dev"), { loadSignals: async () => null });
+    if (!result.ok) throw new Error("조립 실패");
+
+    expect(await result.previewDay("2026-09-23")).toEqual({
+      day: "2026-09-23",
+      photos: { kind: "unknown" },
+      places: { kind: "unknown" },
+    });
+  });
+
+  it("★ PV3 — 던져도 밖으로 나오지 않고 둘 다 모름", async () => {
+    const result = createAppPipeline(resolved("dev"), {
+      loadSignals: async () => {
+        throw new Error("권한 없음");
+      },
+    });
+    if (!result.ok) throw new Error("조립 실패");
+
+    await expect(result.previewDay("2026-09-23")).resolves.toEqual({
+      day: "2026-09-23",
+      photos: { kind: "unknown" },
+      places: { kind: "unknown" },
+    });
+  });
+
+  it("PV5 — 데스크톱(local) 조립에도 있다 — 옵셔널이 아니다", () => {
+    const result = createAppPipeline(resolved("local"), { loadSignals: async () => null });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(typeof result.previewDay).toBe("function");
+  });
+
+  it("★ PV4 — 소스에서 파이프라인과 previewDay가 같은 loadSignals 하나를 나눠 쓴다", () => {
+    const code = readFileSync(join(__dirname, "../../src/app/wiring.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    // 결정은 한 번만 한다 — 두 자리에서 따로 `deps.loadSignals ?? deviceSignals`를 쓰지 않는다.
+    expect(code.match(/deps\.loadSignals\s*\?\?\s*deviceSignals/g)).toHaveLength(1);
   });
 });

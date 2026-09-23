@@ -65,7 +65,10 @@ appId: com.anonymous.alpharium
 - launchApp
 
 # 029 — 캐릭터 다운로드 관리는 설정 탭이다("캐릭터" 탭 흡수, Q1=A). 첫 화면은 일기(006 FR-009).
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 
 # 다섯 자리가 보이는 것을 먼저 확인한다 — 이것이 안 되면 아래가 전부 무의미하다.
 # **스크롤해서 찾는다**: 진단 패널이 있는 dev 빌드에서는 목록이 아래로 밀린다.
@@ -156,8 +159,13 @@ appId: com.anonymous.alpharium
       #
       # ★ 007까지 탭을 옮기면 `Acquisition` 인스턴스가 통째로 사라져, 돌아왔을 때
       # 받던 것을 **멈출 방법이 없었다.**
-      - tapOn: "일기"
-      - tapOn: "설정"
+      # 048 — 탭 줄이 없다. 설정에서 「← 일기」로 홈에 돌아온다.
+      - tapOn:
+          id: "back-to-home"
+      - tapOn:
+          id: "home-menu-button"
+      - tapOn:
+          id: "home-menu-settings"
       - scrollUntilVisible:
           element: "모카"
           direction: DOWN
