@@ -432,9 +432,15 @@ const COUNTER = { fontSize: 12, lineHeight: 16, marginLeft: 8 } as const;
 /** 1a 힌트 — 12px, 흐린 글자. */
 const HINT = { fontSize: 12, lineHeight: 16 } as const;
 
-/** 1a 하단 버튼 줄 — 오른쪽 정렬, 간격 8. 건너뛰기 좌측·확정 우측. */
+/**
+ * 1a 하단 버튼 줄 — 오른쪽 정렬, 간격 8. 건너뛰기 좌측·확정 우측.
+ *
+ * ★ 047 실기기 — 시스템 글꼴 1.3배에서 두 버튼이 한 줄을 넘쳐 [나중에 할래요]의
+ * 앞 글자가 잘렸다. `flexWrap`으로 넘치면 다음 줄로 내린다(기본 글꼴에서는 한 줄 그대로).
+ */
 const BUTTON_ROW = {
   flexDirection: "row",
+  flexWrap: "wrap",
   gap: 8,
   width: "100%",
   justifyContent: "flex-end",

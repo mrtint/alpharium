@@ -49,8 +49,9 @@
 - [X] T017 실기기 dev 검증(quickstart.md 1~6): `1a` 대조 9/9(SC-001), 빈 입력 버튼 모양·무반응, 카운터 0·2·12, 키보드 스크롤, 시스템 글꼴 크게 설정 시 잘림 없이 스크롤 가능(Edge Case), 확정→liveness→일기 탭, Maestro `welcome-naming.yml` PASS. 결과를 이 태스크 아래에 기록한다 — 실기기 SM-S901N
   - **결과(2026-09-23, SM-S901N, dev debug, Metro 리로드)**: `1a` 대조 9/9 해소(표지·🤖 타일·제목 "깨어났어요. / 처음 뵙겠습니다."는 어절 경계에서 줄바꿈·본문·세로 중앙·카운터·힌트·화살표·하단 이름 제거). 빈 입력에서 확정 버튼은 진한 빨강 그대로이고 눌러도 화면 불변. 카운터 `0/12`→`2/12`, 13자 입력 시 `12/12`에서 멈춤. 이름 확정 → 일기 탭 도달.
   - **★ 실기기에서만 드러난 결함 — 고쳤다**: 세로 중앙 배치 후 키보드가 입력줄을 가려 치는 글자가 안 보였다(`adjustResize`가 edge-to-edge에서 레이아웃을 줄이지 않음). `KeyboardAvoidingView` + `keyboardVerticalOffset={48}`로 해소 — 키보드를 연 채 입력줄·두 버튼이 모두 보인다(research R9, 계약 A12). 044는 입력줄이 화면 위쪽이라 드러나지 않았다.
-  - **Maestro `welcome-naming.yml`**: 작명 화면 블록은 이 기기가 이미 작명을 마쳐 `SKIPPED`(조건부 블록, 수동 확인으로 대체). 이후 `author-rename-input-0` 단계에서 FAILED — AGENTS.md 035의 "Maestro가 `author-rename-0` 좌표를 잘못 본다" 알려진 결함과 같은 자리이며 047은 설정 탭을 건드리지 않았다(회귀 아님).
-  - **미확인**: 시스템 글꼴 크게 설정(작명을 마친 기기라 작명 화면에 다시 들어가려면 `pm clear`로 모델 2GB를 지워야 함), 제스처 내비게이션 기기·다른 키보드 앱에서의 키보드 여백.
+  - **Maestro `welcome-naming.yml`**(재실행, `welcomeShown`을 되돌려 작명 화면에서 시작): 작명 화면 블록 PASS(제목 문구·카운터 assert, [나중에 할래요] 탭). 이후 `author-rename-input-0` 단계에서 FAILED — AGENTS.md 035의 "Maestro가 `author-rename-0` 좌표를 잘못 본다" 알려진 결함과 같은 자리이며 047은 설정 탭을 건드리지 않았다(회귀 아님).
+  - **★ 글꼴 1.3배에서 결함 — 고쳤다**: 두 버튼이 한 줄을 넘쳐 [나중에 할래요] 앞 글자가 잘렸다("ㅏ중에 할래요"). 버튼 줄에 `flexWrap: "wrap"`을 줘 넘치면 두 줄로 내린다(계약 A13). 기본 글꼴 1.0에서는 한 줄 그대로임을 재확인. 작명 화면 재진입은 `onboarding.json`의 `welcomeShown`만 `false`로 되돌려 했다(모델 보존).
+  - **미확인**: 제스처 내비게이션 기기·다른 키보드 앱에서의 키보드 여백.
 - [X] T018 AGENTS.md에 047 절(핵심 결론·실기기 관측)을 추가하고 로드맵 28번(재작업) 행을 완료로 표시한다 — `AGENTS.md`, `docs/roadmap/README.md`
 
 ## Dependencies

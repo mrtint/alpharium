@@ -17,3 +17,4 @@
 | A10 | checking·failed 단계의 스타일 상수(`CONTAINER`·`CENTERED`)는 047에서 바뀌지 않는다 | 기존 044 테스트 통과 |
 | A11 | 새 하드코딩 색이 없다 — `#rrggbb` 리터럴이 소스에 없다 | 소스 검사 |
 | A12 | welcome 단계는 `KeyboardAvoidingView`(`keyboardVerticalOffset={KEYBOARD_OFFSET}`, 0보다 큼) 안에 있다 — 실기기 T017에서 추가 | 소스 검사 |
+| A13 | 하단 버튼 줄은 `flexWrap: "wrap"` — 시스템 글꼴 1.3배에서 [나중에 할래요] 앞 글자가 잘린 실측(T017)으로 추가 | 소스 검사 |

@@ -417,3 +417,10 @@ describe("047 A12 — 키보드가 열려도 입력줄과 버튼이 가려지지
     expect(CODE).toMatch(/const KEYBOARD_OFFSET = [1-9]\d*;/);
   });
 });
+
+describe("047 A13 — 글꼴을 키워도 버튼 글자가 잘리지 않는다 (실기기 T017)", () => {
+  it("하단 버튼 줄이 넘치면 다음 줄로 내린다(flexWrap: wrap)", () => {
+    const def = CODE.slice(CODE.indexOf("const BUTTON_ROW ="));
+    expect(def.slice(0, def.indexOf("as const"))).toMatch(/flexWrap:\s*"wrap"/);
+  });
+});
