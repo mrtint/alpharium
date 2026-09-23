@@ -32,7 +32,8 @@ appId: com.anonymous.alpharium
 # 아니라 설정 탭에 있다(020 App.tsx `AutoDiarySection`이 `settings` 갈래에서 그려짐).
 - runFlow:
     when:
-      visible: "설정"
+      visible:
+        id: "home-menu-button"
     commands:
       - tapOn:
           id: "home-menu-button"

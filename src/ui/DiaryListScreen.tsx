@@ -295,7 +295,14 @@ function SignalCell({
     >
       <AppText style={SIGNAL_LABEL}>{label}</AppText>
       {/* testID는 값에 둔다 — 라벨과 값을 한 노드로 맞추면 「사진…」처럼 섞여 읽힌다 */}
+      {/*
+        「오후 12시부터」는 좁은 셋째 칸에서 두 줄로 꺾여 신호 줄 높이를 밀어 올렸다(048 실기기
+        관측, SM-S901N). 한 줄에 두고 넘치면 글자를 줄인다 — 칸 높이가 날마다 달라지지 않게.
+      */}
       <AppText
+        adjustsFontSizeToFit={emphasis}
+        minimumFontScale={0.6}
+        numberOfLines={emphasis ? 1 : undefined}
         style={[SIGNAL_VALUE, emphasis ? { color: COLORS.danger, fontSize: 18 } : null]}
         testID={testID}
       >

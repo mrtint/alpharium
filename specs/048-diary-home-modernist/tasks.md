@@ -165,7 +165,7 @@ description: "048 일기 홈 1d — 작업 목록"
 - [X] T043 [P] `docs/roadmap/README.md` 31번에 048 진행 기록을 적고, 35번 설명의 「전역 하단 탭 바」 전제가 048로 사라졌음을 고친다(번호·차수·선후를 새로 적지 않는다 — 사용자 규칙)
 - [X] T044 `grep -n "day-not-closed\|isDayWritable" __tests__/diary/pipeline*.test.ts`로 012의 파이프라인 게이트 테스트(쓸 수 없는 날을 `pipeline.run`에 직접 넣으면 저장 없이 거부)가 있는지 확인한다 — 없으면 `__tests__/diary/pipeline.test.ts`에 추가한다(SC-003의 둘째 겹)
 - [X] T045 `npm test`·`npm run lint`(eslint + tsc + 헌법 검사 + prettier) 전체 초록을 확인한다. 실패하면 고치고 다시 돈다
-- [ ] T046 ⚠️ **미수행(2026-09-24 00:59, 기기 SM-S901N이 PIN으로 잠겨 있어 사람이 풀어야 한다 — 건너뛴 것은 통과가 아니다)** 실기기 dev 검증 — quickstart.md §2 준비(AGENTS.md 「도구 사용법」 4가지, `pm clear` 후 모델 재배치, `seed:day`) 후 D1~D13을 수행하고, `node scripts/run-device-tests.mjs`로 Maestro를 돌린다. 오전 세션이 아니라 D6·D7을 못 하면 미확인 잔여로 남긴다(건너뛴 것은 통과가 아니다)
+- [X] T046 ✅ **수행(2026-09-24, SM-S901N dev)** — D1~D13 관측(D7 정오 순간 전환만 미관측, 가짜 시계 테스트로 갈음), Maestro 12흐름 중 11 PASS(`welcome-naming`은 035 좌표 결함 자리). 실기기에서 고친 것: 메뉴 앵커 여백, 신호 칸 한 줄, 재실행마다 다운로드 완료 화면·정상 동작 확인이 뜨던 045·040 결함, 흐름 넷의 메뉴 진입 조건. 상세는 AGENTS.md 048 절. 원래 지시: 실기기 dev 검증 — quickstart.md §2 준비(AGENTS.md 「도구 사용법」 4가지, `pm clear` 후 모델 재배치, `seed:day`) 후 D1~D13을 수행하고, `node scripts/run-device-tests.mjs`로 Maestro를 돌린다. 오전 세션이 아니라 D6·D7을 못 하면 미확인 잔여로 남긴다(건너뛴 것은 통과가 아니다)
 - [X] T047 `AGENTS.md`의 기능별 결론 끝에 「048 — 일기 홈 1d와 화면 이동 구조」 절을 더한다 — 탭 줄 제거·`⋯` 메뉴, 쓸 수 있음/고를 수 있음 분리와 00:00~04:00 갈래, `DayPreview` 경계, 전환 타이머, 실기기에서 관측한 것과 미확인 잔여
 
 ---

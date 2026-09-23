@@ -25,7 +25,8 @@ appId: com.anonymous.alpharium
 # 개발자 탭으로 간다 — 진단 화면은 014에서 "개발자" 탭으로 옮겨졌다(local·dev 전용).
 - runFlow:
     when:
-      visible: "개발자"
+      visible:
+        id: "home-menu-button"
     commands:
       - tapOn:
           id: "home-menu-button"

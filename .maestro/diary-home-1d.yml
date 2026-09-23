@@ -23,6 +23,24 @@ appId: com.anonymous.alpharium
 ---
 - launchApp
 
+# 045 — 다운로드 완료 화면의 「시작할게요」는 세션 로컬 상태라 재시작마다 다시 뜬다(welcome-naming.yml
+# 참조). 뜨면 지나간다.
+- extendedWaitUntil:
+    visible:
+      id: "download-progress-complete|home-month"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "download-progress-complete"
+    commands:
+      - tapOn:
+          id: "download-progress-proceed"
+- extendedWaitUntil:
+    visible:
+      id: "home-month"
+    timeout: 20000
+
 # ★ M1 — 1d 구조. 탭 줄 대신 하단 바의 ⋯ 메뉴가 있다.
 - assertVisible:
     id: "home-month"

@@ -45,7 +45,9 @@ export function HomeMenu({ items }: { items: readonly HomeMenuItem[] }) {
     setOpen(true);
     buttonRef.current?.measureInWindow?.((x, y) => {
       if (typeof x !== "number" || typeof y !== "number") return;
-      setAnchor({ left: x, bottom: Dimensions.get("window").height - y + 8 });
+      // 버튼 위쪽 여백(12)과 하단 바의 윗선(2)을 넘어 8만큼 띄운다 — 버튼 위에만 붙이면
+      // 목록이 하단 바의 굵은 윗선을 덮는다(048 실기기 관측).
+      setAnchor({ left: x, bottom: Dimensions.get("window").height - y + 12 + 2 + 8 });
     });
   };
 
