@@ -1,38 +1,57 @@
 /**
- * 일기 목록 화면.
+ * 일기 홈 — 보드 `1d`("Day-first — one date fills the screen").
  *
- * 계약: specs/006-first-diary-app/contracts/screens.md §2
- *       specs/029-writing-flow-simplification/contracts/home-screen.md (H1·H2·H6)
- *       specs/032-nativewind-ui-system/contracts/screen-migration.md SM1
+ * 계약: specs/048-diary-home-modernist/contracts/home-screen.md H·S·G·B, US5 카드
+ *       specs/006-first-diary-app/contracts/screens.md §2 (S1·S7·FR-017a는 그대로 산다)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **★ 이 화면이 원칙 I을 어기기 가장 쉬운 자리다.**
+ * **★ 이 화면이 원칙 I을 어기기 가장 쉬운 자리다**(006).
  *
- * 006이 처음으로 「저장된 일기를 보여주는 화면」을 만든다. **읽기와 쓰기가 같은 동작에
- * 묶이지 않아야 한다**(S1) — 「이미 있으면 그것을 보여준다」는 지름길을 만들면 저장된
- * 것이 생성을 대신하고, 그 순간 헌법 원칙 I이 깨진다.
+ * 저장된 일기를 보여주는 화면이다. **읽기와 쓰기가 같은 동작에 묶이지 않아야 한다**(S1) —
+ * 「이미 있으면 그것을 보여준다」는 지름길을 만들면 저장된 것이 생성을 대신한다. 그래서
+ * `onWrite`는 **목록을 보지 않는다.** 인자도 없다.
  *
- * 그래서 `onWrite`는 **목록을 보지 않는다.** 항목이 있든 없든 같은 일을 한다.
+ * **048 — 모양과 자리가 바뀌었다.** 고른 날이 화면 위쪽을 채우고(큰 날짜·요일·상태),
+ * 7칸 스트립에서 날을 고르며, 신호 줄이 「지금 쓰면 볼 것」을 미리 보이고, 쓰기는 화면 아래
+ * 고정 바가 맡는다. 헤더와 목록은 함께 스크롤되고 하단 바만 고정된다(FR-023).
  *
- * **★ 029에서 쓰기 자리의 위젯 셋이 사라졌다**(FR-001·006). CharacterPicker·
- * VisionPicker·GeocodingSettingToggle과 딸린 안내가 걷혔다 — 캐릭터·사진 설정·장소명은
- * 배선 계층(`resolve-generation.ts`)이 자동 판정한다. 홈에 남는 것은 목록 +
- * "일기 쓰기" + 날짜 셀렉트(009) + 정오 게이트 안내(012) + 거부 권한 안내(021)뿐이다.
+ * **판정하지 않는다.** 고른 날·쓸 수 있음·쓸 수 있게 되는 시각은 `writePromptFor()`가,
+ * 스트립 칸은 `stripCellsFor()`가, 신호 개수는 `DayPreview`가 정해서 온다. 이 화면은
+ * 신호 원형(`DaySignals`)도, 하루 경계의 04·12도 모른다(G9·G10).
  *
- * **★ 032에서 표현만 바꿨다** — `StyleSheet` → 디자인 토큰(className + `tokens.ts`)
- * + 재사용 컴포넌트(`AppText`·`Button`). 기능·문안·`testID`·네비게이션은 불변이다
- * (SM1). 사진 갈래 3문구, `onWrite` 인자 없음, `day-<date>` testID 그대로.
+ * **★ 쓸 수 없는 날에는 쓰기 버튼이 없다**(FR-029·FR-034 첫째 겹) — 비활성 모양으로도 그리지
+ * 않는다. 무엇을 눌러도 `onWrite`에 닿지 않는다(B5). 둘째 겹은 `DiaryHomeScreen.write()`의
+ * 게이트, 셋째 겹은 파이프라인의 `isDayWritable`(012)이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View, type TextStyle } from "react-native";
 
-import type { DiaryListItem, PhotoHint, WritePrompt } from "../app/state";
+import {
+  dayParts,
+  type CountHint,
+  type DayPreview,
+  type DiaryListItem,
+  type PhotoHint,
+  type StripCell,
+  type WritePrompt,
+} from "../app/state";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
-import { Button } from "./components/Button";
-import { COLORS } from "./theme/tokens";
 import { DayPicker } from "./DayPicker";
+import { BAR_HEIGHT, HomeMenu, type HomeMenuItem } from "./HomeMenu";
+import {
+  cardDateText,
+  dayOfMonthText,
+  hourText,
+  monthText,
+  revertedText,
+  weekdayLong,
+} from "./home-text";
+import { COLORS } from "./theme/tokens";
+
+/** 신호 줄의 사진·다닌 자리 칸 — 읽는 중이거나, 다 읽었거나 */
+export type PreviewState = { kind: "loading"; day: DayDate } | DayPreview;
 
 export type DiaryListScreenProps = {
   items: DiaryListItem[];
@@ -43,48 +62,337 @@ export type DiaryListScreenProps = {
    */
   onWrite: () => void;
   /**
-   * 누르면 무슨 일이 일어나는가 (007 FR-023·024).
+   * 고른 날과 그 날에 무슨 일이 일어나는가 (007·009·048).
    *
-   * **이것을 아는 것은 화면이고, `onWrite`는 여전히 모른다** — 안다는 것과 그것으로
-   * 갈리는 것은 다르며 후자만이 원칙 I 위반이다(FR-025).
+   * **옵셔널인 것은 호환 때문이다** — 없으면 헤더·스트립·하단 바 없이 목록만 그린다(옛 호출자·
+   * 권한 안내 테스트). 실제 홈은 언제나 넘긴다.
    */
   write?: WritePrompt;
-  /**
-   * 하루를 고른다 (009 FR-006).
-   *
-   * **`onWrite`는 여전히 하루를 받지 않는다** — 고른 하루는 이 화면 밖의 상태이고
-   * 그것을 파이프라인에 넘기는 것도 밖이다(계약 §3 금지).
-   */
+  /** 7칸 스트립 (048). `stripCellsFor()`가 만든다 */
+  cells?: readonly StripCell[];
+  /** 스트립에서 하루를 고른다 (009 FR-006). `onWrite`는 여전히 하루를 받지 않는다 */
   onSelectDay?: (day: DayDate) => void;
-  /**
-   * 정오 전이라 오늘을 아직 쓸 수 없다는 안내 (012, 헌법 원칙 II MUST).
-   *
-   * `DiaryHomeScreen`이 `isDayWritable()`을 재사용해 계산한 값을 그대로 `DayPicker`에
-   * 전달한다 — 이 화면은 계산하지 않고 넘기기만 한다.
-   */
-  todayNotYetWritable?: boolean;
-  /**
-   * 자동 판정이 캐릭터를 옮겼을 때의 안내 문구 (029 FR-014).
-   *
-   * **부모가 계산해 넘긴 문자열만 그린다** — 007의 `movedFrom` 표시를 이 자리로
-   * 옮겼다. 화면은 persona도 캐릭터도 모른다(원칙 III).
-   */
+  /** 자동 판정이 캐릭터를 옮겼을 때의 안내 문구 (029 FR-014). 부모가 만든 문장만 그린다 */
   movedNotice?: string;
-  /**
-   * 거부된 권한 때문에 제한되는 기능의 정직한 안내 문구들 (021 FR-014, SC-004).
-   */
+  /** 거부된 권한으로 제한되는 기능의 정직한 안내 (021 FR-014). */
   deniedNotices?: readonly string[];
+  /**
+   * 신호 줄의 사진·다닌 자리 (048 US3). 없으면(통로 없음) 두 칸 「모름」.
+   *
+   * **`DaySignals`가 아니다** — 개수로 좁혀진 값만 받는다(FR-020).
+   */
+  preview?: PreviewState;
+  /** `⋯` 메뉴 항목 (048 US4). 무엇을 넣을지는 부르는 쪽이 정한다 */
+  menuItems?: readonly HomeMenuItem[];
 };
 
+export function DiaryListScreen({
+  items,
+  onOpen,
+  onWrite,
+  write,
+  cells,
+  onSelectDay,
+  movedNotice,
+  deniedNotices,
+  preview,
+  menuItems,
+}: DiaryListScreenProps) {
+  return (
+    <View style={ROOT}>
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 24 }}
+        style={{ flex: 1, backgroundColor: COLORS.bg }}
+      >
+        {write !== undefined && (
+          <Header
+            cells={cells ?? []}
+            deniedNotices={deniedNotices}
+            movedNotice={movedNotice}
+            onSelectDay={onSelectDay}
+            preview={preview}
+            write={write}
+          />
+        )}
+
+        {/* 헤더가 없는 옛 호출에서도 거부 안내는 보인다(021) */}
+        {write === undefined && <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />}
+
+        <DiaryList items={items} onOpen={onOpen} />
+      </ScrollView>
+
+      {write !== undefined && (
+        <View style={BOTTOM_BAR} testID="home-bottom-bar">
+          {menuItems !== undefined && menuItems.length > 0 ? (
+            <HomeMenu items={menuItems} />
+          ) : (
+            <View />
+          )}
+          <WriteBar onWrite={onWrite} write={write} />
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ═══════════════════════════════ 헤더 ═══════════════════════════════ */
+
+function Header({
+  write,
+  cells,
+  onSelectDay,
+  movedNotice,
+  deniedNotices,
+  preview,
+}: {
+  write: WritePrompt;
+  cells: readonly StripCell[];
+  onSelectDay?: (day: DayDate) => void;
+  movedNotice?: string;
+  deniedNotices?: readonly string[];
+  preview?: PreviewState;
+}) {
+  const { date, weekday } = dayParts(write.day);
+
+  return (
+    <View>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        {/* 월은 **고른 날의 달**이다(Clarification Q2) */}
+        <AppText style={[KICKER, { color: COLORS.accent }]} testID="home-month">
+          {monthText(write.day)}
+        </AppText>
+        <AppText style={[KICKER, { color: COLORS.textMuted }]} testID="home-kicker">
+          일기
+        </AppText>
+      </View>
+
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 4 }}>
+        <AppText style={DAY_NUMBER} testID="home-day-number">
+          {date}
+        </AppText>
+        <View style={{ gap: 2, paddingBottom: 8, flexShrink: 1 }}>
+          <AppText
+            style={{ fontSize: 16, fontWeight: "700", color: COLORS.text }}
+            testID="home-weekday"
+          >
+            {weekdayLong(weekday)}
+          </AppText>
+          {/* 012의 덮어쓰기 사전 고지가 이 자리로 옮겨 왔다(FR-010) */}
+          <AppText style={{ fontSize: 13, color: COLORS.textMuted }} testID="home-day-state">
+            {write.overwrites ? "이미 썼어요 · 다시 쓰면 덮어써요" : "아직 쓰지 않았어요"}
+          </AppText>
+        </View>
+      </View>
+
+      <DayPicker cells={cells} onSelect={onSelectDay ?? (() => {})} />
+
+      <Notices
+        deniedNotices={deniedNotices}
+        movedNotice={movedNotice}
+        reverted={
+          write.revertedFrom !== undefined ? revertedText(write.revertedFrom, write.day) : undefined
+        }
+      />
+
+      <SignalRow preview={preview} write={write} />
+    </View>
+  );
+}
+
+/** 안내 캡션 — 되돌림(009)·캐릭터 옮김(029)·거부 권한(021). 있을 때만. */
+function Notices({
+  reverted,
+  movedNotice,
+  deniedNotices,
+}: {
+  reverted?: string;
+  movedNotice?: string;
+  deniedNotices?: readonly string[];
+}) {
+  const denied = deniedNotices ?? [];
+  if (reverted === undefined && movedNotice === undefined && denied.length === 0) return null;
+
+  return (
+    <View style={{ gap: 4, marginTop: 12 }}>
+      {/*
+        **말없이 다른 하루를 쓰지 않는다**(009 FR-009). 쓰기 자리를 열어 둔 채 04:00을 넘기면
+        가장 이른 하루가 범위를 벗어나는데, 그때 조용히 바꾸면 사용자는 엉뚱한 하루를 얻는다.
+      */}
+      {reverted !== undefined && <AppText variant="caption">{reverted}</AppText>}
+      {movedNotice !== undefined && <AppText variant="caption">{movedNotice}</AppText>}
+      {denied.length > 0 && (
+        <View style={{ gap: 4 }} testID="denied-notices">
+          {denied.map((notice) => (
+            <AppText key={notice} variant="caption">
+              {notice}
+            </AppText>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+/* ═══════════════════════════════ 신호 줄 ═══════════════════════════════ */
+
 /**
- * 사진 갈래를 사람이 읽는 말로 (007 FR-018·019).
+ * 「지금 쓰면 볼 것」 세 칸 (048 US3, FR-016~018).
  *
- * **「없음」과 「모름」이 서로 다른 문구다**(원칙 V).
+ * **「없음」과 「모름」은 다른 글자다**(원칙 V) — 0으로 채우지 않는다. 미리보기가 아직 오지
+ * 않았으면 「…」, 통로가 없으면 「모름」.
  */
-function photoText(hint: PhotoHint): string {
+function SignalRow({ write, preview }: { write: WritePrompt; preview?: PreviewState }) {
+  const count = (pick: (p: DayPreview) => CountHint): string => {
+    if (preview === undefined) return "모름";
+    if (!("photos" in preview)) return "…";
+    return countText(pick(preview));
+  };
+
+  const windowText =
+    write.writable || write.writableAt === undefined ? "지금" : `${hourText(write.writableAt)}부터`;
+
+  return (
+    <View style={SIGNAL_ROW} testID="signal-row">
+      <SignalCell label="사진" testID="signal-photos" value={count((p) => p.photos)} />
+      <SignalCell label="다닌 자리" testID="signal-places" value={count((p) => p.places)} />
+      <SignalCell emphasis label="쓸 수 있는 때" last testID="signal-window" value={windowText} />
+    </View>
+  );
+}
+
+function countText(hint: CountHint): string {
   switch (hint.kind) {
     case "known":
-      return `사진 ${hint.count}장`;
+      return String(hint.count);
+    case "none":
+      return "없음";
+    case "unknown":
+      return "모름";
+  }
+}
+
+function SignalCell({
+  label,
+  value,
+  testID,
+  emphasis,
+  last,
+}: {
+  label: string;
+  value: string;
+  testID: string;
+  emphasis?: boolean;
+  last?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        { flex: last ? 1.1 : 1, gap: 2, paddingVertical: 12 },
+        last
+          ? { paddingLeft: 12 }
+          : { paddingRight: 12, borderRightWidth: 1, borderRightColor: COLORS.border },
+      ]}
+    >
+      <AppText style={SIGNAL_LABEL}>{label}</AppText>
+      {/* testID는 값에 둔다 — 라벨과 값을 한 노드로 맞추면 「사진…」처럼 섞여 읽힌다 */}
+      {/*
+        「오후 12시부터」는 좁은 셋째 칸에서 두 줄로 꺾여 신호 줄 높이를 밀어 올렸다(048 실기기
+        관측, SM-S901N). 한 줄에 두고 넘치면 글자를 줄인다 — 칸 높이가 날마다 달라지지 않게.
+      */}
+      <AppText
+        adjustsFontSizeToFit={emphasis}
+        minimumFontScale={0.6}
+        numberOfLines={emphasis ? 1 : undefined}
+        style={[SIGNAL_VALUE, emphasis ? { color: COLORS.danger, fontSize: 18 } : null]}
+        testID={testID}
+      >
+        {value}
+      </AppText>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════ 목록 ═══════════════════════════════ */
+
+function DiaryList({
+  items,
+  onOpen,
+}: {
+  items: DiaryListItem[];
+  onOpen: (item: DiaryListItem) => void;
+}) {
+  return (
+    <View style={{ marginTop: 22 }}>
+      <View style={LIST_HEAD}>
+        <AppText style={[KICKER, { color: COLORS.text }]} testID="home-recent">
+          최근
+        </AppText>
+        <AppText style={{ fontSize: 12, color: COLORS.textMuted }} testID="home-count">
+          {`${items.length}편`}
+        </AppText>
+      </View>
+
+      {/* **빈 화면을 보이지 않는다**(006 S7) — 무엇을 하면 생기는지 말한다 */}
+      {items.length === 0 && (
+        <View style={{ paddingVertical: 24, gap: 8 }}>
+          <AppText variant="bodyStrong">아직 일기가 없어요</AppText>
+          <AppText variant="caption">
+            위에서 하루를 고르고 「일기 쓰기」를 누르면 휴대폰이 그 하루를 일기로 써요
+          </AppText>
+        </View>
+      )}
+
+      {items.map((item) => (
+        <DiaryCard item={item} key={item.day} onOpen={onOpen} />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * 목록 카드 (US5).
+ *
+ * **실제 사진 썸네일을 쓰지 않는다** — 목록 항목은 사진 경로를 갖지 않는다(범위 밖). 사진 더미는
+ * 모양일 뿐이고 장수는 배지가 말한다. 사진이 없던 일기와 모르는 일기는 같은 빈 사각형이지만
+ * 날짜 줄 끝의 말로 **서로 구분된다**(007 FR-018·019, 원칙 V).
+ */
+function DiaryCard({
+  item,
+  onOpen,
+}: {
+  item: DiaryListItem;
+  onOpen: (item: DiaryListItem) => void;
+}) {
+  const hint = photoHintText(item.photos);
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onOpen(item)}
+      style={CARD}
+      testID={`diary-card-${item.day}`}
+    >
+      <PhotoStack day={item.day} photos={item.photos} />
+      <View style={{ flex: 1, gap: 4, minWidth: 0 }}>
+        <AppText style={{ fontSize: 11, letterSpacing: 0.66, color: COLORS.textMuted }}>
+          {hint === undefined ? cardDateText(item.day) : `${cardDateText(item.day)} · ${hint}`}
+        </AppText>
+        {!item.readable ? (
+          // **사라지지 않고 그렇다고 말한다**(006 FR-017a)
+          <AppText style={CARD_TITLE}>읽을 수 없어요</AppText>
+        ) : (
+          item.title !== undefined && <AppText style={CARD_TITLE}>{item.title}</AppText>
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+/** 「사진 없음」과 「사진 모름」은 다른 말이다(원칙 V). 본 일기는 배지가 말하므로 없음. */
+function photoHintText(photos: PhotoHint): string | undefined {
+  switch (photos.kind) {
+    case "known":
+      return undefined;
     case "none":
       return "사진 없음";
     case "unknown":
@@ -92,120 +400,215 @@ function photoText(hint: PhotoHint): string {
   }
 }
 
-export function DiaryListScreen({
-  items,
-  onOpen,
-  onWrite,
-  write,
-  onSelectDay,
-  todayNotYetWritable,
-  movedNotice,
-  deniedNotices,
-}: DiaryListScreenProps) {
+function PhotoStack({ day, photos }: { day: DayDate; photos: PhotoHint }) {
+  const seen = photos.kind === "known";
   return (
-    <ScrollView
-      className="bg-bg"
-      contentContainerClassName="p-5 gap-3"
-      contentContainerStyle={{ padding: 20, gap: 12 }}
-      style={{ backgroundColor: COLORS.bg }}
-    >
-      <AppText variant="title">일기</AppText>
-
-      {/* 021 — 거부된 권한으로 제한되는 기능을 정직하게 알린다(FR-014). */}
-      {deniedNotices !== undefined && deniedNotices.length > 0 && (
-        <View className="gap-1 py-1" style={{ gap: 4, paddingVertical: 4 }} testID="denied-notices">
-          {deniedNotices.map((notice) => (
-            <AppText key={notice} variant="caption">
-              {notice}
-            </AppText>
-          ))}
-        </View>
+    <View style={{ width: 44, height: 44, marginTop: 2 }}>
+      {seen && (
+        <>
+          <View style={[STACK_BACK, { opacity: 0.6 }]} />
+          <View style={[STACK_MID, { opacity: 0.8 }]} />
+        </>
       )}
-
-      {/* **빈 화면을 보이지 않는다**(FR-018, S7) — 무엇을 하면 생기는지 말한다 */}
-      {items.length === 0 && (
-        <View className="py-6 gap-2" style={{ paddingVertical: 24, gap: 8 }}>
-          <AppText variant="bodyStrong">아직 일기가 없다</AppText>
-          <AppText variant="caption">
-            아래에서 하루를 고르고 「일기 쓰기」를 누르면 휴대폰이 그 하루를 일기로 쓴다.
-          </AppText>
-        </View>
-      )}
-
-      {items.map((item) => (
-        <Pressable
-          accessibilityRole="button"
-          className="py-3.5 border-b border-border gap-1"
-          key={item.day}
-          onPress={() => onOpen(item)}
-          style={{
-            paddingVertical: 14,
-            borderBottomWidth: 0.5,
-            borderBottomColor: COLORS.border,
-            gap: 4,
-          }}
-        >
-          <AppText variant="body">{item.day}</AppText>
-
-          {item.title !== undefined && <AppText variant="caption">{item.title}</AppText>}
-
-          {!item.readable && <AppText variant="caption">읽을 수 없다</AppText>}
-
-          <AppText variant="caption">{photoText(item.photos)}</AppText>
-        </Pressable>
-      ))}
-
-      {/*
-        ─────────────────────────────────────────────────────────────────────────
-        **쓰기 자리** — 029에서 날짜 셀렉트와 "일기 쓰기"만 남았다. 캐릭터·사진 설정·
-        장소명은 배선 계층이 자동 판정한다(FR-006).
-        ─────────────────────────────────────────────────────────────────────────
-      */}
       <View
-        className="mt-4 pt-4 border-t border-border gap-2.5"
-        style={{
-          marginTop: 16,
-          paddingTop: 16,
-          borderTopWidth: 0.5,
-          borderTopColor: COLORS.border,
-          gap: 10,
-        }}
-      >
-        {/*
-          **자동 판정이 캐릭터를 옮겼으면 알린다**(029 FR-014) — 007의 `movedFrom`
-          표시를 이 자리로 옮겼다. 부모가 persona 이름으로 문장을 만들어 넘긴다.
-        */}
-        {movedNotice !== undefined && <AppText variant="caption">{movedNotice}</AppText>}
-
-        {/*
-          **하루를 고르는 자리**(009 FR-006). **판정은 여기서 하지 않는다** —
-          `write`가 이미 정해서 왔다(FR-009d).
-        */}
-        {write !== undefined && (
-          <DayPicker
-            days={write.selectable}
-            onSelect={onSelectDay ?? (() => {})}
-            revertedFrom={write.revertedFrom}
-            selected={write.day}
-            todayNotYetWritable={todayNotYetWritable}
-          />
-        )}
-
-        {/* **오늘이 아니라 고른 하루다**(009 FR-008, 006 FR-030) */}
-        {write !== undefined && <AppText variant="body">{write.day}를 쓴다</AppText>}
-
-        {/* **덮어쓴다는 것을 누르기 전에 말한다**(FR-024). */}
-        {write?.overwrites === true && (
-          <AppText variant="caption">이 날의 일기가 이미 있다. 다시 쓰면 덮어쓴다</AppText>
-        )}
-
-        {/* **항목이 있든 없든 같은 자리다** — 읽기가 쓰기를 대신하지 않는다(S1) */}
-        <View className="self-start mt-3" style={{ alignSelf: "flex-start", marginTop: 12 }}>
-          <Button variant="secondary" onPress={onWrite}>
-            일기 쓰기
-          </Button>
-        </View>
-      </View>
-    </ScrollView>
+        style={[
+          STACK_FRONT,
+          seen
+            ? { backgroundColor: COLORS.surface, borderColor: COLORS.border }
+            : { backgroundColor: COLORS.bg, borderColor: COLORS.border },
+        ]}
+      />
+      {photos.kind === "known" && (
+        <AppText style={BADGE} testID={`diary-card-badge-${day}`}>
+          {String(photos.count)}
+        </AppText>
+      )}
+    </View>
   );
 }
+
+/* ═══════════════════════════════ 하단 바 ═══════════════════════════════ */
+
+/**
+ * 쓰기 바 (FR-028·029).
+ *
+ * **날짜 조각은 쓰기 버튼 밖의 형제다**(research R8) — 보드에서는 한 버튼처럼 보이지만, 「n일」을
+ * 누르면 쓰기가 시작되는 것은 「누를 수 없는 글자」(D7·FR-014)와 어긋난다. 그래서 같은 강조
+ * 블록 안에 나란히 두되 누름은 왼쪽 조각만 받는다.
+ *
+ * **쓸 수 없으면 버튼이 없다** — 비활성 모양도 아니다. 언제부터 쓸 수 있는지만 말한다.
+ */
+function WriteBar({ write, onWrite }: { write: WritePrompt; onWrite: () => void }) {
+  if (!write.writable) {
+    return (
+      <View style={{ flex: 1, flexShrink: 1, marginLeft: 12, justifyContent: "center" }}>
+        <AppText
+          style={{ fontSize: 14, fontWeight: "600", color: COLORS.text }}
+          testID="write-unavailable"
+        >
+          {`오늘 일기는 ${write.writableAt !== undefined ? hourText(write.writableAt) : ""}부터 쓸 수 있어요`}
+        </AppText>
+      </View>
+    );
+  }
+
+  return (
+    <View style={WRITE_BLOCK}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => onWrite()}
+        style={WRITE_BUTTON}
+        testID="write-button"
+      >
+        <AppText style={WRITE_TEXT}>일기 쓰기</AppText>
+      </Pressable>
+      <View style={WRITE_DAY}>
+        <AppText style={[WRITE_TEXT, { fontSize: 13, fontWeight: "700" }]} testID="write-day-label">
+          {dayOfMonthText(write.day)}
+        </AppText>
+      </View>
+    </View>
+  );
+}
+
+/* ═══════════════════════════════ 치수 ═══════════════════════════════ */
+/*
+ * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(FR-038, 032·047 관례). 색은 `COLORS.*`만.
+ * accent 위 글자는 `accentForeground`(검정) — 보드의 오프화이트 글자는 AA 미달이다(043 R2).
+ */
+
+const ROOT = { flex: 1, backgroundColor: COLORS.bg } as const;
+
+const KICKER = {
+  fontSize: 11,
+  letterSpacing: 1.1,
+  fontWeight: "600",
+} as const;
+
+const DAY_NUMBER: TextStyle = {
+  fontSize: 124,
+  lineHeight: 118,
+  fontWeight: "800",
+  letterSpacing: -6,
+  color: COLORS.text,
+  fontVariant: ["tabular-nums"],
+};
+
+const SIGNAL_ROW = {
+  flexDirection: "row",
+  alignItems: "stretch",
+  marginTop: 16,
+  borderTopWidth: 1,
+  borderTopColor: COLORS.border,
+  borderBottomWidth: 2,
+  borderBottomColor: COLORS.text,
+} as const;
+
+const SIGNAL_LABEL = {
+  fontSize: 10,
+  letterSpacing: 1,
+  fontWeight: "600",
+  color: COLORS.textMuted,
+} as const;
+
+const SIGNAL_VALUE: TextStyle = {
+  fontSize: 22,
+  lineHeight: 26,
+  fontWeight: "800",
+  color: COLORS.text,
+  fontVariant: ["tabular-nums"],
+};
+
+const LIST_HEAD = {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "baseline",
+  paddingBottom: 8,
+  borderBottomWidth: 2,
+  borderBottomColor: COLORS.text,
+} as const;
+
+const CARD = {
+  flexDirection: "row",
+  gap: 12,
+  alignItems: "flex-start",
+  paddingVertical: 14,
+  borderBottomWidth: 1,
+  borderBottomColor: COLORS.border,
+} as const;
+
+const CARD_TITLE = { fontSize: 17, lineHeight: 22, fontWeight: "700", color: COLORS.text } as const;
+
+const STACK_BACK = {
+  position: "absolute",
+  left: 6,
+  top: 0,
+  right: 0,
+  bottom: 6,
+  backgroundColor: COLORS.border,
+} as const;
+
+const STACK_MID = {
+  position: "absolute",
+  left: 3,
+  top: 3,
+  right: 3,
+  bottom: 3,
+  backgroundColor: COLORS.textMuted,
+} as const;
+
+const STACK_FRONT = {
+  position: "absolute",
+  left: 0,
+  bottom: 0,
+  width: 38,
+  height: 38,
+  borderWidth: 1,
+} as const;
+
+const BADGE = {
+  position: "absolute",
+  right: 0,
+  bottom: -3,
+  backgroundColor: COLORS.accent,
+  color: COLORS.accentForeground,
+  fontSize: 10,
+  lineHeight: 15,
+  fontWeight: "800",
+  paddingHorizontal: 5,
+} as const;
+
+const BOTTOM_BAR = {
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 8,
+  paddingHorizontal: 20,
+  paddingTop: 12,
+  paddingBottom: 12,
+  borderTopWidth: 2,
+  borderTopColor: COLORS.text,
+  backgroundColor: COLORS.bg,
+} as const;
+
+const WRITE_BLOCK = {
+  flexDirection: "row",
+  alignItems: "stretch",
+  minHeight: BAR_HEIGHT,
+  backgroundColor: COLORS.accent,
+} as const;
+
+const WRITE_BUTTON = {
+  justifyContent: "center",
+  paddingVertical: 14,
+  paddingHorizontal: 16,
+} as const;
+
+const WRITE_DAY = {
+  justifyContent: "center",
+  paddingHorizontal: 14,
+  borderLeftWidth: 1,
+  borderLeftColor: COLORS.accentForeground,
+} as const;
+
+const WRITE_TEXT = { fontSize: 15, fontWeight: "800", color: COLORS.accentForeground } as const;

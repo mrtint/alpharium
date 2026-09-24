@@ -101,7 +101,10 @@ appId: com.anonymous.alpharium
 # 설정 탭 "장소명" 섹션(3-상태: 자동/켬/끔, 기본 "자동")으로 옮겨졌다. 이제 기본이
 # "자동"이라 고지 문구("좌표를 기기의 지도 서비스에 물어봅니다.")가 처음부터 떠
 # 있을 수 있다 — "끔"을 골라야 사라진다(mode !== "off"일 때 고지).
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 # ⚠️ 세 옵션을 개별 스크롤로 본다(025 실측 — 제목까지만 스크롤하면 마지막 옵션이 잘린다).
 - scrollUntilVisible:
     element:

@@ -114,8 +114,20 @@ describe("★ liveness 실패 화면의 [그냥 시작하기] 막다른 길 (실
 
   it("firstRunStage 계산이 livenessSkipped를 반영한다 — livenessOutcome을 그대로 넘기지 않는다", () => {
     expect(APP_SOURCE).toMatch(
-      /livenessOutcome:\s*livenessSkipped\s*\?\s*"ok"\s*:\s*livenessOutcome,/,
+      /livenessOutcome:\s*livenessPassed\s*\?\s*"ok"\s*:\s*livenessOutcome,/,
     );
+    expect(APP_SOURCE).toMatch(
+      /const livenessPassed = livenessSkipped \|\| !namingDoneThisSession;/,
+    );
+  });
+
+  it("★ 048 실기기 — 이미 모델이 있는 채로 켜면 다운로드 완료 화면을 건너뛴다", () => {
+    expect(APP_SOURCE).toMatch(
+      /downloadProceedConfirmed:\s*downloadProceedConfirmed \|\| !essentialsMissingSeen,/,
+    );
+    // 「없음을 봤다」는 에셋이 없다고 읽혔을 때만 세운다.
+    expect(APP_SOURCE).toMatch(/if \(!ready\) setEssentialsMissingSeen\(true\);/);
+    expect(APP_SOURCE.match(/setEssentialsMissingSeen\(/g)).toHaveLength(1);
   });
 
   it('livenessOutcome state 자체를 직접 "ok"로 덮어쓰지 않는다(원칙 I) — setLivenessOutcome("ok") 호출이 없다', () => {

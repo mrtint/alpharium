@@ -68,7 +68,7 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     neededBy: "사진 수집(004) — 그날 찍힌 사진으로 하루를 짐작한다",
     platforms: ["android", "ios"],
     rationale: "그날 찍힌 사진 몇 장을 살펴 하루를 짐작해 씁니다.",
-    ifDenied: "사진을 볼 수 없어, 일기는 사진 없이 쓰입니다.",
+    ifDenied: "사진을 볼 수 없어서 일기는 사진 없이 써요.",
   },
   {
     key: "location",
@@ -82,7 +82,7 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     neededBy: "장소명(017) — 좌표를 지명으로 옮긴다 (안드로이드·iOS 모두 권한 필요, T030 실측)",
     platforms: ["android", "ios"],
     rationale: "그날 머문 곳을 지명으로 적기 위해 위치를 씁니다.",
-    ifDenied: "지명을 옮기지 못해, 장소는 좌표 없이 비워 둡니다.",
+    ifDenied: "지명을 옮기지 못해서 장소는 비워 둬요.",
   },
   {
     key: "notifications",
@@ -90,7 +90,7 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     neededBy: "완성 알림(020) — 자동으로 쓴 일기를 알린다",
     platforms: ["android", "ios"],
     rationale: "정한 시간대에 일기가 다 쓰이면 알려 드리기 위해 씁니다.",
-    ifDenied: "일기가 완성돼도 바로 알려 드리지 못합니다.",
+    ifDenied: "일기가 완성돼도 바로 알려 드리지 못해요.",
   },
   {
     key: "battery-exception",
@@ -101,6 +101,6 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     // 선언했던 것을 정정 — 검증 환경 제약이 아니라 iOS 자체에 대응 API가 없다.
     platforms: ["android"],
     rationale: "기기가 절전에 들어가도 정한 시간대에 일기를 쓰도록 허용을 요청합니다.",
-    ifDenied: "자동 생성이 정한 시간보다 많이 늦어질 수 있습니다.",
+    ifDenied: "자동으로 쓰는 시간이 정한 때보다 많이 늦어질 수 있어요.",
   },
 ] as const;

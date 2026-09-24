@@ -20,7 +20,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { selectableDays, type DayDate } from "../config/day-boundary";
+import {
+  dayOf,
+  isDayWritable,
+  selectableDays,
+  stripDays,
+  writableAt,
+  type DayDate,
+} from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
 import type { DiaryEntry } from "../diary/types";
@@ -137,13 +144,60 @@ export type WritePrompt = {
    * ─────────────────────────────────────────────────────────────────────────
    */
   revertedFrom?: DayDate;
+  /**
+   * 고른 하루를 **지금 쓸 수 있는가** (048, contracts/write-prompt.md WP).
+   *
+   * 048 이전에는 고를 수 있는 하루가 곧 쓸 수 있는 하루였다. 048은 아직 쓸 수 없는 오늘을
+   * **볼 수 있게** 고를 수 있는 목록에 넣으므로, 「고를 수 있다」와 「쓸 수 있다」가 갈린다.
+   * 거짓이면 화면은 쓰기 버튼을 그리지 않는다 — 쓰기의 마지막 방어는 여전히 파이프라인의
+   * `isDayWritable` 게이트(012)다.
+   */
+  writable: boolean;
+  /**
+   * 쓸 수 없을 때만 — 쓸 수 있게 되는 시각 (048, `day-boundary.writableAt()`의 값).
+   *
+   * **`writable === false`일 때만 존재한다**(I3). 04와 12를 화면이 모르게 하는 대신 이 값을
+   * 싣는다 — 화면은 이것을 사람의 말로 옮기고 전환 타이머도 같은 값으로 건다.
+   */
+  writableAt?: Date;
+};
+
+/**
+ * 화면이 받는 개수 요약 (048, data-model.md §2).
+ *
+ * **`SignalValue`의 세 갈래를 그대로 옮긴다**(원칙 V) — 없음과 모름을 0으로 뭉개지 않는다.
+ * `PhotoHint`와 모양은 같지만 뜻이 다르다: `PhotoHint`는 **그 일기가 본 것**, 이것은
+ * **지금 쓰면 볼 것**이다. 하나로 합치지 않는다.
+ */
+export type CountHint = { kind: "known"; count: number } | { kind: "none" } | { kind: "unknown" };
+
+/**
+ * 신호 줄 — 화면이 받는 하루 신호의 전부 (048).
+ *
+ * **화면은 `DaySignals`를 모른다**(009 이후 경계). 신호 원형을 이 모양으로 좁히는 것은
+ * `app/day-preview.ts`이고, 이 파일은 신호 계층을 import하지 않는다(DP8).
+ * `day`를 싣는 이유: 늦게 도착한 이전 날의 결과를 화면이 대조해 버린다(FR-019).
+ */
+export type DayPreview = { day: DayDate; photos: CountHint; places: CountHint };
+
+/**
+ * 스트립 칸 하나 (048).
+ *
+ * `hasDiary`는 7칸 전부의 **읽기 전용** 정보이고, 누를 수 있는지는 `selectable`이 따로 말한다 —
+ * 흐린 칸에 쓴 일기가 있어도 스트립에서 그것을 열지 않는다(읽기는 목록이 맡는다).
+ */
+export type StripCell = {
+  day: DayDate;
+  hasDiary: boolean;
+  selectable: boolean;
+  selected: boolean;
 };
 
 /**
  * 고를 수 있는 하루 하나 (009 FR-001·011, data-model.md §1).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **필드가 둘뿐인 것이 FR-011a의 방어다.**
+ * **필드가 셋뿐인 것이 FR-011a의 방어다**(048이 `writable`을 더했다 — 사진 갈래는 여전히 없다).
  *
  * 사진 갈래(`PhotoHint`)를 넣지 않는다 — **아직 쓰지 않은 하루의 그 값은 지금 알 수
  * 없다.** 신호를 수집해야 나오고, 수집하려면 고르는 화면이 세 하루를 미리 훑어야
@@ -158,6 +212,11 @@ export type SelectableDay = {
   day: DayDate;
   /** 그 하루에 일기가 이미 있는가 — 고르면 덮어쓴다(FR-011) */
   hasDiary: boolean;
+  /**
+   * 지금 쓸 수 있는가 (048). 009의 셋은 참이고, 아직 쓸 수 없는 오늘만 거짓이다.
+   * 판정은 `isDayWritable()` 하나에서 온다(012) — 이 값은 그것을 옮길 뿐이다.
+   */
+  writable: boolean;
 };
 
 /**
@@ -177,10 +236,24 @@ export function writePromptFor(
 
   // **추가 읽기가 0이다**(FR-011b). 「그 하루에 일기가 있는가」는 이미 읽은 목록에서
   // 나온다 — 읽을 수 없는 일기도 그 하루를 차지한다(원칙 V, 007에서 세운 규칙).
+  const hasDiary = (day: DayDate) => items.some((item) => item.day === day);
   const selectable: SelectableDay[] = days.map((day) => ({
     day,
-    hasDiary: items.some((item) => item.day === day),
+    hasDiary: hasDiary(day),
+    writable: true,
   }));
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // **048 — 아직 쓸 수 없는 오늘을 맨 앞에 붙인다**(설계 D6, Clarification Q1).
+  //
+  // 정오 이후면 오늘은 이미 `days[0]`이므로 붙지 않는다. 00:00~12:00에는 오늘이 쓸 수 없어
+  // `writable: false`로 붙는다 — **볼 수는 있지만 쓸 수는 없다.** 판정은 `isDayWritable()`
+  // 하나뿐이고(012), 기본 선택은 여전히 `days[0]`(쓸 수 있는 첫 날, D9)이다.
+  // ───────────────────────────────────────────────────────────────────────────
+  const today = dayOf(now);
+  if (!isDayWritable(today, now)) {
+    selectable.unshift({ day: today, hasDiary: hasDiary(today), writable: false });
+  }
 
   // ───────────────────────────────────────────────────────────────────────────
   // **★ 매번 다시 묻는다**(FR-009a). 되돌림을 상태로 저장했다가 지우지 않는다 —
@@ -189,20 +262,61 @@ export function writePromptFor(
   //
   // **저장할 것이 없으면 지울 것도 없다.**
   // ───────────────────────────────────────────────────────────────────────────
-  const chosenIsValid = chosenDay != null && days.includes(chosenDay);
+  const chosenIsValid = chosenDay != null && selectable.some((entry) => entry.day === chosenDay);
   const day = chosenIsValid ? chosenDay : days[0];
 
   // **고른 것이 마침 기본값과 같으면 붙지 않는다**(계약 §2 9번 행). 007의
   // `movedFrom`이 같은 함정을 가졌다 — 바뀌지 않았는데 「바뀌었다」고 알리는 것.
   const reverted = chosenDay != null && !chosenIsValid;
 
+  const chosen = selectable.find((entry) => entry.day === day);
+  const writable = chosen?.writable ?? true;
+  const opensAt = writable ? null : writableAt(day, now);
+
   return {
     day,
     // **덮어쓰기는 「고른 하루」를 따른다**(I5). 다른 하루에 일기가 있는 것은 무관하다.
-    overwrites: selectable.find((entry) => entry.day === day)?.hasDiary ?? false,
+    overwrites: chosen?.hasDiary ?? false,
     selectable,
     ...(reverted ? { revertedFrom: chosenDay } : {}),
+    writable,
+    // I3 — 쓸 수 없을 때만 싣는다.
+    ...(opensAt !== null ? { writableAt: opensAt } : {}),
   };
+}
+
+/**
+ * 홈 스트립의 7칸 (048, contracts/write-prompt.md SC).
+ *
+ * **날짜 계산은 `stripDays()`가 한다** — 04:00이 이 파일로 새지 않는다. 여기서는 목록과
+ * 쓰기 예고를 칸에 얹을 뿐이다. 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
+ */
+export function stripCellsFor(
+  items: readonly DiaryListItem[],
+  prompt: WritePrompt,
+  now: Date,
+): StripCell[] {
+  return stripDays(now).map((day) => ({
+    day,
+    hasDiary: items.some((item) => item.day === day),
+    selectable: prompt.selectable.some((entry) => entry.day === day),
+    selected: prompt.day === day,
+  }));
+}
+
+/**
+ * 날짜 조각 (048). 표기 조립은 `ui/home-text.ts`가 한다 — 여기는 숫자만 준다.
+ *
+ * `YYYY-MM-DD`를 기기 시간대의 달력 날짜로 읽는다. `weekday`는 0이 일요일이다.
+ */
+export function dayParts(day: DayDate): {
+  year: number;
+  month: number;
+  date: number;
+  weekday: number;
+} {
+  const [year, month, date] = day.split("-").map(Number);
+  return { year, month, date, weekday: new Date(year, month - 1, date).getDay() };
 }
 
 /**

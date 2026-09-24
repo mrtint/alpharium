@@ -1425,6 +1425,79 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
 - 상세: `specs/047-welcome-naming-1a/`.
 
 
+### 048 — 일기 홈 1d와 화면 이동 구조 (2026-09-24)
+
+로드맵 31번. 보드 `1d`(Day-first)를 채택했다(`1e`는 미채택). `1d`는 하단에 쓰기 바가 고정되는
+구조라 맨 위 탭 줄과 공존할 수 없어 **화면 이동 구조를 함께 바꿨다** — 설계 합의:
+`docs/superpowers/specs/2026-09-24-diary-home-modernist-design.md`(D1~D9).
+
+- **탭 줄이 없다.** `App.tsx`의 `tab`이 `route: "home" | "settings" | "developer"`가 됐고, 설정·
+  개발자는 하단 바 `⋯` 메뉴(`HomeMenu`, RN 코어 `Modal`)로 들어가는 하위 화면이다. 돌아오는 길은
+  `SubScreenFrame`의 「← 일기」(`back-to-home`)와 뒤로 가기 — **뒤로 가기는 그 프레임이 마운트된
+  동안만 가로챈다**(홈에서는 OS가 처리). 개발자 항목은 `showsDiagnostics`일 때만 배열에 있다.
+- **Maestro에서 「설정」·「개발자」 탭을 누르던 흐름은 전부 `home-menu-button` →
+  `home-menu-settings`/`home-menu-developer`로, 「일기」 탭 복귀는 `back-to-home`으로 바뀌었다.**
+  새 흐름을 쓸 때 탭 글자를 누르지 않는다.
+- **「고를 수 있다」와 「쓸 수 있다」가 갈렸다.** `SelectableDay.writable`·`WritePrompt.writable`·
+  `writableAt`. 아직 쓸 수 없는 오늘은 `writable: false`로 `selectable` 맨 앞에 붙는다 — 009의
+  「정오 전 selectable은 셋, 오늘 없음」 테스트들을 이 동작으로 고쳤다. 기본 선택은 여전히
+  쓸 수 있는 첫 날(D9).
+- **★ 쓸 수 없는 오늘은 하루에 두 구간이다**(Clarification Q1). 04:00~12:00(정오에 쓸 수 있게
+  됨)만이 아니라 **00:00~04:00도** 그렇다 — `isDayWritable`이 `now.getHours() >= 12`를 보므로
+  자정을 넘기면 오늘(달력상 전날)이 다시 못 쓰게 되고 04:00에 닫혀 풀린다. 설계 문서는 이
+  구간을 놓쳤고, 그대로 만들었으면 새벽에 「오후 12시부터」라는 틀린 말을 했다. 그래서
+  `day-boundary.ts`의 `writableAt(day, now)`가 **다음 전환 시각(`Date`)**을 주고 화면은 그것을
+  「오전 4시」·「오후 12시」로 옮길 뿐이다 — 04·12는 여전히 이 파일 밖으로 안 나간다
+  (`home-text.test.ts` G10이 홈 화면 소스의 「숫자+시」·「정오」를 막는다).
+- **쓸 수 없는 날의 쓰기는 세 겹으로 막는다** — 화면이 버튼을 안 그림(B4·B5) / `DiaryHomeScreen.
+  write()`가 `writable`을 보고 멈춤(B6, `DiaryListScreen`을 `jest.mock` 대역으로 바꿔 `onWrite`를
+  직접 호출해 검증) / 파이프라인의 `isDayWritable` 게이트(012). 018 미리 준비도 쓸 수 없는 날엔
+  안 돈다.
+- **전환 타이머**: 쓸 수 없는 오늘을 보는 동안만 `writableAt + 1초`에 한 번 울려 다시 판정한다
+  (`AppState active`에서도). 012가 「실기기 미확인」으로 남긴 정오 전환을 가짜 타이머로 잠갔다.
+- **신호 줄**: `wiring.previewDay(day)` → `DayPreview`(사진 전체 장수·자리 수, 「없음」/「모름」
+  구분). 파이프라인과 **같은 `loadSignals` 하나**를 나눠 쓴다(PV4가 소스로 잠근다). 좁히는
+  함수는 `app/day-preview.ts`에 따로 있다 — `state.ts`가 신호 타입을 import하면 화면이 그걸
+  거쳐 신호에 닿는다(DP8). 「읽는 중」은 상태로 저장하지 않고 렌더에서 가른다 —
+  `react-hooks/set-state-in-effect`가 effect 안의 동기 `setState`를 오류로 막는다.
+- **고른 날은 `AppFrame`이 들고 있다**(Q4) — 설정 왕복·040 재마운트에도 남고 파일엔 안 남는다.
+- **하단 바의 「n일」은 쓰기 버튼의 형제다** — 보드는 한 버튼처럼 그렸지만 그 안에 두면 날짜를
+  눌러 쓰기가 시작돼 「누를 수 없는 글자」(D7)와 어긋난다(`/speckit-analyze` 2회차가 잡음).
+- **RNTL 14에는 `UNSAFE_root`가 없다** — 「모든 누를 수 있는 것을 눌러 본다」는
+  `screen.queryAllByRole("button")`로, Modal의 `onRequestClose`는 안쪽 노드에서
+  `fireEvent(node, "requestClose")`(핸들러를 찾아 부모로 올라간다)로 쏜다. jest-expo의
+  `AppState.addEventListener` 스파이를 `mockRestore()`하면 이후 테스트의 구독 반환값이
+  `undefined`가 된다 — 복원하지 않는다(diary-home.test와 같다).
+- `requirements.ts`의 `ifDenied` 넷을 해요체로 바꿨다(홈 캡션·온보딩·설정 권한 섹션이 같은 값을 본다).
+- 기기 없는 테스트 162 스위트 / 2874개 통과, lint·헌법 검사·prettier 클린, 위반 주입 9종 전부 잡힘
+  (`specs/048-diary-home-modernist/quickstart.md` §6).
+- **실기기 검증 완료**(2026-09-24, SM-S901N, dev). D1~D13 전부 관측 — 새벽 01:06에 「오전 4시부터」,
+  07:53에 「오후 12시부터」(쓰기 버튼 없음), 04:00이 지나자 스트립이 하루 밀림, 신호 칸 「12」·「없음」·
+  「모름」(권한은 Maestro `launchApp`이 다시 주므로 `permissions: {all: deny}`로 확인), 메뉴·설정·개발자·
+  뒤로 가기·고른 날 유지, 쓰기·덮어쓰기 확인·새 카드, 카드 「사진 없음」/「사진 모름」.
+  **D7(정오 순간의 조작 없는 전환)은 그 시각에 기기 앞에 있지 않아 못 봤다** — 가짜 시계 테스트가 덮는다.
+  실기기에서 고친 것 둘: `⋯` 메뉴 목록이 하단 바 윗선을 덮음(앵커 여백), 신호 칸 「오후 12시부터」가
+  두 줄로 꺾임(`adjustsFontSizeToFit`).
+- **★ 재실행할 때마다 다운로드 완료 화면·정상 동작 확인이 다시 떴다 — 045·040의 결함, 048에서 고쳤다.**
+  둘 다 세션 로컬 state(`downloadProceedConfirmed`·`livenessOutcome`)만 봐서, 모델이 있고 작명까지 끝낸
+  사용자도 앱을 켤 때마다 「준비됐어요 / 시작할게요」→ 모델 적재 확인을 지나야 홈에 닿았다. 이제 완료
+  화면은 **이번 세션에 에셋이 없는 것을 본 적이 있을 때만**(`essentialsMissingSeen`), 확인은 **이번
+  세션에 작명을 거쳤을 때만**(`livenessPassed`) 돈다. 파일에 새로 저장하는 것은 없다. 재실행 → 홈 직행은
+  실기기로 봤고, **새로 내려받은 직후 완료 화면이 한 번 뜨는 것은 재다운로드가 필요해 소스 계약으로만
+  잠갔다**(`onboarding-complete-gate.test.tsx`).
+- **Maestro 흐름을 `maestro test` 한 번에 넘긴다**(`run-device-tests.mjs`). 흐름마다 따로 부르면 JVM 기동 +
+  드라이버 연결로 **흐름당 약 35초씩 기기가 멈춰 있었다**(명령 실행은 흐름당 약 40초). 한 번에 넘기면
+  기동이 한 번이고 실패해도 다음 흐름으로 간다. 인자로 흐름 파일을 주면 그것만 돈다. 중간에 끊은
+  Maestro 뒤에 곧바로 다시 돌리면 `DeviceServerDiedException`으로 전부 실패할 수 있다 — 한 번 더 돌리면 된다.
+- **Maestro 회귀**: 12흐름 중 11 PASS. `welcome-naming`은 `author-rename-input-0`에서 실패 — 035의 좌표
+  결함(위 「실측 규칙」)과 같은 자리라 048 회귀가 아니다. 흐름 셋(`skeleton`·`prompt-preview`·
+  `scheduled-diary-notification`)이 「개발자」·「설정」 **탭 글자가 보이면** 메뉴로 가도록 적혀 있어 조건이
+  영영 거짓이었다 — `id: home-menu-button`으로 고쳤다. `diary-user-path`는 고른 날에 일기가 이미 있으면
+  덮어쓰기 확인에 멈췄다(기기 상태 의존) — 확인이 뜨면 취소한다.
+- 1회 관측·재현 안 됨: 첫 생성 뒤 상세 대신 홈이 보였다(두 번째 생성은 상세에 머묾). 당시 재실행마다 돌던
+  정상 동작 확인(위)과 겹쳤을 수 있다.
+- 상세: `specs/048-diary-home-modernist/`.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

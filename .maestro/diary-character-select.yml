@@ -34,7 +34,10 @@ appId: com.anonymous.alpharium
 - assertNotVisible: "누가 쓸까요"
 
 # ── 설정 탭으로 간다 ───────────────────────────────────────────────────
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 
 # ★ 029 FR-023 — **설정 탭에 "일기 작성자" 섹션이 있다.**
 - scrollUntilVisible:
@@ -106,7 +109,9 @@ appId: com.anonymous.alpharium
 # 설정 탭을 벗어나도 크래시가 없다.
 # ⚠️ 029 이후 홈 레이아웃이 커져 "일기 쓰기"가 처음부터 화면에 없다 — 스크롤로
 #    찾는다(AGENTS.md 025 "행 높이가 바뀌면 assertVisible이 깨진다").
-- tapOn: "일기"
+# 048 — 탭 줄이 없다. 설정에서 「← 일기」로 홈에 돌아온다.
+- tapOn:
+    id: "back-to-home"
 - scrollUntilVisible:
     element: "일기 쓰기"
     direction: DOWN

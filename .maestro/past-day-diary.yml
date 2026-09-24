@@ -39,30 +39,22 @@ appId: com.anonymous.alpharium
 
 # ★ M1 / FR-001 — **고르는 자리가 있다.**
 #
-# **먼저 내려야 보인다**(007 실측). 캐릭터 다섯만으로도 쓰기 자리가 첫 화면 아래로
-# 밀렸고 **하루 셋이 더해져 더 밀린다** — 계층에는 있지만 Maestro가 보지 못한다.
-- scrollUntilVisible:
-    element:
-      text: "언제를 쓸까"
-    direction: DOWN
-    timeout: 20000
+# 048 — 고르는 자리가 홈 위쪽의 7칸 스트립(`day-strip`)이 됐다. 첫 화면에 바로 보인다.
+- assertVisible:
+    id: "day-strip"
 
 # ★ FR-007·008 — **하나가 골라져 있고 무엇을 쓰게 되는지 보인다.**
 #
 # **부분 문자열은 정규식으로 준다**(007 실측). Maestro의 기본 매칭이 텍스트 노드
 # 전체와 맞춰 보므로 「2026-08-20를 쓴다」를 부분으로 찾으면 실패한다.
 #
-# ⚠️ **017 — "N를 쓴다"까지 다시 스크롤한다.** 017이 사진 설정·장소명
-# 토글을 더해 화면이 길어지면서, "언제를 쓸까" 타이틀까지만 스크롤하면
-# 아래의 "N를 쓴다" 문구가 아직 화면 밖에 있다(2026-08-24 실측).
-- scrollUntilVisible:
-    element:
-      text: ".*를 쓴다"
-    direction: DOWN
-    timeout: 20000
+# 048 — 「N를 쓴다」가 하단 고정 바의 「n일」(`write-day-label`)이 됐고, 골라진 칸은
+# 스트립에서 selected 상태로 표시된다(「선택」 글자는 없다).
 - assertVisible:
-    text: ".*를 쓴다"
-- assertVisible: "선택"
+    id: "write-day-label"
+- assertVisible:
+    id: "day-.*"
+    selected: true
 
 # ★ FR-020 — 고르는 자리가 늘어도 모델 정보가 없다(원칙 III).
 - assertNotVisible: "kanana"
@@ -150,15 +142,13 @@ appId: com.anonymous.alpharium
     commands:
       - tapOn: "← 목록"
 
-# 탭으로도 돌아갈 수 있다 — 위 둘 다 아니었을 때의 마지막 통로다.
+# 뒤로 가기로도 돌아갈 수 있다 — 위 둘 다 아니었을 때의 마지막 통로다(048 — 탭 줄이 없다).
 - runFlow:
     when:
-      notVisible: "언제를 쓸까"
+      notVisible:
+        id: "day-strip"
     commands:
-      - tapOn: "일기"
+      - back
 
-- scrollUntilVisible:
-    element:
-      text: "언제를 쓸까"
-    direction: DOWN
-    timeout: 20000
+- assertVisible:
+    id: "day-strip"

@@ -32,9 +32,13 @@ appId: com.anonymous.alpharium
 # 아니라 설정 탭에 있다(020 App.tsx `AutoDiarySection`이 `settings` 갈래에서 그려짐).
 - runFlow:
     when:
-      visible: "설정"
+      visible:
+        id: "home-menu-button"
     commands:
-      - tapOn: "설정"
+      - tapOn:
+          id: "home-menu-button"
+      - tapOn:
+          id: "home-menu-settings"
 
 # ★ M1 — **자동 생성 설정 화면이 있고, 목표 시각·토글이 보인다.**
 - scrollUntilVisible:

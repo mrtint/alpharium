@@ -66,6 +66,15 @@ appId: com.anonymous.alpharium
 # 무엇을 할 수 있는지 말해 주는가**이다.
 - tapOn: "일기 쓰기"
 
+# 012 — 고른 하루에 이미 일기가 있으면 덮어쓰기 확인(OverwriteConfirmScreen)이 먼저 뜬다.
+# 이 흐름은 생성 결과가 아니라 「무너지지 않는가」를 보므로 취소하고 홈으로 돌아온다
+# (048 실기기 — 이미 쓴 날이 기본 선택이면 확인 화면에 멈춰 아래 메뉴 버튼을 못 찾았다).
+- runFlow:
+    when:
+      visible: ".*덮어쓸지 확인.*"
+    commands:
+      - tapOn: "취소"
+
 # ★ FR-021·S6 — 「쓰고 있다」에 진행률·시간·생성 중인 글이 없다.
 #
 # 누른 직후에 본다. 모델이 없으면 즉시 끝나므로 이 검사는 어느 쪽이든 참이어야 한다.
@@ -91,5 +100,8 @@ appId: com.anonymous.alpharium
 # ⚠️ **2026-09-02 갱신(029)** — "캐릭터" 탭이 사라지고 설정 탭 "일기 작성자"
 # 섹션으로 흡수됐다(Q1=A). 003의 준비 화면(미준비 캐릭터 다운로드)은 설정 탭
 # 아래쪽에 그대로 이어져 있다(FR-028 정신 유지).
-- tapOn: "설정"
+- tapOn:
+    id: "home-menu-button"
+- tapOn:
+    id: "home-menu-settings"
 - assertVisible: "일기 작성자"

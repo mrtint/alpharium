@@ -1,83 +1,99 @@
 /**
- * DayPicker 화면 테스트 — 012 정오 이전 안내.
+ * DayPicker — 홈의 7칸 스트립 (048, 보드 `1d`).
  *
- * 계약: specs/012-today-diary/contracts/day-boundary.md §4 「화면 안내」
+ * 계약: specs/048-diary-home-modernist/contracts/home-screen.md S1~S6
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **헌법 원칙 II "하루의 끝" MUST 조항의 화면 절반이다**: "아직 쓸 수 없는 하루는
- * 왜 아직인지와 언제부터 쓸 수 있는지를 함께 알린다." `/speckit-analyze`가 잡은
- * 태스크 커버리지 갭(C1)을 해소하는 자리다.
+ * **009·012의 세로 목록이 7칸 가로 스트립으로 바뀌었다.** 판정은 여전히 여기 없다 —
+ * 어느 칸을 누를 수 있는지·어느 칸이 골라졌는지는 `stripCellsFor()`가 정해서 넘긴다.
+ * 012가 여기 두었던 정오 이전 안내는 하단 바(「오늘 일기는 … 쓸 수 있어요」)로 옮겨 갔다.
+ *
+ * ⚠️ RNTL 14의 `render`·`fireEvent`는 Promise를 반환한다 — `await`한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { render, screen } from "@testing-library/react-native";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
+import { fireEvent, render, screen } from "@testing-library/react-native";
+
+import type { StripCell } from "../../src/app/state";
 import { DayPicker } from "../../src/ui/DayPicker";
-import type { SelectableDay } from "../../src/app/state";
+import { COLORS } from "../../src/ui/theme/tokens";
 
-const days: readonly SelectableDay[] = [
-  { day: "2026-08-20", hasDiary: false },
-  { day: "2026-08-19", hasDiary: false },
-  { day: "2026-08-18", hasDiary: false },
+jest.setTimeout(30000);
+
+/** 2026-09-24(목) 10:00 기준 — 누를 수 있는 칸은 21~24(24는 아직 쓸 수 없는 오늘) */
+const cells: readonly StripCell[] = [
+  { day: "2026-09-18", hasDiary: false, selectable: false, selected: false },
+  { day: "2026-09-19", hasDiary: true, selectable: false, selected: false },
+  { day: "2026-09-20", hasDiary: false, selectable: false, selected: false },
+  { day: "2026-09-21", hasDiary: false, selectable: true, selected: false },
+  { day: "2026-09-22", hasDiary: false, selectable: true, selected: false },
+  { day: "2026-09-23", hasDiary: true, selectable: true, selected: true },
+  { day: "2026-09-24", hasDiary: false, selectable: true, selected: false },
 ];
 
-const noop = () => {};
+const flatStyle = (style: unknown): Record<string, unknown> =>
+  Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
 
-describe("012 §4 — 정오 이전 안내 (검증 표)", () => {
-  it("1. todayNotYetWritable: true → 안내가 보이고 '몇 시부터' 정보를 포함한다 (FR-002)", async () => {
-    await render(
-      <DayPicker days={days} onSelect={noop} selected="2026-08-20" todayNotYetWritable />,
-    );
+describe("048 DayPicker — 7칸 스트립", () => {
+  it("S1 — 7칸이 날짜 testID와 요일·날짜 숫자를 갖는다", async () => {
+    await render(<DayPicker cells={cells} onSelect={() => {}} />);
 
-    // "몇 시부터"의 정확한 문구는 자유이나, 시각(예: "12시" 또는 "정오")을 포함해야 한다.
-    const notice = screen.getByText(/정오|12시/);
-    expect(notice).toBeTruthy();
+    expect(screen.getByTestId("day-strip")).toBeTruthy();
+    for (const cell of cells) expect(screen.getByTestId(`day-${cell.day}`)).toBeTruthy();
+    // 2026-09-24는 목요일, 18일은 금요일
+    expect(screen.getByTestId("day-2026-09-24")).toHaveTextContent(/목\s*24/);
+    expect(screen.getByTestId("day-2026-09-18")).toHaveTextContent(/금\s*18/);
   });
 
-  it("2. todayNotYetWritable: undefined → 안내가 안 보이고 오늘이 selectable에 있다", async () => {
-    await render(
-      <DayPicker
-        days={[{ day: "2026-08-21", hasDiary: false }, ...days.slice(0, 2)]}
-        onSelect={noop}
-        selected="2026-08-21"
-      />,
-    );
+  it("S2 — 누를 수 있는 칸을 누르면 그 날이 전달된다", async () => {
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={cells} onSelect={onSelect} />);
 
-    expect(screen.queryByText(/정오|12시/)).toBeNull();
-    expect(screen.getByTestId("day-2026-08-21")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("day-2026-09-24"));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+    expect(onSelect).toHaveBeenCalledWith("2026-09-24");
   });
 
-  it("2b. todayNotYetWritable: false → 안내가 안 보인다", async () => {
-    await render(
-      <DayPicker days={days} onSelect={noop} selected="2026-08-20" todayNotYetWritable={false} />,
-    );
+  it("★ S3 — 흐린 칸은 눌러도 아무 일도 없다 (쓴 일기가 있어도)", async () => {
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={cells} onSelect={onSelect} />);
 
-    expect(screen.queryByText(/정오|12시/)).toBeNull();
-  });
-});
-
-describe("012 §4 — 불변식", () => {
-  it("A1 — 안내가 보이는 시각에는 오늘이 selectable에 없다는 것을 데이터로 확인", async () => {
-    // days 자체가 오늘을 포함하지 않는 것이 §2 D3의 보장이다. 여기서는 화면이
-    // 그 모순 없는 데이터를 받았을 때 안내를 정확히 그리는지만 본다.
-    await render(
-      <DayPicker days={days} onSelect={noop} selected="2026-08-20" todayNotYetWritable />,
-    );
-
-    for (const d of days) {
-      expect(screen.getByTestId(`day-${d.day}`)).toBeTruthy();
-    }
+    await fireEvent.press(screen.getByTestId("day-2026-09-19"));
+    await fireEvent.press(screen.getByTestId("day-2026-09-18"));
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByTestId("day-2026-09-19").props.accessibilityState).toMatchObject({
+      disabled: true,
+    });
   });
 
-  it("안내 문구에 '왜'와 '언제부터'가 함께 있다 — '아직 못 쓴다'만 말하고 멈추지 않는다", async () => {
-    await render(
-      <DayPicker days={days} onSelect={noop} selected="2026-08-20" todayNotYetWritable />,
-    );
+  it("S4 — 일기가 있는 날에는 점이 있다 (흐린 칸 포함)", async () => {
+    await render(<DayPicker cells={cells} onSelect={() => {}} />);
 
-    // "왜"(아직 끝나지 않았다 등)와 "언제부터"(정오/12시) 정보가 한 문구에 함께 있다.
-    const notice = screen.getByText(/정오|12시/);
-    expect(notice.props.children).toEqual(
-      expect.stringMatching(/(아직|안|못).*(정오|12시)|(정오|12시).*(아직|안|못)|부터/),
-    );
+    expect(screen.getByTestId("day-dot-2026-09-19")).toBeTruthy();
+    expect(screen.getByTestId("day-dot-2026-09-23")).toBeTruthy();
+    expect(screen.queryByTestId("day-dot-2026-09-24")).toBeNull();
+  });
+
+  it("S5 — 고른 칸은 selected이고 강조색 배경이다", async () => {
+    await render(<DayPicker cells={cells} onSelect={() => {}} />);
+
+    const chosen = screen.getByTestId("day-2026-09-23");
+    expect(chosen.props.accessibilityState).toMatchObject({ selected: true });
+    expect(flatStyle(chosen.props.style).backgroundColor).toBe(COLORS.accent);
+    expect(screen.getByTestId("day-2026-09-22").props.accessibilityState).toMatchObject({
+      selected: false,
+    });
+  });
+
+  it("★ S6 — 스트립은 판정하지 않는다 (지금 시각을 스스로 읽지 않는다)", () => {
+    const code = readFileSync(join(__dirname, "../../src/ui/DayPicker.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toContain("new Date(");
+    expect(code).not.toMatch(/\bnow\s*\(/);
+    expect(code).not.toContain("isDayWritable");
   });
 });
