@@ -1648,7 +1648,7 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   마크업의 `flex`·`position:absolute`·`transform`까지 읽는다 — 메모 글만 읽으면 배치를 놓친다.
 - **`⋯` 메뉴(048 `HomeMenu`)를 없앴다**(저장소 소유자 지시, 설정 화면 구성 과제에서 진입점을 다시 둔다). 지금 설정은
   「캐릭터를 먼저 준비해야 한다」 링크로만 닿고 **개발자 탭은 닿을 길이 없다.** 메뉴로 설정·개발자에 들어가던 Maestro 흐름
-  열한 개는 알려진 실패다(`run-device-tests.mjs` 주석). `src/ui/rnr/dropdown-menu.tsx`와 `@rn-primitives/dropdown-menu`는
+  열한 개는 실행기 `FLOWS`에서 뺐다 — 설정 화면 구성과 함께 전면 재개편한다(저장소 소유자 결정, 파일은 남아 있다). `src/ui/rnr/dropdown-menu.tsx`와 `@rn-primitives/dropdown-menu`는
   쓰는 곳이 없어졌지만 남겨 두었다. 048 절의 메뉴·「n일」 조각 서술은 이력이다.
 - **숨긴 바는 루트에서 잘라야 한다** — `translateY`로 내린 바가 edge-to-edge 아래 내비게이션 바 뒤로 비쳤다(실기기). 쓴 날 루트에
   `overflow: "hidden"`. 숨긴 동안은 `pointerEvents="none"` + 접근성 트리에서 빼므로 jest(RNTL 기본 숨김 제외)와 Maestro 모두
