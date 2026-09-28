@@ -43,19 +43,16 @@ const inFolder = (
 /**
  * 시각이 하루에 고르게 흩어진 카메라 사진 n장. **id가 서로 다르다.**
  *
- * ⚠️ 하루 경계는 04:00이다 — `collect.ts`가 주는 하루는 `[D 04:00, D+1 04:00)`
- * 구간이다. 그래서 04:00부터 다음날 03:59까지(24시간)에 걸쳐 편다. 04:00 이전
- * 시각을 같은 달력일에 두면 `bucketIndexOf`가 그것을 하루의 끝 칸으로 보므로
- * (정상), 시각 순 정렬이 뒤집힌다.
+ * 049 — 하루 경계는 기기 로컬 자정이다 — `collect.ts`가 주는 하루는 `[D 00:00, D+1 00:00)`
+ * 구간이다. 그래서 같은 달력일 00:00부터 23:59까지(24시간)에 걸쳐 편다.
  *
  * ⚠️ `i % 60`으로 분을 만들면 24장을 넘길 때 같은 시각이 나올 수 있으나 id는
  * 항상 다르다.
  */
 const spread = (n: number): Photo[] =>
   Array.from({ length: n }, (_, i) => {
-    // 04:00 기준 0..(24h) 사이를 고르게. minutesSince4am = i*1439/(n-1).
-    const minutesSince4am = Math.floor((i * 1439) / Math.max(1, n - 1));
-    const totalMin = 4 * 60 + minutesSince4am;
+    // 자정 기준 0..(24h) 사이를 고르게. totalMin = i*1439/(n-1).
+    const totalMin = Math.floor((i * 1439) / Math.max(1, n - 1));
     return {
       id: `p${i}`,
       takenAt: new Date(2026, 7, 20, Math.floor(totalMin / 60), totalMin % 60, 0),
@@ -104,12 +101,11 @@ describe("US1. 잡사진 필터링 (contracts/classification.md)", () => {
     expect(idsOf(got).sort()).toEqual(["c1", "c2", "c3", "c4", "c5", "c6"]);
   });
 
-  // 하루(04:00~다음날 04:00)에 고르게 흩뿌린 n장 — folderName만 바꿔 쓴다.
-  // spread()와 같은 04:00 기준 분포지만 folderName을 인자로 받는다.
+  // 하루(00:00~24:00)에 고르게 흩뿌린 n장 — folderName만 바꿔 쓴다.
+  // spread()와 같은 자정 기준 분포지만 folderName을 인자로 받는다.
   const spreadIn = (folderName: string | undefined, n: number): Photo[] =>
     Array.from({ length: n }, (_, i) => {
-      const minutesSince4am = Math.floor((i * 1439) / Math.max(1, n - 1));
-      const totalMin = 4 * 60 + minutesSince4am;
+      const totalMin = Math.floor((i * 1439) / Math.max(1, n - 1));
       return {
         id: `${folderName ?? "u"}${i}`,
         takenAt: new Date(2026, 7, 20, Math.floor(totalMin / 60), totalMin % 60, 0),
@@ -181,16 +177,17 @@ describe("US2. 시간 분포 배분 (contracts/time-distribution.md)", () => {
     // nonEmpty >= budget)를 보려면 상한이 칸 수보다 커야 하므로, 대신 여기서는
     // **6칸 전부 채운 24장**으로 D3·D4 경로의 "양 끝 칸 포함"을 확인한다.
     // 6칸 각 4장, nonEmpty=6 < budget=8 → 최소 6 + remaining 2 비례 배분.
+    // 049 — 칸은 자정 기준(00-04, 04-08, …, 20-24).
     const photos = [
-      ...Array.from({ length: 4 }, (_, i) => at(5, i, `b0-${i}`)), // 04-08
-      ...Array.from({ length: 4 }, (_, i) => at(9, i, `b1-${i}`)), // 08-12
-      ...Array.from({ length: 4 }, (_, i) => at(13, i, `b2-${i}`)), // 12-16
-      ...Array.from({ length: 4 }, (_, i) => at(17, i, `b3-${i}`)), // 16-20
-      ...Array.from({ length: 4 }, (_, i) => at(21, i, `b4-${i}`)), // 20-24
-      { id: "b5-0", takenAt: new Date(2026, 7, 21, 1, 0, 0), folderName: "Camera" as const }, // 00-04
-      { id: "b5-1", takenAt: new Date(2026, 7, 21, 2, 0, 0), folderName: "Camera" as const },
-      { id: "b5-2", takenAt: new Date(2026, 7, 21, 3, 0, 0), folderName: "Camera" as const },
-      { id: "b5-3", takenAt: new Date(2026, 7, 21, 3, 30, 0), folderName: "Camera" as const },
+      ...Array.from({ length: 4 }, (_, i) => at(1, i, `b0-${i}`)), // 00-04
+      ...Array.from({ length: 4 }, (_, i) => at(5, i, `b1-${i}`)), // 04-08
+      ...Array.from({ length: 4 }, (_, i) => at(9, i, `b2-${i}`)), // 08-12
+      ...Array.from({ length: 4 }, (_, i) => at(13, i, `b3-${i}`)), // 12-16
+      ...Array.from({ length: 4 }, (_, i) => at(17, i, `b4-${i}`)), // 16-20
+      at(21, 0, "b5-0"), // 20-24
+      at(22, 0, "b5-1"),
+      at(23, 0, "b5-2"),
+      at(23, 30, "b5-3"),
     ];
     const got = selectForVision(photos);
 
@@ -243,28 +240,43 @@ describe("US2. 시간 분포 배분 (contracts/time-distribution.md)", () => {
     expect(got.filter((p) => p.id.startsWith("D")).length).toBe(1);
   });
 
-  it("D1 — 시간 칸 경계가 04:00 기준이다 (BUCKET_COUNT=6, 4시간 간격)", () => {
-    // 03:59(다음날, 하루 끝 칸)와 04:00(첫 칸)이 서로 다른 칸이라, 양쪽이 모두
-    // 대표된다. 6장 ≤ 상한(8)이라 D2로 전부 반환되므로, 잡사진 필터가 도는
-    // 상한 초과(칸마다 여러 장)로 만들어 칸 경계 효과를 본다.
+  it("D1 — 시간 칸 경계가 자정 기준이다 (BUCKET_COUNT=6, 4시간 간격, 049)", () => {
+    // 6장 ≤ 상한(8)이면 D2로 전부 반환되므로 상한 초과로 만들어 칸 경계 효과를 본다.
     const boundary: Photo[] = [
-      { id: "start", takenAt: new Date(2026, 7, 20, 4, 0, 0), folderName: "Camera" },
-      { id: "start2", takenAt: new Date(2026, 7, 20, 5, 0, 0), folderName: "Camera" },
+      { id: "start", takenAt: new Date(2026, 7, 20, 0, 0, 0), folderName: "Camera" },
+      { id: "start2", takenAt: new Date(2026, 7, 20, 1, 0, 0), folderName: "Camera" },
       { id: "m1", takenAt: new Date(2026, 7, 20, 7, 59, 0), folderName: "Camera" },
       { id: "m2", takenAt: new Date(2026, 7, 20, 9, 0, 0), folderName: "Camera" },
       { id: "mid1", takenAt: new Date(2026, 7, 20, 12, 0, 0), folderName: "Camera" },
       { id: "mid2", takenAt: new Date(2026, 7, 20, 14, 0, 0), folderName: "Camera" },
       { id: "ev1", takenAt: new Date(2026, 7, 20, 17, 0, 0), folderName: "Camera" },
       { id: "ev2", takenAt: new Date(2026, 7, 20, 20, 0, 0), folderName: "Camera" },
-      { id: "lateA", takenAt: new Date(2026, 7, 21, 2, 0, 0), folderName: "Camera" },
-      { id: "lateB", takenAt: new Date(2026, 7, 21, 3, 59, 0), folderName: "Camera" },
+      { id: "lateA", takenAt: new Date(2026, 7, 20, 22, 0, 0), folderName: "Camera" },
+      { id: "lateB", takenAt: new Date(2026, 7, 20, 23, 59, 0), folderName: "Camera" },
     ];
     const got = selectForVision(boundary);
 
-    // 10장(상한 초과) → 첫 칸(04-08)의 가장 이른 start, 마지막 칸(00-04)의
+    // 10장(상한 초과) → 첫 칸(00-04)의 가장 이른 start, 마지막 칸(20-24)의
     // 가장 늦은 lateB가 포함된다(011 R3 보정).
     expect(got[0].id).toBe("start");
     expect(got[got.length - 1].id).toBe("lateB");
+  });
+
+  it("★ DB12 — 새벽(00~04) 칸이 하루의 첫 칸이다 (04:00 복제 제거, 049)", () => {
+    // 새벽 3장, 한낮 40장, 23:30 1장. 새벽 칸 배정은 1장(최대 잔여법이 한낮에 여분을 준다).
+    // 자정 기준이면 새벽 칸이 첫 칸이라 011 R3 보정으로 **가장 이른 00:30**이 뽑힌다.
+    // 옛 04:00 기준이면 새벽 칸이 마지막 칸이 되어 **가장 늦은 03:30**이 뽑힌다 — 그 차이를 본다.
+    const photos = [
+      at(0, 30, "early0"),
+      at(2, 0, "early1"),
+      at(3, 30, "early2"),
+      ...Array.from({ length: 40 }, (_, i) => at(12, i, `mid${i}`)),
+      at(23, 30, "late"),
+    ];
+    const got = selectForVision(photos);
+    expect(got[0].id).toBe("early0");
+    expect(idsOf(got)).not.toContain("early2");
+    expect(got[got.length - 1].id).toBe("late");
   });
 
   it("D7 — 고른 목록은 찍힌 시각 오름차순, 중복 없음", () => {

@@ -12,7 +12,12 @@ import { burst, composeDay } from "../../scripts/seed/shapes";
 
 const DAY = "2026-08-20";
 const { startMs, endMs } = dayBounds(DAY);
-const hoursInto = (h: number) => startMs + h * 3_600_000;
+/**
+ * 049 — 하루는 자정에 시작하지만 모양의 시각표는 새벽 4시를 원점으로 적혀 있다
+ * (`shapes.ts`의 `SHAPE_CLOCK_ORIGIN_HOUR`). 심는 사진의 실제 시각은 048까지와 같다.
+ */
+const ORIGIN_MS = startMs + 4 * 3_600_000;
+const hoursInto = (h: number) => ORIGIN_MS + h * 3_600_000;
 
 describe("burst — 한 구간을 사진들로 편다", () => {
   it("count장을 [fromHour, fromHour+spanHours]에 균등 분포", () => {
@@ -43,12 +48,12 @@ describe("burst — 한 구간을 사진들로 편다", () => {
     expect(burst(DAY, { fromHour: 4, spanHours: 2, count: 0, location: null })).toEqual([]);
   });
 
-  it("자정 넘김 clamp — 마지막 사진이 하루 시작 + 20시간을 넘지 않는다", () => {
+  it("자정 넘김 clamp — 마지막 사진이 시각표 원점(04:00) + 20시간을 넘지 않는다", () => {
     // 22시간 폭을 요청해도 clamp된다(자정을 넘으면 미디어 스캐너가 다음날로 색인).
     const photos = burst(DAY, { fromHour: 2, spanHours: 22, count: 6, location: null });
 
     for (const p of photos) {
-      expect(p.takenAtMs - startMs).toBeLessThanOrEqual(20 * 3_600_000);
+      expect(p.takenAtMs - ORIGIN_MS).toBeLessThanOrEqual(20 * 3_600_000);
       expect(p.takenAtMs).toBeLessThan(endMs);
     }
   });

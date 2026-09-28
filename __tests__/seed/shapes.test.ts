@@ -285,8 +285,12 @@ describe("morning-heavy — 오전에 몰린 하루 (023 D2 시간 분포)", () 
   });
 
   it("한 시간 칸(023 BUCKET_COUNT=6 기준 4시간)에 그날 사진의 절반 이상이 몰린다", () => {
-    const firstBucketEnd = bounds.startMs + 4 * 3_600_000;
-    const inFirst = photos.filter((p) => p.takenAtMs < firstBucketEnd).length;
+    // 049 — 칸은 자정 기준이다(00-04, 04-08, …). 오전 몰림은 04-08 칸에 든다.
+    const bucketStart = bounds.startMs + 4 * 3_600_000;
+    const bucketEnd = bounds.startMs + 8 * 3_600_000;
+    const inFirst = photos.filter(
+      (p) => p.takenAtMs >= bucketStart && p.takenAtMs < bucketEnd,
+    ).length;
     expect(inFirst).toBeGreaterThanOrEqual(Math.ceil(photos.length / 2));
   });
 

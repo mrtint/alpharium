@@ -1,7 +1,8 @@
 /**
  * 홈 화면(일기 목록) 테스트 — 048, 보드 `1d`.
  *
- * 계약: specs/048-diary-home-modernist/contracts/home-screen.md H·B·G, US5 카드
+ * 계약: specs/049-home-day-picker/contracts/day-picking.md H1~H8 (헤더), HS5
+ *       specs/048-diary-home-modernist/contracts/home-screen.md B·G, US5 카드
  *       (이전: specs/006-first-diary-app/contracts/screens.md §2 — S1·S7·FR-017a는 그대로 산다)
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -17,10 +18,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 import {
-  stripCellsFor,
+  weekCellsFor,
   writePromptFor,
   type DayPreview,
   type DiaryListItem,
@@ -39,7 +40,7 @@ const unreadable = (day: string): DiaryListItem => ({
   photos: { kind: "unknown" },
 });
 
-/** 2026-09-24(목) 10:00 — 정오 전. 기본 선택은 09-23 */
+/** 2026-09-24(목) 10:00 — 정오 전. 049부터 기본 선택은 오늘(09-24) */
 const MORNING = new Date("2026-09-24T10:00:00");
 /** 2026-09-13(일) 15:00 — 정오 후. 기본 선택은 09-13(오늘) */
 const SUNDAY_AFTERNOON = new Date("2026-09-13T15:00:00");
@@ -61,7 +62,7 @@ async function renderHome(
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
     write,
-    cells: stripCellsFor(items, write, now),
+    cells: weekCellsFor(items, write, now),
     ...opts,
   };
   await render(<DiaryListScreen {...props} />);
@@ -100,20 +101,101 @@ describe("048 H — 1d 구조와 헤더", () => {
     expect(screen.getByTestId("home-recent")).toHaveTextContent("최근");
   });
 
-  it("H2 — 고른 날의 큰 날짜·요일·「아직 쓰지 않았어요」", async () => {
+  it("H3·H4 — 고른 날의 큰 날짜·요일, 오늘이면 「오늘 일기를 쓸 수 있어요」", async () => {
     await renderHome({ now: SUNDAY_AFTERNOON });
 
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("13");
     expect(screen.getByTestId("home-weekday")).toHaveTextContent("일요일");
-    expect(screen.getByTestId("home-day-state")).toHaveTextContent("아직 쓰지 않았어요");
+    expect(screen.getByTestId("home-day-state")).toHaveTextContent("오늘 일기를 쓸 수 있어요");
   });
 
-  it("H3 — 이미 쓴 날은 덮어쓴다고 미리 알린다 (012 사전 고지)", async () => {
-    await renderHome({ items: [readable("2026-09-23")] });
+  it("★ H4 — 정오 전 오늘도 같은 문장이다 (049 FR-018b)", async () => {
+    await renderHome();
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("24");
+    expect(screen.getByTestId("home-day-state")).toHaveTextContent("오늘 일기를 쓸 수 있어요");
+  });
 
-    expect(screen.getByTestId("home-day-state")).toHaveTextContent(
-      "이미 썼어요 · 다시 쓰면 덮어써요",
+  it("H4 — 지난 날은 「이 날 일기를 쓸 수 있어요」", async () => {
+    await renderHome({ chosen: "2026-09-22" });
+    expect(screen.getByTestId("home-day-state")).toHaveTextContent("이 날 일기를 쓸 수 있어요");
+  });
+
+  it("H4 — 쓴 날은 제목, 제목이 없으면 「이 날 일기를 썼어요」", async () => {
+    await renderHome({
+      items: [readable("2026-09-23", { kind: "none" }, "비 오는 수요일")],
+      chosen: "2026-09-23",
+    });
+    expect(screen.getByTestId("home-day-state")).toHaveTextContent("비 오는 수요일");
+    await renderHome({ items: [readable("2026-09-23")], chosen: "2026-09-23" });
+    expect(screen.getByTestId("home-day-state")).toHaveTextContent("이 날 일기를 썼어요");
+  });
+
+  it("★ H6 — 날짜 표시(월 라벨·숫자·요일)에 「오늘」 글자가 없다", async () => {
+    await renderHome();
+    for (const id of ["home-month", "home-kicker", "home-day-number", "home-weekday"]) {
+      expect(screen.getByTestId(id)).not.toHaveTextContent(/오늘/);
+    }
+  });
+
+  it("★ H7 — 헤더의 날짜 묶음에는 누름 처리가 없다 (049 FR-016, C7)", () => {
+    const code = readFileSync(join(__dirname, "../../src/ui/DiaryListScreen.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const heading = code.slice(
+      code.indexOf("function DayHeading"),
+      code.indexOf("function DayFace"),
     );
+    const face = code.slice(code.indexOf("function DayFace"), code.indexOf("function Notices"));
+    // 헤더 본문 — 스트립(`DayPicker`)은 `onSelect`로 받으므로 `onPress`·`Pressable`이 없어야 한다.
+    const header = code.slice(code.indexOf("function Header"), code.indexOf("function DayHeading"));
+    for (const part of [header, heading, face]) {
+      expect(part).not.toContain("Pressable");
+      expect(part).not.toContain("onPress");
+    }
+  });
+
+  it("H8 — 날이 바뀌면 이전 날이 잠시 함께 그려진다 (크로스페이드 배선, C9)", async () => {
+    const items: DiaryListItem[] = [];
+    const first = writePromptFor(items, MORNING, "2026-09-24");
+    const second = writePromptFor(items, MORNING, "2026-09-21");
+    const base = { items, onOpen: jest.fn(), onWrite: jest.fn(), onSelectDay: jest.fn() };
+    await render(
+      <DiaryListScreen {...base} cells={weekCellsFor(items, first, MORNING)} write={first} />,
+    );
+    expect(screen.queryByTestId("home-day-fade-out")).toBeNull();
+
+    await act(async () => {
+      screen.rerender(
+        <DiaryListScreen {...base} cells={weekCellsFor(items, second, MORNING)} write={second} />,
+      );
+    });
+    expect(screen.getByTestId("home-day-fade-out")).toHaveTextContent(/24/);
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("21");
+  });
+
+  // 실기기(2026-09-28): 한 공유값을 effect에서 0으로 되돌리니, effect가 첫 프레임 뒤에 돌아
+  // 새 날 → 이전 날 → 새 날로 숫자가 빠르게 여러 번 바뀌어 보였다. 겹마다 새로 마운트하고
+  // 시작 투명도를 마운트 값으로 준다.
+  it("★ H9 — 크로스페이드 시작값을 effect에서 되돌리지 않는다 (겹은 날마다 새로 마운트)", () => {
+    const code = readFileSync(join(__dirname, "../../src/ui/DiaryListScreen.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const fade = code.slice(code.indexOf("function DayHeading"), code.indexOf("function DayFace"));
+    expect(fade).not.toMatch(/\.value\s*=\s*[01]\s*;/);
+    expect(fade).toContain("useSharedValue(from)");
+    expect(fade).toMatch(/key=\{`in-\$\{shown\.day\}`\}/);
+    expect(fade).toMatch(/key=\{`out-\$\{shown\.previous\}-\$\{shown\.day\}`\}/);
+  });
+
+  // 실기기(2026-09-28, 사용자 요청): 「6」과 「30」 사이를 넘기면 큰 숫자 폭이 달라 요일이 옆으로
+  // 밀렸다. 숫자 칸은 언제나 두 자리 폭이다.
+  it("★ H10 — 큰 날짜 칸은 두 자리 폭을 잡는다 (한 자리 날에도 요일이 밀리지 않는다)", () => {
+    const code = readFileSync(join(__dirname, "../../src/ui/DiaryListScreen.tsx"), "utf8");
+    expect(code).toMatch(/const DAY_NUMBER_WIDTH = "00";/);
+    const face = code.slice(code.indexOf("function DayFace"), code.indexOf("function Notices"));
+    expect(face).toContain("{DAY_NUMBER_WIDTH}");
+    expect(face).toMatch(/importantForAccessibility="no-hide-descendants"/);
+    expect(face).toMatch(/position: "absolute", left: 0/);
   });
 
   it("★ H4 — 월 표시는 고른 날의 달이다 (Clarification Q2)", async () => {
@@ -124,10 +206,11 @@ describe("048 H — 1d 구조와 헤더", () => {
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("31");
   });
 
-  it("H5 — 되돌림 안내는 해요체다", async () => {
+  it("★ HS5 — 사흘 밖의 날을 골라도 되돌림 안내가 없다 (049 FR-022a)", async () => {
     await renderHome({ chosen: "2026-09-10" });
 
-    expect(screen.getByText("9월 10일은 이제 쓸 수 없어 9월 23일로 바꿨어요")).toBeTruthy();
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("10");
+    expect(screen.queryByText(/바꿨어요/)).toBeNull();
   });
 
   it("H5 — 캐릭터 옮김 안내는 부모가 준 문장을 그대로 보인다", async () => {
@@ -191,36 +274,12 @@ describe("048 B — 하단 바와 쓰기", () => {
     }
   });
 
-  it("★ B4 — 아직 쓸 수 없는 오늘은 쓰기 버튼 대신 언제 쓸 수 있는지 말한다", async () => {
-    await renderHome({ chosen: "2026-09-24" });
+  it("★ B4 — 정오 전 오늘도 쓰기 버튼이 있다 (049 FR-018b)", async () => {
+    await renderHome();
 
-    expect(screen.queryByTestId("write-button")).toBeNull();
-    expect(screen.getByTestId("write-unavailable")).toHaveTextContent(
-      "오늘 일기는 오후 12시부터 쓸 수 있어요",
-    );
-    expect(screen.getByTestId("write-unavailable").props.numberOfLines).toBeUndefined();
-  });
-
-  it("B4 — 새벽의 오늘은 「오전 4시부터」다 (Clarification Q1)", async () => {
-    await renderHome({ now: new Date("2026-09-25T01:00:00"), chosen: "2026-09-24" });
-
-    expect(screen.getByTestId("write-unavailable")).toHaveTextContent(
-      "오늘 일기는 오전 4시부터 쓸 수 있어요",
-    );
-  });
-
-  it("★ B5 — 쓸 수 없는 날에는 화면의 무엇을 눌러도 쓰기에 닿지 않는다", async () => {
-    const props = await renderHome({
-      items: [readable("2026-09-20"), readable("2026-09-23")],
-      chosen: "2026-09-24",
-      menuItems: [{ key: "settings", label: "설정", onPress: jest.fn() }],
-    });
-
-    // 누를 수 있는 것은 전부 button 역할이다(스트립 칸·카드·메뉴). 하나씩 다 눌러 본다.
-    const pressables = screen.queryAllByRole("button");
-    expect(pressables.length).toBeGreaterThan(0);
-    for (const node of pressables) await fireEvent.press(node);
-    expect(props.onWrite).not.toHaveBeenCalled();
+    expect(screen.getByTestId("write-button")).toBeTruthy();
+    expect(screen.getByTestId("write-day-label")).toHaveTextContent("24일");
+    expect(screen.queryByTestId("write-unavailable")).toBeNull();
   });
 });
 
@@ -268,14 +327,9 @@ describe("048 G — 신호 줄", () => {
     expect(screen.getByTestId("signal-window")).toHaveTextContent("지금");
   });
 
-  it("G5·G6 — 쓸 수 없으면 쓸 수 있게 되는 시각", async () => {
-    await renderHome({ chosen: "2026-09-24" });
-    expect(screen.getByTestId("signal-window")).toHaveTextContent("오후 12시부터");
-  });
-
-  it("G6 — 새벽이면 「오전 4시부터」", async () => {
-    await renderHome({ now: new Date("2026-09-25T01:00:00"), chosen: "2026-09-24" });
-    expect(screen.getByTestId("signal-window")).toHaveTextContent("오전 4시부터");
+  it("G5 — 정오 전·자정 직후에도 「지금」 (049 FR-018c)", async () => {
+    await renderHome({ now: new Date("2026-09-25T01:00:00") });
+    expect(screen.getByTestId("signal-window")).toHaveTextContent("지금");
   });
 });
 

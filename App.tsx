@@ -154,9 +154,13 @@ function AppFrame() {
    *
    * 설정·개발자에 다녀오면 홈(`DiarySection`)이 언마운트되고, 040의 자동 첫 일기 후에도 다시
    * 마운트된다. 여기 들고 있어야 돌아왔을 때 같은 날이 골라져 있다. **파일에는 남기지 않는다**
-   * (009) — 앱을 다시 켜면 쓸 수 있는 첫 날에서 시작한다.
+   * (009).
+   *
+   * **049 — 앱을 새로 열면 오늘이다**(FR-010a, 048 D9를 뒤집음). 초기값을 `null`로 두지 않는다 —
+   * `null`이면 기본값(오늘)이 켜 둔 채 자정을 넘길 때 새 오늘을 따라가 「보던 날 유지」(FR-019)가
+   * 깨진다. 마운트 시점의 오늘을 값으로 들고 있는다(AF1).
    */
-  const [chosenDay, setChosenDay] = useState<DayDate | null>(null);
+  const [chosenDay, setChosenDay] = useState<DayDate | null>(() => dayOf(new Date()));
 
   /**
    * 048 — `⋯` 메뉴 항목. **개발자는 진단과 같은 조건에서만 배열에 있다**(FR-003) — 숨김이
@@ -1222,6 +1226,9 @@ function DiarySection({
   /**
    * 029 — 최근 3일 중 사진 신호가 1장 이상인 하루들 (FR-010, 임계값 없음).
    *
+   * **049 — 화면은 지난 날 전부를 고르지만 이 탐색은 사흘 그대로다**(FR-020). 사흘 밖의 날은
+   * 사진 유무를 모르므로 미리 준비를 하지 않는다(`canPrepare`, R5).
+   *
    * 자동 판정("auto" → 사진 있으면 quick)의 입력이다. 3일치를 한 번 훑어 캐시하고
    * `AppState active`에서 다시 훑는다. 정밀 판정은 pipeline이 신호에서 다시 한다.
    */
@@ -1354,6 +1361,9 @@ function DiarySection({
       chosenDay={chosenDay}
       onChooseDay={onChooseDay}
       menuItems={menuItems}
+      // ★ 049 R5 — 미리 준비(018)는 사진 유무를 훑은 날(사흘, `photoDays`와 같은 함수)에서만.
+      //   사흘 밖의 날에 캐릭터 모델을 미리 열면 쓰기 때 VLM과 겹쳐 기기가 죽는다(FR-020a).
+      canPrepare={(day) => selectableDays(new Date()).includes(day)}
       // 048 US3 — 신호 줄. 파이프라인과 같은 신호 통로에서 개수로 좁혀 온다.
       previewDay={wiring.ok ? wiring.previewDay : undefined}
     />

@@ -13,7 +13,7 @@ import { join } from "node:path";
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { dayOf, isDayClosed, latestClosedDay } from "../../src/config/day-boundary";
+import { latestClosedDay } from "../../src/config/day-boundary";
 import {
   afterGeneration,
   cancelOverwrite,
@@ -24,7 +24,9 @@ import {
   toList,
   toWriting,
   dayParts,
-  stripCellsFor,
+  canSwipeNext,
+  swipeWeek,
+  weekCellsFor,
   writePromptFor,
   type DiaryListItem,
   type PhotoHint,
@@ -438,378 +440,118 @@ describe("★★ 읽기와 생성이 분리되어 있다 (원칙 I, S1)", () => 
  * 받지 않으므로 **쓰기를 시작하는 함수는 그것을 볼 수 없다**(FR-025, 원칙 I).
  * ─────────────────────────────────────────────────────────────────────────────
  */
-describe("writePromptFor (007 §4 검증 표)", () => {
-  // 04:00 경계 뒤이므로 「마지막으로 닫힌 하루」는 전날이다.
-  // **표준시 접미사를 붙이지 않는다**(2026-08-21, CI 실패로 확인). `dayOf()`가 로컬
-  // 시각으로 판단하므로 `+09:00`을 붙이면 UTC로 도는 CI에서 하루가 어긋난다.
-  // 006의 day-boundary.test.ts도 접미사 없이 쓴다.
-  const morning = new Date("2026-08-20T10:00:00");
+describe("049 writePromptFor — 고른 날 (contracts/day-picking.md WP)", () => {
+  // **표준시 접미사를 붙이지 않는다**(2026-08-21, CI 실패로 확인) — `dayOf()`가 로컬 시각을 본다.
+  const morning = new Date("2026-09-24T09:00:00");
 
-  it("1. 쓰게 될 하루는 오늘이 아니라 마지막으로 닫힌 하루다(FR-023, 006 FR-030)", () => {
+  it("★ WP1 — 고른 적이 없으면 오늘이다 — 정오 전에도 (048 D9를 뒤집음, FR-010a)", () => {
     const prompt = writePromptFor([], morning);
-
-    expect(prompt.day).toBe("2026-08-19");
+    expect(prompt.day).toBe("2026-09-24");
+    expect(writePromptFor([], new Date("2026-09-24T00:10:00")).day).toBe("2026-09-24");
   });
 
-  it("2. 그 하루가 이미 있으면 덮어쓴다고 알린다(FR-024)", () => {
-    const prompt = writePromptFor([readable("2026-08-19")], morning);
-
-    expect(prompt.overwrites).toBe(true);
+  it("★ WP2 — 사흘 밖의 날(30일 전)을 고르면 그대로 그 날이다 — 되돌림 없음", () => {
+    const prompt = writePromptFor([], morning, "2026-08-25");
+    expect(prompt.day).toBe("2026-08-25");
+    expect(prompt).not.toHaveProperty("revertedFrom");
   });
 
-  it("다른 날 일기만 있으면 덮어쓰지 않는다", () => {
-    const prompt = writePromptFor([readable("2026-08-18")], morning);
+  it("WP3 — 미래를 고르면 오늘로 떨어진다", () => {
+    expect(writePromptFor([], morning, "2026-09-25").day).toBe("2026-09-24");
+  });
 
-    expect(prompt.overwrites).toBe(false);
+  it("WP5 — overwrites는 고른 날의 일기만 본다", () => {
+    const items = [readable("2026-09-20")];
+    expect(writePromptFor(items, morning, "2026-09-20").overwrites).toBe(true);
+    expect(writePromptFor(items, morning, "2026-09-21").overwrites).toBe(false);
+    expect(writePromptFor(items, morning).overwrites).toBe(false);
   });
 
   it("읽을 수 없는 일기도 그 하루를 차지한다 — 쓰면 덮어쓴다(원칙 V)", () => {
-    // 읽지 못할 뿐 파일은 있다. 「없다」로 다루면 조용히 덮어쓰게 된다.
-    const prompt = writePromptFor([unreadable("2026-08-19")], morning);
-
-    expect(prompt.overwrites).toBe(true);
+    expect(writePromptFor([unreadable("2026-09-24")], morning).overwrites).toBe(true);
   });
 
-  /**
-   * ★ 6. **04:00 경계가 지켜진다**(006 FR-021a).
-   *
-   * 03:59는 아직 전날에 속하므로 「마지막으로 닫힌 하루」가 하루 더 이르다.
-   */
-  it("6. 03:59와 04:01이 서로 다른 하루를 가리킨다", () => {
-    const before = writePromptFor([], new Date("2026-08-20T03:59:00"));
-    const after = writePromptFor([], new Date("2026-08-20T04:01:00"));
-
-    expect(before.day).not.toBe(after.day);
-    expect(before.day).toBe("2026-08-18");
-    expect(after.day).toBe("2026-08-19");
-  });
-
-  /* ═══════════════ 009 — 하루를 고른다 (contracts/write-prompt.md §2) ═══════════════ */
-
-  /**
-   * 지금이 2026-08-20T10:00이면 고를 수 있는 하루는 `[08-19, 08-18, 08-17]`이다.
-   * 아래 표는 계약 §2의 검증 표를 그대로 옮긴 것이다.
-   */
-
-  it("009-1. 고른 적이 없으면 마지막으로 닫힌 하루다 (FR-007)", () => {
-    const prompt = writePromptFor([], morning, null);
-
-    expect(prompt.day).toBe("2026-08-19");
-    expect(prompt.revertedFrom).toBeUndefined();
-  });
-
-  it("★ 009-3. 고른 하루가 쓰인다 (FR-006)", () => {
-    const prompt = writePromptFor([], morning, "2026-08-17");
-
-    // **어제가 아닌 하루다.** 이것이 이 기능의 전부다.
-    expect(prompt.day).toBe("2026-08-17");
-    expect(prompt.revertedFrom).toBeUndefined();
-  });
-
-  it("009-4. 고른 하루에 일기가 있으면 덮어쓴다 (FR-012)", () => {
-    const prompt = writePromptFor([readable("2026-08-17")], morning, "2026-08-17");
-
-    expect(prompt.day).toBe("2026-08-17");
-    expect(prompt.overwrites).toBe(true);
-  });
-
-  /**
-   * **★ 009-5 — 덮어쓰기는 「고른 하루」를 따른다.**
-   *
-   * 007의 `items.some(...)`이 하루 하나를 볼 때 성립하던 것이 셋에서도 성립해야
-   * 한다. 다른 하루에 일기가 있는 것은 무관하다 — 무관하지 않게 되면 화면이
-   * 엉뚱한 하루의 덮어쓰기를 예고한다.
-   */
-  it("★ 009-5. 다른 하루에 일기가 있어도 고른 하루에 없으면 덮어쓰지 않는다", () => {
-    const prompt = writePromptFor([readable("2026-08-19")], morning, "2026-08-17");
-
-    expect(prompt.day).toBe("2026-08-17");
-    expect(prompt.overwrites).toBe(false);
-  });
-
-  /* ───────────────── 불변식 I1·I2 (data-model §5) ───────────────── */
-
-  /**
-   * **★ I1이 FR-017의 방어다.**
-   *
-   * 범위 밖 하루가 생성으로 갈 통로가 없다는 것이 이 한 줄에 걸려 있다.
-   * 파이프라인에 `day-too-old` 갈래를 더하지 않은 이유이기도 하다(research §5) —
-   * **넘길 하루가 여기서만 오면 범위 밖 값이 만들어질 자리가 없다.**
-   */
-  it("★ I1 — prompt.day는 언제나 selectable의 원소다 (FR-017)", () => {
-    const chosen = [null, "2026-08-19", "2026-08-17", "2026-08-01", "2026-08-20", "2099-01-01"];
-    const nows = ["2026-08-20T10:00:00", "2026-08-20T03:59:00", "2026-01-01T12:00:00"];
-
-    for (const iso of nows) {
-      for (const day of chosen) {
-        const prompt = writePromptFor([], new Date(iso), day);
-        expect(prompt.selectable.map((s) => s.day)).toContain(prompt.day);
-      }
-    }
-  });
-
-  /**
-   * **048 — 「쓸 수 있는」 하루는 여전히 셋이다.** 정오 전에는 아직 쓸 수 없는 오늘이
-   * `writable: false`로 맨 앞에 더해져 넷이 되지만(스트립에서 볼 수 있게), 쓸 수 있는 셋은
-   * 009 그대로다.
-   */
-  it("I2 — 쓸 수 있는 하루는 언제나 셋이다 (FR-001, 048)", () => {
-    const writable = (p: WritePrompt) => p.selectable.filter((s) => s.writable);
-    expect(writable(writePromptFor([], morning))).toHaveLength(3);
-    expect(writable(writePromptFor([], morning, "2026-08-17"))).toHaveLength(3);
-    expect(writable(writePromptFor([], new Date("2026-08-20T13:00:00")))).toHaveLength(3);
-  });
-
-  it("I2 — selectable은 최근이 먼저다 (048 — 정오 전에는 아직 쓸 수 없는 오늘이 맨 앞)", () => {
-    const prompt = writePromptFor([], morning);
-
-    expect(prompt.selectable.map((s) => s.day)).toEqual([
-      "2026-08-20",
-      "2026-08-19",
-      "2026-08-18",
-      "2026-08-17",
-    ]);
-  });
-
-  /* ══════════ 009 US2 — 어느 하루에 무엇이 있는가 (계약 §2 10~14번 행) ══════════ */
-
-  it("009-10. 일기가 하나도 없으면 셋 다 hasDiary가 false다 (FR-011)", () => {
-    const prompt = writePromptFor([], morning);
-
-    expect(prompt.selectable.every((entry) => !entry.hasDiary)).toBe(true);
-  });
-
-  it("009-11. 있는 하루만 hasDiary가 true다 (FR-011)", () => {
-    const prompt = writePromptFor([readable("2026-08-18")], morning);
-
-    expect(prompt.selectable).toEqual([
-      { day: "2026-08-20", hasDiary: false, writable: false },
-      { day: "2026-08-19", hasDiary: false, writable: true },
-      { day: "2026-08-18", hasDiary: true, writable: true },
-      { day: "2026-08-17", hasDiary: false, writable: true },
-    ]);
-  });
-
-  /**
-   * **★ 009-12 — 셋 다 있어도 고를 자리가 사라지지 않는다**(spec Edge Cases).
-   *
-   * 「전부 썼으니 고를 것이 없다」로 자리를 접으면 **다시 쓰고 싶은 사용자가 막힌다** —
-   * 덮어쓰기는 금지된 것이 아니라 알려야 하는 것이다.
-   */
-  it("★ 009-12. 셋 다 일기가 있어도 자리가 사라지지 않는다", () => {
-    const prompt = writePromptFor(
-      [readable("2026-08-19"), readable("2026-08-18"), readable("2026-08-17")],
-      morning,
-    );
-
-    const writable = prompt.selectable.filter((entry) => entry.writable);
-    expect(writable).toHaveLength(3);
-    expect(writable.every((entry) => entry.hasDiary)).toBe(true);
-    expect(prompt.overwrites).toBe(true);
-  });
-
-  it("009-13. 범위 밖의 일기는 selectable에 나타나지 않는다 (FR-001)", () => {
-    const prompt = writePromptFor([readable("2026-08-01")], morning);
-
-    expect(prompt.selectable.map((entry) => entry.day)).not.toContain("2026-08-01");
-    expect(prompt.selectable.every((entry) => !entry.hasDiary)).toBe(true);
-  });
-
-  /**
-   * **★ 009-14 — 읽을 수 없는 일기도 그 하루를 차지한다**(원칙 V).
-   *
-   * 읽지 못할 뿐 파일은 있다. 「없다」로 다루면 **조용히 덮어쓰게 된다** — 007이
-   * 하루 하나에 대해 세운 규칙이 셋에서도 그대로다.
-   */
-  it("★ 009-14. 읽을 수 없는 일기도 hasDiary다 (원칙 V)", () => {
-    const prompt = writePromptFor([unreadable("2026-08-18")], morning, "2026-08-18");
-
-    expect(prompt.selectable.find((s) => s.day === "2026-08-18")).toEqual({
-      day: "2026-08-18",
-      hasDiary: true,
-      writable: true,
-    });
-    expect(prompt.overwrites).toBe(true);
-  });
-
-  /**
-   * **I5 — 같은 답이 두 곳에서 갈리지 않는다.**
-   *
-   * `overwrites`는 `selectable`에서 골라낼 수 있는데도 따로 싣는다 — 화면이 골라내게
-   * 하면 같은 규칙이 두 곳에 생긴다. 그래서 **둘이 언제나 일치해야 한다.**
-   */
-  it("I5 — overwrites는 고른 하루의 hasDiary와 언제나 같다", () => {
-    const stored = [readable("2026-08-19"), unreadable("2026-08-17")];
-
-    for (const chosen of [null, "2026-08-19", "2026-08-18", "2026-08-17", "2026-01-01"]) {
-      const prompt = writePromptFor(stored, morning, chosen);
-      const entry = prompt.selectable.find((s) => s.day === prompt.day);
-
-      expect(prompt.overwrites).toBe(entry?.hasDiary);
-    }
-  });
-
-  /* ═══════ 009 US3 — 범위 밖은 되돌리고 알린다 (계약 §2 6~9번 행, I4) ═══════ */
-
-  /**
-   * **★ 009-6이 이 표의 핵심이다.**
-   *
-   * 쓰기 자리를 열어 둔 채 04:00을 넘겨 고른 하루가 범위를 벗어난 상황이다.
-   * **말없이 기본값을 쓰지 않고 되돌렸다는 것을 실어 보낸다** — 조용히 바꾸면
-   * 사용자는 엉뚱한 하루의 일기를 얻고 그 이유를 알 방법이 없다.
-   */
-  it("★ 009-6. 범위 밖을 골라 두면 기본값으로 되돌리고 알린다 (FR-009)", () => {
-    const prompt = writePromptFor([], morning, "2026-08-16");
-
-    expect(prompt.day).toBe("2026-08-19");
-    expect(prompt.revertedFrom).toBe("2026-08-16");
-  });
-
-  it("009-7. 되돌린 하루에 일기가 있으면 덮어쓰기도 함께 알린다", () => {
-    const prompt = writePromptFor([readable("2026-08-19")], morning, "2026-08-16");
-
-    expect(prompt.day).toBe("2026-08-19");
-    expect(prompt.revertedFrom).toBe("2026-08-16");
-    expect(prompt.overwrites).toBe(true);
-  });
-
-  /**
-   * **★ 009-8 → 048 — 정오 전의 오늘은 되돌리지 않고 「쓸 수 없음」으로 고른다.**
-   *
-   * 009는 오늘을 범위 밖으로 다뤄 되돌렸다. 048은 오늘을 **볼 수는 있지만 쓸 수 없는** 날로
-   * 고르게 한다(설계 D6). 쓰기 방어는 되돌림이 아니라 `writable: false`가 맡는다 — 화면은
-   * 쓰기 버튼을 그리지 않고, 파이프라인은 여전히 `day-not-closed`로 막는다.
-   */
-  it("★ 009-8 → 048. 정오 전 오늘을 고르면 그대로 고르되 쓸 수 없다고 알린다", () => {
-    // morning은 2026-08-20T10:00이므로 오늘은 2026-08-20이다.
-    const prompt = writePromptFor([], morning, "2026-08-20");
-
-    expect(prompt.day).toBe("2026-08-20");
-    expect(prompt).not.toHaveProperty("revertedFrom");
-    expect(prompt.writable).toBe(false);
-    expect(prompt.writableAt?.getTime()).toBe(new Date("2026-08-20T12:00:00").getTime());
-  });
-
-  /**
-   * **★ 009-9가 6번만큼 중요하다.**
-   *
-   * 고른 것이 마침 기본값과 같을 때 `revertedFrom`이 붙으면 **바뀌지 않았는데
-   * 「바뀌었다」고 알리게 된다.** 007의 `movedFrom`이 같은 함정을 가졌고,
-   * `resolveSelection()`의 1번 행이 그것을 막았다.
-   */
-  it("★ 009-9. 고른 것이 기본값과 같으면 되돌림을 알리지 않는다 (FR-009d)", () => {
-    const prompt = writePromptFor([], morning, "2026-08-19");
-
-    expect(prompt.day).toBe("2026-08-19");
-    expect(prompt).not.toHaveProperty("revertedFrom");
-  });
-
-  it("009-9. 유효한 하루를 고르면 되돌림이 없다", () => {
-    for (const day of ["2026-08-19", "2026-08-18", "2026-08-17"]) {
-      expect(writePromptFor([], morning, day)).not.toHaveProperty("revertedFrom");
-    }
-  });
-
-  it("009. 고른 적이 없으면 되돌림도 없다 (FR-007)", () => {
-    // 기본값을 쓰는 것은 되돌린 것이 아니다 — 되돌릴 선택 자체가 없었다.
-    expect(writePromptFor([], morning)).not.toHaveProperty("revertedFrom");
-    expect(writePromptFor([], morning, null)).not.toHaveProperty("revertedFrom");
-  });
-
-  /**
-   * **I4 — 되돌리지 않았는데 「되돌렸다」고 알리지 않는다.**
-   */
-  it("★ I4 — revertedFrom은 day와 다르고 selectable에 없다", () => {
-    // 048 — 정오 전의 오늘(2026-08-20)은 이제 고를 수 있으므로 되돌림 대상에서 빠졌다.
-    const chosen = ["2026-08-16", "2026-08-21", "2026-01-01", "2099-12-31"];
-
-    for (const day of chosen) {
-      const prompt = writePromptFor([], morning, day);
-
-      expect(prompt.revertedFrom).toBe(day);
-      expect(prompt.revertedFrom).not.toBe(prompt.day);
-      expect(prompt.selectable.map((s) => s.day)).not.toContain(prompt.revertedFrom);
-    }
-  });
-
-  /**
-   * **★ FR-009c — 알림은 다시 고를 때까지 남는다.**
-   *
-   * **지우는 코드가 없다.** 판정이 매번 다시 도므로(FR-009a) 고른 하루가 범위 밖인
-   * 동안 계속 실려 나오고, 사용자가 유효한 하루를 고르면 **그 순간 사라진다.**
-   */
-  it("★ FR-009c — 같은 상태를 다시 물어도 알림이 남는다", () => {
-    const first = writePromptFor([], morning, "2026-08-16");
-    const again = writePromptFor([], morning, "2026-08-16");
-
-    // 한 번 보이고 사라지지 않는다 — 판정은 상태를 갖지 않는다.
-    expect(first.revertedFrom).toBe("2026-08-16");
-    expect(again.revertedFrom).toBe("2026-08-16");
-  });
-
-  it("★ FR-009c — 다시 고르면 그 순간 사라진다", () => {
-    expect(writePromptFor([], morning, "2026-08-16").revertedFrom).toBe("2026-08-16");
-    // 사용자가 유효한 하루를 골랐다.
-    expect(writePromptFor([], morning, "2026-08-18")).not.toHaveProperty("revertedFrom");
-  });
-
-  /**
-   * **★ 04:00을 넘기면 같은 선택이 범위 밖이 된다** — US3의 실제 상황이다.
-   *
-   * 실기기에서는 04:00을 기다려야 해서 확인하기 어렵고(기기 날짜를 못 바꾼다),
-   * **그래서 이 테스트가 이 갈래의 주된 검증이다**(quickstart B3).
-   */
-  it("★ 04:00을 넘기면 같은 선택이 되돌려진다 (US3의 실제 상황)", () => {
-    const chosen = "2026-08-17";
-
-    // 03:59 — 고를 수 있는 하루는 [08-18, 08-17, 08-16]이다.
-    const before = writePromptFor([], new Date("2026-08-20T03:59:00"), chosen);
-    expect(before.day).toBe(chosen);
-    expect(before).not.toHaveProperty("revertedFrom");
-
-    // 04:00 — [08-19, 08-18, 08-17]로 밀렸고 08-17은 아직 살아 있다.
-    const after = writePromptFor([], new Date("2026-08-20T04:00:00"), chosen);
-    expect(after.day).toBe(chosen);
-
-    // 하루 더 지나면 08-17이 범위를 벗어난다.
-    const later = writePromptFor([], new Date("2026-08-21T04:00:00"), chosen);
-    expect(later.day).toBe("2026-08-20");
-    expect(later.revertedFrom).toBe(chosen);
-  });
-
-  /**
-   * **I3 → 048 — 정오 전 「쓸 수 있다」고 표시된 하루는 모두 닫혀 있다**(FR-002).
-   *
-   * 009는 오늘이 아예 섞이지 않게 했다. 048은 아직 쓸 수 없는 오늘을 **`writable: false`로**
-   * 섞는다 — 그러므로 이 불변식은 「정오 전 `writable`은 닫혀 있음과 같다」로 옮겨 온다.
-   * 쓸 수 없는 칸을 쓸 수 있다고 내밀면 사용자가 `day-not-closed`에 막힌다.
-   */
-  it("★ I3 — 정오 전 writable은 닫혀 있음과 같다 (FR-002, 048)", () => {
-    const nows = [
-      "2026-08-20T10:00:00",
-      "2026-08-20T04:00:00",
-      "2026-08-20T03:59:00",
-      "2026-08-20T00:30:00",
-      "2026-03-01T05:00:00",
-    ];
-
-    for (const iso of nows) {
-      const now = new Date(iso);
-      const prompt = writePromptFor([], now);
-
-      for (const entry of prompt.selectable) {
-        expect(entry.writable).toBe(isDayClosed(entry.day, now));
-      }
-    }
+  it("자정을 넘겨도 고른 날은 그대로다 — 기본값만 새 오늘을 따른다 (FR-019)", () => {
+    const beforeMidnight = new Date("2026-09-24T23:59:00");
+    const afterMidnight = new Date("2026-09-25T00:01:00");
+    expect(writePromptFor([], beforeMidnight, "2026-09-24").day).toBe("2026-09-24");
+    expect(writePromptFor([], afterMidnight, "2026-09-24").day).toBe("2026-09-24");
+    expect(writePromptFor([], afterMidnight).day).toBe("2026-09-25");
   });
 });
 
-/**
- * ★ 007 FR-025·SC-014 — **원칙 I의 방어가 타입에 있다.**
- *
- * 006이 `toWriting()`에 인자를 두지 않은 것이 방어이며, 007이 쓰기 자리에 정보를
- * 더하면서도 **그 방어를 깨뜨리지 않았다**는 것을 여기서 못 박는다.
- */
+describe("049 weekCellsFor·swipeWeek — 주간 스트립 (contracts/day-picking.md SW)", () => {
+  const now = new Date("2026-09-24T09:00:00"); // 목요일
+
+  it("★ SW1 — 7칸 일~토, selected 정확히 1, 오늘만 isToday", () => {
+    const cells = weekCellsFor([], writePromptFor([], now), now);
+    expect(cells.map((c) => c.day)).toEqual([
+      "2026-09-20",
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+      "2026-09-24",
+      "2026-09-25",
+      "2026-09-26",
+    ]);
+    expect(cells.filter((c) => c.selected).map((c) => c.day)).toEqual(["2026-09-24"]);
+    expect(cells.filter((c) => c.isToday).map((c) => c.day)).toEqual(["2026-09-24"]);
+  });
+
+  it("SW1 — 일기가 있는 날만 hasDiary", () => {
+    const cells = weekCellsFor([readable("2026-09-21")], writePromptFor([], now), now);
+    expect(cells.filter((c) => c.hasDiary).map((c) => c.day)).toEqual(["2026-09-21"]);
+  });
+
+  it("★ SW2 — 미래 칸은 누를 수 없고, 몇 주 전 칸은 누를 수 있다", () => {
+    const cells = weekCellsFor([], writePromptFor([], now), now);
+    expect(cells.filter((c) => !c.selectable).map((c) => c.day)).toEqual([
+      "2026-09-25",
+      "2026-09-26",
+    ]);
+    const old = weekCellsFor([], writePromptFor([], now, "2026-08-12"), now);
+    expect(old.every((c) => c.selectable)).toBe(true);
+    expect(old.some((c) => c.isToday)).toBe(false);
+  });
+
+  it("SW3 — 이전 주로 넘기면 같은 요일 (토 26 → 토 19)", () => {
+    const sat = new Date("2026-09-26T09:00:00");
+    expect(swipeWeek("2026-09-26", "previous", sat)).toBe("2026-09-19");
+  });
+
+  it("★ SW4 — 오늘이 든 주로 돌아올 때 유지한 요일이 오늘 이후면 오늘 (clamp)", () => {
+    expect(swipeWeek("2026-09-19", "next", now)).toBe("2026-09-24");
+    expect(swipeWeek("2026-09-15", "next", now)).toBe("2026-09-22");
+  });
+
+  it("★ SW5 — 오늘이 든 주에서는 다음 주가 없다 (튕김)", () => {
+    expect(swipeWeek("2026-09-24", "next", now)).toBeNull();
+    expect(swipeWeek("2026-09-20", "next", now)).toBeNull();
+    expect(canSwipeNext("2026-09-20", now)).toBe(false);
+    expect(canSwipeNext("2026-09-19", now)).toBe(true);
+  });
+
+  it("S1 — 결과는 언제나 오늘 이하다", () => {
+    for (const day of ["2026-09-13", "2026-09-17", "2026-09-19", "2026-09-24"]) {
+      const next = swipeWeek(day, "next", now);
+      if (next !== null) expect(next <= "2026-09-24").toBe(true);
+    }
+  });
+
+  it("SW6 — 두 달에 걸친 주는 고른 날이 든 주다 (8/31 → 8/30~9/5)", () => {
+    const cells = weekCellsFor([], writePromptFor([], now, "2026-08-31"), now);
+    expect(cells[0].day).toBe("2026-08-30");
+    expect(cells[6].day).toBe("2026-09-05");
+  });
+
+  it("오늘이 일요일이면 여섯 칸이 미래다", () => {
+    const sunday = new Date("2026-09-20T09:00:00");
+    const cells = weekCellsFor([], writePromptFor([], sunday), sunday);
+    expect(cells.filter((c) => !c.selectable)).toHaveLength(6);
+    expect(swipeWeek("2026-09-19", "next", sunday)).toBe("2026-09-20");
+  });
+});
+
 describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)", () => {
   it("인자를 받지 않는다 — 저장 상태로 갈릴 수 없다", () => {
     // 인자가 없으므로 「이미 있으면 그것을 보여준다」를 쓸 수 없다.
@@ -926,7 +668,7 @@ describe("★ 009 I6·I7 — 담을 자리가 없다", () => {
    * `day`·`overwrites`·`selectable`·`revertedFrom` 뿐이다. 진행률·경과 시간·토큰·
    * 캐릭터·본문이 들어올 자리가 없다(원칙 IV·III·I).
    */
-  it("★ I6 — WritePrompt의 필드가 정확히 여섯이다 (048이 writable·writableAt을 더했다)", () => {
+  it("★ I6·WP4 — WritePrompt의 필드가 정확히 둘이다 (049가 selectable·revertedFrom·writableAt·writable을 걷었다)", () => {
     const body = writePromptBody();
     const fields = body
       .split(";")
@@ -934,14 +676,7 @@ describe("★ 009 I6·I7 — 담을 자리가 없다", () => {
       .filter((line) => line.length > 0)
       .map((line) => line.split(/[?:]/)[0].trim());
 
-    expect(fields.sort()).toEqual([
-      "day",
-      "overwrites",
-      "revertedFrom",
-      "selectable",
-      "writable",
-      "writableAt",
-    ]);
+    expect(fields.sort()).toEqual(["day", "overwrites"]);
   });
 
   it("★ I6 — 진행률·시간·토큰·모델·본문을 담을 자리가 없다 (원칙 IV·III·I)", () => {
@@ -975,30 +710,8 @@ describe("★ 009 I6·I7 — 담을 자리가 없다", () => {
     expect(Object.keys(toWriting())).toEqual(["kind"]);
   });
 
-  /**
-   * **`SelectableDay`도 둘뿐이다**(data-model §1).
-   *
-   * 사진 갈래를 넣으면 **아직 쓰지 않은 하루의 값을 지어내게 된다**(FR-011a) —
-   * 그 값은 신호를 수집해야 나오고, 수집하려면 범위 밖의 기록 계층을 열어야 한다.
-   */
-  it("★ SelectableDay의 필드가 정확히 셋이다 (FR-011a, 048이 writable을 더했다)", () => {
-    const source = withoutComments(stateSource());
-    const start = source.indexOf("export type SelectableDay");
-    expect(start).toBeGreaterThanOrEqual(0);
-
-    const open = source.indexOf("{", start);
-    const close = source.indexOf("};", open);
-    const body = source.slice(open + 1, close);
-
-    const fields = body
-      .split(";")
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-      .map((line) => line.split(/[?:]/)[0].trim());
-
-    expect(fields.sort()).toEqual(["day", "hasDiary", "writable"]);
-    // 사진 갈래가 들어올 자리가 없다.
-    expect(body).not.toContain("PhotoHint");
+  it("★ WP4 — SelectableDay 타입이 없다 (049 — 화면은 사흘을 모른다)", () => {
+    expect(withoutComments(stateSource())).not.toContain("SelectableDay");
   });
 });
 
@@ -1018,8 +731,6 @@ describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)"
   const promptFor = (overrides: Partial<WritePrompt> = {}): WritePrompt => ({
     day: DAY,
     overwrites: false,
-    selectable: [{ day: DAY, hasDiary: false, writable: true }],
-    writable: true,
     ...overrides,
   });
 
@@ -1152,163 +863,6 @@ describe("015 US2 — stage·line이 written·failed로 새지 않는다", () =>
     const screen = afterGeneration({ ok: false, stage: "generation", reason: "무언가" });
     expect(Object.keys(screen)).not.toContain("stage");
     expect(Object.keys(screen)).not.toContain("line");
-  });
-});
-
-/**
- * 048 — 「고를 수 있다」와 「쓸 수 있다」를 가른다 (contracts/write-prompt.md WP·SC·DP7·DP8).
- */
-describe("048 writePromptFor — 아직 쓸 수 없는 오늘", () => {
-  const at = (iso: string) => new Date(iso);
-
-  it("WP1 — 정오 전 기본 선택은 쓸 수 있는 첫 날이다 (D9)", () => {
-    const prompt = writePromptFor([], at("2026-09-24T10:00:00"));
-    expect(prompt.day).toBe("2026-09-23");
-    expect(prompt.writable).toBe(true);
-    expect(prompt).not.toHaveProperty("writableAt");
-  });
-
-  it("WP2 — 정오 전 selectable은 오늘(쓸 수 없음)이 맨 앞에 붙은 넷이다", () => {
-    const prompt = writePromptFor([], at("2026-09-24T10:00:00"));
-    expect(prompt.selectable).toEqual([
-      { day: "2026-09-24", hasDiary: false, writable: false },
-      { day: "2026-09-23", hasDiary: false, writable: true },
-      { day: "2026-09-22", hasDiary: false, writable: true },
-      { day: "2026-09-21", hasDiary: false, writable: true },
-    ]);
-  });
-
-  it("WP3 — 정오 전 오늘을 고르면 쓸 수 없고 그날 정오를 알린다", () => {
-    const prompt = writePromptFor([], at("2026-09-24T10:00:00"), "2026-09-24");
-    expect(prompt.day).toBe("2026-09-24");
-    expect(prompt.writable).toBe(false);
-    expect(prompt.writableAt?.getTime()).toBe(at("2026-09-24T12:00:00").getTime());
-    expect(prompt).not.toHaveProperty("revertedFrom");
-  });
-
-  it("★ WP4 — 새벽 1시의 오늘(달력상 전날)은 04:00을 알린다 (Clarification Q1)", () => {
-    const prompt = writePromptFor([], at("2026-09-25T01:00:00"), "2026-09-24");
-    expect(prompt.day).toBe("2026-09-24");
-    expect(prompt.writable).toBe(false);
-    expect(prompt.writableAt?.getTime()).toBe(at("2026-09-25T04:00:00").getTime());
-  });
-
-  it("WP5 — 정오 이후에는 오늘이 중복되지 않고 셋 다 쓸 수 있다", () => {
-    const prompt = writePromptFor([], at("2026-09-24T13:00:00"));
-    expect(prompt.selectable).toEqual([
-      { day: "2026-09-24", hasDiary: false, writable: true },
-      { day: "2026-09-23", hasDiary: false, writable: true },
-      { day: "2026-09-22", hasDiary: false, writable: true },
-    ]);
-  });
-
-  it("WP6 — 정오 이후 오늘을 고르면 쓸 수 있다", () => {
-    const prompt = writePromptFor([], at("2026-09-24T13:00:00"), "2026-09-24");
-    expect(prompt.writable).toBe(true);
-    expect(prompt).not.toHaveProperty("writableAt");
-  });
-
-  it("★ WP7 — 같은 선택을 정오 직후에 다시 물으면 쓸 수 있게 바뀐다 (전환)", () => {
-    expect(writePromptFor([], at("2026-09-24T11:59:59"), "2026-09-24").writable).toBe(false);
-    expect(writePromptFor([], at("2026-09-24T12:00:01"), "2026-09-24").writable).toBe(true);
-  });
-
-  it("WP8 — 새벽의 오늘을 고른 채 04:00을 넘기면 되돌림 없이 쓸 수 있다", () => {
-    const prompt = writePromptFor([], at("2026-09-25T04:00:01"), "2026-09-24");
-    expect(prompt.day).toBe("2026-09-24");
-    expect(prompt.writable).toBe(true);
-    expect(prompt).not.toHaveProperty("revertedFrom");
-  });
-
-  it("WP9 — 범위 밖은 009 그대로 되돌린다", () => {
-    const prompt = writePromptFor([], at("2026-09-24T10:00:00"), "2026-09-20");
-    expect(prompt.day).toBe("2026-09-23");
-    expect(prompt.revertedFrom).toBe("2026-09-20");
-    expect(prompt.writable).toBe(true);
-  });
-
-  it("★ WP10 — I1·I2·I3·I4 불변식", () => {
-    const nows = [
-      "2026-09-24T00:30:00",
-      "2026-09-24T03:59:59",
-      "2026-09-24T04:00:00",
-      "2026-09-24T10:00:00",
-      "2026-09-24T11:59:59",
-      "2026-09-24T12:00:00",
-      "2026-09-24T23:00:00",
-    ];
-    const chosen = [null, "2026-09-24", "2026-09-23", "2026-09-22", "2026-09-21", "2026-09-10"];
-    for (const iso of nows) {
-      const now = at(iso);
-      for (const day of chosen) {
-        const prompt = writePromptFor([], now, day);
-        // I1 — 고른 날은 언제나 고를 수 있는 날 중 하나다
-        expect(prompt.selectable.map((s) => s.day)).toContain(prompt.day);
-        // I3 — 쓸 수 없을 때만 쓸 수 있게 되는 시각이 실린다
-        expect(prompt.writable === false).toBe(prompt.writableAt !== undefined);
-        // I4 — 쓸 수 없는 칸은 많아야 하나이고 그것은 오늘이다
-        const blocked = prompt.selectable.filter((s) => !s.writable);
-        expect(blocked.length).toBeLessThanOrEqual(1);
-        for (const b of blocked) expect(b.day).toBe(dayOf(now));
-        // I2 — 기본 선택은 언제나 쓸 수 있다
-        if (day === null) expect(prompt.writable).toBe(true);
-      }
-    }
-  });
-
-  it("WP11 — 덮어쓰기와 쓸 수 있음은 서로 독립이다", () => {
-    const prompt = writePromptFor(
-      [readable("2026-09-24")],
-      at("2026-09-24T10:00:00"),
-      "2026-09-24",
-    );
-    expect(prompt.overwrites).toBe(true);
-    expect(prompt.writable).toBe(false);
-  });
-});
-
-describe("048 stripCellsFor — 7칸 스트립", () => {
-  const now = new Date("2026-09-24T10:00:00");
-  const items = [readable("2026-09-19"), readable("2026-09-23")];
-
-  it("SC1 — 7칸이고 일기가 있는 날만 hasDiary (흐린 칸 포함)", () => {
-    const cells = stripCellsFor(items, writePromptFor(items, now), now);
-    expect(cells.map((c) => c.day)).toEqual([
-      "2026-09-18",
-      "2026-09-19",
-      "2026-09-20",
-      "2026-09-21",
-      "2026-09-22",
-      "2026-09-23",
-      "2026-09-24",
-    ]);
-    expect(cells.filter((c) => c.hasDiary).map((c) => c.day)).toEqual(["2026-09-19", "2026-09-23"]);
-    expect(cells.find((c) => c.day === "2026-09-19")?.selectable).toBe(false);
-  });
-
-  it("SC2 — 고른 날 한 칸만 selected", () => {
-    const cells = stripCellsFor(items, writePromptFor(items, now, "2026-09-23"), now);
-    expect(cells.filter((c) => c.selected).map((c) => c.day)).toEqual(["2026-09-23"]);
-  });
-
-  it("SC3 — 정오 전 누를 수 있는 칸은 넷(오늘 포함)", () => {
-    const cells = stripCellsFor(items, writePromptFor(items, now), now);
-    expect(cells.filter((c) => c.selectable).map((c) => c.day)).toEqual([
-      "2026-09-21",
-      "2026-09-22",
-      "2026-09-23",
-      "2026-09-24",
-    ]);
-  });
-
-  it("SC4 — 정오 이후 누를 수 있는 칸은 셋", () => {
-    const noon = new Date("2026-09-24T13:00:00");
-    const cells = stripCellsFor(items, writePromptFor(items, noon), noon);
-    expect(cells.filter((c) => c.selectable).map((c) => c.day)).toEqual([
-      "2026-09-22",
-      "2026-09-23",
-      "2026-09-24",
-    ]);
   });
 });
 

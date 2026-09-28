@@ -27,7 +27,7 @@
 | WP1 | `writePromptFor(items, now, null).day === dayOf(now)` — 09:00에도(048 D9 뒤집기) |
 | WP2 | 사흘 밖의 `chosenDay`(예: 30일 전)는 그대로 `day`가 된다 |
 | WP3 | 미래 `chosenDay`는 `dayOf(now)`로 떨어진다 |
-| WP4 | `WritePrompt`에 `selectable`·`revertedFrom`·`writableAt` 키가 없다(소스) |
+| WP4 | `WritePrompt`의 키가 `day`·`overwrites` 둘뿐이다 — `selectable`·`revertedFrom`·`writableAt`·`writable` 없음(소스) |
 | WP5 | `overwrites`는 고른 날의 일기 유무만 본다 |
 
 ## SW — 주·스와이프 (`src/app/state.ts`)
@@ -61,7 +61,7 @@
 | S1 | 칸 testID `day-YYYY-MM-DD`, 점 `day-dot-YYYY-MM-DD` 유지(FR-023) |
 | S2 | 오늘 칸 밑줄 testID `day-today-YYYY-MM-DD`, 선택 여부에 따라 색이 `COLORS.accent` / 선택 글자색 |
 | S3 | 흐린 칸: `disabled`, 불투명도 0.3, 누르면 `onSelect`가 안 불린다 |
-| S4 | 팬 제스처 testID `day-strip-pan`. `fireGestureHandler`로 `translationX: +80` 끝 → `onSwipe("previous")`, `−80` → `onSwipe("next")`, `+20`·속도 0 → 호출 없음 |
+| S4 | 팬 제스처 testID `day-strip-pan`. `fireGestureHandler`로 `translationX: +80` 끝 → `onSwipe("previous")`, `−80` → `onSwipe("next")`, `+20`·속도 0 → 호출 없음. 문턱 판정은 순수 함수 `swipeDirectionOf(dx, vx)`로도 잠근다(RNGH jest 레지스트리가 테스트 사이에 핸들러를 남기는 것을 실측 — 배선은 한 렌더에서만 쏜다) |
 | S5 | `DayPicker`는 `Date`·`dayOf`·`new Date(`를 쓰지 않는다(판정하지 않는다, 소스) |
 | S6 | 스트립은 이어 스크롤하지 않는다 — `ScrollView`·`FlatList`를 쓰지 않는다(소스) |
 

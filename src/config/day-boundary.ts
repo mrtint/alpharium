@@ -1,21 +1,22 @@
 /**
  * 하루의 경계.
  *
- * 계약: specs/002-diary-pipeline-contracts/contracts/signals.md 「하루 경계」
+ * 계약: specs/049-home-day-picker/contracts/day-picking.md DB1~DB13
+ *       (이전: specs/002-diary-pipeline-contracts/contracts/signals.md 「하루 경계」 — 04:00)
  *
- * **04:00이라는 값은 이 파일에만 존재한다(FR-021a).** 여기가 유일한 정의처다.
- * 신호 수집(다음 기능)과 일기 생성이 서로 다른 하루를 보면 일기의 근거가 어긋나므로,
- * 001에서 policy.ts를 헌법 원칙 I의 방어선으로 삼은 것과 같은 구조를 쓴다.
+ * **하루는 기기 로컬 시간의 자정(00:00)에 바뀐다**(049 Clarification Q2). 002부터 048까지는
+ * 04:00이었다(새벽 활동을 전날에 붙이던 규칙) — 049에서 사용자가 기기 달력 그대로를 택했다.
  *
- * 새벽 활동은 전날 일기에 붙는다. 00:30은 전날이고 04:00은 당일이다 — 이것이 자정
- * 기준과 다른 지점이며, 이 규칙의 전부다.
+ * **경계를 아는 자리는 이 파일 하나다(002 FR-021a).** 값이 바뀌어도 이 원칙은 그대로다 —
+ * 신호 수집(`dayBounds`)과 일기 날짜(`dayOf`)가 서로 다른 하루를 보면 일기의 근거가 어긋난다.
+ * 049가 경계를 옮기며 `vision/select.ts`에 04:00이 복제돼 있던 것을 찾아 걷어냈다 —
+ * `__tests__/config/day-boundary-source.test.ts` DB11이 재발을 막는다.
  *
- * **"지금"을 인자로 받는다.** 함수 안에서 new Date()를 부르면 03:59와 04:00 경계를
- * 테스트할 수 없다(research.md §4).
+ * **"지금"을 인자로 받는다.** 함수 안에서 new Date()를 부르면 자정 경계를 테스트할 수 없다.
  */
 
 /**
- * 04:00 경계로 잘린 하루의 식별자. `YYYY-MM-DD` 형식이다.
+ * 하루의 식별자. `YYYY-MM-DD` 형식이며 기기 시간대의 달력 날짜다.
  *
  * 문자열인 이유: 저장 시 파일명이 곧 이 값이 되고(contracts/storage.md), 직렬화 왕복에서
  * 모양이 변하지 않는다. Date로 두면 시분초가 딸려와 "어느 하루인가"가 흐려진다.
@@ -23,34 +24,22 @@
 export type DayDate = string;
 
 /**
- * 하루가 시작되는 시각(시). 기기의 현재 시간대를 따른다.
+ * 고를 수 있는 하루의 개수 (009 FR-003) — **049 이후 화면은 이것을 쓰지 않는다.**
  *
- * **이 상수를 다른 파일로 복제하지 않는다(FR-021a).** 하루 경계가 필요하면 아래 두 함수를
- * 쓴다. 시간대가 바뀐 하루는 이 기능에서 정하지 않는다(FR-021b).
- */
-const DAY_STARTS_AT_HOUR = 4;
-
-/**
- * 고를 수 있는 하루의 개수 (009 FR-003).
+ * 백그라운드 재시도(`schedule/task.ts`)·알림 기록 정리·018 미리 준비(`App.tsx`의 사진 있는 날
+ * 탐색·`canPrepare`)가 보는 「사흘」이다(049 FR-020 — 뜻을 보존한다). 화면은 지난 날 전부를
+ * 고를 수 있다(049 FR-010).
  *
- * **이 값은 여기에만 있다.** `DAY_STARTS_AT_HOUR`와 같은 이유이며 같은 자리다 —
- * 화면도 테스트도 3을 직접 적지 않고 `selectableDays()`가 돌려준 것의 길이로 안다.
- * 밖으로 내보내지 않으므로 **부르는 쪽이 이 값을 알 방법이 없다.**
- *
- * **「3일」은 고를 수 있는 하루의 개수이지 일기 하나가 덮는 기간이 아니다**
- * (009 FR-006a). 일기는 여전히 하루에 하나이고 그 하루만 쓴다.
+ * 밖으로 내보내지 않는다 — 부르는 쪽이 3을 알면 값이 두 곳에 생긴다.
  */
 const SELECTABLE_DAY_COUNT = 3;
 
 /**
- * 오늘을 쓸 수 있게 되는 시각(시). 기기의 현재 시간대를 따른다.
+ * 「사흘」 범위에 오늘이 들어오는 시각(시) — **`selectableDays()`의 구성 규칙에서만 쓴다.**
  *
- * **이 값은 여기에만 있다**(012 FR-002). `DAY_STARTS_AT_HOUR`와 같은 이유다 —
- * 부르는 쪽에서 `now.getHours() >= 12`를 직접 계산하면 화면·파이프라인·프롬프트가
- * 서로 다른 정오를 볼 수 있다.
- *
- * 04:00(하루의 시작)과는 다른 축이다. 04:00은 "어느 하루에 속하는가", 이 값은
- * "그 하루를 지금 쓸 수 있는가"를 가른다.
+ * 012에서는 「오늘을 쓸 수 있게 되는 시각」이었다. 049가 정오 제한을 없앴으므로(Q1) 오늘은
+ * 언제든 쓸 수 있지만, 백그라운드가 보는 사흘의 구성은 바꾸지 않았다(Q4 — 자동 생성은 이
+ * 조각에서 제외). **이 값을 `isDayWritable`에 되살리지 않는다.**
  */
 const WRITABLE_FROM_HOUR = 12;
 
@@ -62,23 +51,24 @@ function formatDay(date: Date): DayDate {
   return `${year}-${month}-${day}`;
 }
 
-/**
- * 어떤 시각이 속한 하루를 구한다.
- *
- * 04:00 이전이면 전날에 속한다. 월·연 경계를 넘어가는 되돌림은 Date가 처리한다.
- */
+/** `YYYY-MM-DD`에서 `offset`일 떨어진 날. 월·연 되돌림은 Date가 처리한다. */
+function addDays(day: DayDate, offset: number): DayDate {
+  const [year, month, date] = day.split("-").map(Number);
+  // **원본에서 매번 더한다** — 누적하면 서머타임 등으로 오차가 쌓인다. 정오에 두는 것도
+  // 같은 이유다(자정에 두면 서머타임 전환일에 전날로 밀릴 수 있다).
+  return formatDay(new Date(year, month - 1, date + offset, 12, 0, 0, 0));
+}
+
+/** 어떤 시각이 속한 하루 — 기기 시간대의 달력 날짜 */
 export function dayOf(instant: Date): DayDate {
-  const shifted = new Date(instant.getTime());
-  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
-  return formatDay(shifted);
+  return formatDay(instant);
 }
 
 /**
- * 하루가 걸치는 시각의 구간을 구한다. `[start, end)` — 끝은 포함하지 않는다.
+ * 하루가 걸치는 시각의 구간. `[start, end)` — 끝은 포함하지 않는다.
  *
  * 004에서 더했다. 사진을 「이 하루의 것」으로 고르려면 미디어 라이브러리에 시각 구간을
- * 넘겨야 하는데, **그 구간을 부르는 쪽에서 계산하면 04:00이 이 파일 밖으로 새어 나간다**
- * (FR-021a, 004 FR-002). 경계를 아는 자리는 여기 하나여야 한다.
+ * 넘겨야 하는데, **그 구간을 부르는 쪽에서 계산하면 경계가 이 파일 밖으로 새어 나간다.**
  *
  * `dayOf(start)`와 `dayOf(end)`가 각각 그 하루와 다음 하루가 되는 것이 이 함수의 계약이다.
  */
@@ -86,169 +76,93 @@ export function dayBounds(day: DayDate): { startMs: number; endMs: number } {
   const [year, month, date] = day.split("-").map(Number);
 
   // 기기 시간대 기준으로 만든다. UTC로 바꾸면 하루가 어긋난다.
-  const start = new Date(year, month - 1, date, DAY_STARTS_AT_HOUR, 0, 0, 0);
-  const end = new Date(year, month - 1, date + 1, DAY_STARTS_AT_HOUR, 0, 0, 0);
+  const start = new Date(year, month - 1, date, 0, 0, 0, 0);
+  const end = new Date(year, month - 1, date + 1, 0, 0, 0, 0);
 
   return { startMs: start.getTime(), endMs: end.getTime() };
 }
 
 /**
- * 어떤 하루가 닫혔는지 판정한다.
+ * 어떤 하루가 닫혔는지 — 다음 날 자정이 지났는가.
  *
- * 하루는 다음 날 04:00에 닫힌다. 아직 닫히지 않은 하루는 일기를 만들 수 없다(FR-018c) —
- * 하루가 끝나기 전에 쓰는 일기는 그 하루를 다 보지 못한 것이기 때문이다.
+ * 쓰기를 막는 판정이 아니다(049부터 오늘도 쓸 수 있다). 프롬프트의 「오늘은 아직 끝나지
+ * 않았다」(012 `dayStillOpen`, `diary/request.ts`)가 이것을 본다.
  */
 export function isDayClosed(day: DayDate, now: Date): boolean {
   return dayOf(now) > day;
 }
 
 /**
- * 이 하루를 지금 쓸 수 있는가 (012, 헌법 원칙 II 「하루의 끝」).
+ * 이 하루를 지금 쓸 수 있는가 — **미래가 아니면 쓸 수 있다**(049 FR-018b).
  *
- * 닫혔거나(지난 하루), 오늘이면서 정오를 지났으면 쓸 수 있다. **새 판정 방식이
- * 아니라 `isDayClosed()`를 감싼 것이다** — `pipeline.ts`의 1단계 게이트, 화면 안내,
- * `selectableDays()`가 전부 이 함수 하나만 부른다. 세 곳이 각자 계산하면 006~011이
- * 반복한 조용한 배선 끊김과 같은 위험이 생긴다.
+ * 012는 「닫혔거나, 오늘이면서 정오를 지났으면」이었다. 049가 정오 제한을 없앴다.
+ * `pipeline.ts`의 게이트, 화면의 쓰기 예고, 040 첫 실행 자동 생성이 전부 이 함수 하나만 부른다.
+ * 정상 경로로는 미래 날이 들어오지 않지만 게이트는 남긴다(048 FR-034의 세 겹).
  */
 export function isDayWritable(day: DayDate, now: Date): boolean {
-  return isDayClosed(day, now) || (day === dayOf(now) && now.getHours() >= WRITABLE_FROM_HOUR);
+  return day <= dayOf(now);
 }
 
 /**
- * 지금 시점에서 **일기를 쓸 수 있는 가장 최근의 하루**를 구한다 (006 FR-030).
+ * 어제 — 지금 시점에서 **닫힌 가장 최근의 하루** (006 FR-030).
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * **`dayOf(now)`는 오늘이며 오늘은 정의상 닫히지 않았다.** 그래서 그것을 그대로
- * 파이프라인에 넘기면 언제나 `day-not-closed`로 멈춘다.
- *
- * **이 계산이 여기 있어야 하는 이유**: 「하루 전」을 부르는 쪽에서 빼면 04:00 경계가
- * 이 파일 밖으로 새어 나간다(FR-021a). 004가 `dayBounds`를 여기 둔 것과 같은 판단이며,
- * 새는 순간 신호 수집과 일기 생성이 서로 다른 하루를 보게 된다.
- *
- * 새벽 02:00에 부르면 그저께가 아니라 **어제**가 나온다 — 02:00은 아직 어제이므로
- * 그 앞의 하루가 마지막으로 닫힌 하루다.
- * ─────────────────────────────────────────────────────────────────────────────
+ * 개발자 탭의 생성 패널(`GenerationProbe`)이 쓴다. 하루를 빼는 계산이 여기 있어야 경계가
+ * 밖으로 새지 않는다.
  */
 export function latestClosedDay(now: Date): DayDate {
-  const shifted = new Date(now.getTime());
-  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
-  shifted.setDate(shifted.getDate() - 1);
-  return formatDay(shifted);
+  return addDays(dayOf(now), -1);
 }
 
 /**
- * 지금 시점에서 **고를 수 있는 하루들**을 구한다 (009 FR-001, 012 FR-001a).
+ * 「사흘」 — 백그라운드·알림·018 미리 준비의 범위 (009 FR-001, 012 FR-001a, 049 FR-020).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **언제나 정확히 셋이다**(012 FR-001a). 정오 이전에는 지금과 같이 어제·그제·
- * 그그제이고, 정오 이후에는 **그그제가 빠지고 오늘이 맨 앞에 온다** — 오늘이
- * 넷째로 더해지는 것이 아니라 셋을 구성하는 규칙이 조건부로 바뀐다(사용자 결정,
- * spec Clarifications).
+ * **언제나 정확히 셋이다.** 정오 이전에는 어제·그제·그그제, 정오 이후에는 오늘·어제·그제다.
  *
- * `latestClosedDay(now)`에서 시작해 하루씩 거슬러 셋을 모으는 것이 기본이고,
- * **정오를 지났으면 그중 가장 오래된 것(그그제)을 오늘로 바꿔치기한 뒤 다시
- * 내림차순으로 정렬한다.**
+ * **★ 049 — 정오를 여기서 직접 본다.** 012까지는 `isDayWritable(today)`로 간접 판정했는데,
+ * 049가 그 함수를 「미래가 아니면 참」으로 바꿨다. 그대로 두면 **정오 전에도 오늘이 들어와
+ * 백그라운드가 아침에 오늘을 쓰기 시작한다**(research R4) — 오류 없이 조용히. 그래서 이 함수는
+ * `isDayWritable`을 부르지 않는다(DB6·위반 주입 V1이 잠근다).
  *
- * **이 계산이 여기 있어야 하는 이유는 `latestClosedDay()`와 같다.** 「사흘」을
- * 구하려면 하루씩 빼야 하고 하루의 시작은 04:00이다 — 부르는 쪽에서 `setDate(-1)`을
- * 하면 **04:00이 이 파일 밖으로 새어 나간다**(FR-004). 004가 `dayBounds()`를 여기
- * 둔 것과 같은 판단이며, 새는 순간 신호 수집과 일기 생성이 서로 다른 하루를 본다.
- * **정오도 같은 이유로 여기 하나뿐이다** — `isDayWritable()`을 통해서만 본다.
+ * **화면은 이것을 부르지 않는다**(049 FR-010·DB13) — 화면은 지난 날 전부를 고른다.
  *
- * **범위 크기를 인자로 받지 않는다**(FR-003). 받으면 부르는 쪽이 3을 알게 되고
- * 그 순간 값이 두 곳에 생긴다 — `dayBounds()`에 04:00을 넘기지 않는 것과 같다.
+ * **범위 크기를 인자로 받지 않는다**(009 FR-003). 받으면 부르는 쪽이 3을 알게 된다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function selectableDays(now: Date): readonly DayDate[] {
-  const shifted = new Date(now.getTime());
-  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
-
-  const days: DayDate[] = [];
-  for (let back = 1; back <= SELECTABLE_DAY_COUNT; back += 1) {
-    const day = new Date(shifted.getTime());
-    // **원본에서 매번 빼는 것이 중요하다.** 누적해서 빼면 서머타임 등으로 시각이
-    // 밀렸을 때 오차가 쌓인다. 월·연 되돌림은 Date가 처리한다.
-    day.setDate(day.getDate() - back);
-    days.push(formatDay(day));
-  }
-
   const today = dayOf(now);
-  if (isDayWritable(today, now) && !isDayClosed(today, now)) {
-    // 정오를 지난 오늘 — 가장 오래된 것(그그제, 배열 끝)을 오늘로 바꾸고 맨 앞으로.
-    days.pop();
-    days.unshift(today);
-  }
-
-  return days;
-}
-
-/**
- * 홈 스트립의 칸 수 (048).
- *
- * **사람이 정한 값이다**(보드 `1d`의 한 주). 고를 수 있는 하루의 개수(`SELECTABLE_DAY_COUNT`)와
- * 다르다 — 스트립은 **보는** 범위이고 고를 수 있는지는 칸마다 따로 정해진다. 계산이 이 파일에
- * 있어야 하므로(아래 `stripDays`) 값도 여기 둔다.
- */
-export const STRIP_DAY_COUNT = 7;
-
-/**
- * 오늘로 끝나는 7일 (048, contracts/write-prompt.md DB6~DB8).
- *
- * **오래된 것이 먼저다** — 보드 `1d`의 스트립은 왼쪽이 과거, 오른쪽 끝이 오늘이다.
- * `selectableDays()`(최근이 먼저)와 순서가 반대인 것은 의도다.
- *
- * **이 계산이 여기 있어야 하는 이유는 `selectableDays()`와 같다.** 「하루씩 빼기」는 04:00을
- * 알아야 한다 — 부르는 쪽이 `setDate(-1)`을 하면 04:00이 이 파일 밖으로 새어 나간다.
- */
-export function stripDays(now: Date): readonly DayDate[] {
-  const shifted = new Date(now.getTime());
-  shifted.setHours(shifted.getHours() - DAY_STARTS_AT_HOUR);
+  const includesToday = now.getHours() >= WRITABLE_FROM_HOUR;
+  const first = includesToday ? 0 : 1;
 
   const days: DayDate[] = [];
-  for (let back = STRIP_DAY_COUNT - 1; back >= 0; back -= 1) {
-    const day = new Date(shifted.getTime());
-    // **원본에서 매번 뺀다** — 누적하면 서머타임 등으로 오차가 쌓인다(`selectableDays`와 같다).
-    day.setDate(day.getDate() - back);
-    days.push(formatDay(day));
+  for (let back = first; back < first + SELECTABLE_DAY_COUNT; back += 1) {
+    days.push(addDays(today, -back));
   }
   return days;
 }
 
 /**
- * 아직 쓸 수 없는 하루가 **쓸 수 있게 되는 시각** (048, contracts/write-prompt.md DB1~DB5·DB10).
+ * 그 날이 든 주 — **일요일부터 토요일까지 7일**, 오래된 것이 먼저 (049 DB8, 보드 `1d` 스트립).
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * **새 판정이 아니다.** `isDayWritable()`의 두 규칙(닫힘 · 오늘의 정오)이 다음에 참이 되는
- * 시각을 구할 뿐이다. 지금 쓸 수 있으면 `null`이다.
- *
- * **★ 쓸 수 없는 오늘은 하루에 두 구간 있다**(048 Clarification Q1):
- *  - 04:00~12:00 — 그 하루의 정오에 쓸 수 있게 된다
- *  - 00:00~04:00 — 달력은 이미 다음 날이지만 하루는 아직 안 닫혔고, 정오도 지났다고 보지
- *    않는다(`isDayWritable`이 `now.getHours()`를 보므로). 그 하루는 **04:00에 닫혀** 쓸 수
- *    있게 된다. 여기서 정오를 돌려주면 화면이 새벽에 「오후 12시부터」라는 틀린 말을 한다.
- *
- * **04와 12를 밖으로 내보내지 않는 대신 이 `Date`를 내보낸다.** 화면은 이것을 사람의 말로
- * 옮기고 전환 타이머도 같은 값으로 건다 — 문구와 타이머가 서로 다른 시각을 볼 수 없다.
- * ─────────────────────────────────────────────────────────────────────────────
+ * 주 시작(일요일)은 보드가 정한 값이다. 요일은 `Date.getDay()`(0 = 일요일)를 따른다.
  */
-export function writableAt(day: DayDate, now: Date): Date | null {
-  if (isDayWritable(day, now)) return null;
-  if (day !== dayOf(now)) return null; // 미래의 날 — 부르는 쪽이 넘기지 않는 갈래(방어)
+export function weekOf(day: DayDate): readonly DayDate[] {
+  const [year, month, date] = day.split("-").map(Number);
+  const weekday = new Date(year, month - 1, date, 12, 0, 0, 0).getDay();
+  return Array.from({ length: 7 }, (_, i) => addDays(day, i - weekday));
+}
 
-  const { startMs, endMs } = dayBounds(day);
-  // 하루의 시작(04:00)과 같은 달력일이면 04:00~12:00 구간이다 — 그 하루의 정오.
-  const start = new Date(startMs);
-  if (now.getDate() === start.getDate() && now.getMonth() === start.getMonth()) {
-    return new Date(
-      start.getFullYear(),
-      start.getMonth(),
-      start.getDate(),
-      WRITABLE_FROM_HOUR,
-      0,
-      0,
-      0,
-    );
-  }
-  // 달력이 넘어간 새벽(00:00~04:00) — 하루가 닫히는 시각.
-  return new Date(endMs);
+/** 같은 요일로 `weeks`주 떨어진 날 (049 DB8 W4) */
+export function shiftWeek(day: DayDate, weeks: number): DayDate {
+  return addDays(day, weeks * 7);
+}
+
+/**
+ * 다음 하루가 시작되는 시각 — 다음 자정 (049 DB9).
+ *
+ * 홈이 켜진 채 자정을 넘길 때 오늘 밑줄을 옮기는 타이머가 쓴다(FR-019). 경계 시각을 화면이
+ * 계산하지 않게 여기서 준다.
+ */
+export function nextDayStartAt(now: Date): Date {
+  return new Date(dayBounds(dayOf(now)).endMs);
 }

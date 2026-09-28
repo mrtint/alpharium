@@ -59,11 +59,12 @@
 **Decision**: `isDayWritable(day, now) = day <= dayOf(now)`. `writableAt()`과 그것을 쓰는 048의 갈래 전부 삭제:
 `WritePrompt.writableAt`, `WriteBar`의 `write-unavailable` 갈래, `SignalRow`의 「…부터」 값, `DiaryHomeScreen`의 전환
 타이머(`opensAtMs`·`WRITABLE_TIMER_SLACK_MS`), `home-text.ts`의 `hourText`·`HALF_DAY_HOURS`.
-`WritePrompt.writable`은 **남긴다** — 미래 날(정상 경로로는 도달 불가)에 대한 방어이며, 화면·`write()`·파이프라인의
-세 겹(048 FR-034)을 그대로 유지하는 비용이 0이다.
+~~`WritePrompt.writable`은 남긴다~~ → **구현 중 뒤집었다**: `writePromptFor`가 미래 `chosenDay`를 오늘로 떨어뜨리므로
+`writable`은 언제나 참이었다(도달 불가). 필드와 화면·`write()`의 게이트를 걷어내고, 미래 날의 방어는 파이프라인의
+`isDayWritable` 게이트 하나로 남겼다.
 
 **Rationale**: 사용자 결정(Clarifications Q1). 도달할 수 없는 갈래를 남기면 그것은 계약이 아니라 거짓말이다(042 `skipped`
-교훈). `writable`은 도달 불가가 아니라 「미래」라는 실재하는 입력에 대한 방어라 다르다.
+교훈). `writable`도 같은 이유로 걷어냈다(위).
 
 **따라오는 것**:
 - `prompt.ts`의 `DAY_STILL_OPEN`은 그대로. `request.ts:56`이 `!isDayClosed(day, now)`로 계산하므로 오늘이면 언제나

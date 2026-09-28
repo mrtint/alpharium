@@ -70,7 +70,7 @@ const VISION_PHOTO_LIMIT = 8;
 /**
  * 하루를 나누는 고정 시간 칸의 수 (023 FR-007·FR-008).
  *
- * **6 = 4시간 간격**: 04–08, 08–12, 12–16, 16–20, 20–24, 00–04. 사람이 하루를
+ * **6 = 4시간 간격**: 00–04, 04–08, 08–12, 12–16, 16–20, 20–24(049부터 자정 기준). 사람이 하루를
  * 자연스럽게 나누는 시간대와 대략 맞고, 상한(5~12장)과 비슷한 크기라 최소
  * 커버리지가 예산을 거의 다 쓰지 않는다.
  *
@@ -172,17 +172,20 @@ function classifyPhotos(photos: readonly Photo[]): {
 }
 
 /**
- * 그 하루의 04:00을 0으로 놓았을 때 `takenAt`이 몇 번째 시간 칸인가
- * (contracts/time-distribution.md D1).
+ * 그 하루의 자정을 0으로 놓았을 때 `takenAt`이 몇 번째 시간 칸인가
+ * (contracts/time-distribution.md D1, 049 DB12).
  *
- * **`day-boundary.ts`를 import하지 않는다** — `takenAt`의 시:분에서 04:00
- * 기준 경과 분을 직접 유도한다(순수 유지). 04:00 경계와 일관: 00:30은 전날
- * 칸 그룹의 마지막, 04:00은 첫 칸.
+ * **★ 049 — 여기에 04:00이 복제돼 있었다**(`getHours() - 4`). 023이 「`day-boundary.ts`를
+ * import하지 않는다 — 순수 유지」라며 04:00 기준 경과 분을 직접 계산했는데, 049가 하루
+ * 경계를 자정으로 옮기자 새벽 칸이 하루의 **마지막** 칸으로 밀려 011 R3 보정(첫 칸은 가장
+ * 이른 장)이 엉뚱한 사진을 골랐다 — 오류 없이. 이제 하루는 기기 달력 그대로이므로 칸은 시계의
+ * 분 그 자체다. 하루 기준을 옮기는 시 계산(`getHours() ±`)은 이 파일에 두지 않는다
+ * (`day-boundary-source.test.ts` DB11).
  */
 function bucketIndexOf(takenAt: Date): number {
-  const minutesSince4am = ((takenAt.getHours() - 4) * 60 + takenAt.getMinutes() + 1440) % 1440;
+  const minuteOfDay = takenAt.getHours() * 60 + takenAt.getMinutes();
   const bucketSpan = 1440 / BUCKET_COUNT;
-  return Math.min(BUCKET_COUNT - 1, Math.floor(minutesSince4am / bucketSpan));
+  return Math.min(BUCKET_COUNT - 1, Math.floor(minuteOfDay / bucketSpan));
 }
 
 /**

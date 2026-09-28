@@ -57,6 +57,12 @@ jest.mock("react-native-reanimated", () => {
     // 최소 구현으로 충분하다.
     withRepeat: (toValue: unknown) => toValue,
     withSequence: (...values: unknown[]) => values[0],
+    // 049 — gesture-handler가 reanimated를 감지하면(`useSharedValue`가 있으면) `useEvent`로
+    // 제스처 이벤트를 UI 스레드에 잇는다. 목에는 UI 스레드가 없으므로 빈 핸들러를 준다 —
+    // 홈 스트립의 팬은 `runOnJS(true)`라 콜백이 JS에서 돌고, 테스트는 `fireGestureHandler`로
+    // 그 콜백을 직접 쏜다.
+    useEvent: () => () => {},
+    setGestureState: () => {},
     Easing: {
       linear: (t: number) => t,
       ease: (t: number) => t,
@@ -103,3 +109,14 @@ jest.mock("react-native-reanimated-carousel", () => {
       ),
   };
 });
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 049 — `react-native-gesture-handler`의 공식 jest 설정.
+ *
+ * 홈 스트립의 주 넘기기(`Gesture.Pan`)를 `fireGestureHandler`로 쏘려면 네이티브
+ * 모듈 목이 필요하다. **`package.json`의 `setupFiles`에 넣지 않는다** — ui
+ * 프로젝트는 `jest-expo` 프리셋의 `setupFiles`(RN·expo 설정 둘)를 쓰는데, 그 키를
+ * 적으면 프리셋 값이 통째로 **대체**되어 두 설정이 조용히 빠진다.
+ * ───────────────────────────────────────────────────────────────────────────── */
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- 목 등록 파일이라 부수 효과 import만 필요하다
+require("react-native-gesture-handler/jestSetup");

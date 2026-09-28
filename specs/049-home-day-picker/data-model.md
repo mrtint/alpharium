@@ -37,11 +37,12 @@
 WritePrompt = {
   day: DayDate            // 고른 날(미래가 아님). 고른 적 없거나 미래면 dayOf(now)
   overwrites: boolean     // 그 날에 일기가 있는가
-  writable: boolean       // isDayWritable(day, now) — 정상 경로에서는 언제나 참(미래 방어)
 }
 ```
 
-**삭제되는 필드**: `selectable`(사흘 목록), `revertedFrom`(되돌림), `writableAt`(쓸 수 있게 되는 시각).
+**삭제되는 필드**: `selectable`(사흘 목록), `revertedFrom`(되돌림), `writableAt`(쓸 수 있게 되는 시각),
+**`writable`**(구현 중 발견 — 미래 `chosenDay`는 오늘로 떨어지므로 언제나 참이 되어 도달 불가였다.
+미래 날의 마지막 방어는 파이프라인의 `isDayWritable` 게이트 하나다).
 **삭제되는 타입**: `SelectableDay`.
 
 **불변식**
@@ -103,4 +104,5 @@ StripCell = {
 
 ## 8. 상태 줄
 
-`dayStateText(prompt, item | undefined, now): string` — `home-text.ts`. research R9 표.
+`dayStateText(item | undefined, isToday: boolean): string` — `home-text.ts`. research R9 표.
+오늘인가는 스트립 칸(`StripCell.isToday`)에서 받는다 — 화면이 지금 시각을 읽지 않는다(구현 때 확정).

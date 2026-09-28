@@ -24,7 +24,7 @@ import type { Character, CustomNames, DiaryEntry, VisionSetting } from "./types"
 
 /** 어느 단계에서 멈췄는가. 실패 경로마다 정확히 하나가 붙는다(FR-019). */
 export type PipelineStage =
-  | "day-not-closed" // 아직 04:00 경계를 지나지 않음 (FR-018c)
+  | "day-not-closed" // 미래 날 (049부터 오늘은 언제든 쓸 수 있다 — FR-018b)
   | "already-running" // 같은 하루가 이미 생성 중 (FR-018d)
   | "signals" // 신호를 가져오지 못함
   | "request-build" // 캐릭터가 없어 요청 실패 (FR-007)
@@ -207,10 +207,9 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
       input: PipelineInput,
       onProgress?: (stage: ProgressStage, branch?: MonologueBranch) => void,
     ): Promise<PipelineResult> {
-      // 1. 이 하루를 지금 쓸 수 있는가? — 닫혔거나(지난 하루), 오늘이면서
-      //    정오를 지났으면 쓸 수 있다(012, 헌법 원칙 II 「하루의 끝」).
-      //    ★ isDayClosed()만 보던 이전 게이트는 오늘을 언제나 거부했다
-      //    (research.md §9) — isDayWritable()이 그 자리를 대신한다.
+      // 1. 이 하루를 지금 쓸 수 있는가? — 미래가 아니면 쓸 수 있다(049 FR-018b,
+      //    012의 정오 제한 폐지). 정상 경로로는 미래 날이 오지 않지만 이 게이트는
+      //    화면·`write()` 다음의 셋째 겹이다(048 FR-034).
       if (!isDayWritable(input.day, input.now)) {
         return stop("day-not-closed", `${input.day}는 아직 닫히지 않았다`);
       }
