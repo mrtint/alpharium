@@ -20,7 +20,10 @@ import { join } from "node:path";
 const FILES = {
   author: "../../src/ui/AuthorPicker.tsx",
   build: "../../src/ui/BuildErrorScreen.tsx",
-  overwrite: "../../src/ui/OverwriteConfirmScreen.tsx",
+  // 050 — 012의 전체 화면 확인(`OverwriteConfirmScreen`)이 홈 위 대화상자로 바뀌었다. 같은 방어(공용
+  // 부품 사용, 색 리터럴 없음, 일기 본문 없음)를 새 파일에 건다.
+  overwrite: "../../src/ui/OverwriteConfirmDialog.tsx",
+  dialog: "../../src/ui/components/Dialog.tsx",
   permissions: "../../src/ui/PermissionsSection.tsx",
 } as const;
 
@@ -34,11 +37,12 @@ function load(rel: string) {
 const AUTHOR = load(FILES.author);
 const BUILD = load(FILES.build);
 const OVERWRITE = load(FILES.overwrite);
+const DIALOG = load(FILES.dialog);
 const PERMISSIONS = load(FILES.permissions);
 const ALL = [
   ["AuthorPicker", AUTHOR],
   ["BuildErrorScreen", BUILD],
-  ["OverwriteConfirmScreen", OVERWRITE],
+  ["OverwriteConfirmDialog", OVERWRITE],
   ["PermissionsSection", PERMISSIONS],
 ] as const;
 
@@ -55,7 +59,14 @@ describe("ES7 — 원시 hex 리터럴이 없다", () => {
 // ES9 — className + 토큰 style 병행 (spec SC-003)
 // ───────────────────────────────────────────────────────────────────────────
 describe("ES9 — className 문자열과 토큰 참조 style을 함께 쓴다", () => {
-  it.each(ALL)("%s 소스에 className= 이 있다", (_name, { code }) => {
+  // 050 — 덮어쓰기 확인의 className·style 병행은 공용 `components/Dialog.tsx`가 한다(대화상자 파일은
+  // 그것을 조립만 한다).
+  it.each([
+    ["AuthorPicker", AUTHOR],
+    ["BuildErrorScreen", BUILD],
+    ["components/Dialog (OverwriteConfirmDialog가 쓴다)", DIALOG],
+    ["PermissionsSection", PERMISSIONS],
+  ] as const)("%s 소스에 className= 이 있다", (_name, { code }) => {
     expect(code).toMatch(/className=/);
   });
 
@@ -125,12 +136,14 @@ describe("ES1 — 문안이 바이트 그대로다", () => {
     },
   );
 
-  it.each([["이 날의 일기가 이미 있다. 덮어쓸지 확인이 필요하다"], ["취소"], ["확인"]])(
-    "OverwriteConfirmScreen: %s",
-    (literal) => {
-      expect(OVERWRITE.src).toContain(literal);
-    },
-  );
+  // 050 — 덮어쓰기 문구는 보드 `2d` 원문으로 바뀌었고 `home-text.ts`에서만 온다(contracts TXT1·TXT3).
+  // 원문 자체는 `home-text.test.ts`가 글자 단위로 잠근다.
+  it("OverwriteConfirmDialog: 문구를 home-text의 OVERWRITE_CONFIRM에서 가져온다", () => {
+    expect(OVERWRITE.code).toMatch(
+      /import\s*\{[^}]*OVERWRITE_CONFIRM[^}]*\}\s*from\s*["']\.\/home-text["']/,
+    );
+    expect(OVERWRITE.code).not.toContain("다시 쓰기");
+  });
 
   it.each([
     ["권한"],
@@ -174,12 +187,12 @@ describe("ES10 — AuthorPicker 고유", () => {
 });
 
 // ───────────────────────────────────────────────────────────────────────────
-// ES11 — OverwriteConfirmScreen: 공용 Button + StyleSheet.create 제거
+// ES11 — OverwriteConfirmDialog(050): 공용 대화상자 부품 + StyleSheet.create 없음
 // ───────────────────────────────────────────────────────────────────────────
-describe("ES11 — OverwriteConfirmScreen 고유", () => {
-  it("components/Button 을 import 하고 <Button 을 쓴다", () => {
-    expect(OVERWRITE.code).toMatch(/from\s+["']\.\/components\/Button["']/);
-    expect(OVERWRITE.code).toMatch(/<Button\b/);
+describe("ES11 — OverwriteConfirmDialog 고유", () => {
+  it("components/Dialog 를 import 하고 <ConfirmDialog 를 쓴다", () => {
+    expect(OVERWRITE.code).toMatch(/from\s+["']\.\/components\/Dialog["']/);
+    expect(OVERWRITE.code).toMatch(/<ConfirmDialog\b/);
   });
 
   it("StyleSheet.create 가 없다", () => {
@@ -187,8 +200,8 @@ describe("ES11 — OverwriteConfirmScreen 고유", () => {
   });
 
   it("props 타입에 entry 가 없다 (원칙 I, X1)", () => {
-    // OverwriteConfirmScreenProps 선언부에 entry 필드가 없다.
-    const propsBlock = OVERWRITE.code.match(/OverwriteConfirmScreenProps\s*=\s*\{[\s\S]*?\}/);
+    // OverwriteConfirmDialogProps 선언부에 entry 필드가 없다.
+    const propsBlock = OVERWRITE.code.match(/OverwriteConfirmDialogProps\s*=\s*\{[\s\S]*?\}/);
     expect(propsBlock).not.toBeNull();
     expect(propsBlock?.[0]).not.toMatch(/\bentry\b/);
   });

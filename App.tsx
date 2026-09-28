@@ -1,6 +1,7 @@
 // 032 — NativeWind 스타일 부수 효과 import. `metro.config.js`의 `input`과 짝이며
 // 이 줄이 없으면 런타임에 tailwind base/유틸리티가 실리지 않는다(BC4).
 import "./global.css";
+import { PortalHost } from "@rn-primitives/portal";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, Platform, ScrollView, StyleSheet, View } from "react-native";
@@ -128,6 +129,9 @@ export default function App() {
       {/* 인셋을 재는 자리. 이것이 없으면 아래 `SafeAreaView`가 잴 값을 얻지 못한다. */}
       <SafeAreaProvider>
         <AppFrame />
+        {/* 050 — RNR 대화상자·메뉴가 열릴 때 내용을 올리는 자리(research R4). 안전 영역 안의
+            마지막 자식이라 모든 화면 위에 겹친다. 하나만 둔다(contracts DEP5). */}
+        <PortalHost />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

@@ -63,17 +63,14 @@ env:
     timeout: 20000
 - tapOn: "일기 쓰기"
 
-# 이미 일기가 있으면 덮어쓰기 확인 — 확인을 눌러 진행한다(012).
+# 이미 일기가 있으면 덮어쓰기 확인 — 「다시 쓰기」를 눌러 진행한다(012 → 050 홈 위 대화상자).
 - runFlow:
     when:
-      visible: ".*덮어쓴다.*"
+      visible:
+        id: "overwrite-dialog"
     commands:
-      - tapOn: "확인"
-- runFlow:
-    when:
-      visible: ".*덮어쓸지 확인.*"
-    commands:
-      - tapOn: "확인"
+      - tapOn:
+          id: "overwrite-confirm"
 
 # ★ 원칙 IV — 생성 중에 지표가 없다.
 - assertNotVisible: "%"

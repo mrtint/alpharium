@@ -137,7 +137,30 @@ describe("048 H — 1d 구조와 헤더", () => {
     }
   });
 
-  it("★ H7 — 헤더의 날짜 묶음에는 누름 처리가 없다 (049 FR-016, C7)", () => {
+  /**
+   * ★ 050 CAL1 — 049 H7(「헤더의 날짜 묶음에는 누름 처리가 없다」)을 대체한다. 050이 큰 숫자·요일 영역에
+   * 「날짜로 이동」 달력을 여는 누름을 붙였다(spec FR-012). **월 라벨·상태 줄은 여전히 누를 수 없다.**
+   */
+  it("★ CAL1 — 큰 숫자·요일만 누를 수 있고 누르면 onPressDate 1회", async () => {
+    const onPressDate = jest.fn();
+    await renderHome({ onPressDate });
+
+    await fireEvent.press(screen.getByTestId("home-date-button"));
+    expect(onPressDate).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("home-date-button")).toHaveProp("accessibilityLabel", "날짜로 이동");
+  });
+
+  it("★ CAL1 — 월 라벨·「일기」 표지·상태 줄을 눌러도 달력이 열리지 않는다", async () => {
+    const onPressDate = jest.fn();
+    await renderHome({ onPressDate });
+
+    for (const id of ["home-month", "home-kicker", "home-day-state"]) {
+      await fireEvent.press(screen.getByTestId(id));
+    }
+    expect(onPressDate).not.toHaveBeenCalled();
+  });
+
+  it("CAL1 — 크로스페이드 겹(DayHeading·DayFace) 자체에는 누름이 없다 — 누름은 감싸는 한 곳뿐", () => {
     const code = readFileSync(join(__dirname, "../../src/ui/DiaryListScreen.tsx"), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
@@ -146,12 +169,12 @@ describe("048 H — 1d 구조와 헤더", () => {
       code.indexOf("function DayFace"),
     );
     const face = code.slice(code.indexOf("function DayFace"), code.indexOf("function Notices"));
-    // 헤더 본문 — 스트립(`DayPicker`)은 `onSelect`로 받으므로 `onPress`·`Pressable`이 없어야 한다.
-    const header = code.slice(code.indexOf("function Header"), code.indexOf("function DayHeading"));
-    for (const part of [header, heading, face]) {
+    for (const part of [heading, face]) {
       expect(part).not.toContain("Pressable");
       expect(part).not.toContain("onPress");
     }
+    const header = code.slice(code.indexOf("function Header"), code.indexOf("function DayHeading"));
+    expect(header.match(/home-date-button/g) ?? []).toHaveLength(1);
   });
 
   it("H8 — 날이 바뀌면 이전 날이 잠시 함께 그려진다 (크로스페이드 배선, C9)", async () => {

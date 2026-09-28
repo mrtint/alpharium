@@ -1,0 +1,91 @@
+# 실기기 자동 테스트 — 대화상자 기반 (050)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 두 대화상자를 본다 — **덮어쓰기 확인**(보드 2d, 확인 대화상자)과 **날짜로 이동**(보드 2j, 달력).
+#
+# 검증 항목 (specs/050-dialog-foundation):
+#   FR-006·FR-009  일기가 있는 날에서 「일기 쓰기」 → 홈 위 대화상자, 뒤로 가기·취소 = 홈 그대로   (D1)
+#   FR-012·FR-018  헤더 날짜 → 달력 → ‹ → 그 달 1일 → 닫히고 헤더가 그 날                        (D2)
+#   FR-019         달력 「취소」 → 아무것도 바뀌지 않는다                                          (D3)
+#
+# **여기서 자동화하지 않는 것** — quickstart D2(덮개 누름)·D6(다시 쓰기 끝까지)·D9(월·연 목록)·
+# D11(미래 칸): 덮개는 대화상자 면과 좌표가 겹쳐 Maestro로 「면 밖」을 고르기 어렵고, 다시 쓰기 완주는
+# 모델·시간이 필요하다. 사람이 눈으로 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
+#
+# ⚠️ D1은 **일기가 있는 날**이 필요하다 — 없으면 블록이 `runFlow when`으로 건너뛴다(오늘에 일기가
+# 없고 7일 안에도 없으면). 그때는 quickstart D1을 손으로 본다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 20000
+
+# ★ D1 — 오늘에 일기가 있으면(상태 줄이 「… 쓸 수 있어요」가 아니면) 덮어쓰기 대화상자를 본다.
+- runFlow:
+    when:
+      notVisible: ".*일기를 쓸 수 있어요"
+    commands:
+      - tapOn:
+          id: "write-button"
+      - assertVisible:
+          id: "overwrite-dialog"
+      - assertVisible: "일기를 다시 쓸까요?"
+      - assertVisible: "다시 쓰기"
+      # 오늘을 다시 쓸 때만 보이는 안내(Q5)
+      - assertVisible:
+          id: "overwrite-today-note"
+      # 뒤로 가기 = 취소. 앱이 닫히지 않고 홈이 그대로다.
+      - back
+      - extendedWaitUntil:
+          notVisible:
+            id: "overwrite-dialog"
+          timeout: 5000
+      - assertVisible:
+          id: "day-strip"
+      # 「취소」도 같다.
+      - tapOn:
+          id: "write-button"
+      - tapOn:
+          id: "overwrite-cancel"
+      - extendedWaitUntil:
+          notVisible:
+            id: "overwrite-dialog"
+          timeout: 5000
+
+# ★ D2 — 헤더 날짜 → 달력 → 이전 달 → 그 달 1일 → 닫히고 헤더가 1일이다.
+- tapOn:
+    id: "home-date-button"
+- assertVisible:
+    id: "calendar-dialog"
+- assertVisible: "날짜로 이동"
+- tapOn:
+    id: "calendar-prev"
+- tapOn:
+    id: "calendar-day-.*-01"
+- extendedWaitUntil:
+    notVisible:
+      id: "calendar-dialog"
+    timeout: 5000
+- assertVisible:
+    id: "home-day-number"
+    text: "1"
+# 오늘이 든 주가 아니므로 오늘 밑줄이 스트립에 없다.
+- assertNotVisible:
+    id: "day-today-.*"
+
+# ★ D3 — 달력을 열고 「취소」 → 헤더가 그대로 1일이다.
+- tapOn:
+    id: "home-date-button"
+- tapOn:
+    id: "calendar-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "calendar-dialog"
+    timeout: 5000
+- assertVisible:
+    id: "home-day-number"
+    text: "1"

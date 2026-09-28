@@ -35,6 +35,15 @@ jest.setTimeout(30000);
  * 표면은 `Button`·`ListRow`가 실제로 쓰는 것만 둔다 — 안 쓰는 API를 미리 채우면
  * 그것이 032가 남긴 "만들고 안 쓰는" 자리가 된다.
  * ───────────────────────────────────────────────────────────────────────────── */
+/** 050 — 레이아웃 애니메이션 체이닝 스텁. `jest.mock` 팩토리는 `mock` 접두사가 붙은 바깥 이름만 볼 수 있다 */
+function mockLayoutAnimationStub(): Record<string, unknown> {
+  const stub: Record<string, unknown> = {};
+  for (const method of ["duration", "delay", "reduceMotion", "springify", "easing"]) {
+    stub[method] = () => stub;
+  }
+  return stub;
+}
+
 jest.mock("react-native-reanimated", () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock 팩토리는 호이스팅되므로 상단 import를 못 쓴다
   const { View } = require("react-native");
@@ -63,6 +72,12 @@ jest.mock("react-native-reanimated", () => {
     // 그 콜백을 직접 쏜다.
     useEvent: () => () => {},
     setGestureState: () => {},
+    // 050 — RNR 대화상자·메뉴 복사본(`src/ui/rnr/native-only-animated-view.tsx`)이 `entering`/
+    // `exiting`에 레이아웃 애니메이션을 준다. 목에는 움직임이 없으므로 체이닝만 되는 빈 객체를
+    // 준다(`.duration()`·`.delay()`·`.reduceMotion()`이 자기 자신). 움직임은 실기기에서 본다(C9).
+    FadeIn: mockLayoutAnimationStub(),
+    FadeOut: mockLayoutAnimationStub(),
+    ReduceMotion: { System: "system", Always: "always", Never: "never" },
     Easing: {
       linear: (t: number) => t,
       ease: (t: number) => t,

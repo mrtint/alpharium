@@ -4,6 +4,7 @@
  * 계약: specs/045-onboarding-download-consent/contracts/download-consent-gate.md
  *       C9
  *       spec.md FR-001~FR-003·FR-002a
+ *       specs/050-dialog-foundation/contracts/dialogs.md MIG1
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **[확인/시작] 하나만 있다**(FR-002a) — 거부·건너뛰기 조작을 두지 않는다.
@@ -15,16 +16,14 @@
  * `essential-assets.ts`의 `ESSENTIAL_ASSET_KEYS`를 import하지 않는다. 화면이
  * 아는 것은 "사진을 읽는 모델"·"글을 쓰는 모델"이라는 역할 이름뿐이다(원칙 III).
  *
- * **RN 코어 `Modal`만 쓴다** — 새 Dialog 라이브러리를 추가하지 않는다
- * (research.md R5, 043·044 관례 계승).
+ * **050 — 공용 확인 대화상자(`ConfirmDialog`)로 옮겼다**(Clarifications Q4). 045는 「새 Dialog
+ * 라이브러리를 추가하지 않는다」며 RN 코어 `Modal`을 썼는데, 050이 대화상자 기반(RNR)을 들이며 그
+ * 전제를 바꿨다. 동작·문구·testID는 그대로다 — 확인 대화상자라 덮개를 눌러도 닫히지 않고, 닫는 콜백을
+ * 주지 않으므로 뒤로 가기도 아무것도 바꾸지 않는다(앱도 닫지 않는다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Modal, View } from "react-native";
-
-import { Button } from "./components/Button";
-import { AppText } from "./components/Text";
-import { COLORS } from "./theme/tokens";
+import { ConfirmDialog, DialogActionButton } from "./components/Dialog";
 
 export type DownloadConsentDialogProps = {
   visible: boolean;
@@ -41,38 +40,17 @@ const TEXT = {
 
 export function DownloadConsentDialog({ visible, onConfirm }: DownloadConsentDialogProps) {
   return (
-    <Modal animationType="fade" onRequestClose={() => {}} transparent visible={visible}>
-      <View style={BACKDROP}>
-        <View style={CARD} testID="download-consent-dialog">
-          <AppText variant="title">{TEXT.title}</AppText>
-          <AppText variant="body">{TEXT.body}</AppText>
-
-          {/* [확인/시작] 하나뿐이다 — 거부·건너뛰기 버튼을 두지 않는다(FR-002a). */}
-          <Button onPress={onConfirm} testID="download-consent-confirm">
-            {TEXT.confirm}
-          </Button>
-        </View>
-      </View>
-    </Modal>
+    <ConfirmDialog
+      // [확인/시작] 하나뿐이다 — 거부·건너뛰기 버튼을 두지 않는다(FR-002a).
+      actions={
+        <DialogActionButton onPress={onConfirm} testID="download-consent-confirm">
+          {TEXT.confirm}
+        </DialogActionButton>
+      }
+      description={TEXT.body}
+      open={visible}
+      testID="download-consent-dialog"
+      title={TEXT.title}
+    />
   );
 }
-
-/*
- * 032/043 — 색을 토큰에서 가져온다. 인라인 `style`은 jest에 NativeWind 변환이
- * 없어서다(043·044 관례).
- */
-const BACKDROP = {
-  flex: 1,
-  alignItems: "center",
-  justifyContent: "center",
-  backgroundColor: "rgba(32,30,29,0.6)",
-  paddingHorizontal: 24,
-} as const;
-
-const CARD = {
-  width: "100%",
-  maxWidth: 360,
-  gap: 16,
-  padding: 24,
-  backgroundColor: COLORS.bg,
-} as const;

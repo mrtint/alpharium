@@ -76,7 +76,7 @@ latestPickableDay(now: Date): DayDate                                // = dayOf(
 | --- | --- | --- | --- |
 | `ConfirmDialog` | `src/ui/components/Dialog.tsx` | `open`, `onCancel?`, `title`, `description?`, `children?`, `actions` | 덮개 ✗. 뒤로 가기 → `onCancel`(없으면 아무 일도 없음) |
 | `DismissibleDialog` | 같은 파일 | `open`, `onClose`, `title`, `children` | 덮개·뒤로 가기 → `onClose` |
-| `OverwriteConfirmDialog` | `src/ui/OverwriteConfirmDialog.tsx` | `day`, `isToday`, `onCancel`, `onConfirm` | `ConfirmDialog` |
+| `OverwriteConfirmDialog` | `src/ui/OverwriteConfirmDialog.tsx` | `isToday`, `onCancel`, `onConfirm` (구현 중 `day`를 뺐다 — 보드 `2d`는 날짜를 보이지 않는다) | `ConfirmDialog` |
 | `DateJumpDialog` | `src/ui/DateJumpDialog.tsx` | `open`, `items`, `selectedDay`, `now`, `onPick(day)`, `onClose` | `DismissibleDialog` |
 | `DownloadConsentDialog` | 기존 파일 교체 | 기존 props 그대로(`visible`, `onConfirm`) | `ConfirmDialog`(`onCancel` 없음) |
 | `HomeMenu` | 기존 파일 교체 | 기존 props 그대로(`items`) | RNR `DropdownMenu` |
@@ -116,6 +116,6 @@ calendarYearText(year: number): string       // "2026년"
 - `RADIUS.control = 6` (버튼). tailwind `borderRadius.control`.
 - `RNR_COLOR_ALIASES` — 값은 전부 `COLORS.*` 참조(새 hex 0개): `background→bg`, `foreground→text`, `muted-foreground→textMuted`,
   `primary→accent`, `primary-foreground→accentForeground`, `input→text`, `popover→bg`, `popover-foreground→text`.
-- `OVERLAY = { scrim: "rgba(0,0,0,0.5)", shadowColor: "#000000", shadowOpacity: 0.18, shadowRadius: 30, shadowOffsetY: 10 }`.
+- `OVERLAY = { scrim: "rgba(0,0,0,0.5)", faceShadow: "0px 10px 30px rgba(0,0,0,0.18)" }` — 면 그림자는 RN `boxShadow` 문자열 하나로 둔다(구현 중 정정).
 - `DIALOG = { padding: 24, gap: 16, inset: 20, borderWidth: 2, buttonHeight: 48, buttonGap: 8 }`,
   `CALENDAR = { navSize: 40, cellHeight: 40, dot: 4, underlineOffset: 3, disabledOpacity: 0.3 }` — 사람이 정한 값(보드 §3.1).

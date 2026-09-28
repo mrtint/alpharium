@@ -76,11 +76,16 @@ export type AppScreen =
   /**
    * 이미 있는 하루를 다시 쓰려 한다 (012 US3, FR-011~013).
    *
-   * **필드가 `day` 하나뿐이다** — 007의 `toWriting()`이 인자를 받지 않는 것과 같은
-   * 방어다(원칙 I). 기존 일기의 본문·글자 수·미리보기를 담지 않는다 — 담으면 이
-   * 화면이 「확인 대신 미리 보기」로 미끄러질 수 있다.
+   * **일기 본문을 담지 않는다** — 007의 `toWriting()`이 인자를 받지 않는 것과 같은
+   * 방어다(원칙 I). 기존 일기의 본문·글자 수·미리보기를 담으면 이 확인이 「확인 대신 미리
+   * 보기」로 미끄러질 수 있다.
+   *
+   * **050 — `items`가 더해졌다.** 확인은 이제 전체 화면이 아니라 **홈 위의 대화상자**다(보드
+   * `2d`). 뒤에 홈(스트립·헤더·목록)을 그려야 하므로 목록 요약을 싣는다. `DiaryListItem`은
+   * 목록이 이미 보이는 요약(날짜·제목·읽을 수 있는가·사진 요약)이라 위 방어를 깨지 않는다 —
+   * `DiaryEntry`는 여전히 싣지 않는다(050 data-model §3).
    */
-  | { kind: "confirm-overwrite"; day: DayDate }
+  | { kind: "confirm-overwrite"; day: DayDate; items: DiaryListItem[] }
   /**
    * 015 — `stage`·`line` 둘 다 옵셔널이다. 화면이 뜬 직후, 첫 진행 신호가
    * 오기 전에는 둘 다 `undefined`일 수 있다(FR-011).
@@ -200,24 +205,40 @@ export function writePromptFor(
 }
 
 /**
+ * 한 날의 칸 판정 (050 data-model §1, contracts/dialogs.md CAL5·CAL6).
+ *
+ * **스트립(049)과 달력(050 `2j`)이 같은 판정 하나를 쓴다** — 복제하지 않는다(FR-017). 두 곳이 따로
+ * 계산하면 스트립과 달력이 서로 다른 날을 「오늘」로 볼 수 있다. 「오늘」·「미래가 아니다」는
+ * `day-boundary.ts`에서만 온다(049 DB11).
+ */
+export function cellFor(
+  day: DayDate,
+  items: readonly DiaryListItem[],
+  selectedDay: DayDate,
+  now: Date,
+): StripCell {
+  return {
+    day,
+    // 읽을 수 없는 일기도 그 하루를 차지한다(006 FR-017a).
+    hasDiary: items.some((item) => item.day === day),
+    isToday: day === dayOf(now),
+    selectable: isDayWritable(day, now),
+    selected: day === selectedDay,
+  };
+}
+
+/**
  * 홈 스트립의 7칸 — **고른 날이 든 일~토 주** (049 SW1·SW2, 보드 `1d`).
  *
- * **날짜 계산은 `weekOf()`가 한다** — 하루 경계가 이 파일로 새지 않는다. 여기서는 목록과
- * 오늘·미래를 칸에 얹을 뿐이다. 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
+ * **날짜 계산은 `weekOf()`가 한다** — 하루 경계가 이 파일로 새지 않는다. 칸 하나의 판정은
+ * `cellFor()`다(050). 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
  */
 export function weekCellsFor(
   items: readonly DiaryListItem[],
   prompt: WritePrompt,
   now: Date,
 ): StripCell[] {
-  const today = dayOf(now);
-  return weekOf(prompt.day).map((day) => ({
-    day,
-    hasDiary: items.some((item) => item.day === day),
-    isToday: day === today,
-    selectable: isDayWritable(day, now),
-    selected: prompt.day === day,
-  }));
+  return weekOf(prompt.day).map((day) => cellFor(day, items, prompt.day, now));
 }
 
 /** 스트립을 넘기는 방향 — 오른쪽으로 끌면 이전 주, 왼쪽이면 다음 주 */
@@ -340,9 +361,10 @@ export function toWriting(): AppScreen {
  * 이미 있으면 `confirm-overwrite`로 가서 곧바로 생성을 시작하지 않는다(FR-011).
  * 없으면 지금처럼 바로 `writing`이다.
  */
-export function startWriting(prompt: WritePrompt): AppScreen {
+export function startWriting(prompt: WritePrompt, items: DiaryListItem[]): AppScreen {
   if (prompt.overwrites) {
-    return { kind: "confirm-overwrite", day: prompt.day };
+    // 050 — 대화상자 뒤에 그릴 홈의 목록을 함께 든다. 취소는 이것으로 돌아간다(다시 읽지 않는다).
+    return { kind: "confirm-overwrite", day: prompt.day, items };
   }
   return toWriting();
 }
@@ -350,7 +372,8 @@ export function startWriting(prompt: WritePrompt): AppScreen {
 /**
  * 덮어쓰기 확인에서 취소한다 (012, FR-012).
  *
- * 기존 일기는 그대로 남고 아무것도 생성되지 않는다 — 목록으로 돌아갈 뿐이다.
+ * 기존 일기는 그대로 남고 아무것도 생성되지 않는다 — 목록으로 돌아갈 뿐이다. 050 — 화면은
+ * 대화상자가 들고 있던 `items`를 넘긴다. 취소는 아무것도 바꾸지 않았으므로 다시 읽지 않는다.
  */
 export function cancelOverwrite(items: DiaryListItem[]): AppScreen {
   return toList(items);

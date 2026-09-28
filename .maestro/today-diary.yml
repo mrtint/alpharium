@@ -71,15 +71,18 @@ appId: com.anonymous.alpharium
     commands:
       - tapOn:
           id: "write-button"
-      # ★ 확인 화면이 뜨고 곧바로 생성되지 않는다.
-      - assertVisible: "확인"
+      # ★ 확인 대화상자가 뜨고 곧바로 생성되지 않는다(050 — 홈 위의 대화상자, 보드 2d).
+      - assertVisible:
+          id: "overwrite-dialog"
+      - assertVisible: "다시 쓰기"
       - assertVisible: "취소"
       # ★ 확인 화면에 진행률·모델 정보가 없다(원칙 III·IV).
       - assertNotVisible: "%"
       - assertNotVisible: "kanana"
       - assertNotVisible: "exaone"
       # 취소하면 홈으로 돌아가고 아무것도 생성되지 않는다.
-      - tapOn: "취소"
+      - tapOn:
+          id: "overwrite-cancel"
       - assertVisible:
           id: "day-strip"
 

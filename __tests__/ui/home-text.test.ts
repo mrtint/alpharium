@@ -17,6 +17,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  CALENDAR_WEEKDAYS,
+  DATE_JUMP,
+  OVERWRITE_CONFIRM,
+  calendarMonthText,
+  calendarYearText,
   cardDateText,
   dayOfMonthText,
   dayStateText,
@@ -91,12 +96,42 @@ describe("049 — 사라진 문구", () => {
   });
 });
 
+/**
+ * 050 — 대화상자 문구 (contracts/dialogs.md TXT1·TXT2). 보드 `2d`·`2j` KO 원문을 글자 단위로 잠근다(C4).
+ * `todayNote`만 보드 문구표에 없는 사람이 정한 문장이다(Clarifications Q5 — 보드 `2g` 메모에서).
+ */
+describe("★ 050 대화상자 문구 (TXT1·TXT2)", () => {
+  it("TXT1 — 덮어쓰기 확인 (보드 2d h2.confirm*)", () => {
+    expect(OVERWRITE_CONFIRM).toEqual({
+      title: "일기를 다시 쓸까요?",
+      body: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
+      todayNote: "지금까지의 하루로 써요.",
+      confirm: "다시 쓰기",
+      cancel: "취소",
+    });
+  });
+
+  it("TXT1 — 날짜로 이동 (보드 2j cal.*)", () => {
+    expect(DATE_JUMP).toEqual({ title: "날짜로 이동", cancel: "취소" });
+    expect(CALENDAR_WEEKDAYS.join(" ")).toBe("일 월 화 수 목 금 토");
+  });
+
+  it("TXT2 — 달력 머리의 월·연 (보드 cal.month·cal.year)", () => {
+    expect(calendarMonthText({ year: 2026, month: 9 })).toBe("9월");
+    expect(calendarMonthText({ year: 2026, month: 12 })).toBe("12월");
+    expect(calendarYearText(2026)).toBe("2026년");
+  });
+});
+
 describe("★ 048 홈 화면 소스의 경계 (G9·G10)", () => {
   const HOME_FILES = [
     "src/ui/home-text.ts",
     "src/ui/DiaryListScreen.tsx",
     "src/ui/DayPicker.tsx",
     "src/ui/HomeMenu.tsx",
+    // 050 — 홈 위에 뜨는 대화상자도 하루 경계를 따로 판정하지 않는다.
+    "src/ui/OverwriteConfirmDialog.tsx",
+    "src/ui/DateJumpDialog.tsx",
   ];
 
   const sources = HOME_FILES.filter((f) => existsSync(join(__dirname, "../..", f))).map((f) => ({

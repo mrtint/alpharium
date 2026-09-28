@@ -23,6 +23,7 @@ import { memoryStore } from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
+import { renderWithPortal } from "./render-with-portal";
 
 /**
  * **CI에서 기본 5초로는 모자란다**(2026-08-21, PR #13 실패로 확인).
@@ -430,7 +431,8 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     // 그 하루의 일기를 미리 심는다.
     await store.save({ ...entry, date: "2026-08-17" });
 
-    await render(
+    // 050 — 확인은 홈 위의 대화상자다(포털). 호스트와 함께 그린다.
+    await renderWithPortal(
       <DiaryHomeScreen
         now={at}
         pipeline={pipeline}
@@ -443,11 +445,11 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     await userEvent.press(await screen.findByTestId("day-2026-08-17"));
     await userEvent.press(await screen.findByText("일기 쓰기"));
 
-    // 확인 화면이 뜨고, 아직 생성은 시작되지 않았다.
-    await screen.findByText("확인");
+    // 확인 대화상자가 뜨고, 아직 생성은 시작되지 않았다.
+    await screen.findByTestId("overwrite-dialog");
     expect(pipeline.days).toEqual([]);
 
-    await userEvent.press(screen.getByText("확인"));
+    await userEvent.press(screen.getByText("다시 쓰기"));
 
     // **저장된 것을 대신 보여주지 않는다** — 실제로 생성이 돌았다.
     await waitFor(() => expect(pipeline.days).toEqual(["2026-08-17"]));
@@ -1257,5 +1259,46 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
 
     // 새 날짜의 캡션만 실린다 — 이전 날짜의 "이전 날짜 사진"이 섞이지 않는다.
     expect(pipeline.inputs[0].seen?.captions[0]?.text).toBe("새 날짜 사진");
+  });
+});
+
+/**
+ * 050 — 헤더 날짜 → 날짜로 이동 → 스트립·헤더가 그 날 (contracts/dialogs.md CAL1·CAL7, spec FR-018).
+ *
+ * 스트립이 그 날이 든 주로 바뀌는 것은 049가 고른 날에서 주를 계산하므로 저절로 성립한다 — 여기서는 그
+ * 배선(달력 → `setChosenDay`)이 끊기지 않았는지를 본다.
+ */
+describe("050 — 날짜로 이동 (CAL1·CAL7)", () => {
+  const NOW = new Date("2026-09-28T09:00:00");
+
+  it("★ 헤더 날짜 → 달력 → ‹ 두 번 → 7/15 → 닫히고 스트립이 7/12~7/18 주, 7/15 선택", async () => {
+    jest
+      .spyOn(BackHandler, "addEventListener")
+      .mockImplementation(
+        () => ({ remove: () => {} }) as ReturnType<typeof BackHandler.addEventListener>,
+      );
+    await renderWithPortal(
+      <DiaryHomeScreen
+        now={() => NOW}
+        resolution={resolved}
+        resolve={resolveQuiet()}
+        store={memoryStore()}
+      />,
+    );
+    await userEvent.press(await screen.findByTestId("home-date-button"));
+    await screen.findByTestId("calendar-dialog");
+
+    await userEvent.press(screen.getByTestId("calendar-prev"));
+    await userEvent.press(screen.getByTestId("calendar-prev"));
+    await userEvent.press(screen.getByTestId("calendar-day-2026-07-15"));
+
+    await waitFor(() => expect(screen.queryByTestId("calendar-dialog")).toBeNull());
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("15");
+    expect(screen.getByTestId("day-2026-07-12")).toBeTruthy();
+    expect(screen.getByTestId("day-2026-07-18")).toBeTruthy();
+    expect(screen.getByTestId("day-2026-07-15")).toHaveProp(
+      "accessibilityState",
+      expect.objectContaining({ selected: true }),
+    );
   });
 });
