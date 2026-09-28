@@ -62,6 +62,11 @@ export const RADIUS = {
   card: 0,
   /** 알약형 */
   pill: 0,
+  /**
+   * 050 — 대화상자·달력의 버튼(보드 `2d`·`2j`). 면은 여전히 직선(반경 0)이고 **버튼만** 6이다 —
+   * 보드가 하단 바 버튼과 맞춘 값이다(설계 §3.1, 사람이 정한 값).
+   */
+  control: 6,
 } as const;
 
 /**
@@ -123,6 +128,68 @@ export const PRESS = {
 export const REVEAL = {
   /** 글자당 노출 간격 (ms) */
   charMs: 15,
+} as const;
+
+/**
+ * 050 — React Native Reusables(RNR) 색 이름 → 우리 역할 (Clarifications Q3, research R6).
+ *
+ * RNR 복사본(`src/ui/rnr/`)은 shadcn 색 이름(`bg-background`·`text-foreground`…)을 쓴다. CSS 변수를
+ * 두면 단일 출처가 둘로 갈라지므로(032 BC5) **여기서 별칭만** 만들고, 값은 전부 `COLORS`를 가리킨다 —
+ * 새 색이 하나도 없다(DEP4). 복사본이 실제로 쓰는 이름만 둔다.
+ *
+ * RNR의 `accent`(눌림 배경)는 우리 `accent`(빨강)와 이름이 겹치므로 별칭으로 두지 않는다 — 복사본에서
+ * 그 클래스를 `bg-surface`로 바꿨다.
+ */
+export const RNR_COLOR_ALIASES = {
+  background: COLORS.bg,
+  foreground: COLORS.text,
+  "muted-foreground": COLORS.textMuted,
+  primary: COLORS.accent,
+  "primary-foreground": COLORS.accentForeground,
+  input: COLORS.text,
+  popover: COLORS.bg,
+  "popover-foreground": COLORS.text,
+} as const;
+
+/**
+ * 050 — 대화상자 덮개와 면 그림자 (보드 `2d`·`2j`, 설계 §3.1 — 사람이 정한 값).
+ *
+ * `COLORS`는 `#rrggbb`만 담으므로(DT1) 반투명 값은 여기 따로 둔다. 덮개 `rgba(0,0,0,.5)`, 면 그림자
+ * `0 10px 30px rgba(0,0,0,.18)`(RN `boxShadow` 문자열 — 안드로이드에서도 그린다).
+ */
+export const OVERLAY = {
+  scrim: "rgba(0,0,0,0.5)",
+  faceShadow: "0px 10px 30px rgba(0,0,0,0.18)",
+} as const;
+
+/** 050 — 대화상자 면·버튼 치수 (보드 `2d`, 사람이 정한 값). */
+export const DIALOG = {
+  /** 면 안쪽 여백 */
+  padding: 24,
+  /** 면 안 요소 간격 */
+  gap: 16,
+  /** 화면 좌우 바깥 여백 (가로 전폭) */
+  inset: 20,
+  /** 면 테두리 두께 (`COLORS.text`) */
+  borderWidth: 2,
+  /** 버튼 높이 */
+  buttonHeight: 48,
+  /** 세로로 쌓인 버튼 사이 */
+  buttonGap: 8,
+} as const;
+
+/** 050 — 날짜로 이동 달력 치수 (보드 `2j`, 사람이 정한 값). */
+export const CALENDAR = {
+  /** 이전·다음 버튼 한 변 */
+  navSize: 40,
+  /** 날짜 칸 높이 */
+  cellHeight: 40,
+  /** 일기 있음 점 한 변 */
+  dot: 4,
+  /** 오늘 밑줄과 숫자 사이 */
+  underlineOffset: 3,
+  /** 미래 칸·비활성 버튼 불투명도 */
+  disabledOpacity: 0.3,
 } as const;
 
 /**

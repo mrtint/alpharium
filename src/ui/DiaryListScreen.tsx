@@ -48,7 +48,14 @@ import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { DayPicker } from "./DayPicker";
 import { BAR_HEIGHT, HomeMenu, type HomeMenuItem } from "./HomeMenu";
-import { cardDateText, dayOfMonthText, dayStateText, monthText, weekdayLong } from "./home-text";
+import {
+  DATE_JUMP,
+  cardDateText,
+  dayOfMonthText,
+  dayStateText,
+  monthText,
+  weekdayLong,
+} from "./home-text";
 import { COLORS } from "./theme/tokens";
 
 /** 신호 줄의 사진·다닌 자리 칸 — 읽는 중이거나, 다 읽었거나 */
@@ -89,6 +96,11 @@ export type DiaryListScreenProps = {
   preview?: PreviewState;
   /** `⋯` 메뉴 항목 (048 US4). 무엇을 넣을지는 부르는 쪽이 정한다 */
   menuItems?: readonly HomeMenuItem[];
+  /**
+   * 헤더의 큰 숫자·요일을 눌렀다 (050 — 「날짜로 이동」 달력, 보드 `2j`). 무엇을 열지는 부르는 쪽이
+   * 정한다. 없으면 누름 처리를 두지 않는다(049처럼).
+   */
+  onPressDate?: () => void;
 };
 
 export function DiaryListScreen({
@@ -104,6 +116,7 @@ export function DiaryListScreen({
   deniedNotices,
   preview,
   menuItems,
+  onPressDate,
 }: DiaryListScreenProps) {
   return (
     <View style={ROOT}>
@@ -118,6 +131,7 @@ export function DiaryListScreen({
             deniedNotices={deniedNotices}
             items={items}
             movedNotice={movedNotice}
+            onPressDate={onPressDate}
             onSelectDay={onSelectDay}
             onSwipe={onSwipe}
             preview={preview}
@@ -157,6 +171,7 @@ function Header({
   movedNotice,
   deniedNotices,
   preview,
+  onPressDate,
 }: {
   write: WritePrompt;
   items: readonly DiaryListItem[];
@@ -167,6 +182,7 @@ function Header({
   movedNotice?: string;
   deniedNotices?: readonly string[];
   preview?: PreviewState;
+  onPressDate?: () => void;
 }) {
   // 오늘인가는 스트립 칸이 이미 안다 — 화면은 지금 시각을 읽지 않는다.
   const isToday = cells.some((cell) => cell.selected && cell.isToday);
@@ -185,10 +201,22 @@ function Header({
       </View>
 
       {/*
-        ② 날짜 헤더. **누름 처리를 두지 않는다**(049 FR-016, C7) — 탭하면 달력을 여는 것은
-        「대화상자 기반」, 접힌 스트립을 펼치는 것은 「읽기 스크롤」 조각이다.
+        ② 날짜 헤더. **큰 숫자·요일만** 누를 수 있다 — 「날짜로 이동」 달력을 연다(050 FR-012, 보드
+        `2j`). 월 라벨·상태 줄은 누를 수 없다. 접힌 스트립을 먼저 펼치는 갈래는 「읽기 스크롤」
+        조각이 더한다(C7). 크로스페이드 겹은 `pointerEvents="none"`이라 누름을 가로채지 않는다.
       */}
-      <DayHeading day={write.day} />
+      {onPressDate !== undefined ? (
+        <Pressable
+          accessibilityLabel={DATE_JUMP.title}
+          accessibilityRole="button"
+          onPress={onPressDate}
+          testID="home-date-button"
+        >
+          <DayHeading day={write.day} />
+        </Pressable>
+      ) : (
+        <DayHeading day={write.day} />
+      )}
       <AppText style={DAY_STATE} testID="home-day-state">
         {dayStateText(item, isToday)}
       </AppText>

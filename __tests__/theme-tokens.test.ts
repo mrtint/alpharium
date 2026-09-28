@@ -15,7 +15,14 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { COLORS, RADIUS, REVEAL, TYPE, contrastRatio } from "../src/ui/theme/tokens";
+import {
+  COLORS,
+  RADIUS,
+  REVEAL,
+  RNR_COLOR_ALIASES,
+  TYPE,
+  contrastRatio,
+} from "../src/ui/theme/tokens";
 
 const TOKENS_SRC = readFileSync(join(__dirname, "../src/ui/theme/tokens.ts"), "utf8");
 const TAILWIND_SRC = readFileSync(join(__dirname, "../tailwind.config.js"), "utf8");
@@ -129,12 +136,28 @@ describe("DT5 — 단일 출처 (tailwind.config.js가 tokens.ts를 require)", (
     expect(code).not.toMatch(/#[0-9A-Fa-f]{6}/);
   });
 
-  it("★ tailwind config의 색 키 집합 == COLORS 키 집합", () => {
+  it("★ tailwind config의 색 키 집합 == COLORS 키 ∪ RNR 별칭 키 (050)", () => {
     // require로 실제 로드해 비교한다.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const twConfig = require("../tailwind.config.js");
     const twColors = twConfig.theme?.extend?.colors ?? {};
-    expect(Object.keys(twColors).sort()).toEqual([...COLOR_KEYS].sort());
+    expect(Object.keys(twColors).sort()).toEqual(
+      [...COLOR_KEYS, ...Object.keys(RNR_COLOR_ALIASES)].sort(),
+    );
+  });
+
+  it("★ 050 DEP4 — RNR 별칭의 값은 전부 COLORS의 값이다 (새 색 없음)", () => {
+    const palette = new Set<string>(Object.values(COLORS));
+    for (const value of Object.values(RNR_COLOR_ALIASES)) {
+      expect(palette.has(value)).toBe(true);
+    }
+  });
+
+  it("050 — RADIUS.control(버튼 6)이 tailwind borderRadius에 있다", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const twConfig = require("../tailwind.config.js");
+    expect(RADIUS.control).toBe(6);
+    expect(twConfig.theme?.extend?.borderRadius?.control).toBe("6px");
   });
 });
 

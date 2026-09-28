@@ -18,6 +18,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import type { CalendarMonth } from "../app/calendar";
 import { dayParts, type DiaryListItem } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
 
@@ -79,4 +80,40 @@ export function dayStateText(item: DiaryListItem | undefined, isToday: boolean):
   }
   if (!item.readable) return "읽을 수 없어요";
   return item.title ?? "이 날 일기를 썼어요";
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 050 — 대화상자 문구 (보드 `2d`·`2j` KO 원문, contracts/dialogs.md TXT1·TXT2).
+ *
+ * 화면 소스에 문구 리터럴을 두지 않고 여기서만 가져간다(TXT3). `todayNote`만 보드 문구표에 없는
+ * **사람이 정한 문장**이다 — Clarifications Q5, 보드 `2g` 메모 「그 시점까지의 하루로 새로 씀」에서
+ * 옮겼다. 오전에 쓴 오늘 일기가 저녁까지 지어내는 문제(049 관측, 원칙 II)를 고치지는 않고, 오늘을
+ * 다시 쓸 때 사실만 알린다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+/** 덮어쓰기 확인 (`2d`, 보드 `h2.confirm*`) */
+export const OVERWRITE_CONFIRM = {
+  title: "일기를 다시 쓸까요?",
+  body: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
+  todayNote: "지금까지의 하루로 써요.",
+  confirm: "다시 쓰기",
+  cancel: "취소",
+} as const;
+
+/** 날짜로 이동 (`2j`, 보드 `cal.title`·`cal.cancel`) */
+export const DATE_JUMP = { title: "날짜로 이동", cancel: "취소" } as const;
+
+/** 달력 요일 머리 — 일요일 시작 (보드 `cal.dows`) */
+export const CALENDAR_WEEKDAYS = WEEKDAY_SHORT;
+
+/** 달력 머리의 월. 예: 「9월」 (보드 `cal.month`) */
+export function calendarMonthText(m: CalendarMonth): string {
+  return `${m.month}월`;
+}
+
+/** 달력 머리·연 목록의 해. 예: 「2026년」 (보드 `cal.year`) */
+export function calendarYearText(year: number): string {
+  return `${year}년`;
 }

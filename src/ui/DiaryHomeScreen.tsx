@@ -45,6 +45,7 @@ import {
   toFailed,
   toList,
   canSwipeNext,
+  cellFor,
   swipeWeek,
   weekCellsFor,
   writePromptFor,
@@ -64,10 +65,11 @@ import { listDiaries } from "../diary/store";
 import type { Character, VisionSetting } from "../diary/types";
 import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
+import { DateJumpDialog } from "./DateJumpDialog";
 import { DiaryDetailScreen } from "./DiaryDetailScreen";
 import { DiaryListScreen, type PreviewState } from "./DiaryListScreen";
 import type { HomeMenuItem } from "./HomeMenu";
-import { OverwriteConfirmScreen } from "./OverwriteConfirmScreen";
+import { OverwriteConfirmDialog } from "./OverwriteConfirmDialog";
 import { AppText } from "./components/Text";
 import { TypewriterText } from "./components/TypewriterText";
 import { COLORS, REVEAL } from "./theme/tokens";
@@ -238,6 +240,13 @@ export function DiaryHomeScreen({
   /** 방금 생성에서 캐릭터가 옮겨졌으면 그 안내 문구 (029 FR-014). */
   const [movedNotice, setMovedNotice] = useState<string | undefined>(undefined);
 
+  /**
+   * 「날짜로 이동」 달력이 열려 있는가 (050, 보드 `2j`). 화면 로컬 — 파일에 남기지 않는다(FR-020).
+   * 날을 고르면 기존 `setChosenDay`(049)로 고른다 — 스트립이 그 날이 든 주로 바뀌는 것은 049가 고른
+   * 날에서 주를 계산하므로 저절로 성립한다(FR-018, 새 주 계산 없음).
+   */
+  const [calendarOpen, setCalendarOpen] = useState(false);
+
   /** 지금 도는 생성이 있는가. `AppState` 구독이 본다 */
   const running = useRef(false);
 
@@ -374,7 +383,10 @@ export function DiaryHomeScreen({
    * 그린다 — 고른 날은 상태로 들고 있으므로 그대로이고, 오늘 밑줄·흐림만 새 오늘을 따른다.
    * 판정은 여전히 매 렌더 `now()` 하나다.
    */
-  const listItems = screen.kind === "list" ? screen.items : null;
+  // 050 — 덮어쓰기 확인은 홈 **위의** 대화상자다. 그동안에도 홈(스트립·헤더·목록)은 같은 목록으로
+  // 그려져 있어야 하므로 두 상태를 「홈을 그리는 상태」로 함께 본다.
+  const listItems =
+    screen.kind === "list" || screen.kind === "confirm-overwrite" ? screen.items : null;
   const listPrompt = listItems !== null ? writePromptFor(listItems, now(), chosenDay) : null;
   const onList = listItems !== null;
   useEffect(() => {
@@ -518,7 +530,8 @@ export function DiaryHomeScreen({
    * 옮기고, 012의 덮어쓰기 확인을 거친 뒤 생성한다.
    */
   const write = useCallback(async () => {
-    const items = screen.kind === "list" ? screen.items : [];
+    if (screen.kind !== "list") return;
+    const items = screen.items;
     const prompt = writePromptFor(items, now(), chosenDay);
 
     // 049 — 고른 날은 언제나 쓸 수 있다(미래는 `writePromptFor`가 오늘로 떨어뜨린다). 미래 날의
@@ -541,7 +554,7 @@ export function DiaryHomeScreen({
         : undefined,
     );
 
-    const next = startWriting(prompt);
+    const next = startWriting(prompt, items);
     if (next.kind === "confirm-overwrite") {
       setScreen(next);
       // 확인 후 생성할 때 쓸 params를 들고 있는다.
@@ -572,29 +585,53 @@ export function DiaryHomeScreen({
       return <BuildErrorScreen />;
 
     case "list":
+    case "confirm-overwrite": {
+      const items = screen.items;
+      const prompt = listPrompt ?? writePromptFor(items, now(), chosenDay);
       return (
-        <DiaryListScreen
-          canSwipeNext={canSwipeNext(
-            (listPrompt ?? writePromptFor(screen.items, now(), chosenDay)).day,
-            now(),
+        <>
+          <DiaryListScreen
+            canSwipeNext={canSwipeNext(prompt.day, now())}
+            cells={weekCellsFor(items, prompt, now())}
+            deniedNotices={deniedNotices}
+            items={items}
+            menuItems={menuItems}
+            movedNotice={movedNotice}
+            onOpen={(item) => void openItem(item)}
+            // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
+            onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
+            onSelectDay={setChosenDay}
+            onSwipe={onSwipe}
+            onWrite={() => void write()}
+            preview={shownPreview}
+            write={prompt}
+          />
+          {screen.kind === "list" && (
+            <DateJumpDialog
+              items={items}
+              now={now()}
+              onClose={() => setCalendarOpen(false)}
+              onPick={(day) => {
+                setCalendarOpen(false);
+                setChosenDay(day);
+              }}
+              open={calendarOpen}
+              selectedDay={prompt.day}
+            />
           )}
-          cells={weekCellsFor(
-            screen.items,
-            listPrompt ?? writePromptFor(screen.items, now(), chosenDay),
-            now(),
+          {screen.kind === "confirm-overwrite" && (
+            <OverwriteConfirmDialog
+              isToday={cellFor(screen.day, items, screen.day, now()).isToday}
+              onCancel={() => setScreen(cancelOverwrite(items))}
+              onConfirm={() => {
+                setScreen(confirmOverwrite());
+                if (pendingParams.current !== null) void generate(pendingParams.current);
+              }}
+            />
           )}
-          deniedNotices={deniedNotices}
-          items={screen.items}
-          menuItems={menuItems}
-          movedNotice={movedNotice}
-          onOpen={(item) => void openItem(item)}
-          onSelectDay={setChosenDay}
-          onSwipe={onSwipe}
-          onWrite={() => void write()}
-          preview={shownPreview}
-          write={listPrompt ?? writePromptFor(screen.items, now(), chosenDay)}
-        />
+        </>
       );
+    }
 
     case "detail":
       return (
@@ -604,20 +641,6 @@ export function DiaryHomeScreen({
             entry={screen.entry}
           />
         </Frame>
-      );
-
-    case "confirm-overwrite":
-      return (
-        <OverwriteConfirmScreen
-          day={screen.day}
-          onCancel={() => {
-            void refresh().then((items) => setScreen(cancelOverwrite(items)));
-          }}
-          onConfirm={() => {
-            setScreen(confirmOverwrite());
-            if (pendingParams.current !== null) void generate(pendingParams.current);
-          }}
-        />
       );
 
     case "unreadable":

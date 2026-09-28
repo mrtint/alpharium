@@ -1565,6 +1565,48 @@ v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
   지어냈다(원칙 II, 정오 제한 폐지로 더 자주 보일 수 있다). 상세는 quickstart §6.
 - 상세: `specs/049-home-day-picker/`.
 
+### 050 — 대화상자 기반: 덮어쓰기 확인·날짜로 이동 (2026-09-28)
+
+홈 UI/UX 개편의 「대화상자 기반」 조각(분해 설계 §3.1, 보드 `2d`·`2j`). React Native Reusables(RNR)를 들여와
+공용 대화상자 부품 둘(`components/Dialog.tsx`의 `ConfirmDialog`·`DismissibleDialog`)을 세우고, 012의 전체 화면
+덮어쓰기 확인을 홈 위 대화상자로, 헤더 큰 숫자·요일 탭을 「날짜로 이동」 달력으로 바꿨다. 다운로드 동의(045)와
+홈 ⋯ 메뉴(048)도 같은 부품으로 옮겼다(Clarifications Q4). 049 절의 「헤더 날짜에는 누름이 없다」(H7)는 050이
+바꿨다 — 큰 숫자·요일만 누를 수 있고 월 라벨·상태 줄은 여전히 못 누른다.
+
+- **★ RNR 레지스트리 원본은 네이티브 모듈을 끌고 온다.** `alert-dialog`·`dialog`·`dropdown-menu` 원본이
+  `react-native-screens`(`FullWindowOverlay`, iOS 전용)와 `lucide-react-native`(→ `react-native-svg`)를 import한다.
+  `src/ui/rnr/` 복사본에서 걷어냈고 `dialog-foundation-deps.test.ts` DEP1이 되살아나는 것을 막는다. 새로 들인
+  `@rn-primitives/*`·`react-native-ui-datepicker`·`dayjs`에는 네이티브 코드가 없다(설치본 확인) — dev 1회로 끝냈다.
+- **뒤로 가기는 프리미티브가 한다.** AlertDialog·Dialog·DropdownMenu의 `Content`가 마운트 때 `BackHandler`를
+  **한 번** 등록해 그때의 `onOpenChange`를 붙잡는다 — 부품이 최신 콜백을 ref로 읽는다(`useLatest`). 확인 대화상자의
+  덮개는 누름을 받지 않고, 일반 대화상자·메뉴의 덮개는 `closeOnPress`로 닫힌다.
+- **`@rn-primitives` 설치본(`dist`)이 JSX를 그대로 담는다** — jest `ui` 프로젝트의 `transformIgnorePatterns`에
+  `@rn-primitives`를 더했다(없으면 `Unexpected token '<'`).
+- **포털 테스트**: `App.tsx` 루트에 `PortalHost` 하나. 테스트는 `__tests__/ui/render-with-portal.tsx`로 화면 옆에
+  호스트를 그린다 — `rerender`에도 `withPortal()`로 감싸야 호스트가 사라지지 않는다.
+- **★ 드롭다운 메뉴는 jest에서 열리지 않는다** — 트리거를 `measure()`로 재야 목록을 그리는데 RN jest 목의
+  `measure`는 콜백을 부르지 않는다(`@react-native/jest-preset/jest/MockNativeMethods`). `home-menu.test.tsx`가
+  그 목에 버튼 자리를 넣어 준다. 위치(하단 바 윗선을 덮지 않는가)는 실기기에서만 본다.
+- **★ datepicker의 타입 선언과 실제 값이 다르다** — `components.Day`의 `day.date`와 `disabledDates`의 인자는
+  선언상 문자열이지만 **dayjs 객체**다. 변환은 `app/calendar.ts`의 `dayDateFromPicker()` 한 곳. 또 그 라이브러리의
+  `›`는 `maxDate`를 보지 않고 제어 prop(`month`)은 같은 값으로 되돌릴 수 없어, **날짜 격자만** datepicker에 맡기고
+  머리(‹ 월 연 ›)와 월·연 목록은 직접 그린다.
+- **달력과 스트립은 칸 판정 하나(`cellFor`)를 쓴다** — `weekCellsFor`가 그것을 7번 부른다. `DateJumpDialog.tsx`에
+  `dayOf(`·`isDayWritable(`·`.some(`이 없다(CAL5, 소스 검사). 미래 칸 방어는 `disabledDates`(우리 판정)와
+  `maxDate`(오늘) 둘이라 하나만 빼면 테스트가 초록이다 — 위반 주입은 둘 다 빼야 잡힌다.
+- **색**: RNR 색 이름(`background`·`primary`…)은 `tokens.ts`의 `RNR_COLOR_ALIASES`가 `COLORS`를 가리키는 별칭이다
+  (새 색 0, CSS 변수 없음 — Q3). RNR `Button`·`Text`는 대화상자·메뉴 부품 안에서만 쓴다(DEP2).
+- **오늘을 다시 쓸 때만** 대화상자에 「지금까지의 하루로 써요.」(사람이 정한 문장, Q5). 오전 오늘 일기의 지어내기
+  (049 관측, 원칙 II) 자체는 고치지 않았다 — 별도 과제.
+- **이 저장소에서 python으로 파일을 쓰면 Windows가 CRLF로 바꾼다** — 소스를 읽는 계약 테스트(`;
+
+` 정규식)가
+  깨졌다. `open(..., newline="
+")`으로 쓴다.
+- 기기 없는 테스트 168 스위트 / 3064개 통과, lint·헌법 검사·prettier 클린, 위반 주입 13건 전부 잡힘
+  (`specs/050-dialog-foundation/quickstart.md` §5). 실기기 결과는 같은 파일 §6.
+- 상세: `specs/050-dialog-foundation/`.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만

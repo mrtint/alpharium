@@ -13,7 +13,7 @@
 // 없어 영구 라이트로 남는다(BC6, spec FR-019).
 // ─────────────────────────────────────────────────────────────────────────────
 
-const { COLORS, RADIUS, TYPE } = require("./src/ui/theme/tokens");
+const { COLORS, RADIUS, RNR_COLOR_ALIASES, TYPE } = require("./src/ui/theme/tokens");
 
 /** tokens.ts의 TYPE(`{ fontSize, fontWeight, lineHeight }`)을 tailwind fontSize
  *  튜플(`[size, { lineHeight, fontWeight }]`)로 옮긴다. */
@@ -31,10 +31,12 @@ module.exports = {
   darkMode: "class",
   theme: {
     extend: {
-      colors: { ...COLORS },
+      // 050 — RNR 복사본(`src/ui/rnr/`)의 색 이름은 별칭이다. 값은 전부 COLORS를 가리킨다(research R6).
+      colors: { ...COLORS, ...RNR_COLOR_ALIASES },
       borderRadius: {
         card: `${RADIUS.card}px`,
         pill: `${RADIUS.pill}px`,
+        control: `${RADIUS.control}px`,
       },
       fontSize,
     },

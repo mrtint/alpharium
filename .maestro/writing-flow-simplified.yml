@@ -99,16 +99,14 @@ appId: com.anonymous.alpharium
       # 곧바로, 있으면 덮어쓰기 확인 1회. 모델이 준비 안 됐으면 "일기 작성자를
       # 준비해야 한다" 안내로 끝나고 그것이 정상이다(FR-014, 원칙 I).
       - tapOn: "일기 쓰기"
+      # 050 — 덮어쓰기 확인은 홈 위의 대화상자다(「다시 쓰기」/「취소」).
       - runFlow:
           when:
-            visible: ".*덮어쓴다.*"
+            visible:
+              id: "overwrite-dialog"
           commands:
-            - tapOn: "확인"
-      - runFlow:
-          when:
-            visible: ".*덮어쓸지 확인.*"
-          commands:
-            - tapOn: "확인"
+            - tapOn:
+                id: "overwrite-confirm"
 
       # 어떻게 끝나든 「쓰고 있다」가 남지 않는다(005 FR-028c).
       - extendedWaitUntil:

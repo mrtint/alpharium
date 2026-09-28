@@ -25,6 +25,7 @@ import {
   toWriting,
   dayParts,
   canSwipeNext,
+  cellFor,
   swipeWeek,
   weekCellsFor,
   writePromptFor,
@@ -552,6 +553,51 @@ describe("049 weekCellsFor·swipeWeek — 주간 스트립 (contracts/day-pickin
   });
 });
 
+/**
+ * 050 — 한 날 칸 판정 `cellFor` (data-model §1, contracts/dialogs.md CAL6).
+ *
+ * 달력(`2j`)과 스트립이 **같은 판정 하나**를 쓴다(FR-017). 스트립은 7칸, 달력은 한 달이지만 칸 하나의
+ * 판정은 이 함수뿐이다.
+ */
+describe("050 cellFor — 한 날 칸 판정", () => {
+  const now = new Date("2026-09-24T09:00:00"); // 목요일
+
+  it("미래는 누를 수 없고 오늘은 isToday, 선택은 selectedDay", () => {
+    expect(cellFor("2026-09-25", [], "2026-09-24", now)).toEqual({
+      day: "2026-09-25",
+      hasDiary: false,
+      isToday: false,
+      selectable: false,
+      selected: false,
+    });
+    expect(cellFor("2026-09-24", [], "2026-09-24", now)).toMatchObject({
+      isToday: true,
+      selectable: true,
+      selected: true,
+    });
+  });
+
+  it("몇 년 전 날도 누를 수 있다 (과거 한계 없음 — SC-004a)", () => {
+    expect(cellFor("2016-03-15", [], "2026-09-24", now).selectable).toBe(true);
+  });
+
+  it("읽을 수 없는 일기도 그 날을 차지한다 (006 FR-017a)", () => {
+    expect(cellFor("2026-09-21", [unreadable("2026-09-21")], "2026-09-24", now).hasDiary).toBe(
+      true,
+    );
+  });
+
+  it("★ CAL6 — weekCellsFor 7칸은 같은 날의 cellFor와 같다", () => {
+    const items = [readable("2026-09-21"), unreadable("2026-09-22")];
+    for (const chosen of ["2026-09-24", "2026-09-22", "2026-08-31"]) {
+      const prompt = writePromptFor(items, now, chosen);
+      for (const cell of weekCellsFor(items, prompt, now)) {
+        expect(cell).toEqual(cellFor(cell.day, items, prompt.day, now));
+      }
+    }
+  });
+});
+
 describe("toWriting은 여전히 아무것도 보지 않는다 (FR-025, SC-014)", () => {
   it("인자를 받지 않는다 — 저장 상태로 갈릴 수 없다", () => {
     // 인자가 없으므로 「이미 있으면 그것을 보여준다」를 쓸 수 없다.
@@ -735,14 +781,19 @@ describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)"
   });
 
   it("1. 일기 없음 + 누름 → writing(곧바로 생성 시작) (FR-011 부정 조건)", () => {
-    const screen = startWriting(promptFor({ overwrites: false }));
+    const screen = startWriting(promptFor({ overwrites: false }), []);
     expect(screen.kind).toBe("writing");
   });
 
   it("★ 2. 일기 있음 + 누름 → confirm-overwrite(생성 시작 안 함) (FR-011, 이 계약의 핵심)", () => {
-    const screen = startWriting(promptFor({ overwrites: true, day: DAY }));
+    const items = [readable(DAY)];
+    const screen = startWriting(promptFor({ overwrites: true, day: DAY }), items);
     expect(screen.kind).toBe("confirm-overwrite");
-    if (screen.kind === "confirm-overwrite") expect(screen.day).toBe(DAY);
+    if (screen.kind === "confirm-overwrite") {
+      expect(screen.day).toBe(DAY);
+      // 050 — 대화상자 뒤에 홈을 그릴 목록 요약을 함께 싣는다(data-model §3).
+      expect(screen.items).toEqual(items);
+    }
   });
 
   it("3. confirm-overwrite에서 취소 → list(기존 일기 그대로) (FR-012)", () => {
@@ -760,7 +811,7 @@ describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)"
     // confirm-overwrite.day가 곧 쓰게 될 하루다. confirmOverwrite() 자체는 인자를
     // 받지 않으므로(C3), 호출하는 쪽이 confirm-overwrite.day를 그대로 파이프라인에
     // 넘긴다는 것을 값으로 확인한다.
-    const confirmed = startWriting(promptFor({ overwrites: true, day: "2026-08-19" }));
+    const confirmed = startWriting(promptFor({ overwrites: true, day: "2026-08-19" }), []);
     expect(confirmed.kind).toBe("confirm-overwrite");
     if (confirmed.kind === "confirm-overwrite") {
       expect(confirmed.day).toBe("2026-08-19");
@@ -768,12 +819,16 @@ describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)"
   });
 
   /**
-   * **C1 — `confirm-overwrite`의 필드는 정확히 `kind`·`day` 둘뿐이다.**
+   * **C1 — `confirm-overwrite`의 필드는 정확히 `kind`·`day`·`items` 셋뿐이다.**
+   *
+   * 050 — `items`(목록 요약)가 더해졌다. 대화상자가 홈 **위에** 뜨므로 뒤에 그릴 목록이 필요하다.
+   * 012가 막은 것은 **일기 본문·미리보기**였고(X1) `DiaryListItem`은 목록이 이미 보이는 요약이라
+   * 그 방어를 깨지 않는다. `entry`·`text`가 들어오면 여전히 여기서 걸린다.
    *
    * 선언을 `readFileSync`로 직접 읽는다(007에서 배운 것 — `npm test`만으로는
    * 타입 위반을 놓친다).
    */
-  it("★ C1 — AppScreen에 confirm-overwrite 갈래가 있고 필드는 kind·day 둘뿐이다", () => {
+  it("★ C1 — AppScreen에 confirm-overwrite 갈래가 있고 필드는 kind·day·items 셋뿐이다", () => {
     const source = withoutComments(stateSource());
     const match = source.match(/\{\s*kind:\s*"confirm-overwrite"[^}]*\}/);
 
@@ -786,7 +841,7 @@ describe("012 — confirm-overwrite 전이 (contracts/overwrite-confirm.md §1)"
       .filter((line) => line.length > 0)
       .map((line) => line.split(":")[0].trim());
 
-    expect(fields.sort()).toEqual(["day", "kind"]);
+    expect(fields.sort()).toEqual(["day", "items", "kind"]);
   });
 
   /**
