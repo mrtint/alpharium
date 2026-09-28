@@ -88,8 +88,8 @@ describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
     // 같은 실패(쓸 자리 없는 추상을 먼저 만듦)를 되풀이하지 않는다.
     //
     // 038 — `TypewriterText.tsx`가 여덟 번째로 늘었다. 이건 032의 "만들고 안
-    // 쓴" 패턴이 아니다 — 실제로 `DiaryDetailScreen`이 쓰고(첫 표시 타자기
-    // 연출), data-model.md·contracts/typewriter-text.md가 계약을 미리 못
+    // 쓴" 패턴이 아니다 — 038에서는 `DiaryDetailScreen`이 첫 표시 타자기에 썼고, 051에서
+    // 그 화면이 사라진 뒤에는 039 쓰는 중 독백이 쓴다. data-model.md·contracts/typewriter-text.md가 계약을 미리 못
     // 박은 필수 컴포넌트다. 이 숫자는 "새 컴포넌트를 함부로 늘리지 않는다"는
     // 규칙을 지키되, 실제로 쓰이는 새 컴포넌트까지 막지는 않는다.
     //

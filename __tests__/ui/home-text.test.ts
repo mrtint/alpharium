@@ -20,14 +20,15 @@ import {
   CALENDAR_WEEKDAYS,
   DATE_JUMP,
   OVERWRITE_CONFIRM,
+  WRITTEN_DAY_TEXT,
   calendarMonthText,
   calendarYearText,
-  cardDateText,
   dayOfMonthText,
   dayStateText,
   monthText,
   weekdayLong,
   weekdayShort,
+  writtenAtText,
 } from "../../src/ui/home-text";
 
 /** 주석을 걷어낸다 — 금지어가 설명 안에 정당하게 등장한다(011·035 관례) */
@@ -49,10 +50,6 @@ describe("048 home-text — 날짜 문구", () => {
   it("하단 바의 날짜는 「n일」이다", () => {
     expect(dayOfMonthText("2026-09-13")).toBe("13일");
     expect(dayOfMonthText("2026-10-01")).toBe("1일");
-  });
-
-  it("카드 날짜는 「YYYY · MM · DD · 요일」이다", () => {
-    expect(cardDateText("2026-09-12")).toBe("2026 · 09 · 12 · 토");
   });
 });
 
@@ -128,10 +125,12 @@ describe("★ 048 홈 화면 소스의 경계 (G9·G10)", () => {
     "src/ui/home-text.ts",
     "src/ui/DiaryListScreen.tsx",
     "src/ui/DayPicker.tsx",
-    "src/ui/HomeMenu.tsx",
     // 050 — 홈 위에 뜨는 대화상자도 하루 경계를 따로 판정하지 않는다.
     "src/ui/OverwriteConfirmDialog.tsx",
     "src/ui/DateJumpDialog.tsx",
+    // 051 — 쓴 날 지면·캐러셀도 신호·하루 경계를 모른다.
+    "src/ui/WrittenDayPaper.tsx",
+    "src/ui/PhotoCarousel.tsx",
   ];
 
   const sources = HOME_FILES.filter((f) => existsSync(join(__dirname, "../..", f))).map((f) => ({
@@ -156,5 +155,52 @@ describe("★ 048 홈 화면 소스의 경계 (G9·G10)", () => {
     expect(found.code).not.toContain("정오");
     expect(found.code).not.toContain("WRITABLE_FROM_HOUR");
     expect(found.code).not.toContain("DAY_STARTS_AT_HOUR");
+  });
+});
+
+describe("★ 051 쓴 날 문구 — 상대 작성 시각 (TIME1~4, TXT1·2)", () => {
+  const at = new Date("2026-09-28T14:00:00");
+  const after = (ms: number) => new Date(at.getTime() + ms);
+  const SEC = 1000;
+  const MIN = 60 * SEC;
+  const HOUR = 60 * MIN;
+
+  it("TIME1 — 1분 미만과 미래(기기 시각을 되돌림)는 「방금 작성」", () => {
+    expect(writtenAtText(at, after(0))).toBe("방금 작성");
+    expect(writtenAtText(at, after(59 * SEC))).toBe("방금 작성");
+    expect(writtenAtText(at, after(-5 * MIN))).toBe("방금 작성");
+  });
+
+  it("TIME2 — 1분 이상 1시간 미만은 「N분 전에 작성」, 내림", () => {
+    expect(writtenAtText(at, after(60 * SEC))).toBe("1분 전에 작성");
+    expect(writtenAtText(at, after(59 * MIN + 59 * SEC))).toBe("59분 전에 작성");
+  });
+
+  it("TIME3 — 1시간 이상은 「N시간 M분 전에 작성」, 분이 0이어도 적는다", () => {
+    expect(writtenAtText(at, after(HOUR))).toBe("1시간 0분 전에 작성");
+    expect(writtenAtText(at, after(2 * HOUR + 15 * MIN + 30 * SEC))).toBe("2시간 15분 전에 작성");
+  });
+
+  it("TXT2 — 보드 m.writtenAt13 원문과 글자 단위로 같다", () => {
+    expect(writtenAtText(at, after(2 * HOUR + 15 * MIN))).toBe("2시간 15분 전에 작성");
+  });
+
+  it("TXT1 — 「다시 쓰기」는 보드 h2.rewrite 원문", () => {
+    expect(WRITTEN_DAY_TEXT.rewrite).toBe("다시 쓰기");
+  });
+
+  it("051 사람이 정한 문장 — 읽을 수 없음·사진 없음·저장 실패·뒤로 가기", () => {
+    expect(WRITTEN_DAY_TEXT.unreadableLines).toEqual([
+      "이 날의 일기 파일이 손상됐어요.",
+      "다시 쓰면 새로 남아요.",
+    ]);
+    expect(WRITTEN_DAY_TEXT.photoMissing).toBe("이 사진은 이제 없어요");
+    expect(WRITTEN_DAY_TEXT.unsaved).toBe("저장하지 못했어요. 앱을 나가면 이 일기는 사라져요.");
+    expect(WRITTEN_DAY_TEXT.backToHome).toBe("← 일기");
+  });
+
+  it("TIME4 — 경과 시간은 밀리초 차이만 쓴다 — 하루 경계가 아니다 (049 DB11)", () => {
+    const code = stripComments(readFileSync(join(__dirname, "../../src/ui/home-text.ts"), "utf8"));
+    expect(code).not.toMatch(/getHours|setHours/);
   });
 });

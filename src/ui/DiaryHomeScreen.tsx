@@ -21,6 +21,12 @@
  * **049 — 날 고르기.** 스트립을 넘기면 `swipeWeek()`로 다음 날을 정하고, 다음 자정에 한 번 다시
  * 그려 오늘 밑줄만 옮긴다(FR-019). 고른 날은 언제나 쓸 수 있다(정오 제한 폐지). 사흘 밖의 날은
  * 미리 준비하지 않는다(`canPrepare`, FR-020a — 두 모델 동시 적재 방지).
+ *
+ * **051 — 홈이 곧 상세다.** 목록 카드 → 상세 화면 전이가 사라졌다. 고른 날에 일기가 있으면 그 날의
+ * 파일을 읽어 `paperFor()`로 지면 상태를 만들고 `DiaryListScreen`에 넘긴다(늦게 온 결과는 버린다).
+ * 쓰기가 성공하면 결과 화면 없이 홈의 그 날로 돌아온다 — 저장에 실패했을 때만 임시 결과 화면
+ * (`unsaved`)이다. 알림(020)은 상세가 아니라 **고른 날**이 되고(`initialDay`), 확인 기록은 읽을 수
+ * 있는 일기가 실제로 보였을 때 남긴다. 오늘의 일기를 보는 동안 작성 시각을 1분마다 다시 그린다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -41,7 +47,6 @@ import {
   confirmOverwrite,
   initialScreen,
   startWriting,
-  toDetail,
   toFailed,
   toList,
   canSwipeNext,
@@ -55,6 +60,7 @@ import {
   type DiaryListItem,
 } from "../app/state";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
+import { paperFor, type LoadedEntry } from "../app/written-day";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import { pickMonologue } from "../diary/monologue";
@@ -66,9 +72,8 @@ import type { Character, VisionSetting } from "../diary/types";
 import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DateJumpDialog } from "./DateJumpDialog";
-import { DiaryDetailScreen } from "./DiaryDetailScreen";
 import { DiaryListScreen, type PreviewState } from "./DiaryListScreen";
-import type { HomeMenuItem } from "./HomeMenu";
+import { WRITTEN_DAY_TEXT, writtenAtText } from "./home-text";
 import { OverwriteConfirmDialog } from "./OverwriteConfirmDialog";
 import { AppText } from "./components/Text";
 import { TypewriterText } from "./components/TypewriterText";
@@ -116,8 +121,20 @@ export type DiaryHomeScreenProps = {
   onGoToSettings?: () => void;
   /** 알림을 눌러 열렸으면 그 하루 (020, FR-006·SC-004). */
   initialDay?: DayDate | null;
-  /** 그 하루의 일기를 사용자가 확인했음을 기록한다 (020, FR-007 (2)). */
+  /**
+   * 그 하루의 일기를 사용자가 확인했음을 기록한다 (020 FR-007 (2)).
+   *
+   * **051 — 읽을 수 있는 일기가 지면에 실제로 보였을 때** 그 날마다 한 번 부른다(알림으로 열었든
+   * 스스로 골랐든, FR-028·FR-029). 일기가 없거나 읽을 수 없으면 부르지 않는다.
+   */
   onAcknowledge?: (day: DayDate) => void;
+  /**
+   * 알림의 날(`initialDay`)을 고른 날로 적용했다 (051 FR-027, research R6).
+   *
+   * 「적용했다」와 「확인했다」는 다르다 — 알림의 날에 일기가 없어도 적용은 끝났으므로 부른다.
+   * 조립부는 이때 알림 경로를 비운다(설정 왕복 뒤 그 날로 되돌아가지 않게).
+   */
+  onInitialDayApplied?: () => void;
   /**
    * 캐릭터 → 지금 부르는 이름 (035 FR-018).
    *
@@ -141,8 +158,6 @@ export type DiaryHomeScreenProps = {
    * **`DaySignals`가 아니라 개수로 좁혀진 `DayPreview`다**(FR-020). 없으면 신호 줄은 「모름」.
    */
   previewDay?: (day: DayDate) => Promise<DayPreview>;
-  /** `⋯` 메뉴 항목 (048 US4). 무엇을 넣을지는 조립부가 환경으로 정한다(FR-003) */
-  menuItems?: readonly HomeMenuItem[];
   /**
    * 이 날에 미리 준비(018)를 해도 되는가 (049 FR-020a, research R5).
    *
@@ -162,6 +177,9 @@ export type DiaryHomeScreenProps = {
  * 다시 판정해도 오늘이 옮겨지지 않는다. **사람이 정한 여유다**(원칙 V).
  */
 const MIDNIGHT_TIMER_SLACK_MS = 1000;
+
+/** 오늘의 일기 작성 시각을 다시 그리는 간격 (051 FR-019 — 「N분 전」이 1분 단위라서) */
+const WRITTEN_AT_REFRESH_MS = 60_000;
 
 /**
  * 이 캐릭터를 지금 뭐라 부르는가 (035 FR-018).
@@ -194,10 +212,10 @@ export function DiaryHomeScreen({
   characterNames,
   initialDay,
   onAcknowledge,
+  onInitialDayApplied,
   chosenDay: controlledDay,
   onChooseDay,
   previewDay,
-  menuItems,
   canPrepare,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
@@ -269,19 +287,27 @@ export function DiaryHomeScreen({
     let alive = true;
     void (async () => {
       const items = await refresh();
-      const entry =
-        initialDay != null && items.some((i) => i.day === initialDay && i.readable)
-          ? await store.load(initialDay).catch(() => null)
-          : null;
       if (!alive) return;
-      const next = initialScreen(resolution, items, { initialDay, entry });
-      setScreen(next);
-      if (next.kind === "detail") onAcknowledge?.(next.day);
+      setScreen(initialScreen(resolution, items));
     })();
     return () => {
       alive = false;
     };
-  }, [refresh, resolution, initialDay, store, onAcknowledge]);
+  }, [refresh, resolution]);
+
+  /**
+   * 알림의 날을 고른 날로 (051 FR-027, 020 라우팅을 상세에서 옮겼다).
+   *
+   * 마운트 때와 `initialDay`가 바뀔 때(웜 알림) 한 번씩 — 같은 값을 두 번 적용하지 않는다(부모가
+   * 경로를 늦게 비워도 사용자가 고른 날을 되돌리지 않게).
+   */
+  const appliedInitialDay = useRef<DayDate | null>(null);
+  useEffect(() => {
+    if (initialDay == null || appliedInitialDay.current === initialDay) return;
+    appliedInitialDay.current = initialDay;
+    setChosenDay(initialDay);
+    onInitialDayApplied?.();
+  }, [initialDay, setChosenDay, onInitialDayApplied]);
 
   /**
    * 앱이 앞을 벗어나면 끊는다 (005 FR-014b) / 준비를 놓아준다 (018 FR-008).
@@ -297,10 +323,13 @@ export function DiaryHomeScreen({
       } else {
         // 잠든 동안 자정 타이머가 밀렸을 수 있다. 돌아오면 다시 판정한다(049 FR-019).
         setTick((t) => t + 1);
+        // 051 FR-016c — 그 사이 자동 생성이 쓴 일기가 보이도록 목록(→ 그 날의 일기)을 다시 읽는다.
+        // **홈일 때만 반영한다** — 읽는 사이 연 덮어쓰기 대화상자를 닫지 않는다(050 OW10).
+        void refresh().then((items) => setScreen((s) => (s.kind === "list" ? toList(items) : s)));
       }
     });
     return () => subscription.remove();
-  }, [stop, release]);
+  }, [stop, release, refresh]);
 
   /**
    * 캐릭터·날짜가 정해지면 미리 준비를 시작한다 (018, FR-005).
@@ -439,17 +468,65 @@ export function DiaryHomeScreen({
         ? preview
         : { kind: "loading", day: previewTarget };
 
-  const openItem = useCallback(
-    async (item: DiaryListItem) => {
-      const entry = item.readable ? await store.load(item.day).catch(() => null) : null;
-      const next = toDetail(item, entry);
-      setScreen(next);
-      if (next.kind === "detail") onAcknowledge?.(next.day);
-    },
-    [store, onAcknowledge],
-  );
+  /**
+   * 고른 날의 일기 (051 US1, FR-016).
+   *
+   * 목록에 그 날이 있으면(읽을 수 있다고 한 날만) 파일을 읽는다. **늦게 도착한 이전 날의 결과는
+   * 버린다** — 신호 줄과 같은 방식. 목록이 새로 읽히면(쓰기 뒤·앱 복귀) 목록 배열이 바뀌므로 그 날도
+   * 다시 읽는다. 캐시를 두지 않는다. 「읽는 중」은 상태로 저장하지 않는다 — `paperFor`가 가른다.
+   */
+  const [loaded, setLoaded] = useState<LoadedEntry | undefined>(undefined);
+  const loadFor = useRef<DayDate | undefined>(undefined);
+  useEffect(() => {
+    if (previewTarget === undefined || listItems === null) return;
+    if (!listItems.some((item) => item.day === previewTarget && item.readable)) return;
+    loadFor.current = previewTarget;
+    void store
+      .load(previewTarget)
+      .catch(() => null)
+      .then((entry) => {
+        if (loadFor.current !== previewTarget) return;
+        setLoaded({ day: previewTarget, entry });
+      });
+  }, [previewTarget, listItems, store]);
 
-  const backToList = useCallback(async () => {
+  const paper =
+    listItems !== null && previewTarget !== undefined
+      ? paperFor(previewTarget, listItems, loaded)
+      : undefined;
+
+  /**
+   * 확인 기록 (020 FR-007 (2), 051 FR-028·FR-029) — 읽을 수 있는 일기가 보인 날마다 한 번.
+   * `acknowledgeNotified`는 멱등이지만 렌더마다 파일을 건드리지 않게 화면이 한 번으로 줄인다.
+   */
+  const acknowledgedFor = useRef<DayDate | null>(null);
+  const readableDay = paper?.kind === "readable" ? previewTarget : undefined;
+  useEffect(() => {
+    if (readableDay === undefined || acknowledgedFor.current === readableDay) return;
+    acknowledgedFor.current = readableDay;
+    onAcknowledge?.(readableDay);
+  }, [readableDay, onAcknowledge]);
+
+  /**
+   * 오늘의 일기 작성 시각 (051 보드 `2g`, FR-019). **그 일기의 하루가 오늘**일 때만 — 오늘 판정은
+   * `cellFor`(049·050)에서 온다(FR-019a, 복제하지 않는다). 보는 동안 1분마다 다시 그린다.
+   */
+  const showsWrittenAt =
+    paper?.kind === "readable" &&
+    previewTarget !== undefined &&
+    cellFor(previewTarget, listItems ?? [], previewTarget, now()).isToday;
+  const writtenAt =
+    showsWrittenAt && paper?.kind === "readable"
+      ? writtenAtText(paper.entry.createdAt, now())
+      : undefined;
+  useEffect(() => {
+    if (!showsWrittenAt) return;
+    const timer = setInterval(() => setTick((t) => t + 1), WRITTEN_AT_REFRESH_MS);
+    return () => clearInterval(timer);
+  }, [showsWrittenAt]);
+
+  /** 결과·실패 화면에서 홈으로 (051 — 고른 날은 그대로, 목록을 다시 읽는다) */
+  const goHome = useCallback(async () => {
     setScreen(toList(await refresh()));
   }, [refresh]);
 
@@ -512,14 +589,18 @@ export function DiaryHomeScreen({
         // 옮겨진 쪽(params.character). 실패면 부르지 않는다(원칙 I).
         if (result.ok) onGenerated?.(params.character);
 
-        setScreen(afterGeneration(result));
+        // 051 — 성공이면 결과 화면 없이 홈의 그 날로(목록을 다시 읽으면 그 날의 새 일기도 다시
+        // 읽힌다). 저장 실패만 임시 결과 화면, 그 밖은 실패 화면.
+        const next = afterGeneration(result);
+        if (next.kind === "home") setScreen(toList(await refresh()));
+        else setScreen(next);
       } finally {
         running.current = false;
       }
     },
     // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
     // 생성·독백이 돈다(조용히 틀리는 결함).
-    [pipeline, now, onGenerated, characterNames],
+    [pipeline, now, onGenerated, characterNames, refresh],
   );
 
   /**
@@ -580,6 +661,16 @@ export function DiaryHomeScreen({
     return () => subscription.remove();
   }, [screen.kind, cancel]);
 
+  // 051 — 결과·실패 화면의 안드로이드 뒤로 가기는 「← 일기」와 같다(FR-024a·FR-026).
+  useEffect(() => {
+    if (screen.kind !== "unsaved" && screen.kind !== "failed") return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      void goHome();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [screen.kind, goHome]);
+
   switch (screen.kind) {
     case "build-error":
       return <BuildErrorScreen />;
@@ -595,16 +686,16 @@ export function DiaryHomeScreen({
             cells={weekCellsFor(items, prompt, now())}
             deniedNotices={deniedNotices}
             items={items}
-            menuItems={menuItems}
             movedNotice={movedNotice}
-            onOpen={(item) => void openItem(item)}
             // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
             onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
             onSelectDay={setChosenDay}
             onSwipe={onSwipe}
             onWrite={() => void write()}
+            paper={paper}
             preview={shownPreview}
             write={prompt}
+            writtenAt={writtenAt}
           />
           {screen.kind === "list" && (
             <DateJumpDialog
@@ -633,23 +724,19 @@ export function DiaryHomeScreen({
       );
     }
 
-    case "detail":
+    case "unsaved":
+      // 051 FR-024a — 글은 나왔으나 남지 않았다. 읽을 기회를 빼앗지 않되 남지 않는다고 말한다(006
+      // FR-012a·b). 사진·캐러셀은 없다. 「제자리 쓰기」 조각이 올 때까지의 임시 자리다.
       return (
-        <Frame onBack={() => void backToList()}>
-          <DiaryDetailScreen
-            currentAuthorName={nameOf(screen.entry.character, characterNames)}
-            entry={screen.entry}
-          />
-        </Frame>
-      );
-
-    case "unreadable":
-      return (
-        <Frame onBack={() => void backToList()}>
-          <View style={styles.notice}>
-            <AppText variant="caption">{screen.day}</AppText>
-            <AppText variant="body">이 날의 일기를 읽을 수 없다.</AppText>
-            <AppText variant="caption">파일이 손상됐다. 그 하루를 다시 쓸 수 있다.</AppText>
+        <Frame onBack={() => void goHome()}>
+          <View style={styles.notice} testID="unsaved-screen">
+            <AppText variant="body">{WRITTEN_DAY_TEXT.unsaved}</AppText>
+            {screen.entry.title !== undefined && (
+              <AppText variant="title">{screen.entry.title}</AppText>
+            )}
+            <AppText variant="body" style={{ fontSize: 16, lineHeight: 26 }}>
+              {screen.entry.text}
+            </AppText>
           </View>
         </Frame>
       );
@@ -685,25 +772,9 @@ export function DiaryHomeScreen({
       );
     }
 
-    case "written":
-      // 038 — 생성 직후 첫 표시에서만 타자기 연출(FR-001). 목록에서 여는
-      // `case "detail"`은 `reveal`을 넘기지 않아 이 기능 도입 전과 동일하다
-      // (FR-007, SC-004).
-      return (
-        <Frame onBack={() => void backToList()}>
-          <DiaryDetailScreen
-            currentAuthorName={nameOf(screen.entry.character, characterNames)}
-            entry={screen.entry}
-            saved={screen.saved}
-            overwrote={screen.overwrote}
-            reveal
-          />
-        </Frame>
-      );
-
     case "failed":
       return (
-        <Frame onBack={() => void backToList()}>
+        <Frame onBack={() => void goHome()}>
           <View style={styles.notice}>
             <AppText variant="body">{screen.message}</AppText>
 
@@ -728,7 +799,7 @@ function Frame({ children, onBack }: { children: React.ReactNode; onBack: () => 
       style={{ backgroundColor: COLORS.bg }}
     >
       <Pressable accessibilityRole="button" onPress={onBack} style={styles.back}>
-        <AppText variant="body">← 목록</AppText>
+        <AppText variant="body">{WRITTEN_DAY_TEXT.backToHome}</AppText>
       </Pressable>
       {children}
     </ScrollView>

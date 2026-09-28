@@ -113,5 +113,6 @@ appId: com.anonymous.alpharium
 - tapOn:
     id: "back-to-home"
 - scrollUntilVisible:
-    element: "일기 쓰기"
+    element:
+      id: "write-button"
     direction: DOWN

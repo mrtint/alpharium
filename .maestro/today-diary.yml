@@ -41,10 +41,15 @@ appId: com.anonymous.alpharium
     id: "home-day-fade-out"
 
 # ★ M2 — **언제 열어도 쓸 수 있다.** 049가 정오 제한을 없앴다 — 쓰기 버튼이 있고,
-# 048의 「오늘 일기는 … 쓸 수 있어요」 안내가 없다.
-- assertVisible:
-    id: "write-button"
-- assertVisible:
+# 048의 「오늘 일기는 … 쓸 수 있어요」 안내가 없다. 051 수정 — 오늘 일기가 길면 「다시 쓰기」는 지면
+# 끝에 닿아야 올라오므로 내려서 찾는다.
+- scrollUntilVisible:
+    element:
+      id: "write-button"
+    direction: DOWN
+    timeout: 20000
+# 051 수정 — 하단 바는 날짜 조각이 없는 전폭 블록이다(보드 `1d`·`2c`).
+- assertNotVisible:
     id: "write-day-label"
 - assertNotVisible:
     id: "write-unavailable"
@@ -74,7 +79,8 @@ appId: com.anonymous.alpharium
       # ★ 확인 대화상자가 뜨고 곧바로 생성되지 않는다(050 — 홈 위의 대화상자, 보드 2d).
       - assertVisible:
           id: "overwrite-dialog"
-      - assertVisible: "다시 쓰기"
+      - assertVisible:
+          id: "overwrite-confirm"
       - assertVisible: "취소"
       # ★ 확인 화면에 진행률·모델 정보가 없다(원칙 III·IV).
       - assertNotVisible: "%"
@@ -86,12 +92,12 @@ appId: com.anonymous.alpharium
       - assertVisible:
           id: "day-strip"
 
-# 목록이 아니면 돌아간다.
+# 홈이 아니면 돌아간다 — 051부터 결과·실패 화면의 뒤로 가기 글자는 「← 일기」다.
 - runFlow:
     when:
-      visible: "← 목록"
+      visible: "← 일기"
     commands:
-      - tapOn: "← 목록"
+      - tapOn: "← 일기"
 
 - runFlow:
     when:

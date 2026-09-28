@@ -30,6 +30,11 @@ import { join } from "node:path";
  * **하나라도 실패하면 전체가 실패다.** 일부만 통과한 것을 통과로 보고하면, 기기 없이
  * 초록불인 것과 구분되지 않는다(헌법 원칙 V).
  */
+// ★ 051 수정 — 홈의 `⋯` 메뉴를 없앴다(저장소 소유자 지시, 2026-09-28). 설정·개발자 진입점은 설정 화면 구성
+// 과제에서 다시 둔다. 그때까지 `home-menu-button`으로 설정·개발자에 들어가는 흐름 열한 개 — skeleton,
+// model-acquisition, diary-user-path, diary-character-select, download-conflict, photo-vision,
+// diary-body-screen, scheduled-diary-notification, prompt-preview, parallel-model-download, welcome-naming —
+// 는 **알려진 실패**다(회귀로 오해하지 않는다). 진입점이 생기면 그 흐름들의 메뉴 단계를 바꾼다.
 const FLOWS = [
   ".maestro/skeleton.yml",
   ".maestro/model-acquisition.yml",
@@ -112,12 +117,12 @@ const FLOWS = [
   // 저장된 일기를 읽어 판단한다. quickstart.md D1~D4를 손으로 확인한다.
   // **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/photo-selection-over-limit.yml",
-  // 025 — 일기 본문 사진 슬라이더 & 풀스크린 갤러리. 사진 2장 이상인 저장된
-  // 일기를 열어 슬라이더·위치 표시가 뜨고, 탭하면 갤러리가 그 순번에서 열리며
-  // 닫기 버튼으로 상세 화면에 돌아오는가를 본다.
-  // ⚠️ **가로 스와이프 갱신·순환 없음·회전 유지(FR-015a)·집합 일치(SC-003)는
-  // 여기 없다** — 사람이 quickstart.md §2에서 확인한다(원칙 V).
-  ".maestro/diary-photo-gallery.yml",
+  // 051 — 쓴 날 읽기(홈이 곧 상세). 025 `diary-photo-gallery.yml`을 대체한다(갤러리 없음, 순환).
+  // 사진 2장 이상인 쓴 날을 골라 제목·지면·캐러셀 배지·순환·「다시 쓰기」 → 확인 → 취소를 본다.
+  // `-e WRITTEN_DAY=<날> -e WRITTEN_DAY_PHOTOS=<장수>`가 필요하다 — 없으면 첫 단계에서 실패한다.
+  // ⚠️ 흑백·제스처 분리·작성 시각 갱신은 여기 없다 — 051 quickstart D3·D4·D7을 사람이 본다.
+  // **건너뛴 것은 통과가 아니다**(원칙 V).
+  ".maestro/written-day-reading.yml",
   // 026 — 모델 병렬·동시 내려받기. **캐릭터 두 개를 동시에 받을 수 있는가**,
   // **하나를 멈춰도 나머지가 계속되는가**, **탭 복귀 시 전부 복원되는가**를 본다.
   // ⚠️ **핵심 검증(세그먼트 병렬 속도 대조, HF CDN Range 유지, 세그먼트 이어받기,

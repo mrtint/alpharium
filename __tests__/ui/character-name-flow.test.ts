@@ -112,10 +112,8 @@ describe("FR-026b — 저장된 작성자 이름을 읽는 곳이 있다", () =>
     expect(consumers.length).toBeGreaterThan(0);
   });
 
-  it("일기 상세가 authorName을 우선 쓰고 폴백을 갖는다", () => {
-    const detail = codeOf("DiaryDetailScreen.tsx");
-    // `entry.authorName ?? <현재 이름>` 꼴 — 옛 일기(스냅샷 없음)에서 빈 이름이
-    // 나오면 안 된다(SC-005).
-    expect(detail).toMatch(/authorName\s*\?\?/);
-  });
+  // 051 — 「일기 상세가 authorName을 우선 쓰고 폴백을 갖는다」 검사를 걷어냈다. 작성자 이름을 보이던
+  // 화면(`DiaryDetailScreen`의 「{이름}는 이렇게 일기를 작성했어요.」)이 홈이 곧 상세가 되며
+  // 사라졌다(051 FR-016a). `authorName`은 여전히 저장되고(위 테스트의 생성 경로), 보이는 자리가
+  // 다시 생기면 그 화면이 이 폴백 규칙을 다시 잠근다.
 });

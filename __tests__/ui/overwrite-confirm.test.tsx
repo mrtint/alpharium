@@ -17,7 +17,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { act, fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react-native";
 import { AppState, BackHandler } from "react-native";
 
 import type { ResolveOutcome } from "../../src/app/resolve-generation";
@@ -27,6 +27,7 @@ import { memoryStore } from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
 import { partiallyUnknownDay } from "../../src/signals/fake";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
+import { reachPaperEnd } from "./paper-end";
 import { renderWithPortal } from "./render-with-portal";
 
 jest.setTimeout(30000);
@@ -95,6 +96,8 @@ async function renderHome(chosenDay: string) {
       store={store}
     />,
   );
+  // 051 수정 — 쓴 날의 「다시 쓰기」 바는 지면 끝에 닿아야 올라온다(보드 `2c` ④).
+  await reachPaperEnd();
   await screen.findByTestId("write-button");
   return { pipeline, listeners, store };
 }
@@ -105,14 +108,15 @@ async function openDialog() {
 }
 
 describe("OW1~OW5 — 홈 위의 확인 대화상자", () => {
-  it("★ OW1 — 일기가 있는 날에서 「일기 쓰기」 → 홈이 남은 채 대화상자, 생성은 아직 0회", async () => {
+  it("★ OW1 — 일기가 있는 날에서 쓰기 버튼(051 「다시 쓰기」) → 홈이 남은 채 대화상자, 생성은 아직 0회", async () => {
     const { pipeline } = await renderHome(PAST);
     await openDialog();
 
     expect(screen.getByTestId("home-day-number")).toBeTruthy();
     expect(screen.getByText("일기를 다시 쓸까요?")).toBeTruthy();
     expect(screen.getByText("다 쓰면 지금 일기가 새 글로 바뀌어요.")).toBeTruthy();
-    expect(screen.getByText("다시 쓰기")).toBeTruthy();
+    // 051 — 쓴 날의 하단 바도 「다시 쓰기」다. 대화상자의 버튼은 대화상자 안에서 찾는다.
+    expect(within(screen.getByTestId("overwrite-confirm")).getByText("다시 쓰기")).toBeTruthy();
     expect(screen.getByText("취소")).toBeTruthy();
     expect(pipeline.calls).toBe(0);
   });

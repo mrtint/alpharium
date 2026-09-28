@@ -19,6 +19,10 @@
 - **`defaultIndex`는 마운트 때만** 본다(문서 「Default Index Handling」). 날이 바뀌면 캐러셀을 `key={day}`로 새로 마운트해 1장부터 시작한다 — ref로 되돌리지 않는다.
 - **1장은 캐러셀을 쓰지 않는다** — `scrollEnabled={false}`로도 되지만, 배지·인디케이터·제스처가 모두 없어야 하므로(FR-011) 사진 하나만 그리는 편이 계약을 단순하게 한다.
 
+**T017 확인(구현 전, 설치본)**: `onConfigurePanGesture`는 `src/hooks/usePanGestureProxy.ts:95-97`에서 `useMemo` 안(JS 스레드)에 제스처 객체를 만들 때 한 번 불린다 — 워크릿이 아니다(워크릿은 그 뒤 `.onBegin`·`.onUpdate` 등에 붙는 콜백뿐, 같은 파일 108~135행). 그래서 콜백에 `'worklet'` 지시어를 두지 않는다. 설계 §1 C1 표의 `'worklet'`은 이 판에서 필요 없다.
+
+**실기기 정정(2026-09-28, SM-S901N)**: 문서 FAQ대로 `activeOffsetX([-10, 10])`만 두었더니, 캐러셀 위에서 세로로 700px 끄는 동안 가로로 20px 흔들린 입력을 캐러셀이 잡아 사진이 넘어가고 지면은 스크롤되지 않았다. `failOffsetY([-10, 10])`을 더해(세로가 먼저 10을 넘으면 캐러셀이 실패) 같은 입력에서 지면이 스크롤되고 사진은 그대로인 것을 확인했다. 가로 넘김(「1 / 8」 → 「2 / 8」)은 그대로 된다.
+
 **Alternatives considered**:
 - 025 `ScrollView pagingEnabled` 유지 — 순환 불가. Clarifications가 순환을 골랐다.
 - 직접 만든 순환(복제 슬라이드 + `scrollTo` 보정) — 설치된 라이브러리가 같은 일을 한다. 코드만 늘어난다.

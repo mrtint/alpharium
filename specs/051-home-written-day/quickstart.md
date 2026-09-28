@@ -85,6 +85,48 @@ maestro test -e WRITTEN_DAY=<사진 2장 이상인 쓴 날, 이번 주> -e WRITT
 다만 새 흐름은 그 파일의 `FLOWS`에 등록한다(FR-036). 알려진 실패: `welcome-naming`(035 좌표), `parallel-model-download`·
 `download-conflict`(037) — 이번 목록에 넣지 않는다.
 
-## 5. 결과 기록
+## 5. 결과 기록 (2026-09-28)
 
-(구현 뒤 채운다 — 위반 주입 결과, 실기기 D1~D11 관측, Maestro 결과, 미확인 잔여.)
+### 기기 없는 검증
+`npm test` 169 스위트 / 3071개(15 skipped) 통과, `npm run lint` 0 error(경고 2건은 051 전부터 있던 것), 헌법 검사 위반 0,
+`tsc` 0. `tsc`가 지운 갈래(`detail`·`unreadable`·`written`)를 쓰는 자리로 `DiaryHomeScreen.tsx` 하나만 짚었다.
+
+### 위반 주입 (19건 — 전부 잡힘)
+| 주입 | 잡은 것 |
+| --- | --- |
+| `paperFor`의 `loaded.day` 비교 제거 | PAP3·HOME7 |
+| `loop` 제거 / 1장에도 캐러셀 / 배지 0부터 / 흑백 제거 / `contain` | CAR3 / CAR2 / CAR5 / CAR6 / CAR6 |
+| 작성 시각의 `isToday` 조건 제거 / 1분 인터벌 제거 | BAR4 / BAR5 |
+| `writtenAtText` 반올림 | TIME2 |
+| 성공도 결과 화면 / 저장 실패를 `failed`로 | ST2·GEN1 / ST3·GEN3 |
+| 일기 없어도 확인 기록 / 적용 때 경로 비우기 제거 | NR2 / NR5 |
+| 「← 목록」 되살리기 / 화면에 「다시 쓰기」 리터럴 | GEN5·TXT / TXT3 |
+| 달력에 `minDate` | REACH2 |
+| 쓴 날에도 신호 줄 / 복귀 시 다시 읽지 않음 | HOME5 / HOME13 |
+| `WrittenDayPaper`가 `models/roster`에서 이름을 import (FR-034) | 헌법 검사 `UI_TOUCHES_MODEL` |
+
+주의: `import "../models/roster"`(부수 효과 import, `from` 없음)는 헌법 검사가 잡지 **않는다** — 규칙이 `from … models/roster`만
+본다. 051 범위 밖이라 고치지 않았다.
+
+### 실기기 (SM-S901N, dev debug, `pm clear` 없이 — 새 APK 설치 없음, JS만 Metro로)
+| # | 결과 |
+| --- | --- |
+| D1 | ✅ 오늘(9/28) 제목·지면·「다시 쓰기」, 9/21(제목 없음) 「이 날 일기를 썼어요」, 목록 없음 |
+| D2 | ✅ 9/22(8장) 배지 「1 / 8」 → 넘기면 「2 / 8」, 거꾸로 넘기면 「1 / 8」 → 「8 / 8」(순환), 인디케이터 긴 막대 이동 |
+| D3 | ✅ 흑백, 높이 210 잘라 채움 |
+| D4 | ⚠→✅ **처음엔 실패**: 캐러셀 위에서 세로로 끄는 입력(가로 20px 흔들림)을 캐러셀이 잡아 사진이 넘어가고 지면이 스크롤되지 않았다. `failOffsetY([-10, 10])`을 더한 뒤 같은 입력에서 지면이 스크롤되고 사진은 그대로, 가로 넘김은 그대로 됨(research R1 정정) |
+| D5 | 0장 ✅(9/21·9/1 — 캐러셀 없음, 본문이 지면 맨 위부터). 1장 ✅(converge T047 — 기기 카메라로 한 장 찍고 오늘을 다시 씀: 사진 하나만, 배지·인디케이터 없음, 가로로 끌어도 그대로 `photo-carousel-single`) |
+| D6 | ✅ 긴 본문 끝까지 스크롤, 마지막 문단이 바에 가리지 않음 |
+| D7 | ✅ 오늘 「5시간 49분 전에 작성」 → 4분 뒤 「5시간 53분 전에 작성」. 지난 날(9/21·9/22) 없음. 오늘 다시 쓴 9/21에도 없음 |
+| D8 | ✅ 9/22 「다시 쓰기」 → 대화상자 → 취소: 그대로. 9/21 다시 쓰기 → 쓰는 중 → **홈의 9/21에 새 본문**(상세·타자기 없음) |
+| D9 | ✅(converge T046, 웜) 자동 생성 켬 + 목표 17시 → 개발자 탭 트리거 `결과: ran`(9/27 작성) → 홈 버튼으로 나가 알림을 누르니 **홈이 9/27을 고른 채** 제목 자리·지면이 보였다. `notified.json`의 9/27 `acknowledged: true`. 9/28을 고르고 설정에 갔다 와도 9/27로 되돌아가지 않았다. 콜드 시작은 보지 않았다. 뒤에 자동 생성은 다시 껐다(목표 시각 17시는 남음) |
+| D10 | ✅ 달력 → 9/1 → 홈이 9/1 지면(4주 전) |
+| D11 | 코드 무변경(설정 화면·토글 그대로), 지면에 장소 이름 줄 없음 ✅ |
+| US5 | ✅(converge T048) 9/23 일기 파일을 `run-as`로 `{broken`으로 바꾸고 앱을 앞으로 가져오자(FR-016c 다시 읽기) 상태 줄 「읽을 수 없어요」, 지면 두 줄, 「다시 쓰기」. 파일은 백업으로 되돌렸다 |
+
+### Maestro (`maestro test` 직접)
+13흐름 PASS: `written-day-reading`(`-e WRITTEN_DAY=2026-09-22 -e WRITTEN_DAY_PHOTOS=8`)·`diary-body-screen`·`dialog-foundation`·
+`today-diary`·`diary-user-path`·`diary-character-select`·`past-day-diary`·`photo-selection-over-limit`(`-e SEED_DAY=2026-09-22`)·
+`generate-diary`·`writing-flow-simplified`·`writing-monologue`·`writing-monologue-expansion`. 첫 실행에서 넷이 실패했고 전부 흐름 쪽
+결함이었다 — 제목 없는 일기에 `home-day-title`을 단언(→ `home-day-(title|state)`), 쓴 날에 없는 `write-day-label`을 단언
+(`today-diary`·`past-day-diary`·`writing-flow-simplified` — 오늘 일기가 있는 기기에서 하단 바에 날짜 조각이 없다).

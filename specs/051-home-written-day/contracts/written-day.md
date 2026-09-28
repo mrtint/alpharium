@@ -51,7 +51,7 @@ host 노드에 넘기도록 확장해 **배선**을 검사한다.
 | --- | --- | --- |
 | CAR1 | 사진 0장·`photos` 없음 → `photo-carousel`·`photo-carousel-badge`·`photo-carousel-indicator` 모두 없음, 본문이 지면 첫 자식 | 빈 상자 렌더 |
 | CAR2 | 사진 1장 → `photo-carousel-single`(사진 하나) 있음, 배지·인디케이터·`Carousel` 없음 | 1장에도 `Carousel` |
-| CAR3 | 사진 3장 → `Carousel`에 `loop={true}`, `onConfigurePanGesture` 함수, `data.length === 3`(목 host props 검사) | `loop` 제거 / 핸들러 제거 |
+| CAR3 | 사진 3장 → `Carousel`에 `loop={true}`, `onConfigurePanGesture` 함수(`activeOffsetX([-10,10])`·`failOffsetY([-10,10])`), `data.length === 3`(목 host props 검사) | `loop` 제거 / 핸들러 제거 |
 | CAR4 | 사진 3장 → 배지 「1 / 3」, 인디케이터 3칸, 첫 칸만 18×4 `COLORS.text`, 나머지 6×4 `WRITTEN_DAY.indicatorIdle` | 칸 폭 같게 |
 | CAR5 | `onSnapToItem(2)`를 쏘면 배지 「3 / 3」, 셋째 칸이 긴 막대 | 배지를 `index`로(0부터) |
 | CAR6 | 사진 면: 높이 210, `resizeMode="cover"`, 감싼 View에 `filter: [{ grayscale: 1 }]` | `contain` / filter 제거 |

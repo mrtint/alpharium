@@ -22,6 +22,7 @@ import {
   RNR_COLOR_ALIASES,
   TYPE,
   contrastRatio,
+  WRITTEN_DAY,
 } from "../src/ui/theme/tokens";
 
 const TOKENS_SRC = readFileSync(join(__dirname, "../src/ui/theme/tokens.ts"), "utf8");
@@ -184,5 +185,24 @@ describe("DT7 — REVEAL 상수 (038 spec FR-010, T003)", () => {
   it("화면에 노출되지 않는다 — 소스에 charMs를 JSX 텍스트로 렌더하는 코드가 없다(원칙 IV)", () => {
     // tokens.ts 자체에는 렌더 코드가 없다. 이 파일이 값 상수만 갖는지 확인.
     expect(TOKENS_SRC).not.toMatch(/<[A-Za-z]/); // JSX 태그 없음
+  });
+});
+
+describe("051 — 쓴 날 면 색의 대비 (research R7)", () => {
+  it.each([
+    ["본문 / 지면", COLORS.text, WRITTEN_DAY.paper, 4.5],
+    ["「다시 쓰기」 / 바", COLORS.text, WRITTEN_DAY.rewriteBar, 4.5],
+    // 11px 작은 글자 — 4.5:1이 필요하다. 경계에 가깝다(약 4.6).
+    ["작성 시각 / 바", COLORS.textMuted, WRITTEN_DAY.rewriteBar, 4.5],
+    ["읽을 수 없음 두 줄 / 지면", COLORS.text, WRITTEN_DAY.paper, 4.5],
+    // 배지 — accent 위 검정(043 R2와 같은 조합)
+    ["배지 글자 / accent", COLORS.accentForeground, COLORS.accent, 4.5],
+  ] as const)("%s — AA 이상", (_name, fg, bg, min) => {
+    expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(min);
+  });
+
+  it("COLORS 아홉 역할은 그대로다 — 보드 램프 색은 WRITTEN_DAY에만 있다", () => {
+    expect(Object.values(COLORS)).not.toContain(WRITTEN_DAY.paper);
+    expect(Object.values(COLORS)).not.toContain(WRITTEN_DAY.rewriteBar);
   });
 });

@@ -347,10 +347,12 @@ describe("checkSourceFile — 화면이 프롬프트 조립에 닿는다 (022 FR
     expect(violations).toEqual([]);
   });
 
-  it("signals/types·collect는 잡지 않는다 — 기존 화면(DiaryDetailScreen·SignalProbe)의 정당한 사용", () => {
+  it("signals/types·collect는 잡지 않는다 — 기존 화면(SignalProbe)의 정당한 사용", () => {
+    // 051 — 예시였던 `DiaryDetailScreen.tsx`가 사라졌다(홈이 곧 상세). 신호 타입을 쓰는 실재 화면은
+    // 이제 `SignalProbe.tsx`뿐이라 두 갈래 모두 그 파일로 검사한다.
     expect(
       checkSourceFile(
-        "src/ui/DiaryDetailScreen.tsx",
+        "src/ui/SignalProbe.tsx",
         'import type { DaySignals } from "../signals/types";',
       ),
     ).toEqual([]);

@@ -17,6 +17,10 @@
  *
  * **자리가 없으면 담을 수 없다.** 005의 `RunResult`가 `{ text, ending }` 둘뿐인 것과
  * 같은 판단이다.
+ *
+ * **051 — 홈이 곧 상세다.** 상세(`detail`)·「읽을 수 없다」(`unreadable`)·생성 뒤 결과(`written`)
+ * 갈래가 사라졌다. 쓴 날은 화면 상태가 아니라 홈이 고른 날로 그리는 지면 상태다
+ * (`written-day.ts`의 `paperFor`). 생성 뒤 결과 화면은 저장에 실패했을 때(`unsaved`)만 남는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -71,8 +75,6 @@ export type PhotoHint = { kind: "known"; count: number } | { kind: "none" } | { 
 export type AppScreen =
   | { kind: "build-error" }
   | { kind: "list"; items: DiaryListItem[] }
-  | { kind: "detail"; day: DayDate; entry: DiaryEntry }
-  | { kind: "unreadable"; day: DayDate }
   /**
    * 이미 있는 하루를 다시 쓰려 한다 (012 US3, FR-011~013).
    *
@@ -101,7 +103,14 @@ export type AppScreen =
    * 확장」, 원칙 IV).
    */
   | { kind: "writing"; stage?: ProgressStage; branch?: MonologueBranch; line?: string }
-  | { kind: "written"; entry: DiaryEntry; saved: boolean; overwrote: boolean }
+  /**
+   * 글은 나왔으나 저장하지 못했다 (051 FR-024a, 006 FR-012a·b).
+   *
+   * **그 글을 싣는다** — 30초를 들인 글이고 다시 생성해도 같은 글이 나오지 않으므로 읽을 기회를
+   * 빼앗지 않는다. 쓰기 **뒤**의 결과라 012 X1(확인 대화상자에 본문 금지)과 다른 자리다.
+   * 「제자리 쓰기」 조각이 올 때까지의 임시 자리다.
+   */
+  | { kind: "unsaved"; entry: DiaryEntry }
   | { kind: "failed"; message: string };
 
 /**
@@ -286,53 +295,20 @@ export function dayParts(day: DayDate): {
  * 추론 위치를 고를 수 없으므로 새 일기를 쓸 수 없고, 그 상태를 감추면 사용자는
  * 빈 화면 앞에서 원인을 짐작하게 된다.
  *
- * ─────────────────────────────────────────────────────────────────────────────
- * **020 — 알림을 눌러 열렸으면 목록을 건너뛰고 그 하루의 상세로 간다**(FR-006,
- * SC-004). `opts.initialDay`가 그 하루이고, `opts.entry`는 화면이 미리 읽은
- * 일기다(이 함수는 순수하므로 스스로 읽지 않는다 — 006의 `initialScreen`이
- * `EnvironmentResolution`만 받는 성질을 지킨다).
- *
- * `initialDay`가 목록에 없거나(지워졌거나) 읽히지 않으면 조용히 목록으로
- * 떨어진다 — `routeFromNotification`이 형식 불명 응답에 `null`을 주는 것과
- * 같은 원칙(모르면 정상 시작).
- * ─────────────────────────────────────────────────────────────────────────────
+ * **051 — 알림 인자가 사라졌다.** 020은 알림으로 열리면 여기서 상세를 첫 화면으로 만들었다.
+ * 이제 알림의 날은 홈의 **고른 날**이 된다(`DiaryHomeScreen`의 `initialDay`, FR-027).
  */
 export function initialScreen(
   resolution: EnvironmentResolution,
   items: DiaryListItem[],
-  opts: { initialDay?: DayDate | null; entry?: DiaryEntry | null } = {},
 ): AppScreen {
   if (!resolution.ok) return { kind: "build-error" };
-
-  const { initialDay, entry } = opts;
-  if (initialDay != null) {
-    const item = items.find((i) => i.day === initialDay);
-    if (item !== undefined && item.readable && entry != null) {
-      return { kind: "detail", day: initialDay, entry };
-    }
-    // 목록에 없거나 못 읽으면 목록으로 — 알림 라우팅이 조용히 실패한다(원칙 V).
-  }
-
   return { kind: "list", items };
 }
 
 /** 목록으로 돌아간다. 돌아올 때마다 새로 읽은 목록을 받는다(FR-022) */
 export function toList(items: DiaryListItem[]): AppScreen {
   return { kind: "list", items };
-}
-
-/**
- * 목록의 한 줄을 연다.
- *
- * **읽지 못하면 빈 일기를 지어내지 않는다**(FR-017a). `entry`가 `null`이면
- * `unreadable`로 가며, 그것은 「일기가 없다」와 다른 상태다(원칙 V).
- *
- * 목록을 만든 뒤 파일이 깨졌을 수 있으므로 `readable: true`인 항목도 `null`을 받을 수
- * 있다 — 그때도 같은 자리로 간다.
- */
-export function toDetail(item: DiaryListItem, entry: DiaryEntry | null): AppScreen {
-  if (!item.readable || entry === null) return { kind: "unreadable", day: item.day };
-  return { kind: "detail", day: item.day, entry };
 }
 
 /**
@@ -405,28 +381,29 @@ export function toFailed(message: string): AppScreen {
 }
 
 /**
- * 생성 결과를 화면으로 옮긴다 (data-model.md §5).
+ * 생성이 끝난 뒤 어디로 가는가 (051 data-model §3).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **`storage` 실패만 `failed`가 아니다**(FR-012a).
+ * **성공이면 홈의 그 날이다**(FR-024). 목록을 다시 읽는 것은 기기 통로라 이 순수 함수 밖(화면)이
+ * 한다 — `home`은 「다시 읽고 홈으로」라는 뜻이다. 고른 날은 바뀌지 않는다(쓰기는 고른 날을 썼다).
  *
- * 6단계(저장)에 도달했다는 것 자체가 5단계(생성) 성공을 뜻하므로 **보여줄 글이 있다.**
- * 30초를 들인 글이고 다시 생성해도 같은 글이 나오지 않으므로 읽을 기회를 빼앗지 않는다.
+ * **「덮어썼다」를 화면으로 보내지 않는다** — `2d` 대화상자에서 이미 확인받았다(051 Clarifications).
+ * 파이프라인의 `overwrote`(002 FR-023a)는 그대로 남는다.
  *
- * 다만 `saved: false`로 **남지 않는다는 것을 함께 전한다**(FR-012b) — 성공처럼 보이면
- * 사용자는 일기가 남은 줄 안다(SC-008c).
+ * **`storage` 실패만 `failed`가 아니다**(006 FR-012a). 6단계(저장)에 도달했다는 것 자체가
+ * 5단계(생성) 성공을 뜻하므로 보여줄 글이 있다 — `unsaved`가 그 글을 싣고 「남지 않는다」고
+ * 말한다(FR-012b, SC-008c).
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export function afterGeneration(result: PipelineResult): AppScreen {
-  if (result.ok) {
-    return { kind: "written", entry: result.entry, saved: true, overwrote: result.overwrote };
-  }
+export type AfterGeneration =
+  { kind: "home" } | { kind: "unsaved"; entry: DiaryEntry } | { kind: "failed"; message: string };
 
-  // 저장 실패인데 글이 있다 — 보여주되 남지 않는다고 말한다.
-  if (result.entry !== undefined) {
-    // 쓰기가 실패했으므로 기존 일기는 그대로 남아 있다(002 FR-023b) — 덮어쓴 것이 아니다.
-    return { kind: "written", entry: result.entry, saved: false, overwrote: false };
-  }
+export function afterGeneration(result: PipelineResult): AfterGeneration {
+  if (result.ok) return { kind: "home" };
+
+  // 저장 실패인데 글이 있다 — 보여주되 남지 않는다고 말한다. 쓰기가 실패했으므로 기존 일기는
+  // 그대로 남아 있다(002 FR-023b).
+  if (result.entry !== undefined) return { kind: "unsaved", entry: result.entry };
 
   // **거부된 글은 여기 오지 않는다** — 애초에 결과에 없다(002 FR-012).
   return { kind: "failed", message: describeStage(result.stage, result.reason) };

@@ -29,16 +29,12 @@ import {
   type WritePrompt,
 } from "../../src/app/state";
 import { DiaryListScreen, type DiaryListScreenProps } from "../../src/ui/DiaryListScreen";
+import { COLORS } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
 
 const readable = (day: string, photos: PhotoHint = { kind: "none" }, title?: string) =>
   ({ day, readable: true, photos, ...(title !== undefined ? { title } : {}) }) as DiaryListItem;
-const unreadable = (day: string): DiaryListItem => ({
-  day,
-  readable: false,
-  photos: { kind: "unknown" },
-});
 
 /** 2026-09-24(목) 10:00 — 정오 전. 049부터 기본 선택은 오늘(09-24) */
 const MORNING = new Date("2026-09-24T10:00:00");
@@ -58,7 +54,6 @@ async function renderHome(
   const write = opts.write ?? writePromptFor(items, now, opts.chosen ?? null);
   const props: DiaryListScreenProps = {
     items,
-    onOpen: jest.fn(),
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
     write,
@@ -80,7 +75,7 @@ function insideScrollView(node: { parent: unknown; type: unknown } | null): bool
 }
 
 describe("048 H — 1d 구조와 헤더", () => {
-  it("★ H1 — 헤더·스트립·신호 줄·목록 머리가 스크롤 안에, 하단 바는 스크롤 밖에", async () => {
+  it("★ H1 — 헤더·스트립·신호 줄이 스크롤 안에, 하단 바는 스크롤 밖에 (051 — 목록 머리 없음)", async () => {
     await renderHome({ items: [readable("2026-09-20")] });
 
     for (const id of [
@@ -91,14 +86,12 @@ describe("048 H — 1d 구조와 헤더", () => {
       "home-day-state",
       "day-strip",
       "signal-row",
-      "home-recent",
-      "home-count",
     ]) {
       expect(insideScrollView(screen.getByTestId(id) as never)).toBe(true);
     }
-    expect(insideScrollView(screen.getByTestId("home-bottom-bar") as never)).toBe(false);
+    expect(insideScrollView(screen.getByTestId("write-button") as never)).toBe(false);
     expect(screen.getByTestId("home-kicker")).toHaveTextContent("일기");
-    expect(screen.getByTestId("home-recent")).toHaveTextContent("최근");
+    expect(screen.queryByTestId("home-recent")).toBeNull();
   });
 
   it("H3·H4 — 고른 날의 큰 날짜·요일, 오늘이면 「오늘 일기를 쓸 수 있어요」", async () => {
@@ -147,6 +140,9 @@ describe("048 H — 1d 구조와 헤더", () => {
 
     await fireEvent.press(screen.getByTestId("home-date-button"));
     expect(onPressDate).toHaveBeenCalledTimes(1);
+    // 051 수정 — 요일은 상태 줄과 같은 세로 묶음으로 옮겨 따로 감쌌다. 같은 동작이다.
+    await fireEvent.press(screen.getByTestId("home-date-weekday"));
+    expect(onPressDate).toHaveBeenCalledTimes(2);
     expect(screen.getByTestId("home-date-button")).toHaveProp("accessibilityLabel", "날짜로 이동");
   });
 
@@ -266,11 +262,24 @@ describe("048 H — 1d 구조와 헤더", () => {
 });
 
 describe("048 B — 하단 바와 쓰기", () => {
-  it("B1 — 쓸 수 있는 날은 [일기 쓰기 │ n일]", async () => {
+  /**
+   * 051 수정 — 보드 `1d`의 바는 화면 폭 전체의 빨강 블록 「일기 쓰기」 하나다. 048의 「n일」 조각과 `⋯` 메뉴는
+   * 보드에 없어 걷어냈다(메뉴는 저장소 소유자 지시). B3(날짜 조각은 누를 수 없다)은 조각이 없어져 함께 지웠다.
+   */
+  it("★ B1 — 안 쓴 날의 바는 전폭 빨강 블록 「일기 쓰기」 하나, 날짜 조각·메뉴 없음 (보드 1d)", async () => {
     await renderHome({ now: SUNDAY_AFTERNOON });
 
-    expect(screen.getByTestId("write-button")).toHaveTextContent("일기 쓰기");
-    expect(screen.getByTestId("write-day-label")).toHaveTextContent("13일");
+    const button = screen.getByTestId("write-button");
+    expect(button).toHaveTextContent("일기 쓰기");
+    expect(button).toHaveStyle({
+      backgroundColor: COLORS.accent,
+      minHeight: 64,
+      borderTopLeftRadius: 6,
+      borderTopRightRadius: 6,
+    });
+    expect(screen.getByText("일기 쓰기")).toHaveStyle({ fontSize: 17, fontWeight: "800" });
+    expect(screen.queryByTestId("write-day-label")).toBeNull();
+    expect(screen.queryByTestId("home-menu-button")).toBeNull();
   });
 
   it("★ B2 — 쓰기를 누르면 인자 없이 한 번 알린다 (006 S1)", async () => {
@@ -281,27 +290,10 @@ describe("048 B — 하단 바와 쓰기", () => {
     expect(props.onWrite).toHaveBeenCalledWith();
   });
 
-  it("★ B3 — 날짜 조각은 누를 수 없는 글자다 (D7, SC-002)", async () => {
-    const props = await renderHome();
-
-    const label = screen.getByTestId("write-day-label");
-    expect(label.props.onPress).toBeUndefined();
-    await fireEvent.press(label);
-    expect(props.onWrite).not.toHaveBeenCalled();
-    expect(label).not.toHaveTextContent(/[▾›→⌄]/);
-    // 쓰기 버튼의 자손이 아니다
-    let cur = label.parent;
-    while (cur) {
-      expect(cur.props.testID).not.toBe("write-button");
-      cur = cur.parent;
-    }
-  });
-
   it("★ B4 — 정오 전 오늘도 쓰기 버튼이 있다 (049 FR-018b)", async () => {
     await renderHome();
 
     expect(screen.getByTestId("write-button")).toBeTruthy();
-    expect(screen.getByTestId("write-day-label")).toHaveTextContent("24일");
     expect(screen.queryByTestId("write-unavailable")).toBeNull();
   });
 });
@@ -356,76 +348,25 @@ describe("048 G — 신호 줄", () => {
   });
 });
 
-describe("048 목록 — 모든 일기, 카드", () => {
-  it("「n편」이 일기 수이고 7일 밖 일기도 카드로 나온다", async () => {
-    const items = [readable("2026-09-23"), readable("2026-08-01"), readable("2025-12-31")];
-    await renderHome({ items });
+/**
+ * ★ 051 — 「최근 · n편」 목록과 카드가 사라졌다(홈이 곧 상세). 옛 일기에는 스트립(049)·달력(050)으로
+ * 닿는다 — contracts/written-day.md REACH. 카드가 지키던 「사진 없음/모름」·「읽을 수 없어요」 구분은
+ * 쓴 날의 헤더·지면이 이어받았다(written-day-home.test.tsx HOME4·HOME9).
+ */
+describe("051 — 목록이 없다", () => {
+  it("일기가 여럿이어도 목록·카드를 그리지 않는다", async () => {
+    await renderHome({ items: [readable("2026-09-23"), readable("2025-12-31")] });
 
-    expect(screen.getByTestId("home-count")).toHaveTextContent("3편");
-    for (const item of items) expect(screen.getByTestId(`diary-card-${item.day}`)).toBeTruthy();
+    expect(screen.queryByTestId("home-recent")).toBeNull();
+    expect(screen.queryByTestId("home-count")).toBeNull();
+    expect(screen.queryByTestId("diary-card-2026-09-23")).toBeNull();
   });
 
-  it("카드를 누르면 그 항목이 전달된다", async () => {
-    const item = readable("2026-09-20");
-    const props = await renderHome({ items: [item] });
-
-    await fireEvent.press(screen.getByTestId("diary-card-2026-09-20"));
-    expect(props.onOpen).toHaveBeenCalledWith(item);
-  });
-
-  it("카드 날짜는 「YYYY · MM · DD · 요일」", async () => {
-    await renderHome({ items: [readable("2026-09-12")] });
-
-    expect(screen.getByText(/2026 · 09 · 12 · 토/)).toBeTruthy();
-  });
-
-  it("제목이 있으면 보이고, 없으면 날짜만 있다 (014)", async () => {
-    await renderHome({
-      items: [readable("2026-09-12", { kind: "none" }, "비 온 뒤 산책"), readable("2026-09-11")],
-    });
-
-    expect(screen.getByText("비 온 뒤 산책")).toBeTruthy();
-    expect(screen.getByTestId("diary-card-2026-09-11")).not.toHaveTextContent("비 온 뒤 산책");
-  });
-});
-
-describe("048 US5 — 카드가 「없음」과 「모름」을 잃지 않는다", () => {
-  it("사진을 본 일기는 장수 배지가 있다", async () => {
-    await renderHome({ items: [readable("2026-09-12", { kind: "known", count: 3 })] });
-
-    expect(screen.getByTestId("diary-card-badge-2026-09-12")).toHaveTextContent("3");
-  });
-
-  it("★ 사진이 없던 일기와 모르는 일기는 서로 다른 말이다 (007 FR-018·019, 원칙 V)", async () => {
-    await renderHome({
-      items: [
-        readable("2026-09-12", { kind: "none" }),
-        readable("2026-09-11", { kind: "unknown" }),
-      ],
-    });
-
-    expect(screen.getByTestId("diary-card-2026-09-12")).toHaveTextContent(/사진 없음/);
-    expect(screen.getByTestId("diary-card-2026-09-11")).toHaveTextContent(/사진 모름/);
-    expect(screen.queryByTestId("diary-card-badge-2026-09-12")).toBeNull();
-    expect(screen.queryByTestId("diary-card-badge-2026-09-11")).toBeNull();
-  });
-
-  it("★ 읽을 수 없는 일기는 사라지지 않고 그렇다고 말한다 (FR-017a)", async () => {
-    await renderHome({ items: [unreadable("2026-09-12")] });
-
-    expect(screen.getByTestId("diary-card-2026-09-12")).toHaveTextContent(/읽을 수 없어요/);
-  });
-
-  it("★ 빈 목록은 무엇을 하면 생기는지 말한다 (006 S7)", async () => {
+  it("★ 일기가 하나도 없어도 빈 화면이 아니다 — 고를 날과 쓰기가 있다 (006 S7)", async () => {
     await renderHome({ items: [] });
 
-    expect(screen.getByText("아직 일기가 없어요")).toBeTruthy();
-    expect(
-      screen.getByText(
-        "위에서 하루를 고르고 「일기 쓰기」를 누르면 휴대폰이 그 하루를 일기로 써요",
-      ),
-    ).toBeTruthy();
-    expect(screen.getByTestId("home-count")).toHaveTextContent("0편");
+    expect(screen.getByTestId("day-strip")).toBeTruthy();
+    expect(screen.getByTestId("write-button")).toHaveTextContent("일기 쓰기");
   });
 
   it("실제 사진 썸네일을 쓰지 않는다", async () => {

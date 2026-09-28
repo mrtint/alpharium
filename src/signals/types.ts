@@ -180,7 +180,8 @@ export type DaySignals = {
  * unknown이니 빼자"로 정하면 그것이 임계값이다. 사람이 여기 적고, 통로가 생기면
  * 사람이 상수를 고친다.
  *
- * **`prompt.ts`와 `DiaryDetailScreen.tsx`가 이 상수를 본다.** `SignalProbe.tsx`
+ * **`prompt.ts`가 이 상수를 본다**(012 당시에는 `DiaryDetailScreen.tsx`도 — 051에서 그 화면과 신호
+ * 줄이 사라졌다). `SignalProbe.tsx`
  * (진단)는 이 상수를 **보지 않고** 다섯 축을 전부 그린다 — 사용자 화면에서 빠지는
  * 것과 저장소가 값을 잊는 것은 다르다(FR-009).
  *

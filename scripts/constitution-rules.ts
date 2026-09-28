@@ -161,8 +161,8 @@ const UI_TOUCHES_ASSET = /\b(?:ModelAsset|assetFor|allAssets|ESSENTIAL_ASSET_KEY
  * 그 순간 프롬프트가 두 곳이 되어(005 FR-013b — 프롬프트는 `prompt.ts` 한 곳)
  * 원칙 II가 조용히 깨진다. **조심해서 안 부르는 것이 아니라 부를 수 없게 한다.**
  *
- * **신호 타입(`signals/*`)은 여기서 막지 않는다** — `DiaryDetailScreen`이 저장된
- * `signalsUsed`를 그리고 `SignalProbe`가 신호를 수집하는 것은 이미 정당한 기존
+ * **신호 타입(`signals/*`)은 여기서 막지 않는다** — 화면이 저장된 신호 타입을 다루고(022 당시
+ * `DiaryDetailScreen`, 051에서 사라짐) `SignalProbe`가 신호를 수집하는 것은 이미 정당한 기존
  * 동작이며, 022는 그 경계를 건드리지 않는다. 022가 새로 더하는 위험은 "프롬프트
  * 조립이 화면에 복제되는 것" 하나뿐이다.
  * ─────────────────────────────────────────────────────────────────────────
@@ -240,7 +240,7 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
       });
     }
 
-    // **`SignalProbe.tsx`만 검사한다.** 다른 화면(DiaryDetailScreen 등)은 이 상수를
+    // **`SignalProbe.tsx`만 검사한다.** 사용자 화면(012 당시 DiaryDetailScreen 등)은 이 상수를
     // import해서 사용자 화면에 축을 숨기는 것이 맞는 동작이다 — 문제는 진단 경로뿐이다.
     if (normalized === "src/ui/SignalProbe.tsx" && DIAGNOSTICS_HIDES_AXES.test(code)) {
       violations.push({

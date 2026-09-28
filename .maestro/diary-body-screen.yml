@@ -5,10 +5,9 @@
 # 이미 저장된 일기(생성은 사람이 quickstart.md D2~D6에서 한다)를 열어
 # 확인하고, 장소명은 목록 화면의 토글 렌더링·고지 문구·선택 표식을 본다.
 #
-# 검증 항목:
-#   FR-001   사진이 있는 저장된 일기를 열면 사진 영역이 보인다        (M1)
-#   FR-013   사진 0장인 저장된 일기에는 사진 분석 소요 시간이 없다    (M2)
-#   FR-018   소요 시간 문장이 "M분 SS초" 류 형태로 보인다            (M2)
+# 검증 항목 (051 — 홈이 곧 상세가 되며 M1·M2를 다시 썼다):
+#   051 US1  쓴 날을 누르면 홈 지면에 본문·사진이 보인다               (M1)
+#   051 FR-016a 지면에 「이 일기가 본 것」·소요 시간이 없다 (017 M2를 뒤집음) (M1)
 #   FR-004~006 장소명 설정이 켤 때 고지가 뜬다 (029: 설정 탭 "장소명" 섹션)  (M3)
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -42,58 +41,41 @@ appId: com.anonymous.alpharium
 
 - assertVisible: "일기"
 
-# ★ M1 — **사진이 있는 저장된 일기를 열면 사진 영역이 보인다**(FR-001).
+# ★ M1 — **이번 주에 쓴 날이 있으면 홈에서 그 날의 본문이 보인다**(051 — 홈이 곧 상세).
 #
-# "사진 N장"이 붙은 줄이 있으면 그것을 열어 사진이 실제로 보이는지 확인한다.
-# 없으면(이 기기에 아직 사진 있는 일기가 저장되지 않았으면) 이 블록은
-# SKIPPED로 지나간다 — quickstart.md D2가 사람 확인으로 이 갈래를 메운다.
+# 051 전에는 「최근」 목록의 카드를 눌러 상세 화면을 열었다. 이제 목록·상세가 없고, 스트립의 점(일기
+# 있음)이 찍힌 날을 누르면 그 자리에서 지면에 본문이 보인다. 이번 주에 쓴 날이 없으면 SKIPPED —
+# 051 quickstart D1이 사람 확인으로 메운다(건너뛴 것은 통과가 아니다).
 - runFlow:
     when:
       visible:
-        text: "사진 [1-9][0-9]*장"
+        id: "day-dot-.*"
     commands:
       - tapOn:
-          text: "사진 [1-9][0-9]*장"
+          id: "day-dot-.*"
+      - assertVisible:
+          id: "written-paper"
       - scrollUntilVisible:
           element:
-            id: "diary-photo"
+            id: "written-body"
           direction: DOWN
           timeout: 20000
-      - assertVisible:
-          id: "diary-photo"
-      - scrollUntilVisible:
-          element:
-            text: "← 목록"
-          direction: UP
-          timeout: 20000
-      - tapOn: "← 목록"
-
-# ★ M2 — **사진 0장인 저장된 일기에는 사진 분석 소요 시간이 없다**(FR-013).
-#
-# "사진 없음"이 붙은 줄이 있으면 그것을 열어 확인한다. 없으면 SKIPPED —
-# quickstart.md D3이 사람 확인으로 메운다.
-- runFlow:
-    when:
-      visible: "사진 없음"
-    commands:
-      - tapOn: "사진 없음"
-      - scrollUntilVisible:
-          element:
-            text: ".*이렇게 일기를 작성했어요.*"
-          direction: DOWN
-          timeout: 20000
-      # ★ FR-018 — 글쓰기 소요 시간 문장이 보인다.
-      - assertVisible:
-          text: ".*일기를 작성하는 데.*걸렸어요.*"
-      # ★ FR-013 — 사진이 없으니 사진 분석 소요 시간 문장은 없다.
+      # 사진을 본 일기면 캐러셀(1장이면 사진 하나)이 보인다 — 017 FR-001의 사진 영역.
+      - runFlow:
+          when:
+            visible:
+              id: "diary-photo"
+          commands:
+            - assertVisible:
+                id: "diary-photo"
+      # ★ 051 FR-016a — 「이 일기가 본 것」·소요 시간·작성자 문장이 지면에 없다(Clarifications).
+      #   017 M2의 「소요 시간 문장이 보인다」를 뒤집었다.
       - assertNotVisible:
-          text: ".*사진을.*분석하는 데.*"
-      - scrollUntilVisible:
-          element:
-            text: "← 목록"
-          direction: UP
-          timeout: 20000
-      - tapOn: "← 목록"
+          text: ".*이렇게 일기를 작성했어요.*"
+      - assertNotVisible:
+          text: ".*걸렸어요.*"
+      - assertNotVisible:
+          text: ".*대표 장소.*"
 
 # ★ M3 — **장소명 설정이 설정 탭 "장소명" 섹션에 있다**(FR-004~006).
 #

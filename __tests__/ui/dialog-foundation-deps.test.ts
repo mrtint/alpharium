@@ -46,9 +46,7 @@ describe("DEP2 — RNR 버튼·글자는 대화상자·메뉴 부품 안에서�
     ).map((f) => relative(ROOT, join(ROOT, f)).replace(/\\/g, "/"));
 
     const allowed = (f: string) =>
-      f.startsWith("src/ui/rnr/") ||
-      f === "src/ui/components/Dialog.tsx" ||
-      f === "src/ui/HomeMenu.tsx";
+      f.startsWith("src/ui/rnr/") || f === "src/ui/components/Dialog.tsx";
     expect(importers.filter((f) => !allowed(f))).toEqual([]);
   });
 });
@@ -78,7 +76,6 @@ describe("DEP5 — PortalHost는 루트에 하나 (research R4)", () => {
 
 describe("MIG3 — 대화상자·메뉴가 RN 코어 Modal을 쓰지 않는다 (Q4)", () => {
   it.each([
-    "src/ui/HomeMenu.tsx",
     "src/ui/DownloadConsentDialog.tsx",
     "src/ui/OverwriteConfirmDialog.tsx",
     "src/ui/DateJumpDialog.tsx",
