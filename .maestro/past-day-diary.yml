@@ -50,8 +50,9 @@ appId: com.anonymous.alpharium
 #
 # 048 — 「N를 쓴다」가 하단 고정 바의 「n일」(`write-day-label`)이 됐고, 골라진 칸은
 # 스트립에서 selected 상태로 표시된다(「선택」 글자는 없다).
+# 051 — 쓴 날의 하단 바(「다시 쓰기」)에는 날짜 조각이 없다. 쓰게 될 하루는 헤더의 큰 날짜가 보인다.
 - assertVisible:
-    id: "write-day-label"
+    id: "home-day-number"
 - assertVisible:
     id: "day-.*"
     selected: true
@@ -98,8 +99,9 @@ appId: com.anonymous.alpharium
 - assertVisible:
     id: "day-.*"
     selected: true
+# 051 — 쓴 날의 하단 바(「다시 쓰기」)에는 날짜 조각이 없다. 쓰게 될 하루는 헤더의 큰 날짜가 보인다.
 - assertVisible:
-    id: "write-day-label"
+    id: "home-day-number"
 # 4주 전 주에는 흐린(미래) 칸이 없다 — 어느 칸이든 누를 수 있다.
 - tapOn:
     id: "day-.*"
@@ -126,10 +128,12 @@ appId: com.anonymous.alpharium
 # **모델이 없으면 「캐릭터를 먼저 준비해야 한다」로 끝나고 그것이 정상이다**(FR-006).
 - scrollUntilVisible:
     element:
-      text: "일기 쓰기"
+      id: "write-button"
     direction: DOWN
     timeout: 20000
-- tapOn: "일기 쓰기"
+# 051 — 쓴 날에는 같은 버튼이 「다시 쓰기」다(기본 선택 = 오늘). id로 누른다(FR-037a).
+- tapOn:
+    id: "write-button"
 
 # ★ FR-018 — **생성 중에 아무것도 늘지 않았다**(원칙 IV).
 #
@@ -149,7 +153,7 @@ appId: com.anonymous.alpharium
 #   0. 덮어쓰기 확인(「취소」/「확인」) — 012, 고른 하루에 이미 일기가 있다 → 취소
 #   1. 「쓰고 있다」   — 모델이 있고 생성 중이다 → 그만두기
 #   2. 「캐릭터를 먼저 준비해야 한다」 — 모델이 없다(FR-006) → 목록으로
-#   3. 상세 화면       — 생성이 이미 끝났다(2.4초일 수 있다) → 목록으로
+#   3. 홈의 그 날       — 생성이 이미 끝났다(2.4초일 수 있다). 051부터 결과 화면 없이 홈으로 돌아온다
 #
 # ⚠️ **모델이 없는 기기에서 2번으로 가는 것을 잊으면 흐름이 실패한다** — 그 화면에는
 # 고르는 자리가 없으므로 아래의 `scrollUntilVisible`이 영영 못 찾는다. 제품의 결함이
@@ -170,12 +174,12 @@ appId: com.anonymous.alpharium
     commands:
       - tapOn: "그만두기"
 
-# 목록이 아니면 돌아간다. 「← 목록」이 있으면 상세·실패 화면이다.
+# 홈이 아니면 돌아간다. 051 — 「← 일기」가 있으면 실패·저장 실패 화면이다(상세 화면은 없다).
 - runFlow:
     when:
-      visible: "← 목록"
+      visible: "← 일기"
     commands:
-      - tapOn: "← 목록"
+      - tapOn: "← 일기"
 
 # 뒤로 가기로도 돌아갈 수 있다 — 위 둘 다 아니었을 때의 마지막 통로다(048 — 탭 줄이 없다).
 - runFlow:

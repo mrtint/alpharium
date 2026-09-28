@@ -85,15 +85,14 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
     expect(app).not.toContain('"characters"');
   });
 
-  it("★ M6 — 개발자 메뉴 항목은 showsDiagnostics 조건 안에서만 만들어진다 (FR-003)", () => {
+  /**
+   * 051 수정 — 홈의 `⋯` 메뉴(048 M1~M6)를 없앴다(저장소 소유자 지시). 설정·개발자 진입점은 설정 화면 구성
+   * 과제에서 다시 둔다. 개발자 화면은 여전히 `showsDiagnostics` 조건 안에서만 그려진다(FR-024).
+   */
+  it("★ M6 — 홈에 메뉴 항목이 없고, 개발자 화면은 showsDiagnostics 조건 안에서만 그려진다", () => {
     const frame = functionBody("AppFrame");
-    const idx = frame.indexOf('key: "developer"');
-    expect(idx).toBeGreaterThanOrEqual(0);
-    // 개발자 항목 바로 앞의 조건식이 showsDiagnostics다 — 무조건 넣지 않는다.
-    const before = frame.slice(Math.max(0, idx - 120), idx);
-    expect(before).toMatch(/showsDiagnostics\s*\?/);
-    // 항목은 한 자리에서만 만들어진다.
-    expect(frame.match(/key: "developer"/g)).toHaveLength(1);
+    expect(frame).not.toMatch(/menuItems|HomeMenu|key: "developer"/);
+    expect(frame).toMatch(/showsDiagnostics && \(\s*<SubScreenFrame/);
   });
 
   it("N4 — 설정으로 가라는 안내와 알림 라우팅이 새 화면 상태를 쓴다", () => {

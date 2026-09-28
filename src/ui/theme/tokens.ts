@@ -193,6 +193,50 @@ export const CALENDAR = {
 } as const;
 
 /**
+ * 051 — 쓴 날 지면·캐러셀·「다시 쓰기」 바 (보드 `2c`·`2k`·`2g`, 설계 §3.5 — 사람이 정한 값).
+ *
+ * 보드 색 램프(설계 §4.2)의 세 값은 「역할」이 아니라 이 면들의 색이라 `COLORS`(아홉 역할, DT1)에
+ * 넣지 않는다 — 050의 `OVERLAY`·`CALENDAR`와 같은 방식(research R7). 대비는 theme-tokens.test가
+ * 잠근다.
+ */
+export const WRITTEN_DAY = {
+  /** 지면 배경 — 보드 neutral-100 */
+  paper: "#f8f4f4",
+  /** 「다시 쓰기」 바 — 보드 neutral-200 */
+  rewriteBar: "#eae7e7",
+  /** 인디케이터 나머지 칸 — 보드 neutral-400 */
+  indicatorIdle: "#bab6b6",
+  /** 캐러셀 사진 높이 */
+  photoHeight: 210,
+  /** 스트립 아래 지면까지 */
+  paperGap: 20,
+  /** 캐러셀 안쪽 여백 (위·좌우, 아래 0) */
+  carouselPadding: { top: 16, horizontal: 20 },
+  /** 「1 / 3」 배지 — 위·오른쪽 10, 11/700, 자간 .08em(11 × .08), 안쪽 여백 4 9 */
+  badge: { inset: 10, fontSize: 11, letterSpacing: 0.88, paddingV: 4, paddingH: 9 },
+  /** 인디케이터 — 현재 장 18×4, 나머지 6×4, 간격 6 */
+  indicator: { activeWidth: 18, idleWidth: 6, height: 4, gap: 6, marginTop: 10 },
+  /** 본문 — 15, 줄높이 1.65, 문단 간격 14, 안쪽 여백 16 20 104 (사진이 없으면 위 20 — 보드 `2k`) */
+  body: {
+    fontSize: 15,
+    lineHeightRatio: 1.65,
+    paragraphGap: 14,
+    paddingTop: 16,
+    paddingTopAlone: 20,
+    paddingH: 20,
+    paddingBottom: 104,
+  },
+  /** 헤더 제목 15/700 */
+  title: { fontSize: 15, fontWeight: "700" },
+  /** 「다시 쓰기」 17/800 */
+  rewrite: { fontSize: 17, fontWeight: "800" },
+  /** 하단 바 — 최소 높이 64, 위 좌우 반경 6, 올라오고 내려가는 시간 240ms (보드 `2c`·`1d`·`5b`) */
+  bar: { minHeight: 64, radius: 6, slideMs: 240 },
+  /** 상대 작성 시각 11/500, 바 글자와의 간격 3 */
+  writtenAt: { fontSize: 11, fontWeight: "500", gap: 3 },
+} as const;
+
+/**
  * WCAG 상대 명암비 — `(L1 + 0.05) / (L2 + 0.05)`.
  *
  * 순수 함수. 팔레트 값이 AA를 넘는지 **빌드 시** 검증하는 용도이지(theme-tokens.

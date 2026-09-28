@@ -58,10 +58,12 @@ env:
 # ── 생성: "일기 쓰기" 1탭 (029 — 캐릭터는 자동 판정) ──
 - scrollUntilVisible:
     element:
-      text: "일기 쓰기"
+      id: "write-button"
     direction: DOWN
     timeout: 20000
-- tapOn: "일기 쓰기"
+# 051 — 쓴 날에는 같은 버튼이 「다시 쓰기」다(기본 선택 = 오늘). id로 누른다(FR-037a).
+- tapOn:
+    id: "write-button"
 
 # 이미 일기가 있으면 덮어쓰기 확인 — 「다시 쓰기」를 눌러 진행한다(012 → 050 홈 위 대화상자).
 - runFlow:
@@ -93,10 +95,17 @@ env:
 - assertNotVisible: "unfinished"
 - assertNotVisible: "rejected"
 
-# 상세 화면이 떴으면 일기가 나온 것이다 — 「← 목록」으로 돌아가
-# 흐름이 상태를 바꾼 채 끝나지 않게 한다.
+# 051 — 홈이 곧 상세다. 일기가 나왔으면 결과 화면 없이 홈의 그 날로 돌아와 지면에 본문이 보인다.
+# 실패·저장 실패 화면이면 「← 일기」로 홈에 돌아간다(흐름이 상태를 바꾼 채 끝나지 않게).
 - runFlow:
     when:
-      visible: "← 목록"
+      visible: "← 일기"
     commands:
-      - tapOn: "← 목록"
+      - tapOn: "← 일기"
+- runFlow:
+    when:
+      visible:
+        id: "written-body"
+    commands:
+      - assertVisible:
+          id: "home-day-title"

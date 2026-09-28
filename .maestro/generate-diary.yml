@@ -50,10 +50,11 @@ appId: com.anonymous.alpharium
 # 짧아졌다.
 - scrollUntilVisible:
     element:
-      text: "일기 쓰기"
+      id: "write-button"
     direction: DOWN
     timeout: 20000
-- assertVisible: "일기 쓰기"
+- assertVisible:
+    id: "write-button"
 
 # ★ 005 FR-028a — **원칙 IV의 핵심 위험이다.**
 # 오래 기다리는 화면이므로 「얼마나 남았나」를 넣고 싶어지는 압력이 실제로 있다.
@@ -81,7 +82,9 @@ appId: com.anonymous.alpharium
 # 있는지 말해 주는가**이다.
 # 이미 그 하루의 일기가 있으면 덮어쓰기 확인이 먼저 뜬다(012) — 「다시 쓰기」를 눌러 진행한다.
 # 050 — 확인은 전체 화면이 아니라 홈 위의 대화상자(`overwrite-dialog`)이고 버튼은 「다시 쓰기」/「취소」다.
-- tapOn: "일기 쓰기"
+# 051 — 쓴 날에는 같은 버튼이 「다시 쓰기」다(기본 선택 = 오늘). id로 누른다(FR-037a).
+- tapOn:
+    id: "write-button"
 - runFlow:
     when:
       visible:

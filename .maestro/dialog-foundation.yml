@@ -29,12 +29,20 @@ appId: com.anonymous.alpharium
     when:
       notVisible: ".*일기를 쓸 수 있어요"
     commands:
+      # 051 수정 — 쓴 날의 「다시 쓰기」는 지면 끝에 닿아야 올라온다(보드 `2c` ④). 내려서 찾는다.
+      - scrollUntilVisible:
+          element:
+            id: "write-button"
+          direction: DOWN
+          timeout: 20000
       - tapOn:
           id: "write-button"
       - assertVisible:
           id: "overwrite-dialog"
       - assertVisible: "일기를 다시 쓸까요?"
-      - assertVisible: "다시 쓰기"
+      # 051 — 쓴 날의 하단 바도 「다시 쓰기」라 글자로는 대화상자 버튼을 가리지 못한다.
+      - assertVisible:
+          id: "overwrite-confirm"
       # 오늘을 다시 쓸 때만 보이는 안내(Q5)
       - assertVisible:
           id: "overwrite-today-note"

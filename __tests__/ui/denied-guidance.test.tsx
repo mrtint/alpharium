@@ -58,7 +58,7 @@ describe("DiaryListScreen — deniedNotices 배너 (FR-014, SC-004)", () => {
     await render(
       <DiaryListScreen
         items={[]}
-        onOpen={() => {}}
+
         onWrite={() => {}}
         deniedNotices={[photoDenied, locDenied]}
       />,
@@ -69,14 +69,12 @@ describe("DiaryListScreen — deniedNotices 배너 (FR-014, SC-004)", () => {
   });
 
   it("deniedNotices가 비었으면 배너가 없다", async () => {
-    await render(
-      <DiaryListScreen items={[]} onOpen={() => {}} onWrite={() => {}} deniedNotices={[]} />,
-    );
+    await render(<DiaryListScreen items={[]} onWrite={() => {}} deniedNotices={[]} />);
     expect(screen.queryByTestId("denied-notices")).toBeNull();
   });
 
   it("deniedNotices 미지정이면 배너가 없다 (006~020 기존 호출 호환)", async () => {
-    await render(<DiaryListScreen items={[]} onOpen={() => {}} onWrite={() => {}} />);
+    await render(<DiaryListScreen items={[]} onWrite={() => {}} />);
     expect(screen.queryByTestId("denied-notices")).toBeNull();
   });
 });

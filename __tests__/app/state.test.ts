@@ -20,7 +20,6 @@ import {
   confirmOverwrite,
   initialScreen,
   startWriting,
-  toDetail,
   toList,
   toWriting,
   dayParts,
@@ -93,98 +92,32 @@ describe("첫 화면 (FR-018, S7)", () => {
   });
 });
 
-describe("020 — 알림을 눌러 열렸으면 상세로 바로 (FR-006, SC-004)", () => {
-  it("initialDay가 목록에 있고 읽혔으면 첫 화면이 detail이다 — 목록을 안 거친다", () => {
-    const entry = entryFor(DAY);
-    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
-      initialDay: DAY,
-      entry,
-    });
+/**
+ * ★ 051 — 홈이 곧 상세다. 상세 화면·「읽을 수 없다」 화면·생성 뒤 결과 화면(성공)이 화면 상태에서
+ * 사라졌다. 쓴 날은 홈이 고른 날로 그리는 지면 상태다(`written-day.ts`). 알림은 `initialScreen`이
+ * 아니라 홈의 고른 날로 간다(contracts/written-day.md ST1·ST6).
+ */
+describe("★ 051 — 상세 갈래가 없다 (ST1·ST6)", () => {
+  const code = readFileSync(join(__dirname, "../../src/app/state.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
 
-    expect(screen.kind).toBe("detail");
-    if (screen.kind === "detail") {
-      expect(screen.day).toBe(DAY);
-      expect(screen.entry).toBe(entry);
-    }
+  it("ST1 — AppScreen에 detail·unreadable·written 갈래가 없고 toDetail이 없다", () => {
+    expect(code).not.toMatch(/kind:\s*"detail"/);
+    expect(code).not.toMatch(/kind:\s*"unreadable"/);
+    expect(code).not.toMatch(/kind:\s*"written"/);
+    expect(code).not.toMatch(/export function toDetail/);
   });
 
-  it("initialDay가 목록에 없으면 조용히 목록으로 (원칙 V)", () => {
-    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
-      initialDay: "2020-01-01",
-      entry: entryFor("2020-01-01"),
-    });
-
-    expect(screen.kind).toBe("list");
+  it("ST6 — initialScreen은 build-error 또는 list만 — 알림 인자를 받지 않는다", () => {
+    expect(initialScreen.length).toBe(2);
+    expect(initialScreen({ ok: true, environment: "prod" }, [readable(DAY)]).kind).toBe("list");
+    expect(
+      initialScreen({ ok: false, reason: "missing", received: undefined }, [readable(DAY)]).kind,
+    ).toBe("build-error");
   });
 
-  it("initialDay는 있으나 entry가 null이면(못 읽음) 목록으로", () => {
-    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
-      initialDay: DAY,
-      entry: null,
-    });
-
-    expect(screen.kind).toBe("list");
-  });
-
-  it("initialDay가 unreadable 항목이면 목록으로 (빈 일기를 지어내지 않는다)", () => {
-    const screen = initialScreen({ ok: true, environment: "prod" }, [unreadable(DAY)], {
-      initialDay: DAY,
-      entry: entryFor(DAY),
-    });
-
-    expect(screen.kind).toBe("list");
-  });
-
-  it("initialDay가 null이면 기존대로 목록이다 (회귀 없음)", () => {
-    const screen = initialScreen({ ok: true, environment: "prod" }, [readable(DAY)], {
-      initialDay: null,
-    });
-
-    expect(screen.kind).toBe("list");
-  });
-
-  it("환경 실패면 initialDay가 있어도 build-error다", () => {
-    const screen = initialScreen(
-      { ok: false, reason: "missing", received: undefined },
-      [readable(DAY)],
-      { initialDay: DAY, entry: entryFor(DAY) },
-    );
-
-    expect(screen.kind).toBe("build-error");
-  });
-});
-
-describe("목록 → 상세 (FR-019, S3)", () => {
-  it("읽을 수 있는 항목을 누르면 전문이 열린다", () => {
-    const screen = toDetail(readable(DAY), entryFor());
-
-    expect(screen.kind).toBe("detail");
-    if (screen.kind === "detail") {
-      expect(screen.day).toBe(DAY);
-      expect(screen.entry.text).toBe("오늘 주인은 조용했다");
-    }
-  });
-
-  /**
-   * ★ S3 — **「읽을 수 없다」와 「일기가 없다」는 다른 상태다**(원칙 V).
-   *
-   * 조용히 빼면 사용자는 일기를 쓴 기억과 화면이 어긋나는 것을 설명할 방법이 없다.
-   */
-  it("읽을 수 없는 항목은 unreadable로 간다 — detail이 아니다", () => {
-    const screen = toDetail(unreadable(DAY), null);
-
-    expect(screen.kind).toBe("unreadable");
-    if (screen.kind === "unreadable") expect(screen.day).toBe(DAY);
-  });
-
-  it("읽을 수 있다고 했는데 실제로 읽히지 않으면 unreadable이다", () => {
-    // 목록을 만든 뒤 파일이 깨졌을 수 있다. 빈 일기를 지어내지 않는다.
-    const screen = toDetail(readable(DAY), null);
-
-    expect(screen.kind).toBe("unreadable");
-  });
-
-  it("상세에서 목록으로 돌아간다", () => {
+  it("돌아올 때마다 새로 읽은 목록을 받는다 (FR-022)", () => {
     const screen = toList([readable(DAY)]);
 
     expect(screen.kind).toBe("list");
@@ -210,25 +143,21 @@ describe("쓰는 중 (FR-021, S6)", () => {
 });
 
 describe("생성 결과 → 화면 (data-model.md §5)", () => {
-  it("성공하면 written이고 저장됐다", () => {
-    const result: PipelineResult = { ok: true, entry: entryFor(), overwrote: false };
-    const screen = afterGeneration(result);
-
-    expect(screen.kind).toBe("written");
-    if (screen.kind === "written") {
-      expect(screen.entry.text).toBe("오늘 주인은 조용했다");
-      expect(screen.saved).toBe(true);
-    }
+  it("★ ST2 — 성공하면 home이다 — 결과 화면을 거치지 않는다 (051, 덮어썼든 아니든)", () => {
+    expect(afterGeneration({ ok: true, entry: entryFor(), overwrote: false })).toEqual({
+      kind: "home",
+    });
+    // 덮어쓰기는 `2d` 대화상자에서 이미 확인했다 — 051 Clarifications.
+    expect(afterGeneration({ ok: true, entry: entryFor(), overwrote: true })).toEqual({
+      kind: "home",
+    });
   });
 
   /**
-   * ★ 006 FR-012a·b — **저장 실패는 `failed`가 아니라 `written{saved:false}`다.**
-   *
-   * 30초를 들여 만든 글이고 다시 생성해도 같은 글이 나오지 않는다. 원칙 I을 어기지
-   * 않는다 — 금지된 것은 미리 만든 글을 생성 대신 내놓는 것이지 방금 생성한 글을
-   * 보여주는 것이 아니다.
+   * ★ 006 FR-012a·b — **저장 실패는 `failed`가 아니다.** 30초를 들여 만든 글이고 다시 생성해도 같은
+   * 글이 나오지 않는다. 051 — 그 글만 임시 결과 화면(`unsaved`)에 남는다(FR-024a).
    */
-  it("★ 저장에 실패해도 글이 있으면 written이다 (saved: false)", () => {
+  it("★ ST3 — 저장에 실패해도 글이 있으면 unsaved다 — 그 글을 싣는다", () => {
     const result: PipelineResult = {
       ok: false,
       stage: "storage",
@@ -237,40 +166,8 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
     };
     const screen = afterGeneration(result);
 
-    expect(screen.kind).toBe("written");
-    if (screen.kind === "written") {
-      expect(screen.entry.text).toBe("오늘 주인은 조용했다");
-      // 성공한 것처럼 보이면 사용자는 일기가 남은 줄 안다(SC-008c).
-      expect(screen.saved).toBe(false);
-    }
-  });
-
-  /**
-   * ★ 006 FR-034 — **덮어썼다는 사실이 화면까지 간다** (002 FR-023a).
-   */
-  it("★ 덮어쓴 일기는 그 사실이 화면 상태에 남는다", () => {
-    const screen = afterGeneration({ ok: true, entry: entryFor(), overwrote: true });
-
-    expect(screen.kind).toBe("written");
-    if (screen.kind === "written") expect(screen.overwrote).toBe(true);
-  });
-
-  it("처음 쓴 일기는 덮어쓴 것이 아니다", () => {
-    const screen = afterGeneration({ ok: true, entry: entryFor(), overwrote: false });
-
-    if (screen.kind === "written") expect(screen.overwrote).toBe(false);
-  });
-
-  it("저장에 실패했으면 덮어쓴 것도 아니다", () => {
-    // 쓰기가 실패했으므로 기존 일기가 그대로 남아 있다(002 FR-023b).
-    const screen = afterGeneration({
-      ok: false,
-      stage: "storage",
-      reason: "저장 공간이 없다",
-      entry: entryFor(),
-    });
-
-    if (screen.kind === "written") expect(screen.overwrote).toBe(false);
+    expect(screen.kind).toBe("unsaved");
+    if (screen.kind === "unsaved") expect(screen.entry.text).toBe("오늘 주인은 조용했다");
   });
 
   it.each([
@@ -394,7 +291,12 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
   });
 
   it("생성 시간·속도·토큰 수를 담는 자리가 없다 (SC-020)", () => {
-    const screen = afterGeneration({ ok: true, entry: entryFor(), overwrote: false });
+    const screen = afterGeneration({
+      ok: false,
+      stage: "storage",
+      reason: "저장 공간이 없다",
+      entry: entryFor(),
+    });
     const rendered = JSON.stringify(screen);
 
     for (const metric of ["elapsed", "ms", "tokens", "perSecond", "speed"]) {
@@ -415,7 +317,7 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
  * ─────────────────────────────────────────────────────────────────────────────
  */
 describe("★★ 읽기와 생성이 분리되어 있다 (원칙 I, S1)", () => {
-  it("저장된 일기가 있어도 쓰기는 writing으로 간다 — detail이 아니다", () => {
+  it("저장된 일기가 있어도 쓰기는 writing으로 간다 — 저장된 글을 보여주지 않는다", () => {
     // 오늘 쓰려는 하루의 일기가 이미 있는 상황.
     const target = latestClosedDay(new Date("2026-08-17T12:00:00"));
     const items = [readable(target)];
@@ -888,12 +790,12 @@ describe("015 — writing의 stage·line", () => {
  * `line` 자리가 없다 — 타입 선언을 직접 읽어 그 사실을 못박는다(007 이후
  * 관례). 자리가 없으면 새는 경로 자체가 존재하지 않는다.
  */
-describe("015 US2 — stage·line이 written·failed로 새지 않는다", () => {
+describe("015 US2 — stage·line이 unsaved·failed로 새지 않는다", () => {
   const rawSource = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
   const source = rawSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
-  it("written 갈래에 stage·line이 없다", () => {
-    const match = source.match(/\{\s*kind:\s*"written"[^}]*\}/);
+  it("unsaved 갈래에 stage·line이 없다 (051 — written을 대신한다)", () => {
+    const match = source.match(/\{\s*kind:\s*"unsaved"[^}]*\}/);
     expect(match).not.toBeNull();
     expect(match?.[0]).not.toMatch(/\bstage\b|\bline\b/);
   });

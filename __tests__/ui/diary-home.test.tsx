@@ -23,6 +23,7 @@ import { memoryStore } from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
+import { reachPaperEnd } from "./paper-end";
 import { renderWithPortal } from "./render-with-portal";
 
 /**
@@ -443,13 +444,15 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     );
 
     await userEvent.press(await screen.findByTestId("day-2026-08-17"));
-    await userEvent.press(await screen.findByText("일기 쓰기"));
+    // 051 — 쓴 날의 쓰기 버튼은 「다시 쓰기」다(같은 testID). 지면 끝에 닿아야 올라온다(051 수정).
+    await reachPaperEnd();
+    await userEvent.press(await screen.findByTestId("write-button"));
 
     // 확인 대화상자가 뜨고, 아직 생성은 시작되지 않았다.
     await screen.findByTestId("overwrite-dialog");
     expect(pipeline.days).toEqual([]);
 
-    await userEvent.press(screen.getByText("다시 쓰기"));
+    await userEvent.press(screen.getByTestId("overwrite-confirm"));
 
     // **저장된 것을 대신 보여주지 않는다** — 실제로 생성이 돌았다.
     await waitFor(() => expect(pipeline.days).toEqual(["2026-08-17"]));
@@ -773,7 +776,9 @@ describe("015 — 쓰는 중 독백", () => {
 
     await act(async () => pipeline.finish({ ok: true, entry, overwrote: false }));
 
-    expect(await screen.findByText("조용한 하루였다.")).toBeTruthy();
+    // 051 — 결과 화면 없이 홈으로 돌아온다(본문은 저장소에서 다시 읽는다 — written-day-home GEN1).
+    await waitFor(() => expect(screen.queryByText("쓰고 있다")).toBeNull());
+    expect(screen.getByTestId("home-day-number")).toBeTruthy();
   });
 
   it("마지막으로 받은 stage·line이 실패 화면 전환 후에는 남아있지 않다 (FR-009·011)", async () => {
@@ -783,7 +788,7 @@ describe("015 — 쓰는 중 독백", () => {
     await act(async () => pipeline.onProgress("vision"));
     await act(async () => pipeline.finish({ ok: false, stage: "generation", reason: "실패" }));
 
-    await screen.findByText("← 목록");
+    await screen.findByText("← 일기");
     const rendered = JSON.stringify(screen.toJSON());
     expect(rendered).not.toMatch(/사진을 들여다보는|사진을 살펴보는|눈에 담는/);
   });
@@ -994,7 +999,9 @@ describe("018 — prepare()/release() 트리거", () => {
     );
 
     await userEvent.press(await screen.findByText("일기 쓰기"));
-    await screen.findByText(/일기를 작성하는 데|조용한 하루였다/);
+    // 051 — 성공하면 홈으로 돌아온다(죽지 않는다).
+    await waitFor(() => expect(screen.queryByText("쓰고 있다")).toBeNull());
+    expect(screen.getByTestId("home-day-number")).toBeTruthy();
   });
 
   /**

@@ -1,0 +1,110 @@
+# 실기기 자동 테스트 — 쓴 날 읽기: 홈이 곧 상세 (051)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **사진이 여러 장인 쓴 날을 고르면 홈에서 바로 읽는다.** 목록 카드·상세 화면 없이 헤더에 제목,
+# 지면에 캐러셀과 본문, 하단 바에 「다시 쓰기」가 보인다(보드 `2c`).
+#
+# ★ 이 흐름이 025 `diary-photo-gallery.yml`을 대체한다. 051 Clarifications에서 풀스크린 갤러리를
+#   없앴고(보드에 사진을 누르는 동작이 없다), 025의 「순환하지 않는다」(FR-011)를 보드 `loop`로
+#   뒤집었다 — 그래서 옛 흐름(슬라이더·갤러리·끝에서 멈춤)은 지웠다.
+#
+# 검증 항목 (specs/051-home-written-day):
+#   HOME2   쓴 날을 누르면 화면 전환 없이 제목·지면이 홈에 보인다        (R1)
+#   CAR4·5  캐러셀 배지 「1 / n」 → 넘기면 「2 / n」                      (R2)
+#   FR-010  n장을 다 넘기면 「1 / n」으로 돌아온다(순환)                    (R3)
+#   BAR2    「다시 쓰기」 → 덮어쓰기 확인 → 취소 → 지면 그대로               (R4)
+#
+# **여기서 자동화하지 않는 것** — quickstart D3·D4·D6·D7:
+#   흑백인지, 세로 스크롤과 가로 넘김이 섞이지 않는지, 마지막 문단이 바에 가리지 않는지, 작성 시각이
+#   1분마다 바뀌는지 — 움직임·모습은 사람이 눈으로 본다(C9). 건너뛴 것은 통과가 아니다(원칙 V).
+#
+# 선행: 사진이 2장 이상인 쓴 날이 있어야 한다(예: `npm run seed:day -- many-camera <날짜>`로 심고 그
+#       날을 쓴다). `-e WRITTEN_DAY=<그 날> -e WRITTEN_DAY_PHOTOS=<배지의 전체 수>`로 넘긴다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+env:
+  # ★ 흐름의 `env`가 `-e`를 덮어쓴다 — 기본값은 `||`로 준다(049 교훈). 기본값을 비워 두고 아래
+  # `assertTrue`로 빠뜨림을 드러낸다 — 엉뚱한 날을 조용히 검사하지 않게.
+  WRITTEN_DAY: ${WRITTEN_DAY || ""}
+  WRITTEN_DAY_PHOTOS: ${WRITTEN_DAY_PHOTOS || ""}
+---
+- assertTrue: ${WRITTEN_DAY != "" && Number(WRITTEN_DAY_PHOTOS) >= 2}
+
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 20000
+
+# 그 날이 든 주로 간다 — 스트립을 오른쪽으로 넘겨 한 주씩(최대 8주, 049).
+- repeat:
+    times: 8
+    while:
+      notVisible:
+        id: "day-${WRITTEN_DAY}"
+    commands:
+      - swipe:
+          from:
+            id: "day-strip"
+          direction: RIGHT
+- tapOn:
+    id: "day-${WRITTEN_DAY}"
+
+# ★ R1 — 홈이 곧 상세: 제목·지면이 보이고 「← 목록」·「최근」이 없다.
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 10000
+# 제목이 없는 일기면 상태 줄 「이 날 일기를 썼어요」다(FR-007) — 둘 중 하나가 보인다.
+- assertVisible:
+    id: "home-day-(title|state)"
+- assertNotVisible: "← 목록"
+- assertNotVisible:
+    id: "home-recent"
+
+# ★ R2 — 배지 「1 / n」, 왼쪽으로 넘기면 「2 / n」.
+- assertVisible:
+    id: "photo-carousel-badge"
+    text: "1 / ${WRITTEN_DAY_PHOTOS}"
+- swipe:
+    from:
+      id: "photo-carousel"
+    direction: LEFT
+- assertVisible:
+    id: "photo-carousel-badge"
+    text: "2 / ${WRITTEN_DAY_PHOTOS}"
+
+# ★ R3 — 남은 장을 다 넘기면 첫 장으로 돌아온다(순환 — 025 FR-011을 뒤집었다).
+- repeat:
+    times: ${Number(WRITTEN_DAY_PHOTOS) - 1}
+    commands:
+      - swipe:
+          from:
+            id: "photo-carousel"
+          direction: LEFT
+- assertVisible:
+    id: "photo-carousel-badge"
+    text: "1 / ${WRITTEN_DAY_PHOTOS}"
+
+# ★ R4 — 「다시 쓰기」 → 확인 대화상자 → 취소하면 지면이 그대로다(생성하지 않는다).
+- scrollUntilVisible:
+    element:
+      id: "write-button"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "write-button"
+    text: "다시 쓰기"
+- tapOn:
+    id: "write-button"
+- assertVisible:
+    id: "overwrite-dialog"
+- tapOn:
+    id: "overwrite-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "overwrite-dialog"
+    timeout: 5000
+- assertVisible:
+    id: "written-paper"

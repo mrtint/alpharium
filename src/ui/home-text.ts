@@ -53,13 +53,6 @@ export function dayOfMonthText(day: DayDate): string {
   return `${dayParts(day).date}일`;
 }
 
-/** 목록 카드의 날짜 줄. 예: 「2026 · 09 · 12 · 토」 */
-export function cardDateText(day: DayDate): string {
-  const { year, month, date, weekday } = dayParts(day);
-  const two = (n: number) => String(n).padStart(2, "0");
-  return `${year} · ${two(month)} · ${two(date)} · ${weekdayShort(weekday)}`;
-}
-
 /**
  * 헤더 상태 줄 (049 H4, 보드 `1d` ②).
  *
@@ -116,4 +109,43 @@ export function calendarMonthText(m: CalendarMonth): string {
 /** 달력 머리·연 목록의 해. 예: 「2026년」 (보드 `cal.year`) */
 export function calendarYearText(year: number): string {
   return `${year}년`;
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 051 — 쓴 날 읽기 문구 (보드 `2c`·`2g`, contracts/written-day.md TXT1~TXT3·TIME1~TIME4).
+ *
+ * `rewrite`와 `writtenAtText()`의 틀(「2시간 15분 전에 작성」)은 보드 원문(`h2.rewrite`·
+ * `m.writtenAt13`)이다. 나머지는 Clarifications에서 정한 **사람이 쓴 문장**이다 — 006·017의 해라체
+ * (「이 날의 일기를 읽을 수 없다」·「이 사진은 이제 없다」·「저장하지 못했다…」)를 해요체로 옮겼다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+
+export const WRITTEN_DAY_TEXT = {
+  /** 쓴 날의 하단 바 (보드 `h2.rewrite`) */
+  rewrite: "다시 쓰기",
+  /** 읽을 수 없는 일기의 지면 두 줄 (006 FR-017a) */
+  unreadableLines: ["이 날의 일기 파일이 손상됐어요.", "다시 쓰면 새로 남아요."],
+  /** 사진 사본을 못 불러온 슬라이드 (017 FR-002) */
+  photoMissing: "이 사진은 이제 없어요",
+  /** 글은 나왔으나 저장하지 못했다 (006 FR-012b) */
+  unsaved: "저장하지 못했어요. 앱을 나가면 이 일기는 사라져요.",
+  /** 결과·실패 화면에서 홈으로 (048 `SubScreenFrame`과 같은 말) */
+  backToHome: "← 일기",
+} as const;
+
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * 오늘의 일기 작성 시각을 상대 시각으로 (보드 `2g`, data-model §4).
+ *
+ * **밀리초 차이만 센다** — 하루 경계가 아니다(049 DB11). 내림이다(더 정밀해 보이지 않게, 017
+ * `formatDuration`과 같은 방향). 미래(기기 시각을 되돌림)는 「방금」으로 떨어진다 — 음수 시각을
+ * 보이지 않는다. 표시 여부(그 일기의 하루가 오늘인가)는 부르는 쪽이 `cellFor`로 정한다.
+ */
+export function writtenAtText(createdAt: Date, now: Date): string {
+  const minutes = Math.floor((now.getTime() - createdAt.getTime()) / MINUTE_MS);
+  if (minutes < 1) return "방금 작성";
+  if (minutes < 60) return `${minutes}분 전에 작성`;
+  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분 전에 작성`;
 }
