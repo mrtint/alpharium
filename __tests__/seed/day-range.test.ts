@@ -4,7 +4,7 @@
  * 계약: specs/010-synthetic-day-fixture/contracts/seeding.md 「0단계」
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **04:00과 「셋」은 저장소에서 `src/config/day-boundary.ts` 한 자리에만 있다.**
+ * **하루 경계(049부터 자정)와 「셋」은 저장소에서 `src/config/day-boundary.ts` 한 자리에만 있다.**
  *
  * 002가 04:00을, 009가 `SELECTABLE_DAY_COUNT`를 그 파일에 넣었고 **밖으로 내보내지
  * 않았다.** 도구가 그 값을 다시 세면 두 곳이 생기고, 한쪽만 고쳐지는 날이 온다.
@@ -53,8 +53,8 @@ describe("도구가 하루 범위를 다시 세지 않는다 (FR-005b)", () => {
     expect(planSource).not.toMatch(/=\s*3\s*;/);
   });
 
-  /** 04:00도 마찬가지다 — `dayBounds()`에서 받는다 */
-  it("04:00 경계를 다시 계산하지 않는다", () => {
+  /** 하루 경계도 마찬가지다 — `dayBounds()`에서 받는다 */
+  it("하루 경계를 다시 계산하지 않는다", () => {
     expect(planSource).not.toMatch(/setHours\s*\(/);
     expect(planSource).not.toMatch(/DAY_STARTS_AT_HOUR/);
     expect(planSource).not.toMatch(/\b4\s*\*\s*60\s*\*\s*60/);
@@ -128,7 +128,7 @@ describe("심을 사진이 그 하루 안에 있다", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
-      // 04:00 경계를 도구가 아니라 앱이 정한다 — dayOf로 되짚어 확인한다
+      // 하루 경계를 도구가 아니라 앱이 정한다 — dayOf로 되짚어 확인한다
       for (const photo of result.day.photos) {
         expect(dayOf(new Date(photo.takenAtMs))).toBe(day);
       }

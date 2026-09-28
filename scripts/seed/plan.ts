@@ -11,7 +11,7 @@
  * 그 하루가 보이지 않는** 상태로 검증이 헛돈다.
  *
  * **고를 수 있는 하루를 도구가 세지 않는다**(FR-005b). `selectableDays()`를 그대로
- * 부른다 — 04:00과 「셋」은 `src/config/day-boundary.ts` 한 자리에만 있고, 도구가
+ * 부른다 — 하루 경계(049부터 자정)와 「셋」은 `src/config/day-boundary.ts` 한 자리에만 있고, 도구가
  * 다시 세면 두 곳이 생겨 한쪽만 고쳐지는 날이 온다.
  * ─────────────────────────────────────────────────────────────────────────────
  *
@@ -79,7 +79,7 @@ export type PlanResult =
 /**
  * 심을 것을 정한다.
  *
- * **"지금"을 인자로 받는다** — 안에서 `new Date()`를 부르면 04:00 경계를 테스트할 수
+ * **"지금"을 인자로 받는다** — 안에서 `new Date()`를 부르면 하루 경계를 테스트할 수
  * 없다. `day-boundary.ts`가 같은 이유로 같은 모양이다.
  */
 export function planSeeding(shapeName: string, day: DayDate, now: Date): PlanResult {

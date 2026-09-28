@@ -6,7 +6,7 @@
  * **이 기능에서는 항상 `generation`에서 멈춘다.** 추론이 `not-implemented`를 반환하기
  * 때문이며, 그것이 정상이다. 파이프라인이 거기까지 도달하는 것 자체가 검증 대상이다.
  *
- * `now`를 인자로 받으므로 03:59와 04:00 경계를 자유롭게 만들 수 있다. 테스트가 시간에
+ * `now`를 인자로 받으므로 자정 경계(049)를 자유롭게 만들 수 있다. 테스트가 시간에
  * 의존하지 않는다(FR-018a).
  */
 
@@ -89,9 +89,9 @@ function inputFor(
 
 describe("단계별 실패가 해당 stage로 보고된다 (FR-019, SC-006)", () => {
   // contracts/pipeline.md 「검증 표」 6행
-  it("하루가 아직 안 닫힘 → day-not-closed (FR-018c, SC-010)", async () => {
+  it("미래의 하루 → day-not-closed (FR-018c, 049 FR-018b)", async () => {
     const { pipeline } = makePipeline();
-    const result = await pipeline.run(inputFor({ now: new Date("2026-08-13T03:59:00") }));
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-11T23:59:00") }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.stage).toBe("day-not-closed");
@@ -235,34 +235,33 @@ describe("단계별 실패가 해당 stage로 보고된다 (FR-019, SC-006)", ()
   });
 });
 
-describe("하루 경계 — 닫히지 않은 하루는 거부된다 (FR-018c, SC-010)", () => {
-  it("2026-08-13 03:59는 아직 안 닫혔다", async () => {
+describe("하루 경계 — 미래의 하루는 거부된다 (FR-018c, 049 FR-018b)", () => {
+  it("2026-08-11 23:59:59에 08-12는 아직 오지 않았다", async () => {
     const { pipeline } = makePipeline();
-    const result = await pipeline.run(inputFor({ now: new Date("2026-08-13T03:59:59") }));
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-11T23:59:59") }));
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.stage).toBe("day-not-closed");
   });
 
-  it("2026-08-13 04:00이면 닫혔으므로 다음 단계로 넘어간다", async () => {
+  it("2026-08-12 00:00이면 그 하루가 시작됐으므로 다음 단계로 넘어간다 (049 — 자정)", async () => {
     const { pipeline } = makePipeline();
-    const result = await pipeline.run(inputFor({ now: new Date("2026-08-13T04:00:00") }));
+    const result = await pipeline.run(inputFor({ now: new Date("2026-08-12T00:00:00") }));
 
     // day-not-closed를 지나 generation까지 갔다는 것이 확인 대상이다.
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.stage).toBe("generation");
   });
 
-  it("진행 중인 하루는 거부된다", async () => {
-    // 012: 오늘 + 정오 이전이어야 거부된다. 정오 이후는 isDayWritable()이 true다.
+  it("★ 진행 중인 하루(오늘)도 오전에 쓸 수 있다 — 정오 제한 폐지 (049 FR-018b)", async () => {
     const { pipeline } = makePipeline();
     const result = await pipeline.run(inputFor({ now: new Date("2026-08-12T09:00:00") }));
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.stage).toBe("day-not-closed");
+    if (!result.ok) expect(result.stage).toBe("generation");
   });
 
-  it("닫히지 않은 하루는 신호도 가져오지 않는다 — 앞에서 멈춘다", async () => {
+  it("미래의 하루는 신호도 가져오지 않는다 — 앞에서 멈춘다", async () => {
     let called = false;
     const { pipeline } = makePipeline({
       signals: async (day) => {
@@ -271,8 +270,7 @@ describe("하루 경계 — 닫히지 않은 하루는 거부된다 (FR-018c, SC
       },
     });
 
-    // 012: 정오 이전이어야 앞에서 멈춘다.
-    await pipeline.run(inputFor({ now: new Date("2026-08-12T09:00:00") }));
+    await pipeline.run(inputFor({ now: new Date("2026-08-11T09:00:00") }));
     expect(called).toBe(false);
   });
 });
@@ -414,7 +412,7 @@ describe("파이프라인은 실행 시점을 판단하지 않는다 (FR-018a)",
 
     // 실제 현재 시각이 무엇이든 인자로 준 now만 본다.
     const closed = await pipeline.run(inputFor({ now: new Date("2030-01-01T00:00:00") }));
-    const notClosed = await pipeline.run(inputFor({ now: new Date("2026-08-12T05:00:00") }));
+    const notClosed = await pipeline.run(inputFor({ now: new Date("2026-08-11T05:00:00") }));
 
     expect(closed.ok).toBe(false);
     if (!closed.ok) expect(closed.stage).toBe("generation");
@@ -753,17 +751,17 @@ describe("011 — vision 단계", () => {
  * 생성됐다"만으로 통과시키지 않고, day-not-closed를 지나 다음 단계(여기서는
  * generation)까지 실제로 진행하는지 직접 검사한다**(009의 W-T1과 같은 방식).
  */
-describe("012 — 정오 이후 오늘이 day-not-closed를 지나 진행한다 (contracts/day-boundary.md §3)", () => {
+describe("012 → 049 — 오늘이 day-not-closed를 지나 진행한다", () => {
   const TODAY: DayDate = "2026-08-21";
 
-  it("1. 오늘 + 정오 이전 → day-not-closed로 멈춘다 (FR-002)", async () => {
+  it("★ 1. 오늘 + 정오 이전 → 049부터 진행한다 (정오 제한 폐지, FR-018b)", async () => {
     const { pipeline } = makePipeline();
     const result = await pipeline.run(
       inputFor({ day: TODAY, now: new Date("2026-08-21T11:59:00") }),
     );
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.stage).toBe("day-not-closed");
+    if (!result.ok) expect(result.stage).toBe("generation");
   });
 
   it("★ 2. 오늘 + 정오 이후 → day-not-closed를 지나 다음 단계(generation)로 진행한다 (FR-001, 이 계약의 핵심)", async () => {

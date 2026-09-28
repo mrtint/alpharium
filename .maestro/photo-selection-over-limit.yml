@@ -16,49 +16,42 @@
 # ⚠️ **2026-09-02 갱신(029)** — 홈에서 캐릭터·사진 설정 위젯이 사라졌다.
 #   캐릭터: 자동 판정이 "마지막에 쓴 캐릭터"(없으면 온보딩 기본=금동이)를 쓴다.
 #           이 흐름은 금동이가 마지막이거나 유일 준비 캐릭터인 상태를 전제한다.
-#   사진 설정: 설정 탭 "사진 보기"에서 "빠르게 봄"으로 고정한다(자동 판정을 덮어씀).
+#   사진 설정: 042가 설정 자체를 없앴다 — 사진이 있으면 언제나 본다. 예전 흐름이 설정 탭의
+#           `vision-quick`·`vision-auto`를 누르다 실패했다(049 실기기에서 발견·제거).
 #
 # 선행: `npm run seed:day -- many-camera <날짜>` (Phase 8 도구). 그 날짜를
 #        `SEED_DAY` env로 넘긴다.
 #
-# ⚠️ **2026-09-03 갱신(032)** — `SEED_DAY`는 009의 선택 범위 안이어야 한다
-#   (마지막 닫힌 하루 + 앞 둘 = 3개). 고정 날짜는 며칠 지나면 범위를 벗어나
-#   `day-<날짜>` pill이 사라진다 — 실행 직전에 `npm run seed:day -- many-camera
-#   <어제>`로 다시 심고 `-e SEED_DAY=<어제>`로 덮어쓴다. 아래 기본값은
-#   "심은 직후 실행" 전제의 예시일 뿐이다.
+# ⚠️ **049** — 지난 날은 모두 고를 수 있다(009의 사흘 범위는 화면에서 풀렸다). 스트립을
+#   주 단위로 넘겨 그 날을 찾으므로 8주 안이면 된다. `-e SEED_DAY=<심은 날>`로 덮어쓴다.
 # ─────────────────────────────────────────────────────────────────────────────
 appId: com.anonymous.alpharium
 env:
-  SEED_DAY: "2026-09-01"
+  # ★ 흐름의 `env`가 `-e`를 덮어쓴다 — 기본값은 `||`로 준다(Maestro 문서 「Setting default values」).
+  # 예전의 `SEED_DAY: "2026-09-01"`은 `-e`를 무시하고 사진 없는 9/1을 썼다(049 실기기에서 발견).
+  SEED_DAY: ${SEED_DAY || "2026-09-01"}
 ---
 - launchApp
 - assertVisible: "일기"
 
-# ── 사진 설정: 설정 탭 "사진 보기"에서 「빠르게 봄」 고정 ──
-# 자동 판정("자동")이면 사진 있는 날은 어차피 "빠르게 봄"이 되지만, 이 흐름은
-# 상한 초과 캡션을 확실히 트리거하려고 명시적으로 고정한다.
-- tapOn:
-    id: "home-menu-button"
-- tapOn:
-    id: "home-menu-settings"
-- scrollUntilVisible:
-    element:
-      id: "vision-quick"
-    direction: DOWN
-    timeout: 20000
-- tapOn:
-    id: "vision-quick"
-- assertVisible: "선택"
-# 048 — 탭 줄이 없다. 설정에서 「← 일기」로 홈에 돌아온다.
-- tapOn:
-    id: "back-to-home"
-
 # ── 하루: many-camera를 심은 날 ──
+# 049 — 스트립은 고른 날이 든 일~토 주다. 심은 날이 지난 주면 오른쪽으로 넘겨 그 주로 간다
+# (한 번에 한 주, 최대 8주).
 - scrollUntilVisible:
     element:
-      id: "day-${SEED_DAY}"
+      id: "day-strip"
     direction: DOWN
     timeout: 20000
+- repeat:
+    times: 8
+    while:
+      notVisible:
+        id: "day-${SEED_DAY}"
+    commands:
+      - swipe:
+          from:
+            id: "day-strip"
+          direction: RIGHT
 - tapOn:
     id: "day-${SEED_DAY}"
 
@@ -90,8 +83,11 @@ env:
 
 # ★ 완주한다 — 12장 캡션 + 캐릭터 생성은 몇 분 걸릴 수 있다(019 실측 최장
 #   2분 27초, 상한이 8로 오르면 더 길다). 넉넉히 기다린다.
+#   ⚠️ 쓰는 화면 문구는 015 이후 「…중…」 독백이라 「쓰고 있다」를 기다리면 즉시 통과해 버렸다
+#   (049 실기기 — 흐름은 PASS인데 일기는 아직 쓰는 중이었다). 쓰는 화면에만 있는 「그만두기」가
+#   사라질 때까지 기다린다.
 - extendedWaitUntil:
-    notVisible: "쓰고 있다"
+    notVisible: "그만두기"
     timeout: 420000
 
 # ★ 원칙 III — 실패가 모델 용어로 새지 않는다.
@@ -101,20 +97,9 @@ env:
 - assertNotVisible: "rejected"
 
 # 상세 화면이 떴으면 일기가 나온 것이다 — 「← 목록」으로 돌아가
-# 흐름이 상태를 바꾼 채 끝나지 않게 한다. 사진 보기 설정도 "자동"으로 되돌린다.
+# 흐름이 상태를 바꾼 채 끝나지 않게 한다.
 - runFlow:
     when:
       visible: "← 목록"
     commands:
       - tapOn: "← 목록"
-- tapOn:
-    id: "home-menu-button"
-- tapOn:
-    id: "home-menu-settings"
-- scrollUntilVisible:
-    element:
-      id: "vision-auto"
-    direction: DOWN
-    timeout: 20000
-- tapOn:
-    id: "vision-auto"

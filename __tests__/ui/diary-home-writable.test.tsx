@@ -1,12 +1,12 @@
 /**
- * 일기 홈 — 아직 쓸 수 없는 오늘, 전환, 신호 미리보기 (048).
+ * 일기 홈 — 자정 전환, 미리 준비의 범위, 신호 미리보기 (049·048).
  *
- * 계약: specs/048-diary-home-modernist/contracts/home-screen.md T1~T5, G7·G8, N6
+ * 계약: specs/049-home-day-picker/contracts/day-picking.md HS2·HS3
+ *       specs/048-diary-home-modernist/contracts/home-screen.md G7·G8, N6
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **012가 「실기기 미확인」으로 남긴 정오 경계 전환을 기기 없이 닫는 자리다.** 기기 시각을
- * 바꿀 수 없어 실기기로는 실제 정오 전후 세션이 필요하다 — 가짜 타이머와 주입된 `now`로
- * 같은 갈래를 결정적으로 돌린다.
+ * **049 — 정오 전환이 사라지고 자정 전환이 생겼다.** 기기 시각을 바꿀 수 없어 실기기로는 그
+ * 시각에 기기 앞에 있어야 한다 — 가짜 타이머와 주입된 `now`로 같은 갈래를 결정적으로 돌린다.
  *
  * ⚠️ RNTL 14의 `render`·`fireEvent`는 Promise를 반환한다 — `await`한다.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -55,7 +55,7 @@ function clock(iso: string) {
   };
 }
 
-describe("048 T — 아직 쓸 수 없는 오늘과 전환", () => {
+describe("049 HS — 자정 전환과 미리 준비의 범위", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
@@ -73,62 +73,51 @@ describe("048 T — 아직 쓸 수 없는 오늘과 전환", () => {
     await screen.findByTestId("day-strip");
   }
 
-  it("T1 — 정오 전 오늘을 고르면 쓰기 버튼 대신 안내가 보인다", async () => {
-    const c = clock("2026-09-24T11:59:00");
-    await renderAt(c);
+  it("★ 정오 전 오늘이 골라져 있고 쓰기 버튼이 있다 (049 FR-010a·FR-018b)", async () => {
+    await renderAt(clock("2026-09-24T09:00:00"));
 
-    await fireEvent.press(screen.getByTestId("day-2026-09-24"));
-    expect(screen.queryByTestId("write-button")).toBeNull();
-    expect(screen.getByTestId("write-unavailable")).toHaveTextContent(
-      "오늘 일기는 오후 12시부터 쓸 수 있어요",
-    );
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("24");
+    expect(screen.getByTestId("write-button")).toBeTruthy();
+    expect(screen.queryByTestId("write-unavailable")).toBeNull();
   });
 
-  it("★ T2 — 그 화면에 머문 채 정오가 되면 조작 없이 쓰기 버튼이 나타난다", async () => {
-    const c = clock("2026-09-24T11:59:00");
+  it("★ HS2 — 켜 둔 채 자정이 지나면 고른 날은 그대로, 밑줄만 새 오늘로 (FR-019)", async () => {
+    const c = clock("2026-09-25T23:59:30");
     await renderAt(c);
-    await fireEvent.press(screen.getByTestId("day-2026-09-24"));
-    expect(screen.queryByTestId("write-button")).toBeNull();
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("25");
+    expect(screen.getByTestId("day-today-2026-09-25")).toBeTruthy();
 
-    c.set("2026-09-24T12:00:01");
+    c.set("2026-09-26T00:00:01");
     await act(async () => {
-      jest.advanceTimersByTime(61_000);
+      jest.advanceTimersByTime(31_000);
     });
 
-    expect(screen.getByTestId("write-button")).toBeTruthy();
-    expect(screen.getByTestId("signal-window")).toHaveTextContent("지금");
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("25");
+    expect(screen.getByTestId("day-today-2026-09-26")).toBeTruthy();
+    expect(screen.queryByTestId("day-today-2025-09-25")).toBeNull();
+    expect(screen.queryByTestId("day-today-2026-09-25")).toBeNull();
   });
 
-  it("T3 — 다른 날로 바꾸면 걸린 타이머가 지워진다", async () => {
-    const c = clock("2026-09-24T11:00:00");
+  it("HS2 — 토요일 밤을 넘기면 새 오늘은 다음 주 — 선택은 그대로(보던 주가 남는다)", async () => {
+    const c = clock("2026-09-26T23:59:30");
     await renderAt(c);
+    c.set("2026-09-27T00:00:01");
+    await act(async () => {
+      jest.advanceTimersByTime(31_000);
+    });
 
-    const set = jest.spyOn(global, "setTimeout");
-    const clear = jest.spyOn(global, "clearTimeout");
-    await fireEvent.press(screen.getByTestId("day-2026-09-24"));
-    // 정오(+1초 여유)까지 남은 시간으로 한 번 걸렸다.
-    const armed = set.mock.calls.filter(([, ms]) => ms === 60 * 60 * 1000 + 1000);
-    expect(armed).toHaveLength(1);
-
-    const clearsBefore = clear.mock.calls.length;
-    await fireEvent.press(screen.getByTestId("day-2026-09-23"));
-    expect(clear.mock.calls.length).toBeGreaterThan(clearsBefore);
-
-    // 지워졌으므로 정오가 지나도 쓸 수 없는 날이 아닌 그 날(23일) 화면이 그대로다.
-    set.mockRestore();
-    clear.mockRestore();
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("26");
+    expect(screen.getByTestId("day-2026-09-20")).toBeTruthy();
+    // 새 오늘(27일)은 이 주에 없다 — 밑줄이 보이지 않는다.
+    expect(screen.queryByTestId(/^day-today-/)).toBeNull();
   });
 
-  it("T4 — 앱으로 돌아오면(active) 곧바로 다시 판정한다", async () => {
+  it("앱으로 돌아오면(active) 곧바로 다시 판정한다 — 잠든 사이 자정이 지났어도", async () => {
     const spy = jest.spyOn(AppState, "addEventListener");
 
-    const c = clock("2026-09-24T11:00:00");
+    const c = clock("2026-09-25T23:00:00");
     await renderAt(c);
-    await fireEvent.press(screen.getByTestId("day-2026-09-24"));
-    expect(screen.queryByTestId("write-button")).toBeNull();
-
-    // 잠든 사이 정오가 지났다 — 타이머는 아직 안 울렸다.
-    c.set("2026-09-24T12:30:00");
+    c.set("2026-09-26T07:00:00");
     const handlers = spy.mock.calls
       .filter(([event]) => event === "change")
       .map(([, fn]) => fn as (s: string) => void);
@@ -136,22 +125,33 @@ describe("048 T — 아직 쓸 수 없는 오늘과 전환", () => {
       for (const fn of handlers) fn("active");
     });
 
-    expect(screen.getByTestId("write-button")).toBeTruthy();
+    expect(screen.getByTestId("day-today-2026-09-26")).toBeTruthy();
+    expect(screen.getByTestId("home-day-number")).toHaveTextContent("25");
     // 복원하지 않는다 — jest-expo의 AppState 목은 복원하면 구독 반환값을 잃는다(diary-home.test와 같다).
   });
 
-  it("★ T5 — 쓸 수 없는 날에는 미리 준비(prepare·captionDay)를 시작하지 않는다", async () => {
+  it("★ HS3 — 사흘 밖의 날(canPrepare 거짓)에서는 미리 준비하지 않고 놓아준다 (FR-020a)", async () => {
     const prepare = jest.fn(async () => {});
-    const c = clock("2026-09-24T10:00:00");
-    await renderAt(c, { prepare, chosenDay: "2026-09-24", onChooseDay: () => {} });
+    const release = jest.fn(async () => {});
+    const captionDay = jest.fn(async () => ({ kind: "no-photos" as const }));
+    const c = clock("2026-09-24T09:00:00");
+    const canPrepare = (day: string) => day >= "2026-09-22";
 
+    await renderAt(c, { prepare, release, canPrepare });
+    await waitFor(() => expect(prepare).toHaveBeenCalledWith("quiet"));
+
+    // 사흘 밖의 날로 옮긴다 — 준비해 둔 것을 놓아주고 다시 준비하지 않는다.
+    prepare.mockClear();
+    await fireEvent.press(screen.getByTestId("day-2026-09-20"));
+    await waitFor(() => expect(release).toHaveBeenCalled());
     expect(prepare).not.toHaveBeenCalled();
 
-    const captionDay = jest.fn(async () => ({ kind: "no-photos" as const }));
+    // 사진이 있다고 판정되는 경로에서도 사진을 미리 읽지 않는다.
     await render(
       <DiaryHomeScreen
+        canPrepare={canPrepare}
         captionDay={captionDay as never}
-        chosenDay="2026-09-24"
+        chosenDay="2026-09-20"
         now={c.now}
         onChooseDay={() => {}}
         pipeline={neverPipeline()}
@@ -164,12 +164,9 @@ describe("048 T — 아직 쓸 수 없는 오늘과 전환", () => {
     expect(captionDay).not.toHaveBeenCalled();
   });
 
-  it("T5 — 쓸 수 있는 날로 바꾸면 기존대로 준비가 시작된다", async () => {
+  it("HS3 — canPrepare가 참인 날에서는 기존대로 준비가 시작된다", async () => {
     const prepare = jest.fn(async () => {});
-    const c = clock("2026-09-24T10:00:00");
-    await renderAt(c, { prepare });
-
-    // 기본 선택은 어제(쓸 수 있음) — 준비가 시작된다.
+    await renderAt(clock("2026-09-24T09:00:00"), { prepare, canPrepare: () => true });
     await waitFor(() => expect(prepare).toHaveBeenCalledWith("quiet"));
   });
 });

@@ -1,7 +1,8 @@
 /**
  * 일기 홈 — 보드 `1d`("Day-first — one date fills the screen").
  *
- * 계약: specs/048-diary-home-modernist/contracts/home-screen.md H·S·G·B, US5 카드
+ * 계약: specs/049-home-day-picker/contracts/day-picking.md H1~H8·HS5 (헤더·스트립)
+ *       specs/048-diary-home-modernist/contracts/home-screen.md G·B, US5 카드
  *       specs/006-first-diary-app/contracts/screens.md §2 (S1·S7·FR-017a는 그대로 산다)
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -12,20 +13,26 @@
  * `onWrite`는 **목록을 보지 않는다.** 인자도 없다.
  *
  * **048 — 모양과 자리가 바뀌었다.** 고른 날이 화면 위쪽을 채우고(큰 날짜·요일·상태),
- * 7칸 스트립에서 날을 고르며, 신호 줄이 「지금 쓰면 볼 것」을 미리 보이고, 쓰기는 화면 아래
+ * 스트립에서 날을 고르며, 신호 줄이 「지금 쓰면 볼 것」을 미리 보이고, 쓰기는 화면 아래
  * 고정 바가 맡는다. 헤더와 목록은 함께 스크롤되고 하단 바만 고정된다(FR-023).
  *
- * **판정하지 않는다.** 고른 날·쓸 수 있음·쓸 수 있게 되는 시각은 `writePromptFor()`가,
- * 스트립 칸은 `stripCellsFor()`가, 신호 개수는 `DayPreview`가 정해서 온다. 이 화면은
- * 신호 원형(`DaySignals`)도, 하루 경계의 04·12도 모른다(G9·G10).
+ * **049 — 헤더와 주간 스트립이 보드 `1d` ①②③이 됐다.** 스트립은 고른 날이 든 일~토 주이고
+ * 좌우로 넘겨 주를 오간다. 헤더의 날짜는 150ms 크로스페이드로 바뀌고, 상태 줄은 「오늘/이 날
+ * 일기를 쓸 수 있어요」 또는 그 일기의 제목이다. 헤더에는 누름 처리가 없다(C7).
  *
- * **★ 쓸 수 없는 날에는 쓰기 버튼이 없다**(FR-029·FR-034 첫째 겹) — 비활성 모양으로도 그리지
- * 않는다. 무엇을 눌러도 `onWrite`에 닿지 않는다(B5). 둘째 겹은 `DiaryHomeScreen.write()`의
- * 게이트, 셋째 겹은 파이프라인의 `isDayWritable`(012)이다.
+ * **판정하지 않는다.** 고른 날은 `writePromptFor()`가, 스트립 칸(오늘·미래·점)은
+ * `weekCellsFor()`가, 넘긴 뒤의 날은 `swipeWeek()`(`DiaryHomeScreen`)가, 신호 개수는
+ * `DayPreview`가 정해서 온다. 이 화면은 신호 원형(`DaySignals`)도, 하루 경계도, 지금 시각도
+ * 모른다(G9·G10).
+ *
+ * **049 — 고른 날은 언제나 쓸 수 있다**(정오 제한 폐지, 미래는 오늘로 떨어진다). 그래서 쓰기
+ * 버튼은 늘 있다. 미래 날의 마지막 방어는 파이프라인의 `isDayWritable` 게이트다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, ScrollView, View, type TextStyle } from "react-native";
+import { useEffect, useState, type ReactNode } from "react";
+import { Pressable, ScrollView, View, type TextStyle, type ViewStyle } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import {
   dayParts,
@@ -34,20 +41,14 @@ import {
   type DiaryListItem,
   type PhotoHint,
   type StripCell,
+  type SwipeDirection,
   type WritePrompt,
 } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { DayPicker } from "./DayPicker";
 import { BAR_HEIGHT, HomeMenu, type HomeMenuItem } from "./HomeMenu";
-import {
-  cardDateText,
-  dayOfMonthText,
-  hourText,
-  monthText,
-  revertedText,
-  weekdayLong,
-} from "./home-text";
+import { cardDateText, dayOfMonthText, dayStateText, monthText, weekdayLong } from "./home-text";
 import { COLORS } from "./theme/tokens";
 
 /** 신호 줄의 사진·다닌 자리 칸 — 읽는 중이거나, 다 읽었거나 */
@@ -68,10 +69,14 @@ export type DiaryListScreenProps = {
    * 권한 안내 테스트). 실제 홈은 언제나 넘긴다.
    */
   write?: WritePrompt;
-  /** 7칸 스트립 (048). `stripCellsFor()`가 만든다 */
+  /** 주간 스트립의 7칸 (049). `weekCellsFor()`가 만든다 */
   cells?: readonly StripCell[];
   /** 스트립에서 하루를 고른다 (009 FR-006). `onWrite`는 여전히 하루를 받지 않는다 */
   onSelectDay?: (day: DayDate) => void;
+  /** 스트립을 넘겼다 (049). 어느 날이 될지는 부르는 쪽이 정한다 */
+  onSwipe?: (direction: SwipeDirection) => void;
+  /** 다음 주로 넘길 수 있는가 (049) — 거짓이면 스트립이 튕긴다 */
+  canSwipeNext?: boolean;
   /** 자동 판정이 캐릭터를 옮겼을 때의 안내 문구 (029 FR-014). 부모가 만든 문장만 그린다 */
   movedNotice?: string;
   /** 거부된 권한으로 제한되는 기능의 정직한 안내 (021 FR-014). */
@@ -93,6 +98,8 @@ export function DiaryListScreen({
   write,
   cells,
   onSelectDay,
+  onSwipe,
+  canSwipeNext,
   movedNotice,
   deniedNotices,
   preview,
@@ -106,10 +113,13 @@ export function DiaryListScreen({
       >
         {write !== undefined && (
           <Header
+            canSwipeNext={canSwipeNext}
             cells={cells ?? []}
             deniedNotices={deniedNotices}
+            items={items}
             movedNotice={movedNotice}
             onSelectDay={onSelectDay}
+            onSwipe={onSwipe}
             preview={preview}
             write={write}
           />
@@ -139,25 +149,33 @@ export function DiaryListScreen({
 
 function Header({
   write,
+  items,
   cells,
   onSelectDay,
+  onSwipe,
+  canSwipeNext,
   movedNotice,
   deniedNotices,
   preview,
 }: {
   write: WritePrompt;
+  items: readonly DiaryListItem[];
   cells: readonly StripCell[];
   onSelectDay?: (day: DayDate) => void;
+  onSwipe?: (direction: SwipeDirection) => void;
+  canSwipeNext?: boolean;
   movedNotice?: string;
   deniedNotices?: readonly string[];
   preview?: PreviewState;
 }) {
-  const { date, weekday } = dayParts(write.day);
+  // 오늘인가는 스트립 칸이 이미 안다 — 화면은 지금 시각을 읽지 않는다.
+  const isToday = cells.some((cell) => cell.selected && cell.isToday);
+  const item = items.find((entry) => entry.day === write.day);
 
   return (
     <View>
+      {/* ① 월 라벨 — 표시만 한다(누름 없음). **고른 날의 달**이다(048 Q2, 049 H1·H2) */}
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-        {/* 월은 **고른 날의 달**이다(Clarification Q2) */}
         <AppText style={[KICKER, { color: COLORS.accent }]} testID="home-month">
           {monthText(write.day)}
         </AppText>
@@ -166,59 +184,153 @@ function Header({
         </AppText>
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 4 }}>
-        <AppText style={DAY_NUMBER} testID="home-day-number">
-          {date}
-        </AppText>
-        <View style={{ gap: 2, paddingBottom: 8, flexShrink: 1 }}>
-          <AppText
-            style={{ fontSize: 16, fontWeight: "700", color: COLORS.text }}
-            testID="home-weekday"
-          >
-            {weekdayLong(weekday)}
-          </AppText>
-          {/* 012의 덮어쓰기 사전 고지가 이 자리로 옮겨 왔다(FR-010) */}
-          <AppText style={{ fontSize: 13, color: COLORS.textMuted }} testID="home-day-state">
-            {write.overwrites ? "이미 썼어요 · 다시 쓰면 덮어써요" : "아직 쓰지 않았어요"}
-          </AppText>
-        </View>
-      </View>
+      {/*
+        ② 날짜 헤더. **누름 처리를 두지 않는다**(049 FR-016, C7) — 탭하면 달력을 여는 것은
+        「대화상자 기반」, 접힌 스트립을 펼치는 것은 「읽기 스크롤」 조각이다.
+      */}
+      <DayHeading day={write.day} />
+      <AppText style={DAY_STATE} testID="home-day-state">
+        {dayStateText(item, isToday)}
+      </AppText>
 
-      <DayPicker cells={cells} onSelect={onSelectDay ?? (() => {})} />
-
-      <Notices
-        deniedNotices={deniedNotices}
-        movedNotice={movedNotice}
-        reverted={
-          write.revertedFrom !== undefined ? revertedText(write.revertedFrom, write.day) : undefined
-        }
+      {/* ③ 주간 스트립 */}
+      <DayPicker
+        canSwipeNext={canSwipeNext}
+        cells={cells}
+        onSelect={onSelectDay ?? (() => {})}
+        onSwipe={onSwipe}
       />
 
-      <SignalRow preview={preview} write={write} />
+      <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+
+      <SignalRow preview={preview} />
     </View>
   );
 }
 
-/** 안내 캡션 — 되돌림(009)·캐릭터 옮김(029)·거부 권한(021). 있을 때만. */
+/** 날이 바뀔 때 큰 숫자·요일이 겹쳐 바뀌는 시간 (보드 `1d` ② — 150ms) */
+const CROSSFADE_MS = 150;
+
+/**
+ * 큰 날짜·요일 — 날이 바뀌면 **150ms 크로스페이드**(049 FR-013, research R8).
+ *
+ * 두 겹으로 그린다: 이전 날(절대 배치, 1 → 0)과 새 날(0 → 1). 레이아웃 애니메이션
+ * (`entering`/`exiting`)을 쓰지 않는 까닭은 나가는 뷰가 흐름에 남아 순간 높이가 두 배가 될 수
+ * 있어서다(짐작 — 확인하지 않았다). 두 겹 절대 배치는 높이가 새 날 하나로 고정된다.
+ *
+ * ★ **겹마다 새로 마운트하고, 시작 투명도를 마운트 값으로 준다**(`FadeLayer`, `key`가 날).
+ * 처음에는 한 공유값을 effect에서 0으로 되돌렸는데, effect는 **첫 프레임이 그려진 뒤에** 돌아
+ * 그 한 프레임에 새 날(1)이 보였다가 → 이전 날로 돌아갔다가 → 다시 새 날로 바뀌었다(실기기 —
+ * 「넘기는 중에 숫자가 빠르게 여러 번 바뀐다」). 마운트 값은 첫 프레임부터 맞다.
+ *
+ * **jest는 배선만 본다**(C9) — 겹이 함께 그려지는지까지. 실제로 부드럽게 겹치는지는 실기기 D3.
+ */
+function DayHeading({ day }: { day: DayDate }) {
+  const [shown, setShown] = useState<{ day: DayDate; previous: DayDate | null }>({
+    day,
+    previous: null,
+  });
+  // 렌더 중 상태 갱신 — 날이 바뀐 그 렌더에서 이전 날을 기억한다(React 문서의 「이전 props
+  // 저장」 방식). effect 안의 동기 setState는 lint가 막는다(048 관측).
+  if (shown.day !== day) setShown({ day, previous: shown.day });
+
+  return (
+    <View style={{ marginTop: 4 }}>
+      {shown.previous !== null && (
+        <FadeLayer
+          from={1}
+          key={`out-${shown.previous}-${shown.day}`}
+          style={{ position: "absolute", left: 0, right: 0, top: 0 }}
+          testID="home-day-fade-out"
+          to={0}
+        >
+          <DayFace day={shown.previous} />
+        </FadeLayer>
+      )}
+      {/* 앱을 처음 열 때(이전 날 없음)는 나타나는 효과 없이 바로 보인다 */}
+      <FadeLayer from={shown.previous === null ? 1 : 0} key={`in-${shown.day}`} to={1}>
+        <DayFace day={shown.day} testIDs />
+      </FadeLayer>
+    </View>
+  );
+}
+
+/** 마운트할 때의 투명도 `from`에서 `to`로 `CROSSFADE_MS` 동안 옮긴다. 다시 쓰려면 `key`를 바꾼다. */
+function FadeLayer({
+  from,
+  to,
+  style,
+  testID,
+  children,
+}: {
+  from: number;
+  to: number;
+  style?: ViewStyle;
+  testID?: string;
+  children: ReactNode;
+}) {
+  const opacity = useSharedValue(from);
+  useEffect(() => {
+    if (from !== to) opacity.value = withTiming(to, { duration: CROSSFADE_MS });
+    // 마운트 때 한 번만 — 값이 바뀌면 부르는 쪽이 `key`로 새로 마운트한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    // 헤더 날짜는 누를 수 없다(H7) — 겹친 두 겹이 터치를 가로채지 않게 한다.
+    <Animated.View pointerEvents="none" style={[style, fade]} testID={testID}>
+      {children}
+    </Animated.View>
+  );
+}
+
+function DayFace({ day, testIDs }: { day: DayDate; testIDs?: boolean }) {
+  const { date, weekday } = dayParts(day);
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 12 }}>
+      {/* 숫자 칸은 언제나 두 자리 폭이다 — 「6」과 「30」 사이를 넘길 때 요일이 옆으로 밀리지 않게
+          (실기기, 사용자 요청). 보이지 않는 「00」이 폭을 잡고, 실제 숫자는 그 왼쪽에 겹친다. */}
+      <View>
+        <AppText
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[DAY_NUMBER, { opacity: 0 }]}
+        >
+          {DAY_NUMBER_WIDTH}
+        </AppText>
+        <AppText
+          style={[DAY_NUMBER, { position: "absolute", left: 0, bottom: 0 }]}
+          testID={testIDs ? "home-day-number" : undefined}
+        >
+          {String(date)}
+        </AppText>
+      </View>
+      <AppText style={WEEKDAY} testID={testIDs ? "home-weekday" : undefined}>
+        {weekdayLong(weekday)}
+      </AppText>
+    </View>
+  );
+}
+
+/**
+ * 안내 캡션 — 캐릭터 옮김(029)·거부 권한(021). 있을 때만.
+ *
+ * 049 — 되돌림(009) 캡션을 걷어냈다(FR-022a). 지난 날을 모두 고를 수 있어 고른 날이 범위 밖으로
+ * 밀려나는 일이 없다 — 도달할 수 없는 갈래다.
+ */
 function Notices({
-  reverted,
   movedNotice,
   deniedNotices,
 }: {
-  reverted?: string;
   movedNotice?: string;
   deniedNotices?: readonly string[];
 }) {
   const denied = deniedNotices ?? [];
-  if (reverted === undefined && movedNotice === undefined && denied.length === 0) return null;
+  if (movedNotice === undefined && denied.length === 0) return null;
 
   return (
     <View style={{ gap: 4, marginTop: 12 }}>
-      {/*
-        **말없이 다른 하루를 쓰지 않는다**(009 FR-009). 쓰기 자리를 열어 둔 채 04:00을 넘기면
-        가장 이른 하루가 범위를 벗어나는데, 그때 조용히 바꾸면 사용자는 엉뚱한 하루를 얻는다.
-      */}
-      {reverted !== undefined && <AppText variant="caption">{reverted}</AppText>}
       {movedNotice !== undefined && <AppText variant="caption">{movedNotice}</AppText>}
       {denied.length > 0 && (
         <View style={{ gap: 4 }} testID="denied-notices">
@@ -241,15 +353,16 @@ function Notices({
  * **「없음」과 「모름」은 다른 글자다**(원칙 V) — 0으로 채우지 않는다. 미리보기가 아직 오지
  * 않았으면 「…」, 통로가 없으면 「모름」.
  */
-function SignalRow({ write, preview }: { write: WritePrompt; preview?: PreviewState }) {
+function SignalRow({ preview }: { preview?: PreviewState }) {
   const count = (pick: (p: DayPreview) => CountHint): string => {
     if (preview === undefined) return "모름";
     if (!("photos" in preview)) return "…";
     return countText(pick(preview));
   };
 
-  const windowText =
-    write.writable || write.writableAt === undefined ? "지금" : `${hourText(write.writableAt)}부터`;
+  // 049 — 오늘은 언제든 쓸 수 있어 이 칸은 늘 「지금」이다(FR-018c). 칸 자체는 「쓸 재료」 조각이
+  // 신호 줄을 다시 짤 때까지 남긴다(C7).
+  const windowText = "지금";
 
   return (
     <View style={SIGNAL_ROW} testID="signal-row">
@@ -436,22 +549,10 @@ function PhotoStack({ day, photos }: { day: DayDate; photos: PhotoHint }) {
  * 누르면 쓰기가 시작되는 것은 「누를 수 없는 글자」(D7·FR-014)와 어긋난다. 그래서 같은 강조
  * 블록 안에 나란히 두되 누름은 왼쪽 조각만 받는다.
  *
- * **쓸 수 없으면 버튼이 없다** — 비활성 모양도 아니다. 언제부터 쓸 수 있는지만 말한다.
+ * 049 — 고른 날은 언제나 쓸 수 있다(정오 제한 폐지, 미래는 오늘로 떨어진다). 048의 「오늘 일기는
+ * …부터 쓸 수 있어요」 갈래는 도달할 수 없어 걷어냈다(FR-018c).
  */
 function WriteBar({ write, onWrite }: { write: WritePrompt; onWrite: () => void }) {
-  if (!write.writable) {
-    return (
-      <View style={{ flex: 1, flexShrink: 1, marginLeft: 12, justifyContent: "center" }}>
-        <AppText
-          style={{ fontSize: 14, fontWeight: "600", color: COLORS.text }}
-          testID="write-unavailable"
-        >
-          {`오늘 일기는 ${write.writableAt !== undefined ? hourText(write.writableAt) : ""}부터 쓸 수 있어요`}
-        </AppText>
-      </View>
-    );
-  }
-
   return (
     <View style={WRITE_BLOCK}>
       <Pressable
@@ -485,14 +586,24 @@ const KICKER = {
   fontWeight: "600",
 } as const;
 
+/** 보드 `1d` ② — 62/800, 줄높이 .85, 자간 -.05em, 고정폭 숫자 (049) */
+/** 큰 날짜 칸의 폭을 잡는 글자 — 한 달의 가장 긴 날(두 자리). 숫자는 `tabular-nums`라 폭이 같다 */
+const DAY_NUMBER_WIDTH = "00";
+
 const DAY_NUMBER: TextStyle = {
-  fontSize: 124,
-  lineHeight: 118,
+  fontSize: 62,
+  lineHeight: 53,
   fontWeight: "800",
-  letterSpacing: -6,
+  letterSpacing: -3.1,
   color: COLORS.text,
   fontVariant: ["tabular-nums"],
 };
+
+/** 요일 16/700 */
+const WEEKDAY: TextStyle = { fontSize: 16, fontWeight: "700", color: COLORS.text };
+
+/** 상태 줄 13, 보조색 */
+const DAY_STATE: TextStyle = { fontSize: 13, color: COLORS.textMuted, marginTop: 6 };
 
 const SIGNAL_ROW = {
   flexDirection: "row",

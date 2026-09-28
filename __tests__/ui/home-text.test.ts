@@ -1,13 +1,13 @@
 /**
- * 048 — 홈 화면 문구 조립과 홈 화면 소스의 경계.
+ * 048·049 — 홈 화면 문구 조립과 홈 화면 소스의 경계.
  *
- * 계약: specs/048-diary-home-modernist/contracts/home-screen.md G9·G10, data-model.md §2
+ * 계약: specs/049-home-day-picker/contracts/day-picking.md H4·H5 (문구 원문 잠금, C4)
+ *       specs/048-diary-home-modernist/contracts/home-screen.md G9·G10
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **시각 숫자는 `Date`에서 온다.** 04와 12는 `day-boundary.ts` 밖으로 나가지 않고
- * (`WRITABLE_FROM_HOUR`·`DAY_STARTS_AT_HOUR`는 export되지 않는다), 화면은
- * `writableAt()`이 준 `Date`를 사람의 말로 옮길 뿐이다. 화면 소스에 「4시」·「12시」·
- * 「정오」를 적으면 새벽·오전 두 구간(Clarification Q1)을 화면이 따로 판정하게 된다.
+ * **049 — 쓸 수 없는 오늘이 없어져 시각 문구(「오후 12시부터」)가 사라졌다.** 그래도 G10은
+ * 남긴다 — 화면 소스에 「4시」·「12시」·「정오」가 다시 들어오면 화면이 하루 경계를 따로
+ * 판정하기 시작한 것이다.
  *
  * **화면은 신호 원형을 모른다**(009 이후) — 홈 화면 파일들이 `signals/`를 import하지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -19,20 +19,23 @@ import { join } from "node:path";
 import {
   cardDateText,
   dayOfMonthText,
-  hourText,
+  dayStateText,
   monthText,
-  revertedText,
   weekdayLong,
   weekdayShort,
 } from "../../src/ui/home-text";
 
+/** 주석을 걷어낸다 — 금지어가 설명 안에 정당하게 등장한다(011·035 관례) */
+const stripComments = (code: string) =>
+  code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
 describe("048 home-text — 날짜 문구", () => {
-  it("월 표시는 고른 날의 달이다 (Clarification Q2)", () => {
+  it("H1·H2 — 월 표시는 고른 날의 달이다 (보드 t.monthLabel 형식)", () => {
     expect(monthText("2026-08-31")).toBe("2026년 8월");
     expect(monthText("2026-09-24")).toBe("2026년 9월");
   });
 
-  it("요일 — 긴 이름과 짧은 이름", () => {
+  it("H3 — 요일 — 긴 이름과 짧은 이름 (보드 t.satFull)", () => {
     expect(weekdayLong(0)).toBe("일요일");
     expect(weekdayLong(6)).toBe("토요일");
     expect(weekdayShort(4)).toBe("목");
@@ -46,26 +49,45 @@ describe("048 home-text — 날짜 문구", () => {
   it("카드 날짜는 「YYYY · MM · DD · 요일」이다", () => {
     expect(cardDateText("2026-09-12")).toBe("2026 · 09 · 12 · 토");
   });
+});
 
-  it("되돌림 안내는 해요체다 (FR-015)", () => {
-    expect(revertedText("2026-09-10", "2026-09-13")).toBe(
-      "9월 10일은 이제 쓸 수 없어 9월 13일로 바꿨어요",
+describe("★ 049 dayStateText — 상태 줄 (H4·H5, 보드 원문 잠금)", () => {
+  const item = (day: string, over: { title?: string; readable?: boolean } = {}) => ({
+    day,
+    readable: over.readable ?? true,
+    photos: { kind: "none" as const },
+    ...(over.title !== undefined ? { title: over.title } : {}),
+  });
+
+  it("일기가 없는 오늘 — 「오늘 일기를 쓸 수 있어요」 (보드 t.dayState)", () => {
+    expect(dayStateText(undefined, true)).toBe("오늘 일기를 쓸 수 있어요");
+  });
+
+  it("일기가 없는 지난 날 — 「이 날 일기를 쓸 수 있어요」 (보드 m.dayStatePast)", () => {
+    expect(dayStateText(undefined, false)).toBe("이 날 일기를 쓸 수 있어요");
+  });
+
+  it("일기가 있으면 그 제목", () => {
+    expect(dayStateText(item("2026-09-20", { title: "비 오는 토요일" }), false)).toBe(
+      "비 오는 토요일",
     );
+  });
+
+  it("제목 없이 저장된 일기(014) — 「이 날 일기를 썼어요」", () => {
+    expect(dayStateText(item("2026-09-26"), true)).toBe("이 날 일기를 썼어요");
+  });
+
+  it("읽을 수 없는 일기 — 「읽을 수 없어요」 (006 FR-017a)", () => {
+    expect(dayStateText(item("2026-09-20", { readable: false }), false)).toBe("읽을 수 없어요");
   });
 });
 
-describe("048 home-text — 쓸 수 있게 되는 시각의 말", () => {
-  it("정오는 「오후 12시」", () => {
-    expect(hourText(new Date(2026, 8, 24, 12))).toBe("오후 12시");
-  });
-
-  it("04:00은 「오전 4시」", () => {
-    expect(hourText(new Date(2026, 8, 25, 4))).toBe("오전 4시");
-  });
-
-  it("자정은 「오전 12시」, 오후 3시는 「오후 3시」", () => {
-    expect(hourText(new Date(2026, 8, 25, 0))).toBe("오전 12시");
-    expect(hourText(new Date(2026, 8, 25, 15))).toBe("오후 3시");
+describe("049 — 사라진 문구", () => {
+  it("되돌림·시각 문구 함수가 없다 (FR-018c·FR-022a)", () => {
+    const code = stripComments(readFileSync(join(__dirname, "../../src/ui/home-text.ts"), "utf8"));
+    expect(code).not.toContain("hourText");
+    expect(code).not.toContain("revertedText");
+    expect(code).not.toContain("HALF_DAY_HOURS");
   });
 });
 
@@ -76,10 +98,6 @@ describe("★ 048 홈 화면 소스의 경계 (G9·G10)", () => {
     "src/ui/DayPicker.tsx",
     "src/ui/HomeMenu.tsx",
   ];
-
-  /** 주석을 걷어낸다 — 금지어가 설명 안에 정당하게 등장한다(011·035 관례) */
-  const stripComments = (code: string) =>
-    code.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
   const sources = HOME_FILES.filter((f) => existsSync(join(__dirname, "../..", f))).map((f) => ({
     file: f,

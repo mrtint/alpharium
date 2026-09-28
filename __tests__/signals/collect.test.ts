@@ -155,35 +155,46 @@ describe("C2 — 권한이 있고 0장이면 none이다 (FR-009)", () => {
   });
 });
 
-describe("C5 — 04:00 경계 양쪽이 다른 하루로 갈린다 (FR-002, SC-003)", () => {
-  it("03:59는 전날에 속한다", async () => {
-    // 08-13 03:59는 08-12의 하루다. 새벽 활동은 전날 일기에 붙는다.
+describe("C5 — 자정 경계 양쪽이 다른 하루로 갈린다 (FR-002, SC-003, 049)", () => {
+  it("23:59는 그 날에 속한다", async () => {
     const { port } = fakePort({
-      photos: [{ id: "dawn", takenAtMs: at("2026-08-13T03:59:00") }],
+      photos: [{ id: "late", takenAtMs: at("2026-08-12T23:59:00") }],
     });
 
     const signals = await collectDaySignals(port, DAY);
 
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {
-      expect(signals.photos.value.photos.map((p) => p.id)).toEqual(["dawn"]);
+      expect(signals.photos.value.photos.map((p) => p.id)).toEqual(["late"]);
     }
   });
 
-  it("04:01은 당일에 속하므로 전날에서는 보이지 않는다", async () => {
+  it("★ 다음 날 03:59는 더 이상 전날이 아니다 — 049부터 새벽은 당일 일기에 붙는다", async () => {
     const { port } = fakePort({
-      photos: [{ id: "morning", takenAtMs: at("2026-08-13T04:01:00") }],
+      photos: [{ id: "dawn", takenAtMs: at("2026-08-13T03:59:00") }],
     });
 
     const signals = await collectDaySignals(port, DAY);
 
-    // 08-13 04:01은 08-13의 하루다. 08-12를 물으면 없다.
     expect(signals.photos.kind).toBe("none");
   });
 
-  it("하루의 시작 04:00은 당일이다", async () => {
+  it("다음 날 00:00은 다음 하루다 — 끝은 포함하지 않는다", async () => {
     const { port } = fakePort({
-      photos: [{ id: "start", takenAtMs: at("2026-08-12T04:00:00") }],
+      photos: [{ id: "midnight", takenAtMs: at("2026-08-13T00:00:00") }],
+    });
+
+    const signals = await collectDaySignals(port, DAY);
+
+    expect(signals.photos.kind).toBe("none");
+  });
+
+  it("하루의 시작 00:00·새벽 01:30은 당일이다", async () => {
+    const { port } = fakePort({
+      photos: [
+        { id: "start", takenAtMs: at("2026-08-12T00:00:00") },
+        { id: "dawn", takenAtMs: at("2026-08-12T01:30:00") },
+      ],
     });
 
     const signals = await collectDaySignals(port, DAY);

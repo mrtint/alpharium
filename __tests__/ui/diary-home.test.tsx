@@ -358,7 +358,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     };
   }
 
-  /** 2026-08-20T10:00 기준 고를 수 있는 하루는 [08-19, 08-18, 08-17]이다 */
+  /** 2026-08-20(목) 10:00 — 스트립은 08-16(일)~08-22(토), 오늘은 20일 */
   const at = () => new Date("2026-08-20T10:00:00");
 
   async function renderWith(pipeline: Pipeline) {
@@ -375,14 +375,14 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     return store;
   }
 
-  it("W-T2. 아무것도 고르지 않으면 마지막으로 닫힌 하루가 간다 (FR-007)", async () => {
+  it("W-T2 → 049. 아무것도 고르지 않으면 오늘이 간다 — 정오 전에도 (FR-010a·FR-018b)", async () => {
     const pipeline = recordingPipeline();
     await renderWith(pipeline);
 
     await userEvent.press(await screen.findByText("일기 쓰기"));
     await waitFor(() => expect(pipeline.days).toHaveLength(1));
 
-    expect(pipeline.days[0]).toBe("2026-08-19");
+    expect(pipeline.days[0]).toBe("2026-08-20");
   });
 
   /**

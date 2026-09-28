@@ -105,12 +105,20 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
 
   it("★ N5 — 고른 날은 AppFrame이 들고 홈 화면까지 흘려보낸다 (Q4)", () => {
     const frame = functionBody("AppFrame");
-    expect(frame).toMatch(/const \[chosenDay, setChosenDay\] = useState<DayDate \| null>\(null\)/);
+    // 049 AF1 — 초기값은 마운트 시점의 오늘이다(앱을 새로 열면 오늘, FR-010a). `null`이 아니다.
+    expect(frame).toMatch(
+      /const \[chosenDay, setChosenDay\] = useState<DayDate \| null>\(\(\) => dayOf\(new Date\(\)\)\)/,
+    );
+    expect(frame).not.toMatch(/useState<DayDate \| null>\(null\)/);
     expect(frame).toMatch(/chosenDay=\{chosenDay\}/);
 
     const section = functionBody("DiarySection");
     expect(section).toMatch(/chosenDay=\{chosenDay\}/);
     expect(section).toMatch(/onChooseDay=\{onChooseDay\}/);
+    // 049 AF2 — 미리 준비의 범위(사흘)를 홈 화면에 넘긴다(FR-020a, R5).
+    expect(section).toMatch(
+      /canPrepare=\{\(day\) => selectableDays\(new Date\(\)\)\.includes\(day\)\}/,
+    );
   });
 
   it("설정·개발자는 SubScreenFrame으로 감싸 「← 일기」로 돌아온다", () => {

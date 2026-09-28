@@ -1,0 +1,74 @@
+# 실기기 자동 테스트 — 주간 스트립을 넘긴다 (049)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **일~토 7칸을 좌우로 넘겨 주 단위로 오간다.** 요일은 유지되고, 오늘이 든 주보다 뒤(다음
+# 주)로는 넘어가지 않는다(살짝 끌리다 제자리로 튕김).
+#
+# 검증 항목 (specs/049-home-day-picker):
+#   FR-010a  앱을 열면 오늘이 골라져 있다                           (W1)
+#   FR-004   오른쪽으로 넘기면 이전 주, 골라진 칸이 남는다(요일 유지)  (W2)
+#   FR-006   다음 주로 돌아오면 오늘이 든 주다                        (W3)
+#   FR-005   오늘이 든 주에서 왼쪽으로 넘겨도 주·선택이 그대로다      (W4)
+#
+# **여기서 자동화하지 않는 것** — quickstart D3·D4·D5:
+#   끌림이 손가락을 따라오는지, 튕김이 부드러운지, 크로스페이드가 겹쳐 바뀌는지 — 움직임은
+#   jest도 Maestro도 판정하지 못한다(C9). 사람이 눈으로 본다.
+#
+# **요일 유지는 글자로 본다** — 날짜는 기기의 오늘에 달렸으므로 적지 않고, 넘기기 전후의
+# 요일(`home-weekday`)을 복사해 비교한다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 20000
+
+# ★ W1 — 오늘이 골라져 있다(오늘 칸 = 밑줄).
+- assertVisible:
+    id: "day-today-.*"
+- copyTextFrom:
+    id: "home-day-number"
+- evalScript: ${output.today = maestro.copiedText}
+- copyTextFrom:
+    id: "home-weekday"
+- evalScript: ${output.weekday = maestro.copiedText}
+
+# ★ W2 — 오른쪽으로 넘기면 이전 주. 요일은 그대로, 오늘 밑줄은 이 주에 없다.
+- swipe:
+    from:
+      id: "day-strip"
+    direction: RIGHT
+- assertNotVisible:
+    id: "day-today-.*"
+- assertVisible:
+    id: "home-weekday"
+    text: ${output.weekday}
+- assertVisible:
+    id: "day-.*"
+    selected: true
+
+# ★ W3 — 왼쪽으로 넘기면 오늘이 든 주로 돌아온다. 유지한 요일이 오늘 이후였으면 오늘로
+# 맞춰지므로(FR-006) 날짜는 오늘이다.
+- swipe:
+    from:
+      id: "day-strip"
+    direction: LEFT
+- assertVisible:
+    id: "day-today-.*"
+- assertVisible:
+    id: "home-day-number"
+    text: ${output.today}
+
+# ★ W4 — 오늘이 든 주에서 왼쪽으로 넘겨도 아무 것도 바뀌지 않는다(튕김).
+- swipe:
+    from:
+      id: "day-strip"
+    direction: LEFT
+- assertVisible:
+    id: "day-today-.*"
+- assertVisible:
+    id: "home-day-number"
+    text: ${output.today}

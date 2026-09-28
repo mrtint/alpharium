@@ -20,14 +20,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import {
-  dayOf,
-  isDayWritable,
-  selectableDays,
-  stripDays,
-  writableAt,
-  type DayDate,
-} from "../config/day-boundary";
+import { dayOf, isDayWritable, shiftWeek, weekOf, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
 import type { DiaryEntry } from "../diary/types";
@@ -122,44 +115,22 @@ export type AppScreen =
  */
 export type WritePrompt = {
   /**
-   * 쓰게 될 하루. **`selectable` 안에 반드시 있다**(009 불변식 I1).
+   * 쓰게 될 하루 — **사용자가 고른 날**, 고른 적이 없으면 오늘(049 FR-010a).
    *
-   * 006에서는 언제나 마지막으로 닫힌 하루였고, 009부터는 **사용자가 고른 하루**다.
+   * 006에서는 언제나 마지막으로 닫힌 하루였고, 009에서 사흘 중 고른 하루가 됐고, 049부터는
+   * **지난 날 전부** 중 고른 하루다. 미래는 올 수 없다(P1 — 들어오면 오늘로 떨어진다).
    */
   day: DayDate;
   /** 그 하루에 이미 일기가 있는가 — 누르면 덮어쓴다(FR-024) */
   overwrites: boolean;
-  /** 고를 수 있는 하루들. 최근이 먼저다(009 FR-001) */
-  selectable: readonly SelectableDay[];
-  /**
-   * 되돌려졌으면 **사용자가 원래 고른 하루**(009 FR-009).
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   * **별도 갈래가 아니라 사실이다**(FR-009d) — 007의 `movedFrom`과 같은 모양이며
-   * 같은 이유다. 화면이 스스로 이전 값과 비교해 판단하면 같은 규칙이 두 곳에 생긴다.
-   *
-   * **지우는 코드가 없다.** 판정이 매번 다시 도므로(FR-009a) 고른 하루가 범위 밖인
-   * 동안 계속 실려 나오고, **사용자가 다시 고르면 그 순간 사라진다**(FR-009c).
-   * 008이 「거부 안내가 아직 참인가」를 매번 다시 물어 타이밍 버그를 없앤 것과 같다.
-   * ─────────────────────────────────────────────────────────────────────────
+  /*
+   * **049가 걷어낸 필드**: `selectable`(사흘 목록 — 화면은 이제 사흘을 모른다),
+   * `revertedFrom`(되돌림 — 지난 날을 모두 고를 수 있어 밀려날 곳이 없다),
+   * `writableAt`(정오 전환 — 쓸 수 없는 오늘이 없다), **`writable`**(고른 날은 미래면 오늘로
+   * 떨어지므로 언제나 참이 됐다 — 구현 중 발견). 도달할 수 없는 자리를 타입에 남기면 그것은
+   * 계약이 아니라 거짓말이다(042 `skipped`의 교훈). 미래 날의 마지막 방어는 파이프라인의
+   * `isDayWritable` 게이트 하나로 남는다.
    */
-  revertedFrom?: DayDate;
-  /**
-   * 고른 하루를 **지금 쓸 수 있는가** (048, contracts/write-prompt.md WP).
-   *
-   * 048 이전에는 고를 수 있는 하루가 곧 쓸 수 있는 하루였다. 048은 아직 쓸 수 없는 오늘을
-   * **볼 수 있게** 고를 수 있는 목록에 넣으므로, 「고를 수 있다」와 「쓸 수 있다」가 갈린다.
-   * 거짓이면 화면은 쓰기 버튼을 그리지 않는다 — 쓰기의 마지막 방어는 여전히 파이프라인의
-   * `isDayWritable` 게이트(012)다.
-   */
-  writable: boolean;
-  /**
-   * 쓸 수 없을 때만 — 쓸 수 있게 되는 시각 (048, `day-boundary.writableAt()`의 값).
-   *
-   * **`writable === false`일 때만 존재한다**(I3). 04와 12를 화면이 모르게 하는 대신 이 값을
-   * 싣는다 — 화면은 이것을 사람의 말로 옮기고 전환 타이머도 같은 값으로 건다.
-   */
-  writableAt?: Date;
 };
 
 /**
@@ -189,119 +160,87 @@ export type DayPreview = { day: DayDate; photos: CountHint; places: CountHint };
 export type StripCell = {
   day: DayDate;
   hasDiary: boolean;
+  /** 오늘인가 — 숫자 밑줄 (049). 헤더에는 「오늘」 글자가 없고 이 밑줄로만 구분한다 */
+  isToday: boolean;
+  /** 누를 수 있는가 — 미래가 아니다(049). 거짓이면 흐림 */
   selectable: boolean;
   selected: boolean;
 };
 
 /**
- * 고를 수 있는 하루 하나 (009 FR-001·011, data-model.md §1).
+ * 지금 쓰면 무엇이 되는지 정한다 (049 contracts/day-picking.md WP).
+ *
+ * **「지금」을 인자로 받는다**(002 FR-018a). 안에서 `new Date()`를 부르면 자정 경계를
+ * 테스트할 수 없다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **필드가 셋뿐인 것이 FR-011a의 방어다**(048이 `writable`을 더했다 — 사진 갈래는 여전히 없다).
+ * **049 — 사흘을 모른다.** 지난 날은 전부 고를 수 있으므로 고른 날이 범위 밖으로 밀려나는
+ * 일이 없다(009의 되돌림이 도달할 수 없게 됐다). 고른 적이 없으면 **오늘**이다(048 D9를
+ * 뒤집음 — 앱을 열면 오늘). `selectableDays()`는 백그라운드·알림·미리 준비의 범위이고
+ * 이 파일은 그것을 부르지 않는다(DB13).
  *
- * 사진 갈래(`PhotoHint`)를 넣지 않는다 — **아직 쓰지 않은 하루의 그 값은 지금 알 수
- * 없다.** 신호를 수집해야 나오고, 수집하려면 고르는 화면이 세 하루를 미리 훑어야
- * 하는데 그것은 이 기능의 범위 밖인 기록 계층을 여는 일이다.
- *
- * **목록의 줄과 다른 점이 여기다.** `DiaryListItem`에는 사진 갈래가 실린다 — 그것은
- * **이미 쓴 일기**의 값이라 알려져 있다.
+ * 고른 날이 미래면(정상 경로로는 오지 않는다) 조용히 오늘로 떨어진다 — 그래서 고른 날은
+ * 언제나 쓸 수 있고, 「쓸 수 있는가」를 따로 싣지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
- */
-export type SelectableDay = {
-  /** 그 하루 (`YYYY-MM-DD`) */
-  day: DayDate;
-  /** 그 하루에 일기가 이미 있는가 — 고르면 덮어쓴다(FR-011) */
-  hasDiary: boolean;
-  /**
-   * 지금 쓸 수 있는가 (048). 009의 셋은 참이고, 아직 쓸 수 없는 오늘만 거짓이다.
-   * 판정은 `isDayWritable()` 하나에서 온다(012) — 이 값은 그것을 옮길 뿐이다.
-   */
-  writable: boolean;
-};
-
-/**
- * 지금 쓰면 무엇이 되는지 정한다.
- *
- * **「지금」을 인자로 받는다**(002 FR-018a). 안에서 `new Date()`를 부르면 04:00
- * 경계값을 테스트할 수 없다.
  */
 export function writePromptFor(
   items: readonly DiaryListItem[],
   now: Date,
   chosenDay?: DayDate | null,
 ): WritePrompt {
-  // **04:00도 「사흘」도 여기서 계산하지 않는다**(009 FR-003·004). 하루 경계를 아는
-  // 자리는 `day-boundary.ts` 하나여야 한다.
-  const days = selectableDays(now);
-
-  // **추가 읽기가 0이다**(FR-011b). 「그 하루에 일기가 있는가」는 이미 읽은 목록에서
-  // 나온다 — 읽을 수 없는 일기도 그 하루를 차지한다(원칙 V, 007에서 세운 규칙).
-  const hasDiary = (day: DayDate) => items.some((item) => item.day === day);
-  const selectable: SelectableDay[] = days.map((day) => ({
-    day,
-    hasDiary: hasDiary(day),
-    writable: true,
-  }));
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // **048 — 아직 쓸 수 없는 오늘을 맨 앞에 붙인다**(설계 D6, Clarification Q1).
-  //
-  // 정오 이후면 오늘은 이미 `days[0]`이므로 붙지 않는다. 00:00~12:00에는 오늘이 쓸 수 없어
-  // `writable: false`로 붙는다 — **볼 수는 있지만 쓸 수는 없다.** 판정은 `isDayWritable()`
-  // 하나뿐이고(012), 기본 선택은 여전히 `days[0]`(쓸 수 있는 첫 날, D9)이다.
-  // ───────────────────────────────────────────────────────────────────────────
   const today = dayOf(now);
-  if (!isDayWritable(today, now)) {
-    selectable.unshift({ day: today, hasDiary: hasDiary(today), writable: false });
-  }
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // **★ 매번 다시 묻는다**(FR-009a). 되돌림을 상태로 저장했다가 지우지 않는다 —
-  // 지우는 시점을 관리하는 순간 **기기에서만 보이는 타이밍 버그**가 들어온다.
-  // 008이 「거부 안내가 아직 참인가」를 매번 다시 물어 같은 종류를 막았다.
-  //
-  // **저장할 것이 없으면 지울 것도 없다.**
-  // ───────────────────────────────────────────────────────────────────────────
-  const chosenIsValid = chosenDay != null && selectable.some((entry) => entry.day === chosenDay);
-  const day = chosenIsValid ? chosenDay : days[0];
-
-  // **고른 것이 마침 기본값과 같으면 붙지 않는다**(계약 §2 9번 행). 007의
-  // `movedFrom`이 같은 함정을 가졌다 — 바뀌지 않았는데 「바뀌었다」고 알리는 것.
-  const reverted = chosenDay != null && !chosenIsValid;
-
-  const chosen = selectable.find((entry) => entry.day === day);
-  const writable = chosen?.writable ?? true;
-  const opensAt = writable ? null : writableAt(day, now);
+  const day = chosenDay != null && chosenDay <= today ? chosenDay : today;
 
   return {
     day,
-    // **덮어쓰기는 「고른 하루」를 따른다**(I5). 다른 하루에 일기가 있는 것은 무관하다.
-    overwrites: chosen?.hasDiary ?? false,
-    selectable,
-    ...(reverted ? { revertedFrom: chosenDay } : {}),
-    writable,
-    // I3 — 쓸 수 없을 때만 싣는다.
-    ...(opensAt !== null ? { writableAt: opensAt } : {}),
+    // **덮어쓰기는 「고른 하루」를 따른다**(I5). 읽을 수 없는 일기도 그 하루를 차지한다
+    // (원칙 V, 007에서 세운 규칙).
+    overwrites: items.some((item) => item.day === day),
   };
 }
 
 /**
- * 홈 스트립의 7칸 (048, contracts/write-prompt.md SC).
+ * 홈 스트립의 7칸 — **고른 날이 든 일~토 주** (049 SW1·SW2, 보드 `1d`).
  *
- * **날짜 계산은 `stripDays()`가 한다** — 04:00이 이 파일로 새지 않는다. 여기서는 목록과
- * 쓰기 예고를 칸에 얹을 뿐이다. 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
+ * **날짜 계산은 `weekOf()`가 한다** — 하루 경계가 이 파일로 새지 않는다. 여기서는 목록과
+ * 오늘·미래를 칸에 얹을 뿐이다. 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
  */
-export function stripCellsFor(
+export function weekCellsFor(
   items: readonly DiaryListItem[],
   prompt: WritePrompt,
   now: Date,
 ): StripCell[] {
-  return stripDays(now).map((day) => ({
+  const today = dayOf(now);
+  return weekOf(prompt.day).map((day) => ({
     day,
     hasDiary: items.some((item) => item.day === day),
-    selectable: prompt.selectable.some((entry) => entry.day === day),
+    isToday: day === today,
+    selectable: isDayWritable(day, now),
     selected: prompt.day === day,
   }));
+}
+
+/** 스트립을 넘기는 방향 — 오른쪽으로 끌면 이전 주, 왼쪽이면 다음 주 */
+export type SwipeDirection = "previous" | "next";
+
+/**
+ * 주를 넘긴 뒤 고를 날 (049 SW3~SW5, data-model §5).
+ *
+ * 요일을 유지한 채 7일 옮긴다. **오늘이 든 주에서는 다음 주가 없다**(`null` — 화면은 튕김만
+ * 보인다). 오늘이 든 주로 돌아올 때 유지한 요일이 오늘 이후면 오늘로 맞춘다(FR-006).
+ */
+export function swipeWeek(selected: DayDate, direction: SwipeDirection, now: Date): DayDate | null {
+  if (direction === "previous") return shiftWeek(selected, -1);
+
+  const today = dayOf(now);
+  if (weekOf(selected).includes(today)) return null;
+  const next = shiftWeek(selected, 1);
+  return next > today ? today : next;
+}
+
+/** 다음 주로 넘길 수 있는가 — 거짓이면 화면이 끌림에 저항을 건다(러버밴드) */
+export function canSwipeNext(selected: DayDate, now: Date): boolean {
+  return swipeWeek(selected, "next", now) !== null;
 }
 
 /**

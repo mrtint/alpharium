@@ -161,7 +161,7 @@ export type ConnectivityTrace = {
  * 세 갈래도 그대로다 — 넓혔다면 002·003의 모든 판정이 영향받았을 것이다.
  */
 export type DaySignals = {
-  /** 어느 날의 신호인가. 04:00 경계로 정해진다(FR-021). 없으면 만들 수 없다(FR-004) */
+  /** 어느 날의 신호인가. 하루 경계(049부터 자정)로 정해진다(FR-021). 없으면 만들 수 없다(FR-004) */
   date: DayDate;
   /** 004에서 `Photo[]`가 아니라 `PhotoObservation`이 됐다 — 한계가 값에 붙어 있다(FR-024) */
   photos: SignalValue<PhotoObservation>;
