@@ -83,18 +83,18 @@ describe("PF1 — 세기·시간은 토큰 한 곳의 상수다", () => {
 });
 
 describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
-  it("★ src/ui/components/의 파일이 9개다(033 7개 + 038 TypewriterText + 050 Dialog)", () => {
+  it("★ src/ui/components/의 파일이 9개다(033 7개 + 050 Dialog + 054 FadeLayer — 038 TypewriterText는 054에서 지웠다)", () => {
     // 032가 만들고 안 쓴 컴포넌트 4개를 남긴 것이 이 스펙의 존재 이유다.
     // 같은 실패(쓸 자리 없는 추상을 먼저 만듦)를 되풀이하지 않는다.
     //
-    // 038 — `TypewriterText.tsx`가 여덟 번째로 늘었다. 이건 032의 "만들고 안
-    // 쓴" 패턴이 아니다 — 038에서는 `DiaryDetailScreen`이 첫 표시 타자기에 썼고, 051에서
-    // 그 화면이 사라진 뒤에는 039 쓰는 중 독백이 쓴다. data-model.md·contracts/typewriter-text.md가 계약을 미리 못
-    // 박은 필수 컴포넌트다. 이 숫자는 "새 컴포넌트를 함부로 늘리지 않는다"는
-    // 규칙을 지키되, 실제로 쓰이는 새 컴포넌트까지 막지는 않는다.
+    // 038 — `TypewriterText.tsx`가 여덟 번째로 늘었다가, 054에서 쓰는 중 독백이 페이드 교체가 되며 마지막
+    // 사용처가 사라져 지웠다(쓰지 않는 컴포넌트를 두지 않는다 — 044 교훈).
     //
-    // 050 — `Dialog.tsx`가 아홉 번째다. 덮어쓰기 확인·날짜로 이동·다운로드 동의가 같은 날 실제로
+    // 050 — `Dialog.tsx`가 여덟 번째다. 덮어쓰기 확인·날짜로 이동·다운로드 동의가 같은 날 실제로
     // 쓰고(contracts/dialogs.md DLG), 이후 조각(2f·2m)이 쓸 공용 모양이다(spec FR-004).
+    //
+    // 054 — `FadeLayer.tsx`가 아홉 번째다. 049가 `DiaryListScreen` 안에 두었던 것을 꺼냈다 — 홈 헤더 날짜와 쓰는 중
+    // 혼잣말 두 곳이 실제로 쓴다.
     expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(9);
   });
 });

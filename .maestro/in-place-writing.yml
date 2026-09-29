@@ -1,0 +1,119 @@
+# 실기기 자동 테스트 — 제자리 쓰기 (054, 보드 `2b`·`2i`)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **이 흐름이 054의 핵심을 본다: 쓰는 동안 홈을 떠나지 않고, 스트립·헤더 날짜가 잠기며, 그만두면 쓰기 전 상태로
+# 돌아오는가.**
+#
+# 검증 항목:
+#   FR-001   쓰기를 시작해도 별도 화면으로 가지 않는다(헤더·스트립이 그대로 있다)
+#   FR-002   헤더 상태 줄이 「쓰는 중」이다
+#   FR-003   스트립이 잠겨 칸을 눌러도 고른 날이 바뀌지 않는다
+#   FR-004   헤더 큰 숫자·요일을 눌러도 달력이 열리지 않는다
+#   FR-008   하단이 검정 「그만두기」 바다(`stop-button`)
+#   FR-009   그만두면 쓰기 전 상태로 돌아온다(`write-button`)
+#   FR-007   쓰는 중 화면에 %·경과 시간이 없다               (원칙 IV)
+#
+# **여기서 자동화하지 않는 것** — quickstart.md D3·D7~D10:
+#   D3(혼잣말 페이드 교체의 부드러움)·D7~D9(실패 토스트의 위치·3초·쓸어 닫기)·D10(큰 글꼴)은 움직임과 실패 유도가
+#   필요해 Maestro로 재현하기 어렵다. 사람이 화면 녹화로 본다. **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+#
+# ⚠️ **모델이 준비돼 있어야 쓰는 중에 들어간다.** 없으면 쓰기가 곧바로 막혀 쓰는 중 블록이 SKIPPED로 지나간다 —
+# 실패가 아니지만 검증도 아니다. 「일기 쓰기」를 누르면 재료가 없는 날은 053 확인이 먼저 뜬다(확인을 눌러 진행).
+# ⚠️ 쓰기 버튼은 글자가 아니라 `id: "write-button"`으로 누른다(051 — 쓴 날에는 「다시 쓰기」다). 쓰는 중 진입은
+# 글자가 아니라 `id: "stop-button"`으로 가른다(「쓰는 중」은 헤더 상태 줄과 머리말에 둘이라 글자로는 겹친다).
+# ⚠️ `pm clear` 없이 돌린다(모델 보존).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "write-button"
+    timeout: 30000
+
+# 누르는 순간의 헤더 날짜(고른 날)를 기억한다 — 쓰는 중에 바뀌지 않아야 한다.
+- copyTextFrom:
+    id: "home-day-number"
+
+- tapOn:
+    id: "write-button"
+
+# 쓴 날이면 050 덮어쓰기 확인, 재료가 없는 날이면 053 확인이 먼저 뜬다 — 확인을 눌러 진행한다.
+- runFlow:
+    when:
+      visible:
+        id: "overwrite-dialog"
+    commands:
+      - tapOn:
+          id: "overwrite-confirm"
+- runFlow:
+    when:
+      visible:
+        id: "material-confirm"
+    commands:
+      - tapOn:
+          id: "material-confirm-yes"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 여기서부터는 **실제로 쓰는 중일 때만** 참이다 — 모델이 없으면 이 블록 전체가 SKIPPED다(원칙 V).
+# ─────────────────────────────────────────────────────────────────────────────
+- runFlow:
+    when:
+      visible:
+        id: "stop-button"
+    commands:
+      # FR-001·002 — 홈 안이다. 헤더 상태 줄이 「쓰는 중」이고 스트립이 그대로 있다.
+      - assertVisible:
+          id: "home-day-state"
+      - assertVisible: "쓰는 중"
+      - assertVisible:
+          id: "writing-paper"
+
+      # FR-007 — 진행률·경과 시간이 없다.
+      - assertNotVisible: "%"
+      - assertNotVisible: "남음"
+      - assertNotVisible: "초 남"
+      - assertNotVisible: "토큰"
+
+      # 「일기 쓰기」·「다시 쓰기」 바는 없다(검정 「그만두기」 바뿐이다).
+      - assertNotVisible:
+          id: "write-button"
+
+      # FR-004 — 헤더 큰 숫자를 눌러도 달력이 열리지 않는다.
+      - tapOn:
+          id: "home-day-number"
+      - assertNotVisible: "날짜로 이동"
+
+      # FR-003 — 스트립 칸을 눌러도 고른 날이 바뀌지 않는다(눌림이 통과되지 않는다). 첫 칸(일요일)을 누른다 —
+      # 오늘이 일요일이 아니면 고른 날과 다른 칸이라 잠기지 않았다면 날이 바뀐다.
+      - tapOn:
+          id: "day-2026-.*"
+          index: 0
+      - assertVisible:
+          id: "home-day-number"
+          text: ${maestro.copiedText}
+      - assertVisible:
+          id: "stop-button"
+
+      # FR-009 — 그만두면 쓰기 전 상태로 돌아온다.
+      - tapOn:
+          id: "stop-button"
+      - extendedWaitUntil:
+          visible:
+            id: "write-button"
+          timeout: 15000
+      - assertNotVisible:
+          id: "stop-button"
+      - assertNotVisible: "쓰는 중"
+      - assertNotVisible:
+          id: "failure-toast"
+      - assertVisible:
+          id: "home-day-number"
+          text: ${maestro.copiedText}
+
+# ★ 원칙 III — 어느 경우에도 모델 용어가 새지 않는다.
+- assertNotVisible: "되뱉"
+- assertNotVisible: "rejected"
+- assertNotVisible: "unfinished"
+- assertNotVisible: "kanana"

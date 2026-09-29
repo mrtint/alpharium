@@ -3,13 +3,11 @@
 각 결정은 **Decision / Rationale / Alternatives**. 근거는 읽은 코드(`DiaryHomeScreen.tsx`·`DiaryListScreen.tsx`·`state.ts`·`failure-text.ts`·
 `monologue.ts`)와 보드 `2b`·`2i` 마크업(flex·position·transform까지 읽음 — transform 없음, 토스트·하단 바는 `position:absolute` 바닥 기준)이다.
 
-## R1 — `writing` 상태가 `items`를 든다
+## R1 — `writing`은 그대로, 화면이 `items`를 따로 든다
 
-- **Decision**: `AppScreen`의 `{ kind: "writing" }`에 `items: DiaryListItem[]`를 더한다(`stage`·`branch`·`line`은 그대로).
-- **Rationale**: 쓰는 중에도 헤더의 큰 날짜·주간 스트립 7칸(점)을 그려야 한다. `confirm-overwrite`(050)가 같은 이유로 `items`를 든다. `toWriting()`이 인자를 받지
-  않던 방어(원칙 I, S1)는 「저장 상태로 갈리지 않는다」는 뜻이었고 `items`는 목록 요약이지 본문이 아니다 — 방어를 깨지 않는다. 시그니처는 `toWriting(items)`로
-  바뀌지만 **저장 상태로 분기하는 인자가 아니다**(계약 W1이 소스 검사로 잠근다).
-- **Alternatives**: 화면이 `list` items를 별도 ref로 들기 — 상태와 화면이 어긋날 수 있고 050 선례와 다르다.
+- **Decision**: `AppScreen`의 `{ kind: "writing"; stage?; branch?; line? }`를 **바꾸지 않는다**. `generate(params, items)`가 쓰기를 시작할 때 `items`(목록 요약)를 받아 화면 로컬 state `writingItems`에 든다.
+- **Rationale**: 쓰는 중에도 헤더의 큰 날짜·주간 스트립 7칸(점)을 그려야 하므로 그 시점의 목록 요약이 필요하다. 처음에는 `confirm-overwrite`(050)처럼 `writing`이 `items`를 들게 하려 했으나(`toWriting(items)`), **구현 단계에서 기존 방어와 충돌**함을 확인했다 — `toWriting()`이 **인자를 받지 않고 `Object.keys(toWriting())`가 `["kind"]`뿐**임을 007 S1·009 I7·012 C3가 원칙 I(저장 상태로 갈리지 않는다)의 방어로 세 곳에서 잠갔다. `items`가 본문이 아닌 목록 요약이라 정신은 지켜지지만, 세 방어를 완화하는 것보다 `AppScreen`을 그대로 두는 편이 싸고 안전하다. `startWriting(prompt, items)`·`confirmOverwrite()`도 무변경이다.
+- **Alternatives**: `writing`에 `items`를 더한다(위 이유로 기각). 렌더 중 ref 갱신으로 마지막 `items`를 든다(`react-hooks/refs`가 막는다).
 
 ## R2 — 쓰는 중 레이아웃은 안 쓴 날 레이아웃을 쓴다
 

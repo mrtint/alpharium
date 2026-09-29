@@ -142,12 +142,13 @@ async function startWriting(pipeline: Pipeline, stop?: () => Promise<void>) {
 }
 
 describe("쓰는 중 화면 (007 contracts/screens.md §1)", () => {
-  it("1. 회전 표시와 「쓰고 있다」가 보인다(FR-010)", async () => {
+  it("1. 「쓰는 중」 상태 줄과 첫 신호 전의 「쓰고 있다」가 보인다(FR-010, 054 — 회전 표시는 없다)", async () => {
     await startWriting(hangingPipeline());
 
-    // 회전 표시는 접근성 이름으로 찾는다 — 스타일에 묶이지 않는다.
-    expect(screen.getByLabelText("쓰고 있다")).toBeTruthy();
+    // 054 — 쓰는 중이 홈 안의 상태가 됐다. 회전 표시(`ActivityIndicator`)는 없고 헤더 상태 줄이 말한다.
+    expect(screen.getByTestId("home-day-state")).toHaveTextContent("쓰는 중");
     expect(screen.getByText("쓰고 있다")).toBeTruthy();
+    expect(screen.queryByLabelText("쓰고 있다")).toBeNull();
   });
 
   it("2. 「그만두기」를 누를 수 있다(FR-013)", async () => {
@@ -575,7 +576,7 @@ describe("029 — 자동 판정한 사진 설정이 파이프라인까지 간다
  * 003이 없는 모델을 다른 캐릭터로 대체하지 않은 것과 같은 계열이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-describe("011 US4 — 사진을 볼 수 없을 때", () => {
+describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
   /** `vision` 단계에서 멈추는 파이프라인 */
   const visionFailure = (reason: string): Pipeline => ({
     run: async () => ({
@@ -585,72 +586,74 @@ describe("011 US4 — 사진을 볼 수 없을 때", () => {
     }),
   });
 
-  async function writeWith(pipeline: Pipeline, onGoToSettings?: () => void) {
+  async function writeWith(pipeline: Pipeline) {
     await render(
       <DiaryHomeScreen
-        onGoToSettings={onGoToSettings}
         pipeline={pipeline}
         resolution={resolved}
         resolve={resolveQuiet()}
         store={memoryStore()}
       />,
     );
-    await userEvent.press(await screen.findByText("일기 쓰기"));
+    await userEvent.press(await screen.findByTestId("write-button"));
+    return screen.findByTestId("failure-toast");
   }
 
   // ★ FR-021 — 가짜 일기를 대신 주지 않는다.
   it("★ 사진을 못 보면 일기가 나오지 않는다 (FR-021, SC-005)", async () => {
-    await writeWith(visionFailure("not-ready"));
+    const toast = await writeWith(visionFailure("not-ready"));
 
     // 일기 본문이 화면에 없다.
     expect(screen.queryByText(entry.text)).toBeNull();
-    expect(await screen.findByText(/사진을 보는 데 필요한 것/)).toBeTruthy();
+    expect(toast).toHaveTextContent(/사진을 보는 데 필요한 것/);
   });
 
-  it("무엇이 필요한지와 빠져나갈 길을 함께 말한다 (FR-022)", async () => {
+  // 054 — 「보지 않고 쓸 수도 있다」는 042부터 없는 길이다(사진은 언제나 본다). 토스트는 준비하라고만 말한다.
+  it("무엇이 필요한지를 말하고, 다시 써 보라고 하지 않는다 (FR-022, 054 SC-006)", async () => {
+    const toast = await writeWith(visionFailure("not-ready"));
+
+    expect(toast).toHaveTextContent(/준비/);
+    expect(toast).not.toHaveTextContent(/다시 써 볼 수 있어요/);
+    expect(toast).not.toHaveTextContent(/보지 않고/);
+  });
+
+  it("토스트에 버튼이 없다 — 준비하러 가는 길은 쓰기 전 막힘 화면에만 있다 (054 FR-019·024)", async () => {
     await writeWith(visionFailure("not-ready"));
 
-    const message = await screen.findByText(/사진을 보는 데 필요한 것/);
-    // 「준비해야 한다」와 「보지 않고 쓸 수도 있다」가 함께 있다.
-    expect(message.props.children).toMatch(/준비/);
-    expect(message.props.children).toMatch(/보지 않고/);
+    expect(screen.queryByText(/설정에서 작성자 준비하기/)).toBeNull();
   });
 
-  it("준비하러 가는 길이 있다 (FR-022, 003 FR-028)", async () => {
-    await writeWith(visionFailure("not-ready"), () => {});
-
-    expect(await screen.findByText(/설정에서 작성자 준비하기/)).toBeTruthy();
+  it("not-ready는 다른 갈래와 다른 말이고, failed와 cancelled는 다시 써 볼 수 있다는 같은 말이다 (FR-022)", async () => {
+    const notReady = await writeWith(visionFailure("not-ready"));
+    expect(notReady).toHaveTextContent(/필요한 것/);
   });
 
-  it.each([
-    ["not-ready", /필요한 것/],
-    ["failed", /문제가 생겼다/],
-    ["cancelled", /멈췄다/],
-  ])("%s는 서로 다른 말이 된다 (FR-022)", async (reason, pattern) => {
-    await writeWith(visionFailure(reason));
-    expect(await screen.findByText(pattern)).toBeTruthy();
-  });
+  it.each([["failed"], ["cancelled"]])(
+    "%s는 다시 써 볼 수 있다는 말이다 (FR-022)",
+    async (reason) => {
+      const toast = await writeWith(visionFailure(reason));
+      expect(toast).toHaveTextContent("일기를 쓰지 못했어요. 다시 써 볼 수 있어요.");
+    },
+  );
 
   // ★ FR-023 — 오류 문구가 원칙 III의 누출 경로다.
   it("★ 안내에 모델 정보가 없다 (FR-023, 원칙 III)", async () => {
-    await writeWith(visionFailure("not-ready"));
+    const toast = await writeWith(visionFailure("not-ready"));
 
-    const message = await screen.findByText(/사진을 보는 데 필요한 것/);
-    expect(String(message.props.children)).not.toMatch(/LFM|SmolVLM|mmproj|gguf|450M/i);
+    expect(toast).not.toHaveTextContent(/LFM|SmolVLM|mmproj|gguf|450M/i);
   });
 
   it("안내에 시간·토큰이 없다 (원칙 IV)", async () => {
-    await writeWith(visionFailure("failed"));
+    const toast = await writeWith(visionFailure("failed"));
 
-    const message = await screen.findByText(/문제가 생겼다/);
-    expect(String(message.props.children)).not.toMatch(/\d+초|\d+토큰|ms|%/);
+    expect(toast).not.toHaveTextContent(/\d+초|\d+토큰|ms|%/);
   });
 
   /**
    * **`generation`과 뭉개지지 않는다** — 사용자가 할 일이 다르다.
    *
-   * 「캐릭터를 준비해야 한다」와 「사진 보는 것을 준비해야 한다」는 서로 다른 화면으로
-   * 이어지며, 뭉개면 사용자가 엉뚱한 것을 준비한다.
+   * 「캐릭터를 준비해야 한다」와 「사진 보는 것을 준비해야 한다」는 서로 다른 문구이며, 뭉개면 사용자가
+   * 엉뚱한 것을 준비한다.
    */
   it("캐릭터 준비 실패와 다른 말이 된다", async () => {
     const characterFailure: Pipeline = {
@@ -661,11 +664,10 @@ describe("011 US4 — 사진을 볼 수 없을 때", () => {
       }),
     };
 
-    await writeWith(characterFailure);
-    const message = await screen.findByText(/준비/);
+    const toast = await writeWith(characterFailure);
 
-    expect(String(message.props.children)).toMatch(/캐릭터/);
-    expect(String(message.props.children)).not.toMatch(/사진/);
+    expect(toast).toHaveTextContent(/캐릭터/);
+    expect(toast).not.toHaveTextContent(/사진/);
   });
 });
 
@@ -713,10 +715,8 @@ describe("015 — 쓰는 중 독백", () => {
   });
 
   /*
-   * 039 — 독백 문구가 TypewriterText(글자 단위 노출)로 바뀌면서, `act()` 직후
-   * 곧바로 `getByText`로 전체 문구를 찾을 수 없다(타이핑이 실시간으로
-   * 진행 중이므로). `findByText`(자동 재시도)로 완료를 기다린다 — 039
-   * 이전에는 즉시 렌더였으므로 이 대기가 새로 필요해졌다.
+   * 054 — 독백은 페이드 교체다(타자기 없음). 줄이 바뀌면 이전 줄이 나가는 겹으로 잠시 남으므로 「지금 줄」은
+   * `writing-monologue-text` testID로 찾는다(글자로 찾으면 두 겹이 함께 잡힌다).
    */
   it("onProgress('vision')이 오면 「쓰고 있다」에서 다른 문구로 바뀐다", async () => {
     const pipeline = progressPipeline();
@@ -724,7 +724,7 @@ describe("015 — 쓰는 중 독백", () => {
 
     await act(async () => pipeline.onProgress("vision"));
 
-    expect(await screen.findByText(/중…/)).toBeTruthy();
+    expect(await screen.findByTestId("writing-monologue-text")).toHaveTextContent(/중…/);
   });
 
   it("onProgress('vision')이 연달아 여러 번 오면 매번 직전과 다른 문구가 보인다 (FR-014)", async () => {
@@ -734,7 +734,7 @@ describe("015 — 쓰는 중 독백", () => {
     const seen: string[] = [];
     for (let i = 0; i < 5; i++) {
       await act(async () => pipeline.onProgress("vision"));
-      await screen.findByText(/중…/);
+      await screen.findByTestId("writing-monologue-text");
       const rendered = JSON.stringify(screen.toJSON());
       seen.push(rendered);
       if (i > 0) expect(seen[i]).not.toBe(seen[i - 1]);
@@ -759,7 +759,7 @@ describe("015 — 쓰는 중 독백", () => {
     // 039 — 타이핑 완료를 기다린 뒤(findByText) 완성된 문구로 검사한다.
     for (const stage of ["signals", "vision", "generation"] as const) {
       await act(async () => pipeline.onProgress(stage));
-      const line = await screen.findByText(/중…/);
+      const line = await screen.findByTestId("writing-monologue-text");
       expect(String(line.props.children)).not.toMatch(/\d/);
     }
   });
@@ -781,14 +781,14 @@ describe("015 — 쓰는 중 독백", () => {
     expect(screen.getByTestId("home-day-number")).toBeTruthy();
   });
 
-  it("마지막으로 받은 stage·line이 실패 화면 전환 후에는 남아있지 않다 (FR-009·011)", async () => {
+  it("마지막으로 받은 stage·line이 실패 토스트로 돌아온 뒤에는 남아있지 않다 (FR-009·011, 054)", async () => {
     const pipeline = progressPipeline();
     await startWriting(pipeline);
 
     await act(async () => pipeline.onProgress("vision"));
     await act(async () => pipeline.finish({ ok: false, stage: "generation", reason: "실패" }));
 
-    await screen.findByText("← 일기");
+    await screen.findByTestId("failure-toast");
     const rendered = JSON.stringify(screen.toJSON());
     expect(rendered).not.toMatch(/사진을 들여다보는|사진을 살펴보는|눈에 담는/);
   });
@@ -850,13 +850,13 @@ describe("016 — 모델 로드 독백", () => {
       const c = loadProgressPipeline();
       await startWriting(c);
       await act(async () => c.onProgress("load", "cold"));
-      const coldLine = await screen.findByText(/중…/);
+      const coldLine = await screen.findByTestId("writing-monologue-text");
       const cr = String(coldLine.props.children);
 
       const h = loadProgressPipeline();
       await startWriting(h);
       await act(async () => h.onProgress("load", "hot"));
-      const hotLine = await screen.findByText(/중…/);
+      const hotLine = await screen.findByTestId("writing-monologue-text");
       const hr = String(hotLine.props.children);
 
       if (cr !== hr) sawDifference = true;
@@ -869,11 +869,11 @@ describe("016 — 모델 로드 독백", () => {
     await startWriting(pipeline);
 
     await act(async () => pipeline.onProgress("load", "cold"));
-    const loadLine = await screen.findByText(/중…/);
+    const loadLine = await screen.findByTestId("writing-monologue-text");
     const loadText = String(loadLine.props.children);
 
     await act(async () => pipeline.onProgress("generation"));
-    const generationLine = await screen.findByText(/중…/);
+    const generationLine = await screen.findByTestId("writing-monologue-text");
     const generationText = String(generationLine.props.children);
 
     expect(generationText).not.toBe(loadText);
@@ -894,7 +894,7 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
 
     await act(async () => pipeline.onProgress("vision", "normal"));
 
-    expect(await screen.findByText(/중…/)).toBeTruthy();
+    expect(await screen.findByTestId("writing-monologue-text")).toHaveTextContent(/중…/);
   });
 
   it("onProgress('vision', 'many')를 받으면 '많음' 갈래 문구가 보인다", async () => {
@@ -903,7 +903,7 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
 
     await act(async () => pipeline.onProgress("vision", "many"));
 
-    expect(await screen.findByText(/중…/)).toBeTruthy();
+    expect(await screen.findByTestId("writing-monologue-text")).toHaveTextContent(/중…/);
   });
 
   it("렌더된 사진 보기 문구 어디에도 정확한 장수(숫자)가 없다 (FR-007)", async () => {
@@ -913,7 +913,7 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
 
       await act(async () => pipeline.onProgress("vision", branch));
 
-      const line = await screen.findByText(/중…/);
+      const line = await screen.findByTestId("writing-monologue-text");
       expect(String(line.props.children)).not.toMatch(/\d/);
     }
   });

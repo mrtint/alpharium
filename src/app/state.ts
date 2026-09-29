@@ -20,16 +20,15 @@
  *
  * **051 — 홈이 곧 상세다.** 상세(`detail`)·「읽을 수 없다」(`unreadable`)·생성 뒤 결과(`written`)
  * 갈래가 사라졌다. 쓴 날은 화면 상태가 아니라 홈이 고른 날로 그리는 지면 상태다
- * (`written-day.ts`의 `paperFor`). 생성 뒤 결과 화면은 저장에 실패했을 때(`unsaved`)만 남는다.
+ * (`written-day.ts`의 `paperFor`). 054 — 저장 실패도 토스트가 되어 임시 결과 화면(`unsaved`)이 없다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { dayOf, isDayWritable, shiftWeek, weekOf, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
-import type { DiaryEntry } from "../diary/types";
 import type { MonologueBranch, ProgressStage } from "../inference/types";
-import { describeStage } from "./failure-text";
+import { toastKindFor, type ToastKind } from "./failure-toast";
 
 /**
  * 목록의 한 줄 (data-model.md §1).
@@ -104,13 +103,10 @@ export type AppScreen =
    */
   | { kind: "writing"; stage?: ProgressStage; branch?: MonologueBranch; line?: string }
   /**
-   * 글은 나왔으나 저장하지 못했다 (051 FR-024a, 006 FR-012a·b).
-   *
-   * **그 글을 싣는다** — 30초를 들인 글이고 다시 생성해도 같은 글이 나오지 않으므로 읽을 기회를
-   * 빼앗지 않는다. 쓰기 **뒤**의 결과라 012 X1(확인 대화상자에 본문 금지)과 다른 자리다.
-   * 「제자리 쓰기」 조각이 올 때까지의 임시 자리다.
+   * 쓰기 **시작 전**에 막혔다 (029 FR-014 — 캐릭터가 준비되지 않음). 054 이후 쓰는 중의 실패는 이 갈래가
+   * 아니라 토스트다(`afterGeneration`). 이 화면의 「설정에서 작성자 준비하기」가 지금 설정으로 가는 유일한
+   * 길이라 그대로 둔다(054 FR-024).
    */
-  | { kind: "unsaved"; entry: DiaryEntry }
   | { kind: "failed"; message: string };
 
 /**
@@ -386,7 +382,8 @@ export function confirmOverwrite(): AppScreen {
 }
 
 /**
- * 쓰기 전에 막힌다 (007 FR-006).
+ * 쓰기 전에 막힌다 (007 FR-006). **054 — 이제 이 갈래는 쓰기 시작 전의 `no-ready-character`에서만 만들어진다**
+ * (쓰는 중의 실패는 토스트 — `afterGeneration`).
  *
  * **`failed`에 `text`가 없는 것은 그대로다**(006 FR-030) — 여기 실리는 것은 사용자가
  * 할 수 있는 말이지 생성된 글이 아니다.
@@ -400,7 +397,7 @@ export function toFailed(message: string): AppScreen {
 }
 
 /**
- * 생성이 끝난 뒤 어디로 가는가 (051 data-model §3).
+ * 생성이 끝난 뒤 어디로 가는가 (051 data-model §3, 054 data-model §1).
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **성공이면 홈의 그 날이다**(FR-024). 목록을 다시 읽는 것은 기기 통로라 이 순수 함수 밖(화면)이
@@ -409,21 +406,17 @@ export function toFailed(message: string): AppScreen {
  * **「덮어썼다」를 화면으로 보내지 않는다** — `2d` 대화상자에서 이미 확인받았다(051 Clarifications).
  * 파이프라인의 `overwrote`(002 FR-023a)는 그대로 남는다.
  *
- * **`storage` 실패만 `failed`가 아니다**(006 FR-012a). 6단계(저장)에 도달했다는 것 자체가
- * 5단계(생성) 성공을 뜻하므로 보여줄 글이 있다 — `unsaved`가 그 글을 싣고 「남지 않는다」고
- * 말한다(FR-012b, SC-008c).
+ * **054 — 실패는 전부 토스트다.** 결과 화면이 없다: 실패도, **글이 나왔으나 저장하지 못한 경우도**(clarify
+ * Q3 — 글은 버려지고 「일기를 저장하지 못했어요.」 한 줄) 쓰기 전 상태의 홈으로 돌아가 갈래 하나만 알린다.
+ * **토스트에는 글도 이유도 담을 자리가 없다** — `toast`는 갈래 이름 하나뿐이다(SC-005, 원칙 III·I).
+ * 갈래를 고르는 표는 `failure-toast.ts`가 정본이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export type AfterGeneration =
-  { kind: "home" } | { kind: "unsaved"; entry: DiaryEntry } | { kind: "failed"; message: string };
+export type AfterGeneration = { kind: "home" } | { kind: "toast"; toast: ToastKind };
 
 export function afterGeneration(result: PipelineResult): AfterGeneration {
   if (result.ok) return { kind: "home" };
 
-  // 저장 실패인데 글이 있다 — 보여주되 남지 않는다고 말한다. 쓰기가 실패했으므로 기존 일기는
-  // 그대로 남아 있다(002 FR-023b).
-  if (result.entry !== undefined) return { kind: "unsaved", entry: result.entry };
-
-  // **거부된 글은 여기 오지 않는다** — 애초에 결과에 없다(002 FR-012).
-  return { kind: "failed", message: describeStage(result.stage, result.reason) };
+  // **거부된 글은 여기 오지 않는다** — 애초에 결과에 없다(002 FR-012). 저장 실패의 글도 화면에 싣지 않는다.
+  return { kind: "toast", toast: toastKindFor(result) };
 }

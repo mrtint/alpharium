@@ -154,10 +154,10 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
   });
 
   /**
-   * ★ 006 FR-012a·b — **저장 실패는 `failed`가 아니다.** 30초를 들여 만든 글이고 다시 생성해도 같은
-   * 글이 나오지 않는다. 051 — 그 글만 임시 결과 화면(`unsaved`)에 남는다(FR-024a).
+   * ★ 054 — **저장 실패도 토스트다**(clarify Q3). 006 FR-012a·b가 보여주던 임시 결과 화면(`unsaved`)은
+   * 없어졌고, 글은 버려진다 — 화면 상태 어디에도 글을 담을 자리가 없다.
    */
-  it("★ ST3 — 저장에 실패해도 글이 있으면 unsaved다 — 그 글을 싣는다", () => {
+  it("★ ST3 — 저장에 실패하면 글이 있어도 toast(save)다 — 글을 싣지 않는다", () => {
     const result: PipelineResult = {
       ok: false,
       stage: "storage",
@@ -166,38 +166,27 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
     };
     const screen = afterGeneration(result);
 
-    expect(screen.kind).toBe("unsaved");
-    if (screen.kind === "unsaved") expect(screen.entry.text).toBe("오늘 주인은 조용했다");
+    expect(screen).toEqual({ kind: "toast", toast: "save" });
+    expect(JSON.stringify(screen)).not.toContain("오늘 주인은 조용했다");
   });
 
   it.each([
-    ["day-not-closed", /이르다/],
-    ["signals", /가져오지 못했다/],
-    ["request-build", /캐릭터/],
-    ["model-not-ready", /준비/],
-    ["generation", /다시 시도/],
-  ] as const)("%s 실패는 failed이고 할 수 있는 것을 말한다", (stage, expected) => {
+    ["day-not-closed", "retry"],
+    ["signals", "retry"],
+    ["request-build", "prepare-character"],
+    ["model-not-ready", "prepare-character"],
+    ["generation", "retry"],
+  ] as const)("%s 실패는 toast이고 갈래는 표대로다", (stage, toast) => {
     const result: PipelineResult = { ok: false, stage, reason: "무언가" };
-    const screen = afterGeneration(result);
 
-    expect(screen.kind).toBe("failed");
-    if (screen.kind === "failed") expect(screen.message).toMatch(expected);
+    expect(afterGeneration(result)).toEqual({ kind: "toast", toast });
   });
 
   /**
-   * ★ 006 FR-028 — **생성 실패 안에서도 「할 수 있는 것」이 갈린다.**
-   *
-   * ─────────────────────────────────────────────────────────────────────────
-   * 파이프라인은 `generation` 단계의 `reason`에 `kind: detail` 꼴로 무엇이 일어났는지
-   * 담아 온다. 그것을 통째로 버리고 한 문장으로 뭉개면 **「캐릭터를 받아야 하는가」와
-   * 「다시 눌러 보면 되는가」를 구분할 수 없다** — 003이 `ModelReadiness`를 넷으로 가른
-   * 이유가 「사용자에게 무엇을 하라고 말할 수 있어야 한다」였고 같은 판단이다.
-   *
-   * **모델의 실패 양상은 여전히 새지 않는다**(원칙 III). 005의 `describeFailure()`가
-   * 이미 그 방어를 하고 있으므로 **그것을 재사용한다** — 새로 쓰면 방어가 둘로 갈라진다.
-   * ─────────────────────────────────────────────────────────────────────────
+   * ★ 054 — **생성 실패 안에서도 「다시 되는가 / 준비해야 하는가」가 갈린다**(SC-006). 갈래 표는
+   * `failure-toast.ts`가 정본이고 여기서는 결과가 그것으로 이어지는지만 본다.
    */
-  it("★ 모델이 없으면 「준비해야 한다」로, 거부되면 「다시 시도」로 갈린다", () => {
+  it("★ 모델이 없으면 prepare-character로, 거부되면 retry로 갈린다", () => {
     const notFound = afterGeneration({
       ok: false,
       stage: "generation",
@@ -209,52 +198,14 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
       reason: "rejected: echo",
     });
 
-    expect(notFound.kind).toBe("failed");
-    expect(rejected.kind).toBe("failed");
-    if (notFound.kind === "failed" && rejected.kind === "failed") {
-      // 뭉개면 사용자가 무엇을 해야 할지 모른다.
-      expect(notFound.message).not.toBe(rejected.message);
-      expect(notFound.message).toMatch(/준비/);
-      expect(rejected.message).toMatch(/다시 시도/);
-    }
-  });
-
-  it("★ 시간 초과와 끊김이 각자의 말을 가진다", () => {
-    const timedOut = afterGeneration({
-      ok: false,
-      stage: "generation",
-      reason: "timed-out",
-    });
-    const interrupted = afterGeneration({
-      ok: false,
-      stage: "generation",
-      reason: "interrupted",
-    });
-
-    if (timedOut.kind === "failed" && interrupted.kind === "failed") {
-      expect(timedOut.message).not.toBe(interrupted.message);
-      // 앱을 떠나서 멈춘 것은 사용자가 아는 편이 낫다.
-      expect(interrupted.message).toMatch(/떠나|벗어/);
-    }
-  });
-
-  it("★ 갈래를 알 수 없는 reason도 무너지지 않는다", () => {
-    const unknown = afterGeneration({
-      ok: false,
-      stage: "generation",
-      reason: "무언가 새로운 것",
-    });
-
-    expect(unknown.kind).toBe("failed");
-    if (unknown.kind === "failed") expect(unknown.message.length).toBeGreaterThan(0);
+    expect(notFound).toEqual({ kind: "toast", toast: "prepare-character" });
+    expect(rejected).toEqual({ kind: "toast", toast: "retry" });
   });
 
   /**
-   * ★ S2 — **거부된 글이 어떤 화면 상태에도 담기지 않는다**(SC-014).
-   *
-   * 접어서 보여주는 것도 화면에 오르는 것이다.
+   * ★ S2 — **거부된 글이 어떤 화면 상태에도 담기지 않는다**(SC-014). 토스트는 갈래 이름뿐이다.
    */
-  it("★ failed에 글을 담을 자리가 없다", () => {
+  it("★ toast에 글·이유를 담을 자리가 없다", () => {
     const result: PipelineResult = {
       ok: false,
       stage: "generation",
@@ -262,31 +213,26 @@ describe("생성 결과 → 화면 (data-model.md §5)", () => {
     };
     const screen = afterGeneration(result);
 
-    expect(screen.kind).toBe("failed");
+    expect(Object.keys(screen).sort()).toEqual(["kind", "toast"]);
     expect(JSON.stringify(screen)).not.toContain("rejected");
     expect(JSON.stringify(screen)).not.toContain("echo");
   });
 
-  /**
-   * ★ 원칙 III — **모델의 실패 양상이 문구에 새지 않는다.**
-   */
-  it("★ 실패 문구에 모델 정보가 없다", () => {
-    const leaking = ["되뱉", "메아리", "echo", "empty", "unfinished", "토큰", "모델", "GGUF"];
+  it("★ 쓰는 중의 실패가 failed·unsaved 화면을 만들지 않는다 (054 — 전체 화면이 없다)", () => {
     const stages = [
       "day-not-closed",
+      "already-running",
       "signals",
       "request-build",
       "model-not-ready",
+      "vision",
       "generation",
       "storage",
     ] as const;
 
     for (const stage of stages) {
       const screen = afterGeneration({ ok: false, stage, reason: "rejected: echo" });
-      const rendered = JSON.stringify(screen);
-      for (const word of leaking) {
-        expect(rendered).not.toContain(word);
-      }
+      expect(screen.kind).toBe("toast");
     }
   });
 
@@ -786,18 +732,22 @@ describe("015 — writing의 stage·line", () => {
  *
  * 계약: specs/015-writing-monologue/tasks.md T019, FR-009·FR-011
  *
- * `afterGeneration()`이 만드는 `written`·`failed` 갈래에는 애초에 `stage`·
+ * `afterGeneration()`이 만드는 `toast`·`home` 갈래(그리고 `toFailed`의 `failed`)에는 애초에 `stage`·
  * `line` 자리가 없다 — 타입 선언을 직접 읽어 그 사실을 못박는다(007 이후
  * 관례). 자리가 없으면 새는 경로 자체가 존재하지 않는다.
  */
-describe("015 US2 — stage·line이 unsaved·failed로 새지 않는다", () => {
+describe("015 US2 — stage·line이 failed·toast로 새지 않는다", () => {
   const rawSource = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
   const source = rawSource.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
 
-  it("unsaved 갈래에 stage·line이 없다 (051 — written을 대신한다)", () => {
-    const match = source.match(/\{\s*kind:\s*"unsaved"[^}]*\}/);
+  it("unsaved 갈래가 없다 (054 — 저장 실패도 토스트다)", () => {
+    expect(source).not.toMatch(/kind:\s*"unsaved"/);
+  });
+
+  it("★ writing 선언이 그대로다 — items·entry·text·body를 담을 자리가 없다 (054, 원칙 I S1)", () => {
+    const match = source.match(/\{\s*kind:\s*"writing"[^}]*\}/);
     expect(match).not.toBeNull();
-    expect(match?.[0]).not.toMatch(/\bstage\b|\bline\b/);
+    expect(match?.[0]).not.toMatch(/\bitems\b|\bentry\b|\btext\b|\bbody\b/);
   });
 
   it("failed 갈래에 stage·line이 없다", () => {

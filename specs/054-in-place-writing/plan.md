@@ -17,7 +17,7 @@
    (`failure-toast.ts`)와, 「스와이프로 닫는가」 문턱 판정. 문구·갈래는 사람이 못 박은 상수이며 코드가 이유 문자열을 재서 정하지 않는다.
 2. **부품(`src/ui`)** — `WritingPaper`(혼잣말 페이드 교체 + 안내 줄), `StopBar`, `FailureToast`(슬라이드·쓸어 닫기·3초), 공용 `FadeLayer`(049에서
    `DiaryListScreen` 안에 있던 것을 꺼낸다).
-3. **조립(`DiaryHomeScreen`)** — `writing`이 `items`를 들고, 끝나면 `list`로 돌아가며, 토스트 상태와 혼잣말 간격 타이머를 화면 로컬로 든다.
+3. **조립(`DiaryHomeScreen`)** — 쓰기를 시작할 때 들고 있던 목록 요약을 화면 로컬 state로 들고(`AppScreen`의 `writing`은 그대로), 끝나면 `list`로 돌아가며, 토스트 상태와 혼잣말 간격 타이머를 화면 로컬로 든다.
 
 생성 파이프라인·프롬프트·판정 갈래·저장 시점은 무변경이다(FR-023). 새 의존성·새 네이티브 모듈 없음.
 
@@ -83,7 +83,7 @@ specs/054-in-place-writing/
 ```text
 src/
 ├── app/
-│   ├── state.ts            # AppScreen: writing이 items를 든다 · unsaved 제거 · afterGeneration → 토스트 갈래
+│   ├── state.ts            # unsaved 제거 · afterGeneration → 토스트 갈래 (writing·toWriting은 무변경 — S1 방어 유지)
 │   └── failure-toast.ts    # (신규) PipelineResult → ToastKind, ToastKind → 문구, 쓸어 닫기 문턱 판정
 ├── ui/
 │   ├── DiaryHomeScreen.tsx # writing 전체 화면 제거 · 토스트 상태 · 혼잣말 간격 타이머 · 그만두기
@@ -104,7 +104,7 @@ __tests__/
 
 ## 핵심 설계 결정 (상세는 research.md)
 
-- **R1**: `writing`이 `items`를 든다. 쓰는 중에도 헤더·스트립을 그려야 하므로 050의 `confirm-overwrite`와 같은 방식이다.
+- **R1**: `AppScreen`의 `writing`은 **무변경**(`toWriting()`은 여전히 인자가 없고 `{ kind: "writing" }`이 전부 — 007 S1·009 I7·012 C3가 잠근 원칙 I 방어). 쓰는 중에도 헤더·스트립을 그려야 하므로 화면이 생성 시작 때 들고 있던 `items`를 별도 state(`writingItems`)로 든다.
 - **R2**: 쓰는 중 레이아웃은 쓴 날 여부와 무관하게 **안 쓴 날 레이아웃(헤더 안에 스트립)** 을 쓴다 — 접힘·지면 스크롤·「다시 쓰기」 바가 필요 없다. 052 접힘·끝 판정 상태는 쓰는 중 들어갈 때 비운다.
 - **R3**: 그만두기·실패 복귀는 `toList(await refresh())` — 그만두기 우선(007 FR-014a)과 「끝난 뒤 저장이 이미 됐을 수 있는」 경계에서 화면이 저장된 사실과 어긋나지 않게 다시 읽는다.
 - **R4**: 혼잣말은 4초 간격 + **단계 전환 즉시** 교체(문안이 지금 하는 일에 근거, 039). 페이드는 049의 겹마다-마운트 방식.

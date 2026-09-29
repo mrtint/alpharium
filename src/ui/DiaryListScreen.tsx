@@ -69,10 +69,20 @@ import { foldAfterScroll } from "../app/reading-scroll";
 import type { PaperState } from "../app/written-day";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
+import { FadeLayer } from "./components/FadeLayer";
 import { DayPicker } from "./DayPicker";
-import { DATE_JUMP, dayStateText, monthText, weekdayLong, WRITTEN_DAY_TEXT } from "./home-text";
-import { COLORS, MATERIAL_GRID, READING_SCROLL, WRITTEN_DAY } from "./theme/tokens";
+import {
+  DATE_JUMP,
+  dayStateText,
+  monthText,
+  weekdayLong,
+  WRITING_TEXT,
+  WRITTEN_DAY_TEXT,
+} from "./home-text";
+import { COLORS, MATERIAL_GRID, READING_SCROLL, TOAST, WRITING, WRITTEN_DAY } from "./theme/tokens";
 import { MaterialGrid, type PreviewState } from "./MaterialGrid";
+import { FailureToast } from "./FailureToast";
+import { WritingPaper } from "./WritingPaper";
 import { WrittenDayPaper } from "./WrittenDayPaper";
 
 export type { PreviewState };
@@ -125,6 +135,22 @@ export type DiaryListScreenProps = {
    * 부르는 쪽이 오늘인가(`cellFor`)와 문구(`writtenAtText`)를 정해 넘긴다.
    */
   writtenAt?: string;
+  /**
+   * 쓰는 중 (054, 보드 `2b`). 있으면 쓴 날 여부와 무관하게 헤더(잠긴 스트립) + 혼잣말 지면 + 검정 「그만두기」 바를
+   * 그린다. **문자열만 받는다** — 진행률·시간·글 조각이 들어올 자리가 없다(원칙 IV, FR-007). 이 모드에서는
+   * `onSelectDay`·`onSwipe`·`onPressDate`를 넘겨도 쓰지 않는다 — 잠금은 부르는 쪽의 깜빡임에 기대지 않고 이
+   * 화면이 스스로 건다(FR-003·004).
+   */
+  writing?: { line?: string; name?: string };
+  /** 「그만두기」 (054) */
+  onStop?: () => void;
+  /**
+   * 실패 토스트 (054, 보드 `2i`). **문자열만 받는다** — 화면은 갈래·실패 종류·이유를 모른다(FR-016). `id`는
+   * 토스트마다 다르다(같은 문구가 연달아 나도 새로 뜬다).
+   */
+  toast?: { id: number; text: string };
+  /** 토스트가 스스로 사라졌거나 쓸어 닫혔다 */
+  onDismissToast?: () => void;
 };
 
 export function DiaryListScreen({
@@ -142,6 +168,10 @@ export function DiaryListScreen({
   onPressDate,
   paper,
   writtenAt,
+  writing,
+  onStop,
+  toast,
+  onDismissToast,
 }: DiaryListScreenProps) {
   const written = paper !== undefined && paper.kind !== "unwritten" ? paper : undefined;
   // 쓴 날의 지면이 끝에 닿았는가 — **그 날의 값만** 믿는다. 날을 바꾸면 새 지면이 잴 때까지 바는 내려가 있다.
@@ -154,12 +184,51 @@ export function DiaryListScreen({
     undefined,
   );
   const stripHeight = useRef(0);
-  const collapsed = write !== undefined && foldState?.day === write.day && foldState.collapsed;
+  const collapsed =
+    writing === undefined &&
+    write !== undefined &&
+    foldState?.day === write.day &&
+    foldState.collapsed;
   const motion = useFoldMotion(collapsed);
+
+  // 054 R2 — 쓰는 중에는 052의 접힘·끝 판정을 비운다. 그만두고 쓴 날로 돌아오면 지면이 새로 마운트돼 스크롤이 0인데
+  // 접힘이 남아 있으면 스트립이 접힌 채 시작한다. 렌더 중 상태 갱신(effect 안 동기 `setState`는 lint가 막는다).
+  if (writing !== undefined && (foldState !== undefined || end !== undefined)) {
+    setFoldState(undefined);
+    setEnd(undefined);
+  }
+
+  // 054 — 토스트는 하단 바의 **잰 높이** + 12 위다(보드 `2i`). 바가 내려가 있어도(`RewriteBar`) `onLayout` 높이는
+  // 그대로라 바가 올라와도 겹치지 않는다. 재기 전에는 최소 높이다.
+  const [barHeight, setBarHeight] = useState<number>(WRITTEN_DAY.bar.minHeight);
+  const toastNode =
+    toast !== undefined ? (
+      <FailureToast
+        bottom={barHeight + TOAST.gapAboveBar}
+        key={toast.id}
+        onDismiss={() => onDismissToast?.()}
+        text={toast.text}
+      />
+    ) : null;
 
   // 스트립과 안내 캡션 — 안 쓴 날에는 헤더 안에 그대로, 쓴 날에는 지면 위에 덮는 판 안에 놓인다(052).
   const stripBlock =
-    write !== undefined ? (
+    write === undefined ? null : writing !== undefined ? (
+      // 054 — 쓰는 중: 스트립만 35%로 흐리고 누름·스와이프·접근성에서 뺀다(보드 `2b`). 안내 캡션(옮김·거부
+      // 권한)은 정직한 정보라 흐리게 하지 않는다(research R2).
+      <>
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          pointerEvents="none"
+          style={{ opacity: WRITING.stripLockedOpacity }}
+          testID="home-strip-lock"
+        >
+          <DayPicker canSwipeNext={false} cells={cells ?? []} onSelect={() => {}} />
+        </View>
+        <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+      </>
+    ) : (
       <>
         <DayPicker
           canSwipeNext={canSwipeNext}
@@ -169,20 +238,39 @@ export function DiaryListScreen({
         />
         <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
       </>
-    ) : null;
+    );
 
   const header =
     write !== undefined ? (
       <Header
         cells={cells ?? []}
         items={items}
-        onPressDate={onPressDate}
+        onPressDate={writing !== undefined ? undefined : onPressDate}
         paper={paper}
         stripBlock={stripBlock}
-        stripOverlaid={written !== undefined}
+        stripOverlaid={writing === undefined && written !== undefined}
+        writing={writing !== undefined}
         write={write}
       />
     ) : null;
+
+  // 054 — 쓰는 중. 쓴 날 분기·안 쓴 날 분기보다 먼저다(다시 쓰는 날도 같은 그림 — 보드 `2b`).
+  if (write !== undefined && writing !== undefined) {
+    return (
+      <View style={ROOT}>
+        <View style={FIXED_HEADER}>{header}</View>
+        <WritingPaper line={writing.line} name={writing.name} />
+        <View
+          onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+          style={REWRITE_SLOT}
+          testID="stop-bar"
+        >
+          <StopBar onStop={onStop} />
+        </View>
+        {toastNode}
+      </View>
+    );
+  }
 
   // 051 수정 — 쓴 날은 헤더·스트립이 고정되고 지면만 스크롤된다(보드 `2c`). 바는 지면 위에 겹쳐
   // 아래에서 올라온다 — 지면 본문 아래 여백(104)이 바를 비켜 마지막 문단을 가리지 않는다.
@@ -221,7 +309,13 @@ export function DiaryListScreen({
             {stripBlock}
           </StripOverlay>
         </View>
-        <RewriteBar onWrite={onWrite} visible={atEnd} writtenAt={writtenAt} />
+        <RewriteBar
+          onLayoutHeight={setBarHeight}
+          onWrite={onWrite}
+          visible={atEnd}
+          writtenAt={writtenAt}
+        />
+        {toastNode}
       </View>
     );
   }
@@ -240,9 +334,14 @@ export function DiaryListScreen({
             <MaterialGrid onRequestPhoto={onRequestPhoto} preview={preview} />
           </View>
         </ScrollView>
-        <View style={REWRITE_SLOT}>
+        <View
+          onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
+          style={REWRITE_SLOT}
+          testID="write-bar"
+        >
           <WriteBar onWrite={onWrite} />
         </View>
+        {toastNode}
       </View>
     );
   }
@@ -270,6 +369,7 @@ function Header({
   paper,
   stripOverlaid,
   stripBlock,
+  writing,
 }: {
   write: WritePrompt;
   items: readonly DiaryListItem[];
@@ -280,14 +380,17 @@ function Header({
   stripOverlaid: boolean;
   /** 주간 스트립 + 안내 캡션. 안 쓴 날은 여기서 그리고, 쓴 날은 부모가 지면 위 판에 그린다 */
   stripBlock: ReactNode;
+  /** 054 — 쓰는 중이면 상태 줄이 「쓰는 중」(빨강)이고 제목은 보이지 않는다 */
+  writing: boolean;
 }) {
   // 오늘인가는 스트립 칸이 이미 안다 — 화면은 지금 시각을 읽지 않는다.
   const isToday = cells.some((cell) => cell.selected && cell.isToday);
   const item = items.find((entry) => entry.day === write.day);
   // 051 — 제목은 읽은 일기에서, 읽는 중이면 목록 요약에서(같은 값) — 읽기가 끝날 때 상태 줄 모양이
   // 튀지 않게. 목록은 읽혔는데 고른 순간 깨졌으면(`unreadable`) 상태 줄도 「읽을 수 없어요」다.
-  const title =
-    paper?.kind === "readable"
+  const title = writing
+    ? undefined
+    : paper?.kind === "readable"
       ? paper.entry.title
       : paper?.kind === "loading"
         ? item?.title
@@ -328,7 +431,11 @@ function Header({
             날짜 영역이 넓어져 UI를 해친다(저장소 소유자),
             누름 없음). 제목 없음·읽을 수 없음은 지금의 상태 줄 그대로다(FR-007).
           */}
-          {title !== undefined ? (
+          {writing ? (
+            <AppText style={WRITING_STATE} testID="home-day-state">
+              {WRITING_TEXT.kicker}
+            </AppText>
+          ) : title !== undefined ? (
             <AppText
               ellipsizeMode="tail"
               numberOfLines={1}
@@ -520,6 +627,7 @@ function DayHeading({ day, part }: { day: DayDate; part: DayPart }) {
     <View>
       {shown.previous !== null && (
         <FadeLayer
+          durationMs={CROSSFADE_MS}
           from={1}
           key={`out-${shown.previous}-${shown.day}`}
           style={{ position: "absolute", left: 0, right: 0, bottom: 0 }}
@@ -530,40 +638,15 @@ function DayHeading({ day, part }: { day: DayDate; part: DayPart }) {
         </FadeLayer>
       )}
       {/* 앱을 처음 열 때(이전 날 없음)는 나타나는 효과 없이 바로 보인다 */}
-      <FadeLayer from={shown.previous === null ? 1 : 0} key={`in-${shown.day}`} to={1}>
+      <FadeLayer
+        durationMs={CROSSFADE_MS}
+        from={shown.previous === null ? 1 : 0}
+        key={`in-${shown.day}`}
+        to={1}
+      >
         <DayFace day={shown.day} part={part} testIDs />
       </FadeLayer>
     </View>
-  );
-}
-
-/** 마운트할 때의 투명도 `from`에서 `to`로 `CROSSFADE_MS` 동안 옮긴다. 다시 쓰려면 `key`를 바꾼다. */
-function FadeLayer({
-  from,
-  to,
-  style,
-  testID,
-  children,
-}: {
-  from: number;
-  to: number;
-  style?: ViewStyle;
-  testID?: string;
-  children: ReactNode;
-}) {
-  const opacity = useSharedValue(from);
-  useEffect(() => {
-    if (from !== to) opacity.value = withTiming(to, { duration: CROSSFADE_MS });
-    // 마운트 때 한 번만 — 값이 바뀌면 부르는 쪽이 `key`로 새로 마운트한다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
-  return (
-    // 헤더 날짜는 누를 수 없다(H7) — 겹친 두 겹이 터치를 가로채지 않게 한다.
-    <Animated.View pointerEvents="none" style={[style, fade]} testID={testID}>
-      {children}
-    </Animated.View>
   );
 }
 
@@ -656,6 +739,24 @@ function WriteBar({ onWrite }: { onWrite: () => void }) {
 }
 
 /**
+ * 쓰는 중의 하단 바 — 검정 전폭 「그만두기」 (054 보드 `2b`, FR-008).
+ *
+ * 배경 `text`(검정), 글자 `bg`. 누르면 바로 멈추고 쓰기 전 상태로 돌아간다 — 그 판단은 부르는 쪽이 한다.
+ */
+function StopBar({ onStop }: { onStop?: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() => onStop?.()}
+      style={[BAR, { backgroundColor: COLORS.text }]}
+      testID="stop-button"
+    >
+      <AppText style={[BAR_TEXT, { color: COLORS.bg }]}>{WRITING_TEXT.stop}</AppText>
+    </Pressable>
+  );
+}
+
+/**
  * 쓴 날의 하단 바 — 연회색 「다시 쓰기」 (051 보드 `2c`·`2g`, FR-017~FR-020).
  *
  * **testID는 안 쓴 날과 같은 `write-button`이다**(research R9) — 같은 쓰기 동작(`onWrite`)이다. 누르면
@@ -670,10 +771,13 @@ function RewriteBar({
   onWrite,
   writtenAt,
   visible,
+  onLayoutHeight,
 }: {
   onWrite: () => void;
   writtenAt?: string;
   visible: boolean;
+  /** 잰 높이를 위로 알린다 — 토스트가 바의 자리 기준으로 놓인다 (054) */
+  onLayoutHeight?: (height: number) => void;
 }) {
   const shown = useSharedValue(visible ? 1 : 0);
   const height = useSharedValue<number>(WRITTEN_DAY.bar.minHeight);
@@ -693,6 +797,7 @@ function RewriteBar({
       importantForAccessibility={visible ? "auto" : "no-hide-descendants"}
       onLayout={(e) => {
         height.value = e.nativeEvent.layout.height;
+        onLayoutHeight?.(e.nativeEvent.layout.height);
       }}
       pointerEvents={visible ? "auto" : "none"}
       style={[REWRITE_SLOT, slide]}
@@ -747,6 +852,9 @@ const WEEKDAY: TextStyle = { fontSize: 16, fontWeight: "700", color: COLORS.text
 
 /** 상태 줄 13, 보조색 (보드 `1d` — 요일 아래) */
 const DAY_STATE: TextStyle = { fontSize: 13, color: COLORS.textMuted };
+
+/** 쓰는 중 상태 줄 13/600, accent (보드 `2b`) */
+const WRITING_STATE: TextStyle = { fontSize: 13, fontWeight: "600", color: COLORS.accent };
 
 /** 큰 숫자와 세로 묶음 — 아래끝 맞춤, 간격 12 (보드 `1d` ②) */
 const DATE_ROW: ViewStyle = { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 4 };

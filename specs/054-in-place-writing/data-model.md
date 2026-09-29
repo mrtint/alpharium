@@ -6,7 +6,7 @@
 
 | 갈래 | 변경 |
 | --- | --- |
-| `writing` | `{ kind: "writing"; items: DiaryListItem[]; stage?: ProgressStage; branch?: MonologueBranch; line?: string }` — **`items`가 더해졌다**(R1). 타입이 진행률·시간을 막는 성질은 그대로(`stage`·`branch`는 문자열 리터럴, `line`은 `string`뿐) |
+| `writing` | **무변경** — `{ kind: "writing"; stage?: ProgressStage; branch?: MonologueBranch; line?: string }`. 타입이 진행률·시간을 막는 성질과 `toWriting()`의 무인자·`["kind"]` 방어(S1·I7·C3)를 그대로 둔다(research R1). 헤더·스트립에 쓸 목록 요약은 화면 로컬 state `writingItems`가 든다 |
 | `unsaved` | **제거**(R8, clarify Q3) |
 | `failed` | **유지** — 쓰기 시작 전 `no-ready-character` 막힘 전용(FR-024). `afterGeneration`은 더 이상 만들지 않는다 |
 | 나머지 | 무변경 |
@@ -14,7 +14,7 @@
 ### 전이
 
 ```
-list ── 일기 쓰기(053 판정 통과 · 050 확인 통과) ──▶ writing{items}
+list ── 일기 쓰기(053 판정 통과 · 050 확인 통과) ──▶ writing            (화면이 writingItems를 든다)
 writing ── 그만두기 · 뒤로 가기 ──▶ list (refresh, 토스트 없음)
 writing ── 성공 ──▶ list (refresh, 그 날의 쓴 날 — 연출 없음)
 writing ── 실패(retry · prepare-* · plain) ──▶ list (refresh) + toast
@@ -22,9 +22,9 @@ writing ── 저장 실패(글 있음) ──▶ list (refresh) + toast(save) 
 list ── 일기 쓰기(no-ready-character) ──▶ failed   ※ 이 조각 밖, 무변경
 ```
 
-- `toWriting(items)`는 **저장 상태로 분기하지 않는다**(S1 정신 유지) — `items`는 목록 요약이며 본문이 아니다.
+- `toWriting()`은 여전히 인자를 받지 않는다(S1) — `writingItems`는 화면 state이지 `AppScreen`의 일부가 아니다.
 - `afterGeneration(result)`: `{ kind: "home" } | { kind: "toast"; toast: ToastKind }`. `result.ok`면 `home`. 실패면 `toastKindFor(result)`.
-- `startWriting(prompt, items)`·`confirmOverwrite()`는 `items`를 함께 받아 넘긴다(050의 `confirm-overwrite`가 이미 `items`를 들고 있으므로 새 정보 아님).
+- `startWriting(prompt, items)`·`confirmOverwrite()`는 **무변경**이다.
 
 ## 2. 토스트 (`src/app/failure-toast.ts`)
 

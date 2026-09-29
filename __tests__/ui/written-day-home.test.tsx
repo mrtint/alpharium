@@ -574,7 +574,7 @@ describe("051 GEN — 쓰기 뒤 (US3)", () => {
     expect(screen.getByTestId("written-body")).toHaveTextContent("새로 쓴 본문");
   });
 
-  it("★ GEN3·GEN4 — 저장 실패면 결과 화면에 경고·제목·본문, 「← 일기」로 홈(쓰기 전 상태)", async () => {
+  it("★ GEN3·GEN4 — 저장 실패면 결과 화면 없이 쓰기 전 상태의 홈 + 토스트, 나온 글은 버려진다 (054)", async () => {
     const store = memoryStore();
     await store.save(entryFor(PAST));
     const pipeline = writingPipeline(store, (entry) => ({
@@ -590,35 +590,40 @@ describe("051 GEN — 쓰기 뒤 (US3)", () => {
     await userEvent.press(screen.getByTestId("write-button"));
     await userEvent.press(await screen.findByTestId("overwrite-confirm"));
 
-    const unsaved = await screen.findByTestId("unsaved-screen");
-    expect(unsaved).toHaveTextContent(/저장하지 못했어요\. 앱을 나가면 이 일기는 사라져요\./);
-    expect(unsaved).toHaveTextContent(/새 제목/);
-    expect(unsaved).toHaveTextContent(/새로 쓴 본문/);
-    expect(screen.queryByTestId("photo-carousel")).toBeNull();
-
-    await userEvent.press(screen.getByText("← 일기"));
+    expect(await screen.findByTestId("failure-toast")).toHaveTextContent(
+      "일기를 저장하지 못했어요.",
+    );
+    // 054 — 임시 결과 화면이 없다. 글(새 제목·본문)은 어디에도 보이지 않고 기존 일기가 그대로다.
+    expect(screen.queryByTestId("unsaved-screen")).toBeNull();
+    expect(screen.queryByText("← 일기")).toBeNull();
+    expect(JSON.stringify(screen.toJSON())).not.toContain("새로 쓴 본문");
     expect(await screen.findByTestId("written-body")).toHaveTextContent(/첫 문단이다/);
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("27");
   });
 
-  it("GEN4 — 결과·실패 화면에서 안드로이드 뒤로 가기도 홈으로", async () => {
+  it("GEN4 — 쓰기 시작 전 막힘 화면에서 안드로이드 뒤로 가기도 홈으로 (054 — 임시 결과 화면은 없다)", async () => {
     const handlers: Parameters<typeof BackHandler.addEventListener>[1][] = [];
     jest.spyOn(BackHandler, "addEventListener").mockImplementation((_e, handler) => {
       handlers.push(handler);
       return { remove: () => {} } as ReturnType<typeof BackHandler.addEventListener>;
     });
     const store = memoryStore();
-    const pipeline = {
-      run: async () => ({ ok: false, stage: "generation", reason: "rejected: echo" }),
-    } as unknown as Pipeline;
-    await renderHome(store, { pipeline });
+    await renderWithPortal(
+      <DiaryHomeScreen
+        now={() => NOW}
+        pipeline={{ run: async () => ({ ok: true }) } as unknown as Pipeline}
+        resolution={resolved}
+        resolve={() => ({ kind: "no-ready-character" })}
+        store={store}
+      />,
+    );
     await userEvent.press(await screen.findByTestId("write-button"));
     await screen.findByText("← 일기");
 
     await act(async () => {
       handlers.at(-1)?.({} as never);
     });
-    expect(await screen.findByTestId("signal-row")).toBeTruthy();
+    expect(await screen.findByTestId("material-paper")).toBeTruthy();
   });
 
   it("GEN5 — 앱 어디에도 「← 목록」이 없다 (소스)", () => {

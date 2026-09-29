@@ -115,19 +115,51 @@ export const PRESS = {
 } as const;
 
 /**
- * 038 — 일기 첫 표시 타자기 연출의 글자당 노출 간격.
+ * 054 — 쓰는 중 홈(보드 `2b`)의 치수·간격. 색은 넣지 않는다 — `COLORS`만 쓴다(C5).
  *
- * **사람이 정한 값이다**(012 `USER_VISIBLE_SIGNAL_AXES`, 021
- * `PERMISSION_REQUIREMENTS`, 033 `PRESS`가 선례) — 코드가 재서 정하지 않는다
- * (원칙 V). "기다림"보다 "드러남"에 가깝게 빠른 편을 기본으로 한다(FR-010).
- *
- * **화면에 노출하지 않는다**(원칙 IV) — `TypewriterText`가 이 값을 입력
- * prop으로만 받고, 렌더 출력 어디에도 이 숫자가 텍스트로 나타나지 않는다.
- * 실기기에서 느리거나 빠르게 느껴지면 이 한 줄만 고친다.
+ * **사람이 정한 값이다**(012 `USER_VISIBLE_SIGNAL_AXES` 선례) — 코드가 재서 정하지 않는다(원칙 V).
+ * `rotateMs`(혼잣말 교체 간격)·`fadeMs`는 표시 상수이지 측정이 아니다. 실기기에서 어색하면 이 한 곳만 고친다.
  */
-export const REVEAL = {
-  /** 글자당 노출 간격 (ms) */
-  charMs: 15,
+export const WRITING = {
+  /** 잠근 스트립의 불투명도 — 잠긴 것이 보이게 (보드 `2b`) */
+  stripLockedOpacity: 0.35,
+  /** 지면 안쪽 여백 — 아래 120은 하단 바가 덮는 자리 */
+  paperPadding: { top: 32, horizontal: 20, bottom: 120 },
+  gap: 14,
+  /** 머리말 11/600, 대문자 간격 .1em */
+  kicker: { fontSize: 11, fontWeight: "600", letterSpacing: 1.1 },
+  /** 혼잣말 24/700, 줄높이 1.35, 자간 −.01em */
+  monologue: { fontSize: 24, fontWeight: "700", lineHeight: 32.4, letterSpacing: -0.24 },
+  /** 「{이름}이 쓰고 있어요…」 13, 줄높이 1.5 */
+  byline: { fontSize: 13, lineHeight: 19.5 },
+  /** 혼잣말 교체 간격·페이드 (ms) */
+  rotateMs: 4000,
+  fadeMs: 250,
+} as const;
+
+/**
+ * 054 — 실패 토스트(보드 `2i`)의 치수·수명. 쓸어 닫기 문턱은 여기가 아니라 `src/app/failure-toast.ts`의
+ * `TOAST_SWIPE`가 정본이다(순수 판정이 화면 토큰을 import하지 않게).
+ */
+export const TOAST = {
+  /** 좌우 여백 */
+  inset: 12,
+  /** 하단 바 위 간격 */
+  gapAboveBar: 12,
+  minHeight: 48,
+  padding: { vertical: 12, horizontal: 16 },
+  fontSize: 14,
+  fontWeight: "600",
+  lineHeight: 19.6,
+  /** 왼쪽 accent 사각형 6×6, 글과의 간격 10 */
+  marker: 6,
+  markerGap: 10,
+  /** 그림자 `0 8px 24px rgba(0,0,0,.18)` */
+  shadow: { offsetY: 8, blur: 24, opacity: 0.18 },
+  /** 화면에 머무는 시간·페이드 아웃·슬라이드 인 (ms) */
+  showMs: 3000,
+  fadeOutMs: 200,
+  enterMs: 240,
 } as const;
 
 /**

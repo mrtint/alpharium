@@ -5,7 +5,7 @@
 
 ## 화면
 
-- **W1**: `toWriting(items)`는 저장 상태로 분기하는 인자를 받지 않는다 — `items`는 목록 요약(`DiaryListItem[]`)이며 소스 검사로 `entry`·`text`·본문 필드가 없음을 잠근다(S1 정신, 원칙 I).
+- **W1**: `toWriting()`은 여전히 인자를 받지 않고 `Object.keys(toWriting())`가 `["kind"]`뿐이다(007 S1·009 I7·012 C3 — 원칙 I 방어를 그대로 둔다). `AppScreen`의 `writing` 선언에 `items`·`entry`·`text`·`body`가 없음을 소스 검사로 잠근다. 쓰는 중 헤더에 쓰는 목록 요약은 화면 로컬 state다.
 - **W2 (KO 원문)**: 헤더 상태 줄 `쓰는 중` / 머리말 `쓰는 중` / 안내 줄 `{이름}{이/가} 쓰고 있어요. 진행률은 세지 않아요.` / 하단 바 `그만두기`.
   조사는 035 `particleFor(name)`(받침 있으면 「이」, 없으면 「가」). 이름은 화면이 정하는 작성자 이름(`nameOf`).
 - **W3 (헤더)**: `writing` 모드에서 헤더 상태 줄은 13/600 `COLORS.accent`의 「쓰는 중」이다. 제목·`dayStateText`는 보이지 않는다. 월 라벨·큰 숫자·요일은 그대로(고른 날).
