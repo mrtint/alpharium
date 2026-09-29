@@ -239,14 +239,14 @@ export const WRITTEN_DAY = {
 /**
  * 읽기 스크롤(052) — 스트립을 접는 움직임과 ▾ (보드 `5b`).
  *
- * 접힘: 높이 `.24s ease-out`, 불투명도 `.18s`. ▾: 폭 28, 14/700, 아래 2, 불투명도 `.24s`.
+ * 접힘: 높이 `.24s ease-out`, 불투명도 `.18s`. (보드의 ▾는 두지 않는다 — 저장소 소유자 지시)
  * 높이는 보드의 `max-height: 180`(CSS 상한)이 아니라 **잰 자연 높이**를 옮긴다(research R1).
  */
 export const READING_SCROLL = {
   foldMs: 240,
   fadeMs: 180,
-  caretMs: 240,
-  caret: { width: 28, fontSize: 14, fontWeight: "700", paddingBottom: 2 },
+  /** 접히는 영역을 재기 전 첫 프레임의 **짐작값**(기본 글꼴에서 잰 값). 재는 즉시 실측으로 바뀐다 */
+  stripEstimate: 108,
 } as const;
 
 /**

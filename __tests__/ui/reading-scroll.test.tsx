@@ -5,7 +5,10 @@
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * reanimated 목의 `useAnimatedStyle`은 `{}`를 준다 — 높이·불투명도 값은 검사하지 못한다(C9). 접힘의
- * 증거는 `pointerEvents`, 접근성 숨김, ▾의 노출, 누름 갈래다. 움직임은 실기기 녹화로 본다.
+ * 증거는 `pointerEvents`, 접근성 숨김, 누름 갈래다. 움직임은 실기기 녹화로 본다.
+ *
+ * **접힘 표시(▾)도, 접힌 날짜 줄을 눌러 펴는 길도 없다**(저장소 소유자). 펼침의 유일한 길은 지면을 맨 위까지
+ * 올리는 것이다.
  *
  * 날짜 기준: 지금 = 2026-09-28(월) 16:15. 쓴 날은 9/27·9/26.
  * ⚠️ RNTL 14의 `render`·`fireEvent`는 Promise다 — await한다.
@@ -26,7 +29,7 @@ import {
 import type { PaperState } from "../../src/app/written-day";
 import type { DiaryEntry } from "../../src/diary/types";
 import { DiaryListScreen, type DiaryListScreenProps } from "../../src/ui/DiaryListScreen";
-import { DATE_JUMP, READING_SCROLL as TEXT } from "../../src/ui/home-text";
+import { DATE_JUMP } from "../../src/ui/home-text";
 import { READING_SCROLL as TOKENS } from "../../src/ui/theme/tokens";
 import { reachPaperEnd, scrollPaper } from "./paper-end";
 
@@ -75,7 +78,7 @@ const folded = () =>
   "none";
 
 describe("052 RS — 접힘 배선", () => {
-  it("RS1 — 아래로 20px 스크롤하면 스트립이 접히고(누름·접근성에서 빠짐) ▾가 드러난다", async () => {
+  it("RS1 — 아래로 20px 스크롤하면 스트립이 접힌다(누름·접근성에서 빠짐)", async () => {
     await render(<DiaryListScreen {...props(DAY)} />);
     expect(screen.getByTestId("day-strip")).toBeTruthy();
 
@@ -83,12 +86,10 @@ describe("052 RS — 접힘 배선", () => {
 
     expect(folded()).toBe(true);
     expect(screen.queryByTestId("day-strip")).toBeNull();
-    expect(screen.getByTestId("home-fold-caret")).toBeTruthy();
   });
 
-  it("RS2 — 펼친 상태에서는 ▾가 접근성에서 숨고 스트립이 보인다", async () => {
+  it("RS2 — 펼친 상태에서는 스트립이 보인다", async () => {
     await render(<DiaryListScreen {...props(DAY)} />);
-    expect(screen.queryByTestId("home-fold-caret")).toBeNull();
     expect(screen.getByTestId("day-strip")).toBeTruthy();
     expect(folded()).toBe(false);
   });
@@ -109,7 +110,7 @@ describe("052 RS — 접힘 배선", () => {
     expect(folded()).toBe(true);
   });
 
-  it("RS4 — 안내 캡션(거부 권한·캐릭터 옮김)이 접힘 감쌈 안에 있어 함께 접힌다(FR-017)", async () => {
+  it("RS4 — 안내 캡션(거부 권한·캐릭터 옮김)이 접힘 판 안에 있어 함께 접힌다(FR-017)", async () => {
     await render(
       <DiaryListScreen
         {...props(DAY, { deniedNotices: ["사진 권한이 없어요."], movedNotice: "옮겼어요." })}
@@ -137,11 +138,9 @@ describe("052 RS — 접힘 배선", () => {
     expect(screen.getByTestId("day-strip")).toBeTruthy();
   });
 
-  it("RS6 — 안 쓴 날에는 접힘 감쌈·▾·날짜 줄 누름이 없다(FR-016)", async () => {
+  it("RS6 — 안 쓴 날에는 접힘 판이 없고 신호 줄이 그대로다(FR-016)", async () => {
     await render(<DiaryListScreen {...props(DAY, { paper: { kind: "unwritten" } })} />);
     expect(screen.queryByTestId("home-strip-fold", { includeHiddenElements: true })).toBeNull();
-    expect(screen.queryByTestId("home-fold-caret", { includeHiddenElements: true })).toBeNull();
-    expect(screen.queryByTestId("home-date-row", { includeHiddenElements: true })).toBeNull();
     expect(screen.getByTestId("signal-row")).toBeTruthy();
   });
 
@@ -159,6 +158,50 @@ describe("052 RS — 접힘 배선", () => {
     expect(folded()).toBe(true);
 
     expect(sizes()).toEqual(before);
+  });
+
+  it("RS8 — 접혀도 큰 숫자의 정렬이 바뀌지 않는다: 위쪽 정렬 래퍼가 없다", async () => {
+    await render(<DiaryListScreen {...props(DAY)} />);
+    await scrollPaper(20);
+    expect(folded()).toBe(true);
+
+    // 큰 숫자에서 위로 올라가며(날짜 줄 안) 만나는 스타일에 위쪽 정렬이 없어야 한다.
+    let node = screen.getByTestId("home-day-number").parent;
+    const aligned: unknown[] = [];
+    for (let depth = 0; node && depth < 6; depth += 1) {
+      const flat = Object.assign({}, ...[node.props?.style].flat(Infinity).filter(Boolean));
+      if (flat.alignSelf !== undefined) aligned.push(flat.alignSelf);
+      node = node.parent;
+    }
+    expect(aligned).not.toContain("flex-start");
+  });
+
+  it("RS9 — 제목은 한 줄 말줄임이다(줄이 바뀌면 날짜 영역이 넓어져 UI를 해친다)", async () => {
+    await render(<DiaryListScreen {...props(DAY)} />);
+    const title = screen.getByTestId("home-day-title");
+    expect(title.props.numberOfLines).toBe(1);
+    expect(title.props.ellipsizeMode).toBe("tail");
+  });
+
+  it("RS10 — 지면 프레임은 접힘으로 움직이지 않는다: 스트립은 프레임 위에 덮는 판이고 프레임에 marginTop이 없다", async () => {
+    await render(<DiaryListScreen {...props(DAY)} />);
+    const fold = screen.getByTestId("home-strip-fold", { includeHiddenElements: true });
+    const flat = (n: { props: { style?: unknown } }) =>
+      Object.assign({}, ...[n.props.style].flat(Infinity).filter(Boolean));
+    expect(flat(fold)).toMatchObject({ position: "absolute", top: 0 });
+
+    const paper = screen.getByTestId("written-paper");
+    expect(flat(paper).marginTop).toBeUndefined();
+    expect(screen.getByTestId("home-fold-spacer", { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it("RS11 — 소스: 지면 프레임에 marginTop이 없고 접힘은 판·스페이서가 같은 움직임 값을 본다", () => {
+    const paperSrc = code("src/ui/WrittenDayPaper.tsx");
+    expect(paperSrc).not.toMatch(/marginTop/);
+    const screenSrc = code("src/ui/DiaryListScreen.tsx");
+    expect(screenSrc).toMatch(/useFoldMotion\(/);
+    expect(screenSrc).toMatch(/<FoldSpacer motion=\{motion\}/);
+    expect(screenSrc).toMatch(/<StripOverlay/);
   });
 });
 
@@ -183,22 +226,26 @@ describe("052 PAPER — 지면 알림", () => {
     expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
   });
 
+  it("PAPER3 — 짧은 본문이면 처음부터 바가 보인다(051 회귀)", async () => {
+    await render(<DiaryListScreen {...props(DAY)} />);
+    await reachPaperEnd();
+    expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
+  });
+
   it("PAPER4 — 위치가 그대로인 스크롤 사건은 접힘도 끝 판정도 다시 돌리지 않는다(레이아웃 변화)", async () => {
     await render(<DiaryListScreen {...props(DAY)} />);
     await scrollPaper(1200);
     expect(folded()).toBe(true);
     expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
 
-    // 접힌 날짜 줄을 눌러 펼치면 지면 높이가 바뀌고 안드로이드가 같은 위치로 사건을 다시 낸다.
-    await fireEvent.press(screen.getByTestId("home-date-row"));
-    expect(folded()).toBe(false);
+    // 지면 높이가 바뀌면 안드로이드가 같은 위치로 사건을 다시 낸다.
     const paper = screen.getByTestId("written-paper");
     await fireEvent(paper, "layout", {
       nativeEvent: { layout: { x: 0, y: 0, width: 400, height: 600 } },
     });
     await fireEvent.scroll(paper, { nativeEvent: { contentOffset: { y: 1200 } } });
 
-    expect(folded()).toBe(false); // 되접히지 않는다
+    expect(folded()).toBe(true); // 펴지지 않는다
     expect(screen.getByTestId("rewrite-bar")).toBeTruthy(); // 바가 내려가지 않는다
   });
 
@@ -216,77 +263,53 @@ describe("052 PAPER — 지면 알림", () => {
 
     expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
   });
-
-  it("PAPER3 — 짧은 본문이면 처음부터 바가 보인다(051 회귀)", async () => {
-    await render(<DiaryListScreen {...props(DAY)} />);
-    await reachPaperEnd();
-    expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
-  });
 });
 
-describe("052 TAP — 날짜 줄 누름", () => {
-  it("TAP1 — 접힌 날짜 줄을 누르면 펼치고 달력은 열지 않는다", async () => {
+describe("052 TAP — 날짜 누름 (접힘 표시·펴는 누름 없음)", () => {
+  it("TAP1 — 접힌 동안에도 큰 숫자 누름은 050 그대로 달력이다", async () => {
     const p = props(DAY);
     await render(<DiaryListScreen {...p} />);
     await scrollPaper(20);
+    expect(folded()).toBe(true);
 
-    await fireEvent.press(screen.getByTestId("home-date-row"));
+    await fireEvent.press(screen.getByTestId("home-date-button"));
 
-    expect(folded()).toBe(false);
-    expect(p.onPressDate).not.toHaveBeenCalled();
-  });
-
-  it("TAP2 — 접힌 동안 큰 숫자·요일 누름은 없다(안쪽이 바깥을 가로채지 않게)", async () => {
-    await render(<DiaryListScreen {...props(DAY)} />);
-    await scrollPaper(20);
-    expect(screen.queryByTestId("home-date-button")).toBeNull();
-    expect(screen.queryByTestId("home-date-weekday")).toBeNull();
+    expect(p.onPressDate).toHaveBeenCalledTimes(1);
+    expect(folded()).toBe(true); // 누름으로는 펴지지 않는다
   });
 
   it.each([
     ["쓴 날", readable(DAY)],
     ["안 쓴 날", { kind: "unwritten" } as PaperState],
-  ])("TAP3 — 펼친 %s의 큰 숫자 누름은 달력이다", async (_name, paper) => {
+  ])("TAP2 — 펼친 %s의 큰 숫자 누름은 달력이다(050 CAL1)", async (_name, paper) => {
     const p = props(DAY, { paper });
     await render(<DiaryListScreen {...p} />);
-    expect(screen.queryByTestId("home-date-row")).toBeNull();
+    expect(screen.getByTestId("home-date-button").props.accessibilityLabel).toBe(DATE_JUMP.title);
     await fireEvent.press(screen.getByTestId("home-date-button"));
     expect(p.onPressDate).toHaveBeenCalledTimes(1);
   });
 
-  it("TAP4 — 접힌 날짜 줄은 버튼(펼치기 라벨), 펼친 큰 숫자는 「날짜로 이동」(FR-013)", async () => {
+  it("TAP3 — 접힘 표시(▾)와 접힌 날짜 줄 누름은 어느 상태에도 없다", async () => {
     await render(<DiaryListScreen {...props(DAY)} />);
-    expect(screen.getByTestId("home-date-button").props.accessibilityLabel).toBe(DATE_JUMP.title);
-
-    await scrollPaper(20);
-    const row = screen.getByTestId("home-date-row");
-    expect(row.props.accessibilityRole).toBe("button");
-    expect(row.props.accessibilityLabel).toBe(TEXT.expandLabel);
+    for (const y of [0, 20]) {
+      if (y > 0) await scrollPaper(y);
+      expect(screen.queryByTestId("home-fold-caret", { includeHiddenElements: true })).toBeNull();
+      expect(screen.queryByTestId("home-date-row", { includeHiddenElements: true })).toBeNull();
+    }
   });
 
-  it("TAP5 — 끝에서 바가 보이는 채 접힘 → 날짜 줄 누름: 바는 그대로다", async () => {
-    await render(<DiaryListScreen {...props(DAY)} />);
-    await scrollPaper(1200);
-    expect(folded()).toBe(true);
-    expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
-
-    await fireEvent.press(screen.getByTestId("home-date-row"));
-
-    expect(folded()).toBe(false);
-    expect(screen.getByTestId("rewrite-bar")).toBeTruthy();
+  it("TAP4 — 소스: 접힘 표시·펼치기 문구·날짜 줄 누름이 코드에 없다", () => {
+    for (const file of ["src/ui/DiaryListScreen.tsx", "src/ui/home-text.ts"]) {
+      const src = code(file);
+      expect(src).not.toContain("▾");
+      expect(src).not.toMatch(/home-fold-caret|home-date-row|expandLabel|FoldCaret/);
+    }
   });
 });
 
-describe("052 SRC — 문구·토큰", () => {
-  it("SRC1 — ▾ 글자는 home-text.ts에만 있고 화면 소스에 리터럴이 없다", () => {
-    expect(TEXT.caret).toBe("▾");
-    expect(code("src/ui/DiaryListScreen.tsx")).not.toContain("▾");
-  });
-
-  it("SRC2 — 시간·치수 토큰이 보드 `5b` 값이다", () => {
+describe("052 SRC — 토큰", () => {
+  it("SRC2 — 접힘 시간 토큰이 보드 `5b` 값이다", () => {
     expect(TOKENS.foldMs).toBe(240);
     expect(TOKENS.fadeMs).toBe(180);
-    expect(TOKENS.caretMs).toBe(240);
-    expect(TOKENS.caret).toEqual({ width: 28, fontSize: 14, fontWeight: "700", paddingBottom: 2 });
   });
 });

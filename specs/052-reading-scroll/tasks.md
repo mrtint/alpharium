@@ -182,3 +182,19 @@ T017 reading-scroll.yml  ∥  T018 run-device-tests.mjs
 
 - [X] T023 기기에서 접힌 날짜 줄 누름을 10회 반복해(접힘 → `home-date-row` 누름 → 다시 접힘) 달력(`calendar-dialog`)이 열린 횟수를 세고 결과를 `specs/052-reading-scroll/quickstart.md` §5에 적는다 per SC-004 (partial)
 - [X] T024 기기에서 D8(접힌 채 달력으로 다른 쓴 날을 고르면 펼친 상태로 시작)과 D11(접힌 동안 스트립 자리를 좌우로 끌어도 주가 넘어가지 않음)을 확인하고 `specs/052-reading-scroll/quickstart.md` §5의 「D8·D11 따로 보지 않았다」를 관측 결과로 바꾼다 per FR-014·FR-015 (partial)
+
+## Phase 8: 실기기 검토 수정 (2026-09-29, 저장소 소유자 지적 셋)
+
+- [X] T025 접힐 때 큰 날짜 숫자가 위로 튀는 것을 고친다 — 숫자용 `DateJump`의 누를 수 없는 갈래에서 `alignSelf: "flex-start"`를 뺀다(`src/ui/DiaryListScreen.tsx`, FR-022, RS8, research R9)
+- [X] T026 제목을 한 줄 말줄임으로 바꾼다(`numberOfLines 1`) — 051 HOME3 테스트도 이 값으로 고친다(FR-024, RS9)
+- [X] T027 접힘 경계에서 접힘·펼침이 되풀이되는 것을 고친다 — 지면 프레임을 고정하고 스트립을 덮는 판(`StripOverlay`) + 내용 맨 위 스페이서(`FoldSpacer`)로 옮긴다. `WrittenDayPaper`에 `topSpacer`·`endLock`을 더하고 `marginTop`을 뺀다(FR-023, RS10·RS11, PAPER6, research R8)
+- [X] T028 기기에서 접힘 경계를 느리게 끄는 동작으로 전환 횟수(SC-006)와 큰 숫자의 위치를 재고 결과를 quickstart §5에 적는다
+
+## Phase 9: ▾·접힌 날짜 줄 누름 제거 (2026-09-29, 저장소 소유자 지시)
+
+요청에 없던 접힘 표시(▾)와 접힌 날짜 줄을 눌러 펴는 동작을 뺀다 — 스크롤이 맨 위에 닿을 때만 펼친다. 아래 FR-004·FR-008·FR-011은 폐기, FR-012·FR-013·SC-004는 고쳤다(spec Clarifications 「실기기 검토」 4번).
+
+- [X] T029 `FoldCaret`·`READING_SCROLL`(home-text)·`caret` 토큰·날짜 줄 `Pressable`(`home-date-row`)·`onExpand`·`endLock`을 코드에서 없애고 큰 숫자·요일 누름을 접힘과 무관하게 050 그대로 둔다(`src/ui/DiaryListScreen.tsx`·`WrittenDayPaper.tsx`·`home-text.ts`·`theme/tokens.ts`)
+- [X] T030 `__tests__/ui/reading-scroll.test.tsx`를 새 계약(TAP1~TAP4, PAPER6 폐기)에 맞게 다시 쓰고, Maestro `reading-scroll.yml`을 「접힌 채 큰 숫자 → 달력 → 끝 → 맨 위로 올려 펼침」으로 고친다
+- [X] T031 spec·contracts·plan·research·data-model·quickstart·AGENTS.md를 같은 결정으로 고친다
+

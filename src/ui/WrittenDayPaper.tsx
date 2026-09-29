@@ -24,7 +24,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ScrollView, useWindowDimensions, View, type ViewStyle } from "react-native";
 
 import { reachedEnd, type PaperState } from "../app/written-day";
@@ -42,6 +42,11 @@ export type WrittenDayPaperProps = {
    * 스크롤 사건마다의 표본 (052 — 스트립 접힘 판정의 입력). **이 지면은 판정하지 않는다** — 값만
    * 알리고, 접을지는 부르는 쪽이 `foldAfterScroll()`로 정한다.
    */
+  /**
+   * 스크롤 내용의 맨 위에 놓는 자리 (052) — 스트립이 접히고 펴질 때 지면 **내용**만 위아래로 움직이게
+   * 하는 스페이서. 지면(스크롤 뷰)의 프레임은 움직이지 않는다(아래 「프레임을 고정한다」).
+   */
+  topSpacer?: ReactNode;
   onScrollSample?: (sample: {
     y: number;
     previousY: number;
@@ -52,7 +57,12 @@ export type WrittenDayPaperProps = {
 
 const { body, carouselPadding } = WRITTEN_DAY;
 
-export function WrittenDayPaper({ paper, onReachEndChange, onScrollSample }: WrittenDayPaperProps) {
+export function WrittenDayPaper({
+  paper,
+  onReachEndChange,
+  onScrollSample,
+  topSpacer,
+}: WrittenDayPaperProps) {
   // 슬라이드 폭 = 지면 폭 − 좌우 여백. 지면을 잰 값을 쓰고, 재기 전 첫 프레임만 창 폭으로 둔다 —
   // 지면은 화면 끝까지 닿으므로(아래 PAPER) 둘은 같아야 한다. 캐러셀이 늦게 튀어나오지 않게.
   const window = useWindowDimensions();
@@ -112,6 +122,7 @@ export function WrittenDayPaper({ paper, onReachEndChange, onScrollSample }: Wri
       style={PAPER}
       testID="written-paper"
     >
+      {topSpacer}
       {paper.kind === "readable" && (
         <>
           {width > 0 && hasPhotos && (
@@ -161,10 +172,16 @@ function paragraphsOf(text: string): string[] {
 
 /* ═══════════════════════════════ 치수 (보드 `2c`) ═══════════════════════════════ */
 
-/** 스트립 아래 20, 화면 좌우 끝까지, 남은 높이 전부 (보드 `2c` — `flex:1; margin-top:20px`) */
+/**
+ * 화면 좌우 끝까지, 남은 높이 전부 (보드 `2c`).
+ *
+ * ★ **프레임을 고정한다**(052, 실기기 실측). 이 스크롤 뷰에는 `marginTop`이 없고 스트립 접힘이 프레임의
+ * 위치·높이를 바꾸지 않는다 — 스트립과 그 아래 20의 간격은 부모가 이 위에 **덮는 판**이고, 접힘은 판의
+ * 높이와 내용 맨 위 스페이서(`topSpacer`)가 함께 움직여 만든다. 프레임이 손가락 아래에서 움직이면 안드로이드가
+ * 그것을 드래그로 읽어 지면이 밀리고 접힘·펼침이 되풀이됐다(한 번의 느린 끌기에 7번 뒤집힘).
+ */
 const PAPER: ViewStyle = {
   flex: 1,
-  marginTop: WRITTEN_DAY.paperGap,
   backgroundColor: WRITTEN_DAY.paper,
 };
 
