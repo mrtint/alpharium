@@ -176,15 +176,20 @@ describe("048 createAppPipeline — previewDay", () => {
       day: "2026-09-23",
       photos: { kind: "known", count: 2 },
       places: { kind: "known", count: 1 },
+      photoAccess: "ok",
     });
   });
 
   it("PV2 — 신호를 만들지 못하면(null) 둘 다 모름", async () => {
-    const result = createAppPipeline(resolved("dev"), { loadSignals: async () => null });
+    const result = createAppPipeline(resolved("dev"), {
+      loadSignals: async () => null,
+      photoPermission: async () => "granted",
+    });
     if (!result.ok) throw new Error("조립 실패");
 
     expect(await result.previewDay("2026-09-23")).toEqual({
       day: "2026-09-23",
+      photoAccess: "ok",
       photos: { kind: "unknown" },
       places: { kind: "unknown" },
     });
@@ -195,14 +200,43 @@ describe("048 createAppPipeline — previewDay", () => {
       loadSignals: async () => {
         throw new Error("권한 없음");
       },
+      photoPermission: async () => "granted",
     });
     if (!result.ok) throw new Error("조립 실패");
 
     await expect(result.previewDay("2026-09-23")).resolves.toEqual({
       day: "2026-09-23",
+      photoAccess: "ok",
       photos: { kind: "unknown" },
       places: { kind: "unknown" },
     });
+  });
+
+  it("PRM2 — photoPermission을 세 갈래로 옮겨 싣는다 (조회가 던지면 ok)", async () => {
+    const cases = [
+      ["granted", "ok"],
+      ["limited", "ok"],
+      ["denied", "denied"],
+      ["undetermined", "denied"],
+      ["blocked", "blocked"],
+    ] as const;
+    for (const [state, expected] of cases) {
+      const result = createAppPipeline(resolved("dev"), {
+        loadSignals: async () => null,
+        photoPermission: async () => state,
+      });
+      if (!result.ok) throw new Error("조립 실패");
+      expect((await result.previewDay("2026-09-23")).photoAccess).toBe(expected);
+    }
+
+    const throwing = createAppPipeline(resolved("dev"), {
+      loadSignals: async () => null,
+      photoPermission: async () => {
+        throw new Error("조회 실패");
+      },
+    });
+    if (!throwing.ok) throw new Error("조립 실패");
+    expect((await throwing.previewDay("2026-09-23")).photoAccess).toBe("ok");
   });
 
   it("PV5 — 데스크톱(local) 조립에도 있다 — 옵셔널이 아니다", () => {

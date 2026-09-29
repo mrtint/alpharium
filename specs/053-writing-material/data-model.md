@@ -33,7 +33,7 @@ DayPreview = { day; photos: CountHint; places: CountHint; photoAccess: PhotoAcce
 PhotoAccess = "ok" | "denied" | "blocked"
 ```
 
-- `CountHint`는 세 갈래 그대로(`known`·`none`·`unknown`).
+- `CountHint`는 세 갈래 그대로(`known`·`none`·`unknown`). **단 사진이 관측된 0장(`none`)이면 장소는 `none`이다**(실기기 관측 — 수집은 이때도 장소를 `unknown`으로 주지만 장소 수가 사진 좌표에서 나오므로 「0곳」이 관측된 사실이다. 사진이 `unknown`이면 장소도 `unknown` 그대로).
 - `photoAccess`: `granted`·`limited`·조회 실패 → `ok`, `denied`·`undetermined` → `denied`, `blocked` → `blocked`. 신호를 못 만든 경우(`null`)도 `ok`.
 - **화면이 「권한이 없어요」로 보이는 조건** = `photoAccess !== "ok"`. 이때 두 칸 모두 그렇게 보인다(R2).
 - 「0 안내 한 줄」 조건 = `photos`와 `places`가 모두 `zero`(FR-013·014).

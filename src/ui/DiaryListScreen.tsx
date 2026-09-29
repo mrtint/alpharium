@@ -60,8 +60,6 @@ import Animated, {
 
 import {
   dayParts,
-  type CountHint,
-  type DayPreview,
   type DiaryListItem,
   type StripCell,
   type SwipeDirection,
@@ -73,11 +71,11 @@ import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { DayPicker } from "./DayPicker";
 import { DATE_JUMP, dayStateText, monthText, weekdayLong, WRITTEN_DAY_TEXT } from "./home-text";
-import { COLORS, READING_SCROLL, WRITTEN_DAY } from "./theme/tokens";
+import { COLORS, MATERIAL_GRID, READING_SCROLL, WRITTEN_DAY } from "./theme/tokens";
+import { MaterialGrid, type PreviewState } from "./MaterialGrid";
 import { WrittenDayPaper } from "./WrittenDayPaper";
 
-/** 신호 줄의 사진·다닌 자리 칸 — 읽는 중이거나, 다 읽었거나 */
-export type PreviewState = { kind: "loading"; day: DayDate } | DayPreview;
+export type { PreviewState };
 
 export type DiaryListScreenProps = {
   items: DiaryListItem[];
@@ -111,6 +109,8 @@ export type DiaryListScreenProps = {
    * **`DaySignals`가 아니다** — 개수로 좁혀진 값만 받는다(FR-020).
    */
   preview?: PreviewState;
+  /** 「권한이 없어요 ›」를 눌렀다 (053) — 사진 권한 요청. 어느 칸이든 같다(FR-011) */
+  onRequestPhoto?: () => void;
   /**
    * 헤더의 큰 숫자·요일을 눌렀다 (050 — 「날짜로 이동」 달력, 보드 `2j`). 무엇을 열지는 부르는 쪽이
    * 정한다. 없으면 누름 처리를 두지 않는다(049처럼).
@@ -138,6 +138,7 @@ export function DiaryListScreen({
   movedNotice,
   deniedNotices,
   preview,
+  onRequestPhoto,
   onPressDate,
   paper,
   writtenAt,
@@ -177,7 +178,6 @@ export function DiaryListScreen({
         items={items}
         onPressDate={onPressDate}
         paper={paper}
-        preview={preview}
         stripBlock={stripBlock}
         stripOverlaid={written !== undefined}
         write={write}
@@ -226,19 +226,36 @@ export function DiaryListScreen({
     );
   }
 
+  // 053 — 안 쓴 날은 보드 `1d`대로: 헤더(고정 여백) 아래에 화면 바닥까지 채우는 지면이고, 「일기 쓰기」 바는
+  // 그 위에 겹쳐 바닥에 붙는다(지면 아래 여백 120이 바를 비킨다). 큰 글꼴에서 넘치면 함께 스크롤된다.
+  if (write !== undefined) {
+    return (
+      <View style={ROOT}>
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1 }}
+          style={{ flex: 1, backgroundColor: COLORS.bg }}
+        >
+          <View style={FIXED_HEADER}>{header}</View>
+          <View style={MATERIAL_PAPER} testID="material-paper">
+            <MaterialGrid onRequestPhoto={onRequestPhoto} preview={preview} />
+          </View>
+        </ScrollView>
+        <View style={REWRITE_SLOT}>
+          <WriteBar onWrite={onWrite} />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={ROOT}>
       <ScrollView
         contentContainerStyle={SCROLL_CONTENT}
         style={{ flex: 1, backgroundColor: COLORS.bg }}
       >
-        {header}
-
         {/* 헤더가 없는 옛 호출에서도 거부 안내는 보인다(021) */}
-        {write === undefined && <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />}
+        <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
       </ScrollView>
-
-      {write !== undefined && <WriteBar onWrite={onWrite} />}
     </View>
   );
 }
@@ -249,7 +266,6 @@ function Header({
   write,
   items,
   cells,
-  preview,
   onPressDate,
   paper,
   stripOverlaid,
@@ -258,7 +274,6 @@ function Header({
   write: WritePrompt;
   items: readonly DiaryListItem[];
   cells: readonly StripCell[];
-  preview?: PreviewState;
   onPressDate?: () => void;
   paper?: PaperState;
   /** 052 — 쓴 날이면 스트립을 부모가 지면 위 판에 그린다. 안 쓴 날은 여기서 그대로 그린다 */
@@ -332,9 +347,6 @@ function Header({
 
       {/* ③ 주간 스트립 — 안 쓴 날은 여기, 쓴 날은 지면 위 판(052, 안내 캡션과 함께 접힌다) */}
       {stripOverlaid ? null : stripBlock}
-
-      {/* 051 — 쓴 날엔 신호 줄 대신 지면이다(보드 `2c`). 신호 줄 개편은 「쓸 재료」 몫 */}
-      {(paper === undefined || paper.kind === "unwritten") && <SignalRow preview={preview} />}
     </View>
   );
 }
@@ -620,86 +632,6 @@ function Notices({
   );
 }
 
-/* ═══════════════════════════════ 신호 줄 ═══════════════════════════════ */
-
-/**
- * 「지금 쓰면 볼 것」 세 칸 (048 US3, FR-016~018).
- *
- * **「없음」과 「모름」은 다른 글자다**(원칙 V) — 0으로 채우지 않는다. 미리보기가 아직 오지
- * 않았으면 「…」, 통로가 없으면 「모름」.
- */
-function SignalRow({ preview }: { preview?: PreviewState }) {
-  const count = (pick: (p: DayPreview) => CountHint): string => {
-    if (preview === undefined) return "모름";
-    if (!("photos" in preview)) return "…";
-    return countText(pick(preview));
-  };
-
-  // 049 — 오늘은 언제든 쓸 수 있어 이 칸은 늘 「지금」이다(FR-018c). 칸 자체는 「쓸 재료」 조각이
-  // 신호 줄을 다시 짤 때까지 남긴다(C7).
-  const windowText = "지금";
-
-  return (
-    <View style={SIGNAL_ROW} testID="signal-row">
-      <SignalCell label="사진" testID="signal-photos" value={count((p) => p.photos)} />
-      <SignalCell label="다닌 자리" testID="signal-places" value={count((p) => p.places)} />
-      <SignalCell emphasis label="쓸 수 있는 때" last testID="signal-window" value={windowText} />
-    </View>
-  );
-}
-
-function countText(hint: CountHint): string {
-  switch (hint.kind) {
-    case "known":
-      return String(hint.count);
-    case "none":
-      return "없음";
-    case "unknown":
-      return "모름";
-  }
-}
-
-function SignalCell({
-  label,
-  value,
-  testID,
-  emphasis,
-  last,
-}: {
-  label: string;
-  value: string;
-  testID: string;
-  emphasis?: boolean;
-  last?: boolean;
-}) {
-  return (
-    <View
-      style={[
-        { flex: last ? 1.1 : 1, gap: 2, paddingVertical: 12 },
-        last
-          ? { paddingLeft: 12 }
-          : { paddingRight: 12, borderRightWidth: 1, borderRightColor: COLORS.border },
-      ]}
-    >
-      <AppText style={SIGNAL_LABEL}>{label}</AppText>
-      {/* testID는 값에 둔다 — 라벨과 값을 한 노드로 맞추면 「사진…」처럼 섞여 읽힌다 */}
-      {/*
-        「오후 12시부터」는 좁은 셋째 칸에서 두 줄로 꺾여 신호 줄 높이를 밀어 올렸다(048 실기기
-        관측, SM-S901N). 한 줄에 두고 넘치면 글자를 줄인다 — 칸 높이가 날마다 달라지지 않게.
-      */}
-      <AppText
-        adjustsFontSizeToFit={emphasis}
-        minimumFontScale={0.6}
-        numberOfLines={emphasis ? 1 : undefined}
-        style={[SIGNAL_VALUE, emphasis ? { color: COLORS.danger, fontSize: 18 } : null]}
-        testID={testID}
-      >
-        {value}
-      </AppText>
-    </View>
-  );
-}
-
 /* ═══════════════════════════════ 하단 바 ═══════════════════════════════ */
 
 /**
@@ -846,29 +778,14 @@ const SCROLL_CONTENT: ViewStyle = {
 /** 쓴 날의 고정 헤더 — 홈 스크롤과 같은 여백 */
 const FIXED_HEADER: ViewStyle = { paddingHorizontal: 20, paddingTop: 24 };
 
-const SIGNAL_ROW = {
-  flexDirection: "row",
-  alignItems: "stretch",
-  marginTop: 16,
-  borderTopWidth: 1,
-  borderTopColor: COLORS.border,
-  borderBottomWidth: 2,
-  borderBottomColor: COLORS.text,
-} as const;
-
-const SIGNAL_LABEL = {
-  fontSize: 10,
-  letterSpacing: 1,
-  fontWeight: "600",
-  color: COLORS.textMuted,
-} as const;
-
-const SIGNAL_VALUE: TextStyle = {
-  fontSize: 22,
-  lineHeight: 26,
-  fontWeight: "800",
-  color: COLORS.text,
-  fontVariant: ["tabular-nums"],
+/** 안 쓴 날의 지면 — 화면 바닥까지 채운다. 아래 120은 하단 바가 덮는 자리 (보드 `1d`) */
+const MATERIAL_PAPER: ViewStyle = {
+  flexGrow: 1,
+  marginTop: WRITTEN_DAY.paperGap,
+  backgroundColor: WRITTEN_DAY.paper,
+  paddingTop: MATERIAL_GRID.paperPadding.top,
+  paddingHorizontal: MATERIAL_GRID.paperPadding.horizontal,
+  paddingBottom: MATERIAL_GRID.paperPadding.bottom,
 };
 
 /**

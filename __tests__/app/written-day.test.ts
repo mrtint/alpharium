@@ -107,3 +107,73 @@ describe("END — 지면 끝 판정 (reachedEnd)", () => {
     expect(reachedEnd(0, 800, 0)).toBe(false);
   });
 });
+
+/**
+ * 053 — 「지어낸 하루」는 저장하지 않고 읽을 때 저장된 신호에서 계산한다(MADE2·MADE3·MADE4).
+ */
+describe("053 MADE — paperFor의 madeUp", () => {
+  const knownPhotos = (n: number): DaySignals["photos"] => ({
+    kind: "known",
+    value: {
+      photos: Array.from({ length: n }, (_, i) => ({
+        id: `p${i}`,
+        takenAt: new Date(`2026-09-26T1${i}:00:00`),
+      })),
+      complete: true,
+    },
+  });
+
+  it("MADE2 — 재료가 있던 일기는 madeUp false", () => {
+    const withPhotos: DiaryEntry = {
+      ...entry,
+      signalsUsed: { ...signals, photos: knownPhotos(2) },
+    };
+    const paper = paperFor(DAY, [item()], { day: DAY, entry: withPhotos });
+    expect(paper).toMatchObject({ kind: "readable", madeUp: false });
+  });
+
+  it("MADE2 — 재료가 없던 일기(사진 0·장소 0)는 madeUp true", () => {
+    const paper = paperFor(DAY, [item()], { day: DAY, entry });
+    expect(paper).toMatchObject({ kind: "readable", madeUp: true });
+  });
+
+  it("MADE2 — 신호를 못 봤던 일기(권한 없음)도 madeUp true", () => {
+    const unseen: DiaryEntry = {
+      ...entry,
+      signalsUsed: {
+        ...signals,
+        photos: { kind: "unknown", reason: "사진 접근 권한이 없다" },
+        places: { kind: "unknown", reason: "사진을 보지 못해 좌표를 물을 수 없다" },
+      },
+    };
+    expect(paperFor(DAY, [item()], { day: DAY, entry: unseen })).toMatchObject({ madeUp: true });
+  });
+
+  it("MADE2 — 저장된 신호가 깨져 있어도 던지지 않고 표식을 붙이지 않는다 (읽는 것이 먼저다)", () => {
+    const broken = { ...entry, signalsUsed: {} } as unknown as DiaryEntry;
+    expect(paperFor(DAY, [item()], { day: DAY, entry: broken })).toMatchObject({
+      kind: "readable",
+      madeUp: false,
+    });
+  });
+
+  it("MADE4 — 다른 갈래에는 madeUp이 없다", () => {
+    for (const paper of [
+      paperFor(DAY, [], undefined),
+      paperFor(DAY, [item()], undefined),
+      paperFor(DAY, [item({ readable: false })], undefined),
+    ]) {
+      expect(paper).not.toHaveProperty("madeUp");
+    }
+  });
+
+  it("MADE3 — 일기 파일 형식에 표식 필드가 없다 (읽을 때 계산한다)", () => {
+    const read = (file: string) =>
+      readFileSync(join(__dirname, "../..", file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+    for (const file of ["src/diary/types.ts", "src/diary/store.ts"]) {
+      expect(read(file)).not.toMatch(/madeUp|fabricated|imagined/i);
+    }
+  });
+});

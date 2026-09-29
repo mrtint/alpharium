@@ -80,7 +80,7 @@ describe("051 NR — 알림의 날은 홈의 고른 날이다", () => {
     await render(home(store, { initialDay: DAY, onAcknowledge, onInitialDayApplied }));
 
     expect(await screen.findByTestId("home-day-title")).toHaveTextContent("조용한 하루");
-    expect(screen.getByTestId("written-body")).toHaveTextContent("조용한 하루였다.");
+    expect(screen.getByTestId("written-body")).toHaveTextContent(/조용한 하루였다./);
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("27");
     expect(screen.queryByText("← 목록")).toBeNull();
     await waitFor(() => expect(onAcknowledge).toHaveBeenCalledTimes(1));

@@ -19,12 +19,36 @@
  */
 
 import type { DayDate } from "../config/day-boundary";
+import type { PermissionState } from "../signals/port";
 import type { DaySignals } from "../signals/types";
-import type { CountHint, DayPreview } from "./state";
+import type { CountHint, DayPreview, PhotoAccess } from "./state";
 
-export function toDayPreview(day: DayDate, signals: DaySignals | null): DayPreview {
+/**
+ * OS 사진 권한 상태를 화면이 받는 세 갈래로 옮긴다 (053 PRM2).
+ *
+ * `denied`·`undetermined`는 앱이 다시 물을 수 있고, `blocked`는 설정에서만 바꿀 수 있다. `granted`·
+ * `limited`는 「권한이 없어요」가 아니다(`limited`는 셀 수 없음으로 「모름」에 남는다).
+ */
+export function photoAccessOf(state: PermissionState): PhotoAccess {
+  switch (state) {
+    case "denied":
+    case "undetermined":
+      return "denied";
+    case "blocked":
+      return "blocked";
+    case "granted":
+    case "limited":
+      return "ok";
+  }
+}
+
+export function toDayPreview(
+  day: DayDate,
+  signals: DaySignals | null,
+  photoAccess: PhotoAccess,
+): DayPreview {
   if (signals === null) {
-    return { day, photos: { kind: "unknown" }, places: { kind: "unknown" } };
+    return { day, photos: { kind: "unknown" }, places: { kind: "unknown" }, photoAccess };
   }
 
   const photos: CountHint =
@@ -32,10 +56,17 @@ export function toDayPreview(day: DayDate, signals: DaySignals | null): DayPrevi
       ? { kind: "known", count: signals.photos.value.photos.length }
       : { kind: signals.photos.kind };
 
+  // **사진이 관측된 0장이면 장소도 0곳이다**(053, 실기기 관측). 장소 수는 사진의 좌표에서 나오므로 사진이
+  // 없으면 좌표를 가진 사진도 없다 — 이것은 관측된 사실이다. 그런데 신호 수집은 사진이 `none`일 때도 장소를
+  // `unknown`(「사진을 보지 못해 좌표를 물을 수 없다」)으로 돌려주므로, 그대로 두면 사진 0장인 하루가 「장소
+  // 모름」으로 보여 보드 `2e`(0장·0곳)와 어긋난다. **사진이 `unknown`이면 이 승격을 하지 않는다** —
+  // 못 본 것은 여전히 못 본 것이다(원칙 V).
   const places: CountHint =
     signals.places.kind === "known"
       ? { kind: "known", count: signals.places.value.trace.visitCount }
-      : { kind: signals.places.kind };
+      : signals.places.kind === "unknown" && signals.photos.kind === "none"
+        ? { kind: "none" }
+        : { kind: signals.places.kind };
 
-  return { day, photos, places };
+  return { day, photos, places, photoAccess };
 }

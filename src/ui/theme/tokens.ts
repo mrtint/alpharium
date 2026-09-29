@@ -250,6 +250,33 @@ export const READING_SCROLL = {
 } as const;
 
 /**
+ * 쓸 재료(053) — 안 쓴 날 지면의 두 칸과 안내 한 줄 (보드 `1d` ④·`2l`·`2e`).
+ *
+ * 치수는 보드 마크업의 인라인 스타일을 옮긴 사람이 정한 값이다. 색은 새로 만들지 않는다 —
+ * 지면 배경은 `WRITTEN_DAY.paper`(neutral-100), 글자는 `COLORS`.
+ */
+export const MATERIAL_GRID = {
+  /** 지면 안쪽 여백 — 아래 120은 하단 바가 덮는 자리 */
+  paperPadding: { top: 20, horizontal: 20, bottom: 120 },
+  /** 지면 컬럼 간격 — 안내 한 줄의 위 간격은 이 6 + `noteMarginTop` 8 = 14 */
+  columnGap: 6,
+  noteMarginTop: 8,
+  /** 칸 안쪽 여백 세로 16, 둘째 칸은 왼쪽 16, 라벨과 값 사이 8 */
+  cellPaddingVertical: 16,
+  secondCellPaddingLeft: 16,
+  cellGap: 8,
+  /** 「권한이 없어요 ›」 누를 수 있는 영역의 최소 높이 */
+  permissionMinHeight: 44,
+  /** 숫자 48/800(줄높이 .85 = 41, 자간 −.04em), 단위 15/700, 라벨 13/600, 안내 14(줄높이 1.5 = 21) */
+  number: { fontSize: 48, lineHeight: 41, letterSpacing: -1.92 },
+  unitSize: 15,
+  labelSize: 13,
+  note: { fontSize: 14, lineHeight: 21 },
+  /** 「권한이 없어요」 16/700, 「›」 18/700, 사이 간격 6 */
+  permission: { fontSize: 16, caretSize: 18, gap: 6 },
+} as const;
+
+/**
  * WCAG 상대 명암비 — `(L1 + 0.05) / (L2 + 0.05)`.
  *
  * 순수 함수. 팔레트 값이 AA를 넘는지 **빌드 시** 검증하는 용도이지(theme-tokens.

@@ -1226,6 +1226,18 @@ function DiarySection({
    * `AppState active`에서 다시 훑는다. 정밀 판정은 pipeline이 신호에서 다시 한다.
    */
   const [photoDays, setPhotoDays] = useState<ReadonlySet<string>>(new Set());
+
+  /**
+   * 053 — 「권한이 없어요 ›」가 부르는 통로. 021의 사진 권한 요청과 OS 설정 열기를 그대로 감싼다 — 새 통로가
+   * 아니다. `expo-*`는 조립부(여기)에서만 만든다.
+   */
+  const photoAccessPort = useMemo(
+    () => ({
+      request: () => expoPhotoPort().requestPhotoPermission(),
+      openSettings: () => expoOsSettingsPort().openAppSettings(),
+    }),
+    [],
+  );
   useEffect(() => {
     let alive = true;
     async function probe() {
@@ -1357,6 +1369,8 @@ function DiarySection({
       canPrepare={(day) => selectableDays(new Date()).includes(day)}
       // 048 US3 — 신호 줄. 파이프라인과 같은 신호 통로에서 개수로 좁혀 온다.
       previewDay={wiring.ok ? wiring.previewDay : undefined}
+      // 053 — 권한 요청·설정 열기. 없으면 「권한이 없어요 ›」를 눌러도 아무 일도 없다.
+      photoAccessPort={photoAccessPort}
     />
   );
 }

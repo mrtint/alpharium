@@ -7,7 +7,7 @@
 | ID | 계약 | 위반 주입 |
 | --- | --- | --- |
 | MAT1 | `fromCountHint`: `known(3)`→`some`, `known(0)`→`zero`, `none`→`zero`, `unknown`→`unseen` | `unknown`→`zero` |
-| MAT2 | `fromSignalValue`(사진): `known`(사진 1장 이상)→`some`, `none`→`zero`, `unknown`→`unseen`. 장소: `known`(`visitCount` ≥ 1)→`some`, `none`→`zero`, `unknown`→`unseen` | `none`→`unseen` |
+| MAT2 | `fromPhotoSignal`(사진): `known`(사진 1장 이상)→`some`, `none`→`zero`, `unknown`→`unseen`. `fromPlaceSignal`(장소): `known`(`visitCount` ≥ 1)→`some`, `none`→`zero`, `unknown`→`unseen` | `none`→`unseen` |
 | MAT3 | 세 옮김 어디에도 `unknown`을 0/`none`으로 채우는 기본 분기가 없다(소스 검사, 주석 걷어냄) | `default: return "zero"` |
 
 ## DEC — 쓰기 전 판정 (`decideMaterial`)
@@ -48,6 +48,7 @@
 | --- | --- | --- |
 | PRM1 | `toDayPreview(day, signals, "denied")`는 `photoAccess: "denied"`를 싣고 `photos`·`places`는 `signals`에서 온 세 갈래 그대로다 | `photoAccess` 무시 |
 | PRM2 | `previewDay`(wiring)가 `photoPermission()`을 `granted`·`limited`→`ok`, `denied`·`undetermined`→`denied`, `blocked`→`blocked`로 옮긴다. 조회가 던지면 `ok` | `undetermined`→`ok` |
+| PRM5 | ★ 사진이 관측된 0장(`none`)이면 수집이 장소를 `unknown`으로 돌려줘도(사진을 못 봐서 좌표를 물을 수 없다는 뜻) 미리보기의 장소는 `none`이다 — 장소 수는 사진 좌표에서 나오므로 사진이 없으면 좌표도 없다(관측된 사실). **사진이 `unknown`이면 승격하지 않는다** | 사진이 unknown이어도 장소를 none으로 |
 | PRM3 | `photoAccess === "ok"`인데 사진 known·장소 unknown이면 장소 칸은 「모름」(「권한이 없어요」 아님) | 늘 권한 없음 |
 | PRM4 | 소스: 권한 여부 판정에 `reason`(한국어 문자열) 비교가 없다(`reason`·`.includes(`으로 권한을 가르지 않는다) | 문자열 비교로 |
 
