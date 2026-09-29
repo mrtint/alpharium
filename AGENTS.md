@@ -2039,6 +2039,10 @@ jest 설정이 `.ts`(순수 로직, `node` 환경)와 `.tsx`(화면, `jest-expo`
   사라진다).
 - **`--maxWorkers=50%`가 최적이다** — 75%·100%는 워커끼리 CPU를 뺏어 오히려
   느려졌다(18초→27.6초). CI는 러너가 2코어라 `--maxWorkers=2`를 따로 쓴다.
+  **★ `npm test -- --maxWorkers=2`로 넘기면 안 된다** — 스크립트의 `--maxWorkers=50%`와
+  중복돼 jest가 배열로 받아 **50워커**를 띄운다(`jest --showConfig`의 `maxWorkers: 50`).
+  2코어 CI에서 단순 스위트도 30초를 넘겨 RNTL cleanup 훅이 타임아웃으로 죽었다(052~054).
+  CI는 `npx jest --maxWorkers=2`를 직접 부른다.
 
 ### Windows에서 느린 것은 Defender다
 
