@@ -17,11 +17,14 @@
  *
  * **지면만 스크롤된다**(보드 `2c` — 헤더·스트립은 `flex:none`, 지면이 `overflow`). 그래서 이 컴포넌트가
  * 곧 스크롤 영역이고, 끝에 닿았는가(`reachedEnd`)를 부르는 쪽에 알린다 — 「다시 쓰기」 바가 그때
- * 올라온다(`2c` ④, 051 수정). 스트립 접힘은 「읽기 스크롤」 조각 몫이다(C7).
+ * 올라온다(`2c` ④, 051 수정).
+ *
+ * **052 — 스트립 접힘을 위해 스크롤 표본을 알린다**(`onScrollSample`). 접힘·펼침은 지면의 보이는
+ * 높이를 바꾸므로 그것이 끝 판정을 다시 돌리지 않게, 레이아웃은 **처음 잰 순간에만** 판정한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { ScrollView, useWindowDimensions, View, type ViewStyle } from "react-native";
 
 import { reachedEnd, type PaperState } from "../app/written-day";
@@ -35,11 +38,31 @@ export type WrittenDayPaperProps = {
   paper: Exclude<PaperState, { kind: "unwritten" }>;
   /** 지면 끝에 닿았는가가 바뀌었다 (처음 잰 순간에도 한 번 알린다) */
   onReachEndChange?: (atEnd: boolean) => void;
+  /**
+   * 스크롤 사건마다의 표본 (052 — 스트립 접힘 판정의 입력). **이 지면은 판정하지 않는다** — 값만
+   * 알리고, 접을지는 부르는 쪽이 `foldAfterScroll()`로 정한다.
+   */
+  /**
+   * 스크롤 내용의 맨 위에 놓는 자리 (052) — 스트립이 접히고 펴질 때 지면 **내용**만 위아래로 움직이게
+   * 하는 스페이서. 지면(스크롤 뷰)의 프레임은 움직이지 않는다(아래 「프레임을 고정한다」).
+   */
+  topSpacer?: ReactNode;
+  onScrollSample?: (sample: {
+    y: number;
+    previousY: number;
+    viewport: number;
+    content: number;
+  }) => void;
 };
 
 const { body, carouselPadding } = WRITTEN_DAY;
 
-export function WrittenDayPaper({ paper, onReachEndChange }: WrittenDayPaperProps) {
+export function WrittenDayPaper({
+  paper,
+  onReachEndChange,
+  onScrollSample,
+  topSpacer,
+}: WrittenDayPaperProps) {
   // 슬라이드 폭 = 지면 폭 − 좌우 여백. 지면을 잰 값을 쓰고, 재기 전 첫 프레임만 창 폭으로 둔다 —
   // 지면은 화면 끝까지 닿으므로(아래 PAPER) 둘은 같아야 한다. 캐러셀이 늦게 튀어나오지 않게.
   const window = useWindowDimensions();
@@ -48,6 +71,7 @@ export function WrittenDayPaper({ paper, onReachEndChange }: WrittenDayPaperProp
 
   // 끝 판정에 쓰는 세 값 — 렌더와 무관하므로 ref에 둔다. 바뀐 결과만 알린다.
   const metrics = useRef({ y: 0, viewport: 0, content: 0 });
+  const previousY = useRef(0);
   const reported = useRef<boolean | undefined>(undefined);
   const report = () => {
     const { y, viewport, content } = metrics.current;
@@ -63,22 +87,42 @@ export function WrittenDayPaper({ paper, onReachEndChange }: WrittenDayPaperProp
     <ScrollView
       contentContainerStyle={{ flexGrow: 1 }}
       onContentSizeChange={(_, height) => {
+        // 052 — 같은 높이로 다시 온 사건은 무시한다. 스트립이 접히고 펴져 지면 높이가 바뀔 때 안드로이드가
+        // 내용 크기 사건을 부동소수 오차(773.9999 ↔ 774.0001)로 되풀이하는데, 그것으로 끝 판정을 다시
+        // 돌리면 바가 내려간다(실기기 관측). 1px 미만의 차이는 같은 높이로 본다.
+        if (Math.abs(height - metrics.current.content) < 1) return;
         metrics.current.content = height;
         report();
       }}
       onLayout={(e) => {
         setMeasured(e.nativeEvent.layout.width);
         metrics.current.viewport = e.nativeEvent.layout.height;
-        report();
+        // 052 — 처음 잰 순간에만 판정한다. 그 뒤의 높이 변화(스트립 접힘·펼침)로는 바를 움직이지
+        // 않는다 — 보드 `5b`는 끝 판정을 스크롤 사건에서만 다시 재며 `5a` ④가 「바 상태는 그대로」다.
+        if (reported.current === undefined) report();
       }}
       onScroll={(e) => {
-        metrics.current.y = e.nativeEvent.contentOffset.y;
+        const y = e.nativeEvent.contentOffset.y;
+        metrics.current.y = y;
+        // 052 — 위치가 그대로인 사건은 스크롤 정보가 아니다. 스트립이 접히고 펴지면 지면의 높이가 바뀌며
+        // 안드로이드가 같은 위치로 사건을 다시 내는데, 그것으로 접힘을 다시 판정하면 방금 펼친 스트립이
+        // 되접히고(`y >= previousY`가 「아래」로 읽힌다) 끝 판정이 줄어든 높이로 다시 돌아 바가 내려간다.
+        // 보드 `5b`는 브라우저가 움직임이 있을 때만 `scroll`을 내므로 같은 규칙이다(실기기 관측).
+        if (y === previousY.current) return;
+        onScrollSample?.({
+          y,
+          previousY: previousY.current,
+          viewport: metrics.current.viewport,
+          content: metrics.current.content,
+        });
+        previousY.current = y;
         report();
       }}
       scrollEventThrottle={16}
       style={PAPER}
       testID="written-paper"
     >
+      {topSpacer}
       {paper.kind === "readable" && (
         <>
           {width > 0 && hasPhotos && (
@@ -128,10 +172,16 @@ function paragraphsOf(text: string): string[] {
 
 /* ═══════════════════════════════ 치수 (보드 `2c`) ═══════════════════════════════ */
 
-/** 스트립 아래 20, 화면 좌우 끝까지, 남은 높이 전부 (보드 `2c` — `flex:1; margin-top:20px`) */
+/**
+ * 화면 좌우 끝까지, 남은 높이 전부 (보드 `2c`).
+ *
+ * ★ **프레임을 고정한다**(052, 실기기 실측). 이 스크롤 뷰에는 `marginTop`이 없고 스트립 접힘이 프레임의
+ * 위치·높이를 바꾸지 않는다 — 스트립과 그 아래 20의 간격은 부모가 이 위에 **덮는 판**이고, 접힘은 판의
+ * 높이와 내용 맨 위 스페이서(`topSpacer`)가 함께 움직여 만든다. 프레임이 손가락 아래에서 움직이면 안드로이드가
+ * 그것을 드래그로 읽어 지면이 밀리고 접힘·펼침이 되풀이됐다(한 번의 느린 끌기에 7번 뒤집힘).
+ */
 const PAPER: ViewStyle = {
   flex: 1,
-  marginTop: WRITTEN_DAY.paperGap,
   backgroundColor: WRITTEN_DAY.paper,
 };
 

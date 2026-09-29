@@ -16,3 +16,24 @@ export async function reachPaperEnd() {
   });
   await fireEvent(paper, "contentSizeChange", 400, 500);
 }
+
+/**
+ * 052 — 지면을 `y`까지 스크롤한 것으로 만든다. 지면마다 처음 부르면 레이아웃·내용 크기를 먼저 쏜다
+ * (긴 본문: 보이는 800, 내용 2000). 그 뒤 `scroll` 사건을 쏜다 — 접힘 판정은 스크롤 사건에서 돈다.
+ */
+const measured = new WeakSet<object>();
+
+export async function scrollPaper(
+  y: number,
+  { viewport = 800, content = 2000 }: { viewport?: number; content?: number } = {},
+) {
+  const paper = await screen.findByTestId("written-paper", { includeHiddenElements: true });
+  if (!measured.has(paper)) {
+    measured.add(paper);
+    await fireEvent(paper, "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: 400, height: viewport } },
+    });
+    await fireEvent(paper, "contentSizeChange", 400, content);
+  }
+  await fireEvent.scroll(paper, { nativeEvent: { contentOffset: { y } } });
+}

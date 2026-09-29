@@ -128,14 +128,14 @@ describe("051 HOME — 쓴 날을 고르면 홈에서 읽는다 (US1)", () => {
     expect(screen.queryByText("← 목록")).toBeNull();
   });
 
-  it("HOME3 — 제목: 두 줄 말줄임, 15/700 본문색, 누름 없음", async () => {
+  it("HOME3 — 제목: 한 줄 말줄임(052 — 줄이 바뀌면 날짜 영역이 넓어진다), 15/700 본문색, 누름 없음", async () => {
     const store = memoryStore();
     await store.save(entryFor(PAST));
     await renderHome(store);
     await selectPast();
 
     const title = await screen.findByTestId("home-day-title");
-    expect(title).toHaveProp("numberOfLines", 2);
+    expect(title).toHaveProp("numberOfLines", 1);
     expect(title).toHaveProp("ellipsizeMode", "tail");
     expect(title).toHaveStyle({ fontSize: 15, fontWeight: "700", color: COLORS.text });
     expect(title.props.onPress).toBeUndefined();

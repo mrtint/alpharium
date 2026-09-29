@@ -39,10 +39,17 @@
  * (3) 하단 바는 화면 폭 전체의 블록 하나다 — 안 쓴 날은 빨강 「일기 쓰기」, 쓴 날은 연회색 「다시 쓰기」이고
  * 쓴 날의 바는 지면 끝에 닿아야 올라온다(`2c` ④, 짧으면 처음부터 — `2k`). `⋯` 메뉴는 없앴다(설정·개발자
  * 진입점은 설정 화면 구성 과제에서 다시 둔다).
+ *
+ * **052 — 쓴 날을 읽는 동안 스트립이 접힌다**(보드 `5a`·`5b`). 지면을 아래로 8px 넘게 내리면 스트립과
+ * 안내 캡션이 접히고(240ms), 위로 맨 위(2px 이하)에 닿으면 다시 펼쳐진다. **접힘 표시(▾)도, 접힌 날짜 줄을
+ * 눌러 펴는 길도 두지 않는다** — 스크롤이 맨 위에 닿는 것이 펼침의 유일한 길이다(저장소 소유자: 제목을 줄여
+ * 펼치는 것으로 오해하기 쉽다). 큰 숫자·요일의 누름은 접혔든 펴졌든 050 그대로 달력을 연다.
+ * **판정은 `foldAfterScroll()`이 한다**(`src/app/reading-scroll.ts`) — 이 화면은 접힘 상태를 들고 그릴
+ * 뿐이다. 안 쓴 날에는 접힘이 없다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, View, type TextStyle, type ViewStyle } from "react-native";
 import Animated, {
   Easing,
@@ -60,12 +67,13 @@ import {
   type SwipeDirection,
   type WritePrompt,
 } from "../app/state";
+import { foldAfterScroll } from "../app/reading-scroll";
 import type { PaperState } from "../app/written-day";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { DayPicker } from "./DayPicker";
 import { DATE_JUMP, dayStateText, monthText, weekdayLong, WRITTEN_DAY_TEXT } from "./home-text";
-import { COLORS, WRITTEN_DAY } from "./theme/tokens";
+import { COLORS, READING_SCROLL, WRITTEN_DAY } from "./theme/tokens";
 import { WrittenDayPaper } from "./WrittenDayPaper";
 
 /** 신호 줄의 사진·다닌 자리 칸 — 읽는 중이거나, 다 읽었거나 */
@@ -139,19 +147,39 @@ export function DiaryListScreen({
   const [end, setEnd] = useState<{ day: DayDate; atEnd: boolean } | undefined>(undefined);
   const atEnd = write !== undefined && end?.day === write.day && end.atEnd;
 
+  // 052 — 스트립이 접혔는가. **그 날의 값만** 믿는다(날을 바꾸면 펼친 상태로 시작한다, FR-015).
+  // 끝 판정(`end`)과 서로 독립이다 — 접힘·펼침이 바를 움직이지 않는다(FR-010).
+  const [foldState, setFoldState] = useState<{ day: DayDate; collapsed: boolean } | undefined>(
+    undefined,
+  );
+  const stripHeight = useRef(0);
+  const collapsed = write !== undefined && foldState?.day === write.day && foldState.collapsed;
+  const motion = useFoldMotion(collapsed);
+
+  // 스트립과 안내 캡션 — 안 쓴 날에는 헤더 안에 그대로, 쓴 날에는 지면 위에 덮는 판 안에 놓인다(052).
+  const stripBlock =
+    write !== undefined ? (
+      <>
+        <DayPicker
+          canSwipeNext={canSwipeNext}
+          cells={cells ?? []}
+          onSelect={onSelectDay ?? (() => {})}
+          onSwipe={onSwipe}
+        />
+        <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+      </>
+    ) : null;
+
   const header =
     write !== undefined ? (
       <Header
-        canSwipeNext={canSwipeNext}
         cells={cells ?? []}
-        deniedNotices={deniedNotices}
         items={items}
-        movedNotice={movedNotice}
         onPressDate={onPressDate}
-        onSelectDay={onSelectDay}
-        onSwipe={onSwipe}
         paper={paper}
         preview={preview}
+        stripBlock={stripBlock}
+        stripOverlaid={written !== undefined}
         write={write}
       />
     ) : null;
@@ -163,12 +191,36 @@ export function DiaryListScreen({
     return (
       <View style={[ROOT, { overflow: "hidden" }]}>
         <View style={FIXED_HEADER}>{header}</View>
-        <WrittenDayPaper
-          // 날마다 새 지면 — 맨 위에서 시작하고 끝 판정을 새로 잰다
-          key={write.day}
-          onReachEndChange={(value) => setEnd({ day: write.day, atEnd: value })}
-          paper={written}
-        />
+        {/*
+          052 — **지면 프레임은 움직이지 않는다.** 스트립은 지면 위에 덮는 판(`StripOverlay`)이고, 접힘은
+          판의 높이와 지면 내용 맨 위 스페이서(`FoldSpacer`)가 함께 줄어드는 것으로 만든다. 프레임이
+          손가락 아래에서 움직이면 안드로이드가 그것을 드래그로 읽어 접힘·펼침이 되풀이됐다.
+        */}
+        <View style={{ flex: 1 }}>
+          <WrittenDayPaper
+            // 날마다 새 지면 — 맨 위에서 시작하고 끝 판정을 새로 잰다
+            key={write.day}
+            onReachEndChange={(value) => setEnd({ day: write.day, atEnd: value })}
+            onScrollSample={(sample) => {
+              const next = foldAfterScroll(collapsed, {
+                ...sample,
+                stripHeight: stripHeight.current,
+              });
+              if (next !== collapsed) setFoldState({ day: write.day, collapsed: next });
+            }}
+            paper={written}
+            topSpacer={<FoldSpacer motion={motion} />}
+          />
+          <StripOverlay
+            collapsed={collapsed}
+            motion={motion}
+            onMeasure={(height) => {
+              stripHeight.current = height;
+            }}
+          >
+            {stripBlock}
+          </StripOverlay>
+        </View>
         <RewriteBar onWrite={onWrite} visible={atEnd} writtenAt={writtenAt} />
       </View>
     );
@@ -197,26 +249,22 @@ function Header({
   write,
   items,
   cells,
-  onSelectDay,
-  onSwipe,
-  canSwipeNext,
-  movedNotice,
-  deniedNotices,
   preview,
   onPressDate,
   paper,
+  stripOverlaid,
+  stripBlock,
 }: {
   write: WritePrompt;
   items: readonly DiaryListItem[];
   cells: readonly StripCell[];
-  onSelectDay?: (day: DayDate) => void;
-  onSwipe?: (direction: SwipeDirection) => void;
-  canSwipeNext?: boolean;
-  movedNotice?: string;
-  deniedNotices?: readonly string[];
   preview?: PreviewState;
   onPressDate?: () => void;
   paper?: PaperState;
+  /** 052 — 쓴 날이면 스트립을 부모가 지면 위 판에 그린다. 안 쓴 날은 여기서 그대로 그린다 */
+  stripOverlaid: boolean;
+  /** 주간 스트립 + 안내 캡션. 안 쓴 날은 여기서 그리고, 쓴 날은 부모가 지면 위 판에 그린다 */
+  stripBlock: ReactNode;
 }) {
   // 오늘인가는 스트립 칸이 이미 안다 — 화면은 지금 시각을 읽지 않는다.
   const isToday = cells.some((cell) => cell.selected && cell.isToday);
@@ -231,7 +279,6 @@ function Header({
         : undefined;
   const stateItem =
     paper?.kind === "unreadable" && item !== undefined ? { ...item, readable: false } : item;
-
   return (
     <View>
       {/* ① 월 라벨 — 표시만 한다(누름 없음). **고른 날의 달**이다(048 Q2, 049 H1·H2) */}
@@ -246,8 +293,8 @@ function Header({
 
       {/*
         ② 날짜 헤더. **큰 숫자·요일만** 누를 수 있다 — 「날짜로 이동」 달력을 연다(050 FR-012, 보드
-        `2j`). 월 라벨·상태 줄은 누를 수 없다. 접힌 스트립을 먼저 펼치는 갈래는 「읽기 스크롤」
-        조각이 더한다(C7). 크로스페이드 겹은 `pointerEvents="none"`이라 누름을 가로채지 않는다.
+        `2j`). 월 라벨·상태 줄은 누를 수 없다. 스트립이 접혀 있어도 같다(052 — 접힌 날짜 줄을 눌러 펴는
+        길은 두지 않는다). 크로스페이드 겹은 `pointerEvents="none"`이라 누름을 가로채지 않는다.
       */}
       {/*
         보드 `1d`·`2c` — 큰 숫자 오른쪽에 세로 묶음(요일 / 상태 줄 또는 제목), 아래끝 맞춤. 051 수정 전에는
@@ -262,13 +309,14 @@ function Header({
             <DayHeading day={write.day} part="weekday" />
           </DateJump>
           {/*
-            051 — 읽을 수 있는 쓴 날에 제목이 있으면 상태 줄 자리에 제목(보드 `2c` — 15/700, 두 줄 말줄임,
+            051 — 읽을 수 있는 쓴 날에 제목이 있으면 상태 줄 자리에 제목(보드 `2c` — 15/700. 052 — 한 줄 말줄임: 줄이 바뀌면
+            날짜 영역이 넓어져 UI를 해친다(저장소 소유자),
             누름 없음). 제목 없음·읽을 수 없음은 지금의 상태 줄 그대로다(FR-007).
           */}
           {title !== undefined ? (
             <AppText
               ellipsizeMode="tail"
-              numberOfLines={2}
+              numberOfLines={1}
               style={DAY_TITLE}
               testID="home-day-title"
             >
@@ -282,20 +330,107 @@ function Header({
         </View>
       </View>
 
-      {/* ③ 주간 스트립 */}
-      <DayPicker
-        canSwipeNext={canSwipeNext}
-        cells={cells}
-        onSelect={onSelectDay ?? (() => {})}
-        onSwipe={onSwipe}
-      />
-
-      <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+      {/* ③ 주간 스트립 — 안 쓴 날은 여기, 쓴 날은 지면 위 판(052, 안내 캡션과 함께 접힌다) */}
+      {stripOverlaid ? null : stripBlock}
 
       {/* 051 — 쓴 날엔 신호 줄 대신 지면이다(보드 `2c`). 신호 줄 개편은 「쓸 재료」 몫 */}
       {(paper === undefined || paper.kind === "unwritten") && <SignalRow preview={preview} />}
     </View>
   );
+}
+
+/**
+ * 스트립 접힘의 움직임 값 셋 — 덮는 판(`StripOverlay`)과 내용 맨 위 스페이서(`FoldSpacer`)가 **같은 값**을
+ * 본다(052). 그래야 판이 줄어드는 만큼 지면 내용이 똑같이 올라가 사이가 뜨거나 겹치지 않는다.
+ *
+ * `measured`는 접히는 영역의 **잰 자연 높이**다(0이면 아직 못 쟀다 — 그동안은 짐작값 `stripEstimate`).
+ * 시작값은 마운트 때의 상태에서 주고, 상태가 바뀌면 **현재 값에서** 옮긴다 — effect로 시작값을 되돌리면
+ * 첫 프레임이 샌다(049).
+ */
+function useFoldMotion(collapsed: boolean) {
+  const progress = useSharedValue(collapsed ? 0 : 1);
+  const opacity = useSharedValue(collapsed ? 0 : 1);
+  const measured = useSharedValue(0);
+  useEffect(() => {
+    const target = collapsed ? 0 : 1;
+    progress.value = withTiming(target, {
+      duration: READING_SCROLL.foldMs,
+      easing: Easing.out(Easing.ease),
+    });
+    opacity.value = withTiming(target, {
+      duration: READING_SCROLL.fadeMs,
+      easing: Easing.out(Easing.ease),
+    });
+  }, [collapsed, progress, opacity]);
+  // 잰 높이를 넣는 통로 — 공유값은 이 훅 안에서만 쓴다(props로 받은 값을 고치지 않는다, react-hooks 규칙).
+  const setMeasured = (height: number) => {
+    measured.value = height;
+  };
+  return { progress, opacity, measured, setMeasured };
+}
+
+type FoldMotion = ReturnType<typeof useFoldMotion>;
+
+/** 덮는 판·스페이서의 높이 — 스트립 아래 간격(20) + 펼침 진행도 × 스트립의 자연 높이 */
+function coverHeight(motion: FoldMotion): number {
+  "worklet";
+  const natural = motion.measured.value > 0 ? motion.measured.value : READING_SCROLL.stripEstimate;
+  return WRITTEN_DAY.paperGap + motion.progress.value * natural;
+}
+
+/**
+ * 스트립과 안내 캡션을 지면 위에 덮는 판 (052, 보드 `5a` ②·`5b`).
+ *
+ * **지면 프레임 위에 절대 배치**로 얹힌다 — 지면의 프레임은 접힘으로 움직이지 않는다(실기기: 프레임이
+ * 손가락 아래에서 움직이면 접힘·펼침이 되풀이됐다). 판은 불투명이고 높이가 늘 `간격 20 + 진행도 × 자연
+ * 높이`이므로 접혀도 스트립 자리 아래 20의 간격이 남고, 그 밑으로 스크롤된 지면 내용이 가려진다.
+ * 안쪽 내용은 **절대 배치**라 바깥 높이에 눌리지 않아 잰 높이가 늘 자연 높이다(research R1 — 눌리면 잰
+ * 높이가 줄어드는 되먹임이 생겼다). 접히면 누름·스와이프·접근성에서 빠진다(R6).
+ *
+ * **jest는 배선만 본다**(C9) — 실제로 접히는 움직임은 실기기 녹화로 본다.
+ */
+function StripOverlay({
+  collapsed,
+  motion,
+  onMeasure,
+  children,
+}: {
+  collapsed: boolean;
+  motion: FoldMotion;
+  onMeasure: (height: number) => void;
+  children: ReactNode;
+}) {
+  const { opacity, setMeasured } = motion;
+  const cover = useAnimatedStyle(() => ({ height: coverHeight(motion) }));
+  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.View
+      accessibilityElementsHidden={collapsed}
+      importantForAccessibility={collapsed ? "no-hide-descendants" : "auto"}
+      pointerEvents={collapsed ? "none" : "auto"}
+      style={[OVERLAY, cover]}
+      testID="home-strip-fold"
+    >
+      <Animated.View
+        onLayout={(e) => {
+          const height = e.nativeEvent.layout.height;
+          if (height <= 0) return;
+          setMeasured(height);
+          onMeasure(height);
+        }}
+        style={[OVERLAY_INNER, fade]}
+      >
+        {children}
+      </Animated.View>
+    </Animated.View>
+  );
+}
+
+/** 지면 내용 맨 위에서 덮는 판만큼 자리를 잡는 스페이서 — 판과 같은 높이로 함께 움직인다 */
+function FoldSpacer({ motion }: { motion: FoldMotion }) {
+  const style = useAnimatedStyle(() => ({ height: coverHeight(motion) }));
+  return <Animated.View style={style} testID="home-fold-spacer" />;
 }
 
 /**
@@ -312,7 +447,15 @@ function DateJump({
   primary?: boolean;
   children: ReactNode;
 }) {
-  if (onPress === undefined) return <View style={{ alignSelf: "flex-start" }}>{children}</View>;
+  // ★ 큰 숫자(`primary`)는 누를 수 없을 때도 아래 정렬을 그대로 둔다. 요일처럼 `flex-start`를 주면 접힌 동안
+  // 숫자가 줄 위쪽으로 튀어 올랐다(실기기 — 접힐 때 선택한 날짜가 위아래로 움직임, 052).
+  if (onPress === undefined) {
+    return primary ? (
+      <View>{children}</View>
+    ) : (
+      <View style={{ alignSelf: "flex-start" }}>{children}</View>
+    );
+  }
   return primary ? (
     <Pressable
       accessibilityLabel={DATE_JUMP.title}
@@ -675,6 +818,19 @@ const DAY_STATE: TextStyle = { fontSize: 13, color: COLORS.textMuted };
 
 /** 큰 숫자와 세로 묶음 — 아래끝 맞춤, 간격 12 (보드 `1d` ②) */
 const DATE_ROW: ViewStyle = { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 4 };
+
+/** 지면 위에 덮는 판 — 지면 프레임 맨 위에 절대 배치, 불투명, 좌우 여백은 헤더와 같다(20) (052) */
+const OVERLAY: ViewStyle = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  overflow: "hidden",
+  backgroundColor: COLORS.bg,
+};
+
+/** 판 안쪽 — 절대 배치라 바깥 높이에 눌리지 않는다(잰 높이가 늘 자연 높이) */
+const OVERLAY_INNER: ViewStyle = { position: "absolute", top: 0, left: 20, right: 20 };
 
 /** 요일 / 상태 줄·제목 — 간격 2, 아래 2 (보드 `1d`·`2c`) */
 const DATE_COLUMN: ViewStyle = { flex: 1, minWidth: 0, gap: 2, paddingBottom: 2 };
