@@ -228,12 +228,15 @@ const NOTE: TextStyle = {
 /** 「권한이 없어요 ›」 — 가운데 정렬, 간격 6, 누를 수 있는 영역 최소 높이 44. 진한 위험색(C5, 대비 AA) */
 const PERMISSION: ViewStyle = {
   flexDirection: "row",
+  // 큰 글꼴(2.0배)에서 칸 폭을 넘으면 「›」가 옆 칸·여백으로 새므로 넘치면 아래로 내린다
+  flexWrap: "wrap",
   alignItems: "center",
   gap: MATERIAL_GRID.permission.gap,
   minHeight: MATERIAL_GRID.permissionMinHeight,
 };
 
 const PERMISSION_LABEL: TextStyle = {
+  flexShrink: 1,
   fontSize: MATERIAL_GRID.permission.fontSize,
   fontWeight: "700",
   color: COLORS.danger,

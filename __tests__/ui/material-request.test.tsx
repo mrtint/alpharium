@@ -82,6 +82,13 @@ describe("053 GRID — 권한 없음 표시", () => {
     expect(styleOf("signal-photos-permission-label").color).toBe(COLORS.danger);
   });
 
+  it("GRID4 — 큰 글꼴에서 칸 폭을 넘으면 「›」가 아래로 내려온다 (옆 칸으로 새지 않는다, 2.0배 실기기)", async () => {
+    await renderWithPortal(<MaterialGrid onRequestPhoto={() => {}} preview={preview("denied")} />);
+
+    expect(styleOf("signal-photos-permission").flexWrap).toBe("wrap");
+    expect(styleOf("signal-photos-permission-label").flexShrink).toBe(1);
+  });
+
   it("★ GRID4 — 권한 없음은 0이 아니다 (숫자가 없다)", async () => {
     await renderWithPortal(<MaterialGrid onRequestPhoto={() => {}} preview={preview("blocked")} />);
 
