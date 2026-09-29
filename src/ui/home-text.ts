@@ -98,6 +98,12 @@ export const OVERWRITE_CONFIRM = {
 /** 날짜로 이동 (`2j`, 보드 `cal.title`·`cal.cancel`) */
 export const DATE_JUMP = { title: "날짜로 이동", cancel: "취소" } as const;
 
+/**
+ * 읽기 스크롤(052, 보드 `5a`·`5b`). 보드에 새 문구는 없다(▾ 하나) — 접힌 날짜 줄의 접근성 라벨은
+ * 화면에 보이지 않는 글자이며 스크린 리더에게 「누르면 펼친다」를 알린다(FR-013).
+ */
+export const READING_SCROLL = { caret: "▾", expandLabel: "주간 날짜 펼치기" } as const;
+
 /** 달력 요일 머리 — 일요일 시작 (보드 `cal.dows`) */
 export const CALENDAR_WEEKDAYS = WEEKDAY_SHORT;
 

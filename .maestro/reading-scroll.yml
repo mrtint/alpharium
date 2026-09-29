@@ -1,0 +1,101 @@
+# 실기기 자동 테스트 — 읽기 스크롤: 쓴 날을 읽는 동안 스트립이 접힌다 (052)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **긴 본문의 쓴 날을 아래로 읽으면 스트립이 접히고 ▾가 나타난다. 끝에서 「다시 쓰기」가 올라오고,
+# 접힌 날짜 줄을 누르면 스트립이 다시 내려온다**(보드 `5a`·`5b`).
+#
+# 검증 항목 (specs/052-reading-scroll):
+#   RS1     아래로 스크롤 → `day-strip`이 접근성에서 빠지고 `home-fold-caret`이 드러난다
+#   FR-014  접힌 스트립은 접근성 트리에서 빠진다(그래서 Maestro가 못 찾는다)
+#   BAR     끝까지 내리면 「다시 쓰기」(`write-button`)가 올라온다              (051)
+#   TAP1·5  접힌 날짜 줄(`home-date-row`)을 누르면 펼쳐지고 달력은 안 열린다,
+#           바는 그대로다
+#
+# **여기서 자동화하지 않는 것** — quickstart D2·D3·D5·D11·D12·D14:
+#   접힘이 240ms에 한 방향으로만 움직이는가(되튐 없음), 맨 위 도달로 펼쳐지는가, 접힌 동안 스와이프가
+#   안 먹는가, 캐러셀 가로 제스처가 스트립을 접지 않는가, 누름 영역 44dp — 움직임·손맛은 사람이
+#   눈으로 본다(C9). 건너뛴 것은 통과가 아니다(원칙 V).
+#
+# 선행: **화면보다 긴 본문**의 쓴 날이 있어야 한다(사진 여러 장이면 캐러셀 210이 더해져 넉넉하다).
+#       `-e WRITTEN_DAY=<그 날>`로 넘긴다. 실행: `maestro test .maestro/reading-scroll.yml -e WRITTEN_DAY=2026-09-22`
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+env:
+  # ★ 흐름의 `env`가 `-e`를 덮어쓴다 — 기본값은 `||`로 준다(049 교훈). 비워 두고 `assertTrue`로
+  # 빠뜨림을 드러낸다 — 엉뚱한 날을 조용히 검사하지 않게.
+  WRITTEN_DAY: ${WRITTEN_DAY || ""}
+---
+- assertTrue: ${WRITTEN_DAY != ""}
+
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 20000
+
+# 그 날이 든 주로 간다 — 스트립을 오른쪽으로 넘겨 한 주씩(최대 8주, 049).
+- repeat:
+    times: 8
+    while:
+      notVisible:
+        id: "day-${WRITTEN_DAY}"
+    commands:
+      - swipe:
+          from:
+            id: "day-strip"
+          direction: RIGHT
+- tapOn:
+    id: "day-${WRITTEN_DAY}"
+
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 10000
+
+# 들어온 직후는 펼침이다(`5a` ①) — 스트립이 보이고 ▾는 없다.
+- assertVisible:
+    id: "day-strip"
+- assertNotVisible:
+    id: "home-fold-caret"
+
+# ★ RS1 — 지면을 아래로 읽는다(손가락은 위로). 느리게 끌어야 지면이 스크롤된다(051 관측).
+- swipe:
+    from:
+      id: "written-paper"
+    direction: UP
+    duration: 1200
+- extendedWaitUntil:
+    notVisible:
+      id: "day-strip"
+    timeout: 5000
+- assertVisible:
+    id: "home-fold-caret"
+
+# 접혀도 날짜·제목은 그대로 보인다(FR-003).
+- assertVisible:
+    id: "home-day-number"
+
+# ★ BAR — 끝까지 내리면 「다시 쓰기」가 올라온다(051).
+- scrollUntilVisible:
+    element:
+      id: "write-button"
+    direction: DOWN
+    timeout: 30000
+- assertVisible:
+    id: "write-button"
+    text: "다시 쓰기"
+
+# ★ TAP1·5 — 접힌 날짜 줄을 누르면 스트립이 다시 내려오고, 달력은 열리지 않으며, 바는 그대로다.
+- tapOn:
+    id: "home-date-row"
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 5000
+- assertNotVisible:
+    id: "calendar-dialog"
+- assertNotVisible:
+    id: "home-fold-caret"
+- assertVisible:
+    id: "write-button"

@@ -39,10 +39,16 @@
  * (3) 하단 바는 화면 폭 전체의 블록 하나다 — 안 쓴 날은 빨강 「일기 쓰기」, 쓴 날은 연회색 「다시 쓰기」이고
  * 쓴 날의 바는 지면 끝에 닿아야 올라온다(`2c` ④, 짧으면 처음부터 — `2k`). `⋯` 메뉴는 없앴다(설정·개발자
  * 진입점은 설정 화면 구성 과제에서 다시 둔다).
+ *
+ * **052 — 쓴 날을 읽는 동안 스트립이 접힌다**(보드 `5a`·`5b`). 지면을 아래로 8px 넘게 내리면 스트립과
+ * 안내 캡션이 접히고(240ms) 날짜 줄 오른쪽에 ▾가 나타난다. 위로 맨 위(2px 이하)에 닿거나 접힌 날짜 줄을
+ * 누르면 펼친다. **판정은 `foldAfterScroll()`이 한다**(`src/app/reading-scroll.ts`) — 이 화면은 접힘
+ * 상태를 들고 그릴 뿐이다. 접힌 날짜 줄의 누름은 펼치기만 하고, 펼친 상태의 큰 숫자·요일은 050 그대로
+ * 달력을 연다(안쪽 누름을 접힌 동안 없애 바깥을 가로채지 않게 한다). 안 쓴 날에는 접힘이 없다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, View, type TextStyle, type ViewStyle } from "react-native";
 import Animated, {
   Easing,
@@ -60,12 +66,20 @@ import {
   type SwipeDirection,
   type WritePrompt,
 } from "../app/state";
+import { foldAfterScroll } from "../app/reading-scroll";
 import type { PaperState } from "../app/written-day";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { DayPicker } from "./DayPicker";
-import { DATE_JUMP, dayStateText, monthText, weekdayLong, WRITTEN_DAY_TEXT } from "./home-text";
-import { COLORS, WRITTEN_DAY } from "./theme/tokens";
+import {
+  DATE_JUMP,
+  dayStateText,
+  monthText,
+  READING_SCROLL as READING_SCROLL_TEXT,
+  weekdayLong,
+  WRITTEN_DAY_TEXT,
+} from "./home-text";
+import { COLORS, READING_SCROLL, WRITTEN_DAY } from "./theme/tokens";
 import { WrittenDayPaper } from "./WrittenDayPaper";
 
 /** 신호 줄의 사진·다닌 자리 칸 — 읽는 중이거나, 다 읽었거나 */
@@ -139,12 +153,31 @@ export function DiaryListScreen({
   const [end, setEnd] = useState<{ day: DayDate; atEnd: boolean } | undefined>(undefined);
   const atEnd = write !== undefined && end?.day === write.day && end.atEnd;
 
+  // 052 — 스트립이 접혔는가. **그 날의 값만** 믿는다(날을 바꾸면 펼친 상태로 시작한다, FR-015).
+  // 끝 판정(`end`)과 서로 독립이다 — 접힘·펼침이 바를 움직이지 않는다(FR-010).
+  const [foldState, setFoldState] = useState<{ day: DayDate; collapsed: boolean } | undefined>(
+    undefined,
+  );
+  const stripHeight = useRef(0);
+  const collapsed = write !== undefined && foldState?.day === write.day && foldState.collapsed;
+
   const header =
     write !== undefined ? (
       <Header
         canSwipeNext={canSwipeNext}
         cells={cells ?? []}
         deniedNotices={deniedNotices}
+        fold={
+          written !== undefined
+            ? {
+                collapsed,
+                onExpand: () => setFoldState({ day: write.day, collapsed: false }),
+                onMeasure: (height) => {
+                  stripHeight.current = height;
+                },
+              }
+            : undefined
+        }
         items={items}
         movedNotice={movedNotice}
         onPressDate={onPressDate}
@@ -167,6 +200,13 @@ export function DiaryListScreen({
           // 날마다 새 지면 — 맨 위에서 시작하고 끝 판정을 새로 잰다
           key={write.day}
           onReachEndChange={(value) => setEnd({ day: write.day, atEnd: value })}
+          onScrollSample={(sample) => {
+            const next = foldAfterScroll(collapsed, {
+              ...sample,
+              stripHeight: stripHeight.current,
+            });
+            if (next !== collapsed) setFoldState({ day: write.day, collapsed: next });
+          }}
           paper={written}
         />
         <RewriteBar onWrite={onWrite} visible={atEnd} writtenAt={writtenAt} />
@@ -205,6 +245,7 @@ function Header({
   preview,
   onPressDate,
   paper,
+  fold,
 }: {
   write: WritePrompt;
   items: readonly DiaryListItem[];
@@ -217,6 +258,8 @@ function Header({
   preview?: PreviewState;
   onPressDate?: () => void;
   paper?: PaperState;
+  /** 052 — 쓴 날에만 온다. 없으면(안 쓴 날) 접힘이 없다 */
+  fold?: { collapsed: boolean; onExpand: () => void; onMeasure: (height: number) => void };
 }) {
   // 오늘인가는 스트립 칸이 이미 안다 — 화면은 지금 시각을 읽지 않는다.
   const isToday = cells.some((cell) => cell.selected && cell.isToday);
@@ -231,6 +274,15 @@ function Header({
         : undefined;
   const stateItem =
     paper?.kind === "unreadable" && item !== undefined ? { ...item, readable: false } : item;
+  const collapsedNow = fold?.collapsed === true;
+  const strip = (
+    <DayPicker
+      canSwipeNext={canSwipeNext}
+      cells={cells}
+      onSelect={onSelectDay ?? (() => {})}
+      onSwipe={onSwipe}
+    />
+  );
 
   return (
     <View>
@@ -253,48 +305,156 @@ function Header({
         보드 `1d`·`2c` — 큰 숫자 오른쪽에 세로 묶음(요일 / 상태 줄 또는 제목), 아래끝 맞춤. 051 수정 전에는
         상태 줄이 숫자 아래 따로 한 줄이었다(보드와 어긋남).
       */}
-      <View style={DATE_ROW}>
-        <DateJump onPress={onPressDate} primary>
-          <DayHeading day={write.day} part="number" />
-        </DateJump>
-        <View style={DATE_COLUMN}>
-          <DateJump onPress={onPressDate}>
-            <DayHeading day={write.day} part="weekday" />
+      {/*
+        052 — 접힌 동안은 날짜 줄 **전체**가 하나의 버튼이고 펼치기만 한다(보드 `5b`). 안쪽 큰 숫자·요일의
+        누름(050)은 그동안 없다 — 있으면 안쪽이 이겨 달력이 열린다. 감싸는 `Pressable`은 늘 그대로 두어
+        (`disabled`만 바꾼다) 날짜 조각이 다시 마운트되지 않게 한다.
+      */}
+      <Pressable
+        accessibilityLabel={collapsedNow ? READING_SCROLL_TEXT.expandLabel : undefined}
+        accessibilityRole={collapsedNow ? "button" : undefined}
+        accessible={collapsedNow ? true : undefined}
+        disabled={!collapsedNow}
+        onPress={fold?.onExpand}
+        style={collapsedNow ? DATE_ROW_TAP : undefined}
+        testID={collapsedNow ? "home-date-row" : undefined}
+      >
+        <View style={DATE_ROW}>
+          <DateJump onPress={collapsedNow ? undefined : onPressDate} primary>
+            <DayHeading day={write.day} part="number" />
           </DateJump>
-          {/*
+          <View style={DATE_COLUMN}>
+            <DateJump onPress={collapsedNow ? undefined : onPressDate}>
+              <DayHeading day={write.day} part="weekday" />
+            </DateJump>
+            {/*
             051 — 읽을 수 있는 쓴 날에 제목이 있으면 상태 줄 자리에 제목(보드 `2c` — 15/700, 두 줄 말줄임,
             누름 없음). 제목 없음·읽을 수 없음은 지금의 상태 줄 그대로다(FR-007).
           */}
-          {title !== undefined ? (
-            <AppText
-              ellipsizeMode="tail"
-              numberOfLines={2}
-              style={DAY_TITLE}
-              testID="home-day-title"
-            >
-              {title}
-            </AppText>
-          ) : (
-            <AppText style={DAY_STATE} testID="home-day-state">
-              {dayStateText(stateItem, isToday)}
-            </AppText>
-          )}
+            {title !== undefined ? (
+              <AppText
+                ellipsizeMode="tail"
+                numberOfLines={2}
+                style={DAY_TITLE}
+                testID="home-day-title"
+              >
+                {title}
+              </AppText>
+            ) : (
+              <AppText style={DAY_STATE} testID="home-day-state">
+                {dayStateText(stateItem, isToday)}
+              </AppText>
+            )}
+          </View>
+          {fold !== undefined && <FoldCaret collapsed={fold.collapsed} />}
         </View>
-      </View>
+      </Pressable>
 
-      {/* ③ 주간 스트립 */}
-      <DayPicker
-        canSwipeNext={canSwipeNext}
-        cells={cells}
-        onSelect={onSelectDay ?? (() => {})}
-        onSwipe={onSwipe}
-      />
-
-      <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+      {/* ③ 주간 스트립 — 쓴 날에는 안내 캡션과 함께 접힌다(052, FR-017) */}
+      {fold !== undefined ? (
+        <StripFold collapsed={fold.collapsed} onMeasure={fold.onMeasure}>
+          {strip}
+          <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+        </StripFold>
+      ) : (
+        <>
+          {strip}
+          <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+        </>
+      )}
 
       {/* 051 — 쓴 날엔 신호 줄 대신 지면이다(보드 `2c`). 신호 줄 개편은 「쓸 재료」 몫 */}
       {(paper === undefined || paper.kind === "unwritten") && <SignalRow preview={preview} />}
     </View>
+  );
+}
+
+/**
+ * 스트립과 안내 캡션을 접는 감쌈 (052, 보드 `5a` ②·`5b`).
+ *
+ * 높이(`maxHeight`)를 잰 자연 높이 ↔ 0으로 240ms, 불투명도를 180ms로 옮긴다. 보드의 `max-height: 180`은
+ * CSS 상한이지 스트립의 높이가 아니므로 잰 값을 쓰고, 재기 전 첫 프레임은 크게 열어 둬 스트립이 제 높이로
+ * 보이게 한다(research R1). 시작값은 마운트 때의 상태에서 주고, 상태가 바뀌면 **현재 값에서** 옮긴다 —
+ * effect로 시작값을 되돌리면 첫 프레임이 샌다(049). 접히면 누름·스와이프·접근성에서 빠진다(R6).
+ *
+ * **jest는 배선만 본다**(C9) — 실제로 접히는 움직임은 실기기 녹화로 본다.
+ */
+function StripFold({
+  collapsed,
+  onMeasure,
+  children,
+}: {
+  collapsed: boolean;
+  onMeasure: (height: number) => void;
+  children: ReactNode;
+}) {
+  // 재기 전(`natural === 0`)에는 안쪽이 자연스럽게 높이를 정한다. 잰 뒤에는 안쪽을 **절대 배치**로 빼
+  // 바깥 높이에 눌리지 않게 하고, 바깥 높이를 `진행도 × 잰 높이`로 직접 옮긴다.
+  // ★ 안쪽을 흐름에 둔 채 `maxHeight`만 옮기면 안쪽이 바깥에 눌려 잰 높이가 108 → 64 → 41 → 21로 줄고,
+  // 그 값으로 다시 높이를 정해 되먹임이 생겼다(실기기 — 헤더 높이가 흔들려 지면 스크롤이 튀고 펼침·접힘이
+  // 되풀이됐다). 절대 배치는 바깥 제약을 받지 않으므로 잰 높이가 늘 자연 높이다(research R1).
+  const [natural, setNatural] = useState(0);
+  const progress = useSharedValue(collapsed ? 0 : 1);
+  const opacity = useSharedValue(collapsed ? 0 : 1);
+  const measured = useSharedValue(0);
+  useEffect(() => {
+    const target = collapsed ? 0 : 1;
+    progress.value = withTiming(target, {
+      duration: READING_SCROLL.foldMs,
+      easing: Easing.out(Easing.ease),
+    });
+    opacity.value = withTiming(target, {
+      duration: READING_SCROLL.fadeMs,
+      easing: Easing.out(Easing.ease),
+    });
+  }, [collapsed, progress, opacity]);
+  const fold = useAnimatedStyle(() =>
+    measured.value > 0
+      ? { height: progress.value * measured.value, opacity: opacity.value }
+      : { opacity: opacity.value },
+  );
+
+  return (
+    <Animated.View
+      accessibilityElementsHidden={collapsed}
+      importantForAccessibility={collapsed ? "no-hide-descendants" : "auto"}
+      pointerEvents={collapsed ? "none" : "auto"}
+      style={[{ overflow: "hidden" }, fold]}
+      testID="home-strip-fold"
+    >
+      <View
+        onLayout={(e) => {
+          const height = e.nativeEvent.layout.height;
+          if (height <= 0) return;
+          measured.value = height;
+          setNatural(height);
+          onMeasure(height);
+        }}
+        style={natural > 0 ? { position: "absolute", top: 0, left: 0, right: 0 } : undefined}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
+/** 날짜 줄 오른쪽의 ▾ — 접히면 페이드인 (052, 보드 `5b` — 폭 28, 14/700, 자리는 늘 있다) */
+function FoldCaret({ collapsed }: { collapsed: boolean }) {
+  const opacity = useSharedValue(collapsed ? 1 : 0);
+  useEffect(() => {
+    opacity.value = withTiming(collapsed ? 1 : 0, { duration: READING_SCROLL.caretMs });
+  }, [collapsed, opacity]);
+  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return (
+    <Animated.View
+      accessibilityElementsHidden={!collapsed}
+      importantForAccessibility={collapsed ? "auto" : "no-hide-descendants"}
+      style={[CARET, fade]}
+      testID="home-fold-caret"
+    >
+      <AppText style={CARET_TEXT}>{READING_SCROLL_TEXT.caret}</AppText>
+    </Animated.View>
   );
 }
 
@@ -675,6 +835,22 @@ const DAY_STATE: TextStyle = { fontSize: 13, color: COLORS.textMuted };
 
 /** 큰 숫자와 세로 묶음 — 아래끝 맞춤, 간격 12 (보드 `1d` ②) */
 const DATE_ROW: ViewStyle = { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 4 };
+
+/** 접힌 날짜 줄의 누름 영역 — 44 이상(보드 `5b`, FR-011) */
+const DATE_ROW_TAP: ViewStyle = { minHeight: 44, justifyContent: "flex-end" };
+
+/** ▾ — 폭 28, 14/700, 아래 2 (보드 `5b`) */
+const CARET: ViewStyle = {
+  width: READING_SCROLL.caret.width,
+  paddingBottom: READING_SCROLL.caret.paddingBottom,
+  alignItems: "center",
+};
+
+const CARET_TEXT: TextStyle = {
+  fontSize: READING_SCROLL.caret.fontSize,
+  fontWeight: READING_SCROLL.caret.fontWeight,
+  color: COLORS.text,
+};
 
 /** 요일 / 상태 줄·제목 — 간격 2, 아래 2 (보드 `1d`·`2c`) */
 const DATE_COLUMN: ViewStyle = { flex: 1, minWidth: 0, gap: 2, paddingBottom: 2 };

@@ -25,6 +25,8 @@ jest는 배선만 본다. reanimated 목의 `useAnimatedStyle`은 `{}`를 돌려
 | PAPER1 | 스크롤 사건마다 `onScrollSample({ y, previousY, viewport, content })`를 부른다. `previousY`는 직전 사건의 `y`이고, 첫 사건에서는 0이다 | `previousY`를 늘 0으로 |
 | PAPER2 | 끝에 닿아 바가 올라온 뒤 지면의 보이는 높이만 줄어들면(레이아웃 사건), 바는 올라온 채다(`rewrite-bar` 접근성 노출 유지, FR-010) | `onLayout`에서 늘 `report()` |
 | PAPER3 | 짧은 본문(첫 레이아웃 800, 내용 500)이면 처음부터 바가 보인다(051 `2k` 회귀) | 첫 레이아웃 판정 제거 |
+| PAPER4 | 위치가 그대로인 스크롤 사건은 접힘도 끝 판정도 다시 돌리지 않는다 — 끝에서 접힌 날짜 줄을 눌러 펼친 뒤 같은 위치의 사건이 와도 되접히지 않고 바가 그대로다 | `y === previousY` 거름 제거 |
+| PAPER5 | 내용 크기가 1px 미만으로 흔들려 다시 와도(1999.9999 ↔ 2000.0001) 끝 판정을 다시 돌리지 않는다 | 정확한 같음 비교(`===`)로 |
 
 ## RS — 접힘 배선 (`DiaryListScreen`, 쓴 날)
 

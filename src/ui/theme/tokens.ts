@@ -237,6 +237,19 @@ export const WRITTEN_DAY = {
 } as const;
 
 /**
+ * 읽기 스크롤(052) — 스트립을 접는 움직임과 ▾ (보드 `5b`).
+ *
+ * 접힘: 높이 `.24s ease-out`, 불투명도 `.18s`. ▾: 폭 28, 14/700, 아래 2, 불투명도 `.24s`.
+ * 높이는 보드의 `max-height: 180`(CSS 상한)이 아니라 **잰 자연 높이**를 옮긴다(research R1).
+ */
+export const READING_SCROLL = {
+  foldMs: 240,
+  fadeMs: 180,
+  caretMs: 240,
+  caret: { width: 28, fontSize: 14, fontWeight: "700", paddingBottom: 2 },
+} as const;
+
+/**
  * WCAG 상대 명암비 — `(L1 + 0.05) / (L2 + 0.05)`.
  *
  * 순수 함수. 팔레트 값이 AA를 넘는지 **빌드 시** 검증하는 용도이지(theme-tokens.

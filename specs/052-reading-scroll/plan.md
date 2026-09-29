@@ -9,7 +9,7 @@
 쓴 날의 지면을 아래로 8px 넘게 내리면 스트립(과 그 아래 안내 캡션)을 240ms로 접고 날짜 줄 오른쪽에 ▾를 띄운다. 맨 위(2px 이하)로 올라가거나
 접힌 날짜 줄 전체를 누르면 펼친다. 펼쳐도 읽던 위치·바 상태는 그대로다(보드 `5a`·`5b`). 판정은 순수 함수 `foldAfterScroll()`
 (`src/app/reading-scroll.ts`)가 하고, 화면은 051 지면(`WrittenDayPaper`)이 알려 주는 스크롤 표본을 넘기고 결과를 그린다. 접는 움직임은
-reanimated `maxHeight`(잰 높이 ↔ 0) + `opacity`다. 끝 판정은 051 `reachedEnd`를 그대로 쓰되, 다시 판정하는 때를 스크롤 사건·내용 크기 변화·첫 측정으로
+reanimated `height`(잰 높이 ↔ 0, 안쪽은 절대 배치) + `opacity`다. 끝 판정은 051 `reachedEnd`를 그대로 쓰되, 다시 판정하는 때를 스크롤 사건·내용 크기 변화·첫 측정으로
 좁힌다(접힘·펼침이 바를 움직이지 않게). 새 의존성·새 네이티브 모듈·저장 형식 변경이 없다.
 
 ## Technical Context
@@ -74,7 +74,7 @@ src/app/reading-scroll.ts        # 새 — foldAfterScroll() (순수), FOLD_AFTE
 src/ui/WrittenDayPaper.tsx       # onScrollSample(y, previousY, viewport, content) 알림 추가,
                                  #   끝 판정은 스크롤 사건·첫 측정·내용 크기 변화에서만 (레이아웃 변화로는 재판정 안 함)
 src/ui/DiaryListScreen.tsx       # 쓴 날: 접힘 상태(날마다 새로), Header에 foldable/collapsed/onExpand,
-                                 #   StripFold(스트립 + 안내 캡션을 감싸 maxHeight·opacity), DateRow 누름 두 갈래, ▾
+                                 #   StripFold(스트립 + 안내 캡션을 감싸 height·opacity), DateRow 누름 두 갈래, ▾
 src/ui/home-text.ts              # READING_SCROLL(▾ 글자, 접힌 날짜 줄 접근성 라벨)
 src/ui/theme/tokens.ts           # READING_SCROLL 치수(접힘 240·불투명도 180·▾ 240·▾ 폭 28·14/700)
 
