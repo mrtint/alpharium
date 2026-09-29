@@ -74,10 +74,18 @@ import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DateJumpDialog } from "./DateJumpDialog";
 import { DiaryListScreen, type PreviewState } from "./DiaryListScreen";
 import { WRITTEN_DAY_TEXT, writtenAtText } from "./home-text";
+import { decideMaterial, fromCountHint, type MaterialDecision } from "../app/material";
+import { MaterialConfirmDialog, SettingsPromptDialog } from "./MaterialDialogs";
 import { OverwriteConfirmDialog } from "./OverwriteConfirmDialog";
 import { AppText } from "./components/Text";
 import { TypewriterText } from "./components/TypewriterText";
 import { COLORS, REVEAL } from "./theme/tokens";
+
+/** 사진 권한을 다시 묻거나(`request`) OS 설정을 여는(`openSettings`) 통로 (053) */
+export type PhotoAccessPort = {
+  request: () => Promise<unknown>;
+  openSettings: () => Promise<void>;
+};
 
 export type DiaryHomeScreenProps = {
   resolution: EnvironmentResolution;
@@ -159,6 +167,11 @@ export type DiaryHomeScreenProps = {
    */
   previewDay?: (day: DayDate) => Promise<DayPreview>;
   /**
+   * 사진 권한 요청·설정 열기 통로 (053). 조립부(`App.tsx`)가 021의 통로를 감싸 넘긴다 — 이 화면은 `expo-*`에
+   * 닿지 않는다. 없으면 「권한이 없어요 ›」를 눌러도 아무 일도 없다(권한을 강제하지 않는다, FR-012).
+   */
+  photoAccessPort?: PhotoAccessPort;
+  /**
    * 이 날에 미리 준비(018)를 해도 되는가 (049 FR-020a, research R5).
    *
    * **조립부가 「사진 유무를 미리 훑은 날인가」를 넘긴다**(`selectableDays` — 사흘). 사흘 밖의
@@ -216,6 +229,7 @@ export function DiaryHomeScreen({
   chosenDay: controlledDay,
   onChooseDay,
   previewDay,
+  photoAccessPort,
   canPrepare,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
@@ -254,6 +268,27 @@ export function DiaryHomeScreen({
    * 가른다: 담긴 결과의 날이 지금 고른 날과 다르면 그것은 읽는 중이다(아래 `shownPreview`).
    */
   const [preview, setPreview] = useState<DayPreview | undefined>(undefined);
+
+  /**
+   * 미리보기를 다시 읽으라는 신호 (053). 권한을 요청한 뒤와 앱이 앞으로 돌아왔을 때 올린다 — 오늘의 수는
+   * 홈을 열 때만 갱신하고 화면에 머무는 동안 저절로 늘지 않는다(FR-006).
+   */
+  const [previewTick, setPreviewTick] = useState(0);
+
+  /** 이미 거부해 다시 물을 수 없을 때의 설정 안내 대화상자가 떠 있는가 (053, 보드 `2m`). 화면 로컬 */
+  const [settingsPromptOpen, setSettingsPromptOpen] = useState(false);
+
+  /**
+   * 재료 없음 확인 대화상자 (053, 보드 `2f`) — 떠 있는 동안 그 확인 뒤에 쓸 인자를 함께 든다. 화면 로컬,
+   * 파일에 남기지 않는다. **인자는 누른 순간 `resolve(day)`가 정한 것 그대로다**(DLG9).
+   */
+  const [materialConfirm, setMaterialConfirm] = useState<{
+    because: Extract<MaterialDecision, { kind: "confirm" }>["because"];
+    params: ResolvedParams;
+  } | null>(null);
+
+  /** 쓰기 전 판정이 신호를 읽는 동안 다시 눌러도 두 번 시작하지 않는다 */
+  const deciding = useRef(false);
 
   /** 방금 생성에서 캐릭터가 옮겨졌으면 그 안내 문구 (029 FR-014). */
   const [movedNotice, setMovedNotice] = useState<string | undefined>(undefined);
@@ -323,6 +358,8 @@ export function DiaryHomeScreen({
       } else {
         // 잠든 동안 자정 타이머가 밀렸을 수 있다. 돌아오면 다시 판정한다(049 FR-019).
         setTick((t) => t + 1);
+        // 053 — 설정에서 권한을 바꾸고 돌아왔을 수 있다. 다시 센다(FR-009·FR-010).
+        setPreviewTick((t) => t + 1);
         // 051 FR-016c — 그 사이 자동 생성이 쓴 일기가 보이도록 목록(→ 그 날의 일기)을 다시 읽는다.
         // **홈일 때만 반영한다** — 읽는 사이 연 덮어쓰기 대화상자를 닫지 않는다(050 OW10).
         void refresh().then((items) => setScreen((s) => (s.kind === "list" ? toList(items) : s)));
@@ -455,18 +492,49 @@ export function DiaryHomeScreen({
         day: previewTarget,
         photos: { kind: "unknown" },
         places: { kind: "unknown" },
+        photoAccess: "ok",
       }))
       .then((result) => {
         if (previewFor.current !== previewTarget || result.day !== previewTarget) return;
         setPreview(result);
       });
-  }, [previewTarget, previewDay]);
+  }, [previewTarget, previewDay, previewTick]);
   const shownPreview: PreviewState | undefined =
     previewDay === undefined || previewTarget === undefined
       ? undefined
       : preview !== undefined && preview.day === previewTarget
         ? preview
         : { kind: "loading", day: previewTarget };
+
+  /**
+   * 누른 순간의 미리보기 — 「일기 쓰기」·「권한이 없어요 ›」 핸들러가 읽는다. 렌더마다 새로 만들어지는
+   * 값을 콜백 의존성에 넣지 않으려고 ref에 둔다(커밋 뒤에 옮기므로 누름은 언제나 최신 값을 본다).
+   */
+  const shownPreviewRef = useRef<PreviewState | undefined>(undefined);
+  useEffect(() => {
+    shownPreviewRef.current = shownPreview;
+  });
+
+  /**
+   * 「권한이 없어요 ›」를 눌렀다 (053, 보드 `2l`·`2m`). **요청하는 것은 사진 권한 하나다**(FR-011).
+   *
+   * 다시 물을 수 없으면(`blocked`) OS 창이 뜨지 않으므로 설정 안내 대화상자를 띄운다. 그 밖에는 요청하고,
+   * 끝나면 — 허용이든 거부든 — 다시 센다(FR-009). 통로가 없으면 아무 일도 하지 않는다.
+   */
+  const requestPhoto = useCallback(async () => {
+    if (photoAccessPort === undefined) return;
+    const shown = shownPreviewRef.current;
+    if (shown !== undefined && "photoAccess" in shown && shown.photoAccess === "blocked") {
+      setSettingsPromptOpen(true);
+      return;
+    }
+    try {
+      await photoAccessPort.request();
+    } catch {
+      // 요청이 실패해도 다시 센다 — 상태는 미리보기가 정직하게 말한다.
+    }
+    setPreviewTick((t) => t + 1);
+  }, [photoAccessPort]);
 
   /**
    * 고른 날의 일기 (051 US1, FR-016).
@@ -635,6 +703,35 @@ export function DiaryHomeScreen({
         : undefined,
     );
 
+    // 053 — 이미 쓴 날의 「다시 쓰기」가 아닐 때, 셀 수 있는 재료가 하나라도 있으면 바로 쓰고 없으면 한 번 더
+    // 묻는다(보드 `2e`·`2f`). 다시 쓰기는 050의 덮어쓰기 확인이 이미 있다. 미리보기가 아직 안 왔으면 누른 순간
+    // 신호를 읽는다 — 읽는 중을 「재료 없음」으로 취급하지 않는다(원칙 V). 통로가 없으면 판정하지 않는다.
+    if (!prompt.overwrites && previewDay !== undefined) {
+      if (deciding.current) return;
+      deciding.current = true;
+      let decision: MaterialDecision;
+      try {
+        const shown = shownPreviewRef.current;
+        const settled =
+          shown !== undefined && "photos" in shown && shown.day === prompt.day
+            ? shown
+            : await previewDay(prompt.day).catch(() => undefined);
+        decision =
+          settled === undefined
+            ? { kind: "confirm", because: "unseen" }
+            : decideMaterial(fromCountHint(settled.photos), fromCountHint(settled.places));
+      } finally {
+        deciding.current = false;
+      }
+      if (decision.kind === "confirm") {
+        setMaterialConfirm({
+          because: decision.because,
+          params: { ...outcome.params, day: prompt.day },
+        });
+        return;
+      }
+    }
+
     const next = startWriting(prompt, items);
     if (next.kind === "confirm-overwrite") {
       setScreen(next);
@@ -644,7 +741,7 @@ export function DiaryHomeScreen({
     }
 
     await generate({ ...outcome.params, day: prompt.day });
-  }, [screen, now, chosenDay, resolve, generate, characterNames]);
+  }, [screen, now, chosenDay, resolve, generate, characterNames, previewDay]);
 
   const cancel = useCallback(async () => {
     cancelled.current = true;
@@ -690,6 +787,7 @@ export function DiaryHomeScreen({
             // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
             onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
             onSelectDay={setChosenDay}
+            onRequestPhoto={() => void requestPhoto()}
             onSwipe={onSwipe}
             onWrite={() => void write()}
             paper={paper}
@@ -708,6 +806,26 @@ export function DiaryHomeScreen({
               }}
               open={calendarOpen}
               selectedDay={prompt.day}
+            />
+          )}
+          {screen.kind === "list" && settingsPromptOpen && (
+            <SettingsPromptDialog
+              onCancel={() => setSettingsPromptOpen(false)}
+              onOpenSettings={() => {
+                setSettingsPromptOpen(false);
+                void photoAccessPort?.openSettings().catch(() => {});
+              }}
+            />
+          )}
+          {screen.kind === "list" && materialConfirm !== null && (
+            <MaterialConfirmDialog
+              because={materialConfirm.because}
+              onCancel={() => setMaterialConfirm(null)}
+              onConfirm={() => {
+                const params = materialConfirm.params;
+                setMaterialConfirm(null);
+                void generate(params);
+              }}
             />
           )}
           {screen.kind === "confirm-overwrite" && (

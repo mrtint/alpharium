@@ -21,13 +21,30 @@
 
 import type { DayDate } from "../config/day-boundary";
 import type { DiaryEntry } from "../diary/types";
+import { madeUpDay } from "./material";
 import type { DiaryListItem } from "./state";
 
 export type PaperState =
   | { kind: "unwritten" }
   | { kind: "loading" }
-  | { kind: "readable"; entry: DiaryEntry }
+  /**
+   * `madeUp` — 쓰인 때 셀 수 있는 재료가 없었던 하루인가 (053, 「지어낸 하루」). **저장 필드가 아니다** —
+   * 읽을 때 저장된 신호(`entry.signalsUsed`)에서 계산한다. 화면은 불리언만 받고 신호를 모른다.
+   */
+  | { kind: "readable"; entry: DiaryEntry; madeUp: boolean }
   | { kind: "unreadable" };
+
+/**
+ * 「지어낸 하루」인가 — 저장된 신호로 계산한다(053). **신호가 깨져 있으면 표식을 붙이지 않는다**: 일기를
+ * 읽는 것은 표식보다 중요하고, 모르는 것을 「지어냈다」고 단정하지 않는다(원칙 V).
+ */
+function madeUpOf(entry: DiaryEntry): boolean {
+  try {
+    return madeUpDay(entry.signalsUsed);
+  } catch {
+    return false;
+  }
+}
 
 /** 마지막으로 도착한 읽기 결과. `entry`가 `null`이면 읽지 못했다 */
 export type LoadedEntry = { day: DayDate; entry: DiaryEntry | null };
@@ -42,7 +59,7 @@ export function paperFor(
   if (!item.readable) return { kind: "unreadable" };
   if (loaded === undefined || loaded.day !== day) return { kind: "loading" };
   if (loaded.entry === null) return { kind: "unreadable" };
-  return { kind: "readable", entry: loaded.entry };
+  return { kind: "readable", entry: loaded.entry, madeUp: madeUpOf(loaded.entry) };
 }
 
 /**

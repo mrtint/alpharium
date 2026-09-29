@@ -35,10 +35,11 @@ import { acquireLock as acquireLockRecord, releaseLock, type LockPort } from "..
 import { expoLockPort } from "../schedule/lock-port";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
+import type { PermissionState } from "../signals/port";
 import { expoGeocodingPort } from "../signals/geocoding-port";
 import type { DaySignals } from "../signals/types";
-import { toDayPreview } from "./day-preview";
-import type { DayPreview } from "./state";
+import { photoAccessOf, toDayPreview } from "./day-preview";
+import type { DayPreview, PhotoAccess } from "./state";
 import type { VisionOutcome } from "../vision/types";
 import type { LivenessOutcome } from "../welcome/liveness";
 import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
@@ -133,6 +134,8 @@ export type AppPipelineResult =
 export type WiringDeps = {
   store?: DiaryStore;
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>;
+  /** 사진 권한 상태를 묻는다 (053 — 미리보기의 「권한이 없어요」). 주지 않으면 실제 통로를 쓴다 */
+  photoPermission?: () => Promise<PermissionState>;
   isModelReady?: (character: Character) => Promise<boolean>;
   /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
   geocodingEnabled?: boolean;
@@ -264,11 +267,16 @@ export function createAppPipeline(
     checkLiveness,
     store,
     previewDay: async (day: DayDate) => {
+      // 053 — 사진 접근 상태도 함께 읽는다. 조회가 던지면 `ok`다: 권한이 없다고 단정하지 않는다(원칙 V).
+      const askPermission = deps.photoPermission ?? (() => expoPhotoPort().photoPermission());
+      const access: PhotoAccess = await (async () => photoAccessOf(await askPermission()))().catch(
+        (): PhotoAccess => "ok",
+      );
       try {
-        return toDayPreview(day, await loadSignals(day));
+        return toDayPreview(day, await loadSignals(day), access);
       } catch {
         // 권한 회수·통로 없음 — 「모른다」로 둔다(원칙 V). 화면까지 예외를 올리지 않는다.
-        return toDayPreview(day, null);
+        return toDayPreview(day, null, access);
       }
     },
   };

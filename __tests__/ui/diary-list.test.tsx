@@ -298,11 +298,16 @@ describe("048 B — 하단 바와 쓰기", () => {
   });
 });
 
-describe("048 G — 신호 줄", () => {
+/**
+ * 053 — 신호 줄이 「쓸 재료」 두 칸이 됐다(보드 `1d` ④). 세 칸(「쓸 수 있는 때」 포함)은 없다. 두 칸의
+ * 상세 계약은 material-grid.test.tsx GRID1~8이 잠근다 — 여기는 홈 화면에 배선됐는지만 본다.
+ */
+describe("048 G → 053 — 쓸 재료 두 칸", () => {
   const preview = (photos: DayPreview["photos"], places: DayPreview["places"]): DayPreview => ({
     day: "2026-09-23",
     photos,
     places,
+    photoAccess: "ok",
   });
 
   it("G1 — 읽는 중이면 「…」", async () => {
@@ -312,21 +317,21 @@ describe("048 G — 신호 줄", () => {
     expect(screen.getByTestId("signal-places")).toHaveTextContent("…");
   });
 
-  it("G2 — 알면 숫자", async () => {
+  it("G2 — 알면 숫자와 단위", async () => {
     await renderHome({
       preview: preview({ kind: "known", count: 3 }, { kind: "known", count: 2 }),
     });
 
-    expect(screen.getByTestId("signal-photos")).toHaveTextContent("3");
-    expect(screen.getByTestId("signal-places")).toHaveTextContent("2");
+    expect(screen.getByTestId("signal-photos")).toHaveTextContent("3장");
+    expect(screen.getByTestId("signal-places")).toHaveTextContent("2곳");
   });
 
-  it("★ G3 — 「없음」과 「모름」은 서로 다른 글자다 (원칙 V)", async () => {
+  it("★ G3 — 관측된 0과 「모름」은 서로 다른 글자다 (원칙 V)", async () => {
     await renderHome({ preview: preview({ kind: "none" }, { kind: "unknown" }) });
 
-    expect(screen.getByTestId("signal-photos")).toHaveTextContent("없음");
+    expect(screen.getByTestId("signal-photos")).toHaveTextContent("0장");
     expect(screen.getByTestId("signal-places")).toHaveTextContent("모름");
-    expect(screen.getByTestId("signal-photos")).not.toHaveTextContent(/0/);
+    expect(screen.getByTestId("signal-places")).not.toHaveTextContent(/0/);
   });
 
   it("미리보기가 없으면(통로 없음) 두 칸 모두 「모름」", async () => {
@@ -336,15 +341,17 @@ describe("048 G — 신호 줄", () => {
     expect(screen.getByTestId("signal-places")).toHaveTextContent("모름");
   });
 
-  it("G4 — 쓸 수 있으면 「지금」", async () => {
+  it("G4 — 「쓸 수 있는 때」 칸이 없다 (049로 정오 제한이 없어졌다)", async () => {
     await renderHome();
 
-    expect(screen.getByTestId("signal-window")).toHaveTextContent("지금");
+    expect(screen.queryByTestId("signal-window")).toBeNull();
+    expect(screen.queryByText("쓸 수 있는 때")).toBeNull();
   });
 
-  it("G5 — 정오 전·자정 직후에도 「지금」 (049 FR-018c)", async () => {
+  it("G5 — 새벽에도 두 칸은 그대로다", async () => {
     await renderHome({ now: new Date("2026-09-25T01:00:00") });
-    expect(screen.getByTestId("signal-window")).toHaveTextContent("지금");
+    expect(screen.getByTestId("signal-row")).toBeTruthy();
+    expect(screen.queryByTestId("signal-window")).toBeNull();
   });
 });
 

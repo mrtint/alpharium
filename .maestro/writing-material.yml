@@ -1,0 +1,68 @@
+# 실기기 자동 테스트 — 쓸 재료 (053)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **쓰기 전에 그날 셀 수 있는 재료를 두 칸으로 보이고, 셀 수 없으면 「권한이 없어요 ›」로 보이며, 재료가 없으면
+# 「상상해서 적어요」를 한 번 더 확인한다**(보드 `1d` ④⑤·`2l`·`2m`·`2e`·`2f`).
+#
+# 검증 항목 (specs/053-writing-material):
+#   GRID1   두 칸(사진·장소)이 보이고 「쓸 수 있는 때」 칸이 없다           (US1)
+#   GRID4   사진 권한이 없으면 두 칸 모두 「권한이 없어요 ›」               (US2)
+#   DLG3    권한 없음에서 「일기 쓰기」 → 「😢 기록을 볼 수 없어요」 확인, 취소 → 그대로 (US3)
+#
+# **여기서 자동화하지 않는 것** — quickstart D2·D4~D6·D8~D11:
+#   OS 권한 창에서 허용하면 숫자로 바뀌는가, 「다시 묻지 않음」에서 설정 안내가 뜨는가, 설정에서 돌아오면 다시
+#   세는가(adb·OS 화면 이동), 관측된 0의 회색 숫자와 안내 한 줄, 확인을 거쳐 쓴 일기의 「지어낸 하루」 한 줄
+#   (실제 생성이 필요), 큰 글꼴의 겹침 — 사람이 눈으로 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
+#
+# ⚠️ `launchApp`의 `permissions`가 사진 권한을 회수·부여한다(048 §6). 이 흐름은 회수한 채로 끝나므로 다음
+#    흐름 앞에서 권한이 다시 필요하면 그 흐름이 `permissions: {all: allow}`를 준다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+# ★ GRID4 — 권한을 회수한 채로 연다.
+- launchApp:
+    stopApp: true
+    permissions:
+      all: deny
+
+- extendedWaitUntil:
+    visible:
+      id: "signal-row"
+    timeout: 20000
+
+# GRID1 — 두 칸이다. 「쓸 수 있는 때」 칸이 없다.
+- assertVisible:
+    id: "signal-photos"
+- assertVisible:
+    id: "signal-places"
+- assertNotVisible:
+    id: "signal-window"
+
+# 사진 권한이 없으면 두 칸 모두 「권한이 없어요 ›」다 — 0이 아니다.
+- assertVisible:
+    id: "signal-photos-permission"
+- assertVisible:
+    id: "signal-places-permission"
+- assertVisible: "권한이 없어요.*"
+- assertNotVisible: "기록 대신 상상으로 하루를 채워요."
+
+# ★ DLG3 — 셀 수 있는 항목이 없으면 바로 쓰지 않고 확인한다. 기록이 없는지 모르는 상태를 「없다」로 단정하지 않는다.
+- tapOn:
+    id: "write-button"
+- extendedWaitUntil:
+    visible:
+      id: "material-confirm"
+    timeout: 10000
+- assertVisible: "😢 기록을 볼 수 없어요"
+- assertNotVisible: "😢 아무 기록도 없어요"
+- assertVisible: "이렇게 작성하면 하루를 상상해서 적어요."
+
+# 취소하면 닫히고 화면은 그대로다.
+- tapOn:
+    id: "material-confirm-no"
+- assertNotVisible:
+    id: "material-confirm"
+- assertVisible:
+    id: "signal-photos-permission"
+- assertVisible:
+    id: "write-button"

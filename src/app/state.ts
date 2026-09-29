@@ -163,7 +163,26 @@ export type CountHint = { kind: "known"; count: number } | { kind: "none" } | { 
  * `app/day-preview.ts`이고, 이 파일은 신호 계층을 import하지 않는다(DP8).
  * `day`를 싣는 이유: 늦게 도착한 이전 날의 결과를 화면이 대조해 버린다(FR-019).
  */
-export type DayPreview = { day: DayDate; photos: CountHint; places: CountHint };
+export type DayPreview = {
+  day: DayDate;
+  photos: CountHint;
+  places: CountHint;
+  /**
+   * 사진 접근 상태 (053) — 셀 수 없는 칸이 **권한 때문인가**를 가른다. `ok`가 아니면 두 칸 모두 「권한이
+   * 없어요」다(장소 수가 사진 좌표에서 나오므로 사진 권한에 묶인다).
+   *
+   * **`CountHint.unknown`의 `reason` 문장을 비교하지 않는다** — 문구를 고치면 조용히 깨진다. 권한은
+   * 이미 구조화된 값이므로 그것을 옮겨 싣는다. 문자열 리터럴 유니온이라 이 파일이 신호 계층을 import하지
+   * 않는다(DP8).
+   */
+  photoAccess: PhotoAccess;
+};
+
+/**
+ * 사진 접근 — `ok`(허용됨·부분 허용·조회 실패), `denied`(OS가 다시 물을 수 있다), `blocked`(다시 물을 수
+ * 없다 — 설정에서만 바꿀 수 있다). 조회 실패는 `ok`다: 권한이 없다고 단정하지 않는다(원칙 V).
+ */
+export type PhotoAccess = "ok" | "denied" | "blocked";
 
 /**
  * 스트립 칸 하나 (048).

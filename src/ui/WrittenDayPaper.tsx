@@ -25,11 +25,17 @@
  */
 
 import { useRef, useState, type ReactNode } from "react";
-import { ScrollView, useWindowDimensions, View, type ViewStyle } from "react-native";
+import {
+  ScrollView,
+  useWindowDimensions,
+  View,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native";
 
 import { reachedEnd, type PaperState } from "../app/written-day";
 import { AppText } from "./components/Text";
-import { WRITTEN_DAY_TEXT } from "./home-text";
+import { MATERIAL_TEXT, WRITTEN_DAY_TEXT } from "./home-text";
 import { PhotoCarousel } from "./PhotoCarousel";
 import { COLORS, WRITTEN_DAY } from "./theme/tokens";
 
@@ -140,6 +146,15 @@ export function WrittenDayPaper({
             style={[BODY, { paddingTop: hasPhotos ? body.paddingTop : body.paddingTopAlone }]}
             testID="written-body"
           >
+            {/*
+              053 — 「지어낸 하루」 (보드에 없는 사람이 정한 한 줄). 쓰인 때 셀 수 있는 재료가 없었던 일기에만,
+              본문 문단 앞(캐러셀 뒤)에 조용히 둔다. 지면과 함께 스크롤되어 헤더·접힘(052)에 영향이 없다.
+            */}
+            {paper.madeUp && (
+              <AppText style={MADE_UP} testID="made-up-day">
+                {MATERIAL_TEXT.madeUpDay}
+              </AppText>
+            )}
             {paragraphsOf(paper.entry.text).map((text, i) => (
               <AppText key={i} style={PARAGRAPH}>
                 {text}
@@ -201,3 +216,6 @@ const PARAGRAPH = {
   lineHeight: body.fontSize * body.lineHeightRatio,
   color: COLORS.text,
 } as const;
+
+/** 「지어낸 하루」 — 본문보다 작고 조용한 보조색 한 줄 */
+const MADE_UP: TextStyle = { fontSize: 13, fontWeight: "600", color: COLORS.textMuted };

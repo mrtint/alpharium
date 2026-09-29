@@ -38,7 +38,12 @@ const PAST = "2026-09-27";
 
 const signals = (day: string): DaySignals => ({
   date: day,
-  photos: { kind: "none" },
+  // 053 — 재료가 있던 하루로 둔다: 「지어낸 하루」 한 줄이 본문 텍스트에 섞이지 않게(그 표식은
+  // made-up-day.test.tsx가 본다).
+  photos: {
+    kind: "known",
+    value: { photos: [{ id: "p0", takenAt: new Date(`${day}T10:00:00`) }], complete: true },
+  },
   places: { kind: "none" },
   steps: { kind: "unknown", reason: "안드로이드가 기간 걸음 수를 주지 않는다" },
   battery: { kind: "unknown", reason: "기록이 없다" },

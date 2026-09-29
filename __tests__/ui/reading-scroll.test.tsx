@@ -56,7 +56,11 @@ const entry = (day: string): DiaryEntry =>
     createdAt: new Date(`${day}T14:00:00`),
   }) as unknown as DiaryEntry;
 
-const readable = (day: string): PaperState => ({ kind: "readable", entry: entry(day) });
+const readable = (day: string): PaperState => ({
+  kind: "readable",
+  entry: entry(day),
+  madeUp: false,
+});
 
 function props(day: string, over: Partial<DiaryListScreenProps> = {}): DiaryListScreenProps {
   const items = [item(DAY), item(OTHER)];

@@ -203,9 +203,10 @@ describe("048 G7·G8 — 신호 미리보기", () => {
         day: "2026-09-22",
         photos: { kind: "known", count: 2 },
         places: { kind: "none" },
+        photoAccess: "ok",
       });
     });
-    expect(screen.getByTestId("signal-photos")).toHaveTextContent("2");
+    expect(screen.getByTestId("signal-photos")).toHaveTextContent("2장");
 
     // 앞 날(24일)의 결과가 늦게 온다 — 덮이지 않는다.
     await act(async () => {
@@ -213,10 +214,11 @@ describe("048 G7·G8 — 신호 미리보기", () => {
         day: "2026-09-24",
         photos: { kind: "known", count: 9 },
         places: { kind: "known", count: 4 },
+        photoAccess: "ok",
       });
     });
-    expect(screen.getByTestId("signal-photos")).toHaveTextContent("2");
-    expect(screen.getByTestId("signal-places")).toHaveTextContent("없음");
+    expect(screen.getByTestId("signal-photos")).toHaveTextContent("2장");
+    expect(screen.getByTestId("signal-places")).toHaveTextContent("0곳");
   });
 
   it("G8 — 읽기가 실패하면 두 칸 모두 「모름」", async () => {

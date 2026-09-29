@@ -61,7 +61,11 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
   });
 
   it("CAR1 — 사진이 없으면 본문이 지면의 첫 자식이다 (보드 2k)", async () => {
-    await render(<WrittenDayPaper paper={{ kind: "readable", entry: entry("2026-09-26", []) }} />);
+    await render(
+      <WrittenDayPaper
+        paper={{ kind: "readable", entry: entry("2026-09-26", []), madeUp: false }}
+      />,
+    );
     expect(screen.queryByTestId("photo-carousel")).toBeNull();
     expect(screen.getByTestId("written-body")).toBeTruthy();
   });
@@ -160,7 +164,9 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
 
   it("★ CAR10 — 날이 바뀌면 캐러셀이 새로 마운트되어 1장부터", async () => {
     const { rerender } = await render(
-      <WrittenDayPaper paper={{ kind: "readable", entry: entry("2026-09-26", three) }} />,
+      <WrittenDayPaper
+        paper={{ kind: "readable", entry: entry("2026-09-26", three), madeUp: false }}
+      />,
     );
     await act(async () => {
       screen.getByTestId("photo-carousel").props.onSnapToItem(2);
@@ -168,7 +174,9 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
     expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("3 / 3");
 
     await rerender(
-      <WrittenDayPaper paper={{ kind: "readable", entry: entry("2026-09-25", three) }} />,
+      <WrittenDayPaper
+        paper={{ kind: "readable", entry: entry("2026-09-25", three), madeUp: false }}
+      />,
     );
     expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("1 / 3");
   });

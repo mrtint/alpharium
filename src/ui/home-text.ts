@@ -149,3 +149,36 @@ export function writtenAtText(createdAt: Date, now: Date): string {
   if (minutes < 60) return `${minutes}분 전에 작성`;
   return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분 전에 작성`;
 }
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 053 — 쓸 재료 문구 (보드 `1d` ④·`2l`·`2m`·`2e`·`2f` KO 원문, contracts/material.md SRC3).
+ *
+ * 보드 원문은 `m.*`(photos·places·unitP·unitL·noPerm·emptyNote·fabTitle·fabBody·fabYes·fabNo)와 `2m` 메모의
+ * 설정 안내다. **사람이 정한 두 줄**은 보드에 없다 — `confirmTitleUnseen`(기록이 있는지 모르는 상태에서
+ * 「아무 기록도 없어요」라 단정하지 않는다, 원칙 V)과 `madeUpDay`(사용자 표현 그대로).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export const MATERIAL_TEXT = {
+  photos: "사진",
+  places: "장소",
+  unitPhoto: "장",
+  unitPlace: "곳",
+  noPermission: "권한이 없어요",
+  /** 「권한이 없어요」 뒤의 화살표 — 누르면 요청한다는 표시 */
+  caret: "›",
+  /** 셀 수 없는데 권한 때문이 아닌 칸 — 0이 아니다(원칙 V) */
+  unknown: "모름",
+  /** 아직 읽는 중 */
+  loading: "…",
+  emptyNote: "기록 대신 상상으로 하루를 채워요.",
+  confirmTitleZero: "😢 아무 기록도 없어요",
+  confirmTitleUnseen: "😢 기록을 볼 수 없어요",
+  confirmBody: "이렇게 작성하면 하루를 상상해서 적어요.",
+  confirmYes: "확인",
+  confirmNo: "취소",
+  settingsTitle: "설정에서 사진 접근을 허용해 주세요",
+  settingsOpen: "설정 열기",
+  settingsCancel: "취소",
+  madeUpDay: "지어낸 하루",
+} as const;
