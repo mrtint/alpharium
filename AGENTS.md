@@ -7,1807 +7,598 @@
 한 줄로 말하면: **주인의 휴대폰이 화자가 되어 하루를 일기로 쓰는 앱**이다. 사람이
 쓰는 일기가 아니다. 나머지는 헌법에 있다.
 
-이 문서는 압축 요약이다(2026-08-23 정리). 각 기능의 상세 실측 로그(정확한 좌표·
-시각·빌드 시간 등)는 git 히스토리의 이전 버전과 `specs/0xx-*/`에 남아 있다 — 여기는
-**지금도 유효한 결론**과 **아직 남은 위험**만 담는다.
+**이 문서에는 지금도 유효한 결론과 아직 남은 위험만 둔다.** 기능별 상세 실측 로그
+(좌표·시각·빌드 시간·테스트 개수·위반 주입 목록)는 `specs/0xx-*/`와 git 히스토리에
+있다. **뒤의 기능이 앞의 결정을 뒤집으면 앞의 서술을 주석으로 덧대지 않고 고치거나
+지운다** — 이력이 결론처럼 읽히면 이 문서가 스스로 모순된다.
 
 ## 저장소의 현재 상태
 
 2026-08-12에 이전 저장소를 되돌렸다(측정 장치와 제품이 뒤섞였던 것이 원인 — 헌법
-원칙 IV가 된 경위). 같은 날 헌법을 새로 세우고(v1.0.2) 프로젝트 뼈대를 세웠다. 이후
-001부터 014까지 기능을 순서대로 쌓았고, 지금은 다음이 전부 된다:
+원칙 IV가 된 경위). 같은 날 헌법을 새로 세우고 뼈대를 세웠다. 지금은 다음이 된다:
 
-- **온디바이스 일기 생성**(005) — 프롬프트 조립 → `llama.rn` 추론 → 4갈래 판정
-  (`empty`/`echo`/`language`/`unfinished`) → 저장. 실기기(SM-G986N)에서 확인됐다.
-- **손에 쥐는 빌드**(006) — 사용자 화면(목록·상세·쓰기)에서 실제로 저장되고, 제 키
-  (`CN=alpharium`)로 서명한 release APK가 케이블 없이 돈다.
-- **캐릭터 선택·대기·목록**(007), **내려받기 충돌 방지**(008), **과거 하루 선택**
-  (009), **합성 하루를 기기에 심는 도구**(010), **사진 내용 캡션**(011), **정오
-  이후 오늘 쓰기**(012), **캡션 전 리사이즈**(013), **캐릭터 페르소나**(014)까지
-  차례로 쌓였다. 각 기능의 핵심 결론은 아래 절에 있다.
+- **온디바이스 일기 생성** — 프롬프트 조립 → `llama.rn` 추론 → 4갈래 판정
+  (`empty`/`echo`/`language`/`unfinished`) → 저장. 사진은 VLM이 먼저 읽는다.
+- **백그라운드 자동 생성과 알림**, **통합 첫 실행 흐름**(로고 → 권한 → 다운로드 동의·
+  진행 → 작명 → 자동 첫 일기), **캐릭터 페르소나**(로스터는 검증된 하나, 037).
+- **홈 UI/UX 개편(Modernist)이 조각 단위로 진행 중이다**(049~054): 주간 스트립·날짜
+  달력·쓴 날 읽기·읽기 스크롤·쓸 재료·제자리 쓰기. 설정 화면 구성은 아직 안 했다.
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
 
 ## 지금도 유효한 실측 규칙 (헌법 원칙 V — 값을 다시 재지 않도록)
 
+### 안드로이드·Expo·기기
+
 - **Android에는 기간 걸음 수를 되짚는 통로가 없다.** `expo-sensors`의
   `getStepCountAsync`는 iOS 전용이라 걸음 수는 `unknown`이 정상 상태다.
 - **`expo-media-library`는 `ACCESS_MEDIA_LOCATION` 조회 API를 주지 않는다.** 좌표
   권한이 있는지는 `getLocation()`을 실제로 불러 봐야 안다 — 권한이 없으면 `null`이
-  아니라 예외를 던지므로 반드시 감싼다.
-- **`react-native`의 `SafeAreaView`는 안드로이드에서 no-op다.** iOS 전용이며,
-  `react-native-safe-area-context` + 루트를 `SafeAreaProvider`로 감싸는 조합이
-  필요하다. 조용히 실패하는 버그라 안드로이드 화면을 눈으로 봐야 드러난다.
-- **`llama.rn`의 `completion()`은 요청하지 않아도 `timings`·`tokens_predicted`를
-  준다.** 헌법 원칙 IV가 금지한 값이 네이티브에서 밀려 들어오므로 `llama-port.ts`가
-  경계에서 버린다(`{ text, ending }` 둘뿐).
-- **평문 프롬프트로는 빈 글만 나온다.** instruct 모델에 채팅 템플릿 없이 평문을
-  넣으면 즉시 EOS를 낸다 — `completion({ messages: [...], jinja: true })`로 보낸다.
-- **`stopCompletion()`은 거부시키지 않는다.** `interrupted: true`로 정상
-  resolve되므로 `try/catch`로 끊김을 잡으려 하면 놓친다.
-- **★ React Native의 `fetch`는 응답 스트림을 주지 않는다 — `res.body`가 언제나
-  `undefined`다**(041 실측). 전역 `fetch`는 `whatwg-fetch` 폴리필이고
-  (`Libraries/Core/setUpXHR.js:27` → `Libraries/Network/fetch.js:15`), 그 `Body`에는
-  **`body` 속성 자체가 없다**(XHR 기반이라 `ReadableStream`이 존재하지 않는다).
-  그러므로 `res.body.getReader()`로 큰 파일을 스트리밍하려는 코드는 **웹에서 옳고
-  여기서 조용히 반대 갈래를 탄다** — 026이 쓴 `if (!res.body) { arrayBuffer() }`
-  폴백이 늘 참이 되어 구간 하나(약 380MB)를 통째로 힙에 올렸고, 4구간이 동시에
-  그것을 해 `OutOfMemoryError`가 났다(힙 한계 268MB). **그 아래 스트리밍 루프는 한
-  번도 실행된 적이 없는 죽은 코드였다.** 011의 `has_media=0`, 013의 URI 계약 불일치,
-  020의 헤드리스 `defineTask` 미등록과 같은 계열이며, **jest 대역은 `body`를 주므로
-  기기 없는 테스트가 오히려 죽은 쪽을 검증한다** — 소스를 읽어 "쓰지 않아야 할 API"를
-  잠그는 계약 테스트(`__tests__/models/download-memory.test.ts`)가 유일한 통로다.
-  큰 파일을 받을 때는 `fetch`가 아니라 **`expo-file-system`의 `DownloadTask`에
-  `headers: { Range: ... }`를 준다** — 네이티브가 디스크에 직접 쓰므로 바이트가 JS
-  힙에 올라올 자리 자체가 없다.
-- **release는 `run-as`가 안 된다**(`package not debuggable`). 파일 검증은 화면
-  관찰이나 debug 빌드로 갈음한다.
+  아니라 예외를 던지므로 반드시 감싼다. 그래서 **「장소」의 권한은 사진 권한에 묶인다**
+  (장소 수가 사진 EXIF에서 나온다).
+- **`Asset.getUri()`는 `file://` 경로를 준다**(`content://`가 아니다) — 이 기기에서
+  `folderNameOf()`의 `content://` 분기는 dead path다.
+- **`reverseGeocodeAsync`는 위치 권한이 있어야 지명을 준다**(안드로이드도). 없으면
+  예외 → `geocoding-port.ts`가 삼킨다.
+- **Android 14+의 부분 사진 허용(`limited`)이 실제로 온다** —
+  `READ_MEDIA_VISUAL_USER_SELECTED`만 granted. `describePhotoAccessLimit`가
+  `"partial"`을 주고 `visiblePhotoCount` 분기는 이 기기에서 dead path(구형 대비 유지).
+- **`react-native`의 `SafeAreaView`는 안드로이드에서 no-op다.** `react-native-safe-area-context`
+  + 루트 `SafeAreaProvider`가 필요하다. 조용히 실패하는 버그라 화면을 눈으로 봐야 드러난다.
+- **★ edge-to-edge(Android 16)에서는 `adjustResize`가 있어도 키보드가 레이아웃을 줄이지
+  않는다.** 세로 중앙 배치의 입력줄이 키보드 뒤로 숨는다 — `KeyboardAvoidingView
+  behavior="padding"` + 하단 내비게이션 바 높이만큼 `keyboardVerticalOffset`(48)이 필요했다.
+  키보드 위에 무언가를 두는 화면은 실기기에서 키보드를 연 채로 본다.
+- **release는 `run-as`가 안 된다**(`package not debuggable`). 재부팅 뒤에는 첫 잠금 해제
+  전까지 debug도 `run-as`가 실패한다(Direct Boot) — 데이터 손실이 아니다.
 - **서명이 다르면 덮어 설치가 거부되고, 지우면 일기·모델이 함께 사라진다**
-  (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). debug↔release 전환, 서명 키 교체 양쪽
-  모두에서 반복 관측됐다.
-- **기기가 재부팅되면 `run-as`가 첫 잠금 해제 전까지 실패한다**(Android Direct
-  Boot) — 데이터 손실이 아니라 저장소가 아직 복호화되지 않은 것이다.
-- **캐릭터별 생성 시간이 100배까지 벌어진다.** `quiet`(kanana 2.1B)는 웜 2~3초인
-  반면 `narrative`(exaone 2.4B)는 콜드 242초까지 관측됐다 — 헌법 로스터의 "exaone은
-  가장 느리다"가 실측으로 확인된 값이다. 생성 시간 한도(180초)는 모델 **적재**
-  시간을 재지 않고 `engine.run()` 구간만 잰다(`on-device.ts`의 `runWithTimeout()`).
-- **원칙 II 위반(기록에 없는 것을 단언)은 반복 관측되며 특정 캐릭터에 국한되지
-  않는다.** `quiet`도 예외가 아니었다(007·012 실기기). 매번 프롬프트 쪽을 고치되
-  판정 갈래는 늘리지 않는다(원칙 IV) — 014에서 "확실하지 않은 것은 짐작의 말투로"
-  규칙을 추가해 교정했다.
-- **VLM 캡션이 느린 원인은 타일링이다, 파일 크기가 아니다**(2026-08-22 실측).
-  `image_max_tokens`는 청크 하나의 크기만 정하고 청크 **수**는 해상도가 정한다 —
-  4032×3024 사진 한 장이 IMAGE 청크 7~9개(장당 약 24~30초)를 만든다. 압축률·포맷
-  변경은 효과가 없고(디코드는 전체의 1% 미만), **리사이즈만 유효하다**(1024×768로
-  줄이면 청크 9→1개, 장당 30.9초→1.3초, 약 20배). 013이 이것을 제품에 반영했다
-  (캡션 129초→23초, 82% 감소).
-- **이 기기(SM-G986N, Snapdragon 865)는 GPU/NPU 추론 경로를 못 쓴다** —
-  `hasDotProd && hasI8mm && hasHexagon && hasAdreno`가 모두 참이어야 하는데
-  `i8mm`이 없다(ARMv8.2, i8mm은 ARMv8.6부터). 다른 기기에서는 다를 수 있다.
-- **`babel.config.js`에 `react-native-worklets/plugin`이 없으면 reanimated가
-  조용히 안 돈다**(033 실측). reanimated 4.x는 `useAnimatedStyle`·`withTiming`
-  안의 함수를 worklet으로 컴파일하는데, 그 플러그인이 없으면 변환이 일어나지
-  않는다 — **오류를 내지 않고 애니메이션만 안 된다.** 011의 `has_media=0`,
-  013의 URI 계약 불일치, 020의 헤드리스 `defineTask` 미등록과 같은 계열이다.
-  게다가 jest는 reanimated를 목으로 대체하므로 **기기 없는 테스트가 이 결함을
-  구조적으로 못 잡는다** — 실기기 육안이 유일한 통로다. 플러그인은 `plugins`
-  배열의 마지막에 온다.
-- **reanimated는 jest에서 손으로 쓴 목이 필요하다**(033 실측). 목 없이
-  import하면 `Cannot read properties of undefined (reading 'loadUnpackers')`로
-  죽고, **공식 목(`react-native-reanimated/mock`)도 실제 index를 다시 import해
-  똑같이 죽는다.** `jest-expo` 프리셋에도 reanimated 목이 없다.
-  `jest/setup-ui.ts`가 `jest.mock`으로 직접 만든다 — 대가로 기기 없는 테스트는
-  눌림 반응이 **"배선됐는가"만 검증하고 "실제로 움직이는가"는 검증하지 못한다.**
-- **`Pressable`의 `onPressIn`/`onPressOut`은 host 노드의 props에 안 남는다**
-  (033 실측). RN이 責任자(responder) 시스템으로 컴파일해 `onResponderGrant`·
-  `onResponderRelease`만 남는다 — `getByTestId(...).props.onPressIn`으로
-  배선을 검사하려던 계약 테스트가 이것 때문에 실패했다. 이벤트를 실제로
-  쏘거나(`fireEvent(node, "pressIn")`) 소스를 읽어 확인한다.
-- **RNTL 14는 `render`도 `fireEvent`도 Promise를 반환한다** — 둘 다 `await`
-  없이는 렌더·상태 갱신이 flush되지 않는다(025가 `fireEvent`를, 035가 `render`를
-  실측). `await` 없이 쓰면 **"`render` function has not been called"**라는
-  엉뚱한 오류가 나서 원인을 안 가리킨다. 쿼리는 `screen.*`에서 온다(반환값
-  구조분해가 아니다).
-- **★ 018의 프롬프트 접두사에서 호칭 줄을 빼면 안 된다**(035 실측·위반 주입).
-  접두사에 들어가는 캐릭터별 값은 **이름과 출력 언어 둘뿐**인데, 한국어
-  캐릭터가 셋(`quiet`·`narrative`·`imaginative`)이라 **이름을 빼면 셋의 접두사가
-  완전히 같아진다** — 018 P11("캐릭터마다 접두사가 다르다")이 막으려던
-  "캐릭터를 바꿔도 이전 캐릭터의 KV 캐시를 재사용한다"가 정확히 발생한다.
-  035가 사용자 지정 이름을 접두사에 들이며 이 갈래를 실제로 시험했고,
-  `prompt.test.ts`의 N16이 위반 주입에서 잡는 것을 확인했다.
-  **이름이 바뀌어 접두사가 바뀌는 것 자체는 문제가 아니다** — KV 캐시가 부분
-  재사용되어 **느려질 뿐 틀리지 않으며**, 018 계약 E10이 이미 그것을 허용한다.
-  무효화 로직을 만들지 않는다(만들면 "언제 무효화하는가"를 재게 되고 원칙 IV다).
-- **계약 테스트가 소스를 읽을 때는 주석을 먼저 걷어낸다**(011 `vision/
-  engine.test.ts`가 세우고 035가 재확인). 이 저장소의 주석은 **무엇을 왜
-  금지하는가**를 적으므로 금지어가 설명 안에 정당하게 등장한다 — 주석째로
-  검사하면 이유를 적을 수 없게 되고, 그것은 이 저장소가 지켜 온 것과 정반대다.
-  `.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")`가 관용구다.
-  `scripts/constitution-rules.ts`의 검사들도 같은 이유로 줄 단위로 걷어낸다.
-- **`CharacterListScreen`은 설정 탭 하단에 있다**(029 SS4가 「캐릭터」 탭을 흡수).
-  `App.tsx`의 `ModelSection` 안, `VisionPicker`·`GeocodingSettingToggle` 아래다.
-  이 화면을 지나는 Maestro 흐름은 **`download-conflict`·
-  `parallel-model-download`·`photo-vision` 셋**이며,
-  **`diary-character-select.yml`은 이 화면과 무관하다**(설정 탭의 `AuthorPicker`를
-  본다). 셋 다 `scrollUntilVisible`로 찾아 들어가므로 **행 높이가 바뀌면 문안·
-  `testID`가 전부 불변이어도 깨질 수 있다**(025의 "컨테이너 상단에서 멈춘다").
-- **★ Maestro가 NativeWind로 이관된 `Pressable`의 좌표를 잘못 볼 수 있다**(035
-  실측, SM-S901N). 설정 탭 하단 `AuthorPicker`의 `author-rename-0`
-  (`className` + `style` 병행 `Pressable`)에 `scrollUntilVisible` → `tapOn`을
-  하면, Maestro의 뷰 계층 질의가 **엉뚱한 좌표**(그 위 시간대 선택 그리드)를
-  반환해 "16시"를 눌러 키보드가 올라온다 — `adb shell uiautomator dump`로 얻는
-  좌표는 **정확하며** 그 좌표로 raw `adb input tap`을 하면 편집기가 정상적으로
-  열린다. 033의 "`Pressable`은 responder 시스템으로 컴파일된다"와 같은 계열이되
-  이번엔 `tapOn`이 아니라 **`scrollUntilVisible`의 대상 좌표**가 빗나갔다.
-  `welcome-naming.yml`의 rename 블록이 이것 때문에 자동화 실패했고, 계약 테스트
-  (`author-picker.test.tsx` W18·W19)와 실기기 raw-adb 검증으로 대체했다.
-- **RN 리스트의 `key`는 위치여야 한다 — 표시 문자열을 키로 쓰지 않는다**(035
-  실측). `AuthorPicker`가 `<View key={opt.name}>`였는데, 이름을 바꾸면 `opt.name`
-  이 바뀌어 **줄이 언마운트·리마운트**되고 편집 중인 로컬 `useState`(`editing`)가
-  사라졌다 — 실기기에서 저장 버튼에 닿기 전에 편집기가 닫혔다. 로스터는
-  `CHARACTERS` 순서로 고정이라 `key={index}`가 안정적이다. jest는 리렌더를
-  자동으로 안 시켜 이 결함을 못 잡았다 — `rerender()`로 부모 갱신을 흉내내는
-  테스트를 따로 넣어야 한다.
+  (`INSTALL_FAILED_UPDATE_INCOMPATIBLE`). debug↔release 전환, 서명 키 교체 모두에서 관측됐다.
+- **release 빌드에서 R8/minify는 현재 꺼져 있다**(`enableMinifyInReleaseBuilds` 기본
+  `false`, 027). 켜면 동적 `import`·`llama.rn` JNI 심볼·모듈 최상단 부수 효과가 깨질 수
+  있으나 실측한 적 없다.
+- **이 기기(SM-G986N)는 GPU/NPU 추론 경로를 못 쓴다** — `hasDotProd && hasI8mm &&
+  hasHexagon && hasAdreno`가 모두 참이어야 하는데 `i8mm`이 없다(ARMv8.2). 다른 기기는 다를 수 있다.
+- **`babel.config.js`에 `react-native-worklets/plugin`이 없으면 reanimated가 조용히 안
+  돈다**(오류 없이 애니메이션만 안 된다). 플러그인은 `plugins` 배열의 마지막.
+- **★ React Native의 `fetch`는 응답 스트림을 주지 않는다 — `res.body`가 언제나 `undefined`다**
+  (041). 전역 `fetch`는 XHR 기반 `whatwg-fetch` 폴리필이라 `ReadableStream`이 없다.
+  `res.body.getReader()`로 스트리밍하려는 코드는 웹에서 옳고 여기서 조용히 반대 갈래
+  (`arrayBuffer()` 폴백)를 타 구간 하나(약 380MB)를 통째로 힙에 올린다 → `OutOfMemoryError`
+  (힙 한계 268MB). jest 대역은 `body`를 주므로 기기 없는 테스트가 죽은 쪽을 검증한다 —
+  소스를 읽어 「쓰지 않아야 할 API」를 잠그는 계약 테스트(`__tests__/models/download-memory.test.ts`)가
+  유일한 통로다. 큰 파일은 `expo-file-system`의 `DownloadTask`에 `headers: { Range }`를 준다
+  (네이티브가 디스크에 직접 쓴다).
+
+### 추론·프롬프트
+
+- **`llama.rn`의 `completion()`은 요청하지 않아도 `timings`·`tokens_predicted`를 준다.**
+  원칙 IV가 금지한 값이 밀려 들어오므로 `llama-port.ts`가 경계에서 버린다(`{ text, ending }` 둘뿐).
+- **평문 프롬프트로는 빈 글만 나온다** — `completion({ messages: [...], jinja: true })`로 보낸다.
+- **`stopCompletion()`은 거부시키지 않는다.** `interrupted: true`로 정상 resolve되므로
+  `try/catch`로 끊김을 잡으려 하면 놓친다.
+- **생성 시간 한도(180초)는 모델 적재를 재지 않고 `engine.run()` 구간만 잰다**
+  (`on-device.ts`의 `runWithTimeout()`). 헤드리스·Doze에서는 JS 타이머가 억제돼 이 가드가 무력하다(024).
+- **캐릭터·기기에 따라 생성 시간이 크게 벌어진다.** `quiet`(kanana 2.1B) 웜 2~3초, 옛
+  `narrative`(exaone 2.4B) 콜드 242초까지 관측됐다 — 이 격차가 로스터 축소(037)의 한 근거다.
+- **원칙 II 위반(기록에 없는 것을 단언)은 반복 관측되며 특정 캐릭터에 국한되지 않는다.**
+  매번 프롬프트 쪽을 고치되 판정 갈래는 늘리지 않는다(원칙 IV) — 014에서 「확실하지 않은
+  것은 짐작의 말투로」 규칙을 넣어 교정했다. 신호가 없는 하루의 일기가 서로 닮는 것은
+  정상이다(입력이 같으면 출력이 닮는다) — 다양성을 넣으려는 순간 지어내기가 시작된다.
+- **★ 프롬프트 접두사(018)에서 호칭 줄을 빼면 안 된다.** 접두사의 캐릭터별 값은 이름과 출력
+  언어뿐이라 이름을 빼면 같은 언어 캐릭터들의 접두사가 같아져 「캐릭터를 바꿔도 이전 KV
+  캐시를 재사용한다」가 발생한다(P11). 반대로 **이름이 바뀌어 접두사가 바뀌는 것은 문제가
+  아니다** — KV 캐시가 부분 재사용되어 느려질 뿐 틀리지 않는다(E10). 무효화 로직을 만들지
+  않는다(「언제 무효화하는가」를 재게 되어 원칙 IV다). 로스터가 하나인 지금 P11은 둘째
+  캐릭터가 들어올 때를 위한 `FUTURE_CHARACTER` 계약이다(037).
+- **VLM 캡션이 느린 원인은 타일링이다, 파일 크기가 아니다** — 아래 「VLM 캡션 60초의 원인」.
+
+### 조용히 실패하는 결함의 계열 — 기기 없는 테스트가 못 잡는다
+
+이 저장소에서 반복된 가장 비싼 실패 유형이다. **jest는 타입을 지우고, 네이티브·OS·레이아웃·
+타이밍·리렌더가 없으며, reanimated 등을 목으로 바꾼다.** 오류 없이 잘못된 갈래를 타므로
+기기 없는 테스트가 전부 초록이어도 실기기에서만 드러난다:
+
+- 011 `has_media=0`(contentUri를 네이티브가 못 열어 사진을 안 보고 일기가 나옴)·013 URI 계약
+  불일치(`expo-image-manipulator`는 `file://` 요구, 011은 순수 경로 — 입력에 붙이고 출력에서
+  떼는 두 단계 모두 필요, 예외 없이 `{ ok: false }`로 감싸져 `console.log`를 단계마다 심어야 보임)
+- 020 헤드리스 `defineTask` 미등록(024) · 041 `res.body` · 033 worklets 플러그인
+- 040 권한 결정 뒤 `completed` 미저장·자동 생성 뒤 홈이 목록을 안 다시 읽음
+- 043 `busy` stale closure · 045 liveness 실패 화면이 막다른 길 · 047 키보드 · 049 effect가
+  애니메이션 시작값을 되돌려 한 프레임이 샐 때 · 052 `onLayout` 되먹임 · 053 사진 0장이 「0 장 · 모름」
+
+**처방은 하나다: 기능이 끝났다고 말하기 전에 실기기에서 실제 경로를 한 번 본다**(원칙 V).
+「화면을 떠나는 자리가 바뀌면 그 화면이 저장하던 것도 함께 옮겨야 한다」·「검증 경로가 제품과
+다르게 동작하면 그 검증은 제품을 재현하지 못한다」도 같은 계열의 교훈이다. 새 흐름을 만들 때
+설계가 기대던 기존 계약 테스트(소스를 읽는 것)를 먼저 읽는다.
+
+### 테스트 작성의 함정 (jest·RNTL·소스 계약)
+
+- **계약 테스트는 소스 선언을 직접 읽는다** — `tsc`만 잡는 위반(타입·인자 개수)이 있고
+  `Function.length`는 기본값 인자를 세지 않는다. **소스를 읽을 때는 주석을 먼저 걷어낸다**
+  (`.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "")`) — 이 저장소의 주석은 무엇을
+  왜 금지하는가를 적으므로 금지어가 설명 안에 정당하게 나온다. `scripts/constitution-rules.ts`도 줄 단위로 걷는다.
+- **`tsc`는 유니온을 좁히는 위반만 잡고 넓히는 위반은 못 잡는다**(042: `"none"`을 되살려도 0 오류).
+  「고를 자리가 없다」는 소스를 읽는 테스트가 유일한 방어다. 반대로 유니온을 좁히면 `tsc`가
+  변경 대상을 전부 짚으니 손으로 찾지 않는다(037·042).
+- **RNTL 14는 `render`·`fireEvent`·`rerender` 모두 Promise를 반환한다** — `await` 없이는 flush되지
+  않고 「`render` function has not been called」라는 엉뚱한 오류가 난다. 쿼리는 `screen.*`. 기본
+  쿼리는 접근성에서 숨은 요소를 빼므로 「접혔다」의 증거는 `includeHiddenElements: true`와
+  `pointerEvents`다. `UNSAFE_root`는 없다(`screen.queryAllByRole("button")` 등으로 대신).
+  `it` 안에서 `render`를 두 번 부르고 손으로 `unmount()`하면 뒤 테스트의 `screen`이 어긋난다.
+- **reanimated는 jest에서 손으로 쓴 목이 필요하다**(`jest/setup-ui.ts`). 공식 목도 실제 index를 다시
+  import해 죽는다. 대가로 눌림·애니메이션 테스트는 「배선됐는가」만 검증하고 「움직이는가」는
+  못 한다. gesture-handler는 (1) 목에 `useEvent`·`setGestureState`가 필요하고 (2) **앞 테스트에서 팬을
+  쏜 뒤 새로 렌더한 것에 `fireGestureHandler`를 쏘면 앞 핸들러가 불린다** — 팬 배선은 한 테스트의
+  한 렌더에서만 쏘고 문턱 판정은 순수 함수로 잠근다. `jestSetup.js`는 `jest/setup-ui.ts`에서 require한다.
+- **`Pressable`의 `onPressIn`/`onPressOut`은 host props에 안 남는다**(responder로 컴파일) —
+  `fireEvent(node, "pressIn")`이나 소스로 확인한다. **RN `Pressable`은 `disabled={false}`로 호출부의
+  `accessibilityState.disabled`를 덮어쓴다** — 공용 `Button`이 `disabled={disabled || undefined}`를 넘긴다.
+- **`ScrollView`의 `onMomentumScrollEnd`는 테스트에서 전달되지 않는다** — `onScroll` + `fireEvent.scroll`은 된다.
+  **여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가 접근성 트리에 안 나온다** — `accessibilityLabel`
+  + 자식을 템플릿 리터럴 하나로 합친다(025).
+- **RN 리스트의 `key`는 위치여야 한다**(표시 문자열이면 이름을 바꿀 때 줄이 리마운트되어 편집 중 로컬
+  state가 사라진다, 035). jest는 리렌더를 자동으로 안 시키므로 `rerender()`로 부모 갱신을 흉내낸다.
+- **`@rn-primitives`는 설치본이 JSX를 그대로 담아** `ui` 프로젝트 `transformIgnorePatterns`에 넣어야 한다.
+  포털 테스트는 `__tests__/ui/render-with-portal.tsx`(`rerender`도 `withPortal()`). RN jest 목의 `measure`는
+  콜백을 안 불러 드롭다운은 열리지 않는다. datepicker의 타입 선언과 실제 값이 다르다(`day.date`·
+  `disabledDates` 인자는 dayjs 객체) — 변환은 `app/calendar.ts`의 `dayDateFromPicker()` 한 곳.
+- **위반 주입은 치환이 실제로 적용됐는지 먼저 단언한다**(prettier가 줄을 합쳐 놓으면 치환이 조용히
+  안 먹는다). 정규식이 든 테스트를 스크립트로 생성하면 이스케이프(`\b`→백스페이스)가 무력화하니
+  결과 파일을 다시 읽는다. 일괄 `sed` 치환은 같은 문자열의 다른 뜻(`kind: "none"`)을 구분하지 못한다.
+  **이 저장소에서 python으로 파일을 쓰면 Windows가 CRLF로 바꾼다** — `open(..., newline="\n")`.
+- **`jest-expo`의 `AppState.addEventListener` 스파이를 `mockRestore()`하면** 이후 테스트의 구독 반환값이
+  `undefined`가 된다 — 복원하지 않는다.
 
 ## 도구 사용법 — 실기기 검증 전에 (실측으로 얻은 것)
 
-네 가지가 갖춰져야 Maestro 실기기 테스트가 돈다. 하나라도 없으면 화면에 값이
-멀쩡히 있어도 실패한다.
+네 가지가 갖춰져야 Maestro 실기기 테스트가 돈다. 하나라도 없으면 화면에 값이 멀쩡히 있어도 실패한다.
 
-1. **Metro가 dev 환경으로 떠 있어야 한다** — `EXPO_PUBLIC_APP_ENV=dev npx expo start
-   --dev-client`. **Expo는 `NODE_ENV`로 env 파일을 고르지 `EXPO_PUBLIC_APP_ENV`로
-   고르지 않는다** — `dev`라는 `NODE_ENV`는 없으므로 `.env.dev`는 자동 로드되지
-   않는다. 변수를 셸에서 직접 줘야 하며, `@expo/env`의 `load()`는 이미 설정된
-   `process.env` 값을 보존하므로 `.env.development`(내용이 `local`이어도) 값에
-   덮어써지지 않는다.
-2. **기기 잠금이 풀려 있고 화면이 켜져 있어야 한다** — `adb shell dumpsys trust`의
-   `deviceLocked=0`으로 확인한다. PIN은 사람이 넣어야 한다.
-3. **한글 검증 문구는 `-Dfile.encoding=UTF-8`이 있어야 읽힌다** — 한국어 Windows는
-   CP949라서 안 넣으면 문자가 뭉개진 채 기기에 전달된다. `run-device-tests.mjs`가
-   이 옵션을 이미 넣으므로 그 실행기를 거치면 신경 쓸 것이 없다.
-4. **테스트 전 앱 초기화 루틴 (버전 확인 없이 대치 + pm clear + 재시작)** —
-   실기기 테스트에 들어가기 전에는 기존 테스트 앱을 반드시 초기화한다.
-   다시 설치(uninstall)하는 것이 아니라(불필요하고 시간이 낭비됨), 버전을
-   확인할 것 없이 테스트를 위한 버전(dev 빌드 APK)으로 대치(replace:
-   `adb install -r`)해버리고, `pm clear`로 내부 데이터를 날린 뒤 앱을 다시 시작한다:
+1. **Metro가 dev 환경으로 떠 있어야 한다** — `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client`.
+   **Expo는 `NODE_ENV`로 env 파일을 고르지 `EXPO_PUBLIC_APP_ENV`로 고르지 않는다** — 변수를 셸에서
+   직접 준다(`@expo/env`의 `load()`는 이미 설정된 `process.env`를 보존한다).
+2. **기기 잠금이 풀려 있고 화면이 켜져 있어야 한다** — `adb shell dumpsys trust`의 `deviceLocked=0`.
+   PIN은 사람이 넣는다.
+3. **한글 검증 문구는 `-Dfile.encoding=UTF-8`이 있어야 읽힌다**(한국어 Windows는 CP949).
+   `run-device-tests.mjs`가 이미 넣는다.
+4. **테스트 전 앱 초기화(대치 + `pm clear` + 재시작)** — 다시 설치(uninstall)하지 않는다(시간 낭비).
+   버전 확인 없이 dev 빌드 APK로 대치하고 데이터를 날린 뒤 다시 시작한다. `run-device-tests.mjs`가
+   기기 연결 시 자동으로 먼저 한다:
    ```bash
    adb install -r android/app/build/outputs/apk/debug/app-debug.apk
    adb shell pm clear com.anonymous.alpharium
    adb shell am start -n com.anonymous.alpharium/.MainActivity
    ```
+   **`pm clear`는 모델 파일(~2GB)·일기·설정을 지운다.** 모델·일기를 보존해야 하면 `pm clear` 없이
+   `welcomeShown` 등 플래그 파일만 고친다(`files/preferences/onboarding.json`; JSON을 `adb shell "echo {...}"`로
+   쓰면 셸이 중괄호·따옴표를 먹으니 로컬 파일을 `adb push /data/local/tmp/` 한 뒤
+   `cat … | run-as <패키지> sh -c 'cat > …'`). `clearState`도 앱 데이터만 지우고 **OS 권한은 그대로**라
+   사진·위치·알림이 이미 부여된 기기에서는 그 단계가 자동으로 지나간다.
 
-그 외 실측으로 확인된 함정들:
+### 빌드·연결
 
-- **`adb reverse tcp:8081 tcp:8081`이 USB·무선 관계없이 필요하다.** 없으면 debug
-  APK가 `Unable to load script`로 죽는다. 재부팅으로 사라지므로 다시 건다.
-- **Metro 캐시가 스테일이면 "Loading from localhost:8081..."에 영구히 머문다** —
-  오류 없이 영영 로딩 중이라 원인을 가리키지 않는다. `npx expo start --clear`로
-  푼다.
-- **`expo run:android`만으로는 매니페스트가 갱신되지 않는다.** `android/`가 이미
-  있으면 prebuild를 건너뛴다 — `npx expo prebuild --platform android --clean`이
-  필요하고, `adb shell dumpsys package <패키지>`의 `requested permissions`로
-  확인한다(빌드 성공이 매니페스트가 맞다는 뜻이 아니다).
-- **Maestro의 기본 텍스트 매칭은 노드 전체와 맞춰 본다.** `@testing-library`의
-  `toHaveTextContent`와 같은 성질이라 부분 문자열은 정규식(`.*상상을 섞어.*`)으로
-  준다. `childOf`는 RN의 평탄화된 접근성 트리에서 통하지 않으므로 `testID`나
-  그 자리에만 있는 문장 전체로 대신한다(`testID`는 R8·ProGuard에서도 살아남는다).
-- **`uiautomator dump`가 Git Bash에서 `/sdcard/`를 윈도우 경로로 바꾼다** —
-  `MSYS_NO_PATHCONV=1`을 앞에 붙인다. 화면이 계속 움직이면(다운로드 진행률 등)
-  "could not get idle state"로 실패하는데 그때는 `screencap`으로 본다. 한글은
+- **`adb reverse tcp:8081 tcp:8081`이 USB·무선 관계없이 필요하다.** 없으면 debug APK가 `Unable to load script`로
+  죽는다. 재부팅으로 사라지므로 다시 건다.
+- **Metro가 스테일이면 「Loading from localhost:8081...」에 영구히 머문다** — 오류 없이 영영 로딩 중이다.
+  캐시 문제뿐 아니라 며칠 켜 둔 Metro가 번들을 못 서빙하는 경우도 있다(`/status`가 안 돌아옴, 포트 점유).
+  프로세스를 종료하고 `npx expo start --clear`로 다시 띄운다.
+- **`expo run:android`만으로는 매니페스트가 갱신되지 않는다.** `android/`가 있으면 prebuild를 건너뛴다 —
+  `npx expo prebuild --platform android --clean`이 필요하고 `adb shell dumpsys package <패키지>`의
+  `requested permissions`로 확인한다(빌드 성공이 매니페스트가 맞다는 뜻이 아니다).
+- **Metro는 gradle 빌드가 끝난 뒤에 띄운다** — 빌드 중이면 파일 감시자가 중간 산출물을 잡으려다 exit code 7로 죽는다.
+- **기기가 둘 붙으면 `adb shell`이 모호해진다** — `-s <시리얼>`. `adb`는 Windows 실행 파일이라 Git Bash의
+  `/tmp`를 모르므로 `adb pull` 목적지는 `C:/…`. `adb shell` 줄 끝은 CRLF다(파일명 끝 `\r`을 걷어낸다).
+
+### 화면 관찰·조작
+
+- **`uiautomator dump`·`screenrecord`의 기기 경로(`/sdcard/…`)는 Git Bash에서 윈도우 경로로 바뀐다** —
+  `MSYS_NO_PATHCONV=1`을 앞에 붙인다(없으면 녹화가 조용히 실패한다). 화면이 계속 움직이면 「could not get idle
+  state」로 실패하니 `screencap`으로 본다. 녹화를 끝내기 전에 `adb pull`하면 `moov atom not found`다. 한글은
   콘솔에서 CP949로 뭉개지므로 UTF-8로 직접 써야 읽힌다.
-- **기기가 둘 붙으면 `adb shell`이 모호해진다** — `-s <시리얼>`을 붙인다. `adb`는
-  Windows 실행 파일이라 Git Bash의 `/tmp`를 모르므로 `adb pull`의 목적지는 `C:/…`
-  꼴로 준다. `adb shell`의 줄 끝은 CRLF이므로 파일명 끝 캐리지 리턴을 걷어내지
-  않으면 정규식 검사가 빗나간다.
-- **Metro는 gradle 빌드가 끝난 뒤에 띄운다** — 빌드 중에 띄우면 Metro의 파일
-  감시자가 gradle이 지우는 중간 산출물을 잡으려다 exit code 7로 죽는다.
+- **움직임 결함은 스크린샷이 아니라 `screenrecord`(30fps) 프레임 추출로 본다.** 개발 기계에 ffmpeg가 없으면
+  `pip install --target <임시 폴더> imageio-ffmpeg`가 실행 파일을 준다.
+- **`adb shell input`**: 스트립을 넘긴 직후의 첫 `tap`이 먹히지 않을 수 있고, 빠른 `swipe`(300ms)는 지면을
+  스크롤하지 못한 반면 1200ms는 됐다(손가락 입력에서의 원인은 모름). 접힌 뒤에는 스크롤 범위가 작아 큰
+  스와이프가 한 번에 끝에 닿는다.
+- **로고는 1.5초라 스크린샷으로 놓친다**(`LOGO_DISPLAY_MS`). 관찰하려면 상수를 일시적으로 올리고 되돌린다.
+- **`AppState.currentState`와 `adb dumpsys`는 화면의 물리적 꺼짐을 보장하지 않는다** — 반복된 `dumpsys` 조회가
+  화면을 깨운 적이 있다. `dumpsys activity`의 `ResumedActivity`도 화면이 꺼진 뒤 스테일하게 남는다.
 
-## 007~014 기능별 핵심 결론
+### Maestro
 
-각 기능은 기기 없는 테스트(`npm test`)와 최소 1회의 실기기 확인을 거쳤다(원칙 V —
-"건너뛴 실기기 테스트는 통과가 아니다"). 상세 검증 로그는 git 히스토리에 있다.
+- **기본 텍스트 매칭은 노드 전체와 맞춰 본다** — 부분 문자열은 정규식(`.*…*`)으로. `childOf`는 RN의 평탄화된
+  접근성 트리에서 통하지 않으니 `testID`나 그 자리에만 있는 문장 전체로 대신한다(`testID`는 R8에서도 산다).
+  글자가 겹치는 버튼(예: 「다시 쓰기」가 하단 바와 확인 대화상자에 둘)은 글자가 아니라 `id:`로 누른다.
+- **`assertNotVisible`은 `timeout`을 받지 않는다**(파싱 실패). 사라짐을 기다리려면 `extendedWaitUntil`의 `notVisible`.
+  `scrollUntilVisible`에만 `timeout`이 붙는다.
+- **`scrollUntilVisible`은 대상의 위쪽 가장자리·제목에서 멈춘다** — 그 아래 요소는 개별로 스크롤해 올리고, 스크롤
+  타겟은 실제로 봐야 할 것(예: 위치 표시)으로 준다. **행 높이가 바뀌면 문안·`testID`가 불변이어도 깨질 수 있다.**
+- **★ NativeWind로 이관된 `Pressable`(`className` + `style` 병행)에서 `scrollUntilVisible` → `tapOn`이 엉뚱한
+  좌표를 볼 수 있다**(035, 설정 탭 `author-rename-0`) — `uiautomator dump` 좌표는 정확하고 raw `adb input tap`은
+  된다. `welcome-naming.yml`의 rename 블록이 이것으로 자동화 실패해 계약 테스트(`author-picker.test.tsx`
+  W18·W19)와 raw-adb 검증으로 대체했다 — **알려진 실패이며 회귀가 아니다.**
+- **어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다** — `id: "onboarding-step-photos"`를 박으면
+  이미 부여된 기기에서 실패한다(`onboarding-step-.*` + skip-all 루프).
+- **흐름의 `env:` 값은 `-e`를 덮어쓴다** — 기본값은 `${X || "…"}`로 준다. 「쓰고 있다」를 기다려 생성이 끝나기 전에
+  PASS하지 않게, 쓰는 중 표식(`id: stop-button`)이 사라지길 기다린다.
+- **흐름마다 따로 `maestro`를 부르면 흐름당 약 35초씩 기기가 멈춰 있다** — `run-device-tests.mjs`는 한 번의
+  `maestro test`에 넘긴다(실패해도 다음 흐름으로 간다). 끊은 Maestro 직후 곧바로 다시 돌리면
+  `DeviceServerDiedException`으로 전부 실패할 수 있다 — 한 번 더 돌린다. `clearState` 직후 Maestro 기기 서버가
+  죽는 경우도 있어 그 흐름(`first-run-flow`)은 손으로 본다.
+- **`run-device-tests.mjs`가 값(`-e WRITTEN_DAY=…` 등)을 안 넘기는 흐름은 실행기로 돌리면 실패한다**
+  (`written-day-reading`·`reading-scroll`) — `maestro test`로 직접 돌린다. 이 화면을 지나는 흐름
+  (`download-conflict`·`parallel-model-download`·`photo-vision`)은 설정 탭 하단 `CharacterListScreen`을 지난다.
+- **⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야 돈다.** 등록하지 않으면 파일이 있어도
+  아무것도 검증되지 않은 초록불이다. 지금 `FLOWS` 밖에 있는 것: 051이 `⋯` 메뉴를 없앤 뒤 설정·개발자 진입이
+  필요한 흐름 열한 개(설정 화면 구성과 함께 전면 재개편 예정), `download-conflict`(026 이후)·
+  `parallel-model-download`(로스터 하나, 037)·`diary-user-path`(stale 메뉴)는 **알려진 실패**다.
+
+### 백그라운드 작업 소크·헤드리스 관찰
+
+- **`am force-stop`은 WorkManager 잡을 함께 취소한다** — 전경을 벗어나려고 쓰면 잡이 사라져 아무것도 안 도는 채
+  시간만 흐른다(`dumpsys jobscheduler`에 항목 0개로만 드러난다). **홈 버튼을 쓴다.**
+- **앱이 전경에 있으면 태스크가 아예 실행되지 않는다** — `BackgroundTaskScheduler.runTasks()`가 `inForeground`이면
+  `runTasks: App is in the foreground`만 찍고 재예약한다. 그 플래그는 Activity start/stop에 반응하지 화면 on/off가
+  아니다. 판정은 `wm_on_stop_called` 뒤에 `wm_on_resume_called`이 없는 라이프사이클 로그뿐이다. Doze가 깨져도
+  라운드가 무효다.
+- **`"skipped"`는 로그상 정상 완주와 구분되지 않는다**(`Worker result SUCCESS`, 020 B6) — 소크 판정은
+  `files/diary/`의 새 파일과 개발자 탭 `결과:`를 함께 본다. 측정은 `adb logcat` + OS 조회를 사람이 문서로 옮긴다
+  (검증 전용 로그 모듈은 만들지 않는다, 원칙 IV). 정오 직후 앱을 처음 띄우면 040의 첫 실행 트리거가 따로 돌아
+  그날 일기를 먼저 쓴다(`decideSchedule`을 거치지 않는 다른 경로) — 결과를 시각으로 귀속시키지 않으면 오판한다.
+
+## 기능별 핵심 결론
+
+각 기능은 기기 없는 테스트와 최소 1회의 실기기(dev) 확인을 거쳤다(원칙 V — 「건너뛴 실기기 테스트는
+통과가 아니다」). 뒤 기능이 뒤집은 부분은 지웠다.
 
 ### 007 — 캐릭터 선택·대기·목록
 
-- **캐릭터를 사용자가 고른다**(`resolveSelection()`). 006까지는 준비된 것 중
-  먼저 나오는 하나를 말없이 집었다 — 그 결함을 고쳤다. 고른 적이 없으면 준비된
-  것이 있어도 자동으로 고르지 않는다(FR-008, 실기기 확인).
-- 고른 캐릭터가 준비를 잃으면 다른 것으로 옮기고 화면에 알린다(말없이 바꾸지
-  않는다) — 캐릭터별 원칙 II 위반 빈도가 다르므로 사용자가 통제할 수 있어야 한다.
-- 그만두기 버튼이 생겼다. `ActivityIndicator`(RN 코어)에는 진행률 파라미터
-  자체가 없어 이것이 원칙 IV의 방어가 됐다.
-- **타입 방어는 `npm test`가 아니라 `tsc`에 있다** — jest는 타입을 지우므로
-  `Object.keys()` 같은 구조 위반을 못 잡는다. 이후 계약 테스트는 소스 선언을
-  `readFileSync`로 직접 읽어 검사하는 패턴이 이 저장소 전반의 관례가 됐다.
-- 헌법 검사: `src/ui/`가 `models/roster`·`ModelAsset`에 닿지 못하게 막는다.
+- **캐릭터를 사용자가 고른다**(`resolveSelection()`) — 고른 적이 없으면 준비된 것이 있어도 자동으로 고르지 않는다.
+  고른 캐릭터가 준비를 잃으면 다른 것으로 옮기고 화면에 알린다(말없이 바꾸지 않는다).
+- 그만두기 버튼이 있다. `ActivityIndicator`(RN 코어)에는 진행률 파라미터가 없어 이것이 원칙 IV의 방어가 됐다.
+- **타입 방어는 `npm test`가 아니라 `tsc`에 있다**(jest는 타입을 지운다). 헌법 검사: `src/ui/`가 `models/roster`·
+  `ModelAsset`에 닿지 못한다.
 
 ### 008 — 내려받기 충돌
 
-- 사용자가 화면에서 발견한 버그 둘("동시에 못 받는다"는 실은 규칙인데 화면이
-  침묵했고, "받는 중에 다른 걸 누르면 멈춘다"는 실은 안 멈추고 화면에서만
-  사라졌다)을 고쳤다. 원인은 `App.tsx`의 반환값 버림, 거부 요청에서도 도는
-  `setProgress(null)`, 탭 전환 시 `Acquisition` 인스턴스 소실 — 셋 다 오류 없이
-  "아무 일도 일어나지 않는" 조용한 실패였다.
-- `acquisition.ts`(비즈니스 로직)는 이미 옳았다 — 고친 것은 화면이 그것을 부르는
-  방식뿐이다. 판정을 `resolveDownloadView()` 순수 함수로 뗐다.
-- **탭 밖에서 네이티브 다운로드가 실제로 이어진다**(`expo-file-system`의
-  `DownloadTask`가 JS 참조와 별개로 산다) — 이전에는 가정이었다.
-- 받다 만 모델은 앱 UI로 지울 수 없다(003의 "지우기"는 `ready`인 줄에만 있다) —
-  알려진 빈자리로 남아 있다.
+- 「동시에 못 받는다」(실은 규칙인데 화면이 침묵)와 「받는 중에 다른 걸 누르면 멈춘다」(실은 화면에서만 사라짐)를
+  고쳤다. 원인은 `App.tsx`의 반환값 버림·거부 요청에서도 도는 `setProgress(null)`·탭 전환 시 `Acquisition`
+  인스턴스 소실 — 셋 다 오류 없이 「아무 일도 안 일어나는」 조용한 실패였다. `acquisition.ts`(비즈니스 로직)는 이미
+  옳았고 판정만 `resolveDownloadView()` 순수 함수로 뗐다. 탭 밖에서도 `DownloadTask`는 이어진다.
+- 알려진 빈자리: 받다 만 모델·로스터에서 빠진 모델은 앱 UI로 지울 수 없다(041이 구간 임시 파일은 `remove()`가 본다).
 
 ### 009 — 과거 하루 선택
 
-- 고를 수 있는 하루가 셋(마지막으로 닫힌 하루 + 그 앞 둘)이다. **"3일"은 개수이지
-  기간이 아니다** — 일기는 여전히 하루에 하나, 그 하루만 쓴다.
-- 제약이 화면 한 곳(`DiaryHomeScreen`이 넘기는 `day:` 인자)에만 있었다 — 나머지
-  계층은 이미 하루를 인자로 받고 있었다. 안 고치면 화면에서 골라도 조용히 항상
-  어제가 쓰였을 것이다(006·007·008과 같은 계열의 조용한 실패).
-- 되돌림(범위 밖으로 밀려난 하루를 기본값으로)은 지우는 코드 없이, 매 렌더에서
-  다시 판정하는 방식으로 구현했다 — `useEffect`/타이머 없이 타이밍 버그를 막는다.
-- 고른 하루는 파일에 남기지 않는다(007의 캐릭터 선택과 의도적으로 다름) — 시간이
-  지나면 범위를 벗어나 저장된 값이 오히려 틀린 값이 된다.
-- **`Function.length`는 기본값 인자를 세지 않는다** — 계약 테스트를 인자 개수로
-  방어하려던 시도가 뚫렸다. 이후 소스를 직접 읽는 패턴으로 교체.
-- `none`(사진이 실제로 0장인 하루)과 `unknown`(권한 없음)이 실기기에서 서로 다른
-  문구("사진 없음" vs "사진 모름")로 확인됐다 — 004가 값에서 지킨 구분이 화면까지
-  도착했다.
+- 일기는 하루에 하나, 그 하루만 쓴다. **고른 하루는 파일에 남기지 않는다**(시간이 지나면 저장된 값이 틀린 값이 된다;
+  007의 캐릭터 선택과 의도적으로 다름). 이후 049가 화면의 선택 범위를 모든 지난 날로 넓혔고, 사흘(`selectableDays`)은
+  백그라운드 재시도·알림 정리·018 미리 준비의 범위로만 남았다.
+- `none`(사진이 실제로 0장)과 `unknown`(권한 없음)이 화면까지 다른 문구로 도착한다(004가 값에서 지킨 구분).
 
 ### 010 — 합성 하루를 기기에 심는 도구
 
-- 테스트 기기가 주머니에 안 들어가 볼 것이 없는 하루만 검증해 온 문제를 고쳤다.
-  개발 기계 스크립트가 지정한 하루의 사진을 MediaStore에 심고, 앱은 도구가
-  있었는지 모른 채 평소와 똑같이 읽는다(**앱 코드 변경 0줄**).
-- `npm run seed:day -- <모양> <날짜>` / `seed:list` / `seed:clear`.
-- **손으로 만든 EXIF를 미디어 스캐너가 무시한다** — 원인 불명. 그래서 저장소에
-  실기기에서 찍은 템플릿 JPEG을 두고 날짜·GPS 바이트만 길이를 유지한 채
-  교체한다(오프셋 불변, IFD 재계산 불필요).
-- **색인 방법은 `content call --method scan_file` 하나뿐이다** — 브로드캐스트나
-  직접 update는 조용히 실패한다(성공한 것처럼 보이지만 셸 UID가 다른 앱 소유
-  행을 못 고친다).
-- **확인 단계가 실제로 결함을 잡았다**: `over-limit`(201장)을 심었더니 322초
-  걸리고 150장만 색인됐다 — 되읽어 확인하지 않았다면 몰랐을 실패였다. 그래서
-  `over-limit` 모양은 지금 쓸 수 없다.
-- 자동으로 치우지 않는다(`existing`으로 남은 것을 알린다) — 검증을 한 번으로
-  끝내지 않기 위해서다.
-- 헌법 검사: `scripts/seed*`가 `diary/store`·`generate(`·`initLlama`에 닿지 못하게
-  막는다 — "심은 하루로 캐릭터를 비교해 보자"는 원칙 IV·V 위반이 되기 쉬운 자리다.
-  **심은 하루로 품질을 결론짓지 않는다** — 얻을 수 있는 것은 "경로가 도는가"이지
-  "출력이 좋은가"가 아니다.
+- 개발 기계 스크립트가 지정한 하루의 사진을 MediaStore에 심고 앱은 평소처럼 읽는다(**앱 코드 변경 0줄**).
+  `npm run seed:day -- <모양> <날짜>` / `seed:list` / `seed:clear`. 자동으로 치우지 않는다.
+- **손으로 만든 EXIF는 미디어 스캐너가 무시한다** — 저장소의 실기기 템플릿 JPEG의 날짜·GPS 바이트만 길이를 유지한 채
+  교체한다. **`scripts/samples/no-gps/`(2017 Galaxy)는 이 기기(Android 16)에서 `datetaken`이 NULL이 된다** →
+  `with-gps/`를 먼저 쓴다(`pickNoGpsSample`, `patchLocation`은 안 부름). `patchDate`는 IFD0 `DateTime`도 덮어쓴다.
+  심는 사진의 시각표 원점은 `SHAPE_CLOCK_ORIGIN_HOUR = 4`(하루 경계와 무관).
+- **색인은 `content call --method scan_file` 하나뿐이다**(브로드캐스트·직접 update는 조용히 실패). `over-limit`(201장)은
+  322초에 150장만 색인돼 지금 쓸 수 없다. `seed:day`는 아직 사흘 안에만 심는다(화면은 모든 지난 날).
+- 헌법 검사: `scripts/seed*`가 `diary/store`·`generate(`·`initLlama`에 닿지 못한다. **심은 하루로 품질을 결론짓지
+  않는다** — 얻는 것은 「경로가 도는가」다.
 
 ### 011 — 사진 내용 캡션
 
-- 004가 장수·좌표만 세던 것을, 사진 보는 VLM이 장별로 캡션을 만들어 005의
-  프롬프트에 재료로 넣는다. **캐릭터 로스터와 무관한 모델 하나** — 처음엔
-  "캐릭터 모델에 mmproj를 붙인다"로 계획했으나 사용자가 바로잡았다.
-  `src/vision/roster.ts`는 `models/roster.ts`와 서로 import하지 않는다.
-- 파이프라인: `사진 → [VLM 열기 → 장별 캡션 → 닫기] → 텍스트 → [캐릭터 모델 →
-  일기]`. 두 엔진은 서로를 모르며 `on-device.ts`가 순서를 지킨다(한 번에 모델
-  하나만 열린다는 005의 제약 때문).
-- **캡션 샘플링은 `inference/sampling.ts`를 재사용하지 않는다** — 캡션용 온도를
-  낮추면 일기 생성도 함께 바뀌어 원칙 I을 조용히 깬다. `src/vision/sampling.ts`에
-  따로 두고 헌법 검사가 재사용을 막는다.
-- 캡션은 되뱉기 판정 대상에 넣지 않는다 — 캡션은 신호 자체이므로 일기에 나오는
-  것이 정상이다. 5장 상한은 `n_ctx` 초과도 함께 막는다.
-- **5장은 하루에 걸쳐 균일 선택한다**(004의 `slice(0, limit)`과 의도적으로 다름) —
-  앞에서부터 자르면 아침만 보고 하루를 쓰게 된다.
-- 캡션에 "틀릴 수 있다" 같은 불확실성 표현을 붙이지 않는다 — 붙이면 모델이 전부
-  얼버무리고, 005의 실측이 가르친 것은 "압력이 지어내기를 낳는다"는 것이었다.
-- 헌법 검사 둘 추가: `src/vision/`이 `diary/store`(캡션 품질을 일기 저장소로
-  재는 것 방지)와 `inference/sampling`에 닿지 못한다.
-- **실기기 확인에서 결함을 잡았다**: `PhotoPort`가 넘긴 것이 안드로이드
-  contentUri(`content://...`)라 네이티브가 파일로 못 열었다 — 사진을 하나도
-  안 보고도 일기가 나오는 조용한 실패였다(로그의 `has_media=0`으로만 드러남).
-  `filePathOf()`가 `Asset.getUri()`를 부르고 `file://`를 떼는 방식으로 고쳤다.
-- VLM→캐릭터 모델 전환이 실제로 된다(한 요청 안에서 크래시 없이). 「보지 않음」과
-  「빠르게 봄」의 일기가 확연히 다르다(캡션이 실제로 재료가 된다).
-- **캡션이 영어다** — 캡션 프롬프트가 영어라 한국어 일기에 영어 단어가 섞여
-  나온다(예: "sleeping bag"). 아직 고치지 않았다.
-- 캡션 깊이(`image_max_tokens`)가 클수록 더 지어낸다는 관측이 있다(검은 이미지
-  기준) — 다만 진짜 사진에서 같은지는 013 이후 별도로 확인이 필요하다.
-- VLM 안 열기: 사진이 0장이거나 권한이 없으면 VLM을 아예 열지 않는다(캡션 시도
-  0회) — 볼 것이 없으면 여는 것 자체를 생략한다.
+- 사진 보는 VLM이 장별 캡션을 만들어 프롬프트의 재료가 된다. **캐릭터 로스터와 무관한 모델 하나**이고
+  `src/vision/roster.ts`는 `models/roster.ts`와 서로 import하지 않는다. 파이프라인은 `사진 → [VLM 열기 → 캡션 →
+  닫기] → 텍스트 → [캐릭터 모델 → 일기]`이고 `on-device.ts`가 순서를 지킨다(한 번에 모델 하나).
+- **캡션 샘플링은 `inference/sampling.ts`를 재사용하지 않는다**(낮추면 일기 생성도 바뀌어 원칙 I을 깬다) —
+  `src/vision/sampling.ts`에 따로 두고 헌법 검사가 막는다. 헌법 검사: `src/vision/`이 `diary/store`에도 못 닿는다.
+- 캡션은 되뱉기 판정 대상이 아니다(신호 자체). 캡션에 「틀릴 수 있다」 같은 불확실성 표현을 붙이지 않는다(붙이면
+  모델이 전부 얼버무리고, 압력이 지어내기를 낳는다). 볼 것이 없으면(0장·권한 없음) VLM을 열지 않는다.
+- **캡션 프롬프트가 영어라 한국어 일기에 영어 단어가 섞인다**(예: "sleeping bag") — 미해결.
+  `image_max_tokens`가 클수록 더 지어낸다는 관측(검은 이미지 기준)은 진짜 사진에서 미확인.
 
-### 012 — 정오 이후 오늘 쓰기
+### 012 — 오늘 쓰기와 사진 신호 (정오 제한은 049가 폐지)
 
-> 049에서 정오 제한이 사라졌다(오늘은 언제든 쓸 수 있다). 아래는 이력이다.
-
-- `day-boundary.ts`의 `isDayClosed` → `isDayWritable`(정오부터 열림) 교체가
-  기능의 전부이며, 나머지(축 제외·덮어쓰기 확인·사진 상한 제거)는 게이트가
-  열리며 함께 드러난 표면이다.
-- 헌법 원칙 II MUST: `DAY_STILL_OPEN`("오늘은 아직 끝나지 않았다...") 문장이
-  사진 권한과 무관하게 프롬프트에 실린다. **신호가 빈약한 하루에서는 이 문장이
-  되뱉기(`echo`) 거부를 유발할 수 있다**(실기기 관측, 재시도로 해소) — 원칙 I의
-  방어(거부 시 파일 안 건드림)는 정상 작동했다.
-- 사용자 화면에서 걸음·배터리·연결 세 축이 사라졌다(`USER_VISIBLE_SIGNAL_AXES`
-  상수). 진단 화면(`SignalProbe.tsx`)은 여전히 다섯 축을 보인다 — 헌법 검사가
-  진단 화면이 그 상수를 참조하지 못하게 막아 경계를 이중으로 지킨다.
-- 사진 상한을 없앴다(`DEFAULT_PHOTO_LIMIT` 제거) — 조회 성공 시 구간의 사진
-  전부가 담긴다. 실기기에서 18장까지 상한 없음이 확인됐다.
-- 덮어쓰기 확인 화면(`OverwriteConfirmScreen`)이 새로 생겼다 — 이미 있는 하루에
-  "일기 쓰기"를 눌러도 곧바로 생성하지 않고 취소/확인을 먼저 묻는다.
-- **가장 위험했던 결함**: 화면이 완벽해도 파이프라인 게이트가 옛 `isDayClosed`로
-  남아 있으면 조용히 `day-not-closed`로 막힌다 — 위반 주입에서 실제로 이것부터
-  걸렸다.
-- 정오 이전 안내(D8)와 정오 경계를 넘나드는 순간의 화면 갱신은 기기 시각을 바꿀
-  수 없어(root 필요) 실기기 미확인 — 기기 없는 계약 테스트가 이 갈래를 검증한다.
+- **프롬프트의 `DAY_STILL_OPEN`(「오늘은 아직 끝나지 않았다…」)은 헌법 원칙 II MUST**로 사진 권한과 무관하게
+  실린다. **신호가 빈약한 하루에서는 이 문장이 `echo` 거부를 유발할 수 있다**(재시도로 해소; 원칙 I의 방어는 정상).
+- **사용자 화면에 보이는 신호 축은 사진·장소뿐이다**(`USER_VISIBLE_SIGNAL_AXES`). 진단 화면(`SignalProbe.tsx`)은
+  다섯 축을 다 보이고, 헌법 검사가 진단 화면이 그 상수를 참조하지 못하게 막는다.
+- **가장 위험했던 결함**: 화면이 완벽해도 파이프라인 게이트가 옛 함수(`isDayClosed`)로 남으면 조용히
+  `day-not-closed`로 막힌다. 신호 수집은 사진 상한이 없다(`DEFAULT_PHOTO_LIMIT` 제거) — VLM에 넘기는 상한은 023의 8장.
 
 ### 013 — 캡션 전 리사이즈
 
-- 사진을 VLM에 넘기기 전 리사이즈해 캡션 시간을 129초→23초(82% 감소, 스펙 요구
-  "절반 이하"를 크게 웃돎)로 줄였다. "VLM 캡션 60초의 원인" 조사(아래 문단)가
-  근거다.
-- **실기기에서만 드러난 함정 둘** — 기기 없는 테스트 1276개가 통과한 채로 사진을
-  하나도 안 보고 일기가 나왔다(011의 결함과 같은 계열). 원인은 `expo-image-
-  manipulator`(URI 요구)와 011의 `resolvePath()`(순수 경로 반환)가 정반대의 URI
-  계약을 가진 것 — 리사이즈 입력에 `file://`를 붙이고, 출력에서 다시 떼는 두
-  단계가 모두 필요했다. 둘 다 예외 없이 `{ ok: false }`로 조용히 감싸졌으므로
-  `console.log`를 단계마다 심어야 원인이 드러났다.
-- 캡션이 실제 사진 내용을 정확히 반영하는 것을 진짜 사진(피크닉 장면)으로
-  확인했다 — 검은 이미지가 아닌 진짜 사진에서의 첫 검증이다.
-- release 재확인은 생략했다 — `expo-image-manipulator`는 표준 Expo autolinking
-  모듈이라(005·011처럼 손으로 짠 JNI 브릿지가 아님) debug 1회로 충분하다는
-  판단(아래 "테스트" 절의 기준을 따름).
+- 사진을 VLM에 넘기기 전 1024px로 리사이즈해 캡션 시간을 129초→23초(82% 감소)로 줄였다(근거는 아래 「VLM 캡션
+  60초의 원인」). 캡션은 리사이즈된 진짜 사진에서도 내용을 정확히 반영했다. 품질이 무너지는 해상도 하한은 재지 않았다.
+  URI 계약의 함정은 위 「조용히 실패하는 결함의 계열」.
 
 ### 014 — 캐릭터 페르소나
 
-- 다섯 캐릭터가 사람이 지은 이름·소개로 보인다(금동이·루이·오드·샤오바이·모카,
-  `src/diary/persona.ts` 신규 — 003이 남긴 자리를 채웠다). 로드맵 문서가 이미
-  옮겨 둔 값을 코드로 옮겼을 뿐 새로 짓지 않았다.
-- 일기에 제목이 붙는다(`extractTitle()`, `judge()` **통과 후**에만 분리) — 판정
-  갈래는 여전히 4개, 제목을 못 떼도 거부하지 않고 `title: undefined`로 저장한다.
-- 프롬프트에 "확실하지 않은 것은 짐작의 말투로" 규칙을 추가해 원칙 II 위반을
-  교정했다(005~012의 공통 패턴이 "짐작해도 될 것을 단정형으로 썼다"는 재진단).
-- 진단 화면에 캐릭터별 모델 이름이 보인다(`roster.ts`의 `displayName()`) —
-  `DiagnosticsScreen`은 여전히 `roster.ts`를 직접 import하지 않는다(007의 경계
-  유지).
-- **plan.md가 놓친 이중 정의**: `DiaryListItem` 타입이 `store.ts`와 `app/state.ts`
-  두 곳에 독립적으로 있었다 — `tsc`가 즉시 잡았다(007·009와 달리 이번엔 타입
-  검사가 원인을 정확히 가리켰다).
-- **헌법 1.1.1 개정**(2026-08-23, 사용자 요청): 오드의 소개("상상력이 풍부해요")와
-  헌법 MUST 고지("상상을 섞어 씁니다")가 화면에서 같은 사실을 중복 전달했다.
-  로스터 조항에 "소개 문구 자체가 강점의 언어로 그 사실을 담으면 별도 고지가
-  필요 없다"를 명시하고, 오드의 tagline을 헌법이 이미 예로 든 "상상력이
-  풍부해요"로 유지하며 별도 고지 렌더링(`IMAGINATIVE_NOTICE`)을 제거했다. 낱말
-  ("상상")의 반복이 아니라 **같은 사실의 이중 전달**이 진짜 문제였다는 것이
-  교훈이다 — 처음엔 tagline만 바꿔 증상만 지웠다가 사용자가 다시 확인해 뒤집었다.
-- "고름"(선택 표식)이 욕창을 연상시킨다는 사용자 피드백으로 "선택"으로 바꿨다
-  (캐릭터·날짜·사진 설정 세 화면 전부, 관련 Maestro 흐름 문자열도 함께 갱신).
-- 진단 화면(환경·추론 위치 등)을 일기 탭 위 작은 창에서 "개발자" 탭으로 옮겼다
-  (사용자 요청) — 노출 조건(local·dev 전용, `showsOnScreen()`)은 동일하게 유지,
-  prod에서는 탭 자체가 없다. 사용자가 실기기에서 직접 확인했다(2026-08-23).
-- 실기기 확인: 이름·소개·제목(생성·저장·목록·상세)·진단 모델명·덮어쓰기 확인,
-  개발자 탭·오드 고지·선택 표식까지 전부 문제없었다. 다른 캐릭터의 지어내기
-  관측(D6)과 제목 40자 상한의 적절성은 미확인으로 남아 있다.
-
-### 018 — 프롬프트 고정 접두사 미리 프리필 (2026-08-27)
-
-my-ollama 저장소의 실측(Galaxy S22, 교대 설계 18런)을 근거로 받은 스펙 —
-프롬프트의 69.8%(화자 규칙·이름·제목 지시문, 캐릭터가 같으면 날마다 불변)를
-KV 캐시에 미리 채워 두면 TTFT가 20.6초→6.6초로 줄어든다는 결론을 이 저장소에
-적용했다.
-
-- `GenerationEngine.prewarm(character)`가 새 계약이다(`engine-port.ts`) —
-  **반환값이 없다**(원칙 IV). 실패해도 다음 `run()`이 그냥 느릴 뿐 틀리지
-  않으므로 알릴 것이 없다는 것이 이 설계의 핵심.
-- `prompt.ts`의 `promptPrefix()`가 `buildPrompt()`와 **같은 배열
-  (`fixedHead()`)에서** 나온다 — 복제하면 접두사가 한 글자만 어긋나도 KV
-  캐시가 빗나가 이 기능 전체가 "느려질 뿐 오류 없이" 무의미해진다. 계약
-  테스트(P8·P10·P11)가 이 바이트 동일성과 캐릭터별 유일성을 잠근다.
-- **`/speckit-analyze`가 계획 단계에서 구조적 결함을 잡았다**: 화면이 미리
-  읽은 사진 결과(`seen`)를 파이프라인을 거치지 않고는 실제 생성 호출에
-  전달할 수 없었다 — `pipeline.ts`의 `runStages()`가 `deps.backend.generate()`를
-  두 인자로만 부르고 있었기 때문이다. `PipelineInput.seen?`과
-  `InferenceBackend.generate()`의 세 번째 인자를 추가해 해소했다(둘 다
-  옵셔널 확장, 기존 호출자는 안 깨짐).
-- 2단계(사진 있는 날)는 `on-device.ts`에 `captionDay(day, character, vision)`을
-  노출해 화면이 사진 읽기만 독립적으로 트리거하게 했다 — **화면은 신호
-  (`DaySignals`)를 모른다**(009부터 이어진 경계)는 제약 때문에, 신호를
-  읽는 것까지 이 함수 안에서 한다(`wiring.ts`의 `deviceSignals`를 그대로
-  주입받아 재사용, 새 신호 수집 경로를 만들지 않는다).
-- E1(한 번에 하나의 엔진만 열림)을 지키는 자리는 화면이다 — 사진이 있는
-  날은 캡션이 끝난 뒤에만 `prepare()`를 부르고, 캡션이 아직 안 끝난 상태에서
-  "쓰기"를 누르면 새로 읽지 않고 그 `Promise`를 그대로 기다린다(취소·재시도
-  로직 없이 기존 `Promise`를 재사용하는 것으로 충분했다).
-- 계약 테스트로 확인한 위반 주입 셋 — `prewarm()`이 값을 반환하도록
-  고치면 `tsc`가 잡고, 접두사에 날짜를 섞으면 P10이, 두 캐릭터 이름을
-  같게 하면 P11이 잡는다. 셋 다 실제로 잡히는 것을 확인했다.
-- 기기 없는 테스트 1574개 전부 통과, lint·헌법 검사·prettier 전부 클린.
-- **실기기 확인 완료**(2026-08-27, SM-S901N/Galaxy S22, debug). 금동이
-  (quiet)로 즉시 쓰기 36초 vs 40초 대기 후 27초 — **방향은 맞지만
-  절감폭(약 25%)이 my-ollama 원 실측(약 68%)보다 작다.** 이 기기·이
-  캐릭터 조합은 전체 생성 자체가 짧아(27~59초 대) `engine.load()`가
-  차지하는 비중이 상대적으로 크고, `prewarm()`(KV 캐시 프리필)의
-  효과가 상대적으로 더 작게 보이는 것으로 관측된다 — narrative처럼
-  무거운 캐릭터나 다른 기기에서는 절감폭이 달라질 수 있다(미확인).
-  화면 이탈 후 복귀도 정상 완성(41초, 오류 없음). 사진 있는 날(루이,
-  합성 3장)은 캡션 18~20초, 작성 59초로 두 번 모두 사진 내용을 정확히
-  반영했고, 캡션 도중 "쓰기"를 눌러도 재로드 흔적(비정상적으로 긴
-  캡션 시간) 없이 한 번만 돌았다. 날짜를 A(08-24)에서 B(08-25)로
-  바꾼 뒤 쓰면 B의 사진만 반영되고 A의 캡션이 섞이지 않는 것도
-  확인했다(합성 하루는 010 원칙대로 "경로가 도는가"만 확인하는
-  용도로 썼다).
-
-### 019 — 백그라운드 자동 일기 생성 기술 검증 (2026-08-28)
-
-**기능 스펙이 아니라 스파이크**(구현 아님, 검증 전용) — 산출물은
-`src/spike/`의 하네스와 `specs/019-background-diary-feasibility/
-findings.md`다. **결론: 조건부 가능(YES, 조건부).** 화면이 꺼지고
-잠긴 상태에서 `expo-background-task`(WorkManager) 백그라운드 실행이
-실제로 완주하고 정상적인 일기를 남기지만, **배터리 최적화 예외 없이는
-"매일 자동으로"라는 목표 자체가 사실상 무력화된다.**
-
-- 배터리 최적화 **기본값**(예외 없음)에서는 15분 최소 간격으로
-  등록해도 실제 실행이 하루 1~2회로 억제됐다 — 관측된 두 실행 사이
-  간격이 **19시간 33분**(등록값 대비 약 78배)이었다. 15분 요청 자체는
-  `dumpsys jobscheduler`에 정확히 전달되고 있었으므로(`Minimum
-  latency: +14m59s***ms`), 억제의 원인은 앱이 아니라 OS의 Doze/앱
-  대기 버킷이다.
-- 배터리 최적화 **예외**(`설정 → 앱 → 배터리 → 제한 없음`, 검증에서는
-  `adb shell dumpsys deviceidle whitelist +<패키지>`로 동등하게 재현)를
-  주면 standby bucket이 즉시 `EXEMPTED(5)`로 바뀌고, 같은 15분 등록이
-  실제로 **10~32분** 간격으로 돌았다(연속 2회 관측).
-- 6회 전부(기본값 2회 + 예외 2회, 재실행 2회 포함) `outcome: "ok"` →
-  `Success`로 완주했다 — 중단·크래시 없음. 사진 있는 날(3장, 캡션
-  포함)은 2분 27초, 사진 없는 날은 47초~2분 6초였다. 백그라운드에서
-  나온 일기는 판정 4갈래·페르소나 규칙을 정상적으로 거쳤고 포그라운드
-  생성과 구분되지 않았다(원칙 IV 위반 없음).
-- 사진 권한은 6회 전부 방치 후에도 유효했다(`valid: true`) — 자동
-  회수 관측 안 됨. 좌표 권한은 이 기기가 애초에 요청한 적이 없어
-  "회수되는지"는 확인하지 못했다(원래 없음과 회수됨을 구분 못 함).
-- **`AppState.currentState`는 화면의 물리적 꺼짐을 완벽히 보장하지
-  않는다** — 반복된 `adb shell dumpsys` 조회가 화면을 깨운 것으로
-  보이는 순간이 실측 중 실제로 관측됐다(`mWakefulness=Awake`로
-  전환). 화면을 다시 끄고 잠금을 재확인한 뒤에도 태스크는
-  `appState: "background"`로 기록됐다 — "앱 UI가 전경에 없다"만
-  구분하지 "화면이 이 순간 꺼져 있다"는 보장하지 않는다는 한계다.
-- narrative(exaone, 콜드 최대 242초 관측)로는 백그라운드 완주를
-  확인하지 않았다 — quiet만으로 검증했다. E1(엔진 동시 접근) 경합도
-  자연 발생하지 않아 재관측하지 못했다.
-- **하네스는 `src/spike/`에 격리돼 있고 제품 계층을 한 줄도 고치지
-  않았다**(H1). 헌법 검사(`checkSpikeFile`)가 이 경계를 지킨다. 이후
-  실제 기능화 여부·하네스 유지 여부는 별도 스펙(020+)의 결정이다 —
-  이 스파이크가 대신 정하지 않는다(findings.md "다음 스펙에서 고려할
-  사항": 배터리 예외 요청 온보딩 UX, E1 잠금 설계, narrative 완주
-  확인, 좌표 권한 회수 시나리오 전부 미결).
-
-### 020 — 시간대 지정 자동 일기 작성과 완성 알림 (2026-08-28)
-
-019 스파이크의 결론("조건부 가능")을 제품 기능으로 만들었다. **019
-하네스(`src/spike/`)를 제거하고 제품 경로로 대체했다** —
-`checkSpikeFile`을 `checkScheduleFile`로 개명·재활용해 `src/schedule/`
-경계를 지킨다.
-
-- **스케줄·알림·잠금의 순수 판정은 `src/schedule/`에, 기기 통로는
-  `*-port.ts`에.** `decision.ts`(지금 돌릴까 + 어느 하루를),
-  `retry.ts`(놓친 하루 선정 — `selectableDays`만 보므로 009 범위가
-  자동으로 걸린다), `notify.ts`(보낼까/어떻게), `lock.ts`(경합 판정),
-  `settings-effects.ts`(토글 부수 효과 S6 순서). 전부 `now`/`nowMs`를
-  인자로 받고 `new Date()`를 안 부른다.
-- **경합은 `pipeline.run()`의 옵셔널 `acquireLock?` + 파일 잠금 + stale
-  5분.** `running: Set<DayDate>`는 인스턴스 로컬이라 화면 ↔ 백그라운드
-  태스크(다른 파이프라인 인스턴스)를 못 막는다. `wiring.ts`가
-  owner-bound(`"screen"`/`"background"`) `acquireLock` 클로저를 만들어
-  주입하고, `pipeline.ts`는 `isDayWritable` → `running.has` **다음**에
-  취득을 시도한다. 취득 실패는 `already-running` stage로 합류(화면
-  문구 "이미 쓰고 있다" 재사용, 태스크는 `"skipped"`). `finally`에서
-  `release`. `pipeline.ts`는 여전히 `expo-file-system`을 import하지
-  않는다 — 파일 통로는 주입.
-- **`STALE_LOCK_MS = 5분`의 근거**: 019 실측 최장 완주 2분 27초의 2배 +
-  여유. **narrative(exaone) 백그라운드 완주가 4분을 넘으면 이 상수를
-  재검토**한다(T053 게이트) — 019는 quiet만 백그라운드 검증했다.
-- **자동 생성 설정은 "설정" 탭에 있다** — 개발자 탭과 달리 **prod에도
-  있다**(FR-001, 엔드유저 화면). 목표 시각은 시 단위(0–23)만, 분은
-  두지 않는다(근사치, FR-002). 화면·소스 어디에도 "정각"·"매일 7시"
-  같은 정밀도 암시 문구를 두지 않는다(계약 테스트가 소스에서 검사).
-- **`notified.json`은 `DiaryEntry`와 분리**(`preferences/`, `diary/`
-  밖). `pruneNotified`는 **날짜 문자열 비교만**(값·시간 안 봄) —
-  `task.ts`가 알림 발송 직후 `day - 30일`을 `keepFrom`으로 호출한다.
-- **알림 라우팅**: `App.tsx`가 웜(`onResponse`)·콜드
-  (`getLastNotificationResponseAsync`)를 순수 `routeFromNotification`으로
-  통일 → `initialScreen(resolution, items, { initialDay, entry })`가
-  목록을 건너뛰고 상세를 첫 화면으로 만든다(FR-006, SC-004). 상세
-  진입 시 `acknowledgeNotified`로 확인 처리(FR-007 (2)).
-- 기기 없는 테스트 1752개 전부 통과, lint·헌법 검사·prettier 클린.
-- **실기기 검증에서 실제로 관측된 값**: (T053~T055 수행 후 여기 채운다
-  — SC-003 배터리 예외 라운드 간격, narrative 백그라운드 완주 시간,
-  배터리 인텐트가 실제 도착한 제조사 설정 화면, release R8 통과 여부.)
-
-### 021 — 앱 요구 권한 실측 및 통합 신청 절차 (2026-08-29)
-
-020이 `POST_NOTIFICATIONS`·배터리 예외를 새로 도입하며 앱 권한이 여러
-기능에 흩어졌고, 새 release APK 설치 시 모든 권한이 꺼진 채로 사진 없는
-일기가 조용히 생성되는 문제가 실기기에서 관측됐다. 앱 최초 진입부에
-통합 온보딩을 두어 이를 고쳤다.
-
-- **`src/onboarding/`가 새 경계다** — 020의 `src/schedule/`처럼 순수 판정
-  (`requirements`·`decision`·`flag`)과 기기 통로(`*-port`)를 나눈다.
-  `checkOnboardingFile`(`constitution-rules.ts`)이 `diary/prompt`·
-  `diary/acceptance`·`models/roster`·`schedule/settings` 직접 import와
-  `flag.ts`의 `Date`·`count`·`history` 토큰을 막는다(위반 주입 3건 전부
-  잡히는 것을 확인).
-- **필수 권한 목록은 사람이 못 박은 상수**(`requirements.ts`,
-  `PERMISSION_REQUIREMENTS`) — 5갈래(`photos`·`photo-location`·`location`·
-  `notifications`·`battery-exception`), `order` 1..5, 고정 순서. 012의
-  `USER_VISIBLE_SIGNAL_AXES`가 선례다. **코드가 항목을 판정하지 않는다**
-  (원칙 V) — 계약 테스트가 소스를 `readFileSync`로 읽어 `readonly`·문안
-  토큰·플랫폼 메타를 잠근다.
-- **온보딩은 건너뛸 수 있다**(원칙 I) — 각 단계 [허용]/[건너뛰기], 마지막
-  [시작하기]가 `onboarding.json`에 `completed: true`를 쓴다. 뒤로 가기
-  없음. 단계 완료는 저장하지 않고 매번 실시간 권한 상태로 재판정
-  (`planOnboardingSteps`). `battery-exception`은 조회 통로가 없어
-  `batteryNoticeShown`(1회 제시)으로만 판정하되, 세션 내 건너뛰기도
-  존중한다(`skipped-eligible`).
-- **020의 `AutoDiarySettings.batteryExceptionPrompted`를 흡수·제거**했다.
-  `settings.ts`의 필드·파싱·직렬화 4곳, `settings-effects.ts`의
-  `applyToggleOn` 배터리 로직, `SettingsEffectDeps.batteryPort`를 전부
-  걷어냈다. 자동 생성 토글은 더 이상 배터리 인텐트를 띄우지 않는다 —
-  배터리 안내의 주체는 통합 온보딩과 설정 "권한" 섹션뿐이다. **옛
-  `auto-diary.json`의 그 값은 `loadAutoDiarySettings`가 무시하고**,
-  `flag.ts`가 최초 1회 읽어 `batteryNoticeShown`을 시드한다(FR-010a) —
-  `schedule/settings.ts`를 import하지 않고 `flag-port.ts`가 경로
-  하드코딩으로 `auto-diary.json`을 직접 읽는다.
-- **`NotificationPort`에 `getPermission()`을 더했다**(020의
-  `requestPermission()`은 창을 띄우므로 상태 표시에 못 씀). 020 테스트
-  mock 다수를 함께 손봤다.
-- **거부 안내는 문자열 주입으로 흐른다** — `App.tsx`가
-  `PERMISSION_REQUIREMENTS[...].ifDenied`를 모아 `deniedNotices`로
-  `DiaryHomeScreen` → `DiaryListScreen`에 넘긴다. 006-era 화면이 온보딩
-  계층에 닿지 않게 문자열만 넘긴다(중복 정의 없음).
-- **App.tsx 진입 게이트**: `AppFrame`이 `onboarding.json`을 읽어
-  `completed !== true`면 탭 UI 대신 `OnboardingScreen`만 그린다(006의
-  "화면이 둘뿐이므로 상태 하나로 가른다"에 세 번째 상태를 얹음).
-  설정 "권한" 섹션의 [권한 안내 다시 보기]가 `forceOnboarding`을 켠다 —
-  `completed`는 그대로.
-- **포그라운드 복귀 재조회**(SC-006): `OnboardingScreen`·
-  `PermissionsSection`·App.tsx의 `deniedNotices` 계산이 전부 `AppState`
-  `change` → `"active"`에서 권한을 다시 읽는다.
-- **새 네이티브 모듈 0개** — `expo-media-library`·`expo-location`·
-  `expo-notifications`·`expo-intent-launcher`의 기존 API만 재사용. 따라서
-  release 재확인 불필요, debug 1회로 충분(012 기준).
-- 기기 없는 테스트 1853개(+8 스위트) 통과, lint·헌법 검사·prettier 클린.
-- **실기기 검증 완료(2026-08-29, SM-S901N/Galaxy S22, Android 16 / SDK 36,
-  debug)**. 관측:
-  - **진입 게이트**: 새 설치 첫 실행에서 일기 목록이 아니라 "시작하기 전에"
-    온보딩이 먼저 뜬다. `pm clear`로 `onboarding.json`이 지워지면 다시
-    "1 / 5"부터 재시작 — 게이트는 `completed` 플래그로만 판정.
-  - **부분 사진 허용(Android 14+ `limited`)이 실제로 온다.** OS 다이얼로그의
-    "제한된 액세스 허용" → 포토피커 2장 선택 시
-    `READ_MEDIA_VISUAL_USER_SELECTED: granted=true` /
-    `READ_MEDIA_IMAGES: granted=false`, `describePhotoAccessLimit`가
-    `"partial"`을 반환하고 설정 "권한" 행이 **"일부만 허용됨" + [전체 허용]**
-    로 렌더된다. 따라서 **`visiblePhotoCount` 분기는 이 기기에서 dead
-    path**(구형 안드로이드 대비로 유지, 비용 0). 온보딩은 부분 허용도
-    satisfied로 보고 다음 단계로 넘어간다.
-  - **설정 "권한" 섹션 + OS 링크 + 복귀 갱신(SC-006)**: 5개 행이 라이브
-    상태를 보인다. [전체 허용]/[허용] → `com.android.settings`
-    `InstalledAppDetails` 진입. OS에서 부여 후 앱 복귀 시 `AppState`
-    `change→active` 리스너가 행을 자동 갱신("일부만 허용됨"→"허용됨",
-    "거부됨"→"허용됨").
-  - **Maestro**: `.maestro/unified-permission-onboarding.yml` 전체 PASS.
-    ⚠️ 흐름의 M2가 원래 `id: "onboarding-step-photos"`를 박아 두어, 사진
-    권한이 이미(부분) 부여된 기기에서는 첫 단계가 사진이 아니라 실패했다 →
-    **권한 상태 무관하게** 수정(`id: "onboarding-step-.*"` + skip-all
-    루프). 어느 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다는 것이
-    교훈 — OS가 자동 부여하는 항목이 있으면 새 설치라도 첫 단계가 사진이
-    아닐 수 있다.
-  - **회귀 확인**: `.maestro/scheduled-diary-notification.yml`(020)도 함께
-    돌렸다 — **개발자 탭을 탭하던 stale 버그**(020 자동 생성 설정은
-    `settings` 탭에 있다)를 발견·수정 후 PASS. 021 회귀가 아니라 020 흐름의
-    잠재 결함이었다.
-  - **D2 (온보딩 후 실제 생성 `has_media>0`)**: 캐릭터 모델(`a1.bin` kanana)과
-    VLM(`v1.bin`+`v2.bin` LFM2.5-VL)을 개발 기계에서 받아 `run-as`로
-    `files/models/`에 배치 + `state.json`에 `passed:true` verdict 3개
-    (010 도구는 사진만 심으므로 모델은 수동). 사진 있는 하루(08-28, 3장) +
-    `빠르게 봄` → `adb logcat`에 **`loadPrompt:580 ... has_media=1`**(VLM이 사진을
-    IMAGE 청크로 디코드), 이어 캐릭터 모델 706토큰 프롬프트(캡션이 텍스트 재료로
-    들어감). 일기가 사진 내용을 정확히 반영 + 짐작 말투. **021 온보딩이 부여한
-    사진 권한으로 VLM→캐릭터 파이프라인이 실제로 사진을 읽었다**(011 "has_media=0"
-    결함의 반대).
-  - **D6 (020→021 업그레이드 시드)**: `onboarding.json` 삭제 + 구형
-    `auto-diary.json`(`batteryExceptionPrompted:true`) → 재시작 시 온보딩 재노출
-    (`completed:false` 시드), **배터리 단계는 온보딩 흐름에 안 나타남**
-    (`batteryNoticeShown:true` 시드 → satisfied). `loadAutoDiarySettings`는 구형
-    필드 무시, `flag.ts`만 raw로 읽어 시드 — 둘 다 확인.
-  - **T030 (위치 권한 ↔ 안드로이드 장소명)**: 같은 하루(08-27, 좌표 강남 일대)를
-    위치 권한 유무별로 두 번 생성. **부여**: `placeName={"kind":"known","value":"강남구"}`,
-    본문에 "강남구". **거부**(`pm revoke ACCESS_FINE/COARSE_LOCATION`):
-    `placeName={"kind":"unknown"}`, 본문에 지명 없음. → **안드로이드도
-    `reverseGeocodeAsync`는 위치 권한이 있어야 지명을 준다**(없으면 예외 →
-    `geocoding-port.ts`가 삼킴). `location.platforms`는 `["android","ios"]` 유지
-    확정, `requirements.ts`의 "T030 실측 대기" 주석을 이 결과로 교체했다.
-  - **미확인 잔여**: 없음. 새 네이티브 모듈 없어 release 재확인 생략(012 기준).
-    ※ 검증용 모델·합성 하루는 010 원칙대로 "경로가 도는가"만 봤고 품질 결론에
-    쓰지 않았다.
-
-### 022 — 개발자 탭 내 입력 프롬프트 모니터링 (2026-08-29)
-
-로드맵 6번. **원래 항목은 "토큰 지표 노출"까지 포함했으나 AI 이관 과정의
-왜곡이었고**, 사용자 확인 결과 의도는 **입력 프롬프트 원본을 개발자 탭에
-보여주는 것**뿐이었다. 토큰 지표를 건드리지 않으므로 `llama-port.ts`의 원칙 IV
-경계와 파이프라인·`RunResult`는 무변경이다.
-
-- **진단 계층이 `buildPrompt()`를 직접 부른다** — `src/diagnostics/prompt-preview.ts`가
-  사람이 못 박은 `SIGNAL_PRESETS`(`empty`·`photos`)로 `buildRequest()` →
-  `buildPrompt()`(실제 생성 경로가 부르는 바로 그 함수)를 불러
-  `DiagnosticReport.promptPreviews`에 문자열로 싣는다. 014의 `characterModels`와
-  동일한 경로. 계약 테스트 PP1이 "미리보기 문자열 == `buildPrompt()` 출력"을
-  바이트 단위로 잠근다 — 복제하면 즉시 깨진다.
-- **신호 프리셋은 사람이 정한 `readonly` 리터럴**(012의 `USER_VISIBLE_SIGNAL_AXES`
-  선례) — 코드가 신호 값을 보고 조합을 만들지 않는다(원칙 V). `fake.ts`·`collect.ts`에서
-  가져오지 않는다(경계 혼동 방지). `PREVIEW_DATE`는 과거 고정이라
-  `dayStillOpen: false`로 결정된다.
-- **화면은 `report.promptPreviews`의 문자열만 받는다** — `PromptPreviewPanel.tsx`가
-  `diary/prompt`·`signals`를 import하지 않는다. `checkSourceFile`에
-  `UI_TOUCHES_PROMPT`(`src/ui/` → `diary/prompt` 차단) 규칙을 추가했다.
-  **`signals/types`는 막지 않았다** — `DiaryDetailScreen`(저장된 `signalsUsed`
-  렌더)·`SignalProbe`(신호 수집)가 이미 정당하게 쓰고, 022가 그 경계를 새로
-  만들지 않는다. 위반 주입 3종(화면이 `diary/prompt` import / 자체 조립 /
-  `SIGNAL_PRESETS`를 `let`) 전부 잡히는 것을 확인했다.
-- **근사 크기는 `text.length`**이고 화면이 "조립 시점 근사치, 실측 토큰 아님"
-  라벨을 붙인다(원칙 IV). 소스에 `token` 어휘가 없다(계약 테스트 PP6).
-- 기기 없는 테스트 1882개(+29) 통과, lint·헌법 검사(위반 0)·prettier 클린.
-  `tsc`가 `DiagnosticReport` 생성 자리(early return 포함) 누락을 잡는다.
-- **실기기 검증 완료(2026-08-29, SM-S901N/Galaxy S22, Android 16 / SDK 36, dev,
-  무선 디버깅)**. 관측:
-  - **D1 (프롬프트 원본)**: "개발자" 탭(dev라 노출)에 "입력 프롬프트 미리보기"
-    패널이 뜨고, quiet "신호 없음" 프롬프트가 잘림 없이 전체 렌더 — 화자 규칙
-    8줄 + `너는 '금동이'이라 불린다.` + 제목 지시문 + `한국어로 써라.` +
-    `2026-01-15에 네가 본 것:` + `사진: 없었다.` + `다닌 자리: 없었다.` +
-    `이 기록으로 그 하루의 일기를 써라.`. `<Text selectable>`이라 길게 눌러
-    복사 가능(D4).
-  - **D2 (프리셋 비교, SC-002)**: "사진 있음" 프롬프트에만
-    `사진: 2장 (10시, 18시)`, `다닌 자리: 2곳, 대략 3400m 떨어져 있다.
-    (사진 2장 중 2장에서 얻었다)`, `이 자리들은 하루의 궤적이 아니라...` 문장이
-    들어감 — `buildPrompt()`가 프리셋 신호로 실제 조립한 결과(PP1 실기기 확인).
-  - **D3 (근사 크기, FR-011)**: "신호 없음" **867자**, "사진 있음" **964자**
-    (사진 프리셋이 더 큼, SC-003). 라벨은 `867자 (조립 시점 근사치, 실측 토큰
-    아님)` — 원칙 IV 표기 정확.
-  - **캐릭터 전환**: `prompt-preview-character-chinese` 칩 탭 → 프롬프트가 다시
-    조립되어 마지막 줄이 `중국어로 써라.`로 바뀜(캐릭터별 `buildPrompt()` 재호출).
-  - **D5 (사용자 화면 무노출, SC-005)**: 일기 상세 화면에 프롬프트·근사 크기·
-    "실측 토큰" 등 진단 정보가 하나도 없음. 목록·캐릭터·설정 탭은 021에서 이미
-    확인.
-  - **Maestro**: `.maestro/prompt-preview.yml` 전체 PASS(`run-device-tests.mjs`
-    `FLOWS`에 등록). ⚠️ 패널이 길어 각 프리셋·칩마다 `scrollUntilVisible`이
-    필요했다 — `scrollUntilVisible`이 패널 제목에서 멈추므로 그 아래 요소는
-    개별 스크롤로 올려야 한다(첫 작성 때 `assertVisible`만 써서 "사진 있음"에서
-    실패, 수정함).
-  - **회귀 — `skeleton.yml`의 stale 버그 발견·수정**: 014에서 진단 화면이
-    "개발자" 탭으로 옮겨졌는데 `skeleton.yml`(마지막 수정 002)이 launch 직후
-    `assertVisible: "환경"`을 하고 있어 실패했다 — 022 회귀가 아니라 기존 결함.
-    개발자 탭을 먼저 누르도록 고쳐 PASS(020 회귀 검증의 "개발자 탭 stale 버그"와
-    같은 성격). 진단 화면 기존 항목(환경·추론 위치·모듈 상태·저장 점검)은 022
-    패널 아래 그대로 있음.
-  - **미확인 잔여**: D6(prod 빌드에 개발자 탭 없음)은 이 세션에서 안 봤다 — 새
-    네이티브 모듈 없어 release 재확인 생략(012 기준)이나 prod 게이트 자체의
-    실측은 남아 있다. ※ 검증용 합성 프리셋은 사람이 못 박은 상수일 뿐 품질
-    결론에 쓰지 않았다.
-
-### 023 — 사진 선별 알고리즘 고도화 (2026-08-29)
-
-로드맵 2·8번을 하나로. 011의 인덱스 균등 선별을 두 단계로 바꿨다 —
-(1) 파일 경로 상위 폴더 이름으로 잡사진(스크린샷·다운로드·메신저)을
-걸러내고(전부 걸러지면 원본 유지), (2) 남은 것을 찍힌 **시각** 분포로
-배분(칸마다 최소 1장 + 남은 예산을 사진 수에 비례한 최대 잔여법).
-`src/vision/select.ts` 한 파일이 핵심이며 여전히 순수 함수(인자 하나,
-`Date`·난수·파일 안 씀).
-
-- **`VISION_PHOTO_LIMIT`을 5 → 8로 올렸다**(실기기 실측). `many-camera`
-  (12장) 하루로 「빠르게 봄」 `quiet` 생성을 상한 5·8 두 번 걸었다:
-  캡션 8장 46초(`DiaryEntry.timing.visionMs`), 생성 92초, **총 ~138초 /
-  생성 시간 한도 180초**(`on-device.ts` `runWithTimeout()`) — 여유 42초.
-  **걸린 제약은 시간**이고 컨텍스트는 여유(캡션 5장 프롬프트 852토큰 /
-  캐릭터 `n_ctx` 2048). **`narrative`(exaone 콜드 최대 242초)는 미확인이라
-  8에서 멈췄다** — 019·020이 남긴 위험 계열. 상한을 더 올리려면 narrative
-  완주를 먼저 재고 `select.ts` 주석을 갱신한다.
-- **`BUCKET_COUNT` = 6(4시간 칸)은 사람이 정한 값**(012의
-  `USER_VISIBLE_SIGNAL_AXES`, 021의 `PERMISSION_REQUIREMENTS` 선례). 코드가
-  사진 분포를 보고 칸 수를 정하지 않는다(원칙 V). `BUCKET_COUNT` < 상한이라
-  spec FR-011의 `>=` 경계(칸 수 == 예산)는 현재 상한에서 **dead path** —
-  6칸이 다 차도 `nonEmpty(6) < budget(8)`이라 언제나 D3·D4로 간다.
-- **`NON_CAMERA_FOLDERS`는 사람이 못 박은 상수** — `Screenshots`·`Download`·
-  `KakaoTalk`·`WhatsApp Images`·`Telegram`. seed 하위폴더(`AlphariumSeed/
-  Screenshots` 등)로 격리·분류는 실기기에서 확인했으나(`mixed-clutter` 10장
-  중 Camera 6장만 캡션), **실촬 경로 확정은 미완** — 실제 스크린샷이
-  `Pictures/Screenshots`인지 `DCIM/Screenshots`인지 등은 안 쟀다.
-- **`Asset.getUri()`는 `file://` 경로를 반환한다**(T035 실측) — `content://`가
-  아니다. `folderNameOf()`의 `file://` 분기가 유효하고 `content://` 분기는
-  이 기기에서 dead path. `photosBetween()`은 여전히 `getUri()`를 부르지 않고
-  (`AssetMetadata`에 경로 필드 없음), `folderNamesFor()`가 **상한에 닿은
-  하루에서만** asset별로 부른다(T041 — 004 장수 세기 경로·R1 빠른 경로는
-  비용을 안 치른다).
-- **seed 도구 결함을 함께 고쳤다**: `scripts/samples/no-gps/`의 실사 샘플
-  (2017년 Galaxy)이 이 기기(Android 16) 미디어 스캐너에서 `datetaken`을
-  NULL로 둔다 — **patch 여부·EXIF 날짜 태그 일치 여부와 무관**, 원본
-  그대로도 그렇다. `with-gps/` 샘플은 온전해 `patchDate`만으로 정상.
-  `pickNoGpsSample()`이 `with-gps/`를 먼저 쓰도록 바꿨고(`patchLocation`은
-  안 부름 → 좌표 안 심김), `patchDate()`가 IFD0 `DateTime`(0x0132)도
-  덮어쓰도록 강화했다.
-- **Maestro stale 둘을 함께 고쳤다**(023 회귀 아님, 014 이후 깨져 있던 것):
-  `generate-diary.yml`(진단 화면 생성 패널 → 일기 탭 "일기 쓰기"),
-  `diary-character-select.yml`(내부 키 "quiet"·"narrative" → 페르소나 이름
-  "금동이"·"루이"·"오드", `IMAGINATIVE_NOTICE` 제거 반영). 신규
-  `photo-selection-over-limit.yml`을 `run-device-tests.mjs` `FLOWS`에 등록.
-- 헌법 검사 둘 추가: `checkVisionFile`에 `VISION_SCORES_IMAGE`(픽셀 채점
-  헬퍼 차단), `checkPhotoPortFile`(`src/signals/expo-port.ts`가
-  `vision/select`·`NON_CAMERA_FOLDERS`를 import하거나 분류 함수를 두는 것
-  차단). 위반 주입 3종으로 검증.
-- 기기 없는 테스트 1959개 통과, lint·헌법 검사(위반 0)·prettier 클린.
-- **실기기 검증 완료**(2026-08-29, SM-S901N/Galaxy S22, debug): 상한 8
-  실측, 시간 분포(12장 → 8장 균등, 첫·마지막 포함), 잡사진 필터링
-  (Screenshots·Download 제외), Maestro 회귀 8흐름 + 신규 1흐름 PASS.
-  **미확인**: `narrative` 완주 시간(180초 초과 여부), `NON_CAMERA_FOLDERS`
-  실촬 경로 확정, prod 게이트.
-
-### 024 — 백그라운드 안정성 및 예외 대응 (2026-08-30)
-
-로드맵 3번. 019·020·021·023이 미확인으로 남긴 백그라운드 자동 생성의
-안정성 부채를 검증·보강한다. **새 사용자 기능·새 저장 계층·새 네이티브
-모듈·검증 전용 로그 모듈·새 진단 패널을 만들지 않는다** — 020이 만든
-`src/schedule/` 경계와 004가 만든 `src/signals/collect.ts` 경계를 재사용·
-검증한다. **실기기 세션에서 020의 CRITICAL 버그를 발견해 고쳤다**(아래).
-
-- **★ 020 백그라운드 자동 생성이 헤드리스에서 동작하지 않았다 — 고쳤다**
-  (2026-08-30 실기기 SM-S901N). `cmd jobscheduler run -f`로 화면 꺼진 채
-  강제 실행하니 `W/ReactNativeJS: No task registered for key
-  expo-task-manager` → `expo-task-manager`가 태스크를 **자동 해제**했다.
-  근본 원인: 020이 `task.ts`의 `TaskManager.defineTask()` 호출을 **모듈
-  최상단**(019 스파이크 방식)에서 **`App.tsx`의 `useEffect`**로 옮겼고,
-  헤드리스 배경 실행은 컴포넌트를 렌더 안 해 `useEffect`가 안 돈다. 020이
-  이렇게 바꾼 이유는 `logic` jest 프로젝트의 `transformIgnorePatterns`가
-  `expo-task-manager`를 변환에서 빼 최상단 정적 `import`가 `.ts` 테스트를
-  깨뜨리기 때문. **수정**: `defineTask`를 모듈 최상단 부수 효과로 되돌리되
-  **동기 `require("expo-task-manager")`를 try/catch로 감쌌다** — 프로덕션
-  RN(Metro가 전부 변환)에서는 `require` 성공 → 등록(헤드리스 포함), Jest
-  `logic`에서는 `SyntaxError` → catch → 등록 생략(테스트는 주입 의존 사용).
-  계약 테스트 `background-generation.test.ts` B1a(3케이스)가 이 회귀를
-  잠근다. **✅ 수정 후 헤드리스 재확인 완료**(2026-08-30 2차 세션, clean
-  Metro): 화면 꺼진 잠긴 상태 `cmd jobscheduler run -f`에서 `No task
-  registered` 에러 소멸, `TaskService: Registered task` 확인, 배터리
-  예외를 주면 헤드리스 생성이 실제로 완주(`2026-08-30.json` 저장,
-  `writingMs` 52.5초, `Worker result SUCCESS`). **배터리 예외 없이는
-  토큰 생성 단계에서 억제돼 미완주**(5분+ 정지) — 019의 "예외 없이는
-  억제"가 생성 경로에서도 성립. findings.md §9.
-- **`STALE_LOCK_MS`를 5분 → 6분으로 상향했다** — 실기기 §1 실측
-  (2026-08-30, SM-S901N): `narrative` 사진 있는 날(08-28, 캡션 8장) 완주
-  벽시계 **≈ 170초**(`visionMs` 73.0s + `writingMs` 89.8s + 적재). 사진
-  없는 날은 콜드 `writingMs` 54.1s(벽시계 ~60s), 웜 37.6s. 규칙(SL4):
-  `ceil(M × 2 / 60) × 60 = ceil(170×2/60)×60 = 360s = 6분` > 현재 5분
-  이므로 상향. `src/schedule/lock.ts`의 근거 주석도 이 실측으로 교체.
-  값은 여전히 `lock.ts` 한 곳에만, `pipeline.ts`·`task.ts`는 import만
-  (020 L8, SL1이 `task.ts`까지 확장 검사).
-- **FR-014 — `narrative`가 180초 한도에 대해 어디 있는지**: `GENERATION_TIMEOUT_MS
-  = 180_000`은 `engine.run()`(= `writingMs`) 구간만 감시한다. `narrative`
-  사진 있는 날 `writingMs` = 89.8초 < 180초 — **한도에 안 걸린다**
-  (`timeout` 0회). 다만 vision(73s) + writing(90s) = 163초 `engine.run()`
-  총합 + 적재 = 벽시계 ~170초(3분 근접). `VISION_PHOTO_LIMIT`을 8보다
-  올리면 `visionMs`가 비례해 늘어 `STALE_LOCK_MS` 재검토가 필요하다 —
-  **이 스펙은 상한 8을 유지한다**(023 결정 존중, FR-014 MUST NOT). 023의
-  "narrative 미확인"에 답: 상한 8에서 완주하나 느리고 여유가 좁다.
-- **권한 회수 시 `collect.ts`가 이미 `unknown`으로 감싼다 — 코드 무변경.**
-  004 FR-007·FR-012·FR-016 설계상 사진 권한이 `granted`가 아닌 모든 상태,
-  그리고 조회는 `granted`인데 `photosBetween()`이 던지는 실행 중 회수
-  타이밍에서도 `photos.kind === "unknown"`(**절대 `none` 아님**)이 나온다.
-  위치도 마찬가지 — `locationOf()`가 전부 던져도 `places`만 `unknown`이
-  되고 사진 신호는 `known`으로 산다(FR-013a). 신규 계약 테스트
-  `__tests__/signals/signal-revocation.test.ts`(SR1~SR6, 18개)가 이 방어를
-  백그라운드·실행 중 회수 각도에서 명시적으로 잠갔고, 위반 주입 4종(각
-  분기가 `none`을 반환하도록 / catch가 재던지도록)이 전부 잡히는 것을
-  확인했다. **`collect.ts`는 이 스펙에서 한 줄도 안 고쳤다.**
-  **✅ 실기기 재현 완료**(2026-08-30 2차 세션): `adb pm revoke`는 앱
-  프로세스를 즉시 kill(`ActivityManager: Killing … permissions revoked`)
-  하므로 "실행 정확히 그 순간의 회수"는 재현 불가 — 대신 권한 회수 상태
-  그대로 헤드리스 태스크를 강제 실행. `2026-08-28.json` 저장,
-  `signalsUsed.photos.kind === "unknown"`(`reason: "사진 접근 권한이 없다"`,
-  **`none` 아님**), `places.kind === "unknown"`, `has_media=0`(VLM 캡션
-  안 돎), 본문 사진 단정 없음("아마 산책했을 것이다"), 판정 통과, 잠금
-  해제됨. findings.md §4.
-- **재부팅 복구 — 코드 무변경, 그런데 성립 경로가 020 예상과 다르다.**
-  020이 배선한 `App.tsx:923-927`(마운트 시 `settings.enabled === true`면
-  `backgroundPort.register()` idempotent 호출)은 **`AutoDiarySettingsScreen`
-  마운트 시에만 돈다** — 설정 탭을 열어야 한다. **✅ 실기기 확인**
-  (2026-08-30 2차 세션): `adb reboot` 후 앱을 **홈 화면으로만** 한 번
-  열어도 `JOB #u0a569` 재등록됨 — `§9 수정`의 `task.ts` 모듈 최상단
-  `defineTask` 부수 효과가 `BackgroundTaskConsumer.didRegister()` →
-  `BackgroundTaskScheduler.registerTask()` → `scheduleWorker()`를 유발하기
-  때문(`21:21:00.108 I/TaskService: Registered task` → `didRegister` →
-  `Worker is already scheduled, skipping`). **즉 §9 CRITICAL 수정이
-  재부팅 복구도 함께 성립시킨다.** 재부팅 후 앱 열기 전에는 미등록
-  (`BOOT_COMPLETED` 리시버 없음, 문서화된 한계 FR-010). `BOOT_COMPLETED`
-  리시버 같은 새 네이티브 경로는 만들지 않는다(범위 밖). findings.md §3.
-- **`AppState.currentState`를 판정에 쓰지 않는다.** `src/schedule/`·
-  `src/signals/` 소스에 `AppState` 참조 0건(확인). 이 값은 **"앱 UI가
-  전경에 없음"의 근사치이지 "이 순간 화면이 물리적으로 꺼져 있음"의 증거가
-  아니다**(019 §6a — 반복된 `adb dumpsys`가 화면을 깨운 것으로 보이는
-  순간이 관측됨). 검증 로그가 이 값을 기록하더라도 위 의미로만 해석한다.
-- **측정은 `adb logcat` + OS 조회를 사람이 문서로 옮긴다.** 019가 만든
-  `verification-log.ts`를 020이 제거한 전례를 잇는다(헌법 원칙 IV) — 검증
-  전용 로그 모듈이나 진단 패널을 되살리지 않는다. 개발자 탭의 "지금 자동
-  생성 트리거" 버튼(020)으로 백그라운드 경로를 재현한다.
-- **`AppState.currentState` 한계**: `src/schedule/`·`src/signals/`에
-  `AppState` 참조 0건(확인). "앱 UI가 전경에 없음"의 근사치이지 "화면이
-  물리적으로 꺼져 있음"의 증거가 아니다(019 §6a).
-- 기기 없는 테스트 `test:logic` 1680개 통과(신규 `signal-revocation` 18 +
-  `lock.test` SL1~5 + `background-generation` B1a). lint 0 error, 헌법 검사
-  위반 0, prettier 클린.
-- **✅ §7 Maestro 회귀 완료**(2026-08-30 2차 세션): 020
-  (`scheduled-diary-notification.yml`)·021(`unified-permission-onboarding.yml`)·
-  023(`photo-selection-over-limit.yml`) 3흐름 전부 PASS. 회귀 없음.
-  **⚠️ 021 흐름은 `Launch app … with clear state`(=`pm clear`)로 앱
-  데이터를 전부 날린다** — 2차 세션이 §3·§4 뒤에 §7을 돌려 검증용 모델
-  (`a1`·`a2`·`v1`·`v2`)·일기·설정이 삭제됐다. **다음 세션 전 §7을 먼저
-  돌리거나, 모델을 다시 배치**해야 한다.
-- **부수 관측 — 헤드리스 생성이 포그라운드의 ~3배 느리다**: §4 권한 회수
-  라운드에서 `quiet` 콜드 헤드리스 `writingMs` = 158.5초(§1 포그라운드
-  콜드 54초의 ~3배, 배터리 예외 있어도). `narrative` 사진 있는 날은
-  포그라운드에서 이미 `writingMs` 89.8초 + `visionMs` 73초였으므로
-  헤드리스에서 `GENERATION_TIMEOUT_MS`(180초, `writingMs` 구간) 초과
-  위험이 실재 — **`narrative` 헤드리스 완주는 2차 세션에서도 미확인**
-  (quiet만 완주). FR-014 결론에 "헤드리스에서는 여유가 더 좁다" 추가.
-- **EXAONE(narrative) 출력 mojibake 관측**(§1 실기기): 3회 전부 저장된 일기
-  본문이 깨진 UTF-8 surrogate로 나왔고 `title`에 금지된 `###`·`**`가 섞였다.
-  `judge()`는 통과시켰다. `llama.rn` + EXAONE-3.5 Q4_K_M 인코딩 문제로 보인다
-  — **스펙 024 범위 밖, 별도 스펙에서 EXAONE GGUF/`llama.rn` 버전/로스터
-  재검토 필요**(findings.md §10). 019·020·023이 narrative 실기기 검증을
-  미룬 것과 무관하지 않을 수 있다.
-- **실기기 검증 — 2차 세션 §9·§3·§4·§7 완료, 3차 세션(`/speckit-implement`
-  Phase 8) §3 정정·T034·T035·T036·T037 완료**.
-  - **★ `narrative` 헤드리스 완주 불가 확정**(T034, 3차 세션): 배터리
-    예외 부여·화면 강제 켜기까지 해도 `a2`(exaone) 로드 후 `loadPrompt`
-    단계에서 CPU 292%를 26분+ 태우며 산출물 없음. `GENERATION_TIMEOUT_MS`
-    180초 가드는 헤드리스/Doze에서 JS 타이머 억제로 무력(`result:"timeout"`
-    안 나옴). **`narrative`는 이 기기(SM-S901N) 헤드리스 자동 생성에서
-    사실상 쓸 수 없다** — `quiet`만 완주(§9, `writingMs` 52.5초). §10
-    EXAONE mojibake와 같은 뿌리로 보인다. **로스터에서 narrative를 자동
-    생성 대상으로 둘지 / exaone GGUF 교체는 별도 스펙**(findings §9 T034절).
-  - **§3 재부팅 복구 메커니즘 정정**(3차 세션): `expo-task-manager`가
-    자체 `BOOT_COMPLETED` 리시버를 가진다(`I/TaskService: Handling intent
-    with action 'android.intent.action.BOOT_COMPLETED'`). `enabled:true`면
-    재부팅 후 앱을 **홈 화면이든 설정 탭이든** 한 번 열기만 하면 그
-    리시버가 `defineTask` 등록 태스크를 `scheduleWorker()`로 재예약한다 —
-    `App.tsx:925-927`의 설정 탭 전용 `register()`에 의존하지 않는다. §9
-    수정(모듈 최상단 `defineTask`)이 이 복구의 **전제**. `enabled:false`
-    대조군(T035): 재부팅 후 앱 열어도 잡 미등록, `didRegister` 로그 없음
-    → SC-006 충족.
-  - **T036 release 재확인 판정**: **debug 1회로 충분**(012 기준).
-    `require("expo-task-manager")`는 Metro 정적 require이고 표준 Expo
-    autolinking 모듈이라 빌드 설정 경계 아님. 잔여 위험(R8 side-effect
-    트리셰이킹)은 다음 release 세션 1회 확인으로 닫힘. findings §11.
-  - **T037**: 검증용 모델 4개 재배치 완료(개발 기계 재다운로드 + `run-as`
-    + `state.json` verdict 수동).
-  - **남은 것**: §2 배터리 예외/무예외 소크(T012~T014 / T032·T033 —
-    사용자가 2·3차 세션 모두 건너뜀, **SC-003·SC-004 미판정**), 배터리
-    인텐트 삼성 One UI 도착 경로, release APK로 §9 헤드리스 1회 확인,
-    EXAONE mojibake(§10 별도 스펙).
-
-### 025 — 일기 본문 사진 슬라이드 및 갤러리 뷰 (2026-08-31)
-
-로드맵 9번. 017이 만든 정적 96×96 썸네일 격자(`flexWrap`)를
-`DiaryDetailScreen`의 가로 페이징 슬라이더 + 풀스크린 갤러리 모달로 교체한다.
-**`src/ui/` 안에서 완결되는 순수 표시 기능** — `diary/`·`vision/`·`signals/`·
-`models/`·`inference/` 무수정, 새 헌법 검사 규칙 없음.
-
-- **새 의존성 0.** RN 코어 `ScrollView`(`horizontal` + `pagingEnabled` +
-  `disableIntervalMomentum`)로 슬라이더를, 코어 `Modal`(`onRequestClose`로
-  안드로이드 뒤로 가기)로 갤러리를 만든다. `react-native-pager-view`·
-  `react-native-gesture-handler`는 네이티브 링크를 동반해 release 재확인이
-  필요하므로(012) 배제했다 — 범위 밖 제스처(핀치 줌·아래로 쓸어 닫기·배경 탭
-  닫기)가 없으니 제스처 라이브러리가 필요 없다.
-- **저장된 `DiaryEntry.photos[]`를 읽기 전용으로 소비.** 새 신호·새 저장
-  필드 없음(SC-006). `photoId`가 페이저 `key`이자 Maestro `testID` 접미사
-  (`photo-slider-cell-<i>`), `takenAt`은 화면에 표시 안 함(순서는 배열 순서 =
-  023 `select.ts`가 정한 시각순).
-- **갤러리 상태는 화면 로컬 `useState<{ open, index }>`** — 파일에 저장하지
-  않는다(009의 "고른 하루를 파일에 남기지 않는다"와 같은 성격). 부모가
-  `{hasPhotos && gallery.open && <PhotoGalleryModal>}`로 마운트를 제어하고,
-  `PhotoGalleryModal`은 항상 `visible`이며 `current`를 `useState`로만 관리한다
-  (prop 파생 금지) — 같은 Activity 안의 회전·백그라운드에서 React state가
-  유지되므로 갤러리가 같은 사진에서 살아남는다(FR-015a). 콜드 스타트 시
-  상태가 없는 것은 정상.
-- **위치 표시는 `{current + 1} / {total}` 텍스트**(예 `2 / 3`) — 순번이지
-  성능 지표가 아니다(FR-018). 단위("장")·비교·평균 없음. Maestro가 문자열로
-  검증 가능.
-- **`DiaryPhoto`(017의 사본 실패 → "이 사진은 이제 없다")를 슬라이더·갤러리가
-  공유**한다. `style`로 크기를 주입받고 `resizeMode="contain"`으로 세로/가로
-  긴 사진도 잘리지 않는다. 실패 대체 뷰에 `testID="diary-photo-missing"`을
-  새로 달았다 — 기존 `testID="diary-photo"`와 문구는 그대로(017 회귀).
-- **`i8mm` 없는 기기와 무관** — 추론 경로를 안 건드린다. 생성 중 화면
-  (`DiaryHomeScreen`의 `screen.kind === "writing"`, 별도 `View`)은
-  `DiaryDetailScreen`을 거치지 않아 슬라이더·갤러리가 구조적으로 도달 불가
-  (FR-017, SC-005).
-- **jest-expo 테스트 함정 둘**(이번에 실측): (1) `ScrollView`의
-  `onMomentumScrollEnd`는 테스트에서 전달되지 않는다 — `onScroll` +
-  `fireEvent.scroll`은 지원한다(RNTL 14 `native-state` 추적). 제품이 두
-  핸들러를 같은 계산(`pageIndexFromScroll`, `count`로 클램프)에 연결해 이
-  경로로 위치 표시 갱신을 검증한다. (2) **RNTL 14의 `fireEvent`는 Promise를
-  반환하며 `await` 없이는 상태 갱신이 flush되지 않는다** — `await
-  fireEvent.press(...)`. 계약 테스트 `photo-gallery.test.tsx`(C1~C29 + C18a,
-  17개)가 이 둘을 반영한다.
-- 위반 주입으로 방어 확인: 인덱스 클램프 제거 → C12·C13 FAIL(순환), `current`
-  seed를 `initialIndex`→`0` → C10·C11 FAIL. 둘 다 잡힌다.
-- 기기 없는 테스트 2004개 통과, lint(eslint 0 error, `tsc`, 헌법 검사 위반 0,
-  prettier) 클린.
-- **★ 위치 표시 `<Text>`에 `accessibilityLabel`이 필요하다**(실기기 실측,
-  2026-08-31). `<Text testID="photo-slider-position">{current+1} / {photos.length}`
-  는 화면에 멀쩡히 렌더되지만 **uiautomator 접근성 트리에 노출되지 않았다** —
-  여러 텍스트 조각(`{n}` + `" / "` + `{m}`)이 한 `<Text>`에 있으면 `testID`가
-  자식 텍스트 노드로 전파되지 않는 것으로 보인다. `accessibilityLabel={`${n} /
-  ${m}`}` + 자식도 템플릿 리터럴 하나로 합치니 Maestro `id:` 조회가 통했다.
-  `photo-gallery-position`도 같이 고쳤다.
-- **실기기 검증 완료**(2026-08-31, SM-S901N/Galaxy S22, dev, `EXPO_PUBLIC_APP_ENV=dev`).
-  `many-camera`(12장) 하루로 「빠르게 봄」 `quiet`(금동이) 생성(캡션 8장 52초 +
-  작성 56초). 관측:
-  - **슬라이더**(FR-001·002): 격자가 아니라 한 장이 화면 폭으로 크게, 아래에
-    `1 / 8`(8장 = 023 상한). `resizeMode="contain"`으로 세로 사진이 잘리지 않고
-    좌우 회색 여백. 가로 스와이프 → `1 / 8` → `2 / 8` 갱신, 다음 사진 스냅
-    (`pagingEnabled` + `onScroll`/`onMomentumScrollEnd`).
-  - **풀스크린 갤러리**(FR-008·009·010·012): 슬라이더 2번째 사진 탭 → 갤러리가
-    **`2 / 8`에서 시작**(첫 장 아님). 검은 배경 모달, 우상단 "닫기". 좌우
-    스와이프 `2 / 8` → `4 / 8` 갱신, 사진 바뀜.
-  - **순환 없음**(FR-011): 마지막에서 6번 더 스와이프해도 `8 / 8`에 멈춤,
-    `1`로 안 돌아감.
-  - **닫기 + 스크롤 위치 유지**(FR-013): "닫기" 버튼·안드로이드 뒤로 가기 둘 다
-    갤러리 닫고 상세 화면 복귀 — 갤러리 진입 전 스크롤 위치가 픽셀 단위로 유지
-    (`Modal`이 형제로 겹쳤다 사라져 상세 `ScrollView` 언마운트 안 됨). 앱 종료
-    안 됨.
-  - **생성 중 미노출**(FR-017·SC-005): "사진들을 훑어보는 중…"·"이야기를
-    엮어가는 중…" 화면에 슬라이더·갤러리·위치 표시 없음(회전 표시 + "그만두기"만).
-    2회 관측.
-  - **옛 일기/0장 회귀**(FR-006·007·SC-004): 「사진을 보지 않음」으로 08-31
-    생성 → 본문 아래 슬라이더 영역 자체가 없고 "사진: 없었다"·"다닌 자리:
-    모른다" 텍스트만(017 표시 유지). 사진 분석 소요 시간 문장 없음.
-  - **Maestro**: `.maestro/diary-photo-gallery.yml` 전체 PASS
-    (`run-device-tests.mjs` `FLOWS` 등록). ⚠️ 첫 흐름은 세 곳이 어긋나 실패 후
-    수정: (1) 정규식 `[2-9][0-9]*장`이 "12장"을 놓침 → `[1-9][0-9]*장` +
-    `.*…*`. (2) `scrollUntilVisible DOWN id: photo-slider-pager`가 페이저 상단만
-    화면에 넣고 멈춰 그 아래 위치 표시가 화면 밖 → 스크롤 타겟을
-    `photo-slider-position`으로. (3) 위 `accessibilityLabel` 이슈. `.maestro/
-    diary-body-screen.yml`(017)도 함께 돌려 `diary-photo` testID가 슬라이더
-    문맥에서 정상 조회됨을 확인(회귀 없음).
-  - **미확인 잔여**: 회전 시 갤러리 유지(FR-015a)는 앱이 `orientation: "portrait"`
-    고정이라 이 기기에서 회전을 재현할 수 없다(016의 "기기 시각을 바꿀 수 없어
-    미확인"과 같은 계열) — C18a 계약 테스트가 부모 리렌더 각도에서 잠갔다.
-    콜드 스타트 시 갤러리 상태 없이 목록으로 복귀는 spec 명시 정상 동작이며
-    관측됐다. 새 네이티브 모듈 없어 release 재확인 생략(012).
-- 상세: `specs/025-diary-photo-gallery/`.
-
-### 027 — 024 잔여 실측 마무리 (2026-09-01)
-
-로드맵 15번. 024가 2·3차 실기기 세션에서 사용자 결정으로 매번 건너뛴
-미판정 항목을 판정하는 **검증 마무리 스펙**(019 스파이크 계열, 새 기능
-아님). 산출물은 `findings.md` 실측 수치이고 코드 변경은 조건부(US4 RH3
-실패 시에만 `task.ts` 1~3줄). `/speckit-specify`~`/speckit-converge` 전
-체인 + 실기기 US3·US4 수행. **코드 변경 0줄로 종료.**
-
-- **계획 단계 발견**: `android/app/build.gradle:69`가
-  `android.enableMinifyInReleaseBuilds`를 기본 `false`로 두고
-  `android/gradle.properties`에 미설정 → **release 빌드에서 R8/minify가
-  꺼져 있다.** 024 §11의 "R8 side-effect 트리셰이킹"은 현재 위험이 아니라
-  minify가 켜질 때(로드맵 4번)의 잠재 위험. spec의 US4·FR-007을 이 사실로
-  정정했다.
-- **US3 — 삼성 One UI 배터리 화면**(SC-003, 완료): 설정 탭 "배터리 설정
-  열기" 버튼 → `android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS`
-  인텐트 → 삼성이 **`com.android.settings/.Settings$AppBatteryUsageActivity`
-  ("배터리 사용 관리" 앱 목록)** 으로 라우팅한다. 표준 안드로이드의
-  "배터리 최적화" 목록이 아니다. 예외 부여는 목록 → 앱 검색·탭 → "배터리"
-  상세(제한 없음/최적화/제한 라디오) → **"제한 없음" 선택**까지 **4탭**.
-  딥링크로 앱별 토글에 바로 못 간다. "제한 없음" 선택 시
-  `am get-standby-bucket` **`10` → `5`**, `deviceidle whitelist` 등재 —
-  **`adb shell dumpsys deviceidle whitelist +`(024가 재현에 쓴 것)와 최종
-  결과가 동일**함이 실측으로 확인됐다.
-- **US4 — release APK 헤드리스**(SC-004, 완료): AGENTS.md "release 빌드와
-  서명" 절차로 빌드(BUILD SUCCESSFUL **19m 8s**, `CN=alpharium`, minify
-  OFF, 175MB). debug 앱 uninstall(데이터는 `adb exec-out`으로 `a1.bin`
-  md5 검증 + 백업) → release 설치 → `adb reverse --remove-all` 후 실행
-  (`Unable to load script` 없음, `prod` 환경 — 탭 3개, 개발자 탭 없음).
-  설정 탭 자동 생성 토글 ON + 알림 허용 → `Registered task
-  'alpharium-auto-diary'` + `JOB #u0a570/0` (`Minimum latency +14m59s`).
-  `deviceidle whitelist +` + 화면 끔 + `cmd jobscheduler run -f` → logcat에
-  **`No task registered for key expo-task-manager` 및 `Unregistering task`
-  둘 다 부재**, `Executing task` → `Started/Finished headless task` →
-  `WM-WorkerWrapper: Worker result SUCCESS`. **024 §9 수정(`task.ts` 모듈
-  최상단 `defineTask` 부수 효과)이 release 빌드(Hermes 바이트코드, minify
-  OFF)에서도 헤드리스 태스크 등록을 성립시킨다** — DCE/트리셰이킹이 이
-  부수 효과를 제거하지 않음이 실측으로 확인됐다. `quiet` 생성 완주는 024
-  §9의 debug 확인(`writingMs` 52.5초)으로 갈음(모델이 uninstall로 삭제,
-  release `run-as` 불가). **RH4·RH5 발동 안 함 — `git diff src/` = 0줄.**
-- **Metro 함정 재확인**: 21시간 실행된 Metro가 번들 서빙 불가 상태가 됐다
-  (`/status` 6.8초 지연, 동적 `import`가 `SyntaxError: 'return' not in a
-  function`으로 깨짐, 앱이 "Loading from localhost:8081..."에 정지). AGENTS.md
-  "Metro 캐시가 스테일이면 ... 오류 없이 영영 로딩 중" 계열. `EXPO_PUBLIC_APP_ENV=dev
-  npx expo start --dev-client --clear` 재시작으로 즉시 해소(`/status` 0.015초).
-- **실기기 상태 변경**: US4 위해 debug 앱을 지우고 release를 설치했다 —
-  다음 실기기 세션(027 US1·US2, 로드맵 14·17번)은 `npx expo run:android`로
-  dev 빌드 재설치 + 모델 재배치부터 시작해야 한다(`run-as`·개발자 탭 필요).
-  `a1.bin`(quiet)만 백업돼 있다.
-- **US1 — 배터리 예외 라운드 소크**(SC-001, **충족**, 2026-09-14 SM-S901N):
-  유효 라운드 1회에서 목표 시각(12:00) → 발화 **12:12:33**(+13분) → 완주
-  12:13:54(81초, `writingMs` 69.4초) → `2026-09-14.json` 저장·완료 알림.
-  019 표본(10분·32분)과 같은 대역. 표본 1회라 SHOULD(3회 과반 ≤40분)는 미충족.
-- **★ 소크 라운드를 무효로 만드는 조건이 둘이다 — 실기기 3라운드로 분리했다.**
-  이것이 이 세션의 진짜 수확이며, 다음 소크에서 같은 함정을 반복하지 않게 한다.
-  1. **Doze가 깨진다**(019 §7 — 화면이 켜지면 잡 억제 조건이 바뀐다).
-  2. **★ 앱이 전경으로 돌아오면 태스크가 아예 실행되지 않는다.**
-     `BackgroundTaskScheduler.runTasks()`가 `inForeground == true`면
-     `runTasks: App is in the foreground`만 찍고 재예약한다
-     (`BackgroundTaskScheduler.kt:221-228` — 전경에서 무거운 작업을 돌리지
-     않으려는 **설계**다). 그 플래그는 `BackgroundTaskModule.kt:48-54`의
-     `OnActivityEntersForeground`/`Background`가 세우며 **Activity의
-     start/stop에 반응한다 — 화면 on/off가 아니다.**
-     - **화면을 끄는 것만으로는 부족하다.** 전원 버튼을 눌러 화면이 꺼져도
-       `wm_on_stop_called`이 뒤따라야 `inForeground = false`가 된다.
-     - **`dumpsys activity`의 `ResumedActivity`를 판정에 쓰지 않는다** —
-       화면이 꺼진 뒤에도 스테일하게 그 앱을 가리키고, 프로세스도
-       `TPSL(top-sleeping)`로 남는다. **라이프사이클 로그가 유일한 신호다**
-       (`wm_on_stop_called` 뒤에 `wm_on_resume_called`이 없어야 유효).
-- **★ `"skipped"`는 로그상 정상 완주와 구분되지 않는다.** `runAutoDiaryTask`는
-  `ran`/`skipped`/`failed`를 **로그로 남기지 않고**(원칙 IV — 검증 전용 로그
-  모듈을 만들지 않는다), `"skipped"`도 설계상 `Worker result SUCCESS`로
-  매핑된다(020 B6). 첫 라운드가 `selected-character.json` 부재로 조용히
-  `"skipped"`됐고(75ms 완주·일기 없음으로만 드러남), **소크 판정 시
-  `files/diary/`를 반드시 함께 본다.**
-- **US2 — 무예외 24h 소크**(SC-002): **접었다**(2026-09-14, 저장소 소유자
-  결정). 24시간 이상 기기를 사실상 못 쓰는 대가이고, 019가 같은 조건을 이미
-  실측했다(15분 등록 → 실제 19시간 33분 간격, 약 78배 억제. 억제 주체는 앱이
-  아니라 OS). **SC-002는 미판정으로 남는다** — 019 값은 다른 세션 것이라
-  대신 채우지 않았다(원칙 V). 되살리는 절차는 027 `findings.md` §2에 있다.
-- 상세: `specs/027-024-residual-verification/`
-  (`findings.md` §1·§2·§3·§4).
-
-### 037 — 로스터를 검증된 하나로 (2026-09-09)
-
-로드맵 14번. **로스터 다섯 중 넷이 자동 생성 부적합으로 확정돼 나갔다.** 헌법
-v1.6.0을 코드보다 먼저 개정했다(029·035·036 패턴).
-
-- **고친 것은 캐릭터 목록이 아니라 진입 기준이다.** 원칙 III에 조항 추가 —
-  로스터에 들어오려면 **이 저장소의 프롬프트로 저장 가능한 일기를 안정적으로 내는
-  것이 실기기에서 관측되어야 한다**(MUST). 옆 저장소 벤치는 후보를 좁히는 데
-  쓸 수 있으나 진입 근거가 되지 못한다 — 벤치를 근거로 다섯을 담았다가 넷을 뺀
-  것이 1.6.0의 경위다. **"안정적으로"는 사람이 로그를 읽어 판단한다**(원칙 IV —
-  자동 채점 코드를 만들지 않는다). 로스터는 **검증을 감당할 수 있는 크기로
-  유지한다**(SHOULD).
-- **로스터가 하나인 것은 완성이 아니라 현재 상태다** — 헌법이 이 문장을 담았다.
-  늘리는 방향이 정상이며 줄어든 것은 기준을 적용한 결과다.
-- **`Character` 유니온을 좁히면 `tsc`가 변경 대상을 전부 짚는다.** 손으로
-  찾아다니지 않는다 — `Record<Character, …>` 리터럴(`PERSONAS`·`ASSETS`·
-  `DISPLAY_NAMES`·`LANGUAGE`)의 남는 키가 잉여 속성 오류가 되고,
-  `isWrongLanguage`의 `switch`에서 도달 불가 `case`가 드러나며,
-  `DiagnosticsScreen`의 `PROBE_CHARACTER`가 할당 불가가 된다. **`tsc` 0이 곧
-  완료 조건이다.**
-- **★ 옛 일기가 멈추는 자리가 실재했다.** `DiaryEntry.character`는 파일에서 오는
-  값이라 좁아진 타입을 런타임에 만족하지 않고(로스터를 나간 캐릭터가 쓴 일기가
-  기기에 남아 있다), `authorName`은 **옵셔널이다**(035 이전 일기에 없다). 둘이
-  겹치면 `personaOf() → undefined.name`으로 상세 화면이 멈춘다. **`personaOf()`에
-  기본값을 넣어 고치지 않는다** — 로스터 밖에 페르소나가 돌아오면 "로스터에 없는데
-  성격은 있다"가 되어 원칙 III의 경계가 흐려진다. `persona.ts`의 `PERSONA_NAMES`
-  (로스터 밖이면 `undefined`)로 **읽는 쪽이 방어한다**.
-- **캐릭터가 둘 이상이어야 성립하는 계약을 지우지 않는다.** E1(다른 캐릭터를 열면
-  앞의 것이 닫힌다)·E9·018 P11·026 동시 내려받기·007 옮김 알림이 그것이다.
-  세 갈래로 다뤘다 — (1) 식별자만 필요하면 `__tests__/future-character.ts`의
-  `FUTURE_CHARACTER`, (2) 화면이 `CHARACTERS`에서 줄을 그려 둘째가 렌더 안 되거나
-  `buildPrompt`를 거쳐 페르소나가 필요하면 `it.skip` + 되살릴 조건, (3) 조립
-  대신 소스 검사(비-E2SN 프롬프트 경로 전체). **지우면 둘째가 들어올 때 계약이
-  사라진 줄 모른다.**
-- **`FUTURE_CHARACTER`를 `personaOf()`·`assetFor()`에 넘기지 않는다** — 로스터
-  밖에 페르소나·자산이 없는 것이 정상이고 그것은 계약 C3이 따로 확인한다. 자산이
-  실제로 필요한 자리(동시 내려받기)는 `it.skip`이다.
-- **`.maestro/parallel-model-download.yml`은 로스터가 하나인 동안 PASS할 수 없다**
-  — 아직 받지 않은 캐릭터가 둘 필요하다. 흐름을 남기고 실행기(`run-device-tests.mjs`)
-  주석에 사유를 적었다. `download-conflict.yml`(026 이후 구조적 실패)과 같은 계열의
-  **알려진 실패**이며 회귀로 오해하지 않는다.
-- **이미 내려받은 모델 파일을 앱이 지우지 않는다**(FR-011). 로스터에서 빠지면
-  다운로드 관리 목록에서도 사라지므로 **사용자가 앱으로는 지울 수 없다** — 008의
-  "받다 만 모델은 앱으로 못 지운다"와 같은 계열의 알려진 빈자리다. 자동 삭제
-  경로를 만들지 않는다(사용자 저장 공간에 손대는 판단을 코드가 하게 된다).
-- **`STALE_LOCK_MS` 6분의 근거가 사라졌으나 값은 유지한다** — 근거가 "가장 느린
-  캐릭터(narrative) 완주 170초 × 2"였고 그 캐릭터가 나갔다. 줄이려면 재측정이
-  필요하고 **안 잰 값을 쓰는 것이 원칙 V 위반**이다. 주석만 갱신했다.
-- 상세: `specs/037-roster-verified-only/`. 실측 근거: 024 T034·§10(narrative),
-  028(chinese·english), 037 실기기 3회(imaginative), my-ollama 리포트 222런.
-
-### 040 — 초기 권한 획득과 첫 실행 흐름 재설계 (2026-09-11)
-
-로드맵 20번. 021(권한 온보딩)·029(필수 에셋)·035(환영·작명)를 흡수해 첫 실행을
-**로고 → 권한 자동 순차 → (작명 ∥ 다운로드) → liveness → 자동 첫 일기**로
-재배치했다. 새 `src/firstrun/`(순수 판정)과 `checkFirstRunFile` 경계 검사가
-021·035와 같은 패턴으로 생겼다.
-
-- **021·035·029의 순수 로직은 그대로 재사용한다** — `requirements.ts`·
-  `essential-assets.ts`·`liveness.ts`·`naming.ts` 무변경. 040이 만든 것은
-  그 조립 순서(`App.tsx` 게이트)와 `src/firstrun/`의 판정 셋
-  (`resolveFirstRunStage`·`shouldShowLogo`·`shouldAutoGenerate`)뿐이다.
-- **자동 생성은 `schedule/task.ts`의 `runAutoDiaryTask`를 재사용하지 않는다**
-  — 그 함수는 `settings.enabled`와 목표 시각 창을 본다. 040의 트리거는 "설정을
-  막 끝낸" 1회성 이벤트라 그 설정과 무관하게 항상 시도해야 한다.
-  `app/wiring.ts`의 `triggerFirstRunAutoDiary()`가 `pipeline.run()`을 직접
-  부른다(`src/firstrun/`은 "시도해야 하는가"만 답한다 — G7).
-- **★ 실기기에서만 드러난 결함 둘**(2026-09-11, SM-S901N, dev). 기기 없는
-  테스트 2700여 개가 통과한 채로 둘 다 통과했다 — 011의 `has_media=0`,
-  013의 URI 계약 불일치, 020의 헤드리스 `defineTask` 미등록과 같은 계열이다.
-  - **권한 결정 후 `completed`가 저장되지 않았다.** 021은 마지막 [시작하기]
-    버튼이 `onComplete`로 플래그를 세웠는데, 040은 권한 결정 직후 작명
-    화면으로 전환해 **그 버튼에 도달하지 않는다.** 배터리 예외를 건너뛰고
-    작명·자동 생성까지 정상 완주했는데도 앱을 다시 열면 배터리 스텝 4/4로
-    되돌아갔다. **화면을 떠나는 자리가 바뀌면 그 화면이 저장하던 것도 함께
-    옮겨야 한다** — `onAllStepsDecided`가 세션 상태만 세우고 파일에는 아무것도
-    남기지 않은 것이 원인이다.
-  - **자동 생성이 끝나도 홈 화면이 목록을 다시 읽지 않았다.**
-    `DiaryHomeScreen`은 마운트·`AppState` 변화·**자기가 돌린** 생성에서만
-    `refresh()`를 부르는데, 040의 자동 트리거는 그 셋 중 어디에도 해당하지
-    않는다 — 파일에는 일기가 있는데 화면은 "아직 일기가 없다"로 남아 앱을
-    껐다 켜야 보였다. 트리거 완료 후(`finally`) 토큰을 올려 `DiarySection`을
-    재마운트시켜 고쳤다.
-- **로고는 1.5초라 스크린샷으로 놓치기 쉽다**(`LOGO_DISPLAY_MS`). 실기기에서
-  확인하려면 상수를 일시적으로 6000으로 올려 관찰하고 되돌린다 — 1초 간격
-  연속 캡처로도 빈 화면(플래그 로드 전 조기 반환)만 잡혔다.
-- **`clearState`는 앱 데이터만 지우고 OS 권한은 그대로 둔다.** 사진·위치·알림이
-  이미 부여된 기기에서는 그 스텝들이 자동으로 지나가고 배터리 예외만 남는다 —
-  "새 설치 = 권한 4개를 다 묻는다"가 아니다(021이 이미 기록한 것과 같은 계열).
-- **`assertNotVisible`은 `timeout`을 받지 않는다**(Maestro 2.8.0 실측,
-  "Unknown Property: timeout"으로 흐름 자체가 파싱되지 않는다). 사라짐을
-  기다리려면 `extendedWaitUntil`의 `notVisible`을 쓴다 — 기존 흐름들의
-  `timeout`은 전부 `scrollUntilVisible`에 붙은 것이었다.
-- **a1(1.5GB) 다운로드 중 OOM으로 앱이 죽는다 — 040의 결함이 아니다.**
-  `java.lang.OutOfMemoryError`(힙 한계 268MB, OkHttp 스레드, 1.39GB 지점).
-  `src/models/`와 `essential-assets-port.ts`는 040에서 변경 0건이고 마지막
-  변경은 026이다. `expo-port.ts`의 `arrayBuffer()` 폴백이 구간 하나(4분할이라
-  약 380MB)를 통째로 메모리에 올리는 것이 의심 지점 — **어느 조건에서
-  `res.body`가 null이 되는가**가 다음 조사 대상이다. 크래시 후 재시작해도
-  이어받지 못했다. 별도 스펙에서 다룬다.
-- **잘린 모델 파일은 로드 전에 크기 검증에서 걸러진다** — liveness 실패를
-  유도하려고 a1을 50MB로 잘랐더니 앱이 재다운로드로 넘어갔고 liveness까지
-  도달하지 않았다. 덕분에 FR-006 대기 화면("잠시만요 / … 마저 내려받는
-  중이에요" + 진행률, 그만두기 버튼 없음)을 관측했다.
-- **021 Maestro 흐름은 M1~M4가 통과한다** — 040의 자동 전환(1.5초 타이머)이
-  기존 흐름을 깨지 않는다. M5("에셋 미준비로 재실행하면 온보딩이 다시 뜬다")만
-  실패하는데 그 흐름 주석이 스스로 명시한 예외다 — **모델을 미리 받아 둔
-  기기에서는 그 assert가 성립하지 않는다.**
-- 미확인: FR-009의 거부 판정 갈래, liveness 실패 갈래(위 이유로 유도 불가 —
-  035 계약 테스트로 갈음), Maestro `first-run-flow.yml` 자동화(`clearState`
-  직후 Maestro 기기 서버가 죽는다 — F1~F5는 손으로 전부 확인).
-
-### 041 — 모델 내려받기 OOM 해소 (2026-09-11)
-
-040이 실기기에서 발견하고 "별도 스펙"으로 남긴 OOM을 같은 브랜치에서 고쳤다.
-**040의 결함이 아니라 026이 남긴 것**이며(`src/models/`는 040에서 변경 0건),
-로스터가 하나인 지금 이 다운로드가 막히면 앱이 아무것도 못 하므로 미룰 수 없었다.
-
-- **원인은 "어느 조건에서 `res.body`가 null이 되는가"가 아니라 "언제나"였다** —
-  위 「실측 규칙」의 RN `fetch` 항목이 그 결론이다. 040이 `arrayBuffer()` 폴백을
-  의심 지점으로 지목한 것은 맞았고, 남은 질문의 답이 "항상 그 폴백을 탄다"였다.
-- **고친 자리는 `expo-port.ts`의 `fetchRange` 하나다.** `RangeFetchPort` 계약,
-  `src/models/segmented/`(순수 코어), `port.ts`는 **한 줄도 안 고쳤다** — 원인이
-  기기 통로의 구현에 있었지 계획·조립에 있지 않았기 때문이다. 026의 계약 테스트가
-  전부 그대로 통과하는 것이 그 증거다.
-- **구간마다 임시 파일로 받고 1MiB씩 옮겨 붙인다.** 네이티브 `DownloadTask`가
-  `<key>.bin.seg<i>`에 직접 쓰고, 다 받으면 `FileHandle.offset`을 옮겨
-  `COPY_CHUNK_BYTES`씩 최종 파일의 제자리로 복사한다. **상주 메모리가 파일 크기와
-  무관하게 청크 하나로 고정된다** — "메모리에 담지 않는다"가 주석의 약속이 아니라
-  구조가 된다(예전 코드는 그 약속을 주석으로만 갖고 있었다).
-- **`remove()`·`bytesUsed()`가 구간 임시 파일도 본다**(`leftoverNamesFor`).
-  수신 도중 앱이 죽으면 구간 파일이 남는데, 이 목록에 없으면 GB 단위가 사용자
-  눈에 안 보이는 채로 남는다 — 008의 "받다 만 모델은 앱으로 못 지운다"를 되풀이하지
-  않으려는 것이다.
-- **`tsc`가 또 한 번 원인을 정확히 짚었다** — `FileMode.Read`는 없는 멤버이고
-  실제는 `ReadOnly`다. 손으로 쓴 구조적 타입 대신 `expo-file-system`의 실제 타입을
-  빌리자(`InstanceType<...["File"]>`) 잡혔다. 007·014의 교훈과 같은 자리다.
-- 기기 없는 테스트 153 스위트 / 2741개 통과, lint·헌법 검사(위반 0)·prettier 클린.
-  위반 주입(`arrayBuffer()` 되살리기)이 계약 테스트에 잡히는 것을 확인했다.
-- 상세: `specs/041-model-download-oom/`.
-
-### 042 — 사진이 있는 하루는 VLM을 반드시 거친다 (2026-09-14)
-
-로드맵 25번. 헌법 v1.7.0을 코드로 옮겼다 — **사진 접근이 허용되어 있으면 반드시
-본다(MUST), 끄는 경로를 두지 않는다(MUST NOT), 깊이는 하나로 고정한다(MUST).**
-037처럼 헌법 개정이 코드보다 먼저 왔다(PR #67).
-
-- **`VisionSetting`을 `"quick"` 하나로 좁히니 `tsc`가 72곳을 짚었고 그것이 작업
-  목록이 됐다**(037의 `Character` 축소와 같은 방법). 제품 소스 13곳 + 테스트
-  나머지. 손으로 찾아다니지 않았다.
-- **★ 백그라운드 자동 생성이 사진을 한 장도 안 보고 있었다.** `task.ts`가 「자동」과
-  설정 없음을 **전부 `"none"`으로** 떨궜다(029) — 기본 설정으로 자동 생성을 쓰는
-  사용자의 일기가 전부 여기 해당한다. 근거였던 "백그라운드는 그 날 신호를 미리 읽지
-  않는다"는 **파이프라인이 스스로 0장을 판정한다**는 011의 사실로 이미 해소돼
-  있었다. 분기를 통째로 걷어냈다 — **이것이 이 기능의 실질적 이행 지점이다.**
-- **개발자 탭 「지금 생성」도 안 봤다.** `DiagnosticsScreen`이 `vision`을 안 넘기고
-  `GenerationProbe`의 기본값이 `"none"`이었다. 검증 경로가 제품과 다르게 동작하면
-  **그 검증은 제품을 재현하지 못한다**(Governance — 예외를 코드에 몰래 두지 않는다).
-  인자 자체를 없앴다.
-- **`VisionOutcome`의 `skipped`는 죽은 갈래였다** — 제품 코드가 한 번도 반환하지
-  않고 선언과 갈래 수 세는 계약 테스트에만 있었다. 그 주석이 용도를 「설정이 보지
-  않음이라 시작하지 않았다」로 적어 뒀는데 그 설정이 사라져 **도달 불가**가 됐다.
-  제거해 6→5. 도달 못 하는 상태를 타입에 남기면 그것은 계약이 아니라 거짓말이다.
-- **★ `tsc`는 유니온을 「넓히는」 위반을 구조적으로 못 잡는다.** `VisionSetting`에
-  `"none"`을 되살려도 **컴파일이 0 오류로 통과한다**(실측). 좁히는 것만 타입
-  오류다. 그래서 「고를 자리가 없다」는 `__tests__/vision/photo-vision-always.test.ts`가
-  소스를 읽어 잠근다 — 이것이 유일한 방어다. 007 이후의 소스 검사 관례와 같은 자리.
-- **★ 가드 순서가 틀려 있던 것이 이때 드러났다.** `on-device.ts`가
-  `vision === undefined`를 `engine === undefined`보다 **먼저** 보는 바람에,
-  시뮬레이터·웹에서 「네이티브 추론 모듈이 없다」가 「사진을 못 본다」에 가려져
-  **덜 정확한 이유가 나갔다**(원칙 I). 예전에는 사진 설정이 `none`인 요청이 이
-  자리를 그냥 지나쳐 드러나지 않았다 — **「언제나 본다」가 되면서 비로소 보였다.**
-  엔진 부재를 먼저 말하도록 고쳤다.
-- **「볼 것이 없으면 열지 않는다」는 그대로다**(011). 0장·권한없음의 판정은
-  `readPhotos()` 안에 있고 설정과 무관했으므로 축소에 영향받지 않았다. 「없다」와
-  「모른다」의 구분도 프롬프트까지 그대로 산다(원칙 V).
-- **기기에 남은 `preferences/vision-setting.json`을 지우지 않는다** — 읽는 쪽이
-  사라졌으므로 무해하고, 지우는 코드를 넣으면 사용자 저장물에 손대는 판단을 코드가
-  하게 된다. 008(받다 만 모델)·037(로스터 밖 모델 파일)과 같은 의도적 빈자리다.
-- **저장된 일기는 손댈 것이 없었다** — `DiaryEntry`에 사진 설정 필드가 애초에 없다.
-  037이 옛 캐릭터 때문에 읽는 쪽 방어를 만들어야 했던 것과 **다른 상황**이며,
-  없는 문제에 방어를 만들지 않았다.
-- **테스트 수리에서 배운 것**: `sed`로 일괄 치환하다 `SignalValue`의 `kind: "none"`
-  (다른 유니온)까지 바꿔 놓았고, 블록 스코프 헬퍼(`fakeVision`)를 그것이 안 보이는
-  최상위 describe에서 부르게 만들었다. **일괄 치환은 같은 문자열의 다른 뜻을 구분하지
-  못한다** — 파일 구조를 먼저 읽고 모듈 스코프 헬퍼를 두는 편이 빨랐다.
-- 위반 주입 7종 전부 잡히는 것을 확인했다(V1·V3·V5·V7 계약 테스트 / V2 `tsc` /
-  V4 018 갈래 / V6 갈래 수). 기기 없는 테스트 152 스위트 2704개 통과, `tsc` 0,
-  헌법 검사 위반 0, prettier 클린.
-- **실기기 검증**(2026-09-14, SM-S901N, dev debug): **D1~D4·D6·D7과 Maestro
-  `photo-vision.yml` 통과, D5는 미수행.** 사진 있는 하루(합성 3장)를 **설정 조작 없이**
-  썼더니 `has_media=1`이 3회 찍히고 `visionMs` 19.5초가 남았다 — 본문이 사진 내용
-  (주차장·차량·번호판·꽃)을 구체적으로 반영했다. 0장인 하루는 `has_media`·
-  `tokenizeWithMedia`·`processMedia`가 **전부 0**이고 모델 적재가 1회뿐이었다
-  (VLM을 안 열었다). 개발자 탭 「지금 생성」도 `has_media=1`(예전엔 기본값이 `"none"`
-  이라 한 장도 안 봤다). 설정 탭은 덤프 5장 전수 검사에서 금지 토큰 **전부 0**.
-- **★ D5(백그라운드 자동 생성)도 사진을 본다 — 확인 완료**(2026-09-15 12:22 KST).
-  전날 세션은 17시라 020 `decision.ts`의 `isNearTarget`(목표 12시의 창 `[12,15)`)에
-  막혀 `결과: skipped`만 보고 끝났다. **창이 열린 시각에 다시 와서** 확인했다 —
-  `targetHour`도 기기 시각도 바꾸지 않았다. 사진 3장을 심은 하루의 일기 파일만
-  지워 `pickRetryDay`가 그것을 고르게 한 뒤 개발자 탭 트리거(=`runAutoDiaryTask()`)를
-  눌렀더니 **`has_media=1` 3회 → 캐릭터 모델 704토큰 프롬프트 → 일기 저장**,
-  `visionMs` 17996, 화면 표시가 **`결과: ran`**. 029가 「자동」을 `"none"`으로
-  떨구던 자리가 실제로 사라졌다는 증거다.
-  **판정은 로그만으로 하지 않는다**(027 §1) — `결과:` 표시와 `files/diary/`의 새
-  파일을 함께 본다. `"skipped"`는 로그상 정상 완주와 구분되지 않는다.
-- **정오 직후 앱을 처음 띄우면 040의 첫 실행 트리거가 따로 돈다** — 그것은
-  `decideSchedule`을 거치지 않으므로 **D5와 다른 경로다.** 이 세션에서도 실행
-  12초 뒤 그쪽이 먼저 그날 일기를 썼고(사진 3장 캡션), 그 바람에 직후의 수동
-  트리거가 `all-written`으로 `skipped`가 됐다 — **트리거 결과를 시각으로
-  귀속시키지 않으면 오판한다.**
-- **완전 헤드리스도 확인했다**(2026-09-15 13:47). 앱을 한 번 열어 재등록시킨 뒤
-  **홈으로 나가고 화면을 끄면**, 15분 뒤 잡이 스스로 깨어 `doWork: Running worker`
-  → `Executing task 'alpharium-auto-diary'` → `has_media=1` 3회 → 일기 저장까지
-  간다. 저장된 `createdAt`이 `doWork` 시각과 일치하고, 그 구간에
-  `wm_on_resume_called`·`App is in the foreground`가 **0건**이다.
-- **★ `am force-stop`은 WorkManager 잡을 함께 취소한다** — 전경을 벗어나려고
-  이것을 쓰면 잡이 사라져 **아무것도 안 도는 채로 시간만 흐른다**(첫 시도 41분을
-  그렇게 날렸고, `dumpsys jobscheduler`에 항목이 0개인 것으로만 드러났다).
-  **홈 버튼을 쓴다** — Activity만 stop되고 프로세스·잡은 산다. 027이 적은
-  "`inForeground`는 화면 on/off가 아니라 Activity start/stop에 반응한다"의 반대편
-  함정이다.
-- **헤드리스는 포그라운드보다 느리다** — 같은 하루·같은 사진에서 `writingMs`가
-  36.8초 → **137.5초**(약 3.7배), `visionMs` 18.0초 → 33.3초. 024의 "~3배"와 같은
-  대역이며, `GENERATION_TIMEOUT_MS`(180초, `writingMs` 구간)에 대한 여유가 그만큼
-  좁다는 뜻이다.
-- 상세: `specs/042-photo-vision-always/`(`findings.md` §3).
-
-### 043 — Modernist 스플래시·권한 요청 흐름 (2026-09-19)
-
-로드맵 26번. 앱 최초 인상과 권한 획득 흐름을 Modernist 디자인 시스템(오프화이트 배경 `#f3f2f2`, 진한 레드 `#ec3013`, 웜그레이 텍스트)으로 개편하고, 021의 장황했던 설명 카드 단계를 축소하여 OS 다이얼로그 중심의 연속 호출 흐름으로 전환했다.
-
-- **Modernist 디자인 토큰과 WCAG AA 대비 준수**: `src/ui/tokens.ts`에 Modernist 팔레트를 정의하고 `theme-tokens.test.ts`를 통해 WCAG AA 4.5:1(UI 컴포넌트 3:1) 대비를 자동 검증(DT1~DT7). `accentForeground`를 블랙(`#000000`)으로, `danger`를 딥레드(`#ae1800`)로 조정해 가독성 확보.
-- **스플래시 화면(`LogoScreen`)**: 72×72 레드 사각 마크, 굵은 서체의 "Alpharium", 하단 "휴대폰 안에서만" 슬로건과 3점 인디케이터(강조/중간/비활성). 1.5초 후 자동 다음 화면 전환(FR-001~FR-006).
-- **권한 온보딩 간소화 (FR-007~FR-009)**:
-  - 사진·위치·알림 3단계는 자체 설명 카드 및 [허용]/[건너뛰기] 버튼을 완전히 제거하고 빈 Modernist 배경 위에서 OS 다이얼로그를 즉시 연속 호출.
-  - 다이얼로그 거부는 별도 화면 조작 없이 자동으로 건너뛰기로 처리(`skip()` 자동 호출). `blocked`("다시 묻지 않음") 상태에서만 [설정 열기] 버튼 제공.
-  - `battery-exception` 단계는 OS 다이얼로그 호출 통로가 없으므로 기존의 설명 카드 + [설정 열기]/[건너뛰기] 구조를 Modernist 스타일로 유지.
-- **★ 실기기에서 잡은 CRITICAL 버그 — `busy` stale closure 해소**:
-  - 증상: 사진 허용 후 위치 권한 다이얼로그가 뜨지 않고 화면이 멈춤(기기 없는 단위 테스트는 통과했으나 실기기에서 발생).
-  - 원인: `OnboardingScreen`의 `allow` 함수가 `useState(false)`의 `busy`를 클로저로 캡처하고 있었고, `useEffect` deps에서 `allow`가 제외되어 있어 첫 번째 단계에서 `busy = true`로 세팅된 클로저가 다음 단계 타이머에 그대로 전달되어 `if (busy) return`으로 조용히 탈출함.
-  - 처방: `busyRef = useRef(false)`로 즉각적인 동기 가드를 수행하도록 변경하여 연속 권한 다이얼로그 호출이 멈춤 없이 완주되도록 수정.
-- **Maestro `unified-permission-onboarding.yml` 갱신 및 검증**:
-  - 권한이 이미 부여된 기기에서 첫 단계가 배터리 단계일 수 있음을 반영해 [허용] 버튼 부재 어서션 분기(`runFlow.when`) 보정.
-  - 040의 권한 완료 즉시 `completed: true` 저장 설계에 따라, 온보딩 완주 후 재실행 시 온보딩 화면이 다시 뜨지 않고(`assertNotVisible: onboarding-screen`) 다음 첫 실행 단계인 `welcome-screen`이 정상 노출됨(`assertVisible: welcome-screen`)을 검증하도록 M5 갱신.
-  - 실기기(SM-S901N) Maestro 실행 전체 PASS 완료.
-- 상세: `specs/043-modernist-splash-permissions/`.
-
-### 045 — 필수 자산 다운로드 동의 안내와 진행 슬라이드 (2026-09-19)
-
-로드맵 29번 연장. 사용자가 실기기 육안으로 044(작명 화면 Modernist 이관)를
-검토하다가 043·044 사이에 있어야 할 화면 하나가 통째로 비어 있는 것을
-지적했다 — 권한 확인 직후 다운로드가 사용자 동의 없이 조용히 시작되고,
-그 진행 화면도 리뷰 보드가 이미 설계해 둔 4장 스토리텔링 슬라이드
-(`1o`~`1q`)가 아니라 040이 만든 최소 스피너(`WaitingForDownloadScreen`)
-하나뿐이었다.
-
-- **순서를 정정했다**: 040은 "작명이 다운로드보다 먼저 뜨게 해서 대기
-  체감을 줄인다"는 근거로 작명 ∥ 다운로드 병렬 배치를 설계했었다. 이
-  스펙이 그 순서를 되돌렸다 — `권한 확인(043) → 동의 Dialog → 다운로드
-  진행 슬라이드 → 작명(044)`. `resolveFirstRunStage()`의 우선순위를
-  전면 재작성했다(`"waiting-for-download"` 제거, `"download-consent"`·
-  `"downloading"` 신설).
-- **동의 Dialog는 리뷰 보드 원본에 없던 신규 요소다** — 7개 dv-row
-  섹션(`Launch`·`Onboarding`·`First run`·`Persona picked`·`Home`·
-  `Writing`·`Diary detail`)을 전수 확인했고 VLM·LLM을 고르는 화면도
-  동의를 구하는 화면도 없었다. `DownloadConsentDialog`가 새로 하는
-  일은 VLM·LLM을 선택하게 하는 것이 아니라(029 `ESSENTIAL_ASSET_KEYS`
-  는 그대로 셋 다 받는다) 무엇을 왜 받는지 알리고 [확인/시작] 하나로만
-  진행하게 하는 것이다 — 거부·건너뛰기 조작 자체가 없다(040
-  `WaitingForDownloadScreen`의 "그만두기 경로가 없다"와 같은 논리).
-- **`OnboardingFlag`에 `downloadConsented` 필드가 넷째로 더해졌다** —
-  `welcomeShown`이 035에서 추가된 패턴 그대로(boolean 하나, 되돌리는
-  코드 경로 없음, 새 파일을 만들지 않음).
-- **★ 구현 중 발견한 spec 갭 — `downloadProceedConfirmed`**: 계획
-  단계에서는 `downloadReady`가 `true`가 되는 즉시 `"naming"`으로 넘어가는
-  설계였는데, 실제로 짜 보니 `DownloadProgressScreen`의 완료 화면
-  ("시작할게요" 버튼)이 사용자가 누를 틈도 없이 같은 렌더에서 사라지는
-  것을 발견했다(FR-007 위반). `namingDone`과 같은 세션 로컬 boolean을
-  추가해 "완료 화면 버튼을 실제로 눌렀는가"를 별도로 추적하는 것으로
-  해소했다 — 파일에 저장하지 않는다(009 원칙).
-- **★ 040이 세운 헌법 검사(G8, `elapsed*` 등 시간 어휘 전면 금지)를
-  제거했다**(저장소 소유자 지시). `resolveSlideStage()`가 `elapsedMs`를
-  순수 판정 인자로 받는 설계와 정면 충돌했다 — G8은 040 당시 "SC-002의
-  성능 임계값을 코드에 두지 않는다"는 취지로 어휘 자체를 기계적으로
-  막았지만, 045의 경과 시간은 성능 지표가 아니라 장식적 4초 슬라이드
-  전환 타이머다. 헌법 원칙 IV 본문("소요 시간의 사후 기록" 절)이 실제로
-  금지하는 것은 진행 중 화면에 정밀한 시간·바이트·퍼센트를 노출하는
-  것이지 경과 시간 개념 자체가 아니다 — 어휘 정규식 하나로는 이 성격
-  차이를 구분할 수 없어 검사 자체를 없앴다. `tokens_*`·`timings`는
-  여전히 `llama-port.ts` 경계가 따로 막는다.
-- **`UI_TOUCHES_MODEL`/`UI_TOUCHES_ASSET` 헌법 검사 경계를 다시
-  좁혔다**: 처음엔 `onboarding/essential-assets` 경로 전체를 막았는데,
-  029 `OnboardingScreen.tsx`가 그 파일의 `essentialAssetsReady()`(준비
-  여부 판정, `ModelReadiness`와 같은 성격)를 이미 정당하게 쓰고 있어
-  기존 코드가 오탐지됐다 — 경로 차단을 빼고 `ESSENTIAL_ASSET_KEYS`
-  (자산 키 이름 자체)만 `UI_TOUCHES_ASSET`에 추가하는 것으로 정정했다.
-- **`WaitingForDownloadScreen`을 완전히 삭제했다**(044 세션에서 겪은
-  `CharacterPicker.tsx` 죽은 코드 문제를 반복하지 않기 위함) —
-  `DownloadProgressScreen`이 대체하며 소스·테스트 파일 모두 제거.
-- 기기 없는 테스트 156 스위트 2754개 통과, lint 0 error, 헌법 검사
-  위반 0, prettier 클린.
-- **실기기 dev 빌드 검증 완료**(2026-09-19, SM-S901N/Galaxy S22, dev,
-  `EXPO_PUBLIC_APP_ENV=dev`). D1~D5 전부 실제로 관측:
-  - **D1**(동의 Dialog): "받을 것이 있어요" + [받을게요] 하나만, 모델
-    식별자·바이트 없음. 확인.
-  - **D2**(슬라이드 전환): 01/04부터 04/04까지 4초 간격 자동 전환, 4번째에서
-    클램프(순환 안 함), "받는 중이에요" 고정 문구만. 확인.
-  - **D3**(작명 게이트): 완료 화면("준비됐어요")이 버튼을 누를 때까지 화면에
-    유지됨(`downloadProceedConfirmed` 수정이 실제로 효과가 있음을 확인) →
-    [시작할게요] → 044 작명 화면 정상 전환. 확인.
-  - **D5**(041 재개 상호작용): 슬라이드 진행 중 강제 종료 → 재시작 → 동의
-    Dialog 재노출 없이 슬라이드 화면으로 곧바로 진입, 041 세그먼트 이어받기
-    (약 1GB → 15초 만에 1.5GB 완주) 확인.
-  - **다운로드 실패 재시도**(FR-011, T022·T023): 계약 테스트(`download-progress-
-    screen.test.tsx` FR-011 블록)로 갈음.
-- **★ 045 범위 밖에서 발견해 즉시 고친 결함**: liveness(정상 동작 확인) 실패
-  화면의 [그냥 시작하기]가 **막다른 길**이었다(035 계약 W11 "막다른 길을 만들지
-  않는다" 위반) — `onSkip` 콜백이 작명 단계와 실패 단계 양쪽에서 `finishWelcome()`
-  하나로 재사용되는데, 이 함수는 `namingDone`만 세우고 `livenessOutcome`은
-  그대로 두므로 `resolveFirstRunStage`가 계속 `"liveness"`를 반환해 실패 화면에서
-  절대 벗어날 수 없었다. 실기기에서 실제로 무한정 머무르는 것으로 재현했다.
-  `livenessSkipped` 세션 로컬 state를 추가해 `firstRunStage` 계산에서
-  `livenessOutcome`을 대체하는 방식으로 고쳤다(`livenessOutcome` state 자체는
-  `"ok"`로 덮어쓰지 않음 — 원칙 I). 계약 테스트 4개 추가(`onboarding-complete-
-  gate.test.tsx`), 위반 주입으로 방어 확인.
-- **Maestro 회귀 갱신**: `unified-permission-onboarding.yml`(M5 화면 기대 완화) 및
-  `welcome-naming.yml`(세션 로컬 완료 화면 통과 블록 추가) 수정.
-- 상세: `specs/045-onboarding-download-consent/`.
-
-### 047 — 작명 화면을 디자인 보드 1a와 실제로 맞추기 (2026-09-23)
-
-044가 `1a`를 참조해 작명 화면을 다시 썼지만, 046 머지 후 실기기에서 보니 표지("ALPHARIUM")·
-얼굴 타일·`1a` 문구·세로 중앙 배치·글자 수 카운터가 빠져 있었다. `WelcomeScreen`의 welcome
-단계만 다시 그렸다 — props·조립부(`App.tsx`)·checking/failed 단계는 무변경.
-
-- **"디자인을 참조했다"는 "디자인과 같다"가 아니다.** 044는 계약 테스트가 전부 초록이었는데도
-  제목·본문 문구부터 `1a`와 달랐다. 이번엔 `1a` KO 문자열을 글자 단위로 대조하는 계약(A3)을
-  두었다 — 참조 원본이 있으면 원문을 테스트에 박는다.
-- **빈 입력에서 확정 버튼은 흐려지지 않는다**(Clarification) — `1a`에 비활성 모양이 없다.
-  `Button`에 `disabled`를 넘기지 않고 `onPress`에서 거르며 `accessibilityState`로만 알린다.
-- **★ RN `Pressable`은 `disabled={false}`로 호출부의 `accessibilityState.disabled`를
-  덮어쓴다**(`Pressable.js:235`, `disabled != null`이면 병합). 그래서 공용 `Button`이
-  `disabled={disabled || undefined}`를 넘기게 한 줄 고쳤다 — 잠긴 버튼의 동작은 그대로다.
-- **★ `adjustResize`가 있어도 edge-to-edge(Android 16)에서는 키보드가 레이아웃을 줄이지
-  않는다**(실기기 실측). 1a대로 가운데 묶음을 세로 중앙에 두자 입력줄이 키보드 뒤로 숨어
-  치는 글자가 안 보였다 — 044는 입력줄이 화면 위쪽이라 드러나지 않았다. jest는 키보드가 없어
-  구조적으로 못 잡는다. `KeyboardAvoidingView behavior="padding"`만으로는 버튼 줄이 키보드
-  경계에 반쯤 걸렸고(`height`도 같음), 모자란 높이가 하단 내비게이션 바(48dp)와 맞아
-  `keyboardVerticalOffset={48}`로 해소했다. **키보드 위에 무언가를 두는 화면은 실기기에서
-  키보드를 연 채로 봐야 한다.**
-- **확정 버튼 글자는 검정이다**(`1a`는 오프화이트). accent 위 오프화이트는 약 3.8:1로 AA
-  미달이라 043 R2가 정한 `primary`(accent + 검정)를 그대로 쓴다 — 배경색은 `1a`와 같다.
-- **화살표는 문자(`→`)다** — `Button`이 children을 글자로 감싸므로 SVG를 넣으려면 공용
-  컴포넌트나 새 의존성이 필요하다.
-- 계약 A1~A12(`__tests__/ui/welcome-screen.test.tsx`), 위반 주입 3종(확정 버튼에
-  `disabled` 되살리기·힌트 숫자 하드코딩·hex 색 추가) 전부 잡힘. **주입 첫 회차에 하나가
-  새어 나갔다** — Python 문자열로 테스트를 생성하다 `\b`가 백스페이스 문자로 들어가 정규식이
-  무력해졌다. 정규식이 든 테스트를 스크립트로 만들 때는 결과 파일을 다시 읽어 확인한다.
-- **Maestro `welcome-naming.yml`**: 작명 화면을 지나는 블록을 더했다(없으면 작명 화면에
-  멈춰 `assertVisible: "일기"`에 도달하지 못한다). 실행 시 `author-rename-input-0`에서
-  실패하는데 이는 위 「실측 규칙」의 035 좌표 결함과 같은 자리다(047 회귀 아님).
-- **글꼴 1.3배에서 [나중에 할래요]의 앞 글자가 잘렸다**(실기기) — 가로 버튼 줄은
-  `flexWrap: "wrap"`으로 넘치면 내린다. 기본 글꼴에서만 보면 못 잡는다.
-- **작명 화면에 다시 들어가는 법**(모델·일기 보존): `files/preferences/onboarding.json`의
-  `welcomeShown`만 `false`로 바꾸고 재시작 → 완료 화면 [시작할게요]. `pm clear`는 모델까지
-  지운다. JSON을 `adb shell "echo {...}"`로 쓰면 셸이 중괄호·따옴표를 먹어 깨진다 — 로컬
-  파일을 `adb push /data/local/tmp/` 한 뒤 `cat … | run-as <패키지> sh -c 'cat > …'`로 넣는다.
-- 미확인: 제스처 내비게이션 기기·다른 키보드 앱에서의 키보드 여백.
-- 상세: `specs/047-welcome-naming-1a/`.
-
-
-### 048 — 일기 홈 1d와 화면 이동 구조 (2026-09-24)
-
-로드맵 31번. 보드 `1d`(Day-first)를 채택했다(`1e`는 미채택). `1d`는 하단에 쓰기 바가 고정되는
-구조라 맨 위 탭 줄과 공존할 수 없어 **화면 이동 구조를 함께 바꿨다** — 설계 합의:
-`docs/superpowers/specs/2026-09-24-diary-home-modernist-design.md`(D1~D9).
-
-- **탭 줄이 없다.** `App.tsx`의 `tab`이 `route: "home" | "settings" | "developer"`가 됐고, 설정·
-  개발자는 하단 바 `⋯` 메뉴(`HomeMenu`, RN 코어 `Modal`)로 들어가는 하위 화면이다. 돌아오는 길은
-  `SubScreenFrame`의 「← 일기」(`back-to-home`)와 뒤로 가기 — **뒤로 가기는 그 프레임이 마운트된
-  동안만 가로챈다**(홈에서는 OS가 처리). 개발자 항목은 `showsDiagnostics`일 때만 배열에 있다.
-- **Maestro에서 「설정」·「개발자」 탭을 누르던 흐름은 전부 `home-menu-button` →
-  `home-menu-settings`/`home-menu-developer`로, 「일기」 탭 복귀는 `back-to-home`으로 바뀌었다.**
-  새 흐름을 쓸 때 탭 글자를 누르지 않는다.
-- (049에서 이 구분은 사라졌다 — 오늘은 언제든 쓸 수 있다.) **「고를 수 있다」와 「쓸 수 있다」가 갈렸다.** `SelectableDay.writable`·`WritePrompt.writable`·
-  `writableAt`. 아직 쓸 수 없는 오늘은 `writable: false`로 `selectable` 맨 앞에 붙는다 — 009의
-  「정오 전 selectable은 셋, 오늘 없음」 테스트들을 이 동작으로 고쳤다. 기본 선택은 여전히
-  쓸 수 있는 첫 날(D9).
-- **★ 쓸 수 없는 오늘은 하루에 두 구간이다**(Clarification Q1). 04:00~12:00(정오에 쓸 수 있게
-  됨)만이 아니라 **00:00~04:00도** 그렇다 — `isDayWritable`이 `now.getHours() >= 12`를 보므로
-  자정을 넘기면 오늘(달력상 전날)이 다시 못 쓰게 되고 04:00에 닫혀 풀린다. 설계 문서는 이
-  구간을 놓쳤고, 그대로 만들었으면 새벽에 「오후 12시부터」라는 틀린 말을 했다. 그래서
-  `day-boundary.ts`의 `writableAt(day, now)`가 **다음 전환 시각(`Date`)**을 주고 화면은 그것을
-  「오전 4시」·「오후 12시」로 옮길 뿐이다 — 04·12는 여전히 이 파일 밖으로 안 나간다
-  (`home-text.test.ts` G10이 홈 화면 소스의 「숫자+시」·「정오」를 막는다).
-- **쓸 수 없는 날의 쓰기는 세 겹으로 막는다** — 화면이 버튼을 안 그림(B4·B5) / `DiaryHomeScreen.
-  write()`가 `writable`을 보고 멈춤(B6, `DiaryListScreen`을 `jest.mock` 대역으로 바꿔 `onWrite`를
-  직접 호출해 검증) / 파이프라인의 `isDayWritable` 게이트(012). 018 미리 준비도 쓸 수 없는 날엔
-  안 돈다.
-- **전환 타이머**: 쓸 수 없는 오늘을 보는 동안만 `writableAt + 1초`에 한 번 울려 다시 판정한다
-  (`AppState active`에서도). 012가 「실기기 미확인」으로 남긴 정오 전환을 가짜 타이머로 잠갔다.
-- **신호 줄**: `wiring.previewDay(day)` → `DayPreview`(사진 전체 장수·자리 수, 「없음」/「모름」
-  구분). 파이프라인과 **같은 `loadSignals` 하나**를 나눠 쓴다(PV4가 소스로 잠근다). 좁히는
-  함수는 `app/day-preview.ts`에 따로 있다 — `state.ts`가 신호 타입을 import하면 화면이 그걸
-  거쳐 신호에 닿는다(DP8). 「읽는 중」은 상태로 저장하지 않고 렌더에서 가른다 —
-  `react-hooks/set-state-in-effect`가 effect 안의 동기 `setState`를 오류로 막는다.
-- **고른 날은 `AppFrame`이 들고 있다**(Q4) — 설정 왕복·040 재마운트에도 남고 파일엔 안 남는다.
-- **하단 바의 「n일」은 쓰기 버튼의 형제다** — 보드는 한 버튼처럼 그렸지만 그 안에 두면 날짜를
-  눌러 쓰기가 시작돼 「누를 수 없는 글자」(D7)와 어긋난다(`/speckit-analyze` 2회차가 잡음).
-- **RNTL 14에는 `UNSAFE_root`가 없다** — 「모든 누를 수 있는 것을 눌러 본다」는
-  `screen.queryAllByRole("button")`로, Modal의 `onRequestClose`는 안쪽 노드에서
-  `fireEvent(node, "requestClose")`(핸들러를 찾아 부모로 올라간다)로 쏜다. jest-expo의
-  `AppState.addEventListener` 스파이를 `mockRestore()`하면 이후 테스트의 구독 반환값이
-  `undefined`가 된다 — 복원하지 않는다(diary-home.test와 같다).
-- `requirements.ts`의 `ifDenied` 넷을 해요체로 바꿨다(홈 캡션·온보딩·설정 권한 섹션이 같은 값을 본다).
-- 기기 없는 테스트 162 스위트 / 2874개 통과, lint·헌법 검사·prettier 클린, 위반 주입 9종 전부 잡힘
-  (`specs/048-diary-home-modernist/quickstart.md` §6).
-- **실기기 검증 완료**(2026-09-24, SM-S901N, dev). D1~D13 전부 관측 — 새벽 01:06에 「오전 4시부터」,
-  07:53에 「오후 12시부터」(쓰기 버튼 없음), 04:00이 지나자 스트립이 하루 밀림, 신호 칸 「12」·「없음」·
-  「모름」(권한은 Maestro `launchApp`이 다시 주므로 `permissions: {all: deny}`로 확인), 메뉴·설정·개발자·
-  뒤로 가기·고른 날 유지, 쓰기·덮어쓰기 확인·새 카드, 카드 「사진 없음」/「사진 모름」.
-  **D7(정오 순간의 조작 없는 전환)은 그 시각에 기기 앞에 있지 않아 못 봤다** — 가짜 시계 테스트가 덮는다.
-  실기기에서 고친 것 둘: `⋯` 메뉴 목록이 하단 바 윗선을 덮음(앵커 여백), 신호 칸 「오후 12시부터」가
-  두 줄로 꺾임(`adjustsFontSizeToFit`).
-- **★ 재실행할 때마다 다운로드 완료 화면·정상 동작 확인이 다시 떴다 — 045·040의 결함, 048에서 고쳤다.**
-  둘 다 세션 로컬 state(`downloadProceedConfirmed`·`livenessOutcome`)만 봐서, 모델이 있고 작명까지 끝낸
-  사용자도 앱을 켤 때마다 「준비됐어요 / 시작할게요」→ 모델 적재 확인을 지나야 홈에 닿았다. 이제 완료
-  화면은 **이번 세션에 에셋이 없는 것을 본 적이 있을 때만**(`essentialsMissingSeen`), 확인은 **이번
-  세션에 작명을 거쳤을 때만**(`livenessPassed`) 돈다. 파일에 새로 저장하는 것은 없다. 재실행 → 홈 직행은
-  실기기로 봤고, **새로 내려받은 직후 완료 화면이 한 번 뜨는 것은 재다운로드가 필요해 소스 계약으로만
-  잠갔다**(`onboarding-complete-gate.test.tsx`).
-- **Maestro 흐름을 `maestro test` 한 번에 넘긴다**(`run-device-tests.mjs`). 흐름마다 따로 부르면 JVM 기동 +
-  드라이버 연결로 **흐름당 약 35초씩 기기가 멈춰 있었다**(명령 실행은 흐름당 약 40초). 한 번에 넘기면
-  기동이 한 번이고 실패해도 다음 흐름으로 간다. 인자로 흐름 파일을 주면 그것만 돈다. 중간에 끊은
-  Maestro 뒤에 곧바로 다시 돌리면 `DeviceServerDiedException`으로 전부 실패할 수 있다 — 한 번 더 돌리면 된다.
-- **Maestro 회귀**: 12흐름 중 11 PASS. `welcome-naming`은 `author-rename-input-0`에서 실패 — 035의 좌표
-  결함(위 「실측 규칙」)과 같은 자리라 048 회귀가 아니다. 흐름 셋(`skeleton`·`prompt-preview`·
-  `scheduled-diary-notification`)이 「개발자」·「설정」 **탭 글자가 보이면** 메뉴로 가도록 적혀 있어 조건이
-  영영 거짓이었다 — `id: home-menu-button`으로 고쳤다. `diary-user-path`는 고른 날에 일기가 이미 있으면
-  덮어쓰기 확인에 멈췄다(기기 상태 의존) — 확인이 뜨면 취소한다.
-- 1회 관측·재현 안 됨: 첫 생성 뒤 상세 대신 홈이 보였다(두 번째 생성은 상세에 머묾). 당시 재실행마다 돌던
-  정상 동작 확인(위)과 겹쳤을 수 있다.
-- 상세: `specs/048-diary-home-modernist/`.
-
-### 049 — 날 고르기: 주간 스트립, 자정 경계, 정오 제한 폐지 (2026-09-27)
-
-홈 UI/UX 개편의 첫 조각(`docs/superpowers/specs/2026-09-26-home-uiux-decomposition-design.md`
-§3.2). 보드 `1d` ①월 라벨 ②날짜 헤더 ③주간 스트립. clarify에서 **하루 경계와 정오 규칙이 함께
-바뀌었다**(사용자 결정) — 이 절이 그 둘의 현재 규칙이다. 위 009·012·048 절의 04:00·정오 서술은
-**이력**이다.
-
-- **★ 하루는 기기 로컬 자정(00:00)에 바뀐다**(002부터의 04:00 경계를 버렸다). 헌법 2.0.0에는
-  04:00이 없어 개정 없이 바꿨다. 경계는 여전히 `day-boundary.ts` 한 곳이다 — `dayOf`는 달력 날짜,
-  `dayBounds`는 자정~자정. 저장된 옛 일기의 날짜는 옮기지 않는다(파일명이 곧 날짜).
-- **★ 오늘은 언제든 쓸 수 있다**(012의 정오 제한 폐지). `isDayWritable = day <= dayOf(now)`.
-  048의 쓸 수 없는 오늘 갈래(`writableAt`·「오후 12시부터」·전환 타이머·`WritePrompt.writable`)를
-  전부 걷어냈다. 프롬프트의 「오늘은 아직 끝나지 않았다」(012)는 그대로다. 040 첫 실행 자동 생성도
-  이제 오전에 돈다(귀결, 막지 않음).
-- **★ 경계를 옮기다 숨은 복제를 찾았다** — `vision/select.ts`의 `bucketIndexOf`가 `getHours() - 4`로
-  04:00을 직접 계산하고 있었다(023이 「순수 유지」라며 둔 것). 놓쳤으면 새벽 칸이 하루의 **마지막**
-  칸으로 밀려 011 R3 보정이 엉뚱한 사진을 골랐다 — 오류 없이. `day-boundary-source.test.ts` DB11이
-  `getHours() ±`를 경계 파일 밖에서 막는다. **경계 값을 바꿀 때는 값 테스트가 아니라 소스를 센다.**
-- **★ 「사흘」은 화면에서만 풀었다** — `selectableDays()`(백그라운드 재시도·알림 정리·018 미리 준비)는
-  개수·구성(정오 이후에만 오늘)을 그대로 둔다. **정오 조건을 함수 안에서 직접 본다** — 예전처럼
-  `isDayWritable(today)`로 간접 판정하면 새 `isDayWritable`(오늘은 언제나 참)을 타고 **백그라운드가
-  아침에 오늘을 쓰기 시작한다**(위반 주입 V1로 확인). 화면(`state.ts`)은 `selectableDays`를 부르지 않는다.
-- **★ 사흘 밖의 날에서 두 모델이 동시에 열릴 수 있었다** — `photoDays`(사진 있는 날 탐색)가 사흘만
-  훑으므로 사흘 밖의 사진 있는 날은 `hasPhotos: false` → 캐릭터 모델을 미리 연다(`prepare`) → 쓰기 때
-  VLM이 이어진다(`on-device.ts`가 경고하는 E1·E15). 049 전에는 그 날을 고를 수 없어 닿지 않던 길이다.
-  `DiaryHomeScreen.canPrepare`(App이 `selectableDays`로 넘김)가 거짓이면 미리 준비를 하지 않고
-  `release()`한다 — 느려질 뿐 틀리지 않는다.
-- **앱을 열면 오늘이다**(048 D9 뒤집음). `AppFrame`의 고른 날 초기값이 `null`이 아니라
-  `dayOf(new Date())`다 — `null`이면 기본값(오늘)이 켜 둔 채 자정을 넘길 때 새 오늘을 따라가 「보던 날
-  유지」가 깨진다. 자정 타이머(`nextDayStartAt + 1초`)가 밑줄·흐림만 옮긴다.
-- **되돌림 캡션(009)은 도달 불가라 걷어냈다.** 캐릭터 옮김·거부 권한 캡션은 그대로.
-- **스와이프는 `Gesture.Pan().runOnJS(true)` + reanimated 스프링**(설치된 것만). 문턱은 사람이 정한
-  값(`SWIPE_DISTANCE 40`·`SWIPE_VELOCITY 500`·`RUBBER_BAND 0.25`). ctx7 기본 ID는 gesture-handler
-  **v3 API(`usePanGesture`)**를 준다 — 이 저장소는 v2라 `/…/v2.29.1`로 문서를 봤다.
-- **★ gesture-handler jest 함정 둘**(실측): (1) reanimated 목에 `useSharedValue`가 있으면 RNGH가
-  reanimated로 보고 `useEvent`를 부른다 — 목에 `useEvent`·`setGestureState`를 더했다. (2) **앞 테스트에서
-  팬을 쏜 뒤 새로 렌더한 스트립에 `fireGestureHandler`를 쏘면 앞 테스트의 핸들러가 불린다**(핸들러 태그가
-  매번 1). 그래서 팬 배선은 한 테스트의 한 렌더에서만 쏘고, 문턱 판정은 순수 함수(`swipeDirectionOf`)로,
-  넘긴 뒤의 날은 `DiaryListScreen` 대역의 `onSwipe`를 직접 불러 검증한다. **RNGH `jestSetup.js`는
-  `setupFiles`가 아니라 `jest/setup-ui.ts`에서 require한다** — ui 프로젝트에 `setupFiles`를 적으면
-  `jest-expo` 프리셋의 `setupFiles`가 통째로 대체된다.
-- `scripts/seed/shapes.ts`는 시각표 원점(`SHAPE_CLOCK_ORIGIN_HOUR = 4`)을 따로 둬 심는 사진의 실제 시각을
-  048까지와 같게 유지했다(하루 경계가 아니다).
-- **실기기 검증 완료**(2026-09-28 07:45~08:13, SM-S901N, dev). D1·D2·D4~D10 통과 — 07:53에 오늘을 써 저장(정오 전
-  쓰기), 사흘 밖 9/14(사진 3장)는 고르는 동안 캡션·모델 적재가 없고 쓰기 때 `has_media=1` 3회로 저장. **`pm clear`
-  없이** 했다(모델 보존) — Maestro도 실행기가 아니라 `maestro test`로 직접 돌렸다. 미확인: 크로스페이드 겹침(150ms는
-  스크린샷으로 못 잡는다), 자정 순간, 손가락 손맛.
-- **★ effect로 애니메이션 시작값을 되돌리면 한 프레임이 샌다**(049 실기기, 사용자 관측 「넘기는 중에 숫자가 여러 번
-  바뀐다」). 크로스페이드가 한 공유값을 `useEffect`에서 0으로 되돌렸는데, effect는 **첫 프레임을 그린 뒤** 돌아 새 날 →
-  이전 날 → 새 날로 깜빡였다. jest의 reanimated 목은 값을 즉시 대입해 이것을 구조적으로 못 잡는다(033과 같은 계열).
-  겹마다 `key`로 새로 마운트하고 시작값을 `useSharedValue(from)`으로 준다(`FadeLayer`, H9).
-- **★ 끌린 자리는 새 내용이 그려지는 커밋에서 되돌린다**(049 스트립). 손을 뗀 순간 0으로 두면 JS 렌더가 끝날 때까지
-  (dev 약 0.2초) 옛 내용이 가운데 멈춰 보이고, 스프링으로 되돌리면 새 내용이 출렁인다 — 둘 다 「숫자가 여러 번 바뀐다」로
-  보였다. `useLayoutEffect`에서 0으로 둔다(S8). **움직임 결함은 스크린샷이 아니라 `adb shell screenrecord` + 프레임 추출로
-  본다** — 개발 기계에 ffmpeg가 없으면 `pip install --target <임시 폴더> imageio-ffmpeg`가 실행 파일을 준다.
-- 홈 헤더의 큰 날짜는 **언제나 두 자리 폭**이다(보이지 않는 「00」이 폭을 잡는다, H10) — 한 자리 날에서 요일이 밀리지 않게.
-- **실기기에서 고친 것 둘**: (1) 밑줄을 오늘 칸에만 그리니 **오늘이 든 주에서만 스트립이 높아** 주를 넘길 때 아래가
-  튀었다 — 밑줄 자리를 모든 칸에 둔다(S7). (2) `photo-selection-over-limit.yml`이 042 이후 깨져 있었다 — 없는 설정
-  `vision-quick`을 누르고, **흐름의 `env:` 값이 `-e`를 덮어써**(기본값은 `${X || "…"}`로 준다) 사진 없는 날을 썼고,
-  「쓰고 있다」를 기다려 **생성이 끝나기 전에 PASS**했다(쓰는 화면은 015 이후 「…중…」 독백 — 「그만두기」 사라짐을 기다린다).
-- **남긴 관측**: 사진 없는 날은 기기에서 018 미리 준비가 한 번도 돌지 않는다(029부터, `captionDay`가 있으면 1단계가
-  바로 돌아간다). `seed:day`는 아직 사흘 안에만 심는다(화면은 모든 지난 날). 신호 없는 오전의 오늘 일기가 저녁까지
-  지어냈다(원칙 II, 정오 제한 폐지로 더 자주 보일 수 있다). 상세는 quickstart §6.
-- 상세: `specs/049-home-day-picker/`.
-
-### 050 — 대화상자 기반: 덮어쓰기 확인·날짜로 이동 (2026-09-28)
-
-홈 UI/UX 개편의 「대화상자 기반」 조각(분해 설계 §3.1, 보드 `2d`·`2j`). React Native Reusables(RNR)를 들여와
-공용 대화상자 부품 둘(`components/Dialog.tsx`의 `ConfirmDialog`·`DismissibleDialog`)을 세우고, 012의 전체 화면
-덮어쓰기 확인을 홈 위 대화상자로, 헤더 큰 숫자·요일 탭을 「날짜로 이동」 달력으로 바꿨다. 다운로드 동의(045)와
-홈 ⋯ 메뉴(048)도 같은 부품으로 옮겼다(Clarifications Q4). 049 절의 「헤더 날짜에는 누름이 없다」(H7)는 050이
-바꿨다 — 큰 숫자·요일만 누를 수 있고 월 라벨·상태 줄은 여전히 못 누른다.
-
-- **★ RNR 레지스트리 원본은 네이티브 모듈을 끌고 온다.** `alert-dialog`·`dialog`·`dropdown-menu` 원본이
-  `react-native-screens`(`FullWindowOverlay`, iOS 전용)와 `lucide-react-native`(→ `react-native-svg`)를 import한다.
-  `src/ui/rnr/` 복사본에서 걷어냈고 `dialog-foundation-deps.test.ts` DEP1이 되살아나는 것을 막는다. 새로 들인
-  `@rn-primitives/*`·`react-native-ui-datepicker`·`dayjs`에는 네이티브 코드가 없다(설치본 확인) — dev 1회로 끝냈다.
-- **뒤로 가기는 프리미티브가 한다.** AlertDialog·Dialog·DropdownMenu의 `Content`가 마운트 때 `BackHandler`를
-  **한 번** 등록해 그때의 `onOpenChange`를 붙잡는다 — 부품이 최신 콜백을 ref로 읽는다(`useLatest`). 확인 대화상자의
-  덮개는 누름을 받지 않고, 일반 대화상자·메뉴의 덮개는 `closeOnPress`로 닫힌다.
-- **`@rn-primitives` 설치본(`dist`)이 JSX를 그대로 담는다** — jest `ui` 프로젝트의 `transformIgnorePatterns`에
-  `@rn-primitives`를 더했다(없으면 `Unexpected token '<'`).
-- **포털 테스트**: `App.tsx` 루트에 `PortalHost` 하나. 테스트는 `__tests__/ui/render-with-portal.tsx`로 화면 옆에
-  호스트를 그린다 — `rerender`에도 `withPortal()`로 감싸야 호스트가 사라지지 않는다.
-- **★ 드롭다운 메뉴는 jest에서 열리지 않는다** — 트리거를 `measure()`로 재야 목록을 그리는데 RN jest 목의
-  `measure`는 콜백을 부르지 않는다(`@react-native/jest-preset/jest/MockNativeMethods`). `home-menu.test.tsx`가
-  그 목에 버튼 자리를 넣어 준다. 위치(하단 바 윗선을 덮지 않는가)는 실기기에서만 본다.
-- **★ datepicker의 타입 선언과 실제 값이 다르다** — `components.Day`의 `day.date`와 `disabledDates`의 인자는
-  선언상 문자열이지만 **dayjs 객체**다. 변환은 `app/calendar.ts`의 `dayDateFromPicker()` 한 곳. 또 그 라이브러리의
-  `›`는 `maxDate`를 보지 않고 제어 prop(`month`)은 같은 값으로 되돌릴 수 없어, **날짜 격자만** datepicker에 맡기고
-  머리(‹ 월 연 ›)와 월·연 목록은 직접 그린다.
-- **달력과 스트립은 칸 판정 하나(`cellFor`)를 쓴다** — `weekCellsFor`가 그것을 7번 부른다. `DateJumpDialog.tsx`에
-  `dayOf(`·`isDayWritable(`·`.some(`이 없다(CAL5, 소스 검사). 미래 칸 방어는 `disabledDates`(우리 판정)와
-  `maxDate`(오늘) 둘이라 하나만 빼면 테스트가 초록이다 — 위반 주입은 둘 다 빼야 잡힌다.
-- **색**: RNR 색 이름(`background`·`primary`…)은 `tokens.ts`의 `RNR_COLOR_ALIASES`가 `COLORS`를 가리키는 별칭이다
-  (새 색 0, CSS 변수 없음 — Q3). RNR `Button`·`Text`는 대화상자·메뉴 부품 안에서만 쓴다(DEP2).
-- **오늘을 다시 쓸 때만** 대화상자에 「지금까지의 하루로 써요.」(사람이 정한 문장, Q5). 오전 오늘 일기의 지어내기
-  (049 관측, 원칙 II) 자체는 고치지 않았다 — 별도 과제.
-- **이 저장소에서 python으로 파일을 쓰면 Windows가 CRLF로 바꾼다** — 소스를 읽는 계약 테스트(`;
-
-` 정규식)가
-  깨졌다. `open(..., newline="
-")`으로 쓴다.
-- 기기 없는 테스트 168 스위트 / 3064개 통과, lint·헌법 검사·prettier 클린, 위반 주입 13건 전부 잡힘
-  (`specs/050-dialog-foundation/quickstart.md` §5). 실기기 결과는 같은 파일 §6.
-- 상세: `specs/050-dialog-foundation/`.
-
-### 051 — 쓴 날 읽기: 홈이 곧 상세 (2026-09-28)
-
-홈 UI/UX 개편의 「쓴 날 읽기」 조각(분해 설계 §3.5, 보드 `2c`·`2k`·`2g`). 고른 날에 일기가 있으면 화면 전환 없이
-헤더 상태 줄 자리에 제목, 스트립 아래 연회색 지면에 흑백 순환 캐러셀과 본문, 하단 바에 연회색 「다시 쓰기」(오늘의
-일기면 「N시간 M분 전에 작성」)다. **「최근 · n편」 목록과 `DiaryDetailScreen`이 사라졌다** — 위 017·025·038 절의
-상세 화면·슬라이더·갤러리·첫 표시 타자기, 048 절의 목록 카드(「사진 없음/모름」)는 **이력**이다.
-
-- **옛 일기에는 스트립(049, 과거 한계 없음)과 달력(050, 가장 이른 날 한계 없음)으로 닿는다** — 목록을 지운 근거(분해
-  설계 §2 성립 조건)이며 `written-day-reach.test.ts` REACH가 잠근다. 읽을 수 없는 일기도 점이 찍힌다.
-- **쓴 날인가는 목록 요약이 먼저 정한다**(`src/app/written-day.ts`의 `paperFor`) — 파일을 읽기 전에 하단 바가 「다시
-  쓰기」라 빨강이 깜빡이지 않는다. 늦게 온 이전 날의 읽기는 버린다. 목록은 읽혔는데 고른 순간 깨지면 상태 줄도 지면도
-  「읽을 수 없어요」다(구현 중 테스트가 잡았다 — 처음엔 상태 줄이 목록의 제목을 보였다).
-- **화면 상태에서 `detail`·`unreadable`·`written`이 없어졌다.** 쓰기가 성공하면 결과 화면 없이 홈의 그 날(목록을 다시
-  읽는다)이고, 저장 실패만 임시 결과 화면(`unsaved`, 「← 일기」)이다(054에서 이것도 토스트가 됐다). 「이전 일기를 덮어썼다」 안내는 없앴다(`2d`에서
-  확인했다). 실패 화면의 뒤로 가기 글자도 「← 일기」다.
-- **알림(020)은 「적용」과 「확인」을 가른다** — `initialDay`는 홈의 고른 날이 되고 `onInitialDayApplied`에서 App이
-  경로를 비운다. 확인(`acknowledgeNotified`)은 읽을 수 있는 일기가 지면에 실제로 보였을 때 그 날마다 한 번이다. 예전처럼
-  확인 때만 경로를 비우면 일기가 없는 알림 날에서 설정 왕복마다 그 날로 되돌아간다.
-- **캐러셀은 046에서 설치된 `react-native-reanimated-carousel`을 2장 이상일 때만** 쓴다(순환 때문 — 025 FR-011을
-  뒤집었다). 설치본에 네이티브 파일이 없다. `onConfigurePanGesture`는 `useMemo` 안(JS 스레드)에서 불려 워크릿이 아니다
-  (`usePanGestureProxy.ts:95`). `data`·`renderItem`을 렌더마다 새로 만들면 안 된다(046 교훈) — `memo`로 뗐다.
-- **★ 세로 지면 안의 가로 캐러셀에는 `failOffsetY`가 필요했다**(실기기 실측). 문서 FAQ대로 `activeOffsetX([-10, 10])`만
-  두면 세로로 700px 끄는 동안 가로로 20px 흔들린 손가락을 캐러셀이 잡아 사진이 넘어가고 지면은 스크롤되지 않았다.
-  `.failOffsetY([-10, 10])`을 더해 해소했다. jest는 제스처를 흉내내지 못한다(C9).
-- **흑백은 새 아키텍처 `filter: [{ grayscale: 1 }]`로 안드로이드에서 된다**(SM-S901N 실기기 확인, 문서상 iOS만 제한).
-  사진 면을 감싼 `View`에 주고 배지·인디케이터는 그 밖에 둔다.
-- **Maestro는 쓰기 버튼을 글자가 아니라 `id: "write-button"`으로 누른다** — 기본 선택이 오늘이라 기기에 오늘 일기가
-  있으면 하단 바가 「다시 쓰기」이고, 확인 대화상자의 버튼 글자도 「다시 쓰기」라 글자로는 겹친다(`overwrite-confirm`·
-  `overwrite-cancel` id). 쓴 날의 버튼도 같은 testID다. 날짜 조각(`write-day-label`)은 안 쓴 날에만 있다.
-- **`diary-photo-gallery.yml`을 지우고 `written-day-reading.yml`로 대체했다** — `-e WRITTEN_DAY=<사진 2장 이상인 쓴 날>
-  -e WRITTEN_DAY_PHOTOS=<장수>`가 필요하고 없으면 첫 단계(`assertTrue`)에서 실패한다. `run-device-tests.mjs`는 이
-  값을 넘기지 않으므로 실행기로 돌리면 이 흐름이 실패한다(알려진 실패).
-- **adb 입력의 함정**: 스트립을 넘긴 직후의 첫 `input tap`이 한 번 먹히지 않았다(두 번째에 됨). 빠른 `input swipe`(300ms)는
-  지면을 스크롤하지 못했고 1200ms 스와이프는 됐다 — 손가락 입력에서의 문제인지는 확인하지 않았다(모름).
-- **★ 구현 뒤 실기기에서 보드와 셋이 어긋났다**(저장소 소유자 육안). 계약 테스트는 전부 초록이었다 — 047의 「참조했다는
-  같다가 아니다」와 같은 계열이다. (1) 상태 줄·제목은 **큰 숫자 오른쪽 세로 묶음의 요일 아래**다(숫자 아래 한 줄이 아니다).
-  (2) 쓴 날은 **헤더·스트립이 고정되고 지면만 스크롤**된다. (3) 하단 바는 **화면 폭 전체의 블록 하나**이고, 쓴 날의 바는
-  **지면 끝(4px)에 닿아야 올라온다**(짧으면 처음부터, `reachedEnd`). clarify에서 정한 「늘 보인다」를 뒤집었다. 보드를 옮길 때는
-  마크업의 `flex`·`position:absolute`·`transform`까지 읽는다 — 메모 글만 읽으면 배치를 놓친다.
-- **`⋯` 메뉴(048 `HomeMenu`)를 없앴다**(저장소 소유자 지시, 설정 화면 구성 과제에서 진입점을 다시 둔다). 지금 설정은
-  「캐릭터를 먼저 준비해야 한다」 링크로만 닿고 **개발자 탭은 닿을 길이 없다.** 메뉴로 설정·개발자에 들어가던 Maestro 흐름
-  열한 개는 실행기 `FLOWS`에서 뺐다 — 설정 화면 구성과 함께 전면 재개편한다(저장소 소유자 결정, 파일은 남아 있다). `src/ui/rnr/dropdown-menu.tsx`와 `@rn-primitives/dropdown-menu`는
-  쓰는 곳이 없어졌지만 남겨 두었다. 048 절의 메뉴·「n일」 조각 서술은 이력이다.
-- **숨긴 바는 루트에서 잘라야 한다** — `translateY`로 내린 바가 edge-to-edge 아래 내비게이션 바 뒤로 비쳤다(실기기). 쓴 날 루트에
-  `overflow: "hidden"`. 숨긴 동안은 `pointerEvents="none"` + 접근성 트리에서 빼므로 jest(RNTL 기본 숨김 제외)와 Maestro 모두
-  바를 못 찾는다 — 테스트는 `__tests__/ui/paper-end.ts`로 지면 끝을 흉내 내고, 흐름은 `scrollUntilVisible`로 내려서 찾는다.
-- 상세: `specs/051-home-written-day/`.
-
-### 052 — 읽기 스크롤: 쓴 날을 읽는 동안 스트립을 접는다 (2026-09-29)
-
-홈 UI/UX 개편의 「읽기 스크롤」 조각(분해 설계 §3.6, 보드 `5a`·`5b`). 쓴 날의 지면을 아래로 8px 넘게 내리면 스트립과
-안내 캡션이 접히고(240ms), 맨 위(위로, 2px 이하)에 닿으면 펴진다. **접힘 표시(▾)도, 접힌 날짜 줄을 눌러 펴는 길도 없다**(저장소
-소유자 — 요청에 없었고 제목을 줄여 펼치는 버튼으로 오해하기 쉽다; 보드 `5b`의 ▾·날짜 줄 탭은 따르지 않는다). 051 절의 「스트립
-접힘·▾는 읽기 스크롤 몫」에서 ▾는 만들지 않았다. 새 의존성·저장 형식 변경 없음.
-
-- **판정은 `src/app/reading-scroll.ts`의 `foldAfterScroll()` 하나다**(순수, 상수 `FOLD_AFTER 8`·`UNFOLD_AT 2`). 보드 `5b`의
-  `onPaperScroll`과 같은 규칙이되 **300ms 디바운스는 두지 않았다**(시안용) — 8과 2 사이의 간격이 되튐을 막는다. **보드에 없는
-  규칙 하나**: 접은 뒤에도 더 내릴 거리가 8px 이하인 본문은 접지 않는다(FR-005 — 접자마자 스크롤이 0으로 눌려 되접히는 것을 막는다).
-- **큰 숫자·요일의 누름은 접혔든 펴졌든 050 그대로 달력을 연다.** 접힘 전용 누름이 없으므로 안쪽 `DateJump`의 `onPress`를 끄거나
-  날짜 줄을 `Pressable`로 감쌀 일이 없다. 접힌 스트립은 `pointerEvents="none"` + 접근성 숨김이라 누름·스와이프·Maestro 모두 못 본다.
-  날이 바뀌면 펼친 상태로 시작한다. **펼침의 유일한 길은 스크롤이 맨 위(y ≤ 2)에 닿는 것이다.**
-- **★ 접는 감쌈은 안쪽을 절대 배치로 빼야 한다**(실기기 실측). 안쪽을 흐름에 둔 채 `maxHeight`만 옮기니 안쪽이 바깥 제약에
-  눌려 잰 높이가 108 → 64 → 41 → 21로 줄고, 그 값으로 다시 높이를 정해 헤더 높이가 흔들렸다. 지면 스크롤이 튀며 빠른 위
-  스크롤의 절반이 맨 위에 못 닿고 접힌 채 멈췄다(051 baseline은 6/6 도달). 원인은 임시 로그(`sh` = 잰 높이)로 보였다 — **애니메이션
-  안쪽의 `onLayout`을 재는 값으로 다시 쓰는 되먹임은 jest가 구조적으로 못 잡는다**(reanimated 목은 값을 안 계산한다).
-- **★ 지면 높이가 바뀔 때 안드로이드가 되풀이하는 사건 둘을 거른다.** (1) 위치가 그대로인 `onScroll` — 판정하면 방금 펼친
-  스트립이 되접힌다(`y >= previousY`가 「아래」). (2) 1px 미만으로 흔들려 오는 `onContentSizeChange`(773.9999 ↔ 774.0001) —
-  끝 판정을 줄어든 높이로 다시 돌려 「다시 쓰기」 바가 내려갔다. **「같은 값」 비교를 부동소수에 정확한 같음으로 쓰면 뚫린다.**
-  그래서 끝 판정은 스크롤 사건(위치 변화)·내용 크기(1px 이상 변화)·처음 잰 레이아웃에서만 돈다(FR-010, `5a` ④ 「바 상태는 그대로」).
-- **★ 접힘 경계에서 접힘·펼침이 되풀이됐다 — 지면 프레임을 고정해서 고쳤다**(구현 뒤 저장소 소유자 검토, 실기기 실측).
-  스트립을 지면 프레임 **위**에서 줄이면 프레임의 위쪽 경계가 손가락 아래에서 움직인다. 안드로이드 `ScrollView`는 프레임 기준
-  터치 좌표로 드래그를 읽으므로 그것을 손가락이 내려간 것으로 읽어 지면을 아래로 스크롤했고(`y ≤ 2`), 그러면 펼침 조건이 서서
-  프레임이 다시 내려가 반대로 읽혔다 — 한 번의 느린 끌기(`input swipe … 3000`)에 **7번** 뒤집혔다. 접힘 8px·펼침 2px의
-  간격(히스테리시스)으로는 못 막는다(`y` 자체가 밀리므로). **지면 스크롤 뷰의 프레임은 접힘으로 움직이지 않는다**: 스트립은 지면
-  위에 절대 배치로 덮는 불투명 판(`StripOverlay`)이고, 지면 내용 맨 위에 같은 높이의 스페이서(`FoldSpacer`)를 둔다 — 둘이
-  `useFoldMotion`의 같은 값(`간격 20 + 진행도 × 잰 높이`)을 본다. 수정 뒤 같은 끌기가 접힘 1회, 맨 위까지 느리게 올리면 펼침 1회.
-  (한때 스페이서가 내용 높이를 바꾸는 동안 끝 판정을 막는 `endLock`을 뒀으나, 펴는 누름과 함께 없앴다 — 펼침은 맨 위에서만 일어나 그때는 끝이 아니다.)
-- **★ 접힐 때 큰 날짜 숫자가 위로 튀었다**(지금은 그 갈래 자체가 없다): 접힌 동안 숫자용 `DateJump`가 누를 수 없는 갈래(`alignSelf: flex-start` 래퍼)로 바뀌어
-  줄의 `alignItems: flex-end`를 깼다(녹화 프레임 숫자 위 가장자리 146 → 121). 숫자용은 정렬을 건드리지 않는다. **화면을
-  「눌림 갈래」로 바꿀 때 래퍼의 정렬 스타일도 함께 바뀌는지 본다.**
-- **제목은 한 줄 말줄임이다**(저장소 소유자 지시): 두 줄까지 허용하면 줄이 바뀔 때 날짜 영역이 넓어진다. 051의 「두 줄까지」(보드
-  `2c`)를 뒤집었다. 제목이 없는 날의 상태 줄 문구는 그대로다.
-- **테스트 함정**: `render`를 테스트 안에서 두 번 부르고 손으로 `unmount()`하면 뒤 테스트의 `screen`이 어긋난다(`it.each`로 나눈다).
-  `rerender`도 Promise다 — `await`. RNTL의 기본 쿼리는 접근성에서 숨은 요소를 빼므로 「접혔다」의 증거는 `pointerEvents`와
-  `includeHiddenElements: true` 쿼리다.
-- **`adb shell input swipe`로 접힘을 볼 때**: 지면이 접힌 뒤에는 스크롤 범위가 작아(접힌 상태에서 화면 안에 거의 다 들어온다)
-  큰 스와이프가 한 번에 맨 위·끝에 닿는다 — 움직임은 `screenrecord`(30fps 프레임 추출)로 본다. Windows에서 `adb pull`은
-  `MSYS_NO_PATHCONV=1`이 필요하다.
-- **Metro가 어제 것으로 남아 응답하지 않았다**(`/status`가 안 돌아옴, 포트 8081 점유) — 027 §1의 함정과 같다. 프로세스를 종료하고
-  `--clear`로 다시 띄웠다.
-- 기기 없는 테스트 170 스위트 / 3081개 통과, lint·헌법 검사·prettier 클린, 위반 주입 19종(초기 14 + 실기기 검토 4 − 폐기 PAPER6 + ▾ 제거 후 2) 전부 잡힘.
-- **실기기 검증 완료**(2026-09-29, SM-S901N, dev, `pm clear` 없음): 접힘·펼침·바 유지·달력 분리·짧은 본문·안 쓴 날·캐러셀 제스처
-  분리·대화상자 뒤 상태, 화면 녹화로 되튐 없음 확인. Maestro `reading-scroll.yml`(`-e WRITTEN_DAY=2026-09-22`)·051 회귀
-  `written-day-reading.yml` PASS. **저장소 소유자 확인**(2026-09-29): 손가락 손맛(문턱 8px·2px), 자정·날 바뀜 순간, 큰 글꼴(1.3배)에서의 접힘은 직접 써 보고 자연스럽다고 했다.
-  접힘 끝 ±8px 지면 경계 흔들림은 원인 미상이나 체감상 문제 없다고 했다.
-- 상세: `specs/052-reading-scroll/`.
-
-### 053 — 쓸 재료: 쓰기 전에 그날의 재료를 보이고, 없으면 한 번 더 묻는다 (2026-09-29)
-
-홈 UI/UX 개편의 「쓸 재료」 조각(분해 설계 §3.3, 보드 `1d` ④⑤·`2l`·`2m`·`2e`·`2f`). 안 쓴 날의 신호 줄(세 칸)을 두 칸(사진·장소)으로 바꾸고,
-사진 권한이 없으면 「권한이 없어요 ›」, 재료가 없으면 쓰기 전에 확인을 묻고, 그렇게 쓴 일기에 「지어낸 하루」를 보인다. 새 의존성·네이티브 모듈·저장
-필드가 없다 — 050의 확인 대화상자·048의 미리보기·051의 하단 바·021의 권한 통로를 재사용했다. **048 절의 「쓸 수 있는 때」 칸·세 칸 신호 줄은 이력이다.**
-
-- **판정 하나를 두 곳에 쓴다**(`src/app/material.ts`). 각 항목을 `some`(1 이상)·`zero`(관측된 0)·`unseen`(셀 수 없음)으로 옮기고 `decideMaterial` 하나가
-  「바로 쓴다/확인을 묻는다」를 정한다(`some` → `zero` → `unseen` 순서가 계약). 쓰기 전에는 미리보기(`CountHint`)에, 읽을 때는 저장된 신호에 같은 함수를
-  적용한다 — **「확인이 뜬 하루」와 「지어낸 하루」가 다른 말을 하지 않게.** `unseen`을 `zero`로 세지 않는다(원칙 V, MAT3가 기본 분기를 소스에서 막는다).
-- **「지어낸 하루」는 저장하지 않는다**(clarify). 읽을 때 `paperFor()`가 `entry.signalsUsed`로 `madeUp`을 계산한다 — 그래서 옛 일기·백그라운드 자동 생성이
-  재료 없이 쓴 일기도 같은 규칙으로 표식이 붙는다(확인 대화상자를 거쳤는지가 아니라 「쓰인 때 셀 수 있는 재료가 없었는가」). 본문 지면 맨 위의 보조색 한 줄이다.
-  신호가 깨져 있으면 던지지 않고 표식을 붙이지 않는다(읽는 것이 먼저다).
-- **★ 「장소」의 권한은 사진에 묶인다**(clarify). 장소 수가 사진 EXIF에서 나오고 `ACCESS_MEDIA_LOCATION`은 조회 API가 없다. 그래서 보드의 「사진만 권한
-  없음, 장소는 2」는 성립하지 않는다 — 사진 권한이 없으면 두 칸 모두 「권한이 없어요 ›」이고 어느 칸을 눌러도 요청하는 것은 사진 권한 하나다. 권한이 있는데
-  좌표를 못 읽은 것은 「모름」이며 누를 수 없다(거짓 버튼을 만들지 않는다).
-- **`DayPreview.photoAccess`**(`ok`/`denied`/`blocked`)가 「권한 때문인가」를 가른다. `CountHint`의 `unknown.reason`(한국어 문장)을 비교하지 않는다 — 문구를
-  고치면 조용히 깨진다. `wiring.previewDay`가 `photoPermission()`을 함께 읽어 옮긴다(조회 실패는 `ok`).
-- **★ 실기기에서만 드러난 결함 — 사진 0장인 하루가 「0 장 · 모름」으로 보였다.** 기기 없는 테스트는 통과했다. `collectPlaces`가 사진이 `none`이어도 장소를
-  `unknown`(「사진을 보지 못해 좌표를 물을 수 없다」)으로 주기 때문이다. 장소 수는 사진 좌표에서 나오므로 사진이 관측된 0장이면 장소도 0곳이 관측된 사실이다 —
-  `toDayPreview`가 그것을 `none`으로 옮긴다. **사진이 `unknown`이면 승격하지 않는다**(못 본 것은 못 본 것). 수집 계층은 건드리지 않았다(004의 계약).
-- **`2f` 제목은 이유에 따라 둘이다.** 관측된 0이면 보드 문구 「😢 아무 기록도 없어요」, 전부 권한 없음이면 「😢 기록을 볼 수 없어요」(사람이 정한 값) — 기록이 있는지
-  모르는 상태를 「없다」로 단정하지 않는다. 안내 한 줄 「기록 대신 상상으로 하루를 채워요.」는 **셀 수 있는 항목이 모두 관측된 0일 때만** 보인다.
-- **쓰기 전 판정은 누른 순간 한다.** 화면이 든 미리보기가 그 날의 것이면 그것으로, 아니면 `previewDay(day)`를 한 번 기다린다 — 「읽는 중」을 재료 없음으로 취급하지 않는다.
-  `previewDay`가 없으면 판정 없이 바로 쓴다. **다시 쓰기(이미 쓴 날)는 판정을 거치지 않는다**(050 덮어쓰기 확인이 이미 있다). 「확인」으로 쓰는 인자는 누른 순간 `resolve(day)`가
-  정한 그대로다. 권한이 없어도 쓸 수 있다(확인만 거친다) — 권한을 강제하지 않는다.
-- **핸들러가 읽는 미리보기는 ref에 둔다.** `shownPreview`를 `useCallback` 의존성에 넣으면 렌더마다 새 객체라 `react-hooks/exhaustive-deps` 경고가 나고, `useMemo`로 감싸면
-  React Compiler 규칙(`preserve-manual-memoization`)이 오류를 낸다. 커밋 뒤에 ref로 옮기면 누름은 언제나 최신 값을 본다.
-- **「지어낸 하루」 한 줄이 본문 텍스트에 섞인다.** `written-body`를 `toHaveTextContent("본문")`(정확 일치)로 검사하던 051 테스트가 깨졌다 — fixture가 재료 없는 하루라
-  표식이 붙었다. 재료 있는 fixture로 바꾸거나 정규식으로 검사한다.
-- **위반 주입에서 첫 GRID6 주입이 적용되지 않았다** — 코드가 그 조건을 갖고 있지 않아 치환이 실패했다(prettier가 줄을 합쳐 놓은 탓도 있다). 「권한 없음이면 안내 한 줄이 없다」를 값이
-  `0`으로 남은 경우까지 테스트로 잠그고 조건을 넣은 뒤 다시 주입해 잡혔다. **치환 성공을 먼저 단언한다.**
-- 기기 없는 테스트 175 스위트 통과, lint(eslint 0 error)·헌법 검사·prettier 클린. 위반 주입 14건 전부 잡힘(`specs/053-writing-material/quickstart.md` §5).
-- **실기기 검증 완료**(2026-09-29, SM-S901N, dev, `pm clear` 없음). D1~D11과 Maestro `writing-material.yml`(FLOWS 등록) PASS, 회귀 4흐름 PASS. 같은 날 후속으로 D7(재료 있는 날 즉시 쓰기)·확인 뒤 새로 쓴
-  일기의 표식·설정 화면에서 손으로 허용 후 복귀·글꼴 2.0배도 관측했다(쓴 일기는 지웠다). **2.0배에서 「권한이 없어요 ›」 두 칸이 서로 붙고 「›」가 지면 밖으로 새던 결함**을 찾아 `flexWrap`으로 고쳤다
-  (넘치면 「›」가 아래로 내려온다). **미확인**: 제스처 내비게이션 기기·다른 키보드 앱·삼성 밖 설정 화면. **홈 헤더의 021 안내 캡션(「사진을 볼 수 없어서 일기는 사진 없이 써요」)이 권한 없음
-  칸과 같은 사실을 두 번 말한다** — 건드리지 않았고 후속 판단이다.
-- 상세: `specs/053-writing-material/`.
-
-### 054 — 제자리 쓰기: 쓰는 동안 홈을 떠나지 않는다 (2026-09-29)
-
-홈 UI/UX 개편의 「제자리 쓰기」 조각(분해 설계 §3.4, 보드 `2b`·`2i`). 별도 전체 화면이던 쓰는 중이 **홈 안의 상태**가 됐다 — 헤더 상태 줄
-「쓰는 중」(빨강), 35%로 잠긴 스트립, 캐릭터 혼잣말과 「{이름}이 쓰고 있어요. 진행률은 세지 않아요.」, 검정 전폭 「그만두기」 바. 그만두거나
-실패하면 쓰기 전 상태의 홈으로 돌아오고, 실패는 하단 바 위 12에서 올라오는 **토스트 한 줄**이다. 새 의존성·네이티브 모듈 없음. 위 048~053
-절의 「쓰는 중 전체 화면」·「임시 결과 화면(`unsaved`)」·039의 타자기 서술은 **이력**이다.
-
-- **★ `AppScreen`의 `writing`을 넓히지 않았다.** 처음 설계(`toWriting(items)`)는 구현 중 기존 방어와 부딪혔다 — `toWriting()`이 인자를 받지 않고
-  `Object.keys(toWriting())`가 `["kind"]`뿐인 것을 007 S1·009 I7·012 C3가 원칙 I의 방어로 세 곳에서 잠갔다. 헤더·스트립에 쓸 목록 요약은 화면
-  로컬 state(`writingItems`)로 들고, `generate(params, items)`가 시작 때 받는다. **설계를 구현에서 뒤집을 때는 그 설계가 기대던 기존 계약 테스트를
-  먼저 읽는다** — `tsc`가 아니라 소스를 읽는 테스트가 그 방어를 든다.
-- **실패 갈래 표는 사람이 못 박은 상수다**(`src/app/failure-toast.ts`, 012·021 선례). `retry`(다시 써 볼 수 있어요)·`prepare-character`·
-  `prepare-vision`·`plain`·`save` 다섯. 파이프라인 이유는 `` `${kind}: ${detail}` `` 꼴이라 **앞 토큰과 `vision-failed`의 detail만** 본다(문구를 비교하면
-  문구를 고칠 때 조용히 깨진다 — 053 교훈). **사용자가 조치해야 풀리는 실패에 「다시 써 볼 수 있어요」라고 하지 않는다**(SC-006). 초안 넷 문구는
-  저장소 소유자가 바꿀 수 있고 정본은 `TOAST_TEXT` 한 곳이다. 쓸어 닫기 문턱(`TOAST_SWIPE`)도 이 순수 모듈이 정본이다(`src/app`이 `src/ui`를 import하지 않게).
-- **★ 설정 진입 정정.** clarify에서 「준비하러 가는 길은 홈에 이미 있는 설정 안내」라고 했으나 **사실이 아니었다** — 지금 설정으로 가는 유일한 길은
-  쓰기 **시작 전** `no-ready-character` 안내 화면(`failed`)의 「설정에서 작성자 준비하기」 버튼이다(051이 `⋯` 메뉴를 없앴다). 그 화면은 쓰는 중이
-  아니므로 그대로 뒀고(`AppScreen`의 `failed`·`toFailed` 유지), 쓰는 도중의 준비 실패(파일이 그 사이 사라짐)는 토스트뿐이라 그 자리에서 설정으로 가는
-  길이 없다. 설정 진입점은 「설정 화면 구성」 과제의 몫이다.
-- **저장 실패도 토스트다**(clarify Q3, 권고였던 「글을 보여 준다」와 다르게 사용자가 골랐다). 임시 결과 화면(`unsaved`)과 `WRITTEN_DAY_TEXT.unsaved`를
-  지웠고, **글은 버려진다** — 화면 상태 어디에도 글을 담을 자리가 없다(SC-005).
-- **혼잣말은 4초 간격 + 단계 전환 즉시, 페이드 교체다**(타자기 없음). 문안은 「지금 하는 일」에 근거하므로(039) 타이머만 돌리면 사진 보기가 끝난 뒤에도
-  「사진을 살펴보는 중」이 남는다 — 단계·갈래가 바뀌면 진행 콜백이 즉시 새 줄을 고르고 effect 의존성이 바뀌어 간격을 다시 센다. 페이드는 049의
-  `FadeLayer`(겹마다 `key`, 시작값을 마운트 값으로)를 `components/`로 꺼내 공용으로 썼다. **그 결과 「지금 줄」은 글자가 아니라 `writing-monologue-text`
-  testID로 찾는다** — 나가는 겹이 잠시 트리에 남아 글자로 찾으면 두 겹이 잡힌다(기존 015·016 테스트 수리에서 확인).
-- **쓰는 중에 들어갈 때 052의 접힘·끝 판정 상태를 비운다**(렌더 중 상태 갱신). 그러지 않으면 그만두고 쓴 날로 돌아왔을 때 지면은 새로 마운트돼
-  스크롤이 0인데 `foldState`가 접힘이라 스트립이 접힌 채 시작한다. 위반 주입으로 그 회귀가 실제로 잡히는 것을 확인했다.
-- **토스트 바닥은 「바의 잰 높이 + 12」다**(바가 「다시 쓰기」로 작성 시각 줄을 가지면 64보다 크고, 내려가 있어도 `onLayout` 높이는 그대로라 올라와도
-  겹치지 않는다). 래퍼는 `pointerEvents="box-none"`이라 하단 바를 막지 않는다. 실기기에서 바와 토스트 사이가 12dp(3배 밀도에서 36px)로 측정됐다.
-- **lint 함정**: 공유값(`useSharedValue`)을 수정하는 함수는 그 값을 쓰는 **effect보다 먼저** 선언한다(049 `DayPicker`의 `drag`·`settle` 방식) —
-  effect가 쓴 값을 그 뒤에서 바꾸면 `react-hooks/immutability`가 막는다. ref로 「한 번만 닫는다」를 들면 `react-hooks/refs`가 제스처 핸들러 안의
-  접근을 렌더 중으로 읽는다 — 공유값으로 든다.
-- **죽은 코드 정리**: `TypewriterText`·`grapheme-slice`·`REVEAL`을 지웠다(쓰는 곳 0 — 044 교훈). `components/` 파일 수는 9로 그대로다(FadeLayer +1, TypewriterText −1).
-- **Maestro**: 쓰는 중 진입은 글자가 아니라 `id: stop-button`으로 가른다(「쓰는 중」은 헤더 상태 줄과 머리말에 둘). 「쓰고 있다」는 첫 진행 신호 전의 자리
-  문구일 뿐 표식이 아니다. 새 흐름 `in-place-writing.yml`(FLOWS 등록), 수리 일곱. **`photo-selection-over-limit`의 「제목이 보인다」 단정이 제목 없는
-  일기(모델이 못 뗌 — 014, `title: undefined`)로 실패했다 — 054 회귀가 아니라 흐름의 결함이라 제목의 유무를 단정하지 않게 고쳤다.** `diary-user-path`는
-  쓰기 구간은 통과하고 051이 없앤 `home-menu-button`에서 실패한다(알려진 stale, FLOWS 밖).
-- **실기기에서 관측한 것**: 생성이 진행 중일 때 앱을 홈으로 보냈다 돌아오면 **중단 실패가 돌아온 뒤 한참(약 20초) 지나서야 토스트로 올라온다**(생성이
-  이어지다 끝난다) — 054의 결함이 아니라 005 FR-014b(앞을 벗어나면 `stop()`)와 llama의 종료 시점이다. 토스트를 놓치지 않으려면 화면 녹화로 본다.
-  **`adb shell screenrecord`의 경로는 `MSYS_NO_PATHCONV=1` 없이는 Git Bash가 윈도우 경로로 바꿔 녹화가 조용히 실패한다**(기기 경로 `/sdcard/...`가
-  `C:/Users/.../git/sdcard/...`가 된다). 녹화를 끝내기 전에 `adb pull`하면 `moov atom not found`다.
-- 기기 없는 테스트 179 스위트 / 3239개 통과(신규 8 파일), lint·헌법 검사·prettier 클린, 위반 주입 10건 전부 잡힘(`specs/054-in-place-writing/quickstart.md` §3).
-- **실기기 검증**(2026-09-29, SM-S901N, dev, `pm clear` 없음): D1·D2·D5·D7·D8·D10·D11과 Maestro 일곱 흐름(여덟 중 `diary-user-path`만 stale 메뉴로 실패)을 봤다.
-  이어서 convergence로 안 쓴 날 그만두기·뒤로 가기·토스트 위 하단 바 누름을 기기에서 확인했고, **혼잣말 페이드는 녹화 프레임(30fps)에서 이전 줄·새 줄이 겹쳐 보이는
-  것(약 200ms)을 확인했다.** **미확인**: 약하게 쓸었을 때 되돌아옴·글꼴 2.0배의 토스트·저장 실패/`plain`/`prepare-*` 토스트(기기에서 유도하지 못했다 — 계약 테스트로 갈음).
-  검증 중 만든 오늘(2026-09-29) 일기 파일은 지웠다.
-- 상세: `specs/054-in-place-writing/`.
+- 캐릭터→이름·소개의 유일한 통과 지점은 `src/diary/persona.ts`(`roster.ts`를 import하지 않는다, 원칙 III). 소개는
+  프롬프트에 들어가지 않는다(이름만). 일기에 제목이 붙는다(`extractTitle()`, **`judge()` 통과 후에만** 분리; 판정
+  갈래는 여전히 4개, 못 떼면 `title: undefined`로 저장). 진단 화면의 모델 이름은 `displayName()`이 주고
+  `DiagnosticsScreen`은 `roster.ts`를 직접 import하지 않는다.
+- **헌법 1.1.1의 교훈**: 소개 문구가 강점의 언어로 「상상을 섞어 쓴다」를 담으면 별도 고지가 필요 없다. 진짜 문제는
+  낱말의 반복이 아니라 **같은 사실의 이중 전달**이다(053에서 권한 없음 캡션이 같은 사실을 두 번 말하는 것도 같은
+  계열로 남았다). 타입이 두 곳에 독립 정의된 것(`DiaryListItem`)은 `tsc`가 잡았다.
+- 선택 표식은 「고름」(욕창 연상) 대신 「선택」이다.
+
+### 018 — 프롬프트 고정 접두사 미리 프리필
+
+- `GenerationEngine.prewarm(character)`는 **반환값이 없다**(원칙 IV) — 실패해도 다음 `run()`이 그냥 느릴 뿐 틀리지
+  않는다. `prompt.ts`의 `promptPrefix()`는 `buildPrompt()`와 **같은 배열(`fixedHead()`)에서** 나온다 — 복제하면 접두사가
+  한 글자만 어긋나도 KV 캐시가 빗나가 기능 전체가 「느려질 뿐 오류 없이」 무의미해진다(P8·P10·P11).
+- 화면이 미리 읽은 사진 결과(`seen`)를 파이프라인에 넘기려 `PipelineInput.seen?`·`InferenceBackend.generate()`의 셋째
+  인자를 옵셔널로 더했다. `on-device.ts`의 `captionDay()`가 사진 읽기만 독립적으로 돌리고(**화면은 신호를 모른다**),
+  E1(엔진 하나만 열림)은 화면이 지킨다 — 사진이 있는 날은 캡션이 끝난 뒤에만 `prepare()`를 부르고, 캡션 도중 「쓰기」는
+  그 `Promise`를 그대로 기다린다.
+- 절감은 기대(68%)보다 작았다(약 25%, 이 기기·캐릭터에서 전체 생성이 짧아 `engine.load()` 비중이 큼) — 무거운
+  캐릭터·다른 기기는 미확인. 사흘 밖의 날은 `photoDays`가 훑지 않아 `hasPhotos: false`로 보이므로 `canPrepare`가
+  거짓이면 미리 준비를 하지 않는다(E1·E15, 049). 사진 없는 날은 기기에서 018 미리 준비가 돌지 않는다(`captionDay`가
+  있으면 1단계가 바로 돈다).
+
+### 019·020 — 백그라운드 자동 생성
+
+- **019(스파이크) 결론: 조건부 가능.** 배터리 최적화 **기본값**에서는 15분 등록이 실제로 하루 1~2회(관측 간격 19시간
+  33분, 약 78배 억제 — OS의 Doze/앱 대기 버킷 탓)로 억제되고, **배터리 예외**를 주면 standby bucket이 `EXEMPTED(5)`가
+  되어 10~32분 간격으로 돈다. 사진 권한은 방치 후에도 유효했다.
+- **020 구조**: 순수 판정은 `src/schedule/`(`decision.ts`·`retry.ts`·`notify.ts`·`lock.ts`·`settings-effects.ts`,
+  전부 `now`를 인자로 받는다), 기기 통로는 `*-port.ts`. `retry.ts`는 `selectableDays`만 보므로 사흘 범위가 자동으로
+  걸린다. **경합은 `pipeline.run()`의 옵셔널 `acquireLock?` + 파일 잠금 + stale**이다(`running: Set`은 인스턴스 로컬이라
+  화면↔백그라운드를 못 막는다). 취득 실패는 `already-running`으로 합류하고 태스크는 `"skipped"`. `pipeline.ts`는
+  `expo-file-system`을 import하지 않는다(통로는 주입).
+- **`STALE_LOCK_MS`는 6분**(`lock.ts` 한 곳, `pipeline.ts`·`task.ts`는 import만; SL1). 원래 근거는 「가장 느린 완주(옛
+  narrative 사진 있는 날 ≈170초) × 2」였고 그 캐릭터가 나간 뒤에도(037) 안 잰 값을 줄이는 것이 원칙 V 위반이라 유지한다.
+- **자동 생성 설정은 설정 탭에 있다**(prod에도, 엔드유저). 목표 시각은 시 단위(0–23)뿐이다 — 「정각」·「매일 7시」 같은
+  정밀도 암시 문구를 두지 않는다. `notified.json`은 `DiaryEntry`와 분리(`preferences/`)이고 `pruneNotified`는 날짜 문자열
+  비교만 한다. 알림 라우팅은 웜(`onResponse`)·콜드(`getLastNotificationResponseAsync`)를 순수 `routeFromNotification`으로
+  통일한다.
+
+### 021 — 권한 통합 신청과 설정 「권한」 섹션
+
+- **`src/onboarding/`**: 순수 판정(`requirements`·`decision`·`flag`)과 기기 통로(`*-port`). **필수 권한 목록은 사람이 못 박은
+  상수**(`PERMISSION_REQUIREMENTS`, 5갈래: `photos`·`photo-location`·`location`·`notifications`·`battery-exception`, 고정 순서)
+  — 코드가 항목을 판정하지 않는다(원칙 V). 온보딩은 건너뛸 수 있고(원칙 I), 단계 완료는 저장하지 않고 매번 실시간 권한
+  상태로 재판정한다(`planOnboardingSteps`). `battery-exception`은 조회 통로가 없어 `batteryNoticeShown`(1회 제시)으로만 판정한다.
+- **020의 `batteryExceptionPrompted`는 흡수·제거**됐다 — 자동 생성 토글은 배터리 인텐트를 띄우지 않고, 안내의 주체는
+  첫 실행 흐름과 설정 「권한」 섹션이다. 옛 `auto-diary.json`의 그 값은 `flag.ts`가 최초 1회 읽어 시드한다(FR-010a).
+- `NotificationPort.getPermission()`(창을 안 띄움)이 있다. **거부 안내는 문자열 주입으로 흐른다** — `App.tsx`가
+  `PERMISSION_REQUIREMENTS[...].ifDenied`를 `deniedNotices`로 넘겨 화면이 온보딩 계층에 닿지 않는다. 포그라운드 복귀
+  (`AppState` `change→active`) 시 권한을 다시 읽는다(SC-006). 설정 [권한 안내 다시 보기]는 `forceOnboarding`이다.
+- **진입 게이트**: `onboarding.json`의 `completed !== true`면 탭 UI 대신 온보딩만 그린다(043·045가 그 안의 단계를 바꿨다).
+  새 네이티브 모듈 0개.
+
+### 022 — 개발자 탭의 입력 프롬프트 미리보기
+
+- `src/diagnostics/prompt-preview.ts`가 사람이 못 박은 `SIGNAL_PRESETS`(`empty`·`photos`, 진단 계층 `fake.ts`·`collect.ts`에서
+  안 가져온다)로 **실제 `buildPrompt()`를 불러** `DiagnosticReport.promptPreviews`에 문자열로 싣는다(PP1이 바이트 동일성을
+  잠근다). 화면은 그 문자열만 받는다 — `PromptPreviewPanel.tsx`가 `diary/prompt`·`signals`를 import하지 않고 헌법 검사
+  `UI_TOUCHES_PROMPT`가 막는다(`signals/types`는 `DiaryDetailScreen` 등이 정당하게 써서 막지 않는다). 크기는 `text.length`
+  근사치이고 「실측 토큰 아님」 라벨이 붙는다(원칙 IV, 소스에 `token` 어휘 금지, PP6).
+- **⚠️ 개발자 탭은 지금 진입점이 없다**(051이 `⋯` 메뉴를 없앴다) — 설정 화면 구성 과제에서 다시 둔다.
+
+### 023 — 사진 선별 알고리즘
+
+- `src/vision/select.ts`(순수 함수 하나)가 (1) 상위 폴더 이름으로 잡사진을 거르고(전부 걸러지면 원본 유지) (2) 남은 것을 찍힌
+  **시각** 분포로 배분한다(칸마다 최소 1장 + 사진 수에 비례한 최대 잔여법). 011의 「하루 균일」을 대체했다.
+- **`VISION_PHOTO_LIMIT = 8`**(실측 상한). 12장 하루로 총 ~138초 / 생성 시간 한도 180초 — **걸린 제약은 시간**이고
+  컨텍스트는 여유(캡션 5장 프롬프트 852토큰 / `n_ctx` 2048). 올리려면 헤드리스 완주(포그라운드의 ~3~4배 느림, 042)를 먼저
+  잰다. `BUCKET_COUNT = 6`(4시간 칸)과 `NON_CAMERA_FOLDERS`(`Screenshots`·`Download`·`KakaoTalk`·`WhatsApp Images`·`Telegram`)는
+  사람이 정한 상수다(코드가 분포를 보고 정하지 않는다). `BUCKET_COUNT < 상한`이라 칸 수 == 예산 경계는 dead path.
+  **실촬 스크린샷 경로(`Pictures/` vs `DCIM/Screenshots`)는 미확인.**
+- `photosBetween()`은 `getUri()`를 부르지 않고 `folderNamesFor()`가 **상한에 닿은 하루에서만** asset별로 부른다.
+  헌법 검사: `VISION_SCORES_IMAGE`(픽셀 채점 헬퍼 차단)·`checkPhotoPortFile`(`expo-port.ts`가 분류를 두지 못하게).
+
+### 024·027 — 백그라운드 안정성
+
+- **★ `defineTask`는 모듈 최상단 부수 효과여야 한다.** 020이 그것을 `App.tsx`의 `useEffect`로 옮겨 헤드리스 실행이
+  `No task registered for key expo-task-manager`로 태스크를 자동 해제했다(자동 생성이 한 번도 안 돌았다). 최상단에서
+  **동기 `require("expo-task-manager")`를 try/catch로 감싼다** — 프로덕션 RN에서는 성공(헤드리스 포함), jest `logic`에서는
+  `SyntaxError` → catch → 등록 생략(B1a). release 빌드(minify OFF)에서도 등록이 성립한다(027).
+- **재부팅 복구**: `expo-task-manager`가 자체 `BOOT_COMPLETED` 리시버를 가져 `enabled:true`면 재부팅 뒤 앱을 홈이든
+  설정이든 한 번 열기만 하면 재예약된다(위 `defineTask` 수정이 전제). 앱을 열기 전에는 미등록(문서화된 한계).
+  `enabled:false`이면 재예약되지 않는다.
+- **권한 회수는 `collect.ts`가 이미 `unknown`으로 감싼다**(코드 무변경; `signal-revocation.test.ts` SR1~6이 잠근다). 사진
+  권한이 `granted`가 아니거나 실행 중 회수돼도 `photos.kind === "unknown"`(절대 `none` 아님)이고 위치만 못 읽으면 `places`만
+  `unknown`이 된다. `adb pm revoke`는 앱 프로세스를 즉시 kill해 「그 순간의 회수」는 재현되지 않는다.
+- **헤드리스 생성은 포그라운드의 3~4배 느리다**(`quiet` 콜드 `writingMs` 158초 vs 54초; 042 `writingMs` 36.8→137.5초) —
+  180초 한도에 대한 여유가 그만큼 좁다. 배터리 예외 없이는 토큰 생성 단계에서 억제돼 미완주(019의 예외 없는 억제가 생성
+  경로에서도 성립). 옛 `narrative`는 헤드리스에서 26분 넘게 CPU만 태우고 산출물이 없었다(037의 근거).
+- **삼성 One UI**: 「배터리 설정 열기」는 `IGNORE_BATTERY_OPTIMIZATION_SETTINGS` 인텐트를 `AppBatteryUsageActivity`(「배터리 사용
+  관리」 앱 목록)로 라우팅한다. 예외는 목록 → 앱 → 「배터리」 → 「제한 없음」까지 4탭이고 딥링크가 없다. 결과는
+  `adb shell dumpsys deviceidle whitelist +`와 같다(bucket 10→5).
+- **`AppState`를 판정에 쓰지 않는다**(`src/schedule/`·`src/signals/`에 참조 0건) — 「앱 UI가 전경에 없음」의 근사치일 뿐이다.
+  **소크 라운드 표본**: 유효 1회에서 목표 12:00 → 발화 +13분 → 완주 81초(SC-001 충족, 표본 1). **SC-002(무예외 24h 소크)는
+  접었고 미판정**이다(019 값을 대신 채우지 않는다). release APK 헤드리스 확인은 `quiet` 생성까지는 못 갔다(모델 삭제 + `run-as`
+  불가) — debug 확인으로 갈음.
+
+### 025 — 사진 슬라이더·갤러리 (051이 대체)
+
+- 격자를 페이징 슬라이더 + 풀스크린 갤러리로 바꿨으나 `DiaryDetailScreen`과 함께 051이 홈 지면의 캐러셀로 대체했다. 남은 것:
+  새 의존성 없이 코어 `ScrollView`·`Modal`로 만든 방식, `DiaryPhoto`(사본 실패 → 「이 사진은 이제 없다」)를 공유하는 구조,
+  테스트 함정(위 「테스트 작성의 함정」). 「순환하지 않는다」(FR-011)는 051이 뒤집었다.
+
+### 037 — 로스터를 검증된 하나로
+
+- **로스터 진입 기준**(헌법 원칙 III): 이 저장소의 프롬프트로 저장 가능한 일기를 안정적으로 내는 것이 **실기기에서 관측**되어야
+  한다(MUST). 옆 저장소 벤치는 후보를 좁히는 데만 쓴다. **「안정적으로」는 사람이 로그를 읽어 판단한다**(원칙 IV — 자동 채점
+  코드를 만들지 않는다). **로스터가 하나인 것은 완성이 아니라 현재 상태다** — 늘리는 방향이 정상이다.
+- **옛 일기가 멈추는 자리**: `DiaryEntry.character`는 파일에서 오는 값이라 로스터를 나간 캐릭터가 쓴 일기가 남아 있고
+  `authorName`은 옵셔널이라(035 이전) `personaOf() → undefined.name`으로 상세가 멈춘다. **`personaOf()`에 기본값을 넣지 않는다**
+  (「로스터에 없는데 성격은 있다」가 원칙 III 경계를 흐린다) — 읽는 쪽이 `PERSONA_NAMES`(로스터 밖이면 `undefined`)로 방어한다.
+- **캐릭터가 둘 이상이어야 성립하는 계약(E1·E9·018 P11·026 동시 내려받기·007 옮김 알림)은 지우지 않는다.** 식별자만 필요하면
+  `__tests__/future-character.ts`의 `FUTURE_CHARACTER`, 둘째가 렌더 안 되거나 페르소나가 필요하면 `it.skip` + 되살릴 조건,
+  조립 대신 소스 검사로 다룬다. **`FUTURE_CHARACTER`를 `personaOf()`·`assetFor()`에 넘기지 않는다.**
+- 이미 내려받은 모델 파일을 앱이 지우지 않는다(사용자 저장 공간에 손대는 판단을 코드가 하게 된다).
+
+### 040 — 첫 실행 흐름
+
+- `src/firstrun/`은 「시도해야 하는가」만 답한다(`resolveFirstRunStage`·`shouldShowLogo`·`shouldAutoGenerate`). 021·035·029의 순수
+  로직(`requirements.ts`·`essential-assets.ts`·`liveness.ts`·`naming.ts`)은 그대로 재사용한다. **자동 첫 일기는
+  `schedule/task.ts`의 `runAutoDiaryTask`를 재사용하지 않고**(그 함수는 `settings.enabled`·목표 시각 창을 본다)
+  `wiring.ts`의 `triggerFirstRunAutoDiary()`가 `pipeline.run()`을 직접 부른다. 049 이후 오전에도 돈다.
+- **잘린 모델 파일은 로드 전 크기 검증에서 걸러져** 재다운로드로 넘어간다(liveness 실패는 유도할 수 없어 035 계약 테스트로 갈음).
+  미확인: FR-009 거부 판정 갈래.
+
+### 041 — 모델 내려받기 OOM 해소
+
+- 원인은 「어느 조건에서 `res.body`가 null인가」가 아니라 **언제나**였다(위 RN `fetch` 규칙). 고친 자리는 `expo-port.ts`의
+  `fetchRange` 하나다 — 구간마다 임시 파일(`<key>.bin.seg<i>`)에 `DownloadTask`로 받고 `COPY_CHUNK_BYTES`(1MiB)씩 최종 파일에 옮겨
+  붙인다(상주 메모리가 파일 크기와 무관). `RangeFetchPort` 계약·`src/models/segmented/`·`port.ts`는 무변경이다.
+  `remove()`·`bytesUsed()`는 구간 임시 파일도 본다(`leftoverNamesFor`). 손으로 쓴 구조적 타입 대신
+  `InstanceType<...["File"]>`을 빌려 `tsc`가 `FileMode.Read` 오류를 잡았다.
+
+### 042 — 사진이 있는 하루는 VLM을 반드시 거친다
+
+- 헌법 v1.7.0: 사진 접근이 허용되어 있으면 반드시 본다(MUST), 끄는 경로를 두지 않는다(MUST NOT), 깊이는 하나로 고정한다(MUST).
+  `VisionSetting`은 `"quick"` 하나이고 기기에 남은 `preferences/vision-setting.json`은 지우지 않는다(읽는 쪽이 사라졌으므로 무해).
+- **★ 백그라운드 자동 생성이 사진을 한 장도 안 보고 있었다**(`task.ts`가 「자동」·설정 없음을 `"none"`으로 떨궜다, 029). 분기를
+  통째로 걷어냈다 — 실질적 이행 지점이다. 개발자 탭 「지금 생성」도 안 봤다(검증 경로가 제품과 다르면 그 검증은 제품을
+  재현하지 못한다). `VisionOutcome`의 `skipped`는 도달 불가라 제거했다(6→5).
+- **가드 순서**: `on-device.ts`가 `vision === undefined`를 `engine === undefined`보다 먼저 봐서 시뮬레이터에서 「네이티브 추론
+  모듈이 없다」가 「사진을 못 본다」에 가려졌다(원칙 I) — 엔진 부재를 먼저 말한다. 「볼 것이 없으면 열지 않는다」(011)는 그대로다.
+- **D5**: 완전 헤드리스(홈 + 화면 끄기, 15분 뒤 잡이 스스로 깸)에서도 `has_media=1` 3회 → 저장까지 간다. 저장된 `createdAt`이
+  `doWork` 시각과 일치하고 그 구간에 `wm_on_resume_called`·`App is in the foreground`가 0건이다.
+
+### 043 — Modernist 스플래시·권한 흐름
+
+- 디자인 토큰(`src/ui/tokens.ts`)은 오프화이트 배경·진한 레드·웜그레이이고 `theme-tokens.test.ts`가 WCAG AA 대비(4.5:1, UI 3:1)를
+  자동 검증한다(`accentForeground`는 블랙, `danger`는 딥레드). **accent 위 오프화이트는 AA 미달**이라 `primary` 버튼 글자는 검정이다.
+- 사진·위치·알림 단계는 설명 카드·[허용]/[건너뛰기]를 없애고 **빈 배경 위에서 OS 다이얼로그를 연속 호출**한다. 거부는 자동으로
+  건너뛰기이고 `blocked`(「다시 묻지 않음」)일 때만 [설정 열기]가 있다. `battery-exception`은 호출 통로가 없어 카드 + [설정 열기]/[건너뛰기]를 유지한다.
+- **★ `busy` stale closure**: `allow`가 `useState`의 `busy`를 캡처하고 effect deps에서 빠져 있어 첫 단계의 `busy = true`가 다음 단계
+  타이머에 전달돼 조용히 탈출했다 → `useRef` 동기 가드(`busyRef`)로 고쳤다.
+
+### 045 — 다운로드 동의와 진행 슬라이드
+
+- **순서는 `권한 → 동의 Dialog → 진행 슬라이드 → 작명 → liveness → 자동 첫 일기`다**(040의 작명∥다운로드 병렬을 뒤집었다).
+  `resolveFirstRunStage()`에 `"download-consent"`·`"downloading"`이 있고 `"waiting-for-download"`(`WaitingForDownloadScreen`)는 삭제했다.
+- 동의 Dialog(`DownloadConsentDialog`)는 VLM·LLM을 고르게 하지 않는다(`ESSENTIAL_ASSET_KEYS`는 셋 다) — 무엇을 왜 받는지 알리고
+  [받을게요] 하나뿐이다(거부 조작 없음). `OnboardingFlag.downloadConsented`가 넷째 필드다. **`downloadProceedConfirmed`**(세션 로컬)가
+  「완료 화면 버튼을 눌렀는가」를 따로 추적한다 — 없으면 `downloadReady`가 되는 즉시 완료 화면이 사라진다(FR-007).
+- **040의 헌법 검사 G8(경과 시간 어휘 전면 금지)을 제거했다** — 4초 장식 슬라이드 전환의 `elapsedMs`와 충돌했다. 원칙 IV가 금지하는 것은
+  진행 중 화면에 정밀한 시간·바이트·퍼센트를 노출하는 것이지 경과 시간 개념이 아니다(`tokens_*`·`timings`는 `llama-port.ts`가 따로 막는다).
+  `UI_TOUCHES_ASSET` 경계는 `ESSENTIAL_ASSET_KEYS`만 막도록 좁혔다(`essentialAssetsReady()`는 정당한 사용).
+- **liveness 실패 화면의 [그냥 시작하기]가 막다른 길이었다**(035 W11 위반) — `finishWelcome()`이 `namingDone`만 세우고 `livenessOutcome`은 그대로라
+  `"liveness"`에서 못 벗어났다 → `livenessSkipped` 세션 로컬 state가 그것을 대체한다(`livenessOutcome`을 `"ok"`로 덮어쓰지 않는다, 원칙 I).
+- **재실행마다 완료 화면·정상 동작 확인이 다시 떴다**(045·040 결함, 048에서 고침): 세션 로컬 state만 봐서 모델이 있고 작명까지 끝낸 사용자도 매번
+  지나야 했다. 완료 화면은 이번 세션에 에셋이 없는 것을 본 적이 있을 때만(`essentialsMissingSeen`), 확인은 이번 세션에 작명을 거쳤을 때만
+  (`livenessPassed`) 돈다. 새 내려받기 직후의 완료 화면은 재다운로드가 필요해 소스 계약으로만 잠갔다.
+
+### 047 — 작명 화면 = 보드 1a
+
+- **「디자인을 참조했다」는 「디자인과 같다」가 아니다** — 계약 테스트가 전부 초록이어도 문구부터 달랐다. 참조 원본이 있으면 원문을 테스트에
+  박는다(`1a` KO 문자열 글자 단위, A3). 보드를 옮길 때는 메모 글만이 아니라 마크업의 `flex`·`position:absolute`·`transform`까지 읽는다.
+- 빈 입력에서 확정 버튼은 흐려지지 않는다(`1a`에 비활성 모양이 없다) — `Button`에 `disabled`를 넘기지 않고 `onPress`에서 거르며
+  `accessibilityState`로만 알린다. 화살표는 문자 `→`(SVG는 공용 컴포넌트나 새 의존성이 필요). 글꼴 1.3배에서 가로 버튼 줄은
+  `flexWrap: "wrap"`이어야 앞 글자가 안 잘린다. 미확인: 제스처 내비게이션 기기·다른 키보드 앱.
+
+### 048 — 일기 홈 구조
+
+- **탭 줄이 없다.** `route: "home" | "settings" | "developer"`이고 하위 화면은 `SubScreenFrame`의 「← 일기」(`back-to-home`)와 뒤로 가기(그
+  프레임이 마운트된 동안만 가로챈다)로 돌아온다. 홈에서 하위 화면으로 가는 메뉴는 051이 없앴다(위 022 참조).
+- **미리보기는 파이프라인과 같은 `loadSignals` 하나를 나눠 쓴다**(`wiring.previewDay(day)` → `DayPreview`, PV4). 좁히는 함수는
+  `app/day-preview.ts`에 따로 있다(`state.ts`가 신호 타입을 import하면 화면이 그걸 거쳐 신호에 닿는다, DP8). 「읽는 중」은 상태로
+  저장하지 않고 렌더에서 가른다(`react-hooks/set-state-in-effect`). **고른 날은 `AppFrame`이 들고 있다**(설정 왕복·재마운트에도 남고
+  파일엔 안 남는다). 하단 바의 「n일」은 쓰기 버튼의 형제다(안에 두면 날짜를 눌러 쓰기가 시작된다).
+- `requirements.ts`의 `ifDenied` 넷은 해요체다(홈 캡션·온보딩·설정 권한 섹션이 같은 값을 본다).
+
+### 049 — 날 고르기
+
+- **★ 하루는 기기 로컬 자정(00:00)에 바뀐다**(002의 04:00을 버렸다; 헌법에 04:00이 없어 개정 없이) **그리고 오늘은 언제든 쓸 수 있다**
+  (`isDayWritable = day <= dayOf(now)`, 012의 정오 제한 폐지). 경계는 `day-boundary.ts` 하나다. **경계를 옮기다 숨은 복제를 찾았다** —
+  `vision/select.ts`의 `bucketIndexOf`가 `getHours() - 4`로 04:00을 직접 계산하고 있었다. `day-boundary-source.test.ts` DB11이
+  `getHours() ±`를 경계 파일 밖에서 막는다 — **경계 값을 바꿀 때는 값 테스트가 아니라 소스를 센다.**
+- **「사흘」은 화면에서만 풀었다** — `selectableDays()`(백그라운드 재시도·알림 정리·018)는 개수·구성(정오 이후에만 오늘)을 그대로 둔다.
+  **정오 조건을 함수 안에서 직접 본다** — `isDayWritable(today)`로 간접 판정하면 새 규칙을 타고 백그라운드가 아침에 오늘을 쓰기 시작한다.
+  화면(`state.ts`)은 `selectableDays`를 부르지 않는다. 정오는 그 구성 규칙에만 남아 있다.
+- **앱을 열면 오늘이다** — `AppFrame`의 고른 날 초기값이 `dayOf(new Date())`(`null`이면 자정을 넘길 때 새 오늘을 따라가 「보던 날 유지」가 깨진다).
+  자정 타이머(`nextDayStartAt + 1초`)가 밑줄·흐림만 옮긴다.
+- **스와이프는 `Gesture.Pan().runOnJS(true)` + reanimated 스프링**이고 문턱은 사람이 정한 값(`SWIPE_DISTANCE 40`·`SWIPE_VELOCITY 500`·
+  `RUBBER_BAND 0.25`)이다. ctx7 기본 ID는 gesture-handler v3 API(`usePanGesture`)를 주는데 이 저장소는 v2라 `/…/v2.29.1`로 본다.
+- **★ 움직임 결함 둘**(기기 없는 테스트가 못 잡는다): (1) 크로스페이드 공유값을 `useEffect`에서 되돌리면 첫 프레임을 그린 뒤라 한 프레임이 샌다 →
+  겹마다 `key`로 새로 마운트하고 시작값을 `useSharedValue(from)`으로(`FadeLayer`, H9). (2) 끌린 자리는 새 내용이 그려지는 커밋(`useLayoutEffect`,
+  S8)에서 되돌린다(손을 뗀 순간 0이면 옛 내용이 멈춰 보이고 스프링이면 출렁인다). 밑줄 자리는 모든 칸에 둔다(S7 — 오늘 칸에만 그리면 오늘이 든
+  주에서만 스트립이 높다). 큰 날짜 숫자는 언제나 두 자리 폭이다(H10).
+- 남긴 관측: 신호 없는 오전의 오늘 일기가 저녁까지 지어냈다(원칙 II — 정오 제한 폐지로 더 자주 보일 수 있다).
+
+### 050 — 대화상자 기반
+
+- React Native Reusables(RNR) 복사본이 `src/ui/rnr/`에 있고 공용 부품은 `components/Dialog.tsx`의 `ConfirmDialog`·`DismissibleDialog`다(덮어쓰기 확인·
+  날짜로 이동 달력·다운로드 동의가 쓴다). **RNR 레지스트리 원본은 `react-native-screens`(`FullWindowOverlay`)·`lucide-react-native`(→ `react-native-svg`)를
+  끌고 오므로 복사본에서 걷어냈다**(DEP1이 되살아나는 것을 막는다). 새로 들인 `@rn-primitives/*`·`react-native-ui-datepicker`·`dayjs`에는 네이티브 코드가 없다.
+- 뒤로 가기는 프리미티브가 한다(`Content`가 마운트 때 `BackHandler`를 한 번 등록하므로 부품이 최신 콜백을 ref로 읽는다). `App.tsx` 루트에 `PortalHost` 하나.
+  색 이름은 `tokens.ts`의 `RNR_COLOR_ALIASES`가 `COLORS`를 가리키는 별칭이다(새 색 0). RNR `Button`·`Text`는 대화상자·메뉴 부품 안에서만 쓴다(DEP2).
+  `src/ui/rnr/dropdown-menu.tsx`·`@rn-primitives/dropdown-menu`는 쓰는 곳이 없지만 남겨 두었다.
+- **달력은 날짜 격자만 datepicker에 맡긴다**(그 `›`는 `maxDate`를 안 보고 제어 prop은 같은 값으로 되돌릴 수 없어 머리·월·연 목록은 직접 그린다). 달력과 스트립은
+  **칸 판정 하나(`cellFor`)를 쓴다** — `DateJumpDialog.tsx`에 `dayOf(`·`isDayWritable(`·`.some(`이 없다(CAL5). 미래 칸 방어는 `disabledDates`와 `maxDate` 둘이라
+  위반 주입은 둘 다 빼야 잡힌다. 큰 숫자·요일만 누를 수 있다(월 라벨·상태 줄은 못 누른다). 오늘을 다시 쓸 때만 「지금까지의 하루로 써요.」(Q5).
+
+### 051 — 쓴 날 읽기
+
+- **홈이 곧 상세다.** 고른 날에 일기가 있으면 헤더 상태 줄에 제목, 스트립 아래 연회색 지면에 흑백 순환 캐러셀과 본문, 하단 바에 「다시 쓰기」(오늘이면
+  「N시간 M분 전에 작성」)다. **「최근 · n편」 목록과 `DiaryDetailScreen`이 사라졌다** — 옛 일기는 스트립·달력으로 닿는다(`written-day-reach.test.ts` REACH).
+  쓴 날인가는 목록 요약이 먼저 정한다(`paperFor`; 파일 읽기 전에 하단 바가 정해져 빨강이 깜빡이지 않는다, 늦게 온 읽기는 버린다). 쓰기 성공은 결과 화면 없이
+  홈의 그 날이다. 화면 상태에 `detail`·`unreadable`·`written`이 없다.
+- 알림은 「적용」과 「확인」을 가른다 — `initialDay`는 홈의 고른 날이 되고 `onInitialDayApplied`에서 경로를 비운다. 확인(`acknowledgeNotified`)은 읽을 수 있는
+  일기가 지면에 실제로 보였을 때 그 날마다 한 번이다.
+- 캐러셀은 `react-native-reanimated-carousel`을 2장 이상일 때만 쓴다(순환). `data`·`renderItem`은 `memo`로 뗀다(렌더마다 새로 만들면 안 된다, 046). **★ 세로 지면 안의
+  가로 캐러셀에는 `.failOffsetY([-10, 10])`이 필요했다**(`activeOffsetX`만 두면 세로로 끌다 가로로 20px 흔들린 손가락을 캐러셀이 잡아 지면이 안 스크롤된다). 흑백은
+  `filter: [{ grayscale: 1 }]`(새 아키텍처, 안드로이드에서 됨)를 사진 면 `View`에 주고 배지·인디케이터는 그 밖에 둔다.
+- **하단 바는 화면 폭 전체의 블록 하나이고 쓴 날의 바는 지면 끝(4px)에 닿아야 올라온다**(`reachedEnd`). 숨긴 바는 `pointerEvents="none"` + 접근성 트리에서 뺀다
+  (jest·Maestro 모두 못 본다 — 테스트는 `__tests__/ui/paper-end.ts`, 흐름은 `scrollUntilVisible`). `translateY`로 내린 바가 edge-to-edge 아래 내비게이션 바 뒤로
+  비쳐 쓴 날 루트에 `overflow: "hidden"`. 헤더·스트립은 고정이고 지면만 스크롤된다. 상태 줄·제목은 큰 숫자 오른쪽 세로 묶음의 요일 아래다.
+- **`⋯` 메뉴(048 `HomeMenu`)를 없앴다** — 지금 설정은 「캐릭터를 먼저 준비해야 한다」 링크로만 닿고 개발자 탭은 닿을 길이 없다. 진입점은 설정 화면 구성 과제의 몫이다.
+- **구현 뒤 보드와 셋이 어긋났다**(저장소 소유자 육안; 계약 테스트는 전부 초록) — 047과 같은 교훈이다.
+
+### 052 — 읽기 스크롤
+
+- 쓴 날의 지면을 8px 넘게 내리면 스트립과 안내 캡션이 접히고(240ms) 맨 위(2px 이하)에 닿으면 펴진다. **접힘 표시(▾)도, 접힌 날짜 줄을 눌러 펴는 길도 없다**
+  (저장소 소유자 결정 — 보드 `5b`를 따르지 않는다). 판정은 `src/app/reading-scroll.ts`의 `foldAfterScroll()` 하나(`FOLD_AFTER 8`·`UNFOLD_AT 2`; 300ms 디바운스는 없다).
+  보드에 없는 규칙: 접은 뒤에도 더 내릴 거리가 8px 이하인 본문은 접지 않는다(FR-005). 큰 숫자·요일은 접혔든 펴졌든 050 그대로 달력을 연다. 제목은 한 줄 말줄임이다.
+- **★ 스트립을 지면 프레임 위에서 줄이면 접힘 경계에서 접힘·펼침이 되풀이된다**(프레임 경계가 손가락 아래에서 움직여 안드로이드 `ScrollView`가 그것을 드래그로 읽는다;
+  히스테리시스로 못 막는다). **지면 스크롤 뷰의 프레임은 접힘으로 움직이지 않는다** — 스트립은 지면 위에 절대 배치되는 불투명 판(`StripOverlay`)이고 지면 맨 위에 같은 높이의
+  스페이서(`FoldSpacer`)를 두어 둘이 `useFoldMotion`의 같은 값을 본다. 접는 감쌈은 안쪽을 절대 배치로 빼야 한다(안쪽을 흐름에 두고 `maxHeight`만 옮기면 잰 높이가 되먹임으로 줄어든다).
+  **애니메이션 안쪽의 `onLayout`을 재는 값으로 다시 쓰는 되먹임은 jest가 못 잡는다.**
+- 지면 높이가 바뀔 때 안드로이드가 되풀이하는 사건 둘을 거른다: 위치가 그대로인 `onScroll`, 1px 미만으로 흔들리는 `onContentSizeChange`(773.9999↔774.0001; 「같은 값」 비교를
+  부동소수에 정확한 같음으로 쓰면 뚫린다). 접힐 때 큰 숫자가 튀었던 것은 「눌림 갈래」로 바꿀 때 래퍼의 정렬 스타일이 함께 바뀐 탓이다.
+
+### 053 — 쓸 재료
+
+- 안 쓴 날의 신호 줄은 두 칸(사진·장소)이다. **판정 하나(`src/app/material.ts`의 `decideMaterial`)를 두 곳에 쓴다** — 항목을 `some`/`zero`(관측된 0)/`unseen`(셀 수 없음)으로 옮겨
+  쓰기 전 미리보기와 읽을 때의 저장된 신호에 같은 함수를 적용한다(「확인이 뜬 하루」와 「지어낸 하루」가 다른 말을 하지 않게). **`unseen`을 `zero`로 세지 않는다**(원칙 V, MAT3).
+- **「지어낸 하루」는 저장하지 않는다** — 읽을 때 `paperFor()`가 `entry.signalsUsed`로 `madeUp`을 계산한다(그래서 옛 일기·백그라운드 생성 일기도 같은 규칙으로 표식이 붙는다).
+  신호가 깨져 있으면 던지지 않고 표식을 안 붙인다.
+- `DayPreview.photoAccess`(`ok`/`denied`/`blocked`)가 「권한 때문인가」를 가른다 — `CountHint.unknown.reason` 문구를 비교하지 않는다(문구를 고치면 조용히 깨진다). **`toDayPreview`가
+  사진이 관측된 0장이면 장소도 `none`으로 옮긴다**(`collectPlaces`가 사진 `none`이어도 장소를 `unknown`으로 줘 「0 장 · 모름」이 보였다; 사진이 `unknown`이면 승격하지 않는다).
+  `2f` 제목은 관측된 0이면 「😢 아무 기록도 없어요」, 전부 권한 없음이면 「😢 기록을 볼 수 없어요」다.
+- 쓰기 전 판정은 누른 순간 한다(미리보기가 그 날 것이면 그것으로, 아니면 `previewDay(day)`를 한 번 기다린다). **다시 쓰기는 판정을 거치지 않는다**(050 덮어쓰기 확인이 있다).
+  권한이 없어도 쓸 수 있다(확인만 거친다). 핸들러가 읽는 미리보기는 ref에 둔다(`useMemo`는 React Compiler 규칙 위반). 글꼴 2.0배에서 「권한이 없어요 ›」 두 칸이 붙던 것은 `flexWrap`.
+  **홈 헤더의 021 안내 캡션이 권한 없음 칸과 같은 사실을 두 번 말한다** — 후속 판단.
+
+### 054 — 제자리 쓰기
+
+- 쓰는 중이 홈 안의 상태다 — 헤더 상태 줄 「쓰는 중」(빨강), 35%로 잠긴 스트립, 혼잣말과 「{이름}이 쓰고 있어요. 진행률은 세지 않아요.」, 검정 전폭 「그만두기」 바. 그만두거나
+  실패하면 쓰기 전 홈이고 **실패는 하단 바 위 12에서 올라오는 토스트 한 줄**이다(글은 버려진다, SC-005).
+- **`AppScreen`의 `writing`을 넓히지 않았다** — `toWriting()`이 인자를 안 받고 `Object.keys(toWriting())`가 `["kind"]`뿐인 것을 007 S1·009 I7·012 C3가 잠근다. 목록 요약은
+  화면 로컬 state(`writingItems`)다. **설계를 구현에서 뒤집을 때는 그 설계가 기대던 기존 계약 테스트를 먼저 읽는다.**
+- **실패 갈래 표는 사람이 못 박은 상수**(`src/app/failure-toast.ts`: `retry`·`prepare-character`·`prepare-vision`·`plain`·`save`). 파이프라인 이유는 `` `${kind}: ${detail}` `` 꼴이라 앞 토큰과
+  `vision-failed`의 detail만 본다(문구 비교 금지). **사용자가 조치해야 풀리는 실패에 「다시 써 볼 수 있어요」라고 하지 않는다**(SC-006). 정본은 `TOAST_TEXT`·`TOAST_SWIPE`.
+- **설정 진입 정정**: 쓰는 도중의 준비 실패는 토스트뿐이라 그 자리에서 설정으로 가는 길이 없다 — 유일한 길은 쓰기 **시작 전** `no-ready-character` 안내 화면의 버튼이다.
+- 혼잣말은 4초 간격 + 단계 전환 즉시 페이드 교체다(문안은 「지금 하는 일」에 근거, 039; 「지금 줄」은 글자가 아니라 `writing-monologue-text` testID로 찾는다 — 나가는 겹이 잠시 트리에 남는다).
+  **쓰는 중에 들어갈 때 052의 접힘·끝 판정 상태를 비운다**(안 그러면 그만두고 돌아올 때 스트립이 접힌 채 시작한다). 토스트 바닥은 「바의 잰 높이 + 12」다.
+  `react-hooks/immutability`: 공유값을 수정하는 함수는 그 값을 쓰는 effect보다 먼저 선언한다.
+- 생성 중 앱을 홈으로 보냈다 돌아오면 중단 실패가 약 20초 뒤에야 토스트로 올라온다(005 FR-014b + llama의 종료 시점 — 054의 결함이 아니다). **미확인**: 약한 스와이프 되돌림·글꼴 2.0배 토스트·
+  저장 실패/`plain`/`prepare-*` 토스트(계약 테스트로 갈음).
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
-013의 리사이즈 결정 근거가 된 조사. 제품 코드는 건드리지 않고 `adb logcat`만
-읽었다(SM-G986N, release, `quiet`, 「빠르게 봄」).
-
-**원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의
-크기만 정하고, 4032×3024 사진은 타일로 쪼개져 IMAGE 청크 7~9개(장당 약 3.2~3.3초
-× 개수)를 만든다 — 파일 크기 0.97MB와 4.15MB가 똑같이 7~9청크였다. 시간의 96%가
-IMAGE 청크 평가이고 디코드는 1% 미만이므로 압축률·포맷 변경은 효과가 없다.
-
-**리사이즈만 유효하며 효과는 약 20배다** — 4032×3024→1024×768에서 IMAGE 청크
-9→1개, 장당 30.9초→1.3초(같은 실행 안에서 원본·리사이즈본을 함께 캡션해 대조).
-1024px에서도 캡션이 실제 사진 내용을 정확히 반영했다(붉은 화병·노란 직선 등을
-원본과 대조 확인). 다만 품질 하한(512·768에서도 유지되는가)은 재지 않았다.
-
-미확인으로 남은 것: 품질이 무너지는 해상도 하한, 기기 내 리사이즈 자체의 비용
-(013이 제품에 반영하며 답을 얻음 — 위 013 절 참조), `image_min_tokens`의 효과,
-`i8mm`이 있는 다른 기기에서 GPU 경로가 열리는가.
+013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크
+**수**는 해상도가 정한다 — 4032×3024 사진 한 장이 IMAGE 청크 7~9개(장당 약 24~30초)를 만든다. 파일 크기 0.97MB와 4.15MB가 똑같이 7~9청크였고 시간의 96%가 IMAGE 청크
+평가이며 디코드는 1% 미만이므로 압축률·포맷 변경은 효과가 없다. **리사이즈만 유효하다** — 4032×3024→1024×768에서 청크 9→1개, 장당 30.9초→1.3초(약 20배; 같은 실행 안에서
+원본·리사이즈본을 함께 캡션해 대조). 제품 반영(013): 캡션 129초→23초. 미확인: 품질이 무너지는 해상도 하한(512·768), `image_min_tokens`의 효과, `i8mm`이 있는 기기에서 GPU 경로가 열리는가.
 
 ## 코드를 어디에 두는가
 
@@ -1816,86 +607,47 @@ src/
 ├── config/       환경 판정, 추론 위치 규칙, 하루 경계
 ├── inference/    추론 어댑터 (온디바이스 / 데스크톱 서버)
 ├── signals/      하루치 신호. 사진은 실제로 수집한다 (나머지는 unknown)
-├── vision/       사진의 내용을 읽는다 (011). **캐릭터와 무관한 모델 하나**
+├── vision/       사진의 내용을 읽는다 (011). 캐릭터와 무관한 모델 하나
 ├── diary/        일기의 모양, 파이프라인, 저장, 캐릭터 페르소나(014), 제목(014)
 ├── models/       캐릭터→모델 파일 매핑, 내려받기·검증·삭제
+├── schedule/     자동 생성 판정·잠금·알림 (020) — 순수 판정 + *-port.ts
+├── onboarding/   권한 요구 목록·판정·플래그 (021)
+├── firstrun/     첫 실행 단계 판정 (040)
+├── app/          화면이 쓰는 순수 상태·조립 (wiring.ts, state.ts, material.ts …)
 ├── diagnostics/  진단 정보 수집과 출력 경로
-└── ui/           화면
+└── ui/           화면 (components/ 공용 부품, rnr/ 대화상자 프리미티브)
 
 scripts/          헌법 검사, 실기기 테스트 실행기, 합성 하루 심기(010)
 __tests__/        기기 불필요 테스트 (항상 돈다)
 .maestro/         실기기 테스트 (기기 있을 때만)
 ```
 
-- `src/signals/` — **사진은 실제로 수집한다**(004). `photos`는 미디어
-  라이브러리에서, `places`는 사진 좌표에서 온다. `steps`·`battery`·`connectivity`는
-  `unknown`이며 그것이 결론이지 미완성이 아니다 — 되짚을 통로가 없다. `fake.ts`는
-  테스트·개발 전용이며 `src/ui/`에서 import하지 않는다(원칙 I).
-- `src/diary/` — 요청·일기·파이프라인·저장·프롬프트·판정·페르소나·제목.
-  - `prompt.ts` — **헌법 원칙 II의 유일한 통과 지점.** 화자 규칙이 여기 하나뿐이고
-    `unknown`/`none`을 다른 문장으로 옮긴다. 캐릭터에서 오는 것은 이름과 출력
-    언어뿐 — 성격 지시를 넣으면 관측된 성격이 아니라 지어낸 성격이 된다(원칙 III).
-  - `acceptance.ts` — **원칙 I의 마지막 방어선.** 거부 갈래가 넷뿐(`empty`/`echo`/
-    `language`/`unfinished`)이고 테스트가 그 수를 직접 센다. 임계값·유사도·점수를
-    쓰지 않는다 — 다섯 번째 갈래를 넣으려면 `contracts/acceptance.md`를 먼저 고친다.
-  - `persona.ts`(014) — 캐릭터→이름·소개의 유일한 통과 지점. `roster.ts`를
-    import하지 않는다(원칙 III). 소개는 프롬프트에 들어가지 않는다(이름만 들어감).
-  - `title.ts`(014) — `judge()` 통과 후에만 호출되는 순수 함수. 예외를 던지지
-    않고, 제목을 못 떼면 `title` 없이 원문 전체를 `body`로 반환한다.
-- `src/models/` — **캐릭터와 모델 파일을 잇는 자리, 원칙 III의 최전선.**
-  - `roster.ts` — 캐릭터→모델 매핑의 유일한 자리. `allAssets()`나
-    `characterFor()`를 두지 않는다 — 있으면 "다섯을 다 받자"가 한 줄로 가능해지고
-    그것이 헌법 로스터 위반이다. `displayName()`(014)이 진단용 표시 이름을 준다.
-  - `readiness.ts` — 준비 상태를 넷으로 가르는 순수 함수.
-  - `expo-port.ts` — 기기에 닿는 유일한 자리. 나머지는 대역으로 검증된다.
-- `src/inference/` — 001에서 열렸고 005가 실제 추론을 채웠다.
-  - `llama-port.ts` — 기기에 닿는 유일한 자리이자 **원칙 IV의 경계**. 네이티브가
-    요청하지 않은 지표(`timings` 등)를 보내므로 `RunResult`가 `{ text, ending }`
-    둘만 갖는 것이 방어다.
-  - `sampling.ts` — 온디바이스·데스크톱이 공유하는 유일한 자리(동일 파라미터).
-  - `engine-port.ts` — 적재·실행·정리 계약. `Ending` 다섯 갈래.
-- `src/vision/`(011) — **캐릭터 로스터와 별개의 자리**, `models/roster.ts`와 서로
-  import하지 않는다.
-  - `select.ts` — 5장을 하루에 걸쳐 균일하게 고른다(004의 `slice(0, limit)`과
-    의도적으로 다름).
-  - `vision-port.ts` — 기기에 닿는 유일한 자리이자 **원칙 IV의 두 번째 경계**
-    (`VisionRunResult`가 `text` 하나뿐).
-  - `sampling.ts` — `inference/sampling.ts`를 재사용하지 않는다(헌법 검사가 막음).
+- `src/signals/` — **사진은 실제로 수집한다**(004). `photos`는 미디어 라이브러리에서, `places`는 사진 좌표에서 온다. `steps`·`battery`·`connectivity`는 `unknown`이며 그것이 결론이지
+  미완성이 아니다. `fake.ts`는 테스트·개발 전용이며 `src/ui/`에서 import하지 않는다(원칙 I).
+- `src/diary/`
+  - `prompt.ts` — **헌법 원칙 II의 유일한 통과 지점.** 화자 규칙이 여기 하나뿐이고 `unknown`/`none`을 다른 문장으로 옮긴다. 캐릭터에서 오는 것은 이름과 출력 언어뿐 — 성격
+    지시를 넣으면 관측된 성격이 아니라 지어낸 성격이 된다(원칙 III).
+  - `acceptance.ts` — **원칙 I의 마지막 방어선.** 거부 갈래가 넷뿐이고 테스트가 그 수를 직접 센다. 임계값·유사도·점수를 쓰지 않는다 — 다섯째를 넣으려면 `contracts/acceptance.md`를 먼저 고친다.
+  - `persona.ts`·`title.ts` — 014 참조. `title.ts`는 예외를 던지지 않는다.
+- `src/models/` — **원칙 III의 최전선.** `roster.ts`는 캐릭터→모델 매핑의 유일한 자리이고 `allAssets()`나 `characterFor()`를 두지 않는다(「다섯을 다 받자」가 한 줄로 가능해진다).
+  `readiness.ts`(준비 상태 넷), `expo-port.ts`(기기에 닿는 유일한 자리).
+- `src/inference/` — `llama-port.ts`가 기기에 닿는 유일한 자리이자 **원칙 IV의 경계**, `sampling.ts`는 온디바이스·데스크톱이 공유하는 유일한 자리, `engine-port.ts`는 적재·실행·정리 계약
+  (`Ending` 다섯 갈래).
+- `src/vision/` — `roster.ts`(모델 하나)는 `models/roster.ts`와 서로 import하지 않는다. `select.ts`(023), `vision-port.ts`(**원칙 IV의 두 번째 경계**, `VisionRunResult`가 `text` 하나), `sampling.ts`(재사용 금지).
 
-**측정·채점 코드를 둘 자리는 없다.** 모델 출력을 점수로 매기거나 여러 모델을
-비교하는 코드는 위 어느 자리에도 속하지 않는다(원칙 IV). 필요하면 별도 저장소에서
-한다. `scripts/check-constitution.mts`는 설정 위반을 잡는 것이지 모델 출력을 재지
-않는다.
+**측정·채점 코드를 둘 자리는 없다.** 모델 출력을 점수로 매기거나 여러 모델을 비교하는 코드는 어느 자리에도 속하지 않는다(원칙 IV) — 필요하면 별도 저장소에서 한다.
+`scripts/check-constitution.mts`는 설정 위반을 잡는 것이지 모델 출력을 재지 않는다.
 
 ### 지켜야 할 경계
 
-- **`process.env`는 `src/config/environment.ts`에서만 읽는다**(FR-009a).
-- **추론 위치는 `src/inference/select.ts`에서만 고른다**(FR-025) — 어댑터를 직접
-  만들어 쓰지 않는다.
-- **`src/config/policy.ts`가 헌법 원칙 I의 방어선이다** — dev·prod에서 데스크톱
-  서버가 허용되지 않는다는 규칙이 이 파일 한 곳에만 있다.
-- **하루는 기기 로컬 자정(00:00)에 바뀌고 오늘은 언제든 쓸 수 있다**(049 — 002의 04:00
-  경계와 012의 정오 제한을 버렸다). 경계는 `src/config/day-boundary.ts` 하나뿐이다(FR-021a) —
-  다른 파일에서 `getHours() ±`로 하루 기준을 옮기지 않는다(DB11). 함수는 모두 "지금"을 인자로
-  받는다(`new Date()`를 안에서 부르면 테스트 불가). 정오는 `selectableDays()`(백그라운드의 사흘)의
-  구성 규칙에만 남아 있다.
-- **모르는 것을 기본값으로 채우지 않는다**(FR-003, 원칙 V). `SignalValue<T>`는
-  `known`/`none`/`unknown` 셋을 가르며 `valueOr(signal, 0)` 같은 편의 함수를
-  만들지 않는다.
-- **실패가 텍스트를 반환하지 않는다**(FR-016, 원칙 I). `GenerationFailure`의 어느
-  갈래에도 `text` 필드가 없다 — 플레이스홀더 텍스트도 금지.
-- **신호가 없는 하루의 일기는 서로 비슷해도 된다**(006 FR-037a) — 입력이 같으면
-  출력이 닮는 것은 정상이다. 일률적인 것을 결함으로 읽고 다양성을 넣으려 하지
-  않는다 — 그 순간 지어내기가 시작된다.
-- **프롬프트는 `src/diary/prompt.ts`에만 있다**(005 FR-013b, 데스크톱 어댑터도
-  이것을 부른다). 캐릭터에서 오는 것은 이름과 출력 언어뿐이다.
-- **출력 판정의 갈래는 넷이고 늘리지 않는다**(005 FR-018b) — 테스트가 그 수를
-  직접 센다. 임계값을 두는 순간 채점 코드가 되고 그것이 원칙 IV — 되돌리기의
-  이유다.
-- **네이티브 추론 결과의 지표를 경계 밖으로 내보내지 않는다**(005 FR-011,
-  `llama-port.ts`가 유일한 경계).
-- **생성 중인 글을 화면에 보여주지 않는다**(005 FR-028b) — 토큰 콜백을
-  `completion()`에 아예 넘기지 않는다.
+- **`process.env`는 `src/config/environment.ts`에서만 읽는다**(FR-009a). **추론 위치는 `src/inference/select.ts`에서만 고른다**(FR-025). **`src/config/policy.ts`가 원칙 I의 방어선이다** —
+  dev·prod에서 데스크톱 서버가 허용되지 않는다는 규칙이 이 파일 한 곳에만 있다.
+- **하루는 기기 로컬 자정(00:00)에 바뀌고 오늘은 언제든 쓸 수 있다**(049). 경계는 `src/config/day-boundary.ts` 하나뿐이다(FR-021a) — 다른 파일에서 `getHours() ±`로 하루 기준을 옮기지 않는다(DB11).
+  함수는 모두 「지금」을 인자로 받는다(`new Date()`를 안에서 부르면 테스트 불가). 정오는 `selectableDays()`(백그라운드의 사흘) 구성 규칙에만 남아 있다.
+- **모르는 것을 기본값으로 채우지 않는다**(FR-003, 원칙 V). `SignalValue<T>`는 `known`/`none`/`unknown` 셋을 가르며 `valueOr(signal, 0)` 같은 편의 함수를 만들지 않는다.
+- **실패가 텍스트를 반환하지 않는다**(FR-016, 원칙 I) — `GenerationFailure`의 어느 갈래에도 `text`가 없고 플레이스홀더도 금지. **생성 중인 글을 화면에 보여주지 않는다**(005 FR-028b) — 토큰 콜백을 `completion()`에 넘기지 않는다.
+- **프롬프트는 `src/diary/prompt.ts`에만 있다**(데스크톱 어댑터도 이것을 부른다). **출력 판정의 갈래는 넷이고 늘리지 않는다**(005 FR-018b) — 임계값을 두는 순간 채점 코드가 되고 그것이 원칙 IV다.
+- **네이티브 추론 결과의 지표를 경계 밖으로 내보내지 않는다**(005 FR-011, `llama-port.ts`가 유일한 경계).
 
 ## 환경은 셋이다
 
@@ -1905,32 +657,24 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 | `dev` | 실기기, 개발 빌드 | 온디바이스만 |
 | `prod` | 실기기, 배포 빌드 | 온디바이스만 |
 
-환경은 실행 시점에 `EXPO_PUBLIC_APP_ENV`로 정해진다. 빌드는 하나다.
-
-**Expo Go로는 실행할 수 없다.** 네이티브 추론 모듈(`llama.rn`)이 Expo Go에 없기
-때문이다. `npx expo run:android`로 development build를 쓴다.
+환경은 실행 시점에 `EXPO_PUBLIC_APP_ENV`로 정해진다. 빌드는 하나다. **Expo Go로는 실행할 수 없다**(`llama.rn`이 없다) — `npx expo run:android`로 development build를 쓴다.
 
 ## release 빌드와 서명 — 요청받았을 때만 탄다
 
 **손으로 설치할 수 있는 배포물을 만드는 절차다**(006). 스토어 등록은 범위 밖이다.
 
-> **⚠️ 이 절은 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug)로만 하며,
-> 이 절차는 저장소 소유자가 그 세션에서 명시적으로 요청했을 때만 탄다(아래
-> 「테스트」 절). **release를 설치하려면 debug 앱을 지워야 하고 그때 모델
-> 파일·일기·설정이 함께 사라진다** — 시작 전에 모델 백업부터 확인한다.
+> **⚠️ 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug)로만 하며(아래 「테스트」), 이 절차는 저장소 소유자가 그 세션에서 명시적으로 요청했을 때만 탄다. **release를 설치하려면 debug 앱을
+> 지워야 하고 그때 모델 파일·일기·설정이 함께 사라진다** — 시작 전에 모델 백업(`~/.alpharium-signing/model-backup/`)을 확인한다.
 
 ### 서명 키 (최초 1회)
 
-**⚠️ 이 키를 잃으면 이미 설치된 앱을 덮어쓸 수 없다.** 지우고 다시 깔면 사용자의
-일기가 함께 사라진다. **저장소 밖에 백업한다.**
+**⚠️ 이 키를 잃으면 이미 설치된 앱을 덮어쓸 수 없다.** 지우고 다시 깔면 사용자의 일기가 함께 사라진다. **저장소 밖에 백업한다.**
 
 ```
 keytool -genkeypair -v -keystore <경로>/alpharium.jks   -alias alpharium -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-**원본은 저장소 밖(`~/.alpharium-signing/`)에 두고, `android/app/`에는 사본을
-놓는다** — `prebuild --clean`이 `android/`를 통째로 지우므로 거기 둔 키는 함께
-사라진다.
+**원본은 저장소 밖(`~/.alpharium-signing/`)에 두고 `android/app/`에는 사본을 놓는다** — `prebuild --clean`이 `android/`를 통째로 지우므로 거기 둔 키는 함께 사라진다.
 
 ```
 mkdir -p ~/.alpharium-signing
@@ -1945,9 +689,7 @@ ALPHARIUM_STORE_PASSWORD=<비밀번호>
 ALPHARIUM_KEY_PASSWORD=<비밀번호>
 ```
 
-**서명 설정은 `plugins/with-release-signing.js`가 선언으로 넣는다.**
-`android/app/build.gradle`을 직접 고치지 않는다 — gitignore된 생성물이라
-`prebuild --clean`에 지워진다.
+**서명 설정은 `plugins/with-release-signing.js`가 선언으로 넣는다.** `android/app/build.gradle`은 gitignore된 생성물이라 직접 고치지 않는다(`prebuild --clean`에 지워진다).
 
 ### 빌드
 
@@ -1957,12 +699,8 @@ cp ~/.alpharium-signing/alpharium.jks android/app/     # ★ prebuild가 지웠�
 cd android && NODE_ENV=production ./gradlew assembleRelease
 ```
 
-**`--clean`을 건너뛰지 않는다** — 004에서 이것 때문에 권한이 빠진 APK가
-설치됐다. **가운데 줄을 건너뛰지 않는다** — `prebuild --clean`이 키를 지운다.
-**`NODE_ENV=production`이 필요하다** — 없으면 `.env.production`이 로드되지 않고
-앱이 「이 빌드는 잘못 만들어졌다」로 뜬다.
-
-산출물: `android/app/build/outputs/apk/release/app-release.apk`
+**`--clean`을 건너뛰지 않는다**(004에서 권한이 빠진 APK가 설치됐다). **가운데 줄을 건너뛰지 않는다.** **`NODE_ENV=production`이 필요하다** — 없으면 `.env.production`이 로드되지 않고 앱이
+「이 빌드는 잘못 만들어졌다」로 뜬다. 산출물: `android/app/build/outputs/apk/release/app-release.apk`(빌드 약 19분).
 
 ### 확인 — 빌드 성공을 믿지 않는다
 
@@ -1970,14 +708,10 @@ cd android && NODE_ENV=production ./gradlew assembleRelease
 | --- | --- | --- |
 | 서명 | `apksigner verify --print-certs <apk>` | `CN=Android Debug`가 **아니다** |
 | 키 비커밋 | `git status`, `git ls-files \| grep -i jks` | 아무것도 안 나온다 |
-| Metro 없이 도는가 | **Metro를 끄고 USB를 뽑고** 앱을 연다 | `Unable to load script`가 없다 |
+| Metro 없이 도는가 | **Metro를 끄고 USB를 뽑거나 `adb reverse --remove-all` 하고** 앱을 연다 | `Unable to load script`가 없다 |
 | 환경 | 앱 화면 | 「이 빌드는 잘못 만들어졌다」가 **아니다** |
 
-**⚠️ release는 minify·R8·ProGuard가 켜진다**(현재 `enableMinifyInReleaseBuilds`가
-기본 `false`라 실제로는 꺼져 있다 — 027 발견). 동적 `import`와 `llama.rn`의 JNI
-심볼이 여기서 깨질 수 있으며, **debug에서 돌았다는 것은 release에서 돈다는 뜻이
-아니다**(원칙 V). 이 위험은 기록으로 남기되, 그것 때문에 스스로 release 빌드를
-만들지는 않는다 — 요청받았을 때만 탄다.
+**debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V) — minify·R8이 켜지면 동적 `import`·`llama.rn` JNI 심볼이 깨질 수 있다(현재는 꺼져 있다, 위 실측 규칙).
 
 ## 테스트
 
@@ -1989,95 +723,52 @@ cd android && NODE_ENV=production ./gradlew assembleRelease
 | `npm run test:device` | 실기기 갈래 (Maestro) | 있으면 돌고 없으면 건너뛴다 |
 | `npm run lint` | eslint + tsc + 헌법 검사 + prettier 포맷 검사 | 필요 없음 |
 
-**건너뛴 실기기 테스트는 통과가 아니다.** 기기 없이 전부 초록불이어도 온디바이스는
-검증되지 않은 상태다. 기능이 끝났다고 말하려면 최소 한 번은 실기기에서 돌아야
-한다(원칙 V).
+**건너뛴 실기기 테스트는 통과가 아니다.** 기기 없이 전부 초록불이어도 온디바이스는 검증되지 않은 상태다. 기능이 끝났다고 말하려면 최소 한 번은 실기기에서 돌아야 한다(원칙 V).
 
-**★ 그 "한 번"은 dev(debug) 빌드다. release 빌드는 만들지 않는다**(2026-09-09
-저장소 소유자 지시로 확정). 012가 "네이티브를 안 건드리면 debug 1회로 충분"을
-세웠고, 그 뒤로도 release 세션마다 대가가 컸다 — 빌드 한 번이 약 19분이고,
-설치하려면 debug 앱을 지워야 해서 **모델 파일(~2GB)·일기·설정이 함께
-사라진다**(027이 실제로 그렇게 됐고 다음 세션이 재다운로드로 시작했다).
+**★ 그 「한 번」은 dev(debug) 빌드다. release 빌드는 만들지 않는다**(2026-09-09 저장소 소유자 지시). release 세션마다 대가가 컸다 — 빌드 한 번이 약 19분이고 설치하려면 debug 앱을 지워야 해서
+모델 파일(~2GB)·일기·설정이 함께 사라진다.
 
-- **기본**: 새 네이티브 모듈이나 빌드 설정을 건드리는 기능이어도 **dev로만
-  검증하고 완료로 처리한다.** release 잔여 위험이 있으면 스펙의 "미확인 잔여"에
-  한 줄 기록만 남긴다 — 그것을 닫을지는 저장소 소유자가 정한다.
-- **스펙 문서에 release 검증 태스크를 기본으로 넣지 않는다.** 완료 조건으로도
-  세우지 않는다.
-- **예외**: 저장소 소유자가 그 세션에서 "release로 확인해 달라"고 명시적으로
-  요청했을 때만 아래 「release 빌드와 서명」 절차를 탄다. 그때는 모델 백업
-  (`~/.alpharium-signing/model-backup/`)이 있는지 먼저 확인한다.
+- **기본**: 새 네이티브 모듈이나 빌드 설정을 건드리는 기능이어도 dev로만 검증하고 완료로 처리한다. release 잔여 위험은 스펙의 「미확인 잔여」에 한 줄 기록만 남긴다(닫을지는 저장소 소유자가 정한다).
+- **스펙 문서에 release 검증 태스크를 기본으로 넣지 않는다.** 완료 조건으로도 세우지 않는다.
+- **예외**: 저장소 소유자가 그 세션에서 「release로 확인해 달라」고 명시적으로 요청했을 때만 위 절차를 탄다.
 
-시뮬레이터(Expo Go 등)는 이 프로젝트에서 애초에 옵션이 아니다.
-
-**⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야
-돈다.** 등록하지 않으면 파일이 있어도 실행기가 돌리지 않고, 초록불인데 아무것도
-검증되지 않은 상태가 된다.
-
-**★ 테스트 전 앱 초기화 원칙 (대치 + `pm clear` + 재시작)**: 실기기 테스트에
-들어가기 전에는 항상 기존 테스트 앱을 초기화한다. 다시 설치(uninstall)하는 것이
-아니라, 버전을 일일이 확인할 것 없이 테스트를 위한 버전(dev 빌드 APK)으로
-대치(replace, `adb install -r`)하고, `pm clear`로 내부 데이터를 날린 뒤 다시
-시작한다. 이전 세션의 스테일한 상태나 캐시가 검증을 왜곡하는 것을 원천 차단한다.
-`scripts/run-device-tests.mjs`가 기기 연결 시 이 루틴을 자동으로 먼저 수행한다.
+시뮬레이터(Expo Go 등)는 애초에 옵션이 아니다. 실기기 도구 사용법은 위 「도구 사용법」과 「Maestro」.
 
 ### jest가 두 프로젝트로 나뉜다 — 화면만 RN 런타임을 진다
 
-`jest-expo` 프리셋은 워커마다 React Native 런타임을 세운다. `package.json`의
-jest 설정이 `.ts`(순수 로직, `node` 환경)와 `.tsx`(화면, `jest-expo`) 둘로
-갈라져 있다 — 순수 로직 40여 개가 43.8초에서 12.4초로 줄었다.
+`jest-expo` 프리셋은 워커마다 React Native 런타임을 세운다. `package.json`의 jest 설정이 `.ts`(순수 로직, `node` 환경)와 `.tsx`(화면, `jest-expo`) 둘로 갈라져 있다 — 순수 로직 40여 개가
+43.8초에서 12.4초로 줄었다.
 
-**개발 중에는 `npm run test:logic`을 쓴다** — 화면을 안 건드렸으면 이것으로
-충분하다(약 7초). 화면을 건드렸으면 `npm run test:ui`, 커밋 전에는 `npm test`다.
+**개발 중에는 `npm run test:logic`을 쓴다**(화면을 안 건드렸으면 충분). 화면을 건드렸으면 `npm run test:ui`, 커밋 전에는 `npm test`다.
 
-- **가르는 기준은 확장자다.** `.tsx`면 화면, `.ts`면 순수 로직 — 새 화면 테스트를
-  `.ts`로 만들면 `render()`가 없다고 실패한다(원인을 가리키는 실패라 안전하다).
-- **`testMatch`가 어긋나면 스위트가 조용히 사라진다** — 어느 프로젝트에도 안
-  잡힌 파일을 jest는 오류 없이 그냥 안 돌린다. `__tests__/jest-projects.test.ts`가
-  파일 수를 직접 세어 막으며, 이 가드는 일부러 **양쪽** 프로젝트에 들어 있다
-  (한쪽에만 두면 그 프로젝트가 통째로 사라지는 위반에서 가드 자신도 함께
-  사라진다).
-- **`--maxWorkers=50%`가 최적이다** — 75%·100%는 워커끼리 CPU를 뺏어 오히려
-  느려졌다(18초→27.6초). CI는 러너가 2코어라 `--maxWorkers=2`를 따로 쓴다.
-  **★ `npm test -- --maxWorkers=2`로 넘기면 안 된다** — 스크립트의 `--maxWorkers=50%`와
-  중복돼 jest가 배열로 받아 **50워커**를 띄운다(`jest --showConfig`의 `maxWorkers: 50`).
-  2코어 CI에서 단순 스위트도 30초를 넘겨 RNTL cleanup 훅이 타임아웃으로 죽었다(052~054).
-  CI는 `npx jest --maxWorkers=2`를 직접 부른다.
+- **가르는 기준은 확장자다.** `.tsx`면 화면, `.ts`면 순수 로직 — 새 화면 테스트를 `.ts`로 만들면 `render()`가 없다고 실패한다.
+- **`testMatch`가 어긋나면 스위트가 조용히 사라진다** — 어느 프로젝트에도 안 잡힌 파일을 jest는 오류 없이 안 돌린다. `__tests__/jest-projects.test.ts`가 파일 수를 세어 막으며 이 가드는
+  일부러 **양쪽** 프로젝트에 들어 있다.
+- **`--maxWorkers=50%`가 최적이다** — 75%·100%는 워커끼리 CPU를 뺏어 오히려 느려졌다(18초→27.6초). CI는 러너가 2코어라 `--maxWorkers=2`를 따로 쓴다.
+  **★ `npm test -- --maxWorkers=2`로 넘기면 안 된다** — 스크립트의 `--maxWorkers=50%`와 중복돼 jest가 배열로 받아 **50워커**를 띄운다(`jest --showConfig`의 `maxWorkers: 50`).
+  2코어 CI에서 단순 스위트도 30초를 넘겨 RNTL cleanup 훅이 타임아웃으로 죽었다(052~054). CI는 `npx jest --maxWorkers=2`를 직접 부른다.
 
 ### Windows에서 느린 것은 Defender다
 
-같은 명령이 CI(우분투)에서 6초, Windows에서 11분 39초였던 적이 있다 — 코드
-문제가 아니라 Defender 실시간 검사가 `node_modules`의 44,221개 파일을 매번
-가로챈 것(처음 35.37ms, 캐시 후 0.36ms, 98배 차이). `scripts/windows-dev-
-exclusions.ps1`을 관리자 권한으로 돌리면 해소된다(기계 설정이라 CI에는 영향
-없음). 테스트는 저장소 쪽에서 `--maxWorkers=50%`로 고쳤다 — 16워커가 CPU를 서로
-뺏어 `render()`가 기본 5초 타임아웃을 넘겼던 것이 원인이었다.
+같은 명령이 CI(우분투)에서 6초, Windows에서 11분 39초였던 적이 있다 — 코드 문제가 아니라 Defender 실시간 검사가 `node_modules`의 44,221개 파일을 매번 가로챈 것(처음 35.37ms, 캐시 후 0.36ms,
+98배 차이). `scripts/windows-dev-exclusions.ps1`을 관리자 권한으로 돌리면 해소된다(기계 설정이라 CI에는 영향 없음). 테스트는 저장소 쪽에서 `--maxWorkers=50%`로 고쳤다 — 16워커가
+CPU를 서로 뺏어 `render()`가 기본 5초 타임아웃을 넘겼던 것이 원인이었다.
 
 ## Expo 작업 시
 
-패키지 버전을 추측하지 않는다. `expo install`은 npm이 아니라 Expo API에서 버전을
-해석하므로 `npm view`는 틀린 답을 준다. 대상 SDK의 버전별 공식 문서나
-context7(`/expo/expo`)로 확인하고 `npx expo install --check`로 검증한다.
+패키지 버전을 추측하지 않는다. `expo install`은 npm이 아니라 Expo API에서 버전을 해석하므로 `npm view`는 틀린 답을 준다. 대상 SDK의 버전별 공식 문서나 context7(`/expo/expo`)로 확인하고
+`npx expo install --check`로 검증한다.
 
-**Expo SDK 57**로 간다 — 온디바이스 추론(Expo 57 + RN 0.86 + `llama.rn`)이
-실증된 조합이기 때문이다. `llama.rn`은 Expo가 관리하는 패키지가 아니므로
-`expo install --check`가 이 항목을 검사하지 않는다 — 패치 버전을 올릴 때도
-실기기에서 `loaded`를 다시 확인한다(온디바이스 모듈이므로).
+**Expo SDK 57**로 간다 — 온디바이스 추론(Expo 57 + RN 0.86 + `llama.rn`)이 실증된 조합이기 때문이다. `llama.rn`은 Expo가 관리하는 패키지가 아니므로 `expo install --check`가 검사하지
+않는다 — 패치 버전을 올릴 때도 실기기에서 `loaded`를 다시 확인한다.
 
 ## 작업 습관
 
-- 커밋 메시지는 한국어로 쓴다(헌법 「개발 방식」).
-- 계약을 먼저 정하고 테스트를 먼저 쓴다(헌법 「개발 방식」).
-- **`main`에서 직접 작업하지 않는다.** 기능마다 브랜치를 파고 PR로 머지한다
-  (021은 #31로 머지). **작업을 시작하기 전에 `git branch --show-current`로 지금
-  브랜치를 눈으로 확인한다** — 스펙킷(`setup-plan.ps1` 등)이 출력하는 `BRANCH:`
-  필드는 스펙 디렉터리 이름이지 체크아웃된 브랜치가 아니다. 2026-08-29에 이것을
-  믿고 022를 통째로 `main`에서 작업·커밋한 사고가 있었다. `.githooks/pre-commit`·
-  `pre-push`가 `main`/`master` 직접 커밋·push를 막는다(`core.hooksPath=.githooks`,
-  clone 후 `git config core.hooksPath .githooks` 한 번 필요). 우회는 `--no-verify`.
-- **한 축을 깊게 파고들고 싶어지면 그것이 실패 신호다.** 이 프로젝트에서 반복된
-  실패는 코딩 에이전트가 여러 축 중 하나를 붙잡고 지나치게 파고든 것이었다.
-- **계약 테스트는 소스 선언을 직접 읽는다.** jest는 타입을 지우므로 `tsc`만
-  잡는 위반(타입 위반, 인자 개수 등)이 있다 — 007·009·012에서 반복 확인됐다.
-- **위반 주입으로 방어를 검증한다.** 새 규칙을 세울 때마다 실제로 어겨 보고
-  테스트나 헌법 검사가 잡는지 확인한다(007~014 전체의 공통 관례).
+- 커밋 메시지는 한국어로 쓴다(헌법 「개발 방식」). 계약을 먼저 정하고 테스트를 먼저 쓴다.
+- **`main`에서 직접 작업하지 않는다.** 기능마다 브랜치를 파고 PR로 머지한다. **작업을 시작하기 전에 `git branch --show-current`로 지금 브랜치를 눈으로 확인한다** — 스펙킷(`setup-plan.ps1` 등)이
+  출력하는 `BRANCH:` 필드는 스펙 디렉터리 이름이지 체크아웃된 브랜치가 아니다(022를 통째로 `main`에서 작업·커밋한 사고가 있었다). `.githooks/pre-commit`·`pre-push`가 `main`/`master` 직접
+  커밋·push를 막는다(`core.hooksPath=.githooks`, clone 후 `git config core.hooksPath .githooks` 한 번 필요; 우회는 `--no-verify`).
+- **한 축을 깊게 파고들고 싶어지면 그것이 실패 신호다.** 반복된 실패는 코딩 에이전트가 여러 축 중 하나를 붙잡고 지나치게 파고든 것이었다.
+- **위반 주입으로 방어를 검증한다.** 새 규칙을 세울 때마다 실제로 어겨 보고 테스트나 헌법 검사가 잡는지 확인한다(치환이 실제로 적용됐는지 먼저 단언한다).
+- **경계를 옮기거나 유니온을 좁힐 때는 `tsc` 0을 완료 조건으로 삼고, 같은 규칙의 복제가 다른 파일에 있는지 소스를 센다**(049 `bucketIndexOf`).
+- **보드·스펙을 옮기는 일은 원문 대조를 계약 테스트에 넣는다**(047). 구현 뒤 사람이 화면을 보고 어긋남을 찾는 일이 반복됐다.
