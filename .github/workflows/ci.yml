@@ -29,7 +29,12 @@ jobs:
       # 러너는 2코어다. package.json의 --maxWorkers=50%는 개발자 기계(다중 코어)를
       # 기준으로 잡은 값이라 여기서는 워커가 1개가 되어 오히려 느려진다.
       # CI에서는 코어 수를 그대로 쓴다.
-      - run: npm test -- --maxWorkers=2
+      #
+      # `npm test -- --maxWorkers=2`로 쓰면 안 된다: 스크립트가 이미 --maxWorkers=50%를
+      # 갖고 있어 옵션이 두 번 들어가고, jest는 그것을 배열로 받아 50개 워커를 띄운다
+      # (`jest --showConfig`에서 maxWorkers: 50). 2코어에 워커 50개가 몰려 단순 스위트도
+      # 30초를 넘기고 RNTL cleanup 훅이 타임아웃으로 죽었다. jest를 직접 부른다.
+      - run: npx jest --maxWorkers=2
 
       # 의존성 선언과 SDK 기대값이 어긋나는지 확인(FR-022)
       #
