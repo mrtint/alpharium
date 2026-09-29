@@ -201,7 +201,12 @@ describe("048 H — 1d 구조와 헤더", () => {
       .replace(/\/\/.*$/gm, "");
     const fade = code.slice(code.indexOf("function DayHeading"), code.indexOf("function DayFace"));
     expect(fade).not.toMatch(/\.value\s*=\s*[01]\s*;/);
-    expect(fade).toContain("useSharedValue(from)");
+    // 054 — `FadeLayer`가 `components/FadeLayer.tsx`로 꺼내졌다(쓰는 중 혼잣말과 공용). 시작값 규칙은 그 파일이 지닌다.
+    const layer = readFileSync(join(__dirname, "../../src/ui/components/FadeLayer.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(layer).toContain("useSharedValue(from)");
+    expect(layer).not.toMatch(/\.value\s*=\s*[01]\s*;/);
     expect(fade).toMatch(/key=\{`in-\$\{shown\.day\}`\}/);
     expect(fade).toMatch(/key=\{`out-\$\{shown\.previous\}-\$\{shown\.day\}`\}/);
   });

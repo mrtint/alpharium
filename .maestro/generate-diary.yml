@@ -106,12 +106,13 @@ appId: com.anonymous.alpharium
           notVisible: ".*중….*"
           timeout: 300000
 
-# 005 FR-028c — 어떻게 끝나든 「쓰고 있다」가 남아 있지 않다.
+# 005 FR-028c — 어떻게 끝나든 쓰는 중 표식(`stop-button`)이 남아 있지 않다(054 — 쓰는 중은 홈 안의 상태).
 #
 # 모델이 없으면 즉시 끝나고, 있으면 오래 걸린다. 어느 쪽이든 **끝난 뒤에는** 사라져야
 # 하므로 넉넉히 기다린 뒤 본다.
 - extendedWaitUntil:
-    notVisible: "쓰고 있다"
+    notVisible:
+      id: "stop-button"
     timeout: 300000
 
 # ★ 005 FR-017e — 실패가 「할 수 있는 것」으로 옮겨진다 (원칙 III).

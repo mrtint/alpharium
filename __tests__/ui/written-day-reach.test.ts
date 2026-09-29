@@ -93,13 +93,11 @@ describe("★ 051 DEL — 없어지는 것이 정말 없다", () => {
     }
   });
 
-  it("DEL3 — TypewriterText는 쓰는 중 독백(039)에만 쓰인다", () => {
+  it("DEL3 — TypewriterText는 없다 (054 — 쓰는 중 독백이 페이드 교체가 되어 마지막 사용처가 사라졌다)", () => {
     const importers = src.filter((f) =>
       /from\s+["'][^"']*components\/TypewriterText["']/.test(readFileSync(f, "utf8")),
     );
-    expect(importers.map((f) => f.replace(/\\/g, "/").replace(/^.*\/src\//, "src/"))).toEqual([
-      "src/ui/DiaryHomeScreen.tsx",
-    ]);
+    expect(importers).toEqual([]);
   });
 
   it("DEL4 — 새 의존성이 없다 (main과 dependencies 키가 같다)", () => {
@@ -132,7 +130,6 @@ describe("★ 051 TXT3 — 쓴 날 문구는 home-text.ts에만 있다", () => {
     WRITTEN_DAY_TEXT.rewrite,
     ...WRITTEN_DAY_TEXT.unreadableLines,
     WRITTEN_DAY_TEXT.photoMissing,
-    WRITTEN_DAY_TEXT.unsaved,
     WRITTEN_DAY_TEXT.backToHome,
     "전에 작성",
     "방금 작성",

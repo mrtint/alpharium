@@ -24,22 +24,20 @@
  *
  * **051 — 홈이 곧 상세다.** 목록 카드 → 상세 화면 전이가 사라졌다. 고른 날에 일기가 있으면 그 날의
  * 파일을 읽어 `paperFor()`로 지면 상태를 만들고 `DiaryListScreen`에 넘긴다(늦게 온 결과는 버린다).
- * 쓰기가 성공하면 결과 화면 없이 홈의 그 날로 돌아온다 — 저장에 실패했을 때만 임시 결과 화면
- * (`unsaved`)이다. 알림(020)은 상세가 아니라 **고른 날**이 되고(`initialDay`), 확인 기록은 읽을 수
- * 있는 일기가 실제로 보였을 때 남긴다. 오늘의 일기를 보는 동안 작성 시각을 1분마다 다시 그린다.
+ * 쓰기가 성공하면 결과 화면 없이 홈의 그 날로 돌아온다. 알림(020)은 상세가 아니라 **고른 날**이 되고
+ * (`initialDay`), 확인 기록은 읽을 수 있는 일기가 실제로 보였을 때 남긴다. 오늘의 일기를 보는 동안 작성 시각을
+ * 1분마다 다시 그린다.
+ *
+ * **054 — 제자리 쓰기.** 쓰는 중은 별도 전체 화면이 아니라 이 홈 안의 상태다(`DiaryListScreen`의 `writing`
+ * 모드 — 잠긴 스트립·혼잣말·검정 「그만두기」 바). 그만두거나 실패하면 쓰기 전 상태의 홈으로 돌아오고, 실패는
+ * 하단 바 위 토스트 한 줄이다 — **저장 실패도 그렇다**(임시 결과 화면 `unsaved`는 없어졌고 글은 버려진다).
+ * `AppScreen`의 `writing`은 넓히지 않았다(`toWriting()`의 무인자 방어, 원칙 I) — 헤더·스트립에 쓸 목록 요약은
+ * 이 화면의 `writingItems` state가 든다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  AppState,
-  BackHandler,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from "react-native";
+import { AppState, BackHandler, Pressable, ScrollView, StyleSheet, View } from "react-native";
 
 import {
   afterGeneration,
@@ -60,6 +58,7 @@ import {
   type DiaryListItem,
 } from "../app/state";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
+import { TOAST_TEXT, type ToastKind } from "../app/failure-toast";
 import { paperFor, type LoadedEntry } from "../app/written-day";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
@@ -78,8 +77,7 @@ import { decideMaterial, fromCountHint, type MaterialDecision } from "../app/mat
 import { MaterialConfirmDialog, SettingsPromptDialog } from "./MaterialDialogs";
 import { OverwriteConfirmDialog } from "./OverwriteConfirmDialog";
 import { AppText } from "./components/Text";
-import { TypewriterText } from "./components/TypewriterText";
-import { COLORS, REVEAL } from "./theme/tokens";
+import { COLORS, WRITING } from "./theme/tokens";
 
 /** 사진 권한을 다시 묻거나(`request`) OS 설정을 여는(`openSettings`) 통로 (053) */
 export type PhotoAccessPort = {
@@ -235,6 +233,14 @@ export function DiaryHomeScreen({
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
   /**
+   * 쓰다가 실패해 홈으로 돌아온 뒤 뜨는 토스트 한 줄 (054, 보드 `2i`). **갈래 이름만** 든다 — 글도 이유도 담을 자리가
+   * 없다(SC-005). 화면 로컬이며 파일에 남기지 않는다(FR-012). `id`는 실패마다 올라 같은 갈래가 연달아 나도 새로
+   * 뜬다. 새 쓰기·날 바꿈에서 즉시 비운다(FR-018).
+   */
+  const [toast, setToast] = useState<{ id: number; kind: ToastKind } | null>(null);
+  const toastId = useRef(0);
+
+  /**
    * 사용자가 고른 하루 (009 FR-006). `null`이면 고른 적이 없다는 뜻이고 그때
    * 기본값(마지막으로 닫힌 하루)을 쓴다(FR-007).
    *
@@ -249,6 +255,8 @@ export function DiaryHomeScreen({
   const chosenDay = controlledDay !== undefined ? controlledDay : localDay;
   const setChosenDay = useCallback(
     (day: DayDate) => {
+      // 054 FR-018 — 토스트는 그것을 낳은 실패 하나에 대한 것이다. 날을 바꾸면 새 날에 붙어 남지 않는다.
+      setToast(null);
       if (onChooseDay !== undefined) onChooseDay(day);
       else setLocalDay(day);
     },
@@ -289,6 +297,18 @@ export function DiaryHomeScreen({
 
   /** 쓰기 전 판정이 신호를 읽는 동안 다시 눌러도 두 번 시작하지 않는다 */
   const deciding = useRef(false);
+
+  /**
+   * 쓰는 중에도 헤더·스트립을 그리려고 쓰기를 시작할 때 들고 있던 목록 요약 (054, research R1).
+   *
+   * `AppScreen`의 `writing`은 일부러 그대로다 — `toWriting()`이 인자를 받지 않고 `["kind"]`뿐인 것이 원칙 I의
+   * 방어(007 S1·009 I7·012 C3)라서, 그 선언을 넓히지 않고 화면이 따로 든다. 이 값은 그리기 전용이며 저장
+   * 상태로 무엇을 정하는 데 쓰지 않는다.
+   */
+  const [writingItems, setWritingItems] = useState<DiaryListItem[]>([]);
+
+  /** 쓰는 중 안내 줄에 쓰는 이름 — 생성이 정한 캐릭터의 지금 이름 (054, 035 `nameOf`) */
+  const [writingName, setWritingName] = useState<string | undefined>(undefined);
 
   /** 방금 생성에서 캐릭터가 옮겨졌으면 그 안내 문구 (029 FR-014). */
   const [movedNotice, setMovedNotice] = useState<string | undefined>(undefined);
@@ -451,8 +471,13 @@ export function DiaryHomeScreen({
    */
   // 050 — 덮어쓰기 확인은 홈 **위의** 대화상자다. 그동안에도 홈(스트립·헤더·목록)은 같은 목록으로
   // 그려져 있어야 하므로 두 상태를 「홈을 그리는 상태」로 함께 본다.
+  // 054 — 쓰는 중에도 같은 홈을 그린다(목록 요약은 쓰기를 시작할 때 들고 있던 것).
   const listItems =
-    screen.kind === "list" || screen.kind === "confirm-overwrite" ? screen.items : null;
+    screen.kind === "list" || screen.kind === "confirm-overwrite"
+      ? screen.items
+      : screen.kind === "writing"
+        ? writingItems
+        : null;
   const listPrompt = listItems !== null ? writePromptFor(listItems, now(), chosenDay) : null;
   const onList = listItems !== null;
   useEffect(() => {
@@ -482,7 +507,8 @@ export function DiaryHomeScreen({
    * 지금 고른 날과 같을 때만 반영한다. 실패하면 두 칸 「모름」(0으로 채우지 않는다, 원칙 V).
    * 캐시를 두지 않는다(FR-022).
    */
-  const previewTarget = listPrompt?.day;
+  // 054 — 쓰는 중에는 신호·일기를 다시 읽지 않는다(생성과 같은 미디어를 동시에 훑지 않는다).
+  const previewTarget = screen.kind === "writing" ? undefined : listPrompt?.day;
   const previewFor = useRef<DayDate | undefined>(undefined);
   useEffect(() => {
     if (previewTarget === undefined || previewDay === undefined) return;
@@ -609,9 +635,12 @@ export function DiaryHomeScreen({
    * 배선(`createAppPipeline`)이 이미 파이프라인에 넣어 두었다.
    */
   const generate = useCallback(
-    async (params: ResolvedParams) => {
+    async (params: ResolvedParams, items: DiaryListItem[]) => {
       if (pipeline === undefined) return;
 
+      setToast(null);
+      setWritingItems(items);
+      setWritingName(nameOf(params.character, characterNames));
       setScreen({ kind: "writing" });
       running.current = true;
       cancelled.current = false;
@@ -658,10 +687,10 @@ export function DiaryHomeScreen({
         if (result.ok) onGenerated?.(params.character);
 
         // 051 — 성공이면 결과 화면 없이 홈의 그 날로(목록을 다시 읽으면 그 날의 새 일기도 다시
-        // 읽힌다). 저장 실패만 임시 결과 화면, 그 밖은 실패 화면.
+        // 읽힌다). 054 — 실패도 결과 화면 없이 쓰기 전 상태의 홈이다(저장 실패도 — 글은 버려진다).
         const next = afterGeneration(result);
-        if (next.kind === "home") setScreen(toList(await refresh()));
-        else setScreen(next);
+        setScreen(toList(await refresh()));
+        if (next.kind === "toast") setToast({ id: ++toastId.current, kind: next.toast });
       } finally {
         running.current = false;
       }
@@ -740,8 +769,28 @@ export function DiaryHomeScreen({
       return;
     }
 
-    await generate({ ...outcome.params, day: prompt.day });
+    await generate({ ...outcome.params, day: prompt.day }, items);
   }, [screen, now, chosenDay, resolve, generate, characterNames, previewDay]);
+
+  /**
+   * 혼잣말 교체 간격 (054 R4, 039의 타자기를 대체). 첫 진행 신호가 온 뒤부터 `WRITING.rotateMs`마다 **지금 단계의
+   * 풀**에서 다음 줄을 고른다 — 사진 보기가 끝났는데 「사진을 살펴보는 중」이 남지 않게 문안은 단계에 근거한다(039).
+   * 단계·갈래가 바뀌면 진행 콜백이 즉시 새 줄을 고르고, 이 effect의 의존성이 바뀌어 **간격을 다시 센다.**
+   * 간격은 표시 상수이지 측정이 아니다(원칙 IV·V).
+   */
+  const writingStage = screen.kind === "writing" ? screen.stage : undefined;
+  const writingBranch = screen.kind === "writing" ? screen.branch : undefined;
+  useEffect(() => {
+    if (writingStage === undefined) return;
+    const timer = setInterval(() => {
+      setScreen((s) =>
+        s.kind === "writing" && s.stage !== undefined
+          ? { ...s, line: pickMonologue(s.stage, s.branch, s.line) }
+          : s,
+      );
+    }, WRITING.rotateMs);
+    return () => clearInterval(timer);
+  }, [writingStage, writingBranch]);
 
   const cancel = useCallback(async () => {
     cancelled.current = true;
@@ -758,9 +807,10 @@ export function DiaryHomeScreen({
     return () => subscription.remove();
   }, [screen.kind, cancel]);
 
-  // 051 — 결과·실패 화면의 안드로이드 뒤로 가기는 「← 일기」와 같다(FR-024a·FR-026).
+  // 051 — 실패 화면(쓰기 시작 전 막힘)의 안드로이드 뒤로 가기는 「← 일기」와 같다(FR-026). 054 — 임시 결과
+  // 화면(`unsaved`)은 없어졌다.
   useEffect(() => {
-    if (screen.kind !== "unsaved" && screen.kind !== "failed") return;
+    if (screen.kind !== "failed") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       void goHome();
       return true;
@@ -773,8 +823,9 @@ export function DiaryHomeScreen({
       return <BuildErrorScreen />;
 
     case "list":
-    case "confirm-overwrite": {
-      const items = screen.items;
+    case "confirm-overwrite":
+    case "writing": {
+      const items = screen.kind === "writing" ? writingItems : screen.items;
       const prompt = listPrompt ?? writePromptFor(items, now(), chosenDay);
       return (
         <>
@@ -788,11 +839,17 @@ export function DiaryHomeScreen({
             onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
             onSelectDay={setChosenDay}
             onRequestPhoto={() => void requestPhoto()}
+            onDismissToast={() => setToast(null)}
+            onStop={() => void cancel()}
             onSwipe={onSwipe}
             onWrite={() => void write()}
             paper={paper}
             preview={shownPreview}
+            toast={toast === null ? undefined : { id: toast.id, text: TOAST_TEXT[toast.kind] }}
             write={prompt}
+            writing={
+              screen.kind === "writing" ? { line: screen.line, name: writingName } : undefined
+            }
             writtenAt={writtenAt}
           />
           {screen.kind === "list" && (
@@ -824,7 +881,7 @@ export function DiaryHomeScreen({
               onConfirm={() => {
                 const params = materialConfirm.params;
                 setMaterialConfirm(null);
-                void generate(params);
+                void generate(params, items);
               }}
             />
           )}
@@ -834,59 +891,11 @@ export function DiaryHomeScreen({
               onCancel={() => setScreen(cancelOverwrite(items))}
               onConfirm={() => {
                 setScreen(confirmOverwrite());
-                if (pendingParams.current !== null) void generate(pendingParams.current);
+                if (pendingParams.current !== null) void generate(pendingParams.current, items);
               }}
             />
           )}
         </>
-      );
-    }
-
-    case "unsaved":
-      // 051 FR-024a — 글은 나왔으나 남지 않았다. 읽을 기회를 빼앗지 않되 남지 않는다고 말한다(006
-      // FR-012a·b). 사진·캐러셀은 없다. 「제자리 쓰기」 조각이 올 때까지의 임시 자리다.
-      return (
-        <Frame onBack={() => void goHome()}>
-          <View style={styles.notice} testID="unsaved-screen">
-            <AppText variant="body">{WRITTEN_DAY_TEXT.unsaved}</AppText>
-            {screen.entry.title !== undefined && (
-              <AppText variant="title">{screen.entry.title}</AppText>
-            )}
-            <AppText variant="body" style={{ fontSize: 16, lineHeight: 26 }}>
-              {screen.entry.text}
-            </AppText>
-          </View>
-        </Frame>
-      );
-
-    case "writing": {
-      // 032 — 표현만 바꿨다. 회전 표시 + "그만두기"만. 진행률 숫자·경과 시간·
-      // 생성 중인 글은 여전히 없다(005 FR-028b, 015·016, SM3).
-      //
-      // 039 — 독백 문구도 038의 TypewriterText로 글자 단위 노출한다. `key`를
-      // 문구 문자열 자체로 줘서, `line`이 바뀔 때마다(단계 전환 또는 같은
-      // 단계 안에서 branch만 바뀌는 경우) 리마운트되어 처음부터 다시
-      // 타이핑한다(FR-002) — 이어서 채우지 않는다. `skipToEnd`는 항상
-      // `false`(탭 건너뛰기 없음, US2, FR-004). `onDone`은 무시한다 — 이
-      // 화면에 완료를 관찰해 분기하는 로직이 없다(research 결정 3).
-      // 완료 후에는 `TypewriterText` 자체가 이미 완성된 텍스트를 계속
-      // 렌더하므로 별도 처리 없이 정지 상태가 유지된다(FR-002a).
-      const monologueLine = screen.line ?? "쓰고 있다";
-      return (
-        <View className="flex-1 items-center justify-center bg-bg" style={styles.center}>
-          <ActivityIndicator accessibilityLabel="쓰고 있다" size="large" color={COLORS.accent} />
-          <TypewriterText
-            key={monologueLine}
-            text={monologueLine}
-            charMs={REVEAL.charMs}
-            skipToEnd={false}
-            onDone={() => {}}
-            variant="body"
-          />
-          <Pressable accessibilityRole="button" onPress={() => void cancel()} style={styles.link}>
-            <AppText variant="body">그만두기</AppText>
-          </Pressable>
-        </View>
       );
     }
 
@@ -929,7 +938,6 @@ function Frame({ children, onBack }: { children: React.ReactNode; onBack: () => 
 const styles = StyleSheet.create({
   frame: { paddingTop: 12 },
   back: { paddingHorizontal: 20, paddingVertical: 8, alignSelf: "flex-start" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40, gap: 12 },
   notice: { padding: 20, gap: 12 },
   link: {
     paddingVertical: 10,

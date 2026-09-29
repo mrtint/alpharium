@@ -189,13 +189,12 @@ describe("★ 051 쓴 날 문구 — 상대 작성 시각 (TIME1~4, TXT1·2)", (
     expect(WRITTEN_DAY_TEXT.rewrite).toBe("다시 쓰기");
   });
 
-  it("051 사람이 정한 문장 — 읽을 수 없음·사진 없음·저장 실패·뒤로 가기", () => {
+  it("051 사람이 정한 문장 — 읽을 수 없음·사진 없음·뒤로 가기 (054 — 저장 실패 문구는 토스트로 옮겼다)", () => {
     expect(WRITTEN_DAY_TEXT.unreadableLines).toEqual([
       "이 날의 일기 파일이 손상됐어요.",
       "다시 쓰면 새로 남아요.",
     ]);
     expect(WRITTEN_DAY_TEXT.photoMissing).toBe("이 사진은 이제 없어요");
-    expect(WRITTEN_DAY_TEXT.unsaved).toBe("저장하지 못했어요. 앱을 나가면 이 일기는 사라져요.");
     expect(WRITTEN_DAY_TEXT.backToHome).toBe("← 일기");
   });
 

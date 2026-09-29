@@ -112,9 +112,10 @@ appId: com.anonymous.alpharium
             - tapOn:
                 id: "overwrite-confirm"
 
-      # 어떻게 끝나든 「쓰고 있다」가 남지 않는다(005 FR-028c).
+      # 어떻게 끝나든 쓰는 중 표식(`stop-button`)이 남지 않는다(005 FR-028c, 054 — 홈 안의 상태).
       - extendedWaitUntil:
-          notVisible: "쓰고 있다"
+          notVisible:
+            id: "stop-button"
           timeout: 300000
 
       # ★ 029 FR-014 / 원칙 III — 실패가 「할 수 있는 것」으로 옮겨진다.

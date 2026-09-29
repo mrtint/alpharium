@@ -21,6 +21,7 @@
 import type { CalendarMonth } from "../app/calendar";
 import { dayParts, type DiaryListItem } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
+import { particleFor } from "../diary/particle";
 
 /** 요일 이름 — 0이 일요일(`Date.getDay()`와 같은 순서). 이 표는 여기에만 있다. */
 const WEEKDAY_LONG = [
@@ -128,10 +129,26 @@ export const WRITTEN_DAY_TEXT = {
   unreadableLines: ["이 날의 일기 파일이 손상됐어요.", "다시 쓰면 새로 남아요."],
   /** 사진 사본을 못 불러온 슬라이드 (017 FR-002) */
   photoMissing: "이 사진은 이제 없어요",
-  /** 글은 나왔으나 저장하지 못했다 (006 FR-012b) */
-  unsaved: "저장하지 못했어요. 앱을 나가면 이 일기는 사라져요.",
   /** 결과·실패 화면에서 홈으로 (048 `SubScreenFrame`과 같은 말) */
   backToHome: "← 일기",
+} as const;
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 054 — 쓰는 중 문구 (보드 `2b` KO 원문: `t.writingKicker`·`t.writingBy`·`t.stop`).
+ *
+ * `byline()`의 조사는 035 `particleFor()`가 고른다(받침 있으면 「이」, 없으면 「가」). `fallback`은 첫 진행
+ * 신호가 오기 전의 자리 문구로 지금까지의 값을 그대로 둔다(039). 문구는 `home-text.test.ts`·
+ * `writing-in-place.test.tsx`가 글자 단위로 잠근다.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+export const WRITING_TEXT = {
+  kicker: "쓰는 중",
+  stop: "그만두기",
+  fallback: "쓰고 있다",
+  /** 「{이름}{이/가} 쓰고 있어요. 진행률은 세지 않아요.」 — 진행률·시간을 말하지 않는다는 안내 */
+  byline: (name: string): string =>
+    `${name}${particleFor(name)} 쓰고 있어요. 진행률은 세지 않아요.`,
 } as const;
 
 const MINUTE_MS = 60 * 1000;
