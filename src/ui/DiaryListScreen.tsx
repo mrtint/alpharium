@@ -834,13 +834,16 @@ const KICKER = {
   fontWeight: "600",
 } as const;
 
-/** 보드 `1d` ② — 62/800, 줄높이 .85, 자간 -.05em, 고정폭 숫자 (049) */
+/**
+ * 보드 `1d` ② — 62/800, 자간 -.05em, 고정폭 숫자 (049). 보드는 줄높이 .85(= 53)지만 iOS는
+ * 줄높이가 글자 높이보다 작으면 윗부분을 잘라 내므로 글자 크기(62)와 같게 잡는다.
+ */
 /** 큰 날짜 칸의 폭을 잡는 글자 — 한 달의 가장 긴 날(두 자리). 숫자는 `tabular-nums`라 폭이 같다 */
 const DAY_NUMBER_WIDTH = "00";
 
 const DAY_NUMBER: TextStyle = {
   fontSize: 62,
-  lineHeight: 53,
+  lineHeight: 62,
   fontWeight: "800",
   letterSpacing: -3.1,
   color: COLORS.text,

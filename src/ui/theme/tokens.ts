@@ -299,8 +299,12 @@ export const MATERIAL_GRID = {
   cellGap: 8,
   /** 「권한이 없어요 ›」 누를 수 있는 영역의 최소 높이 */
   permissionMinHeight: 44,
-  /** 숫자 48/800(줄높이 .85 = 41, 자간 −.04em), 단위 15/700, 라벨 13/600, 안내 14(줄높이 1.5 = 21) */
-  number: { fontSize: 48, lineHeight: 41, letterSpacing: -1.92 },
+  /**
+   * 숫자 48/800(자간 −.04em), 단위 15/700, 라벨 13/600, 안내 14(줄높이 1.5 = 21).
+   * 보드는 줄높이 .85(= 41)지만 iOS는 줄높이가 글자 높이보다 작으면 윗부분을 잘라 낸다 —
+   * 안드로이드에서는 안 보이는 결함이라 줄높이를 글자 크기(48)와 같게 잡는다.
+   */
+  number: { fontSize: 48, lineHeight: 48, letterSpacing: -1.92 },
   unitSize: 15,
   labelSize: 13,
   note: { fontSize: 14, lineHeight: 21 },
