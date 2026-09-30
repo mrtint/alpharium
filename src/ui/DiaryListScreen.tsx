@@ -823,7 +823,7 @@ function RewriteBar({
 /* ═══════════════════════════════ 치수 ═══════════════════════════════ */
 /*
  * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(FR-038, 032·047 관례). 색은 `COLORS.*`만.
- * accent 위 글자는 `accentForeground`(검정) — 보드의 오프화이트 글자는 AA 미달이다(043 R2).
+ * accent 위 글자는 `accentForeground`(보드의 오프화이트).
  */
 
 const ROOT = { flex: 1, backgroundColor: COLORS.bg } as const;

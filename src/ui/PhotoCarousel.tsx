@@ -174,7 +174,7 @@ const BADGE: ViewStyle = {
   paddingHorizontal: badge.paddingH,
 };
 
-// accent 위 글자는 검정(`accentForeground`) — 보드의 `bg` 글자는 AA 미달이다(043 R2, C5).
+// accent 위 글자는 `accentForeground`(보드의 `bg` 오프화이트, C5).
 const BADGE_TEXT = {
   color: COLORS.accentForeground,
   fontSize: badge.fontSize,

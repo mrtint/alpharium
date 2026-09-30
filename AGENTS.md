@@ -464,8 +464,9 @@
 
 ### 043 — Modernist 스플래시·권한 흐름
 
-- 디자인 토큰(`src/ui/tokens.ts`)은 오프화이트 배경·진한 레드·웜그레이이고 `theme-tokens.test.ts`가 WCAG AA 대비(4.5:1, UI 3:1)를
-  자동 검증한다(`accentForeground`는 블랙, `danger`는 딥레드). **accent 위 오프화이트는 AA 미달**이라 `primary` 버튼 글자는 검정이다.
+- 디자인 토큰(`src/ui/theme/tokens.ts`)은 오프화이트 배경·진한 레드·웜그레이이고 `theme-tokens.test.ts`가 WCAG 대비를 자동 검증한다.
+  **빨간(accent) 면 위 글자는 보드 그대로 오프화이트다**(3.76:1 — AA 본문 4.5:1 미달, 큰 글자·UI 3:1만 충족; 2026-10-01 저장소 소유자
+  결정으로 043의 「검정」을 뒤집었다). 테스트는 3:1을 하한으로 잠근다 — 대비를 이유로 다시 검정으로 바꾸지 않는다.
 - 사진·위치·알림 단계는 설명 카드·[허용]/[건너뛰기]를 없애고 **빈 배경 위에서 OS 다이얼로그를 연속 호출**한다. 거부는 자동으로
   건너뛰기이고 `blocked`(「다시 묻지 않음」)일 때만 [설정 열기]가 있다. `battery-exception`은 호출 통로가 없어 카드 + [설정 열기]/[건너뛰기]를 유지한다.
 - **★ `busy` stale closure**: `allow`가 `useState`의 `busy`를 캡처하고 effect deps에서 빠져 있어 첫 단계의 `busy = true`가 다음 단계
