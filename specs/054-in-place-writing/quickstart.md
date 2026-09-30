@@ -93,6 +93,9 @@ npm test && npm run lint
 | D11 | ✅ | 성공하면 연출 없이 쓴 날 화면(「지어낸 하루」 표식·본문), 스트립 잠금이 풀렸다 |
 
 - **미확인 잔여**: 저장 실패·`plain`·`prepare-*` 토스트(기기에서 유도하지 못했다 — 계약 테스트 T1~T6·W15로 갈음), 약한 쓸기의 되돌아옴·손맛, 글꼴 2.0배의 토스트.
+- **후속 확인(2026-09-30, 머지 후, 문구 통일 뒤)**: 저장 실패 토스트 ✅(`run-as chmod 500 files/diary`로 유도, 「일기를 쓰지 못했어요.」, 새 파일 없음, 끝나고 700으로 되돌림) ·
+  글꼴 2.0배 토스트 ✅(한 줄, 바 위 12dp) · 약한 쓸기 ✅(55px/600ms 끌기 — 약 25px 따라갔다 약 230ms에 제자리, 세 번 모두 닫히지 않고 3초 수명으로 사라짐; 25px/700ms는 10pt 활성 미만이라 움직이지 않음).
+  남은 미확인: `plain`·`prepare-*`(기기 유도 불가·모델 파일을 건드려야 함), 사람 손의 손맛.
 - Maestro: `in-place-writing`·`generate-diary`·`past-day-diary`·`photo-selection-over-limit`(제목 유무 단정을 고친 뒤)·`writing-flow-simplified`·`writing-monologue`·
   `writing-monologue-expansion` PASS. `diary-user-path`는 쓰기 구간 통과 후 051이 없앤 `home-menu-button`에서 실패(알려진 stale, FLOWS 밖).
 - 검증 중 만든 2026-09-29 일기 파일은 지웠다. 글꼴 배율은 1.0으로 되돌렸다.

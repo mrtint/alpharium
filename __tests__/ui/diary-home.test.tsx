@@ -605,14 +605,14 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
 
     // 일기 본문이 화면에 없다.
     expect(screen.queryByText(entry.text)).toBeNull();
-    expect(toast).toHaveTextContent(/사진을 보는 데 필요한 것/);
+    expect(toast).toHaveTextContent("일기를 쓰지 못했어요.");
   });
 
-  // 054 — 「보지 않고 쓸 수도 있다」는 042부터 없는 길이다(사진은 언제나 본다). 토스트는 준비하라고만 말한다.
-  it("무엇이 필요한지를 말하고, 다시 써 보라고 하지 않는다 (FR-022, 054 SC-006)", async () => {
+  // 054 — 「보지 않고 쓸 수도 있다」는 042부터 없는 길이다(사진은 언제나 본다). 2026-09-30부터 토스트는 모든 갈래가
+  // 「일기를 쓰지 못했어요.」 한 줄이다(저장소 소유자 결정) — 다시 써 보라고도, 준비하라고도 하지 않는다.
+  it("다시 써 보라고 하지 않는다 (FR-022, 054 SC-006)", async () => {
     const toast = await writeWith(visionFailure("not-ready"));
 
-    expect(toast).toHaveTextContent(/준비/);
     expect(toast).not.toHaveTextContent(/다시 써 볼 수 있어요/);
     expect(toast).not.toHaveTextContent(/보지 않고/);
   });
@@ -623,16 +623,11 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
     expect(screen.queryByText(/설정에서 작성자 준비하기/)).toBeNull();
   });
 
-  it("not-ready는 다른 갈래와 다른 말이고, failed와 cancelled는 다시 써 볼 수 있다는 같은 말이다 (FR-022)", async () => {
-    const notReady = await writeWith(visionFailure("not-ready"));
-    expect(notReady).toHaveTextContent(/필요한 것/);
-  });
-
-  it.each([["failed"], ["cancelled"]])(
-    "%s는 다시 써 볼 수 있다는 말이다 (FR-022)",
+  it.each([["not-ready"], ["failed"], ["cancelled"]])(
+    "%s — 같은 한 줄이다 (2026-09-30 통일)",
     async (reason) => {
       const toast = await writeWith(visionFailure(reason));
-      expect(toast).toHaveTextContent("일기를 쓰지 못했어요. 다시 써 볼 수 있어요.");
+      expect(toast).toHaveTextContent(/^일기를 쓰지 못했어요\.$/);
     },
   );
 
@@ -650,12 +645,11 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
   });
 
   /**
-   * **`generation`과 뭉개지지 않는다** — 사용자가 할 일이 다르다.
-   *
-   * 「캐릭터를 준비해야 한다」와 「사진 보는 것을 준비해야 한다」는 서로 다른 문구이며, 뭉개면 사용자가
-   * 엉뚱한 것을 준비한다.
+   * **갈래는 뭉개지지 않는다** — 캐릭터 준비(`prepare-character`)와 사진 보기 준비(`prepare-vision`)는 여전히 다른
+   * 갈래다(`__tests__/app/failure-toast.test.ts` T1·T2가 잠근다). 2026-09-30부터 **화면 문구만** 한 줄로 통일됐다
+   * (저장소 소유자 결정) — 설정 진입점이 생기면 `TOAST_TEXT`만 다시 가른다.
    */
-  it("캐릭터 준비 실패와 다른 말이 된다", async () => {
+  it("캐릭터 준비 실패도 같은 한 줄이다 — 사진·캐릭터 어느 쪽 이름도 새지 않는다", async () => {
     const characterFailure: Pipeline = {
       run: async () => ({
         ok: false,
@@ -666,8 +660,7 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
 
     const toast = await writeWith(characterFailure);
 
-    expect(toast).toHaveTextContent(/캐릭터/);
-    expect(toast).not.toHaveTextContent(/사진/);
+    expect(toast).toHaveTextContent(/^일기를 쓰지 못했어요\.$/);
   });
 });
 

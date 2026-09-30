@@ -27,7 +27,7 @@ function failure(stage: PipelineStage, reason = ""): PipelineFailure {
   return { ok: false, stage, reason } as PipelineFailure;
 }
 
-const RETRY_TEXT = "일기를 쓰지 못했어요. 다시 써 볼 수 있어요.";
+const FAILED_TEXT = "일기를 쓰지 못했어요.";
 
 describe("T1 — 단계 표", () => {
   const STAGES: readonly (readonly [PipelineStage, ToastKind])[] = [
@@ -96,18 +96,10 @@ describe("T3 — 모르는 것은 retry이고 던지지 않는다", () => {
 });
 
 describe("T4 — 문구 KO 원문", () => {
-  it("retry는 보드 m.failToast와 글자 단위로 같다", () => {
-    expect(TOAST_TEXT.retry).toBe(RETRY_TEXT);
-  });
-  it("나머지 넷(초안)", () => {
-    expect(TOAST_TEXT["prepare-character"]).toBe(
-      "일기를 쓰지 못했어요. 먼저 캐릭터를 준비해 주세요.",
-    );
-    expect(TOAST_TEXT["prepare-vision"]).toBe(
-      "일기를 쓰지 못했어요. 사진을 보는 데 필요한 것을 먼저 준비해 주세요.",
-    );
-    expect(TOAST_TEXT.plain).toBe("일기를 쓰지 못했어요.");
-    expect(TOAST_TEXT.save).toBe("일기를 저장하지 못했어요.");
+  it("★ 다섯 갈래가 모두 한 줄로 같다 (저장소 소유자 결정, 2026-09-30)", () => {
+    for (const text of Object.values(TOAST_TEXT)) {
+      expect(text).toBe(FAILED_TEXT);
+    }
   });
   it("갈래가 다섯이다", () => {
     expect(Object.keys(TOAST_TEXT).sort()).toEqual(
@@ -121,6 +113,11 @@ describe("T5 — 거짓 안내 금지 (SC-006)", () => {
     for (const [kind, text] of Object.entries(TOAST_TEXT)) {
       if (kind === "retry") continue;
       expect(text).not.toContain("다시 써 볼 수 있어요");
+    }
+  });
+  it("재시도를 약속하는 말이 어느 갈래에도 없다 — 통일한 한 줄이 조치 필요 실패에도 뜬다", () => {
+    for (const text of Object.values(TOAST_TEXT)) {
+      expect(text).not.toMatch(/다시|준비/);
     }
   });
 });
