@@ -590,9 +590,7 @@ describe("051 GEN — 쓰기 뒤 (US3)", () => {
     await userEvent.press(screen.getByTestId("write-button"));
     await userEvent.press(await screen.findByTestId("overwrite-confirm"));
 
-    expect(await screen.findByTestId("failure-toast")).toHaveTextContent(
-      "일기를 저장하지 못했어요.",
-    );
+    expect(await screen.findByTestId("failure-toast")).toHaveTextContent("일기를 쓰지 못했어요.");
     // 054 — 임시 결과 화면이 없다. 글(새 제목·본문)은 어디에도 보이지 않고 기존 일기가 그대로다.
     expect(screen.queryByTestId("unsaved-screen")).toBeNull();
     expect(screen.queryByText("← 일기")).toBeNull();

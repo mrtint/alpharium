@@ -36,13 +36,20 @@ export type ToastKind =
   /** 글은 나왔으나 저장하지 못했다 */
   | "save";
 
-/** 갈래 → 문구. **정본은 이 상수 하나다**(초안 넷은 저장소 소유자가 바꿀 수 있다). `retry`는 보드 `m.failToast`. */
+/** 모든 갈래가 지금 쓰는 한 줄 (저장소 소유자 결정, 2026-09-30) */
+const FAILED = "일기를 쓰지 못했어요.";
+
+/**
+ * 갈래 → 문구. **정본은 이 상수 하나다.** 지금은 저장소 소유자가 다섯 갈래를 한 줄로 통일했다(2026-09-30) —
+ * 준비를 요청해도 쓰는 중 화면에서 설정으로 갈 길이 아직 없고, 「다시 써 볼 수 있어요」는 조치가 필요한 실패에
+ * 거짓이 될 수 있어서다. 갈래 판정(`toastKindFor`)은 그대로 두어, 설정 진입점이 생기면 문구만 다시 가른다.
+ */
 export const TOAST_TEXT: Readonly<Record<ToastKind, string>> = {
-  retry: "일기를 쓰지 못했어요. 다시 써 볼 수 있어요.",
-  "prepare-character": "일기를 쓰지 못했어요. 먼저 캐릭터를 준비해 주세요.",
-  "prepare-vision": "일기를 쓰지 못했어요. 사진을 보는 데 필요한 것을 먼저 준비해 주세요.",
-  plain: "일기를 쓰지 못했어요.",
-  save: "일기를 저장하지 못했어요.",
+  retry: FAILED,
+  "prepare-character": FAILED,
+  "prepare-vision": FAILED,
+  plain: FAILED,
+  save: FAILED,
 };
 
 /**

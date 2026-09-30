@@ -46,7 +46,7 @@ describe("T9·T14 — 모양과 접근성", () => {
     await render(<FailureToast bottom={76} onDismiss={jest.fn()} text={TOAST_TEXT.retry} />);
 
     const toast = screen.getByTestId("failure-toast");
-    expect(toast).toHaveTextContent(/^일기를 쓰지 못했어요\. 다시 써 볼 수 있어요\.$/);
+    expect(toast).toHaveTextContent(/^일기를 쓰지 못했어요\.$/);
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(toast.props.accessibilityRole).toBe("alert");
     expect(toast.props.accessibilityLiveRegion).toBe("polite");
