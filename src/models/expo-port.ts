@@ -63,6 +63,19 @@ const segmentNameFor = (key: AssetKey, index: number) => `${key}.bin.seg${index}
 const COPY_CHUNK_BYTES = 1024 * 1024;
 
 /**
+ * 옮겨 붙이는 동안 몇 청크마다 한 번 이벤트 루프에 양보하는가.
+ *
+ * **동기 루프로 끝까지 돌면 청크가 풀리지 않는다**(iOS 실기기 관측). 네이티브가 읽은
+ * 청크(`Data`)는 JS 스레드의 런루프가 한 바퀴 돌아야 해제되고, 그 사이 JS 쪽 사본도
+ * 가비지 수집을 못 받는다. 1.5GB 모델에서 앱이 2.8GB까지 불어 OS에 강제 종료됐다 —
+ * 안드로이드에서는 드러나지 않았다. **사람이 정한 상수다**(원칙 V) — 16MiB마다 한 번.
+ */
+const YIELD_EVERY_CHUNKS = 16;
+
+/** 런루프를 한 바퀴 돌게 한다 — 그 사이 네이티브 청크와 JS 사본이 풀린다. */
+const yieldToRunLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+/**
  * 이 자산이 디스크에 남길 수 있는 모든 이름 (041).
  *
  * 최종 파일 + 003의 부분 파일 + 구간 임시 파일들. 지우기(FR-029)와 용량 합산
@@ -308,7 +321,7 @@ export function expoRangeFetchPort(): RangeFetchPort {
 
         // 받은 구간을 최종 파일의 제자리로 옮겨 붙인다. 진행 보고는 수신
         // 단계에서 이미 끝났으므로 여기서는 보고하지 않는다.
-        copyInto(target, scratch, segment.start, FileMode);
+        await copyInto(target, scratch, segment.start, FileMode);
         return { kind: "completed" };
       } catch (error) {
         if (signal?.aborted) return { kind: "aborted" };
@@ -327,25 +340,27 @@ export function expoRangeFetchPort(): RangeFetchPort {
  * 받아 둔 구간 파일을 최종 파일의 `offset` 자리로 옮겨 붙인다 (041).
  *
  * **청크 단위로 옮긴다** — `COPY_CHUNK_BYTES`씩 읽어 쓰므로 구간이 아무리 커도
- * 힙에 올라오는 것은 청크 하나뿐이다. 이것이 FR-001을 성립시키는 자리다.
+ * 힙에 올라오는 것은 청크 하나뿐이다. 이것이 FR-001을 성립시키는 자리다. 단 그것은
+ * 청크가 제때 풀릴 때의 이야기이고, 풀리려면 `YIELD_EVERY_CHUNKS`마다 양보해야 한다.
  *
  * 두 핸들 모두 `finally`에서 닫는다 — 열어 둔 채 예외가 나면 파일 서술자가 샌다.
  */
-function copyInto(
+async function copyInto(
   target: ExpoFile,
   source: ExpoFile,
   offset: number,
   FileMode: ExpoFileModeEnum,
-): void {
+): Promise<void> {
   const reader = source.open(FileMode.ReadOnly);
   let writer: ReturnType<ExpoFile["open"]> | null = null;
   try {
     writer = target.open(FileMode.ReadWrite);
     writer.offset = offset;
-    for (;;) {
+    for (let copied = 1; ; copied++) {
       const chunk = reader.readBytes(COPY_CHUNK_BYTES);
       if (chunk.byteLength === 0) break;
       writer.writeBytes(chunk);
+      if (copied % YIELD_EVERY_CHUNKS === 0) await yieldToRunLoop();
     }
   } finally {
     reader.close();
