@@ -108,14 +108,15 @@ jest.mock("react-native-reanimated-carousel", () => {
   const { View } = require("react-native");
   return {
     __esModule: true,
-    // 051 — 배선 검사용으로 `loop`·`onSnapToItem`·`onConfigurePanGesture`·`data`·`style`을 host
-    // props로 넘긴다(계약 CAR3·CAR5). 넘김·순환은 이 목으로 검증할 수 없다 — 실기기(C9).
+    // 051 — 배선 검사용으로 `loop`·`onSnapToItem`·`onProgressChange`·`onConfigurePanGesture`·`data`·
+    // `style`을 host props로 넘긴다(계약 CAR3·CAR5). 넘김·순환은 이 목으로 검증할 수 없다 — 실기기(C9).
     Carousel: ({
       data,
       renderItem,
       testID,
       loop,
       onSnapToItem,
+      onProgressChange,
       onConfigurePanGesture,
       style,
     }: {
@@ -124,12 +125,13 @@ jest.mock("react-native-reanimated-carousel", () => {
       testID?: string;
       loop?: boolean;
       onSnapToItem?: (index: number) => void;
+      onProgressChange?: (progress: number) => void;
       onConfigurePanGesture?: (gesture: unknown) => void;
       style?: unknown;
     }) =>
       createElement(
         View,
-        { testID, loop, onSnapToItem, onConfigurePanGesture, data, style },
+        { testID, loop, onSnapToItem, onProgressChange, onConfigurePanGesture, data, style },
         data.length > 0 ? renderItem({ item: data[0], index: 0 }) : null,
       ),
   };

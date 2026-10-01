@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * **jest는 배선만 본다**(C9). `react-native-reanimated-carousel`은 `jest/setup-ui.ts`의 목이 첫
  * 슬라이드만 그리고 받은 props(`loop`·`onSnapToItem`·`onConfigurePanGesture`·`data`)를 host 노드에
- * 넘긴다. 실제 넘김·순환·흑백·세로 스크롤과의 제스처 분리는 실기기(quickstart D2~D4)에서 본다.
+ * 넘긴다. 실제 넘김·순환·세로 스크롤과의 제스처 분리는 실기기(quickstart D2~D4)에서 본다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -16,7 +16,7 @@ import { join } from "node:path";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 import type { DiaryEntry } from "../../src/diary/types";
-import { PhotoCarousel } from "../../src/ui/PhotoCarousel";
+import { indexAtProgress, PhotoCarousel } from "../../src/ui/PhotoCarousel";
 import { WrittenDayPaper } from "../../src/ui/WrittenDayPaper";
 import { COLORS, WRITTEN_DAY } from "../../src/ui/theme/tokens";
 
@@ -115,24 +115,23 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
   it("★ CAR5 — 셋째 장에 멈추면 배지 「3 / 3」, 셋째 칸이 긴 막대", async () => {
     await render(<PhotoCarousel photos={three} width={320} />);
     await act(async () => {
-      screen.getByTestId("photo-carousel").props.onSnapToItem(2);
+      screen.getByTestId("photo-carousel").props.onProgressChange(2);
     });
     expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("3 / 3");
     expect(screen.getByTestId("photo-carousel-dot-2")).toHaveStyle({ width: 18 });
     expect(screen.getByTestId("photo-carousel-dot-0")).toHaveStyle({ width: 6 });
   });
 
-  it("★ CAR6 — 흑백·잘라 채움, 높이 210", async () => {
+  it("★ CAR6 — 원본 색(흑백 필터 없음)·잘라 채움, 높이 210", async () => {
+    // 2026-10-01 저장소 소유자 결정 — 보드의 grayscale을 따르지 않는다.
     await render(<PhotoCarousel photos={[photo(1)]} width={320} />);
     const face = screen.getByTestId("photo-face-p1");
-    expect(flat(face.props.style)).toMatchObject({
-      height: WRITTEN_DAY.photoHeight,
-      filter: [{ grayscale: 1 }],
-    });
+    expect(flat(face.props.style)).toMatchObject({ height: WRITTEN_DAY.photoHeight });
+    expect(flat(face.props.style).filter).toBeUndefined();
     expect(screen.getByTestId("diary-photo")).toHaveProp("resizeMode", "cover");
   });
 
-  it("CAR7 — 배지: accent 배경 + accentForeground 글자, 11/700, 위·오른쪽 10 — 흑백 면 밖", async () => {
+  it("CAR7 — 배지: accent 배경 + accentForeground 글자, 11/700, 위·오른쪽 10", async () => {
     await render(<PhotoCarousel photos={three} width={320} />);
     const badge = screen.getByTestId("photo-carousel-badge");
     expect(flat(badge.props.style)).toMatchObject({
@@ -155,6 +154,31 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
     expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("1 / 3");
   });
 
+  it("★ CAR5a — 배지·인디케이터는 넘김이 끝나길 기다리지 않는다 (onSnapToItem 미사용)", async () => {
+    // 실기기: onSnapToItem은 넘김 애니메이션이 끝난 뒤에 불려 막대가 한 박자 늦게 따라왔다.
+    await render(<PhotoCarousel photos={three} width={320} />);
+    const carousel = screen.getByTestId("photo-carousel");
+    expect(carousel.props.onSnapToItem).toBeUndefined();
+    // 둘째 장으로 반을 조금 넘게 끈 순간 — 손을 떼기 전에 이미 바뀐다
+    await act(async () => {
+      carousel.props.onProgressChange(0.6);
+    });
+    expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("2 / 3");
+    expect(screen.getByTestId("photo-carousel-dot-1")).toHaveStyle({ width: 18 });
+  });
+
+  it("CAR5b — 위치 → 순번: 반올림, 순환(범위 밖·음수), 이상값은 0", () => {
+    expect(indexAtProgress(0, 3)).toBe(0);
+    expect(indexAtProgress(0.49, 3)).toBe(0);
+    expect(indexAtProgress(0.51, 3)).toBe(1);
+    expect(indexAtProgress(2.6, 3)).toBe(0); // 마지막 장에서 첫 장으로 순환
+    expect(indexAtProgress(-0.6, 3)).toBe(2); // 첫 장에서 뒤로
+    expect(indexAtProgress(-4, 3)).toBe(2);
+    expect(indexAtProgress(7, 3)).toBe(1);
+    expect(indexAtProgress(Number.NaN, 3)).toBe(0);
+    expect(indexAtProgress(1, 0)).toBe(0);
+  });
+
   it("CAR9 — 사진에 누름이 없다 (갤러리 없음)", async () => {
     await render(<PhotoCarousel photos={[photo(1)]} width={320} />);
     expect(screen.getByTestId("diary-photo").props.onPress).toBeUndefined();
@@ -169,7 +193,7 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
       />,
     );
     await act(async () => {
-      screen.getByTestId("photo-carousel").props.onSnapToItem(2);
+      screen.getByTestId("photo-carousel").props.onProgressChange(2);
     });
     expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("3 / 3");
 
