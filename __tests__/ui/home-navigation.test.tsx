@@ -13,11 +13,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { fireEvent, render, screen } from "@testing-library/react-native";
-import { BackHandler, Text } from "react-native";
-
-import { SubScreenFrame } from "../../src/ui/SubScreenFrame";
-
 jest.setTimeout(30000);
 
 const app = readFileSync(join(__dirname, "../../App.tsx"), "utf8")
@@ -33,48 +28,10 @@ function functionBody(name: string): string {
   return app.slice(start, next === -1 ? undefined : next);
 }
 
-describe("048 N2·N3 — SubScreenFrame", () => {
-  it("N2 — 「← 일기」를 누르면 홈으로 돌아가라고 알린다", async () => {
-    const onBack = jest.fn();
-    await render(
-      <SubScreenFrame onBack={onBack}>
-        <Text>설정 내용</Text>
-      </SubScreenFrame>,
-    );
-
-    expect(screen.getByText("설정 내용")).toBeTruthy();
-    expect(screen.getByTestId("back-to-home")).toHaveTextContent("← 일기");
-    await fireEvent.press(screen.getByTestId("back-to-home"));
-    expect(onBack).toHaveBeenCalledTimes(1);
-  });
-
-  it("★ N3 — 마운트된 동안만 안드로이드 뒤로 가기를 가로채 홈으로 보낸다", async () => {
-    const remove = jest.fn();
-    let handler: (() => boolean | null | undefined) | undefined;
-    const spy = jest.spyOn(BackHandler, "addEventListener").mockImplementation(((
-      event: string,
-      fn: () => boolean,
-    ) => {
-      if (event === "hardwareBackPress") handler = fn;
-      return { remove };
-    }) as never);
-
-    const onBack = jest.fn();
-    const view = await render(
-      <SubScreenFrame onBack={onBack}>
-        <Text>개발자</Text>
-      </SubScreenFrame>,
-    );
-
-    expect(handler).toBeDefined();
-    expect(handler?.()).toBe(true);
-    expect(onBack).toHaveBeenCalledTimes(1);
-
-    await view.unmount();
-    expect(remove).toHaveBeenCalled();
-    spy.mockRestore();
-  });
-});
+/*
+ * 048 N2·N3(`SubScreenFrame` 렌더)은 055가 없앴다 — 하위 화면은 홈 위에 겹치는 `StackLayer`이고, 그 뒤로 가기 계약(S6)은
+ * `settings-stack.test.tsx`가, 머리 「‹ 일기」(F1)는 `settings-frame.test.tsx`가 잠근다.
+ */
 
 describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
   it("H7·N1 — 전역 탭 줄이 없고 화면 상태가 셋이다", () => {
@@ -89,14 +46,16 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
    * 051 수정 — 홈의 `⋯` 메뉴(048 M1~M6)를 없앴다(저장소 소유자 지시). 설정·개발자 진입점은 설정 화면 구성
    * 과제에서 다시 둔다. 개발자 화면은 여전히 `showsDiagnostics` 조건 안에서만 그려진다(FR-024).
    */
-  it("★ M6 — 홈에 메뉴 항목이 없고, 개발자 화면은 showsDiagnostics 조건 안에서만 그려진다", () => {
+  it("★ M6 — 홈에 메뉴 항목이 없고, 개발자 겹은 showsDiagnostics 조건 안에서만 열린다 (055)", () => {
     const frame = functionBody("AppFrame");
     expect(frame).not.toMatch(/menuItems|HomeMenu|key: "developer"/);
-    expect(frame).toMatch(/showsDiagnostics && \(\s*<SubScreenFrame/);
+    expect(frame).toMatch(/open=\{showsDiagnostics && route === "developer"\}/);
   });
 
-  it("N4 — 설정으로 가라는 안내와 알림 라우팅이 새 화면 상태를 쓴다", () => {
-    expect(app).toMatch(/onGoToSettings=\{\(\) => setRoute\("settings"\)\}/);
+  it("N4 — 설정 진입·알림 라우팅이 화면 상태를 쓴다 (055 — 설정 진입은 점 세 개, 실패 안내는 「모듈 다시 받기」)", () => {
+    expect(app).toMatch(/onOpenSettings=\{openSettings\}/);
+    expect(app).toMatch(/const openSettings = useCallback\(\(\) => setRoute\(/);
+    expect(app).not.toContain("onGoToSettings");
     const frame = functionBody("AppFrame");
     const onResponse = frame.slice(frame.indexOf("onResponse("));
     expect(onResponse.slice(0, 400)).toContain('setRoute("home")');
@@ -120,9 +79,10 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
     );
   });
 
-  it("설정·개발자는 SubScreenFrame으로 감싸 「← 일기」로 돌아온다", () => {
+  it("055 — 설정·개발자는 홈 위의 StackLayer 겹이고 닫으면 홈이다 (셋째 겹은 설정 위의 이름 바꾸기)", () => {
     const frame = functionBody("AppFrame");
-    expect(frame.match(/<SubScreenFrame onBack=\{goHome\}>/g)?.length).toBe(2);
+    expect(frame.match(/<StackLayer[\s>]/g)?.length).toBe(3);
+    expect(frame.match(/onClose=\{goHome\}/g)?.length).toBe(2);
   });
 
   it("신호 미리보기 통로가 홈 화면까지 온다 (US3)", () => {

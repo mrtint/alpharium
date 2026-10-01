@@ -24,28 +24,23 @@ describe("AutoDiarySettingsScreen — 알림·배터리 안내 (FR-014)", () => 
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
         notificationDenied
       />,
     );
     expect(screen.getByText(/알림 권한이 없어/)).toBeTruthy();
   });
 
-  it("배터리 지연 경고가 상시 보인다 (배터리 예외 설정 버튼은 여기 없음 — D1)", async () => {
+  it("055 — 배터리 상시 안내는 설정의 배터리 행으로 옮겼다 (이 화면에는 없다)", async () => {
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
       />,
     );
-    // 020의 기존 배터리 링크(open-battery-settings)는 유지된다 —
-    // FR-018의 상시 링크. 021 D1은 "PermissionsSection에도 중복으로 두지 않는다"이지
-    // AutoDiarySettingsScreen에서 빼라는 것이 아니다(이 화면의 링크는 020 E4).
-    expect(screen.getByTestId("open-battery-settings")).toBeTruthy();
+    // 020 E4·021 FR-018의 상시 링크는 055에서 「권한 · 휴대폰 설정으로 이동」의 배터리 행(보조 문구 「배터리 사용 · 제한
+    // 없음으로 두면 제때 써요」, 앱 정보 화면으로)이 맡는다 — settings-screen.test.tsx C4·C6.
+    expect(screen.queryByTestId("open-battery-settings")).toBeNull();
   });
 });
 

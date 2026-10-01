@@ -6,6 +6,7 @@
 # 검증 항목:
 #   FR-001·009·023  탭 줄·메뉴 없이 헤더·스트립이 보인다                   (M1)
 #   (051 수정 — ⋯ 메뉴·「n일」 조각을 없애 M2~M5를 걷어냈다)
+#   055  월 라벨 줄 오른쪽 점 세 개(home-settings) → 설정 → 「‹ 일기」·뒤로 가기로 홈 (M6)
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # **★ 여기서 자동화하지 않는 것 — quickstart.md §3:**
@@ -51,9 +52,42 @@ appId: com.anonymous.alpharium
     id: "home-menu-button"
 - assertNotVisible:
     id: "write-day-label"
+# 055 — 월 라벨 줄 오른쪽은 설정 버튼(점 세 개, 보드 `6a`)이다. 048의 「일기」 글자는 없다.
+- assertVisible:
+    id: "home-settings"
 
 # M2~M5(⋯ → 설정 → 「← 일기」·뒤로 가기·메뉴 바깥 누름·「n일」 조각)는 051 수정에서 걷어냈다 — 메뉴와 날짜
-# 조각이 사라졌다. 설정 진입점은 설정 화면 구성 과제에서 다시 둔다.
+# 조각이 사라졌다. 055 — 설정 진입이 생겼다(M6).
+
+# ★ M6 — 점 세 개 → 설정이 홈 위에 겹친다 → 「‹ 일기」로 홈. 다시 열고 시스템 뒤로로 홈.
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-title"
+    timeout: 5000
+- assertVisible: "캐릭터"
+- tapOn:
+    id: "back-to-home"
+- extendedWaitUntil:
+    notVisible:
+      id: "settings-title"
+    timeout: 5000
+- assertVisible:
+    id: "home-settings"
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-title"
+    timeout: 5000
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: "settings-title"
+    timeout: 5000
+- assertVisible:
+    id: "home-day-number"
 
 # ★ 원칙 III·IV — 홈 어디에도 모델 정보·진행 지표가 없다.
 - assertNotVisible: "kanana"

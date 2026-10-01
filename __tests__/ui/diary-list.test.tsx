@@ -80,7 +80,7 @@ describe("048 H — 1d 구조와 헤더", () => {
 
     for (const id of [
       "home-month",
-      "home-kicker",
+      "home-settings",
       "home-day-number",
       "home-weekday",
       "home-day-state",
@@ -90,7 +90,8 @@ describe("048 H — 1d 구조와 헤더", () => {
       expect(insideScrollView(screen.getByTestId(id) as never)).toBe(true);
     }
     expect(insideScrollView(screen.getByTestId("write-button") as never)).toBe(false);
-    expect(screen.getByTestId("home-kicker")).toHaveTextContent("일기");
+    // 055 — 048의 「일기」 표지 자리는 설정 버튼(점 셋)이다(보드 `6a`). 글자는 없다.
+    expect(screen.queryByTestId("home-kicker")).toBeNull();
     expect(screen.queryByTestId("home-recent")).toBeNull();
   });
 
@@ -125,7 +126,7 @@ describe("048 H — 1d 구조와 헤더", () => {
 
   it("★ H6 — 날짜 표시(월 라벨·숫자·요일)에 「오늘」 글자가 없다", async () => {
     await renderHome();
-    for (const id of ["home-month", "home-kicker", "home-day-number", "home-weekday"]) {
+    for (const id of ["home-month", "home-day-number", "home-weekday"]) {
       expect(screen.getByTestId(id)).not.toHaveTextContent(/오늘/);
     }
   });
@@ -146,11 +147,11 @@ describe("048 H — 1d 구조와 헤더", () => {
     expect(screen.getByTestId("home-date-button")).toHaveProp("accessibilityLabel", "날짜로 이동");
   });
 
-  it("★ CAL1 — 월 라벨·「일기」 표지·상태 줄을 눌러도 달력이 열리지 않는다", async () => {
+  it("★ CAL1 — 월 라벨·설정 버튼·상태 줄을 눌러도 달력이 열리지 않는다", async () => {
     const onPressDate = jest.fn();
     await renderHome({ onPressDate });
 
-    for (const id of ["home-month", "home-kicker", "home-day-state"]) {
+    for (const id of ["home-month", "home-settings", "home-day-state"]) {
       await fireEvent.press(screen.getByTestId(id));
     }
     expect(onPressDate).not.toHaveBeenCalled();

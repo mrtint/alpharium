@@ -274,9 +274,10 @@ describe("ES14 — PermissionsSection 좌우 padding 이 없다", () => {
     expect(sectionBlock).not.toBeNull();
     expect(sectionBlock?.[0]).not.toMatch(/paddingHorizontal\s*:/);
     expect(sectionBlock?.[0]).not.toMatch(/\bpadding\s*:\s*\d/);
-    // App.tsx 가 settingsSection 래퍼로 감싼다.
+    // 055 — 설정 조립(App.tsx)에서 이 섹션을 걷었다(S5 — 권한은 `SettingsScreen`의 네 행). 파일은 개발자 메뉴 조각이
+    // 정리할 때까지 남아 있고, 다시 쓰일 때 좌우 여백은 그 조립부가 소유한다는 규칙은 그대로다.
     const appSrc = readFileSync(join(__dirname, "../../App.tsx"), "utf8");
-    expect(appSrc).toMatch(/settingsSection[\s\S]{0,160}?<PermissionsSection/);
+    expect(appSrc).not.toMatch(/<PermissionsSection/);
   });
 });
 

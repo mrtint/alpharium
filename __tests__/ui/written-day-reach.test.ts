@@ -115,7 +115,12 @@ describe("★ 051 DEL — 없어지는 것이 정말 없다", () => {
       // 로컬(main이 있는 곳)에서는 늘 돈다 — 새 의존성은 실기기 검증 전에 여기서 걸린다.
       return;
     }
-    expect(now.sort()).toEqual(before.sort());
+    // 055 — `expo-application`을 직접 의존성으로 올렸다(research R5 — 버전 표시). `expo-notifications`를 통해 이미 설치·자동
+    // 링크돼 있던 모듈이라 새 네이티브 코드가 아니다. 이 브랜치가 main에 들어가면 두 목록이 다시 같아진다.
+    const known = new Set(["expo-application"]);
+    expect(now.filter((k) => !known.has(k)).sort()).toEqual(
+      before.filter((k) => !known.has(k)).sort(),
+    );
   });
 });
 

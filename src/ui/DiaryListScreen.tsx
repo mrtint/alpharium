@@ -79,7 +79,16 @@ import {
   WRITING_TEXT,
   WRITTEN_DAY_TEXT,
 } from "./home-text";
-import { COLORS, MATERIAL_GRID, READING_SCROLL, TOAST, WRITING, WRITTEN_DAY } from "./theme/tokens";
+import {
+  COLORS,
+  MATERIAL_GRID,
+  READING_SCROLL,
+  SETTINGS,
+  TOAST,
+  WRITING,
+  WRITTEN_DAY,
+} from "./theme/tokens";
+import { SETTINGS_TEXT } from "./settings-text";
 import { MaterialGrid, type PreviewState } from "./MaterialGrid";
 import { FailureToast } from "./FailureToast";
 import { WritingPaper } from "./WritingPaper";
@@ -127,6 +136,11 @@ export type DiaryListScreenProps = {
    */
   onPressDate?: () => void;
   /**
+   * 월 라벨 줄 오른쪽의 설정 버튼을 눌렀다 (055, 보드 `6a`). 쓰는 중에도 누를 수 있다 — 설정은 홈 위에 겹쳐지고
+   * 쓰기는 멈추지 않는다(FR-006). 없으면 버튼은 그려지되 누름이 없다.
+   */
+  onOpenSettings?: () => void;
+  /**
    * 고른 날의 지면 (051). `paperFor()`가 만든다. 없거나 `unwritten`이면 안 쓴 날(048~050 그대로).
    */
   paper?: PaperState;
@@ -166,6 +180,7 @@ export function DiaryListScreen({
   preview,
   onRequestPhoto,
   onPressDate,
+  onOpenSettings,
   paper,
   writtenAt,
   writing,
@@ -245,6 +260,7 @@ export function DiaryListScreen({
       <Header
         cells={cells ?? []}
         items={items}
+        onOpenSettings={onOpenSettings}
         onPressDate={writing !== undefined ? undefined : onPressDate}
         paper={paper}
         stripBlock={stripBlock}
@@ -365,6 +381,7 @@ function Header({
   write,
   items,
   cells,
+  onOpenSettings,
   onPressDate,
   paper,
   stripOverlaid,
@@ -374,6 +391,7 @@ function Header({
   write: WritePrompt;
   items: readonly DiaryListItem[];
   cells: readonly StripCell[];
+  onOpenSettings?: () => void;
   onPressDate?: () => void;
   paper?: PaperState;
   /** 052 — 쓴 날이면 스트립을 부모가 지면 위 판에 그린다. 안 쓴 날은 여기서 그대로 그린다 */
@@ -400,13 +418,15 @@ function Header({
   return (
     <View>
       {/* ① 월 라벨 — 표시만 한다(누름 없음). **고른 날의 달**이다(048 Q2, 049 H1·H2) */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+      {/*
+        055 — 오른쪽은 설정 버튼(보드 `6a`). 048의 「일기」 글자 자리다. 스트립의 일기 점과 같은 어휘의 5px 네모 셋.
+        이 줄은 안 쓴 날·쓴 날·접힘·쓰는 중 모두 같은 자리에 그려진다(헤더는 접히지 않는다, 052).
+      */}
+      <View style={MONTH_ROW}>
         <AppText style={[KICKER, { color: COLORS.accent }]} testID="home-month">
           {monthText(write.day)}
         </AppText>
-        <AppText style={[KICKER, { color: COLORS.textMuted }]} testID="home-kicker">
-          일기
-        </AppText>
+        <SettingsButton onPress={onOpenSettings} />
       </View>
 
       {/*
@@ -827,6 +847,44 @@ function RewriteBar({
  */
 
 const ROOT = { flex: 1, backgroundColor: COLORS.bg } as const;
+
+const MONTH_ROW: ViewStyle = {
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  minHeight: 16,
+};
+
+/**
+ * 설정 버튼 — 점 셋(5×5, 간격 4, 본문 글자 색), 누름 44×44를 오른쪽 위 모서리 쪽으로(보드 음수 여백 -14 -12 -14 0).
+ * 스크린리더 라벨 「설정」(FR-003).
+ */
+function SettingsButton({ onPress }: { onPress?: () => void }) {
+  const { dot, gap, hit, margin } = SETTINGS.entry;
+  return (
+    <Pressable
+      accessibilityLabel={SETTINGS_TEXT.entryLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={{
+        width: hit,
+        height: hit,
+        marginTop: margin.top,
+        marginRight: margin.right,
+        marginBottom: margin.bottom,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+      testID="home-settings"
+    >
+      <View style={{ flexDirection: "row", gap }} testID="home-settings-dots">
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={{ width: dot, height: dot, backgroundColor: COLORS.text }} />
+        ))}
+      </View>
+    </Pressable>
+  );
+}
 
 const KICKER = {
   fontSize: 11,

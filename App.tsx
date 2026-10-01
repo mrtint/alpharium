@@ -4,7 +4,7 @@ import "./global.css";
 import { PortalHost } from "@rn-primitives/portal";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AppState, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { AppState, Platform, StyleSheet, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
@@ -53,8 +53,15 @@ import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScree
 import { DownloadConsentDialog } from "./src/ui/DownloadConsentDialog";
 import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
-import { PermissionsSection } from "./src/ui/PermissionsSection";
-import { SubScreenFrame } from "./src/ui/SubScreenFrame";
+import { SettingsFrame } from "./src/ui/SettingsFrame";
+import { SettingsScreen } from "./src/ui/SettingsScreen";
+import { RenameScreen } from "./src/ui/RenameScreen";
+import { usePermissionTags } from "./src/ui/use-permission-tags";
+import type { PermissionFacts } from "./src/app/permission-tags";
+import { photoLocationProbe } from "./src/app/photo-location-probe";
+import { formatVersion } from "./src/app/version";
+import { SETTINGS_TEXT } from "./src/ui/settings-text";
+import { StackLayer } from "./src/ui/StackLayer";
 import { AppText } from "./src/ui/components/Text";
 import { COLORS } from "./src/ui/theme/tokens";
 import {
@@ -69,23 +76,11 @@ import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { expoFileSystemPort, fileStore } from "./src/diary/store";
 import { CHARACTERS, type Character } from "./src/diary/types";
-import { type Acquisition, createAcquisition } from "./src/models/acquisition";
-import { resolveDownloadView } from "./src/models/download-view";
 import { expoModelPorts } from "./src/models/expo-port";
 import { readinessOf } from "./src/models/readiness";
 import { assetFor } from "./src/models/roster";
-import { pausedFor, readState, removeAsset, segmentedFor, verdictFor } from "./src/models/storage";
-import type { DownloadProgress, DownloadRejection, ModelReadiness } from "./src/models/types";
-import {
-  prepareVision,
-  removeVision,
-  visionReadiness,
-  visionStorageBytes,
-} from "./src/vision/acquisition";
-import { CharacterListScreen } from "./src/ui/CharacterListScreen";
-import { AuthorPicker } from "./src/ui/AuthorPicker";
+import { pausedFor, readState, verdictFor } from "./src/models/storage";
 import { GeocodingSettingToggle } from "./src/ui/GeocodingSettingToggle";
-import { personaOf } from "./src/diary/persona";
 import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
 import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
 
@@ -143,14 +138,43 @@ export default function App() {
 const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;
 
 function AppFrame() {
-  const environment = currentEnvironment();
+  /*
+   * ★ 055 — 환경 판정은 **마운트 때 한 번만** 한다. `currentEnvironment()`는 부를 때마다 새 객체를 돌려준다 — 렌더마다
+   * 부르면 그 값을 의존성으로 쓰는 effect·`useMemo`가 매 렌더 다시 돈다(아래 `DiarySection` 주석의 실기기 결함).
+   */
+  const [environment] = useState(() => currentEnvironment());
   const showsDiagnostics = showsOnScreen(environment);
   /**
    * 048 — 지금 어느 화면인가. 탭이 아니라 **홈이 뿌리이고 나머지는 하위 화면**이다(설계 D1).
    * `developer`는 `showsDiagnostics`일 때만 들어갈 수 있다 — 메뉴에 항목이 아예 없다(FR-003).
    */
   const [route, setRoute] = useState<"home" | "settings" | "developer">("home");
-  const goHome = useCallback(() => setRoute("home"), []);
+  /**
+   * 055 — 이름 바꾸기 겹이 설정 위에 열려 있는가. 설정이 닫히면 함께 닫힌다(홈으로 돌아올 때 남지 않는다).
+   */
+  const [renaming, setRenaming] = useState(false);
+  const closeRename = useCallback(() => setRenaming(false), []);
+  const goHome = useCallback(() => {
+    setRoute("home");
+    setRenaming(false);
+  }, []);
+  const openSettings = useCallback(() => setRoute((r) => (r === "settings" ? r : "settings")), []);
+
+  /**
+   * 055 — 겹이 그려져 있는가(닫히는 움직임이 끝날 때까지 참). **홈은 언마운트하지 않는다**(설계 D4) — 겹이 그 위에
+   * 덮일 뿐이다. 덮인 동안 홈은 뒤로 가기·누름·스크린리더에서 빠진다(`covered`, research R2·R3). `route`만 보면 닫히는
+   * 240ms 동안 홈이 뒤로 가기를 다시 등록해 겹과 겨룬다 — 그래서 겹이 알려 주는 마운트 상태를 함께 본다.
+   */
+  const [layersMounted, setLayersMounted] = useState({ settings: false, developer: false });
+  const onSettingsSettled = useCallback(
+    (mounted: boolean) => setLayersMounted((m) => ({ ...m, settings: mounted })),
+    [],
+  );
+  const onDeveloperSettled = useCallback(
+    (mounted: boolean) => setLayersMounted((m) => ({ ...m, developer: mounted })),
+    [],
+  );
+  const homeCovered = route !== "home" || layersMounted.settings || layersMounted.developer;
 
   /**
    * 048 — 홈에서 고른 하루 (Clarification Q4, FR-005a).
@@ -231,6 +255,7 @@ function AppFrame() {
       if (route !== null) {
         setPendingRoute(route);
         setRoute("home");
+        setRenaming(false);
       }
     });
 
@@ -243,42 +268,6 @@ function AppFrame() {
   const onAcknowledge = useCallback((day: DayDate) => {
     void acknowledgeNotified(expoNotifiedStorePort(), day);
   }, []);
-
-  /**
-   * ★ **008이 내려받기 상태를 여기로 올린다**(FR-013·014).
-   *
-   * ───────────────────────────────────────────────────────────────────────────
-   * **007까지 이 넷이 `ModelSection` 안에 있었고, 그것이 셋째 결함이었다.**
-   *
-   * 아래의 탭이 **삼항 연산자로** 갈리므로 캐릭터 탭을 떠나면 `ModelSection`이
-   * 언마운트되고, `useState`에 있던 **`Acquisition` 인스턴스가 통째로 사라진다** —
-   * `running`도 `handle`도 함께. 돌아오면 새 인스턴스라 `busyWith()`가 `null`이고
-   * **받던 것을 멈출 방법이 없다.**
-   *
-   * 오류가 나지 않고 **아무 일도 일어나지 않을 뿐**이라, 006의 `GenerationProbe`나
-   * 007의 끊긴 `stop` 배선과 **같은 종류의 조용한 결함**이었다.
-   *
-   * **`AppFrame`은 탭이 바뀌어도 언마운트되지 않으므로** 여기가 그 자리다.
-   *
-   * **`expoModelPorts()`를 여기서 만들어도 안전하다**(2026-08-21 코드 확인):
-   * 클로저 객체 넷을 만들 뿐이고 기기 통로는 메서드 안의 `await import`로 열린다.
-   * 일기 탭에서도 만들어지지만 비용이 없다.
-   *
-   * **지연 생성(`useState(() => …)`)은 유지한다** — 모듈 수준 상수로 바꾸면 모듈 로드
-   * 시점에 불려 기기 통로가 없는 환경(웹·시뮬레이터)에서 터진다.
-   * ───────────────────────────────────────────────────────────────────────────
-   */
-  const [ports] = useState(() => expoModelPorts());
-  const [acquisition] = useState(() => createAcquisition(ports));
-  /**
-   * 026 — 받는 중인 캐릭터들의 진행 상태.
-   *
-   * **단수 → `Map`으로 바꿨다** — 서로 다른 캐릭터를 동시에 받을 수 있으므로
-   * (026 FR-005). 각 캐릭터의 진행 콜백이 자기 항목만 갱신하고, 탭 복귀 시
-   * `busyWith()` 배열 전부를 복원한다.
-   */
-  const [progress, setProgress] = useState<ReadonlyMap<Character, DownloadProgress>>(new Map());
-  const [rejection, setRejection] = useState<DownloadRejection | null>(null);
 
   /**
    * 021 — 통합 권한 온보딩 진입 게이트.
@@ -950,6 +939,29 @@ function AppFrame() {
     [customNames, finishWelcome],
   );
 
+  /**
+   * 055 — 쓰기 시작 전 「캐릭터를 먼저 준비해야 한다」 안내의 「모듈 다시 받기」(FR-030, research R9).
+   *
+   * 설정에서 캐릭터 준비가 사라졌으므로(S5) 그 길은 첫 실행의 다운로드 화면(045·046)이다. 필수 에셋을 다시 읽어 없으면
+   * `essentialsReady=false` → `resolveFirstRunStage`가 `"downloading"`을 내 진행 화면이 뜬다(동의는 이미 저장돼 있다).
+   *
+   * ★ **다운로드 시작 ref와 완료 확인을 먼저 되돌린다.** 위 다운로드 effect는 `essentialDownloadStarted`로 세션당 한 번만
+   * 돈다 — 이번 세션에 이미 받은 적이 있으면 ref가 참이라 진행 화면만 뜬 채 아무것도 받지 않는다(조용한 결함). 완료 화면도
+   * 다시 보여야 하므로 `downloadProceedConfirmed`를 끈다. 이미 준비돼 있으면 `true` — 홈이 쓰기 전 화면으로 돌아간다.
+   */
+  const onRedownload = useCallback(async (): Promise<boolean> => {
+    essentialDownloadStarted.current = false;
+    setDownloadProceedConfirmed(false);
+    try {
+      const ready = essentialAssetsReady(await onboardingPorts.essentialAssets.readFacts());
+      setEssentialsReady(ready);
+      return ready;
+    } catch {
+      setEssentialsReady(false);
+      return false;
+    }
+  }, [onboardingPorts, setEssentialsReady]);
+
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
@@ -1070,19 +1082,24 @@ function AppFrame() {
     // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
     <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
       {/*
-        ─────────────────────────────────────────────────────────────────────
-        **048 — 전역 탭 줄이 없다**(설계 D1). 홈이 뿌리이고 설정·개발자는 하단 바의 `⋯`
-        메뉴로 들어가는 하위 화면이다. 돌아오는 길은 「← 일기」와 뒤로 가기(`SubScreenFrame`).
-        새 내비게이션 라이브러리 없이 상태 하나로 가른다(006 관례, FR-008).
-        ─────────────────────────────────────────────────────────────────────
+        **048 — 전역 탭 줄이 없다**(설계 D1). 홈이 뿌리이고 설정·개발자는 그 위의 하위 화면이다. 새 내비게이션
+        라이브러리 없이 상태 하나(`route`)로 가른다(006 관례, FR-008).
+
+        055 — 홈은 늘 그려진다(`route` 삼항으로 바꿔 끼우지 않는다, contracts S1). 설정·개발자는 그 위에 겹쳐 오른쪽에서
+        밀려 들어오는 겹(`StackLayer`)이다 — 그래서 설정에 다녀와도 쓰는 중·지면 스크롤·접힘이 그대로다.
+
+        ★ 겹들을 안쪽 `View` 하나에 담는다 — 절대 배치는 부모의 **패딩을 무시**하므로 `SafeAreaView` 바로 아래에 두면
+        겹이 상태 표시줄·내비게이션 바 밑까지 덮는다(2026-10-01 실기기). 안쪽 `View`는 인셋을 뺀 자리만 차지한다.
       */}
-      {route === "home" ? (
+      <View style={styles.stack}>
         <DiarySection
           // ★ 040 — 자동 첫 일기 생성이 끝나면 다시 마운트해 목록을 읽게
           //   한다(SC-003, 위 `autoGeneratedToken` 주석 참조). 048 — 고른 날은 이 재마운트와
           //   설정 왕복에도 남도록 `AppFrame`이 들고 있다(Q4).
           key={`diary-${autoGeneratedToken}`}
-          onGoToSettings={() => setRoute("settings")}
+          onRedownload={onRedownload}
+          onOpenSettings={openSettings}
+          covered={homeCovered}
           // 020 → 051 — 알림을 눌러 열렸으면 그 하루를 홈의 고른 날로(FR-027). 적용하면 비운다.
           initialDay={pendingRoute?.day ?? null}
           onInitialDayApplied={() => setPendingRoute(null)}
@@ -1094,40 +1111,53 @@ function AppFrame() {
           chosenDay={chosenDay}
           onChooseDay={setChosenDay}
         />
-      ) : route === "settings" ? (
-        <SubScreenFrame onBack={goHome}>
+        <StackLayer
+          active={!renaming}
+          onClose={goHome}
+          onSettled={onSettingsSettled}
+          open={route === "settings"}
+        >
+          <SettingsFrame backLabel={SETTINGS_TEXT.back} onBack={goHome} title={SETTINGS_TEXT.title}>
+            <SettingsSection
+              characterName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
+              onOpenRename={() => setRenaming(true)}
+              onboardingPorts={onboardingPorts}
+            />
+          </SettingsFrame>
           {/*
-            020 — 자동 생성 설정(FR-001). 021 — "권한" 섹션. 029 — "일기 작성자"·
-            "사진 보기"·"장소명" 섹션도 여기(FR-023~025). 048 — 내용은 그대로이고
-            들어오고 나가는 길만 바뀌었다(FR-007).
-          */}
-          <AutoDiarySection
-            platform={platform}
-            onboardingPorts={onboardingPorts}
-            onRestartOnboarding={() => setForceOnboarding(true)}
-            modelPorts={ports}
-            acquisition={acquisition}
-            progress={progress}
-            setProgress={setProgress}
-            rejection={rejection}
-            setRejection={setRejection}
-            // 035 — 사용자가 지은 이름과 그 편집 통로(FR-022).
-            characterNames={customNames}
-            onRenameCharacter={onRenameCharacter}
-          />
-        </SubScreenFrame>
-      ) : (
-        // **개발자 화면은 진단과 같은 조건에서만 그려진다**(FR-024·SC-013) — 메뉴에 항목이
-        // 없으면 이 갈래에 닿을 수 없지만, 한 번 더 지킨다.
-        showsDiagnostics && (
-          <SubScreenFrame onBack={goHome}>
-            <ScrollView style={styles.diagnostics}>
-              {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
-              <DiagnosticsScreen characterNames={customNames} />
-            </ScrollView>
-          </SubScreenFrame>
-        )
-      )}
+          055 — 이름 바꾸기는 설정 위에 한 겹 더 쌓인다(Clarification). 열린 동안 설정 겹은 뒤로 가기를 등록하지 않는다
+          (`active`) — 겹 사이에서도 등록 순서에 기대지 않는다(S6).
+        */}
+          <StackLayer onClose={closeRename} open={renaming}>
+            <RenameScreen
+              initialName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
+              onClose={closeRename}
+              onSave={(raw) => {
+                onRenameCharacter(ONBOARDING_DEFAULT_CHARACTER, raw);
+                closeRename();
+              }}
+            />
+          </StackLayer>
+        </StackLayer>
+        {/*
+        **개발자 화면은 진단과 같은 조건에서만 열린다**(FR-024·SC-013). 진입점은 개발자 메뉴 조각 몫이라 지금은 닿을 길이
+        없지만, 한 번 더 지킨다.
+      */}
+        <StackLayer
+          onClose={goHome}
+          onSettled={onDeveloperSettled}
+          open={showsDiagnostics && route === "developer"}
+        >
+          <SettingsFrame
+            backLabel={SETTINGS_TEXT.back}
+            onBack={goHome}
+            title={SETTINGS_TEXT.developerTitle}
+          >
+            {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
+            <DiagnosticsScreen characterNames={customNames} />
+          </SettingsFrame>
+        </StackLayer>
+      </View>
       <StatusBar style="auto" />
     </SafeAreaView>
   );
@@ -1141,7 +1171,9 @@ function AppFrame() {
  * 간다(FR-035a).
  */
 function DiarySection({
-  onGoToSettings,
+  onRedownload,
+  onOpenSettings,
+  covered,
   initialDay,
   onInitialDayApplied,
   onAcknowledge,
@@ -1153,8 +1185,12 @@ function DiarySection({
   /** 048 — 고른 하루. `AppFrame`이 들고 있다(Q4) */
   chosenDay?: DayDate | null;
   onChooseDay?: (day: DayDate) => void;
-  /** 029 — no-ready-character 실패 시 설정 탭으로 (FR-014) */
-  onGoToSettings?: () => void;
+  /** 029 → 055 — no-ready-character 실패 시 「모듈 다시 받기」(FR-030) */
+  onRedownload?: () => Promise<boolean>;
+  /** 055 — 홈 월 라벨 줄의 설정 버튼 */
+  onOpenSettings?: () => void;
+  /** 055 — 설정·개발자 겹이 덮여 있다 (FR-007) */
+  covered?: boolean;
   /** 020 — 알림을 눌러 열렸으면 그 하루 (051 — 홈의 고른 날이 된다, FR-027) */
   initialDay?: DayDate | null;
   /** 051 — 홈이 알림의 날을 고른 날로 적용했다 → pendingRoute를 비운다 (research R6) */
@@ -1166,7 +1202,14 @@ function DiarySection({
   /** 035 — 캐릭터 → 지금 부르는 이름. 조립부가 만든 문자열만 (FR-018) */
   characterNames?: CustomNames;
 }) {
-  const environment = currentEnvironment();
+  /*
+   * ★ 055 실기기 결함 — **환경 판정을 렌더마다 하지 않는다.** `currentEnvironment()`는 부를 때마다 새 객체를 주고,
+   * `DiaryHomeScreen`은 `resolution`이 바뀌면 화면을 처음 상태로 되돌린다(목록을 다시 읽는 effect). 048까지는 쓰는 중에
+   * 이 컴포넌트가 다시 그려질 일이 거의 없어 드러나지 않았는데, 055가 설정을 홈 위에 겹치자 설정을 여는 순간(`covered`·
+   * 겹 마운트 상태가 바뀌어 다시 그려진다) **쓰는 중 화면이 안 쓴 날로 돌아가고 생성만 뒤에서 계속 돌았다**(2026-10-01,
+   * SM-S901N — 저장은 됐지만 화면은 그것을 몰랐다). 파이프라인 조립(`wiring`)도 같은 값에 기대 매 렌더 새로 만들어졌다.
+   */
+  const [environment] = useState(() => currentEnvironment());
 
   // 화면이 다시 그려질 때마다 새로 만들지 않는다. 지연 import 하는 통로이므로
   // 여기서 만들어도 모듈이 즉시 해석되지 않는다.
@@ -1356,7 +1399,9 @@ function DiarySection({
       resolve={resolveWrite}
       onGenerated={onGenerated}
       deniedNotices={deniedNotices}
-      onGoToSettings={onGoToSettings}
+      onRedownload={onRedownload}
+      onOpenSettings={onOpenSettings}
+      covered={covered}
       characterNames={characterNames}
       initialDay={initialDay}
       // 051 — 확인은 기록만 한다. 알림 경로는 적용 때 비운다(onInitialDayApplied).
@@ -1413,315 +1458,32 @@ async function readyCharacters(): Promise<Character[]> {
   }
 }
 
-/** 준비 상태를 모른다는 것과 "받지 않음"은 다르다(원칙 V). 읽기 전에는 아무것도 그리지 않는다. */
-type Readiness = Record<Character, ModelReadiness> | null;
-
 /**
- * 캐릭터 목록과 그 상태를 잇는다.
- *
- * **판정은 순수 함수(`readinessOf`)가 하고 여기서는 재료만 모은다.** 그래야 판정 규칙이
- * 기기 없이 검증된다.
- */
-type ModelSectionProps = {
-  ports: ReturnType<typeof expoModelPorts>;
-  acquisition: Acquisition;
-  /** 026 — 받는 중인 캐릭터별 진행 상태 */
-  progress: ReadonlyMap<Character, DownloadProgress>;
-  setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
-  rejection: DownloadRejection | null;
-  setRejection: (rejection: DownloadRejection | null) => void;
-  /** 035 — 캐릭터 → 지금 부르는 이름 (FR-018). 아래 목록이 그린다. */
-  characterNames?: CustomNames;
-};
-
-function ModelSection(props: ModelSectionProps) {
-  const { ports, acquisition, progress, setProgress, rejection, setRejection } = props;
-  const { characterNames } = props;
-
-  /**
-   * **준비 상태는 올리지 않는다**(008).
-   *
-   * 화면에 들어올 때 다시 읽으면 되는 것이며, 오래된 값을 들고 있을 이유가 없다.
-   * 올려야 하는 것은 **내려받기처럼 화면보다 오래 사는 것**뿐이다.
-   */
-  const [readiness, setReadiness] = useState<Readiness>(null);
-
-  /**
-   * 다섯 캐릭터의 준비 상태를 읽는다.
-   *
-   * **판정은 순수 함수가 하고 여기서는 재료만 모은다** — 파일이 있는지, 검증 기록이
-   * 있는지, 중단 정보가 있는지. 그래야 규칙이 기기 없이 검증된다.
-   *
-   * 기기 통로가 없는 환경(웹·시뮬레이터)에서는 **null을 돌려준다.** "받지 않음"으로
-   * 채우지 않는다 — 모르는 것을 아는 것처럼 만들지 않는다(원칙 V).
-   */
-  const read = useCallback(async (): Promise<Readiness> => {
-    try {
-      const state = await readState(ports.metadata);
-      const entries = await Promise.all(
-        CHARACTERS.map(async (character) => {
-          const asset = assetFor(character);
-          const facts = await ports.files.facts(asset.key);
-          return [
-            character,
-            readinessOf({
-              assetKey: asset.key,
-              expectedBytes: asset.expectedBytes,
-              expectedMd5: asset.md5,
-              file: facts,
-              verdict: verdictFor(state, asset.key),
-              paused: pausedFor(state, asset.key),
-              // 026 — 세그먼트 재개 상태가 있으면 partial + resumable: true (FR-023).
-              segmentedResume: segmentedFor(state, asset.key),
-              // 부분 파일 판정은 파일 통로가 아직 구분해 주지 않는다.
-              // 중단 정보가 있으면 그쪽으로 잡히므로 지금은 false로 둔다.
-              hasPartialFile: false,
-            }),
-          ] as const;
-        }),
-      );
-      return Object.fromEntries(entries) as Record<Character, ModelReadiness>;
-    } catch {
-      return null;
-    }
-  }, [ports]);
-
-  // 화면이 뜬 뒤 한 번 읽는다. 언마운트된 뒤에는 반영하지 않는다 —
-  // 002의 DiagnosticsScreen이 `alive` 플래그를 쓴 것과 같은 방식이다.
-  useEffect(() => {
-    let alive = true;
-    read().then((next) => {
-      if (alive) setReadiness(next);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [read]);
-
-  /**
-   * 탭에서 돌아왔을 때 받는 중인 것을 **전부** 되찾는다 (008 FR-013, 026 FR-006).
-   *
-   * **`Acquisition`이 이제 탭보다 오래 살므로 물어볼 대상이 남아 있다.** 026에서
-   * 여러 캐릭터가 동시에 받는 중일 수 있으므로 `busyWith()` 배열 전부를 순회한다.
-   *
-   * ⚠️ **백분율은 되찾을 수 없다.** `Acquisition`은 마지막 진행률을 들고 있지 않고
-   * 콜백으로 흘려보낼 뿐이다. 그래서 `fraction: null`로 시작하고 **다음 진행 콜백이
-   * 오면 붙는다** — 「받는 중…」으로 보이며 **0%로 채우지 않는다**(원칙 V).
-   */
-  useEffect(() => {
-    const running = acquisition.busyWith();
-    if (running.length === 0) return;
-    setProgress((prev) => {
-      const next = new Map(prev);
-      for (const character of running) {
-        if (!next.has(character)) next.set(character, { character, fraction: null });
-      }
-      return next;
-    });
-    // 화면이 뜰 때 한 번만 본다. `progress`가 바뀔 때마다 되돌리면 안 된다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [acquisition]);
-
-  const refresh = useCallback(async () => {
-    setReadiness(await read());
-  }, [read]);
-
-  /**
-   * ★ **008이 고치는 자리 — 두 버그가 여기서 함께 났다.**
-   *
-   * ───────────────────────────────────────────────────────────────────────────
-   * **006까지 이 함수가 두 줄이었고 둘 다 틀렸다:**
-   *
-   * ```ts
-   * await acquisition.prepare(character, setProgress);   // ← 반환값을 버린다 (버그 ①)
-   * setProgress(null);                                   // ← 거부에서도 돈다 (버그 ②)
-   * ```
-   *
-   * **버그 ①**: `prepare()`가 `{ ok: false, failure: { kind: "busy", busyWith } }`를
-   * 정확히 돌려주는데 호출자가 값을 받지 않아, **거부가 화면까지 갈 통로가 없었다.**
-   * 사용자에게는 「눌렀는데 아무 일이 없다」로 보였다.
-   *
-   * **버그 ②**: `busy` 거부는 네트워크를 타지 않고 **즉시 반환되므로** 곧바로
-   * `setProgress(null)`이 돌아 **받던 것의 진행률이 지워졌다.** 그러면 멈추기 버튼이
-   * 함께 사라지고 — 그런데 `acquisition`의 `running`은 그대로라 — 사용자는
-   * **받는 줄도 모르고, 멈출 수도 없고, 다른 것도 못 받는** 상태에 갇혔다.
-   * 003 FR-020a가 약속한 「멈추면 새 요청이 통한다」가 화면에서 실행 불가능했다.
-   *
-   * **고침**: 반환값을 받고, **자기 요청의 결과로만 진행 표시를 거둔다.**
-   * ───────────────────────────────────────────────────────────────────────────
-   */
-  const onPrepare = useCallback(
-    async (character: Character) => {
-      // 026 — 이 캐릭터의 진행만 갱신하는 콜백. 다른 캐릭터의 항목은 건드리지 않는다.
-      const reportOne = (p: DownloadProgress) =>
-        setProgress((prev) => new Map(prev).set(p.character, p));
-
-      const result = await acquisition.prepare(character, reportOne);
-
-      // ★ 거부는 **받던 것을 건드리지 않는다**(FR-008). 진행률도 멈추기 버튼도 그대로
-      //   남아야 사용자가 빠져나갈 수 있다(FR-009, 003 FR-020a).
-      if (!result.ok && result.failure.kind === "busy") {
-        setRejection({ requested: character, busyWith: result.failure.busyWith });
-        return;
-      }
-
-      // 그 외(완료·멈춤·실패)는 **내 요청이 끝난 것이므로** 이 캐릭터의 진행 표시만
-      // 거둔다(FR-012) — 026에서 다른 캐릭터가 동시에 받는 중일 수 있으므로 `Map`
-      // 전체를 비우지 않는다. 거부 통지도 함께 비운다(008 FR-005).
-      setProgress((prev) => {
-        const next = new Map(prev);
-        next.delete(character);
-        return next;
-      });
-      setRejection(null);
-      await refresh();
-    },
-    [acquisition, refresh, setProgress, setRejection],
-  );
-
-  const onRemove = useCallback(
-    async (character: Character) => {
-      await removeAsset(ports.files, ports.metadata, assetFor(character).key);
-      await refresh();
-    },
-    [ports, refresh],
-  );
-
-  /* ───────────── 011 — 사진을 보는 데 필요한 것 ───────────── */
-
-  /**
-   * 사진 보는 모델의 준비 상태와 진행률.
-   *
-   * **캐릭터와 따로 둔다**(FR-025). 같은 상태에 넣으면 그것이 곧 「캐릭터가 사진을
-   * 본다」는 잘못된 모양이다.
-   *
-   * ⚠️ **지금은 캐릭터와 동시에 받을 수 있다** — 003의 「한 번에 하나」가 이 쌍에는
-   * 적용되지 않는다(tasks.md T009~T011의 「미룬 까닭」). 잊은 것이 아니라 미룬 것이다.
-   */
-  const [visionState, setVisionState] = useState<ModelReadiness | null>(null);
-  const [visionProgress, setVisionProgress] = useState<number | null>(null);
-  const [visionBytes, setVisionBytes] = useState(0);
-
-  const readVision = useCallback(async () => {
-    const [state, bytes] = await Promise.all([
-      visionReadiness(ports).catch(() => ({ kind: "not-downloaded" }) as ModelReadiness),
-      visionStorageBytes(ports).catch(() => 0),
-    ]);
-    return { state, bytes };
-  }, [ports]);
-
-  const refreshVision = useCallback(async () => {
-    const { state, bytes } = await readVision();
-    setVisionState(state);
-    setVisionBytes(bytes);
-  }, [readVision]);
-
-  // **`alive` 자물쇠를 둔다** — 화면이 사라진 뒤 상태를 세우면 경고가 난다.
-  // 007의 선택 읽기가 같은 방식이다.
-  useEffect(() => {
-    let alive = true;
-    void readVision().then(({ state, bytes }) => {
-      if (!alive) return;
-      setVisionState(state);
-      setVisionBytes(bytes);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [readVision]);
-
-  const onPrepareVision = useCallback(async () => {
-    await prepareVision(ports, setVisionProgress);
-    setVisionProgress(null);
-    await refreshVision();
-  }, [ports, refreshVision]);
-
-  const onRemoveVision = useCallback(async () => {
-    await removeVision(ports);
-    await refreshVision();
-  }, [ports, refreshVision]);
-
-  if (readiness === null) {
-    return (
-      <View style={styles.placeholder}>
-        <AppText variant="bodyStrong">캐릭터 상태를 읽는 중…</AppText>
-      </View>
-    );
-  }
-
-  return (
-    <CharacterListScreen
-      readiness={readiness}
-      // 035 — 사용자가 지은 이름. 없으면 persona.ts의 기본 이름으로 떨어진다.
-      // **위 `AuthorPicker`와 같은 값을 봐야 한다** — 갈리면 같은 화면에서 한
-      // 캐릭터가 두 이름으로 보인다(수렴 검사 F3).
-      characterNames={characterNames}
-      // **판정은 순수 함수가 하고 화면은 그린다**(008). 「거부 안내가 아직 참인가」가
-      // 시간에 따라 거짓이 되므로, 지우는 코드를 두지 않고 **매번 다시 묻는다.**
-      view={resolveDownloadView([...progress.values()], rejection)}
-      onPrepare={(character) => void onPrepare(character)}
-      onPause={(character) => void acquisition.pause(character)}
-      onRemove={(character) => void onRemove(character)}
-      onDismissNotice={() => setRejection(null)}
-      // ★ 011 — **이 줄들이 없으면 사진 보는 모델을 받을 길이 없다.**
-      visionReadiness={visionState ?? undefined}
-      visionProgress={visionProgress}
-      visionBytes={visionBytes}
-      onPrepareVision={() => void onPrepareVision()}
-      onRemoveVision={() => void onRemoveVision()}
-    />
-  );
-}
-
-/**
- * 자동 생성 설정을 조립한다 (020) + 권한 섹션 (021).
+ * 설정 화면을 조립한다 (055, 보드 `6c` — 이전 020·021·029의 `AutoDiarySection`).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **화면은 판정하지 않는다** — `AutoDiarySettingsScreen`은 props와 콜백만
- * 받는다. 부수 효과 순서(S6)는 여기가 지킨다:
+ * **화면은 판정하지 않는다** — `SettingsScreen`은 문자열·불리언·꼬리표만 받는다. 기기 통로(`expo-*`)는 여기서만 만든다.
  *
- *   토글 켬:  알림 권한 요청 → save → register
- *   토글 끔:  save → unregister
- *   시각 변경: save → reschedule
+ * - 이름: 첫 실행이 정한 기본 캐릭터(로스터 하나, 037)의 지금 이름. 바꾸기는 위 겹(`RenameScreen`)에서 한다.
+ * - 자동으로 쓰기: 020의 부수 효과 순서(S6)를 `settings-effects.ts`가 지킨다 — 토글 켬: 알림 권한 요청 → save → register,
+ *   끔: save → unregister, 시각 변경: save → reschedule.
+ * - 그 아래: §3.2가 행으로 옮기기 전까지의 시각 목록(`AutoDiarySettingsScreen`)과 장소명 3상태(`GeocodingSettingToggle`).
+ * - 권한 네 행: `usePermissionTags`가 마운트·전경 복귀 때 읽고 `permissionTagFor`가 정한다. 누르면 앱 정보 화면(R7).
+ * - 버전: 설치본의 versionName·versionCode(`expo-application`, R5).
  *
- * **배터리 예외 요청은 021이 걷어냈다** — 자동 생성 토글은 더 이상 배터리
- * 인텐트를 띄우지 않는다(FR-010). 배터리 안내는 아래 `PermissionsSection`의
- * 상시 링크와 통합 온보딩이 맡는다.
+ * **걷은 것**(S5): 작성자 고르기(`AuthorPicker`), 캐릭터·사진 모델 받기(`CharacterListScreen`), 설명 카드형 권한 섹션과
+ * 「온보딩 다시 하기」(`PermissionsSection`), 배터리 목록 인텐트 링크. 대체 경로는 개발자 메뉴 조각 몫이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-function AutoDiarySection({
-  platform,
+function SettingsSection({
   onboardingPorts,
-  onRestartOnboarding,
-  modelPorts,
-  acquisition,
-  progress,
-  setProgress,
-  rejection,
-  setRejection,
-  characterNames,
-  onRenameCharacter,
+  characterName,
+  onOpenRename,
 }: {
-  platform: "android" | "ios";
   onboardingPorts: OnboardingPorts;
-  onRestartOnboarding: () => void;
-  /** 029 — "일기 작성자" 섹션의 다운로드 관리에 쓴다 (기존 ModelSection). */
-  modelPorts: ReturnType<typeof expoModelPorts>;
-  acquisition: Acquisition;
-  progress: ReadonlyMap<Character, DownloadProgress>;
-  setProgress: React.Dispatch<React.SetStateAction<ReadonlyMap<Character, DownloadProgress>>>;
-  rejection: DownloadRejection | null;
-  setRejection: (rejection: DownloadRejection | null) => void;
-  /** 035 — 캐릭터 → 지금 부르는 이름 (FR-018·FR-022). */
-  characterNames?: CustomNames;
-  /**
-   * 035 — 준비된 캐릭터의 이름을 바꾼다 (FR-022·FR-025).
-   *
-   * 빈 문자열을 넘기면 기본 이름으로 되돌린다 — 조립부가 키를 제거한다(W19).
-   * 검증(`validateCharacterName`)도 조립부가 한다: 첫 만남과 설정이 같은
-   * 규칙을 쓴다(W18).
-   */
-  onRenameCharacter?: (character: Character, name: string) => void;
+  /** 035 — 지금 부르는 이름 (`displayNameOf`) */
+  characterName: string;
+  onOpenRename: () => void;
 }) {
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
@@ -1730,39 +1492,21 @@ function AutoDiarySection({
   const [settings, setSettings] = useState<AutoDiarySettings | null>(null);
   const [notificationDenied, setNotificationDenied] = useState(false);
 
-  /* ── 029 — "일기 작성자"·"장소명" 섹션 (042에서 「사진 보기」가 빠졌다) ─── */
-  const selectionPort = useMemo(() => expoSelectionPort(), []);
+  /* ── 029 — 장소명 (자동·켬·끔). §3.2가 행으로 옮기기 전까지 지금 모양 그대로 ─── */
   const geoPort = useMemo(() => expoGeocodingSettingPort(), []);
-  const [author, setAuthor] = useState<Character | null>(null);
-  const [readyChars, setReadyChars] = useState<readonly Character[]>([]);
   const [geoPref, setGeoPref] = useState<GeocodingPreference>("auto");
 
   useEffect(() => {
     let alive = true;
-    void Promise.all([
-      loadSelection(selectionPort).catch(() => null),
-      readyCharacters(),
-      loadGeocodingSetting(geoPort).catch(() => "auto" as const),
-    ]).then(([a, r, g]) => {
-      if (!alive) return;
-      setAuthor(a);
-      setReadyChars(r);
-      setGeoPref(g);
-    });
+    void loadGeocodingSetting(geoPort)
+      .catch(() => "auto" as const)
+      .then((g) => {
+        if (alive) setGeoPref(g);
+      });
     return () => {
       alive = false;
     };
-  }, [selectionPort, geoPort]);
-
-  const onSelectAuthor = useCallback(
-    (index: number) => {
-      const character = CHARACTERS[index];
-      if (character === undefined || !readyChars.includes(character)) return;
-      setAuthor(character);
-      void saveSelection(selectionPort, character).catch(() => {});
-    },
-    [readyChars, selectionPort],
-  );
+  }, [geoPort]);
 
   const onSelectGeoPref = useCallback(
     (g: GeocodingPreference) => {
@@ -1825,9 +1569,41 @@ function AutoDiarySection({
     [settings, effectDeps],
   );
 
-  const onOpenBatterySettings = useCallback(() => {
-    void onboardingPorts.battery.openSettingsList().catch(() => {});
+  /* ── 055 — 권한 꼬리표. 재료는 021의 통로 + 사진 한 장의 좌표 읽기(R6) ─── */
+  // 좌표 읽기에는 021 온보딩 통로가 주지 않는 `photosBetween`·`locationOf`가 필요하다 — 004의 사진 통로를 쓴다.
+  const photoPort = useMemo(() => expoPhotoPort(), []);
+  const readPermissions = useCallback(async (): Promise<PermissionFacts> => {
+    const unknown = () => "unknown" as const;
+    const [photos, photoLocation, location, notifications] = await Promise.all([
+      onboardingPorts.photo.photoPermission().catch(unknown),
+      photoLocationProbe(photoPort, Date.now()),
+      onboardingPorts.location.status().catch(unknown),
+      onboardingPorts.notification.getPermission().catch(unknown),
+    ]);
+    return { photos, photoLocation, location, notifications };
+  }, [onboardingPorts, photoPort]);
+  const permissionTags = usePermissionTags(readPermissions);
+
+  const onOpenAppSettings = useCallback(() => {
+    void onboardingPorts.osSettings.openAppSettings().catch(() => {});
   }, [onboardingPorts]);
+
+  /* ── 055 — 버전. 설치본의 값을 읽는다(R5). 읽지 못하면 비운다 ─── */
+  const [versionText, setVersionText] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void import("expo-application")
+      .then((Application) =>
+        formatVersion(Application.nativeApplicationVersion, Application.nativeBuildVersion),
+      )
+      .catch(() => null)
+      .then((text) => {
+        if (alive) setVersionText(text);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   if (settings === null) {
     return (
@@ -1838,80 +1614,25 @@ function AutoDiarySection({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.settingsPage}>
-      <AutoDiarySettingsScreen
-        settings={settings}
-        onToggleEnabled={(enabled) => void onToggleEnabled(enabled)}
-        onChangeTargetHour={(hour) => void onChangeTargetHour(hour)}
-        onOpenBatterySettings={onOpenBatterySettings}
-        notificationDenied={notificationDenied}
-      />
-
-      {/*
-        033 — **이 셋은 좌우 여백을 여기서 준다**(2026-09-07 실기기 지적).
-
-        `settingsPage`에는 좌우 padding이 없고 각 자식이 알아서 여백을 낸다 —
-        `AutoDiarySettingsScreen`(20)·`PermissionsSection`(20)·
-        `CharacterListScreen`(20)은 자체 padding이 있는데 이 셋만 없어
-        **화면 끝에서 끝까지 붙어 보였다**(실측: `geocoding-auto`가 0~1080,
-        캐릭터 행은 72~1008).
-
-        `SelectRow`(공용 컴포넌트)를 고치면 이것을 쓰는 다른 자리까지 바뀌므로
-        **조립하는 여기서 감싼다.** 세 컴포넌트의 내부 구조·`testID`·문안은
-        건드리지 않는다.
-      */}
-      <View style={styles.settingsSection}>
-        {/* 029 — 일기 작성자 (FR-023). persona 이름·소개·준비 여부만. */}
-        <AuthorPicker
-          options={CHARACTERS.map((character) => ({
-            // 035 — 이름만 사용자가 지을 수 있다(헌법 1.4.0). **소개(tagline)는
-            // 코드 안 고정값 그대로다** — 말투·성격은 사용자가 바꿀 수 없다.
-            name: characterNames?.[character] ?? personaOf(character).name,
-            tagline: personaOf(character).tagline,
-            ready: readyChars.includes(character),
-            selected: author === character,
-          }))}
-          onSelect={onSelectAuthor}
-          // index → Character는 조립부가 옮긴다 — 화면은 심볼을 모른다(원칙 III).
-          onRename={
-            onRenameCharacter === undefined
-              ? undefined
-              : (index, name) => {
-                  const character = CHARACTERS[index];
-                  if (character !== undefined) onRenameCharacter(character, name);
-                }
-          }
-        />
-      </View>
-
-      {/* 029 — 장소명 (FR-025). 자동/켬/끔. */}
-      <View style={styles.settingsSection}>
-        <GeocodingSettingToggle mode={geoPref} onSelect={onSelectGeoPref} />
-      </View>
-
-      {/* 029 — 미준비 캐릭터·VLM 다운로드 관리 (기존 ModelSection, SS4). */}
-      <ModelSection
-        ports={modelPorts}
-        acquisition={acquisition}
-        progress={progress}
-        setProgress={setProgress}
-        rejection={rejection}
-        setRejection={setRejection}
-        characterNames={characterNames}
-      />
-
-      {/* 021 — 권한 상태·재요청·온보딩 재실행 (FR-017~020). prod에도 있다. */}
-      {/* 034 — 좌우 여백은 조립부가 소유한다(OQ-2): 다른 설정 섹션과 같은
-          `settingsSection` 래퍼로 감싸 화면 끝에서 20px인 한 세로선에 세운다. */}
-      <View style={styles.settingsSection}>
-        <PermissionsSection
-          platform={platform}
-          requirements={PERMISSION_REQUIREMENTS}
-          ports={onboardingPorts}
-          onRestartOnboarding={onRestartOnboarding}
-        />
-      </View>
-    </ScrollView>
+    <SettingsScreen
+      autoWriteEnabled={settings.enabled}
+      characterName={characterName}
+      diaryExtras={
+        <>
+          <AutoDiarySettingsScreen
+            notificationDenied={notificationDenied}
+            onChangeTargetHour={(hour) => void onChangeTargetHour(hour)}
+            settings={settings}
+          />
+          <GeocodingSettingToggle mode={geoPref} onSelect={onSelectGeoPref} />
+        </>
+      }
+      onOpenAppSettings={onOpenAppSettings}
+      onOpenRename={onOpenRename}
+      onToggleAutoWrite={(enabled) => void onToggleEnabled(enabled)}
+      permissionTags={permissionTags}
+      versionText={versionText}
+    />
   );
 }
 
@@ -1921,20 +1642,10 @@ const styles = StyleSheet.create({
     // 032 — 앱 전체의 따뜻한 라이트 바탕. 개별 화면이 같은 색을 다시 칠해도 무해.
     backgroundColor: COLORS.bg,
   },
-  // 이전에는 탭 위에 얹힌 작은 창이라 `maxHeight`가 있었다(260). 이제 개발자
-  // 탭이 다른 두 탭과 같은 자격으로 화면 전체를 쓰므로 그 제약이 없다.
-  diagnostics: { flex: 1 },
+  /** 055 — 홈과 그 위의 겹들. 겹의 절대 배치 기준이 안전 영역 안쪽이 되게 한다 */
+  stack: { flex: 1 },
   placeholder: {
     padding: 24,
     alignItems: "center",
   },
-  settingsPage: { gap: 20, paddingBottom: 24 },
-  /**
-   * 033 — 자체 padding이 없는 설정 섹션의 좌우 여백.
-   *
-   * 값 20은 이미 자체 padding을 가진 이웃들과 같다
-   * (`AutoDiarySettingsScreen.page`·`PermissionsSection.section`이 20,
-   * `CharacterListScreen`도 20) — 설정 탭 전체가 같은 세로선에 선다.
-   */
-  settingsSection: { paddingHorizontal: 20 },
 });

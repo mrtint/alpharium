@@ -117,7 +117,7 @@ async function renderHome(
     pipeline?: Pipeline;
     stop?: () => Promise<void>;
     resolve?: (day: string) => ResolveOutcome;
-    onGoToSettings?: () => void;
+    onRedownload?: () => Promise<boolean>;
   } = {},
 ) {
   const store = memoryStore();
@@ -127,7 +127,7 @@ async function renderHome(
       resolution={resolved}
       resolve={options.resolve ?? resolveQuiet()}
       stop={options.stop}
-      onGoToSettings={options.onGoToSettings}
+      onRedownload={options.onRedownload}
       store={store}
     />,
   );
@@ -620,7 +620,7 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
   it("토스트에 버튼이 없다 — 준비하러 가는 길은 쓰기 전 막힘 화면에만 있다 (054 FR-019·024)", async () => {
     await writeWith(visionFailure("not-ready"));
 
-    expect(screen.queryByText(/설정에서 작성자 준비하기/)).toBeNull();
+    expect(screen.queryByText(/설정에서 작성자 준비하기|모듈 다시 받기/)).toBeNull();
   });
 
   it.each([["not-ready"], ["failed"], ["cancelled"]])(
