@@ -23,6 +23,7 @@ import {
   ConfirmDialog,
   DialogActionButton,
   DialogCancelButton,
+  DialogNote,
   DismissibleDialog,
 } from "../../src/ui/components/Dialog";
 import { COLORS, DIALOG, OVERLAY, RADIUS } from "../../src/ui/theme/tokens";
@@ -214,6 +215,55 @@ describe("DLG5·DLG6 — 보드 모양 (인라인 style)", () => {
       .getAllByTestId(/^(act|cancel)$/)
       .map((n) => n.props.testID);
     expect(ids.indexOf("act")).toBeLessThan(ids.indexOf("cancel"));
+  });
+});
+
+describe("★ DLG8 — 화면보다 높아지면 안전 영역 안에서 본문이 스크롤된다 (056 실기기 — 글꼴 2.0배)", () => {
+  it("덮개는 위·아래에도 바깥 여백을 둔다(안전 영역이 없으면 inset만)", async () => {
+    captureBackHandlers();
+    await renderWithPortal(
+      <DismissibleDialog onClose={() => {}} open testID="tall" title="제목">
+        <DialogNote>본문</DialogNote>
+      </DismissibleDialog>,
+    );
+    const overlay = flat(screen.getByTestId("tall-overlay"));
+    expect(overlay.paddingTop).toBe(DIALOG.inset);
+    expect(overlay.paddingBottom).toBe(DIALOG.inset);
+  });
+
+  it("면은 덮개 높이를 넘지 않고 줄어들 수 있으며, 본문은 스크롤 뷰 안에 있다", async () => {
+    captureBackHandlers();
+    await renderWithPortal(
+      <DismissibleDialog onClose={() => {}} open testID="tall" title="제목">
+        <DialogNote testID="tall-note">본문</DialogNote>
+      </DismissibleDialog>,
+    );
+    expect(flat(screen.getByTestId("tall"))).toMatchObject({ flexShrink: 1 });
+    const body = screen.getByTestId("tall-body");
+    expect(body.type).toBe("RCTScrollView");
+    expect(within(body).getByTestId("tall-note")).toBeTruthy();
+    // 제목은 스크롤 밖 — 넘쳐도 무엇을 고르는 창인지 보인다
+    expect(within(body).queryByText("제목")).toBeNull();
+  });
+
+  it("부제(subtitle)는 제목과 한 묶음(간격 6)으로 스크롤 밖에 있다", async () => {
+    captureBackHandlers();
+    await renderWithPortal(
+      <DismissibleDialog
+        onClose={() => {}}
+        open
+        subtitle="이 휴대폰의 시간대 · 서울 (GMT+9)"
+        subtitleTestID="tall-sub"
+        testID="tall"
+        title="제목"
+      >
+        <DialogNote>본문</DialogNote>
+      </DismissibleDialog>,
+    );
+    const sub = screen.getByTestId("tall-sub");
+    expect(sub).toHaveTextContent("이 휴대폰의 시간대 · 서울 (GMT+9)");
+    expect(within(screen.getByTestId("tall-body")).queryByTestId("tall-sub")).toBeNull();
+    expect(flat(screen.getByTestId("tall-head")).gap).toBe(DIALOG.subtitleGap);
   });
 });
 

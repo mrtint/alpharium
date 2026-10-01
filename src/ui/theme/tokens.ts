@@ -208,6 +208,12 @@ export const DIALOG = {
   buttonHeight: 48,
   /** 세로로 쌓인 버튼 사이 */
   buttonGap: 8,
+  /** 056 — 제목과 부제 사이(보드 `6f` 제목·시간대 줄 묶음) */
+  subtitleGap: 6,
+  /** 056 — 부제 글자 크기(보드 `6f` 시간대 줄 13) */
+  subtitleSize: 13,
+  /** 056 — 보드 body 기본 줄높이(글자 크기에 곱한다) */
+  lineHeightRatio: 1.55,
 } as const;
 
 /** 050 — 날짜로 이동 달력 치수 (보드 `2j`, 사람이 정한 값). */
@@ -374,8 +380,52 @@ export const SETTINGS = {
     filledPadding: { v: 3, h: 8 },
     outlinedPadding: { v: 2, h: 7 },
   },
-  /** 토글 — 44×26, 안쪽 3, 손잡이 20×20 */
-  toggle: { width: 44, height: 26, padding: 3, knob: 20 },
+  /**
+   * 토글 — 44×26, 안쪽 3, 손잡이 20×20. 꺼짐 손잡이는 `textMuted`(보드 neutral-600 근처) — 꺼짐 면(`tagFill`) 대비 4.54:1.
+   * 055의 「꺼짐 = 바탕색 손잡이」는 면과 거의 구분되지 않아 056 FR-029가 뒤집었다(theme-tokens.test가 3:1 하한을 잠근다).
+   */
+  toggle: { width: 44, height: 26, padding: 3, knob: 20, knobOff: COLORS.textMuted },
+  /** 056 — 「매일 쓰는 시각」 행이 펼쳐지고 접히는 시간(보드 `6c` ③ 「0→44, 200ms」) */
+  expandMs: 200,
+  /**
+   * 056 — 보드의 기본 줄높이(`body { line-height: 1.55 }`, 글자 크기에 곱한다). 줄높이를 따로 적지 않은 대화상자 안 글자
+   * (시간대 줄·오전/오후·격자 숫자·장소 칸 이름·지도 고지)에 쓴다 — `AppText`의 기본 22를 물려받으면 13 글자는 보드보다 높고
+   * 16 글자는 낮아진다.
+   */
+  boardLineHeightRatio: 1.55,
+  /** 056 — 두 대화상자의 제목 20/700(보드 `6f`·`6l`) */
+  dialogTitle: { size: 20, weight: "700" },
+  /**
+   * 056 — 시 격자 대화상자(보드 `6f`). 시간대 줄은 대화상자 틀의 부제(`DIALOG.subtitle*`)다. 오전/오후 칸 높이 40·15(선택 800, 아님 600),
+   * 격자 칸 높이 52·18(선택 800, 아님 600)·열 4(12시간)/6(24시간), 미리보기 13·줄높이 1.5.
+   */
+  timeDialog: {
+    meridiemHeight: 40,
+    meridiemSize: 15,
+    cellHeight: 52,
+    cellSize: 18,
+    previewSize: 13,
+    previewLineHeightRatio: 1.5,
+    columns12: 4,
+    columns24: 6,
+  },
+  /**
+   * 056 — 장소 이름 대화상자(보드 `6l`). 칸 사이 8, 안쪽 12·14, 표식 12×12·표식과 글 사이 12(위 4 내림),
+   * 이름 16(선택 800, 아님 600), 설명 13·줄높이 1.45·이름 아래 3.
+   */
+  placeDialog: {
+    optionGap: 8,
+    optionPaddingV: 12,
+    optionPaddingH: 14,
+    markSize: 12,
+    markGap: 12,
+    markTop: 4,
+    nameSize: 16,
+    descSize: 13,
+    descLineHeightRatio: 1.45,
+    descGap: 3,
+    noticeSize: 13,
+  },
   /** 진입점 — 점 5×5 셋, 간격 4, 누름 44×44, 보드 음수 여백 -14 -12 -14 0 */
   entry: { dot: 5, gap: 4, hit: 44, margin: { top: -14, right: -12, bottom: -14 } },
   /** 겹이 밀려 들어오고 나가는 시간 — 052 접힘·051 바와 맞춘 사람이 정한 값(research R1) */

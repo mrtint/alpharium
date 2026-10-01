@@ -1,8 +1,6 @@
 import { render, screen } from "@testing-library/react-native";
 
-import { AutoDiarySettingsScreen } from "../../src/ui/AutoDiarySettingsScreen";
 import { DiaryListScreen } from "../../src/ui/DiaryListScreen";
-import { DEFAULT_AUTO_DIARY_SETTINGS } from "../../src/schedule/settings";
 import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
 
 /**
@@ -19,30 +17,8 @@ import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
 // CI 러너(2코어)에서 `jest-expo` 첫 `render()`가 기본 5초를 넘길 수 있다.
 jest.setTimeout(30000);
 
-describe("AutoDiarySettingsScreen — 알림·배터리 안내 (FR-014)", () => {
-  it("notificationDenied면 알림 권한 안내가 보인다 (020 N8 유지)", async () => {
-    await render(
-      <AutoDiarySettingsScreen
-        settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onChangeTargetHour={() => {}}
-        notificationDenied
-      />,
-    );
-    expect(screen.getByText(/알림 권한이 없어/)).toBeTruthy();
-  });
-
-  it("055 — 배터리 상시 안내는 설정의 배터리 행으로 옮겼다 (이 화면에는 없다)", async () => {
-    await render(
-      <AutoDiarySettingsScreen
-        settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onChangeTargetHour={() => {}}
-      />,
-    );
-    // 020 E4·021 FR-018의 상시 링크는 055에서 「권한 · 휴대폰 설정으로 이동」의 배터리 행(보조 문구 「배터리 사용 · 제한
-    // 없음으로 두면 제때 써요」, 앱 정보 화면으로)이 맡는다 — settings-screen.test.tsx C4·C6.
-    expect(screen.queryByTestId("open-battery-settings")).toBeNull();
-  });
-});
+// 056 — 옛 자동 생성 화면(`AutoDiarySettingsScreen`)과 그 아래의 알림 거부 안내(020 N8)를 걷었다(056 FR-033) — 설정의
+// 「권한 · 휴대폰 설정으로 이동」 묶음의 알림 행 「허용 안 함」이 같은 사실을 말한다(settings-screen.test.tsx C4·C5).
 
 describe("DiaryListScreen — deniedNotices 배너 (FR-014, SC-004)", () => {
   const photoDenied = PERMISSION_REQUIREMENTS.find((r) => r.key === "photos")!.ifDenied;

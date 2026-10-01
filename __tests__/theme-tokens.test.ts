@@ -212,4 +212,8 @@ describe("055 — 설정 면 색의 대비 (research R10)", () => {
     expect(Object.values(COLORS)).not.toContain(SETTINGS.chevron);
     expect(Object.values(COLORS)).not.toContain(SETTINGS.tagText);
   });
+
+  it("056 FR-029·SC-007 — 토글 꺼짐 손잡이가 꺼짐 면과 3:1 이상 구분된다", () => {
+    expect(contrastRatio(SETTINGS.toggle.knobOff, SETTINGS.tagFill)).toBeGreaterThanOrEqual(3);
+  });
 });

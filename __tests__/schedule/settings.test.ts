@@ -79,11 +79,16 @@ describe("왕복 — 담고 꺼낸다 (S3)", () => {
  * 명시적 기본값이 있는 설정이다.
  */
 describe("읽기 실패는 기본값이다 (S3)", () => {
-  it("기본값이 { enabled: false, targetHour: 7 }", () => {
+  it("기본값이 { enabled: false, targetHour: 22 } — 056 FR-005(보드 「기본값 오후 10시」)", () => {
     expect(DEFAULT_AUTO_DIARY_SETTINGS).toEqual({
       enabled: false,
-      targetHour: 7,
+      targetHour: 22,
     });
+  });
+
+  it("★ 056 SE3 — 이미 저장된 7은 7로 읽는다(옛 기본값을 옮기지 않는다)", async () => {
+    const raw = JSON.stringify({ enabled: true, targetHour: 7 });
+    expect((await loadAutoDiarySettings(memoryPort(raw))).targetHour).toBe(7);
   });
 
   it("담은 적이 없으면 기본값", async () => {
@@ -113,7 +118,7 @@ describe("읽기 실패는 기본값이다 (S3)", () => {
 /**
  * ★ 부분 손상에 관대하다 (S3).
  *
- * `targetHour`가 0–23 정수가 아니면 그 필드만 7로, 나머지는 살린다.
+ * `targetHour`가 0–23 정수가 아니면 그 필드만 기본값(22, 056 FR-005)으로, 나머지는 살린다.
  * `enabled`가 boolean이 아니면 false.
  */
 describe("부분 손상 — 나쁜 필드만 대체하고 나머지는 살린다 (S3)", () => {
@@ -123,13 +128,13 @@ describe("부분 손상 — 나쁜 필드만 대체하고 나머지는 살린다
     ["7.5 (정수 아님)", 7.5],
     ['"7" (문자열)', "7"],
     ["null", null],
-  ])("targetHour가 %s이면 7로 대체, enabled는 살린다", async (_label, badHour) => {
+  ])("targetHour가 %s이면 22로 대체, enabled는 살린다", async (_label, badHour) => {
     const raw = JSON.stringify({
       enabled: true,
       targetHour: badHour,
     });
     const loaded = await loadAutoDiarySettings(memoryPort(raw));
-    expect(loaded.targetHour).toBe(7);
+    expect(loaded.targetHour).toBe(22);
     expect(loaded.enabled).toBe(true);
   });
 

@@ -10,6 +10,11 @@
  * 보드 표에 없는 셋(`save`·`backToSettings`·`redownload`)은 보드의 다른 자리에서 온 낱말이다 —
  * `save`는 `6c` ② 메모의 「저장 버튼」, `backToSettings`는 `6e`·`6h` 마크업의 「‹ 설정」, `redownload`는
  * `dev.redownload` 「모듈 다시 받기」(055 Clarification).
+ *
+ * 056 — 「매일 쓰는 시각」·「장소 이름으로 보기」 행과 두 대화상자(보드 `6c` ③·`6f`·`6l`)의 정적 문구. 시를 끼워 넣는
+ * 문장(행 값·미리보기·시간대 줄)의 틀은 `src/app/target-hour.ts`가 갖는다(`src/app/`이 `src/ui/`를 import하지 않는다).
+ * 보드의 `time.save` 「저장」은 쓰지 않는다 — 두 대화상자 모두 칸을 누르면 바로 적용된다(056 Clarification Q4).
+ * 보드 표에 없는 `placeNotice`는 017 FR-006의 지도 고지를 해요체로 옮긴 것이다(056 FR-026).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -42,6 +47,22 @@ export const SETTINGS_TEXT = {
   redownload: "모듈 다시 받기",
   /** 개발자 겹의 제목(보드 `dev.title`) — 진입점은 개발자 메뉴 조각 몫 */
   developerTitle: "개발자",
+  /* ── 056 — 매일 쓰는 시각·장소 이름 (보드 `6c` ③·`6f`·`6l`) ── */
+  autoWriteTime: "매일 쓰는 시각",
+  placeNames: "장소 이름으로 보기",
+  timeTitle: "매일 쓰는 시각",
+  timeAm: "오전",
+  timePm: "오후",
+  timeCancel: "취소",
+  placeTitle: "장소 이름으로 보기",
+  placeAuto: "자동",
+  placeAutoDesc: "위치 권한이 있으면 이름으로, 없으면 비워 둬요",
+  placeOn: "켬",
+  placeOnDesc: "다닌 자리를 숫자 대신 이름으로 보여줘요",
+  placeOff: "끔",
+  placeOffDesc: "장소 이름을 옮기지 않아요",
+  placeCancel: "취소",
+  placeNotice: "좌표를 기기의 지도 서비스에 물어봐요.",
 } as const;
 
 /** 진입점·머리의 ‹ 글리프. 문구와 따로 그린다(보드 마크업이 ‹ 를 22, 글자를 15로 다르게 그린다). */

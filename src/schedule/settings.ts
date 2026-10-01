@@ -15,7 +15,7 @@
  * 아니라 **항상 `AutoDiarySettings`를 돌려준다**(geocoding 설정과 같은 판단).
  *
  * **부수 효과는 이 파일이 하지 않는다**(S6) — 태스크 등록·알림 권한·배터리
- * 인텐트는 호출부(`App.tsx`/`AutoDiarySettingsScreen`)가 한다. 007의
+ * 인텐트는 호출부(`App.tsx`)가 한다(056 이후 설정 화면 조립이 `settings-effects.ts`로 순서를 지킨다). 007의
  * `saveSelection`이 파일만 쓰고 화면이 나머지를 하는 것과 같다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -37,7 +37,8 @@ export type AutoDiarySettings = {
   /** 자동 생성 켜짐 여부 (FR-009). 기본값 false — 사용자가 명시적으로 켠다. */
   enabled: boolean;
   /**
-   * 대략적인 목표 시각. 기기 현지 시간대 기준 "시" (0–23). 기본값 7 (FR-001).
+   * 대략적인 목표 시각. 기기 현지 시간대 기준 "시" (0–23). 기본값 22 — 056 FR-005(보드 「기본값 오후 10시」, 020의 7을 바꿨다).
+   * 이미 저장된 값(옛 기본값 7 포함)은 그대로 읽는다 — 사용자가 고른 7과 옛 기본값 7을 구분할 길이 없다(056 Clarification Q1).
    * 분은 두지 않는다 — 근사치(FR-002)이므로 분 단위 정밀도를 암시하지 않는다.
    */
   targetHour: number;
@@ -46,7 +47,7 @@ export type AutoDiarySettings = {
 /** 파일 없음·손상 시의 값. geocoding 설정처럼 명시적 기본값이 있다(S3). */
 export const DEFAULT_AUTO_DIARY_SETTINGS: AutoDiarySettings = {
   enabled: false,
-  targetHour: 7,
+  targetHour: 22,
 };
 
 /** 설정이 담기는 통로. 테스트가 기기 없이 갈아끼운다. */
@@ -66,7 +67,7 @@ function validHour(value: unknown): value is number {
  * **항상 `AutoDiarySettings`를 돌려준다**(S3) — 파일 없음·깨짐·통로 예외
  * 전부 `DEFAULT_AUTO_DIARY_SETTINGS`로 귀결된다.
  *
- * **부분 손상에 관대하다**: `targetHour`가 0–23 정수가 아니면 그 필드만 7로,
+ * **부분 손상에 관대하다**: `targetHour`가 0–23 정수가 아니면 그 필드만 기본값(22)으로,
  * `enabled`/`batteryExceptionPrompted`가 boolean이 아니면 false. 나머지
  * 필드는 살린다(`store.ts`의 방식).
  */
