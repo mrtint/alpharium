@@ -83,7 +83,7 @@ describe("PF1 — 세기·시간은 토큰 한 곳의 상수다", () => {
 });
 
 describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
-  it("★ src/ui/components/의 파일이 9개다(033 7개 + 050 Dialog + 054 FadeLayer — 038 TypewriterText는 054에서 지웠다)", () => {
+  it("★ src/ui/components/의 파일이 10개다(033 7개 + 050 Dialog + 054 FadeLayer + 055 NameField — 038 TypewriterText는 054에서 지웠다)", () => {
     // 032가 만들고 안 쓴 컴포넌트 4개를 남긴 것이 이 스펙의 존재 이유다.
     // 같은 실패(쓸 자리 없는 추상을 먼저 만듦)를 되풀이하지 않는다.
     //
@@ -95,7 +95,10 @@ describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
     //
     // 054 — `FadeLayer.tsx`가 아홉 번째다. 049가 `DiaryListScreen` 안에 두었던 것을 꺼냈다 — 홈 헤더 날짜와 쓰는 중
     // 혼잣말 두 곳이 실제로 쓴다.
-    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(9);
+    //
+    // 055 — `NameField.tsx`가 열 번째다. 1a 입력줄을 첫 실행 작명(`WelcomeScreen`)과 설정의 이름 바꾸기(`RenameScreen`) 두
+    // 곳이 실제로 쓴다(보드 `6c` ② 「이름 짓기(1a)와 같은 입력 화면」).
+    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(10);
   });
 });
 

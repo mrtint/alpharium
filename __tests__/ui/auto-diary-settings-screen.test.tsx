@@ -16,36 +16,24 @@ import { DEFAULT_AUTO_DIARY_SETTINGS } from "../../src/schedule/settings";
  *       spec.md FR-001·FR-002·FR-010·SC-001
  */
 
-describe("AutoDiarySettingsScreen — 존재 (FR-001)", () => {
-  it("토글과 시각 선택 UI가 렌더된다", async () => {
+/*
+ * ★ 055 — on/off 토글은 설정의 「자동으로 쓰기」 행(`SettingsScreen` — settings-screen.test.tsx C2)으로, 배터리 상시 링크(E4)는
+ * 「권한 · 휴대폰 설정으로 이동」의 배터리 행(앱 정보 화면 — C4·C6)으로 옮겨 갔다. 이 화면에는 시각 선택만 남는다(055 FR-019).
+ */
+describe("AutoDiarySettingsScreen — 시각 선택 (FR-001, 055)", () => {
+  it("시각 선택 UI가 렌더되고, 토글·배터리 링크는 여기 없다", async () => {
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
       />,
     );
 
-    expect(screen.getByTestId("auto-diary-toggle")).toBeTruthy();
     expect(screen.getByTestId("target-hour-7")).toBeTruthy();
     expect(screen.getByTestId("target-hour-0")).toBeTruthy();
     expect(screen.getByTestId("target-hour-23")).toBeTruthy();
-  });
-
-  it("토글을 누르면 반대 값으로 onToggleEnabled가 불린다", async () => {
-    const onToggleEnabled = jest.fn();
-    await render(
-      <AutoDiarySettingsScreen
-        settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={onToggleEnabled}
-        onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
-      />,
-    );
-
-    fireEvent.press(screen.getByTestId("auto-diary-toggle"));
-    expect(onToggleEnabled).toHaveBeenCalledWith(true);
+    expect(screen.queryByTestId("auto-diary-toggle")).toBeNull();
+    expect(screen.queryByTestId("open-battery-settings")).toBeNull();
   });
 
   it("시각 셀을 누르면 그 시각으로 onChangeTargetHour가 불린다", async () => {
@@ -53,14 +41,19 @@ describe("AutoDiarySettingsScreen — 존재 (FR-001)", () => {
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={onChangeTargetHour}
-        onOpenBatterySettings={() => {}}
       />,
     );
 
-    fireEvent.press(screen.getByTestId("target-hour-9"));
+    await fireEvent.press(screen.getByTestId("target-hour-9"));
     expect(onChangeTargetHour).toHaveBeenCalledWith(9);
+  });
+
+  it("바깥 스크롤을 두지 않는다 — 설정 지면이 스크롤한다", () => {
+    const code = readFileSync(join(__dirname, "../../src/ui/AutoDiarySettingsScreen.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/ScrollView/);
   });
 });
 
@@ -69,45 +62,11 @@ describe("AutoDiarySettingsScreen — 근사치 안내 (E5, SC-001)", () => {
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
       />,
     );
 
     expect(screen.getByText(/무렵/)).toBeTruthy();
-  });
-});
-
-describe("AutoDiarySettingsScreen — 배터리 상시 링크 (E4, FR-010)", () => {
-  it("자동 생성이 꺼져 있어도 배터리 설정 링크가 보인다", async () => {
-    const onOpenBatterySettings = jest.fn();
-    await render(
-      <AutoDiarySettingsScreen
-        settings={{ ...DEFAULT_AUTO_DIARY_SETTINGS, enabled: false }}
-        onToggleEnabled={() => {}}
-        onChangeTargetHour={() => {}}
-        onOpenBatterySettings={onOpenBatterySettings}
-      />,
-    );
-
-    const link = screen.getByTestId("open-battery-settings");
-    expect(link).toBeTruthy();
-    fireEvent.press(link);
-    expect(onOpenBatterySettings).toHaveBeenCalledTimes(1);
-  });
-
-  it("자동 생성이 켜져 있어도 배터리 설정 링크가 보인다 (E4 상시)", async () => {
-    await render(
-      <AutoDiarySettingsScreen
-        settings={{ ...DEFAULT_AUTO_DIARY_SETTINGS, enabled: true }}
-        onToggleEnabled={() => {}}
-        onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
-      />,
-    );
-
-    expect(screen.getByTestId("open-battery-settings")).toBeTruthy();
   });
 });
 
@@ -116,9 +75,7 @@ describe("AutoDiarySettingsScreen — N8 알림 권한 거부 안내", () => {
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
         notificationDenied
       />,
     );
@@ -130,9 +87,7 @@ describe("AutoDiarySettingsScreen — N8 알림 권한 거부 안내", () => {
     await render(
       <AutoDiarySettingsScreen
         settings={DEFAULT_AUTO_DIARY_SETTINGS}
-        onToggleEnabled={() => {}}
         onChangeTargetHour={() => {}}
-        onOpenBatterySettings={() => {}}
       />,
     );
 

@@ -207,13 +207,17 @@ describe("T13 — 그만두기 뒤에는 토스트가 없다", () => {
 });
 
 describe("FR-024 — 쓰기 시작 전 no-ready-character는 그대로다", () => {
-  it("쓰는 중에 들어가지 않고 토스트 없이 기존 실패 화면(설정으로 가는 길)이다", async () => {
-    const onGoToSettings = jest.fn();
+  /*
+   * 055 FR-030 — 실패 화면의 길이 「설정에서 작성자 준비하기」에서 「모듈 다시 받기」(첫 실행 다운로드 화면)로 바뀌었다.
+   * 설정에 캐릭터 준비가 사라졌기 때문이다(S5). 쓰는 중에 들어가지 않고 토스트가 없다는 054 계약은 그대로다.
+   */
+  it("쓰는 중에 들어가지 않고 토스트 없이 기존 실패 화면(「모듈 다시 받기」)이다", async () => {
+    const onRedownload = jest.fn(async () => false);
     const store = memoryStore();
     await renderWithPortal(
       <DiaryHomeScreen
         now={() => NOW}
-        onGoToSettings={onGoToSettings}
+        onRedownload={onRedownload}
         pipeline={scriptedPipeline()}
         resolution={resolved}
         resolve={resolveNoReady}
@@ -222,11 +226,32 @@ describe("FR-024 — 쓰기 시작 전 no-ready-character는 그대로다", () =
     );
     await press();
 
-    expect(await screen.findByText(/설정에서 작성자 준비하기/)).toBeTruthy();
+    expect(await screen.findByText("모듈 다시 받기")).toBeTruthy();
+    expect(screen.queryByText(/설정에서 작성자 준비하기/)).toBeNull();
     expect(screen.queryByTestId("stop-button")).toBeNull();
     expect(screen.queryByTestId("failure-toast")).toBeNull();
 
-    await userEvent.press(screen.getByText(/설정에서 작성자 준비하기/));
-    expect(onGoToSettings).toHaveBeenCalledTimes(1);
+    // ★ D2 — 누르면 onRedownload. 준비가 안 됐으면(false) 안내 화면에 남는다 — 조립부가 다운로드 화면으로 바꿔 끼운다.
+    await userEvent.press(screen.getByTestId("redownload-button"));
+    expect(onRedownload).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("redownload-button")).toBeTruthy();
+  });
+
+  it("★ D2 — 이미 준비돼 있으면(true) 쓰기 전 홈으로 돌아온다", async () => {
+    const onRedownload = jest.fn(async () => true);
+    await renderWithPortal(
+      <DiaryHomeScreen
+        now={() => NOW}
+        onRedownload={onRedownload}
+        pipeline={scriptedPipeline()}
+        resolution={resolved}
+        resolve={resolveNoReady}
+        store={memoryStore()}
+      />,
+    );
+    await press();
+    await userEvent.press(await screen.findByTestId("redownload-button"));
+    expect(await screen.findByTestId("home-settings")).toBeTruthy();
+    expect(screen.queryByTestId("redownload-button")).toBeNull();
   });
 });

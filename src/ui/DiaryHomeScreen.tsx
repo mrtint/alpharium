@@ -78,6 +78,7 @@ import { MaterialConfirmDialog, SettingsPromptDialog } from "./MaterialDialogs";
 import { OverwriteConfirmDialog } from "./OverwriteConfirmDialog";
 import { AppText } from "./components/Text";
 import { COLORS, WRITING } from "./theme/tokens";
+import { SETTINGS_TEXT } from "./settings-text";
 
 /** 사진 권한을 다시 묻거나(`request`) OS 설정을 여는(`openSettings`) 통로 (053) */
 export type PhotoAccessPort = {
@@ -123,8 +124,27 @@ export type DiaryHomeScreenProps = {
   ) => Promise<VisionOutcome>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
   now?: () => Date;
-  /** 설정 탭으로 가는 길 (029 FR-014 — no-ready-character일 때). */
-  onGoToSettings?: () => void;
+  /**
+   * 「모듈 다시 받기」 (055 FR-030 — 029 FR-014의 「설정에서 작성자 준비하기」를 대신한다).
+   *
+   * 설정에서 캐릭터 준비가 사라졌으므로(S5) 쓰기 시작 전 「캐릭터를 먼저 준비해야 한다」 안내의 길은 첫 실행의 다운로드 화면이다.
+   * 조립부가 필수 에셋을 다시 읽어, 없으면 다운로드 진행 화면으로 바꿔 끼우고 `false`를, 이미 있으면 `true`를 돌려준다 —
+   * `true`면 이 화면이 쓰기 전 홈으로 돌아간다(막다른 길을 만들지 않는다).
+   */
+  onRedownload?: () => Promise<boolean>;
+  /**
+   * 홈 월 라벨 줄 오른쪽의 설정 버튼(055, 보드 `6a`). 조립부가 설정 겹을 연다. 홈의 모든 헤더 상태(안 쓴 날·쓴 날·
+   * 접힘·쓰는 중)에서 같은 자리에 있다(FR-002).
+   */
+  onOpenSettings?: () => void;
+  /**
+   * 설정·개발자 겹이 이 화면 위에 덮여 있는가 (055 FR-007, research R2·R3).
+   *
+   * **덮인 동안 이 화면은 뒤로 가기를 아예 등록하지 않는다** — 등록 순서(안드로이드는 나중 것부터 부른다)에 기대면
+   * 설정이 열린 뒤 이 화면의 effect가 다시 돌 때 그만두기 핸들러가 앞에 서서 **설정의 뒤로 가기가 쓰기를 멈춘다**.
+   * 스크린리더·누름에서도 빠진다. **멈추지 않는 것**: 쓰기·혼잣말·자정 타이머(FR-008) — 이 화면은 그대로 살아 있다.
+   */
+  covered?: boolean;
   /** 알림을 눌러 열렸으면 그 하루 (020, FR-006·SC-004). */
   initialDay?: DayDate | null;
   /**
@@ -219,7 +239,9 @@ export function DiaryHomeScreen({
   release,
   captionDay,
   now = () => new Date(),
-  onGoToSettings,
+  onRedownload,
+  onOpenSettings,
+  covered = false,
   characterNames,
   initialDay,
   onAcknowledge,
@@ -799,121 +821,152 @@ export function DiaryHomeScreen({
   }, [stop, refresh]);
 
   useEffect(() => {
-    if (screen.kind !== "writing") return;
+    // 055 — 겹이 덮인 동안 등록하지 않는다(위 `covered` 주석). 걷히면 다시 등록한다.
+    if (covered || screen.kind !== "writing") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       void cancel();
       return true;
     });
     return () => subscription.remove();
-  }, [screen.kind, cancel]);
+  }, [screen.kind, cancel, covered]);
 
   // 051 — 실패 화면(쓰기 시작 전 막힘)의 안드로이드 뒤로 가기는 「← 일기」와 같다(FR-026). 054 — 임시 결과
   // 화면(`unsaved`)은 없어졌다.
   useEffect(() => {
-    if (screen.kind !== "failed") return;
+    if (covered || screen.kind !== "failed") return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       void goHome();
       return true;
     });
     return () => subscription.remove();
-  }, [screen.kind, goHome]);
+  }, [screen.kind, goHome, covered]);
 
-  switch (screen.kind) {
-    case "build-error":
-      return <BuildErrorScreen />;
+  const body = renderBody();
+  // 055 — 덮인 동안 스크린리더(안드로이드·iOS 각각의 속성)와 누름에서 뺀다(R3). 감싸는 겹은 레이아웃을 바꾸지 않는다.
+  return (
+    <View
+      accessibilityElementsHidden={covered}
+      importantForAccessibility={covered ? "no-hide-descendants" : "auto"}
+      pointerEvents={covered ? "none" : "auto"}
+      style={styles.root}
+      testID="diary-home-root"
+    >
+      {body}
+    </View>
+  );
 
-    case "list":
-    case "confirm-overwrite":
-    case "writing": {
-      const items = screen.kind === "writing" ? writingItems : screen.items;
-      const prompt = listPrompt ?? writePromptFor(items, now(), chosenDay);
-      return (
-        <>
-          <DiaryListScreen
-            canSwipeNext={canSwipeNext(prompt.day, now())}
-            cells={weekCellsFor(items, prompt, now())}
-            deniedNotices={deniedNotices}
-            items={items}
-            movedNotice={movedNotice}
-            // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
-            onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
-            onSelectDay={setChosenDay}
-            onRequestPhoto={() => void requestPhoto()}
-            onDismissToast={() => setToast(null)}
-            onStop={() => void cancel()}
-            onSwipe={onSwipe}
-            onWrite={() => void write()}
-            paper={paper}
-            preview={shownPreview}
-            toast={toast === null ? undefined : { id: toast.id, text: TOAST_TEXT[toast.kind] }}
-            write={prompt}
-            writing={
-              screen.kind === "writing" ? { line: screen.line, name: writingName } : undefined
-            }
-            writtenAt={writtenAt}
-          />
-          {screen.kind === "list" && (
-            <DateJumpDialog
+  function renderBody() {
+    switch (screen.kind) {
+      case "build-error":
+        return <BuildErrorScreen />;
+
+      case "list":
+      case "confirm-overwrite":
+      case "writing": {
+        const items = screen.kind === "writing" ? writingItems : screen.items;
+        const prompt = listPrompt ?? writePromptFor(items, now(), chosenDay);
+        return (
+          <>
+            <DiaryListScreen
+              canSwipeNext={canSwipeNext(prompt.day, now())}
+              cells={weekCellsFor(items, prompt, now())}
+              deniedNotices={deniedNotices}
               items={items}
-              now={now()}
-              onClose={() => setCalendarOpen(false)}
-              onPick={(day) => {
-                setCalendarOpen(false);
-                setChosenDay(day);
-              }}
-              open={calendarOpen}
-              selectedDay={prompt.day}
+              movedNotice={movedNotice}
+              // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
+              onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
+              onOpenSettings={onOpenSettings}
+              onSelectDay={setChosenDay}
+              onRequestPhoto={() => void requestPhoto()}
+              onDismissToast={() => setToast(null)}
+              onStop={() => void cancel()}
+              onSwipe={onSwipe}
+              onWrite={() => void write()}
+              paper={paper}
+              preview={shownPreview}
+              toast={toast === null ? undefined : { id: toast.id, text: TOAST_TEXT[toast.kind] }}
+              write={prompt}
+              writing={
+                screen.kind === "writing" ? { line: screen.line, name: writingName } : undefined
+              }
+              writtenAt={writtenAt}
             />
-          )}
-          {screen.kind === "list" && settingsPromptOpen && (
-            <SettingsPromptDialog
-              onCancel={() => setSettingsPromptOpen(false)}
-              onOpenSettings={() => {
-                setSettingsPromptOpen(false);
-                void photoAccessPort?.openSettings().catch(() => {});
-              }}
-            />
-          )}
-          {screen.kind === "list" && materialConfirm !== null && (
-            <MaterialConfirmDialog
-              because={materialConfirm.because}
-              onCancel={() => setMaterialConfirm(null)}
-              onConfirm={() => {
-                const params = materialConfirm.params;
-                setMaterialConfirm(null);
-                void generate(params, items);
-              }}
-            />
-          )}
-          {screen.kind === "confirm-overwrite" && (
-            <OverwriteConfirmDialog
-              isToday={cellFor(screen.day, items, screen.day, now()).isToday}
-              onCancel={() => setScreen(cancelOverwrite(items))}
-              onConfirm={() => {
-                setScreen(confirmOverwrite());
-                if (pendingParams.current !== null) void generate(pendingParams.current, items);
-              }}
-            />
-          )}
-        </>
-      );
-    }
-
-    case "failed":
-      return (
-        <Frame onBack={() => void goHome()}>
-          <View style={styles.notice}>
-            <AppText variant="body">{screen.message}</AppText>
-
-            {/* 029 — 작성자를 준비해야 하는 실패면 설정 탭으로 가는 길을 준다(FR-014). */}
-            {onGoToSettings !== undefined && /준비/.test(screen.message) && (
-              <Pressable accessibilityRole="button" onPress={onGoToSettings} style={styles.link}>
-                <AppText variant="body">설정에서 작성자 준비하기</AppText>
-              </Pressable>
+            {screen.kind === "list" && (
+              <DateJumpDialog
+                items={items}
+                now={now()}
+                onClose={() => setCalendarOpen(false)}
+                onPick={(day) => {
+                  setCalendarOpen(false);
+                  setChosenDay(day);
+                }}
+                open={calendarOpen}
+                selectedDay={prompt.day}
+              />
             )}
-          </View>
-        </Frame>
-      );
+            {screen.kind === "list" && settingsPromptOpen && (
+              <SettingsPromptDialog
+                onCancel={() => setSettingsPromptOpen(false)}
+                onOpenSettings={() => {
+                  setSettingsPromptOpen(false);
+                  void photoAccessPort?.openSettings().catch(() => {});
+                }}
+              />
+            )}
+            {screen.kind === "list" && materialConfirm !== null && (
+              <MaterialConfirmDialog
+                because={materialConfirm.because}
+                onCancel={() => setMaterialConfirm(null)}
+                onConfirm={() => {
+                  const params = materialConfirm.params;
+                  setMaterialConfirm(null);
+                  void generate(params, items);
+                }}
+              />
+            )}
+            {screen.kind === "confirm-overwrite" && (
+              <OverwriteConfirmDialog
+                isToday={cellFor(screen.day, items, screen.day, now()).isToday}
+                onCancel={() => setScreen(cancelOverwrite(items))}
+                onConfirm={() => {
+                  setScreen(confirmOverwrite());
+                  if (pendingParams.current !== null) void generate(pendingParams.current, items);
+                }}
+              />
+            )}
+          </>
+        );
+      }
+
+      case "failed":
+        return (
+          <Frame onBack={() => void goHome()}>
+            <View style={styles.notice}>
+              <AppText variant="body">{screen.message}</AppText>
+
+              {/*
+                029 → 055 — 작성자를 준비해야 하는 실패면 다시 받는 길을 준다(FR-030). 이미 준비돼 있으면 쓰기 전 홈으로.
+              */}
+              {onRedownload !== undefined && /준비/.test(screen.message) && (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() =>
+                    void onRedownload()
+                      .catch(() => false)
+                      .then((ready) => {
+                        if (ready) void goHome();
+                      })
+                  }
+                  style={styles.link}
+                  testID="redownload-button"
+                >
+                  <AppText variant="body">{SETTINGS_TEXT.redownload}</AppText>
+                </Pressable>
+              )}
+            </View>
+          </Frame>
+        );
+    }
   }
 }
 
@@ -936,6 +989,7 @@ function Frame({ children, onBack }: { children: React.ReactNode; onBack: () => 
 // 032 — 색은 tokens.ts에서. 레이아웃 숫자만 남는다(SM3). 생성 중 뷰에 진행률·
 // 경과 시간·글 조각 없음.
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   frame: { paddingTop: 12 },
   back: { paddingHorizontal: 20, paddingVertical: 8, alignSelf: "flex-start" },
   notice: { padding: 20, gap: 12 },

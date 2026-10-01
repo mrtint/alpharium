@@ -21,22 +21,17 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import type { AutoDiarySettings } from "../schedule/settings";
 import { AppText } from "./components/Text";
-import { Button } from "./components/Button";
-import { COLORS, RADIUS } from "./theme/tokens";
+import { COLORS } from "./theme/tokens";
 
 export type AutoDiarySettingsScreenProps = {
   /** 지금 설정. 기본값은 꺼짐·7시(FR-009·FR-001) */
   settings: AutoDiarySettings;
-  /** "자동 생성" on/off 토글. `App.tsx`가 S6 순서로 부수 효과를 배선한다 */
-  onToggleEnabled: (enabled: boolean) => void;
   /** 목표 시각 변경 (0–23). enabled 유지 시 reschedule로 이어진다 */
   onChangeTargetHour: (hour: number) => void;
-  /** 배터리 최적화 예외 설정 목록을 연다 (E4 상시 링크) */
-  onOpenBatterySettings: () => void;
   /**
    * 알림 권한이 거부됐는가 (N8 Edge Case). true면 "앱을 열어 확인" 안내를
    * 보인다 — 자동 생성 자체는 켤 수 있다(생성은 알림과 무관하게 완주).
@@ -47,40 +42,19 @@ export type AutoDiarySettingsScreenProps = {
 /** 목표 시각 선택지. 시 단위(0–23) — 분은 두지 않는다(근사치, FR-002). */
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 
+/**
+ * ★ 055 — **시각 선택만 남았다.** on/off 토글은 설정 화면의 「자동으로 쓰기」 행(`SettingsScreen`, 보드 `6c` ③)이,
+ * 배터리 링크는 「권한 · 휴대폰 설정으로 이동」의 배터리 행(앱 정보 화면)이 맡는다. 이 시각 목록은 분해 설계 §3.2(「매일 쓰는
+ * 시각」 행 + 시 격자 대화상자)가 대신할 때까지 지금 동작·문구 그대로 「일기」 묶음 안에 놓인다(055 FR-019). 바깥 스크롤은
+ * 설정 지면이 한다 — 여기서 `ScrollView`를 두지 않는다(겹치면 안쪽이 스크롤을 먹는다).
+ */
 export function AutoDiarySettingsScreen({
   settings,
-  onToggleEnabled,
   onChangeTargetHour,
-  onOpenBatterySettings,
   notificationDenied,
 }: AutoDiarySettingsScreenProps) {
   return (
-    <ScrollView
-      className="bg-bg"
-      contentContainerStyle={styles.page}
-      style={{ backgroundColor: COLORS.bg }}
-    >
-      <AppText variant="title">자동으로 일기 쓰기</AppText>
-
-      {/* ★ on/off 토글 (FR-001). */}
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: settings.enabled }}
-        onPress={() => onToggleEnabled(!settings.enabled)}
-        style={[styles.row, settings.enabled && styles.rowSelected]}
-        testID="auto-diary-toggle"
-      >
-        <View style={styles.info}>
-          <AppText variant="body">자동 생성</AppText>
-          <AppText variant="caption">하루가 지나면 휴대폰이 알아서 그 하루를 일기로 쓴다</AppText>
-        </View>
-        {settings.enabled && (
-          <AppText variant="caption" style={{ color: COLORS.danger, fontWeight: "600" }}>
-            켜짐
-          </AppText>
-        )}
-      </Pressable>
-
+    <View style={styles.page}>
       {/* ★ 목표 시각 선택 UI — 시 단위(0–23). */}
       <View style={styles.section}>
         <AppText variant="sectionTitle">언제쯤 쓸까</AppText>
@@ -117,43 +91,15 @@ export function AutoDiarySettingsScreen({
           알림 권한이 없어 완료를 알릴 수 없어요. 앱을 열어 새 일기를 확인하세요.
         </AppText>
       )}
-
-      {/* ★ E4 — 배터리 예외 상시 링크. batteryExceptionPrompted·enabled와 무관하게 항상. */}
-      <View style={styles.section}>
-        <AppText variant="caption">
-          일기가 제때 안 써지나요? 배터리 설정에서 이 앱을 &apos;제한 없음&apos;으로 바꾸면 더 자주
-          시도합니다.
-        </AppText>
-        <View style={{ alignSelf: "flex-start" }}>
-          <Button
-            variant="secondary"
-            onPress={onOpenBatterySettings}
-            testID="open-battery-settings"
-          >
-            배터리 설정 열기
-          </Button>
-        </View>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
 // 032 — 색은 tokens.ts에서. 시각 시 단위(0–23)·정밀도 암시 문구 없음·testID 불변(SM5).
 const styles = StyleSheet.create({
-  page: { padding: 20, gap: 16 },
+  // 055 — 설정 지면(좌우 20)과 같은 세로선에 선다. 위아래만 띄운다.
+  page: { paddingVertical: 12, gap: 16 },
   section: { gap: 8 },
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.card,
-  },
-  rowSelected: { borderColor: COLORS.accent, borderWidth: 1 },
-  info: { flex: 1, gap: 2 },
   hourGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   hourCell: {
     paddingVertical: 8,

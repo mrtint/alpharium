@@ -313,6 +313,76 @@ export const MATERIAL_GRID = {
 } as const;
 
 /**
+ * 설정 화면(055) — 홈 위에 쌓이는 설정의 틀·행·꼬리표·토글과 진입점 (보드 `6a`·`6c`).
+ *
+ * 치수는 보드 마크업 인라인 스타일을 옮긴 사람이 정한 값이다. 보드 색 램프 중 이미 있는 값은 새로 만들지
+ * 않는다(research R10) — 지면 `WRITTEN_DAY.paper`(neutral-100), 값·보조 줄 `COLORS.textMuted`(보드
+ * neutral-600을 043이 AA로 조정한 값), 「허용 안 함」 글자 `COLORS.danger`(= accent-700), 행 구분선
+ * `COLORS.border`(divider). 새로 드는 것은 아래 셋뿐이다.
+ */
+export const SETTINGS = {
+  /** › — 보드 neutral-500. 장식 글리프라 대비 규칙 밖(지면 위 약 2.6:1 — theme-tokens.test가 잠근다) */
+  chevron: "#9b9797",
+  /** 「허용됨」 꼬리표 면·토글 꺼짐 면 — 보드 neutral-200(「다시 쓰기」 바와 같은 값) */
+  tagFill: WRITTEN_DAY.rewriteBar,
+  /** 「허용됨」 꼬리표 글자 — 보드 neutral-800 */
+  tagText: "#444141",
+  /**
+   * 머리 — 위 10·좌우 20, 「‹ 일기」 15/700·‹ 22·최소 높이 44, 제목 44/800·자간 -.04em, 아래 2px 선, 제목 위 6·아래 14.
+   * 보드의 위 56은 iOS 프레임의 상태 표시줄 46을 품은 값이다 — 홈 헤더가 보드 70을 24로 옮긴 것과 같은 환산(2026-10-01 실기기에서
+   * 56을 그대로 두자 머리가 홈보다 한참 아래로 내려앉았다).
+   */
+  head: {
+    paddingTop: 10,
+    paddingH: 20,
+    backSize: 15,
+    backWeight: "700",
+    chevronSize: 22,
+    backMinHeight: 44,
+    backGap: 6,
+    titleSize: 44,
+    titleWeight: "800",
+    /** 보드는 줄높이 .9(= 39.6)지만 iOS는 줄높이가 글자보다 작으면 윗부분을 잘라 낸다(#98) — 글자 크기와 같게 */
+    titleLineHeight: 44,
+    titleLetterSpacingEm: -0.04,
+    titlePaddingTop: 6,
+    titlePaddingBottom: 14,
+    ruleWidth: 2,
+  },
+  /** 지면 안쪽 여백 — 위 14·좌우 20·아래 40 */
+  paperPadding: { top: 14, horizontal: 20, bottom: 40 },
+  /** 묶음 머리 — 11/600, 자간 .1em, 대문자, 위 14(첫 묶음 0)·아래 6 */
+  group: { fontSize: 11, fontWeight: "600", letterSpacingEm: 0.1, marginTop: 14, marginBottom: 6 },
+  /** 행 — 최소 44(보조 줄 56), 간격 12, 라벨 15/600, 값 15, › 18, 보조 줄 12·줄높이 1.35, 라벨·보조 줄 사이 3, 값·› 사이 8 */
+  row: {
+    minHeight: 44,
+    minHeightWithHint: 56,
+    gap: 12,
+    labelSize: 15,
+    labelWeight: "600",
+    valueSize: 15,
+    chevronSize: 18,
+    hintSize: 12,
+    hintLineHeightRatio: 1.35,
+    hintGap: 3,
+    valueGap: 8,
+  },
+  /** 꼬리표 — 13/600. 면 있는 것은 여백 3·8, 테두리 있는 것은 1px + 여백 2·7 */
+  tag: {
+    fontSize: 13,
+    fontWeight: "600",
+    filledPadding: { v: 3, h: 8 },
+    outlinedPadding: { v: 2, h: 7 },
+  },
+  /** 토글 — 44×26, 안쪽 3, 손잡이 20×20 */
+  toggle: { width: 44, height: 26, padding: 3, knob: 20 },
+  /** 진입점 — 점 5×5 셋, 간격 4, 누름 44×44, 보드 음수 여백 -14 -12 -14 0 */
+  entry: { dot: 5, gap: 4, hit: 44, margin: { top: -14, right: -12, bottom: -14 } },
+  /** 겹이 밀려 들어오고 나가는 시간 — 052 접힘·051 바와 맞춘 사람이 정한 값(research R1) */
+  slideMs: 240,
+} as const;
+
+/**
  * WCAG 상대 명암비 — `(L1 + 0.05) / (L2 + 0.05)`.
  *
  * 순수 함수. 팔레트 값이 AA를 넘는지 **빌드 시** 검증하는 용도이지(theme-tokens.

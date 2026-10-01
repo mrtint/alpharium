@@ -129,7 +129,7 @@ export const WRITTEN_DAY_TEXT = {
   unreadableLines: ["이 날의 일기 파일이 손상됐어요.", "다시 쓰면 새로 남아요."],
   /** 사진 사본을 못 불러온 슬라이드 (017 FR-002) */
   photoMissing: "이 사진은 이제 없어요",
-  /** 결과·실패 화면에서 홈으로 (048 `SubScreenFrame`과 같은 말) */
+  /** 쓰기 시작 전 실패 화면에서 홈으로 (048 하위 화면의 뒤로와 같은 말이었다 — 055 설정은 「‹ 일기」) */
   backToHome: "← 일기",
 } as const;
 

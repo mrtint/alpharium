@@ -22,7 +22,9 @@
 - **백그라운드 자동 생성과 알림**, **통합 첫 실행 흐름**(로고 → 권한 → 다운로드 동의·
   진행 → 작명 → 자동 첫 일기), **캐릭터 페르소나**(로스터는 검증된 하나, 037).
 - **홈 UI/UX 개편(Modernist)이 조각 단위로 진행 중이다**(049~054): 주간 스트립·날짜
-  달력·쓴 날 읽기·읽기 스크롤·쓸 재료·제자리 쓰기. 설정 화면 구성은 아직 안 했다.
+  달력·쓴 날 읽기·읽기 스크롤·쓸 재료·제자리 쓰기.
+- **설정·개발자 화면 개편도 조각 단위로 진행 중이다**(055~): 홈 위에 쌓이는 설정 틀. 시각 격자·자동 쓰기 규칙·이 휴대폰·
+  개발자 메뉴(버전 7번 탭)·진단·상태 흉내는 아직이다(분해 설계 `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`).
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -230,7 +232,8 @@
   (`download-conflict`·`parallel-model-download`·`photo-vision`)은 설정 탭 하단 `CharacterListScreen`을 지난다.
 - **⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야 돈다.** 등록하지 않으면 파일이 있어도
   아무것도 검증되지 않은 초록불이다. 지금 `FLOWS` 밖에 있는 것: 051이 `⋯` 메뉴를 없앤 뒤 설정·개발자 진입이
-  필요한 흐름 열한 개(설정 화면 구성과 함께 전면 재개편 예정), `download-conflict`(026 이후)·
+  필요한 흐름 열한 개(055가 설정 진입 `home-settings`를 두었으나 설정에 캐릭터 목록·권한 안내 다시 보기가 없어 그 단계에
+  기대는 흐름은 폐기 후보 — 개발자 메뉴 조각에서 하나씩 정한다), `download-conflict`(026 이후)·
   `parallel-model-download`(로스터 하나, 037)·`diary-user-path`(stale 메뉴)는 **알려진 실패**다.
 
 ### 백그라운드 작업 소크·헤드리스 관찰
@@ -377,7 +380,7 @@
   잠근다). 화면은 그 문자열만 받는다 — `PromptPreviewPanel.tsx`가 `diary/prompt`·`signals`를 import하지 않고 헌법 검사
   `UI_TOUCHES_PROMPT`가 막는다(`signals/types`는 `DiaryDetailScreen` 등이 정당하게 써서 막지 않는다). 크기는 `text.length`
   근사치이고 「실측 토큰 아님」 라벨이 붙는다(원칙 IV, 소스에 `token` 어휘 금지, PP6).
-- **⚠️ 개발자 탭은 지금 진입점이 없다**(051이 `⋯` 메뉴를 없앴다) — 설정 화면 구성 과제에서 다시 둔다.
+- **⚠️ 개발자 화면은 지금 진입점이 없다**(051이 `⋯` 메뉴를 없앴다) — 개발자 메뉴 조각(설정 「버전」 7번 탭)이 둔다.
 
 ### 023 — 사진 선별 알고리즘
 
@@ -498,8 +501,7 @@
 
 ### 048 — 일기 홈 구조
 
-- **탭 줄이 없다.** `route: "home" | "settings" | "developer"`이고 하위 화면은 `SubScreenFrame`의 「← 일기」(`back-to-home`)와 뒤로 가기(그
-  프레임이 마운트된 동안만 가로챈다)로 돌아온다. 홈에서 하위 화면으로 가는 메뉴는 051이 없앴다(위 022 참조).
+- **탭 줄이 없다.** `route: "home" | "settings" | "developer"`이고 하위 화면은 홈 위에 쌓이는 겹이다(055 — 아래).
 - **미리보기는 파이프라인과 같은 `loadSignals` 하나를 나눠 쓴다**(`wiring.previewDay(day)` → `DayPreview`, PV4). 좁히는 함수는
   `app/day-preview.ts`에 따로 있다(`state.ts`가 신호 타입을 import하면 화면이 그걸 거쳐 신호에 닿는다, DP8). 「읽는 중」은 상태로
   저장하지 않고 렌더에서 가른다(`react-hooks/set-state-in-effect`). **고른 날은 `AppFrame`이 들고 있다**(설정 왕복·재마운트에도 남고
@@ -552,7 +554,7 @@
 - **하단 바는 화면 폭 전체의 블록 하나이고 쓴 날의 바는 지면 끝(4px)에 닿아야 올라온다**(`reachedEnd`). 숨긴 바는 `pointerEvents="none"` + 접근성 트리에서 뺀다
   (jest·Maestro 모두 못 본다 — 테스트는 `__tests__/ui/paper-end.ts`, 흐름은 `scrollUntilVisible`). `translateY`로 내린 바가 edge-to-edge 아래 내비게이션 바 뒤로
   비쳐 쓴 날 루트에 `overflow: "hidden"`. 헤더·스트립은 고정이고 지면만 스크롤된다. 상태 줄·제목은 큰 숫자 오른쪽 세로 묶음의 요일 아래다.
-- **`⋯` 메뉴(048 `HomeMenu`)를 없앴다** — 지금 설정은 「캐릭터를 먼저 준비해야 한다」 링크로만 닿고 개발자 탭은 닿을 길이 없다. 진입점은 설정 화면 구성 과제의 몫이다.
+- **`⋯` 메뉴(048 `HomeMenu`)를 없앴다** — 설정 진입은 055의 월 라벨 줄 점 세 개다.
 - **구현 뒤 보드와 셋이 어긋났다**(저장소 소유자 육안; 계약 테스트는 전부 초록) — 047과 같은 교훈이다.
 
 ### 052 — 읽기 스크롤
@@ -589,8 +591,8 @@
 - **실패 갈래 표는 사람이 못 박은 상수**(`src/app/failure-toast.ts`: `retry`·`prepare-character`·`prepare-vision`·`plain`·`save`). 파이프라인 이유는 `` `${kind}: ${detail}` `` 꼴이라 앞 토큰과
   `vision-failed`의 detail만 본다(문구 비교 금지). **사용자가 조치해야 풀리는 실패에 「다시 써 볼 수 있어요」라고 하지 않는다**(SC-006). 정본은 `TOAST_TEXT`·`TOAST_SWIPE`.
   **문구는 지금 다섯 갈래 모두 「일기를 쓰지 못했어요.」 한 줄이다**(2026-09-30 저장소 소유자 결정 — 보드 `m.failToast`의 「다시 써 볼 수 있어요」도 뺐다). 갈래 판정은 남겨
-  두었으니 설정 진입점이 생기면 `TOAST_TEXT`만 다시 가른다.
-- **설정 진입 정정**: 쓰는 도중의 준비 실패는 토스트뿐이라 그 자리에서 설정으로 가는 길이 없다 — 유일한 길은 쓰기 **시작 전** `no-ready-character` 안내 화면의 버튼이다.
+  두었다 — 055의 설정에는 캐릭터 준비 경로가 없어(S5) 다시 가를 근거가 아직 없다.
+- 쓰는 도중의 준비 실패는 토스트뿐이다. 다시 받는 길은 쓰기 **시작 전** `no-ready-character` 안내 화면의 「모듈 다시 받기」(055)뿐이다.
 - 혼잣말은 4초 간격 + 단계 전환 즉시 페이드 교체다(문안은 「지금 하는 일」에 근거, 039; 「지금 줄」은 글자가 아니라 `writing-monologue-text` testID로 찾는다 — 나가는 겹이 잠시 트리에 남는다).
   **쓰는 중에 들어갈 때 052의 접힘·끝 판정 상태를 비운다**(안 그러면 그만두고 돌아올 때 스트립이 접힌 채 시작한다). 토스트 바닥은 「바의 잰 높이 + 12」다.
   `react-hooks/immutability`: 공유값을 수정하는 함수는 그 값을 쓰는 effect보다 먼저 선언한다.
@@ -598,6 +600,40 @@
   저장 실패 토스트(일기 폴더를 `run-as chmod 500`으로 막아 유도 — 새 파일 없음), 글꼴 2.0배의 토스트(한 줄, 바 위 12dp), 약한 쓸기(10pt 활성 ~ 24pt 문턱 사이)의
   되돌아옴(약 25px 따라 내려갔다가 약 230ms에 제자리, 닫히지 않음 — 녹화 프레임). **10pt 미만의 끌기는 팬이 서지 않아 토스트가 움직이지 않는다**(`activeOffsetY`).
   **미확인**: `plain`·`prepare-*` 토스트(계약 테스트로 갈음 — 문구가 한 줄로 같아 갈래는 판정 테스트가 본다), 사람 손의 손맛.
+
+### 055 — 설정 진입과 화면 틀
+
+- **설정은 홈 위에 쌓인다 — 홈을 언마운트하지 않는다.** `AppFrame`은 `DiarySection`을 `route`와 무관하게 늘 그리고 그 위에
+  `StackLayer`(절대 배치 + reanimated `translateX` 240ms, 닫힘 뒤 JS 타이머로 언마운트)를 얹는다. 그래서 설정에 다녀와도 쓰는 중·지면
+  스크롤·접힘이 그대로다. 새 내비게이션 라이브러리는 없다(`react-native-screens`는 050 DEP1). 이름 바꾸기는 설정 위에 한 겹 더 쌓는다.
+- **★ 겹친 동안 홈은 뒤로 가기를 아예 등록하지 않는다(`DiaryHomeScreen`의 `covered`).** 안드로이드 `BackHandler`는 나중에 등록한 것부터
+  부르므로(RN `BackHandler.android.js`가 뒤에서부터 순회), 설정이 열린 뒤 홈의 effect가 다시 돌면 쓰는 중의 그만두기 핸들러가 앞에 서서
+  **설정의 뒤로 가기가 쓰기를 멈춘다** — 조용한 결함. 등록 순서에 기대지 않는다: 덮인 홈은 등록하지 않고, 겹도 위에 다른 겹이 있으면
+  (`active={false}`) 등록하지 않는다. `covered`는 닫히는 240ms 동안에도 참이다(겹이 `onSettled`로 마운트 상태를 알린다). 덮인 홈은
+  `importantForAccessibility="no-hide-descendants"`·`accessibilityElementsHidden`·`pointerEvents="none"`. 쓰기·혼잣말·자정 타이머는 멈추지 않는다.
+- **★ 실기기에서만 드러난 결함 둘**(jest 전부 초록): (1) `currentEnvironment()`는 부를 때마다 새 객체인데 `DiarySection`이 렌더마다
+  불렀다 — 설정을 열어 홈이 다시 그려지는 순간 `DiaryHomeScreen`의 `resolution` effect가 화면을 처음 상태로 돌려 **쓰는 중이 안 쓴 날로
+  보이고 생성은 뒤에서 계속 돌아 저장됐다.** 환경 판정은 `useState(() => currentEnvironment())`로 마운트 때 한 번이다(jest는 같은 상수로
+  다시 그려 못 잡았다 — 소스 계약으로 잠갔다). (2) 절대 배치는 부모의 패딩을 무시한다 — 겹을 `SafeAreaView` 바로 아래에 두면 인셋 밑까지
+  덮는다. 홈과 겹을 안쪽 `View` 하나에 담는다. 머리 위 여백은 보드 56 − iOS 상태 표시줄 46 = 10(홈 70 → 24와 같은 환산).
+- 진입점은 월 라벨 줄 오른쪽 점 셋(`home-settings`, 048의 `home-kicker` 「일기」 글자 자리) — 헤더는 접히지 않아 안 쓴 날·쓴 날·접힘·쓰는 중
+  모두 같은 자리다. 쓰기 시작 전 실패 안내는 홈 헤더가 없는 별도 화면이라 진입점이 없다.
+- 설정 내용: 이름(→ `RenameScreen`, 1a 입력줄 `NameField` 공유, 빈 이름이면 「저장」 흐림 — 첫 실행 1a는 047대로 흐리지 않는다)·자동으로
+  쓰기 토글(그 아래 §3.2 전까지 옛 0–23 시각 목록과 장소명 3상태)·권한 네 행·버전. **캐릭터 목록·작성자 고르기·`PermissionsSection`(온보딩
+  다시 하기)을 설정 조립에서 걷었다**(파일·자기 테스트는 남겼다 — 정리는 개발자 메뉴 조각). 배터리 행도 앱 정보 화면으로 간다(024의
+  「배터리 사용 관리」 목록 인텐트는 온보딩 배터리 단계에만 남는다).
+- 권한 꼬리표는 순수 함수 `permissionTagFor`(`src/app/permission-tags.ts`) — 읽지 못한 행은 `unread`로 꼬리표를 그리지 않는다. 사진의 위치
+  정보는 조회 API가 없어 `photoLocationProbe`가 최근 사진 한 장의 `locationOf`를 실제로 불러 본다(실패 = 권한 없음으로 본다 — 「막 지운 사진」도
+  섞이는 짐작). 마운트·`AppState → active` 때 다시 읽는다(`usePermissionTags`).
+- 버전은 `expo-application`의 `nativeApplicationVersion`·`nativeBuildVersion`(설치본 값). `expo-constants`의 `platform.android`는 bare에서 빈 맵이다.
+  `expo-application`은 `expo-notifications`를 통해 이미 자동 링크돼 있었다(`npx expo-modules-autolinking search -p android`) — 직접 의존성으로만 올렸다.
+- **「설정에서 작성자 준비하기」 → 「모듈 다시 받기」**: 누르면 `onRedownload`가 다운로드 시작 ref(`essentialDownloadStarted`)와 완료 확인
+  (`downloadProceedConfirmed`)을 **먼저 되돌린 뒤** 필수 에셋을 다시 읽는다 — ref를 안 되돌리면 이번 세션에 이미 받은 적이 있을 때 진행 화면만 뜬 채
+  아무것도 받지 않는다. 이미 준비돼 있으면 홈으로 돌아온다.
+- 큰 제목 줄높이는 보드 .9가 아니라 글자 크기(44)다(#98 — iOS가 윗부분을 자른다).
+- 테스트 함정: fake timers를 쓰는 스위트에서 `act(() => …)`(동기)로 핸들러를 부르면 **다음 테스트의 effect가 flush되지 않았다** — `await act(async …)`.
+  python으로 테스트에 정규식 `\b`를 쓰면 백스페이스가 박힌다(AGENTS 위 규칙 그대로 — `diary-list.test.tsx`·`day-preview.test.ts`·
+  `material-grid.test.tsx`에 이전부터 박힌 것이 남아 있다, 그 단언들은 아무것도 검사하지 못한다).
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

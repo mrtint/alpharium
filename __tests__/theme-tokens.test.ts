@@ -21,6 +21,7 @@ import {
   RNR_COLOR_ALIASES,
   TYPE,
   contrastRatio,
+  SETTINGS,
   WRITTEN_DAY,
 } from "../src/ui/theme/tokens";
 
@@ -187,5 +188,28 @@ describe("051 — 쓴 날 면 색의 대비 (research R7)", () => {
   it("COLORS 아홉 역할은 그대로다 — 보드 램프 색은 WRITTEN_DAY에만 있다", () => {
     expect(Object.values(COLORS)).not.toContain(WRITTEN_DAY.paper);
     expect(Object.values(COLORS)).not.toContain(WRITTEN_DAY.rewriteBar);
+  });
+});
+
+describe("055 — 설정 면 색의 대비 (research R10)", () => {
+  it.each([
+    ["「허용됨」 글자 / 꼬리표 면", SETTINGS.tagText, SETTINGS.tagFill, 4.5],
+    ["「허용 안 함」 글자 / 지면", COLORS.danger, WRITTEN_DAY.paper, 4.5],
+    ["값·보조 줄·「일부 허용」 글자 / 지면", COLORS.textMuted, WRITTEN_DAY.paper, 4.5],
+    ["라벨 / 지면", COLORS.text, WRITTEN_DAY.paper, 4.5],
+  ] as const)("%s — AA 이상", (_name, fg, bg, min) => {
+    expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(min);
+  });
+
+  // › 는 장식 글리프다(누름 영역은 행 전체이고 뜻은 라벨이 말한다). 보드 neutral-500 그대로 둔다 —
+  // 실측 약 2.65:1. 색을 바꾸려면 저장소 소유자에게 묻는다. 값이 더 흐려지지 않게만 잠근다.
+  it("› / 지면 — 장식이라 대비 규칙 밖, 실측 2.6:1 아래로 내려가지 않는다", () => {
+    expect(contrastRatio(SETTINGS.chevron, WRITTEN_DAY.paper)).toBeGreaterThanOrEqual(2.6);
+  });
+
+  it("새 색은 COLORS에 넣지 않는다 — 꼬리표 면은 「다시 쓰기」 바와 같은 값", () => {
+    expect(SETTINGS.tagFill).toBe(WRITTEN_DAY.rewriteBar);
+    expect(Object.values(COLORS)).not.toContain(SETTINGS.chevron);
+    expect(Object.values(COLORS)).not.toContain(SETTINGS.tagText);
   });
 });

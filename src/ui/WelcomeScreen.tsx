@@ -40,9 +40,10 @@
  */
 
 import { useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, KeyboardAvoidingView, ScrollView, View } from "react-native";
 
 import { Button } from "./components/Button";
+import { NameField } from "./components/NameField";
 import { AppText } from "./components/Text";
 import { COLORS } from "./theme/tokens";
 
@@ -123,7 +124,6 @@ export function WelcomeScreen({
   // 빈 입력·공백만은 확정할 수 없다(FR-012). 조립부가 다시 검증하지만
   // 화면에서도 버튼을 잠가 사용자가 헛되이 누르지 않게 한다.
   const canSubmit = draft.trim() !== "";
-  const counter = `${draft.length}/${NAME_INPUT_MAX_LENGTH}`;
 
   return (
     <View style={phase !== "welcome" ? CONTAINER : WELCOME_CONTAINER} testID="welcome-screen">
@@ -193,36 +193,15 @@ export function WelcomeScreen({
                 {TEXT.namePrompt}
               </AppText>
 
-              <View style={INPUT_ROW}>
-                {/*
-                 * 025 실측 — 여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가
-                 * 접근성 트리에 노출되지 않는다. 입력창은 조각이 하나지만 Maestro가
-                 * 확실히 찾도록 `accessibilityLabel`을 함께 준다.
-                 */}
-                <TextInput
-                  accessibilityLabel={TEXT.namePlaceholder}
-                  maxLength={NAME_INPUT_MAX_LENGTH}
-                  onChangeText={setDraft}
-                  placeholder={TEXT.namePlaceholder}
-                  placeholderTextColor={COLORS.textMuted}
-                  style={INPUT}
-                  testID="welcome-name-input"
-                  value={draft}
-                />
-                {/*
-                 * 입력 중인 글자 수다 — 원칙 IV가 금지한 측정 지표가 아니다. 셈은
-                 * `maxLength`·`naming.ts`와 같은 `.length`(research R6). 조각을 한
-                 * 문자열로 합쳐 testID가 접근성 트리에 남게 한다(025).
-                 */}
-                <AppText
-                  accessibilityLabel={counter}
-                  style={COUNTER}
-                  testID="welcome-name-counter"
-                  variant="caption"
-                >
-                  {counter}
-                </AppText>
-              </View>
+              {/* 055 — 입력줄은 설정의 이름 바꾸기와 공유한다(`NameField`). 모양·testID는 그대로다. */}
+              <NameField
+                counterTestID="welcome-name-counter"
+                inputTestID="welcome-name-input"
+                maxLength={NAME_INPUT_MAX_LENGTH}
+                onChangeText={setDraft}
+                placeholder={TEXT.namePlaceholder}
+                value={draft}
+              />
               <AppText style={HINT} variant="caption">
                 {TEXT.nameHint}
               </AppText>
@@ -405,29 +384,6 @@ const DIVIDER = {
 
 /** 1a 이름 프롬프트 — 14px / 600. */
 const NAME_PROMPT = { fontSize: 14, lineHeight: 20, fontWeight: "600" } as const;
-
-/** 1a 입력줄 — 밑줄 2px 본문색, 입력 글자와 카운터가 한 줄 양 끝. */
-const INPUT_ROW = {
-  flexDirection: "row",
-  alignItems: "center",
-  justifyContent: "space-between",
-  borderBottomWidth: 2,
-  borderBottomColor: COLORS.text,
-  paddingTop: 8,
-  paddingBottom: 10,
-} as const;
-
-/** 1a 입력 글자 — 28px / 800. 테두리는 `INPUT_ROW`의 밑줄뿐이다. */
-const INPUT = {
-  flex: 1,
-  padding: 0,
-  fontSize: 28,
-  fontWeight: "800",
-  color: COLORS.text,
-} as const;
-
-/** 1a 카운터 — 12px, 흐린 글자. */
-const COUNTER = { fontSize: 12, lineHeight: 16, marginLeft: 8 } as const;
 
 /** 1a 힌트 — 12px, 흐린 글자. */
 const HINT = { fontSize: 12, lineHeight: 16 } as const;

@@ -31,7 +31,7 @@
 
 | ID | 계약 | 검증 |
 | --- | --- | --- |
-| F1 | 머리: 「‹ 일기」(`testID="back-to-home"`, 최소 높이 44, ‹ 22, 글자 15/700) + 「설정」(44/800, 줄높이 0.9×44, 자간 -0.04×44) + 아래 2px `COLORS.text` 선. 머리는 스크롤 밖 | jest |
+| F1 | 머리: 「‹ 일기」(`testID="back-to-home"`, 최소 높이 44, ‹ 22, 글자 15/700) + 「설정」(44/800, 줄높이 44 — 보드 .9는 iOS 잘림 #98 선례로 글자 크기와 같게, 자간 -0.04×44) + 아래 2px `COLORS.text` 선. 머리 위 10(보드 56 − iOS 상태 표시줄 46)·좌우 20, 머리는 스크롤 밖 | jest |
 | F2 | 지면: `WRITTEN_DAY.paper` 배경 `ScrollView`, 여백 위 14·좌우 20·아래 40 | jest |
 | F3 | 묶음 머리: 11/600, 자간 1.1, 대문자, `COLORS.accent`, 위 14(첫 묶음 0)·아래 6 | jest |
 | F4 | 행: 최소 높이 44(보조 줄 56), 아래 1px `COLORS.border`, 간격 12, 라벨 15/600 `text`, 값 15 `textMuted` tabular, › 18 `SETTINGS.chevron`, 보조 줄 12 줄높이 1.35×12 `textMuted` | jest |
