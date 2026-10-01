@@ -14,7 +14,9 @@
 
 ## 진행 예정 과제
 
-없음.
+| 스펙 | 과제 |
+| :--: | ---- |
+| 055 | 설정 진입과 화면 틀 — 홈 위에 쌓이는 설정 (보드 `6a`·`6c`, 분해 설계 [2026-10-01-settings-developer-decomposition-design.md](../superpowers/specs/2026-10-01-settings-developer-decomposition-design.md) §3.1) |
 
 ## 완료 이력
 
