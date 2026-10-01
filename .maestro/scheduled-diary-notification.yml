@@ -1,14 +1,16 @@
 # 055 — 설정 진입은 `home-settings`(홈 월 라벨 줄 오른쪽 점 세 개). 설정에 캐릭터 목록·권한 안내 다시 보기가 없다 —
 #       그 단계에 기대면 폐기 후보(대체 경로는 개발자 메뉴 조각). FLOWS 밖이다.
+# 056 — 시각 선택은 「매일 쓰는 시각」 행 + 시 격자 대화상자(`settings-time-place.yml`이 FLOWS에서 본다). 이 흐름은 M1~M3을
+#       새 자리로 고쳤고, 개발자 탭 단계(stale)는 그대로 둔다.
 # 실기기 자동 테스트 — 시간대 지정 자동 일기 작성과 완성 알림 (020)
 #
 # ─────────────────────────────────────────────────────────────────────────────
 # **019 스파이크가 검증한 백그라운드 생성 경로를 제품 기능으로 만든 것을 본다.**
 #
 # 검증 항목:
-#   FR-001       자동 생성 설정 화면에 목표 시각 선택·on/off 토글이 있다        (M1)
-#   FR-002·SC-001 근사치 안내 문구가 보인다("그 무렵에")                        (M2)
-#   FR-010       배터리 예외 상시 링크가 화면에 있다                            (M3)
+#   FR-001       설정에 자동으로 쓰기 토글과 「매일 쓰는 시각」 행이 있다          (M1)
+#   FR-002·SC-001 시각 값이 근사치 꼴이다(「…시쯤」, 056)                        (M2)
+#   FR-010       배터리 행과 보조 문구가 있다(055 — 앱 정보 화면으로)            (M3)
 #   FR-002       정밀도를 암시하는 문구("정각"/"매일 7시")가 없다              (원칙 II)
 #   원칙 III      설정·알림에 모델 정보가 없다                                  (M4)
 #
@@ -30,32 +32,40 @@ appId: com.anonymous.alpharium
 ---
 - launchApp
 
-# 설정 탭으로 간다 — 자동 생성 설정은 prod에도 있는 사용자 화면이라 개발자 탭이
-# 아니라 설정 탭에 있다(020 App.tsx `AutoDiarySection`이 `settings` 갈래에서 그려짐).
+# 설정으로 간다 — 055 진입점(홈 월 라벨 줄 오른쪽 점 세 개).
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 20000
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-title"
+    timeout: 5000
+
+# ★ M1 — **토글이 있고, 켜져 있으면 「매일 쓰는 시각」 행이 있다**(056).
+- assertVisible:
+    id: "auto-diary-toggle"
 - runFlow:
     when:
-      visible:
-        id: "home-menu-button"
+      notVisible:
+        id: "settings-target-hour"
     commands:
       - tapOn:
-          id: "home-menu-button"
-      - tapOn:
-          id: "home-menu-settings"
+          id: "auto-diary-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "settings-target-hour"
+    timeout: 5000
 
-# ★ M1 — **자동 생성 설정 화면이 있고, 목표 시각·토글이 보인다.**
-- scrollUntilVisible:
-    element:
-      text: ".*자동.*일기.*"
-    direction: DOWN
-    timeout: 20000
-
-# ★ M2 — **근사치 안내 문구가 보인다**(FR-002·SC-001).
+# ★ M2 — **시각 값이 근사치 꼴이다**(FR-002·SC-001, 056 — 「…시쯤」).
 - assertVisible:
-    text: ".*무렵.*"
+    text: ".*시쯤"
 
-# ★ M3 — **배터리 예외 상시 링크가 있다**(FR-010, batteryExceptionPrompted와 무관).
+# ★ M3 — **배터리 행과 보조 문구가 있다**(055 — 앱 정보 화면으로 간다).
 - assertVisible:
-    text: ".*배터리 설정.*"
+    text: ".*제한 없음으로 두면 제때 써요.*"
 
 # ★ 원칙 II — **정밀도를 암시하는 문구가 없다**(FR-002).
 - assertNotVisible:

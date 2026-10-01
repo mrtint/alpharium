@@ -1,0 +1,160 @@
+# 056 — 매일 쓰는 시각과 장소 이름 (보드 `6c` ③·`6f`·`6l`)
+#
+# 검증 항목:
+#   FR-001·002  자동으로 쓰기가 켜져 있으면 토글 아래 「매일 쓰는 시각」 행이 있다          (M1)
+#   FR-006~016  행 → 시 격자 대화상자, 칸 한 번에 적용·닫힘, 행 값이 「…시쯤」으로 바뀐다   (M2)
+#   FR-017      「취소」는 값을 바꾸지 않는다                                              (M3)
+#   FR-019~027  「장소 이름으로 보기」 행 → 세 갈래 대화상자, 칸 한 번에 적용·닫힘          (M4)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **★ 여기서 자동화하지 않는 것 — quickstart.md:**
+#
+#   펼침·접힘의 움직임(Q1), 다시 예약(Q3, `dumpsys jobscheduler`), 바깥 누름·시스템 뒤로(Q4),
+#   「켬」의 위치 권한 창(Q6), 두 번째 열기에 「읽는 중」이 없음(Q7, 녹화 프레임), 토글 꺼짐 손잡이(Q8), 큰 글꼴(Q9).
+#
+# **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+#
+# ⚠️ 이 흐름은 기기 설정을 바꾼다 — 끝에서 시각을 오후 10시(22, 기본값)·장소를 「자동」(기본값)으로 둔다. 원래 값이
+# 다른 기기라면 손으로 되돌린다. 자동으로 쓰기가 꺼져 있었으면 켜고 끝난다.
+# 12시간 형식(ko) 기기를 가정한다 — 24시간 형식이면 오전/오후 칸이 없어 M2가 실패한다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# 045 — 다운로드 완료 화면이 뜨면 지나간다(diary-home-1d.yml과 같다).
+- extendedWaitUntil:
+    visible:
+      id: "download-progress-complete|home-month"
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: "download-progress-complete"
+    commands:
+      - tapOn:
+          id: "download-progress-proceed"
+- extendedWaitUntil:
+    visible:
+      id: "home-month"
+    timeout: 20000
+
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-title"
+    timeout: 5000
+
+# ★ M1 — 꺼져 있으면 켠다. 켜지면 토글 아래 「매일 쓰는 시각」 행이 펼쳐진다.
+- runFlow:
+    when:
+      notVisible:
+        id: "settings-target-hour"
+    commands:
+      - tapOn:
+          id: "auto-diary-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "settings-target-hour"
+    timeout: 5000
+- assertVisible: "매일 쓰는 시각"
+
+# ★ M2 — 행 → 대화상자. 오후 10시로 맞춘 뒤(이미 22면 닫히기만 한다) 오후 9시로 바꾼다.
+- tapOn:
+    id: "settings-target-hour"
+- extendedWaitUntil:
+    visible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- assertVisible:
+    id: "target-hour-preview"
+- assertNotVisible: "저장"
+- tapOn:
+    id: "target-hour-pm"
+- tapOn:
+    id: "target-hour-cell-22"
+- extendedWaitUntil:
+    notVisible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- assertVisible: "오후 10시쯤"
+
+- tapOn:
+    id: "settings-target-hour"
+- extendedWaitUntil:
+    visible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- tapOn:
+    id: "target-hour-cell-21"
+- extendedWaitUntil:
+    notVisible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- assertVisible: "오후 9시쯤"
+
+# ★ M3 — 오전으로 바꾸고 「취소」 → 값 그대로.
+- tapOn:
+    id: "settings-target-hour"
+- extendedWaitUntil:
+    visible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- tapOn:
+    id: "target-hour-am"
+- assertVisible: "매일 오전 9시쯤 어제 일기를 써요. 이미 쓴 날은 건너뛰어요."
+- tapOn:
+    id: "target-hour-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- assertVisible: "오후 9시쯤"
+
+# 기본값(오후 10시)으로 되돌린다.
+- tapOn:
+    id: "settings-target-hour"
+- extendedWaitUntil:
+    visible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- tapOn:
+    id: "target-hour-cell-22"
+- extendedWaitUntil:
+    notVisible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- assertVisible: "오후 10시쯤"
+
+# ★ M4 — 장소 이름 행 → 「끔」 → 행 값 「끔」 → 「자동」으로 되돌린다.
+- tapOn:
+    id: "settings-place-names"
+- extendedWaitUntil:
+    visible:
+      id: "place-name-dialog"
+    timeout: 5000
+- assertVisible: "좌표를 기기의 지도 서비스에 물어봐요."
+- tapOn:
+    id: "place-name-off"
+- extendedWaitUntil:
+    notVisible:
+      id: "place-name-dialog"
+    timeout: 5000
+- assertVisible:
+    id: "settings-place-names"
+- assertVisible: "끔"
+
+- tapOn:
+    id: "settings-place-names"
+- extendedWaitUntil:
+    visible:
+      id: "place-name-dialog"
+    timeout: 5000
+- tapOn:
+    id: "place-name-auto"
+- extendedWaitUntil:
+    notVisible:
+      id: "place-name-dialog"
+    timeout: 5000
+- assertVisible: "자동"

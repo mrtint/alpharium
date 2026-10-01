@@ -47,8 +47,15 @@ function DialogContent({
           entering={FadeIn.duration(200).reduceMotion(ReduceMotion.System)}
           exiting={FadeOut.duration(150).reduceMotion(ReduceMotion.System)}
         >
-          {/* 면 안의 누름이 덮개의 닫기로 새지 않게 가둔다 */}
-          <Pressable accessible={false} onPress={() => {}} style={{ width: "100%" }}>
+          {/*
+            면 안의 누름이 덮개의 닫기로 새지 않게 가둔다. 056 — 덮개 높이를 넘지 않고 줄어들어야 면(`flexShrink`)과 본문 스크롤이
+            넘침을 맡는다(Dialog.tsx DLG8).
+          */}
+          <Pressable
+            accessible={false}
+            onPress={() => {}}
+            style={{ width: "100%", maxHeight: "100%", flexShrink: 1 }}
+          >
             <DialogPrimitive.Content
               className={cn("bg-background z-50 flex w-full flex-col", className)}
               {...props}

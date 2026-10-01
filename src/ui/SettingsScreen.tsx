@@ -7,15 +7,19 @@
  * **판정하지 않는다** — 이름·토글 상태·권한 꼬리표·버전 문자열을 조립부(`App.tsx`)에서 받아 그린다. 권한 꼬리표는
  * `permissionTagFor`(src/app)가 이미 정했고, 이 화면은 `expo-*`에도 로스터에도 닿지 않는다(원칙 III, 007 헌법 검사).
  *
- * 묶음은 넷 — 캐릭터 · 일기 · 권한 · 정보(FR-016). 「일기」 묶음의 토글 아래(`diaryExtras`)에는 §3.2가 행으로 옮기기
- * 전까지 지금의 시각 선택과 장소명을 그대로 둔다(FR-019). 「이 휴대폰」(§3.4)·말투(S1)는 없다.
+ * 묶음은 넷 — 캐릭터 · 일기 · 권한 · 정보(FR-016). 「이 휴대폰」(§3.4)·말투(S1)는 없다.
+ *
+ * 056 — 「일기」 묶음은 자동으로 쓰기 토글 → 「매일 쓰는 시각」(토글이 켜졌을 때만 펼쳐진다) → 「장소 이름으로 보기」(늘)다
+ * (보드 `6c` ③, specs/056-settings-time-place FR-001~FR-006·FR-019). 값 문자열은 조립부가 `src/app/target-hour.ts`로 만들어
+ * 넘기고, 누르면 조립부가 대화상자를 연다. 055가 임시로 두었던 자리(옛 24칸 시각 목록·장소명 카드)는 걷었다.
  *
  * 묶음 머리·행·토글·꼬리표 부품은 이 파일 안에 둔다 — 공용화는 그것이 필요한 조각의 몫이다(C7).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import type { PermissionTag, TaggedPermission } from "../app/permission-tags";
 import { AppText } from "./components/Text";
@@ -30,8 +34,12 @@ export type SettingsScreenProps = {
   onOpenRename: () => void;
   autoWriteEnabled: boolean;
   onToggleAutoWrite: (enabled: boolean) => void;
-  /** 토글 아래 — §3.2 전까지의 시각 선택·장소명(FR-019) */
-  diaryExtras?: ReactNode;
+  /** 056 — 「매일 쓰는 시각」 행 값(「오후 10시쯤」). 토글이 꺼져도 지우지 않는다(FR-003) */
+  targetHourText: string;
+  onOpenTargetHour: () => void;
+  /** 056 — 「장소 이름으로 보기」 행 값(「자동」·「켬」·「끔」) */
+  placeNamesText: string;
+  onOpenPlaceNames: () => void;
   permissionTags: Record<TaggedPermission, PermissionTag>;
   /** 네 행 모두 — 이 앱의 안드로이드 앱 정보 화면(FR-026) */
   onOpenAppSettings: () => void;
@@ -44,7 +52,10 @@ export function SettingsScreen({
   onOpenRename,
   autoWriteEnabled,
   onToggleAutoWrite,
-  diaryExtras,
+  targetHourText,
+  onOpenTargetHour,
+  placeNamesText,
+  onOpenPlaceNames,
   permissionTags,
   onOpenAppSettings,
   versionText,
@@ -65,7 +76,20 @@ export function SettingsScreen({
           label={SETTINGS_TEXT.autoWrite}
           trailing={<Toggle on={autoWriteEnabled} onChange={onToggleAutoWrite} />}
         />
-        {diaryExtras}
+        <ExpandingRow open={autoWriteEnabled}>
+          <Row
+            label={SETTINGS_TEXT.autoWriteTime}
+            onPress={onOpenTargetHour}
+            testID="settings-target-hour"
+            trailing={<Value chevron text={targetHourText} />}
+          />
+        </ExpandingRow>
+        <Row
+          label={SETTINGS_TEXT.placeNames}
+          onPress={onOpenPlaceNames}
+          testID="settings-place-names"
+          trailing={<Value chevron text={placeNamesText} />}
+        />
       </Group>
 
       <Group label={SETTINGS_TEXT.groupPerm} testID="settings-group-perm">
@@ -249,7 +273,47 @@ function Tag({ kind, testID }: { kind: Exclude<PermissionTag, "unread">; testID:
   );
 }
 
-/** 토글 — 44×26, 안쪽 3. 켜짐 = accent 면 + 오른쪽 손잡이, 꺼짐 = 회색 면 + 왼쪽 손잡이(055 Clarification) */
+/**
+ * 056 — 토글 아래에서 펼쳐지고 접히는 행(보드 `6c` ③ 「높이 0→44, 200ms」, FR-002).
+ *
+ * ★ 안쪽 행을 절대 배치로 빼고 감쌈의 높이만 옮긴다 — 안쪽을 흐름에 두고 감쌈 크기를 옮기면 잰 높이가 되먹임으로 줄어든다
+ * (052 교훈). 펼친 높이는 안쪽 행이 잰 높이다(기본 글꼴 44, 글꼴이 커지면 그만큼 — 자르지 않는다). 시작값은 마운트 때의 상태로
+ * 정한다 — effect에서 되돌리면 첫 프레임이 샌다(049 교훈). 접힌 동안은 누를 수 없고 스크린리더에서 숨는다.
+ */
+function ExpandingRow({ open, children }: { open: boolean; children: ReactNode }) {
+  const [measured, setMeasured] = useState<number>(row.minHeight);
+  const height = useSharedValue(open ? measured : 0);
+  // 바뀐 뒤에만 움직인다 — 마운트 때는 시작값이 이미 목표와 같아 아무 일도 없다.
+  useEffect(() => {
+    height.value = withTiming(open ? measured : 0, { duration: SETTINGS.expandMs });
+  }, [open, measured, height]);
+  const style = useAnimatedStyle(() => ({ height: height.value }));
+  return (
+    <Animated.View
+      accessibilityElementsHidden={!open}
+      importantForAccessibility={open ? "auto" : "no-hide-descendants"}
+      pointerEvents={open ? "auto" : "none"}
+      style={[{ overflow: "hidden" }, style]}
+      testID="settings-target-hour-wrap"
+    >
+      <View
+        onLayout={(e) => {
+          const next = e.nativeEvent.layout.height;
+          // 1px 미만의 흔들림은 거른다(052 — 부동소수 같은 값이 773.9999↔774.0001로 되풀이된다).
+          if (next > 0 && Math.abs(next - measured) >= 1) setMeasured(next);
+        }}
+        style={{ position: "absolute", top: 0, left: 0, right: 0 }}
+      >
+        {children}
+      </View>
+    </Animated.View>
+  );
+}
+
+/**
+ * 토글 — 44×26, 안쪽 3. 켜짐 = accent 면 + 오른쪽 바탕색 손잡이, 꺼짐 = 회색 면 + 왼쪽 진한 손잡이.
+ * 꺼짐 손잡이는 056 FR-029가 바탕색에서 `knobOff`로 바꿨다(055 실기기 — 바탕색 손잡이가 회색 면 위에서 거의 안 보였다).
+ */
 function Toggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
   return (
     <Pressable
@@ -269,7 +333,11 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => vo
       testID="auto-diary-toggle"
     >
       <View
-        style={{ width: toggle.knob, height: toggle.knob, backgroundColor: COLORS.bg }}
+        style={{
+          width: toggle.knob,
+          height: toggle.knob,
+          backgroundColor: on ? COLORS.bg : toggle.knobOff,
+        }}
         testID="auto-diary-toggle-knob"
       />
     </Pressable>

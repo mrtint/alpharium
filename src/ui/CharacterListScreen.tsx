@@ -231,7 +231,7 @@ export function CharacterListScreen(props: CharacterListProps) {
   return (
     <View
       /* 033 — 좌우 20은 설정 탭의 다른 섹션과 같은 값이다
-         (`AutoDiarySettingsScreen`·`PermissionsSection`·`App.tsx`의
+         (옛 `AutoDiarySettingsScreen`(056이 걷음)·`PermissionsSection`·`App.tsx`의
          `settingsSection`). 이 화면은 설정 탭 안에 살므로 같은 세로선에 선다. */
       className="flex-1 px-5 py-6 gap-3"
       style={{

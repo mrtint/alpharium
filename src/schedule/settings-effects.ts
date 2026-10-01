@@ -94,7 +94,12 @@ export async function applyTargetHour(
   deps: SettingsEffectDeps,
 ): Promise<AutoDiarySettings> {
   const next: AutoDiarySettings = { ...current, targetHour: hour };
-  await saveAutoDiarySettings(deps.settingsPort, next).catch(() => {});
+  // 056 FR-018 — 저장하지 못했으면 화면이 새 값을 보이지 않게 지금 값을 돌려주고, 다시 예약도 하지 않는다.
+  const saved = await saveAutoDiarySettings(deps.settingsPort, next).then(
+    () => true,
+    () => false,
+  );
+  if (!saved) return current;
   if (next.enabled) await deps.backgroundPort.reschedule().catch(() => {});
   return next;
 }

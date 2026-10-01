@@ -16,7 +16,10 @@ import {
   ensureAutoDiaryTaskDefined,
   // 부수 효과: 전역 스코프 TaskManager.defineTask 등록 경로를 모듈에 들인다.
 } from "./src/schedule/task";
-import { expoBackgroundSchedulePort } from "./src/schedule/background-port";
+import {
+  expoBackgroundSchedulePort,
+  type BackgroundSchedulePort,
+} from "./src/schedule/background-port";
 import { expoBatteryExceptionPort } from "./src/schedule/battery-exception-port";
 import { expoNotificationPort } from "./src/schedule/notification-port";
 import { acknowledgeNotified, expoNotifiedStorePort } from "./src/schedule/notified-store";
@@ -26,6 +29,7 @@ import {
   expoAutoDiarySettingsPort,
   loadAutoDiarySettings,
   type AutoDiarySettings,
+  type AutoDiarySettingsPort,
 } from "./src/schedule/settings";
 import { applyTargetHour, applyToggleOff, applyToggleOn } from "./src/schedule/settings-effects";
 import { expoPhotoPort } from "./src/signals/expo-port";
@@ -44,7 +48,6 @@ import { displayNameOf, type CustomNames } from "./src/diary/character-name";
 import { shouldShowWelcome } from "./src/welcome/decision";
 import { validateCharacterName } from "./src/welcome/naming";
 import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/welcome/names-port";
-import { AutoDiarySettingsScreen } from "./src/ui/AutoDiarySettingsScreen";
 import { shouldShowLogo } from "./src/firstrun/logo";
 import { resolveFirstRunStage } from "./src/firstrun/progress";
 import { shouldAutoGenerate } from "./src/firstrun/auto-diary";
@@ -55,6 +58,10 @@ import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { SettingsFrame } from "./src/ui/SettingsFrame";
 import { SettingsScreen } from "./src/ui/SettingsScreen";
+import { TargetHourDialog } from "./src/ui/TargetHourDialog";
+import { PlaceNameDialog } from "./src/ui/PlaceNameDialog";
+import { formatTargetHour, timeZoneLine } from "./src/app/target-hour";
+import { readDeviceClock } from "./src/app/device-clock";
 import { RenameScreen } from "./src/ui/RenameScreen";
 import { usePermissionTags } from "./src/ui/use-permission-tags";
 import type { PermissionFacts } from "./src/app/permission-tags";
@@ -69,6 +76,7 @@ import {
   loadGeocodingSetting,
   saveGeocodingSetting,
   type GeocodingPreference,
+  type GeocodingSettingPort,
 } from "./src/app/geocoding-setting-store";
 import { dayBounds, dayOf, isDayWritable, selectableDays } from "./src/config/day-boundary";
 import { createAppPipeline, triggerFirstRunAutoDiary } from "./src/app/wiring";
@@ -80,7 +88,6 @@ import { expoModelPorts } from "./src/models/expo-port";
 import { readinessOf } from "./src/models/readiness";
 import { assetFor } from "./src/models/roster";
 import { pausedFor, readState, verdictFor } from "./src/models/storage";
-import { GeocodingSettingToggle } from "./src/ui/GeocodingSettingToggle";
 import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
 import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
 
@@ -175,6 +182,45 @@ function AppFrame() {
     [],
   );
   const homeCovered = route !== "home" || layersMounted.settings || layersMounted.developer;
+
+  /**
+   * ★ 056 — 설정 값(자동 쓰기 설정·장소 갈래)은 여기서 **앱 실행마다 한 번** 읽어 들고 있는다(FR-030, research R5).
+   * 설정 겹은 닫히면 언마운트되므로(`StackLayer`) 거기서 읽으면 열 때마다 「설정을 읽는 중…」이 약 1초 보였다(055 관측).
+   * 이 두 파일을 쓰는 곳은 설정 화면뿐이라(백그라운드 태스크는 읽기만) 여기 값이 낡을 경로가 없다. 생성 파이프라인은 장소명
+   * 파일을 매번 직접 읽는다(아래 `DiarySection`) — 이 보관과 무관하다. 아직 못 읽었으면 `null` — 기본값을 그리지 않는다(FR-031).
+   */
+  const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
+  const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
+  const geoPort = useMemo(() => expoGeocodingSettingPort(), []);
+  const [settingsValues, setSettingsValues] = useState<SettingsValues | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([
+      loadAutoDiarySettings(settingsPort),
+      loadGeocodingSetting(geoPort).catch(() => "auto" as const),
+    ]).then(([autoDiary, geocoding]) => {
+      if (alive) setSettingsValues({ autoDiary, geocoding });
+    });
+    return () => {
+      alive = false;
+    };
+  }, [settingsPort, geoPort]);
+  const onAutoDiaryChange = useCallback(
+    (autoDiary: AutoDiarySettings) =>
+      setSettingsValues((v) => (v === null ? v : { ...v, autoDiary })),
+    [],
+  );
+  const onGeocodingChange = useCallback(
+    (geocoding: GeocodingPreference) =>
+      setSettingsValues((v) => (v === null ? v : { ...v, geocoding })),
+    [],
+  );
+  // 020 B5 — `enabled: true`면 태스크를 재등록한다(재부팅 후 재등록). `register()`는 idempotent다. 056부터 설정을 열지
+  // 않아도 앱을 열면 돈다(값을 여기서 들고 있으므로).
+  const autoDiaryEnabled = settingsValues?.autoDiary.enabled === true;
+  useEffect(() => {
+    if (autoDiaryEnabled) void backgroundPort.register().catch(() => {});
+  }, [autoDiaryEnabled, backgroundPort]);
 
   /**
    * 048 — 홈에서 고른 하루 (Clarification Q4, FR-005a).
@@ -1119,9 +1165,15 @@ function AppFrame() {
         >
           <SettingsFrame backLabel={SETTINGS_TEXT.back} onBack={goHome} title={SETTINGS_TEXT.title}>
             <SettingsSection
+              backgroundPort={backgroundPort}
               characterName={displayNameOf(ONBOARDING_DEFAULT_CHARACTER, customNames)}
+              geoPort={geoPort}
+              onAutoDiaryChange={onAutoDiaryChange}
+              onGeocodingChange={onGeocodingChange}
               onOpenRename={() => setRenaming(true)}
               onboardingPorts={onboardingPorts}
+              settingsPort={settingsPort}
+              values={settingsValues}
             />
           </SettingsFrame>
           {/*
@@ -1467,7 +1519,9 @@ async function readyCharacters(): Promise<Character[]> {
  * - 이름: 첫 실행이 정한 기본 캐릭터(로스터 하나, 037)의 지금 이름. 바꾸기는 위 겹(`RenameScreen`)에서 한다.
  * - 자동으로 쓰기: 020의 부수 효과 순서(S6)를 `settings-effects.ts`가 지킨다 — 토글 켬: 알림 권한 요청 → save → register,
  *   끔: save → unregister, 시각 변경: save → reschedule.
- * - 그 아래: §3.2가 행으로 옮기기 전까지의 시각 목록(`AutoDiarySettingsScreen`)과 장소명 3상태(`GeocodingSettingToggle`).
+ * - 056 — 그 아래 「매일 쓰는 시각」(토글이 켜졌을 때만)과 「장소 이름으로 보기」 행. 누르면 대화상자(`6f`·`6l`)가 열리고 칸
+ *   한 번에 적용된다(Clarification Q4). 값은 `AppFrame`이 들고 있고(FR-030) 이 조립은 바뀐 값을 올린다. 형식(12/24)·시간대는
+ *   마운트 때 한 번 `readDeviceClock`으로 읽는다(겹이 닫히면 언마운트되므로 열 때마다 새로 읽힌다).
  * - 권한 네 행: `usePermissionTags`가 마운트·전경 복귀 때 읽고 `permissionTagFor`가 정한다. 누르면 앱 정보 화면(R7).
  * - 버전: 설치본의 versionName·versionCode(`expo-application`, R5).
  *
@@ -1479,64 +1533,29 @@ function SettingsSection({
   onboardingPorts,
   characterName,
   onOpenRename,
+  values,
+  onAutoDiaryChange,
+  onGeocodingChange,
+  settingsPort,
+  backgroundPort,
+  geoPort,
 }: {
   onboardingPorts: OnboardingPorts;
   /** 035 — 지금 부르는 이름 (`displayNameOf`) */
   characterName: string;
   onOpenRename: () => void;
+  /** 056 — `AppFrame`이 들고 있는 설정 값. 아직 못 읽었으면 `null` */
+  values: SettingsValues | null;
+  onAutoDiaryChange: (next: AutoDiarySettings) => void;
+  onGeocodingChange: (next: GeocodingPreference) => void;
+  settingsPort: AutoDiarySettingsPort;
+  backgroundPort: BackgroundSchedulePort;
+  geoPort: GeocodingSettingPort;
 }) {
-  const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
-  const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
   const notificationPort = useMemo(() => expoNotificationPort(), []);
-
-  const [settings, setSettings] = useState<AutoDiarySettings | null>(null);
-  const [notificationDenied, setNotificationDenied] = useState(false);
-
-  /* ── 029 — 장소명 (자동·켬·끔). §3.2가 행으로 옮기기 전까지 지금 모양 그대로 ─── */
-  const geoPort = useMemo(() => expoGeocodingSettingPort(), []);
-  const [geoPref, setGeoPref] = useState<GeocodingPreference>("auto");
-
-  useEffect(() => {
-    let alive = true;
-    void loadGeocodingSetting(geoPort)
-      .catch(() => "auto" as const)
-      .then((g) => {
-        if (alive) setGeoPref(g);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [geoPort]);
-
-  const onSelectGeoPref = useCallback(
-    (g: GeocodingPreference) => {
-      setGeoPref(g);
-      void saveGeocodingSetting(geoPort, g).catch(() => {});
-      // "켬"일 때 위치 런타임 권한을 요청한다(017 L8·L9 — 실패해도 값은 유지).
-      if (g === "on") {
-        void import("expo-location")
-          .then((Location) => Location.requestForegroundPermissionsAsync())
-          .catch(() => {});
-      }
-    },
-    [geoPort],
-  );
-
-  useEffect(() => {
-    let alive = true;
-    void loadAutoDiarySettings(settingsPort).then((loaded) => {
-      if (alive) setSettings(loaded);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [settingsPort]);
-
-  // `enabled: true`인 채 마운트되면 태스크를 재등록한다(B5 — 재부팅 후
-  // 재등록). `register()`는 idempotent다.
-  useEffect(() => {
-    if (settings?.enabled === true) void backgroundPort.register().catch(() => {});
-  }, [settings?.enabled, backgroundPort]);
+  const [clock] = useState(() => readDeviceClock(new Date()));
+  const [openDialog, setOpenDialog] = useState<"time" | "place" | null>(null);
+  const closeDialog = useCallback(() => setOpenDialog(null), []);
 
   // S6 순서는 `settings-effects.ts`의 순수 조합 함수가 지킨다(기기 없이 검증).
   const effectDeps = useMemo(
@@ -1544,29 +1563,51 @@ function SettingsSection({
     [settingsPort, backgroundPort, notificationPort],
   );
 
+  const autoDiary = values?.autoDiary ?? null;
+  const geocoding = values?.geocoding ?? null;
+
   const onToggleEnabled = useCallback(
     async (enabled: boolean) => {
-      if (settings === null) return;
-      if (!enabled) {
-        setSettings(await applyToggleOff(settings, effectDeps));
-        return;
-      }
-      const { settings: next, notificationDenied: denied } = await applyToggleOn(
-        settings,
-        effectDeps,
-      );
-      setSettings(next);
-      setNotificationDenied(denied);
+      if (autoDiary === null) return;
+      // 056 FR-033 — 알림 거부 안내를 걷었다. 권한 묶음의 알림 행이 같은 사실을 말한다.
+      const next = enabled
+        ? (await applyToggleOn(autoDiary, effectDeps)).settings
+        : await applyToggleOff(autoDiary, effectDeps);
+      onAutoDiaryChange(next);
     },
-    [settings, effectDeps],
+    [autoDiary, effectDeps, onAutoDiaryChange],
   );
 
-  const onChangeTargetHour = useCallback(
+  /** 056 — 칸을 누르면 대화상자가 먼저 닫히고, 저장 → 다시 예약 뒤 반환값으로 갱신한다(저장 실패면 그대로, FR-016·FR-018). */
+  const onSelectTargetHour = useCallback(
     async (hour: number) => {
-      if (settings === null) return;
-      setSettings(await applyTargetHour(settings, hour, effectDeps));
+      setOpenDialog(null);
+      if (autoDiary === null) return;
+      onAutoDiaryChange(await applyTargetHour(autoDiary, hour, effectDeps));
     },
-    [settings, effectDeps],
+    [autoDiary, effectDeps, onAutoDiaryChange],
+  );
+
+  /**
+   * 056 — 장소 갈래. 대화상자를 닫고, 저장이 성공한 뒤에만 값을 바꾼다(FR-018). 「켬」으로 바뀌었을 때만 닫힌 직후 위치 권한을
+   * 요청한다(017 L8·L9 — 거부돼도 값은 「켬」, 이미 허용이면 OS가 창을 띄우지 않는다, FR-025).
+   */
+  const onSelectGeocoding = useCallback(
+    async (g: GeocodingPreference) => {
+      setOpenDialog(null);
+      const saved = await saveGeocodingSetting(geoPort, g).then(
+        () => true,
+        () => false,
+      );
+      if (!saved) return;
+      onGeocodingChange(g);
+      if (g === "on") {
+        void import("expo-location")
+          .then((Location) => Location.requestForegroundPermissionsAsync())
+          .catch(() => {});
+      }
+    },
+    [geoPort, onGeocodingChange],
   );
 
   /* ── 055 — 권한 꼬리표. 재료는 021의 통로 + 사진 한 장의 좌표 읽기(R6) ─── */
@@ -1605,7 +1646,8 @@ function SettingsSection({
     };
   }, []);
 
-  if (settings === null) {
+  // FR-031 — 아직 한 번도 못 읽었을 때만(같은 실행에서 두 번째로 열면 `AppFrame`의 값이 있다).
+  if (values === null || autoDiary === null || geocoding === null) {
     return (
       <View style={styles.placeholder}>
         <AppText variant="bodyStrong">설정을 읽는 중…</AppText>
@@ -1614,27 +1656,51 @@ function SettingsSection({
   }
 
   return (
-    <SettingsScreen
-      autoWriteEnabled={settings.enabled}
-      characterName={characterName}
-      diaryExtras={
-        <>
-          <AutoDiarySettingsScreen
-            notificationDenied={notificationDenied}
-            onChangeTargetHour={(hour) => void onChangeTargetHour(hour)}
-            settings={settings}
-          />
-          <GeocodingSettingToggle mode={geoPref} onSelect={onSelectGeoPref} />
-        </>
-      }
-      onOpenAppSettings={onOpenAppSettings}
-      onOpenRename={onOpenRename}
-      onToggleAutoWrite={(enabled) => void onToggleEnabled(enabled)}
-      permissionTags={permissionTags}
-      versionText={versionText}
-    />
+    <>
+      <SettingsScreen
+        autoWriteEnabled={autoDiary.enabled}
+        characterName={characterName}
+        onOpenAppSettings={onOpenAppSettings}
+        onOpenPlaceNames={() => setOpenDialog("place")}
+        onOpenRename={onOpenRename}
+        onOpenTargetHour={() => setOpenDialog("time")}
+        onToggleAutoWrite={(enabled) => void onToggleEnabled(enabled)}
+        permissionTags={permissionTags}
+        placeNamesText={PLACE_NAME_TEXT[geocoding]}
+        targetHourText={formatTargetHour(autoDiary.targetHour, clock.format)}
+        versionText={versionText}
+      />
+      {openDialog === "time" && (
+        <TargetHourDialog
+          format={clock.format}
+          hour={autoDiary.targetHour}
+          onClose={closeDialog}
+          onSelect={(hour) => void onSelectTargetHour(hour)}
+          open
+          timeZoneLine={timeZoneLine(clock.timeZoneId, clock.offsetMinutes)}
+        />
+      )}
+      {openDialog === "place" && (
+        <PlaceNameDialog
+          onClose={closeDialog}
+          onSelect={(g) => void onSelectGeocoding(g)}
+          open
+          value={geocoding}
+        />
+      )}
+    </>
   );
 }
+
+/** 056 — 설정 화면의 값. `AppFrame`이 들고 있다(FR-030) */
+type SettingsValues = { autoDiary: AutoDiarySettings; geocoding: GeocodingPreference };
+
+/** 056 — 장소 갈래 → 행 값(보드 `place.auto`·`place.on`·`place.off`) */
+const PLACE_NAME_TEXT: Record<GeocodingPreference, string> = {
+  auto: SETTINGS_TEXT.placeAuto,
+  on: SETTINGS_TEXT.placeOn,
+  off: SETTINGS_TEXT.placeOff,
+};
 
 const styles = StyleSheet.create({
   container: {

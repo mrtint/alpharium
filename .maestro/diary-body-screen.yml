@@ -79,54 +79,42 @@ appId: com.anonymous.alpharium
       - assertNotVisible:
           text: ".*대표 장소.*"
 
-# ★ M3 — **장소명 설정이 설정 탭 "장소명" 섹션에 있다**(FR-004~006).
+# ★ M3 — **장소명 설정이 설정의 「장소 이름으로 보기」 행에 있다**(FR-004~006).
 #
-# ⚠️ **2026-09-02 갱신(029)** — 017의 `GeocodingSettingToggle`이 홈에서 사라지고
-# 설정 탭 "장소명" 섹션(3-상태: 자동/켬/끔, 기본 "자동")으로 옮겨졌다. 이제 기본이
-# "자동"이라 고지 문구("좌표를 기기의 지도 서비스에 물어봅니다.")가 처음부터 떠
-# 있을 수 있다 — "끔"을 골라야 사라진다(mode !== "off"일 때 고지).
+# ⚠️ **056 갱신** — 029의 설정 카드(3-상태 칸)가 「장소 이름으로 보기」 행 + 세 갈래 대화상자(보드 `6l`)로 바뀌었다.
+# 지도 고지는 대화상자 안에 늘 있다(「좌표를 기기의 지도 서비스에 물어봐요.」, 056 FR-026). 칸을 누르면 바로 적용·닫힌다.
 - tapOn:
-    id: "home-menu-button"
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-place-names"
+    timeout: 5000
 - tapOn:
-    id: "home-menu-settings"
-# ⚠️ 세 옵션을 개별 스크롤로 본다(025 실측 — 제목까지만 스크롤하면 마지막 옵션이 잘린다).
-- scrollUntilVisible:
-    element:
-      id: "geocoding-auto"
-    direction: DOWN
-    timeout: 20000
-- assertVisible: "장소 이름으로 보기"
+    id: "settings-place-names"
+- extendedWaitUntil:
+    visible:
+      id: "place-name-dialog"
+    timeout: 5000
 - assertVisible:
-    id: "geocoding-auto"
-- scrollUntilVisible:
-    element:
-      id: "geocoding-on"
-    direction: DOWN
-    timeout: 20000
+    id: "place-name-auto"
 - assertVisible:
-    id: "geocoding-on"
-- scrollUntilVisible:
-    element:
-      id: "geocoding-off"
-    direction: DOWN
-    timeout: 20000
+    id: "place-name-on"
 - assertVisible:
-    id: "geocoding-off"
+    id: "place-name-off"
 
-# ★ FR-006 — "켬"을 고르면 고지 문구가 그 자리에서 뜬다(원래 M3의 핵심).
-- tapOn:
-    id: "geocoding-on"
-- assertVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
-- assertVisible: "선택"
+# ★ FR-006 — 고지 문구가 대화상자 안에 있다(056 FR-026).
+- assertVisible: "좌표를 기기의 지도 서비스에 물어봐요."
 
 # ★ 원칙 III·IV — 좌표·수치·모델 정보가 화면에 없다.
 - assertNotVisible: "latitude"
 - assertNotVisible: "longitude"
 - assertNotVisible: "expo-location"
 
-# ★ 029 — "끔"을 고르면 고지가 사라진다(mode === "off"). 기기 상태를 자동으로 되돌린다.
+# ★ 056 — 칸을 누르면 바로 적용·닫힌다. 기기 상태를 「자동」(기본값)으로 둔다.
 - tapOn:
-    id: "geocoding-off"
-- assertNotVisible: "좌표를 기기의 지도 서비스에 물어봅니다."
-- tapOn:
-    id: "geocoding-auto"
+    id: "place-name-auto"
+- extendedWaitUntil:
+    notVisible:
+      id: "place-name-dialog"
+    timeout: 5000
+- assertVisible: "자동"

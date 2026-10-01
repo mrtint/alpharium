@@ -9,8 +9,9 @@ Phase 0 — 스펙(Clarifications 5건 반영 후)에 남은 기술 미지수를
   GMT 차이는 `Intl`이 아니라 `-now.getTimezoneOffset()`(분, 동쪽 양수)로 계산한다.
 - **Rationale**: Clarification Q3 — 새 네이티브 모듈 0. Hermes 문서(ctx7 `/discord/hermes`, `doc/IntlAPIs.md`·`DateTimeFormat.java`)가 안드로이드에서
   `timeZone` 기본값(시스템 시간대)과 `hourCycle` 옵션(`h11`·`h12`·`h23`·`h24`)을 지원한다고 적는다. `getTimezoneOffset`은 엔진 기본이라 `Intl` 결함과 무관하다.
-- **실측 필요(미확인)**: 이 기기(SM-S901N, RN 0.86의 Hermes)에서 `resolvedOptions().hourCycle`이 실제로 오는지, `timeZone`이 `"Asia/Seoul"`인지.
-  **구현 첫 단계에서 dev 빌드로 한 번 찍어 본다**(quickstart Q0). 안 오면 폴백(12시간·시간대 줄 숨김)이 정상 경로가 되고 그 사실을 AGENTS에 남긴다.
+- **실측(2026-10-02, SM-S901N, dev, quickstart Q0)**: `new Intl.DateTimeFormat(undefined, { hour: "numeric" }).resolvedOptions()`가
+  `{ hour12: true, hourCycle: "h12", timeZone: "Asia/Seoul", locale: "ko-KR", … }`를 준다 → `readDeviceClock` = `{ format: "h12", timeZoneId: "Asia/Seoul",
+  offsetMinutes: 540 }`. 폴백이 아니라 정상 경로로 읽힌다. 기기 「24시간 형식」 스위치를 켠 상태는 재지 않았다.
 - **한계**: 기기 설정의 「24시간 형식」 스위치는 `Intl`이 보지 못한다(안드로이드 `DateFormat.is24HourFormat`은 네이티브). ko 로케일 + 스위치 켬 사용자는 12시간을 본다 — 스펙 Assumptions·미확인 잔여.
 - **Alternatives**: `expo-localization`(`getCalendars()[0].uses24hourClock`) — 스위치까지 읽지만 새 네이티브 모듈(S3·FR-036 위반, Clarification에서 기각).
   항상 12시간 — 보드 「기기 형식을 따름」을 뒤집어 기각.

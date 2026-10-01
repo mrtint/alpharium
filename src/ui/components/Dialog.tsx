@@ -20,11 +20,18 @@
  * 그때의 `onOpenChange`를 붙잡는다. 부르는 쪽이 매 렌더 새 함수를 넘겨도 최신 것이 불리게 한다.
  *
  * `className`과 인라인 `style`을 함께 준다 — jest에는 NativeWind 변환이 없다(034).
+ *
+ * ★ 056 — **화면보다 높아지면 안전 영역 안에서 본문이 스크롤된다**(DLG8). 글꼴 2.0배에서 장소 이름 대화상자(`6l`)가 화면보다
+ * 높아져 위는 상태 표시줄, 아래는 내비게이션 바 밑으로 들어갔다(2026-10-02 실기기). 덮개는 위·아래에도 안전 영역 + 바깥 여백을
+ * 두고, 면은 그 안에서 줄어들 수 있으며, `DismissibleDialog`의 본문(제목·부제 밖)은 스크롤 뷰에 담긴다. 안전 영역은 루트의
+ * `SafeAreaProvider`에서 읽는다 — 없으면(jest) 0이다. 대화상자는 edge-to-edge 포털에 그려지므로 인셋을 직접 더해야 한다.
+ * 부제(`subtitle`)는 제목과 간격 6의 한 묶음이다(보드 `6f`의 시간대 줄) — 본문 첫 줄로 두면 스크롤 뷰 위쪽에서 잘린다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useLayoutEffect, useRef, type ReactNode } from "react";
-import { View } from "react-native";
+import { useContext, useLayoutEffect, useRef, type ReactNode } from "react";
+import { ScrollView, View } from "react-native";
+import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 
 import {
   AlertDialog,
@@ -35,6 +42,7 @@ import {
 import { Button } from "../rnr/button";
 import { Dialog, DialogContent, DialogTitle } from "../rnr/dialog";
 import { Text } from "../rnr/text";
+import { AppText } from "./Text";
 import { COLORS, DIALOG, OVERLAY, RADIUS } from "../theme/tokens";
 
 /**
@@ -73,6 +81,7 @@ export function ConfirmDialog({
   testID,
 }: ConfirmDialogProps) {
   const cancel = useLatest(onCancel);
+  const overlayStyle = useOverlayStyle();
   return (
     <AlertDialog
       onOpenChange={(next) => {
@@ -82,7 +91,7 @@ export function ConfirmDialog({
     >
       <AlertDialogContent
         className="border-2 border-foreground"
-        overlayStyle={OVERLAY_STYLE}
+        overlayStyle={overlayStyle}
         overlayTestID={`${testID}-overlay`}
         style={FACE}
         testID={testID}
@@ -105,8 +114,11 @@ export type DismissibleDialogProps = {
   /** 덮개·뒤로 가기가 부른다 */
   onClose: () => void;
   title: string;
+  /** 056 — 제목 바로 아래(간격 6) 보조 줄. 스크롤 밖에 제목과 한 묶음으로 선다(보드 `6f`의 시간대 줄) */
+  subtitle?: string;
+  subtitleTestID?: string;
   children?: ReactNode;
-  /** 면의 testID. 덮개는 `<testID>-overlay` */
+  /** 면의 testID. 덮개는 `<testID>-overlay`, 본문 스크롤은 `<testID>-body` */
   testID: string;
 };
 
@@ -114,10 +126,13 @@ export function DismissibleDialog({
   open,
   onClose,
   title,
+  subtitle,
+  subtitleTestID,
   children,
   testID,
 }: DismissibleDialogProps) {
   const close = useLatest(onClose);
+  const overlayStyle = useOverlayStyle();
   return (
     <Dialog
       onOpenChange={(next) => {
@@ -127,13 +142,24 @@ export function DismissibleDialog({
     >
       <DialogContent
         className="border-2 border-foreground"
-        overlayStyle={OVERLAY_STYLE}
+        overlayStyle={overlayStyle}
         overlayTestID={`${testID}-overlay`}
         style={FACE}
         testID={testID}
       >
-        <DialogTitle style={TITLE}>{title}</DialogTitle>
-        {children}
+        <View style={HEAD} testID={`${testID}-head`}>
+          <DialogTitle style={TITLE}>{title}</DialogTitle>
+          {subtitle !== undefined && (
+            <AppText style={SUBTITLE} testID={subtitleTestID}>
+              {subtitle}
+            </AppText>
+          )}
+        </View>
+        {children !== undefined && (
+          <ScrollView contentContainerStyle={BODY} style={BODY_SCROLL} testID={`${testID}-body`}>
+            {children}
+          </ScrollView>
+        )}
       </DialogContent>
     </Dialog>
   );
@@ -168,6 +194,19 @@ export function DialogNote({ children, testID }: { children: string; testID?: st
   );
 }
 
+/**
+ * 덮개 — 좌우 바깥 여백 20, 위·아래는 안전 영역(상태 표시줄·내비게이션 바) + 20(056 DLG8). 포털은 edge-to-edge 화면 전체에
+ * 그려지므로 인셋을 여기서 더한다. `SafeAreaProvider`가 없으면(jest) 인셋은 0이다.
+ */
+function useOverlayStyle() {
+  const insets = useContext(SafeAreaInsetsContext);
+  return {
+    ...OVERLAY_STYLE,
+    paddingTop: (insets?.top ?? 0) + DIALOG.inset,
+    paddingBottom: (insets?.bottom ?? 0) + DIALOG.inset,
+  };
+}
+
 const OVERLAY_STYLE = {
   position: "absolute",
   top: 0,
@@ -189,7 +228,25 @@ const FACE = {
   padding: DIALOG.padding,
   gap: DIALOG.gap,
   boxShadow: OVERLAY.faceShadow,
+  // 056 DLG8 — 덮개 높이를 넘으면 줄어든다(안의 본문 스크롤이 나머지를 맡는다).
+  flexShrink: 1,
 } as const;
+
+/** 056 — 제목과 부제의 한 묶음(간격 6) */
+const HEAD = { gap: DIALOG.subtitleGap } as const;
+
+/** 056 — 부제 13·보조색·줄높이 1.55(보드 `6f` 시간대 줄, body 기본 줄높이) */
+const SUBTITLE = {
+  fontSize: DIALOG.subtitleSize,
+  lineHeight: DIALOG.subtitleSize * DIALOG.lineHeightRatio,
+  color: COLORS.textMuted,
+} as const;
+
+/** 056 — 본문 스크롤. 넘칠 때만 줄어든다 */
+const BODY_SCROLL = { flexGrow: 0, flexShrink: 1 } as const;
+
+/** 본문 요소 사이도 면과 같은 간격 16 */
+const BODY = { gap: DIALOG.gap } as const;
 
 /** 제목 20/700, 줄높이 1.3 */
 const TITLE = { fontSize: 20, fontWeight: "700", lineHeight: 26, color: COLORS.text } as const;

@@ -36,6 +36,10 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     permissionTags: { photos: "allowed", location: "denied", notifications: "partial" },
     onOpenAppSettings: jest.fn(),
     versionText: "1.0.0 (9)",
+    targetHourText: "오후 10시쯤",
+    onOpenTargetHour: jest.fn(),
+    placeNamesText: "자동",
+    onOpenPlaceNames: jest.fn(),
     ...over,
   };
 }
@@ -64,6 +68,26 @@ describe("055 FR-031 — 보드 KO 원문", () => {
       save: "저장",
       backToSettings: "설정",
       redownload: "모듈 다시 받기",
+    });
+  });
+
+  it("056 TX1 — 매일 쓰는 시각·장소 이름 문구가 보드 표(지도 고지는 056 FR-026) 그대로다", () => {
+    expect(SETTINGS_TEXT).toMatchObject({
+      autoWriteTime: "매일 쓰는 시각",
+      placeNames: "장소 이름으로 보기",
+      timeTitle: "매일 쓰는 시각",
+      timeAm: "오전",
+      timePm: "오후",
+      timeCancel: "취소",
+      placeTitle: "장소 이름으로 보기",
+      placeAuto: "자동",
+      placeAutoDesc: "위치 권한이 있으면 이름으로, 없으면 비워 둬요",
+      placeOn: "켬",
+      placeOnDesc: "다닌 자리를 숫자 대신 이름으로 보여줘요",
+      placeOff: "끔",
+      placeOffDesc: "장소 이름을 옮기지 않아요",
+      placeCancel: "취소",
+      placeNotice: "좌표를 기기의 지도 서비스에 물어봐요.",
     });
   });
 
@@ -185,6 +209,13 @@ describe("055 C2·C3 — 자동으로 쓰기", () => {
     });
   });
 
+  it("★ 056 SR6 — 꺼짐 손잡이는 진한 색(knobOff), 켜짐 손잡이는 바탕색 (FR-029)", async () => {
+    await render(<SettingsScreen {...props({ autoWriteEnabled: false })} />);
+    expect(flat(screen.getByTestId("auto-diary-toggle-knob")).backgroundColor).toBe(
+      SETTINGS.toggle.knobOff,
+    );
+  });
+
   it("C2 — 꺼짐: 회색 면 + 왼쪽 손잡이, 누르면 onToggleAutoWrite(true)", async () => {
     const p = props({ autoWriteEnabled: false });
     await render(<SettingsScreen {...p} />);
@@ -197,12 +228,75 @@ describe("055 C2·C3 — 자동으로 쓰기", () => {
     await fireEvent.press(toggle);
     expect(p.onToggleAutoWrite).toHaveBeenCalledWith(true);
   });
+});
 
-  it("C3 — 토글 아래에 넘겨받은 시각 선택·장소명이 「일기」 묶음 안에 그대로 있다", async () => {
-    await render(<SettingsScreen {...props({ diaryExtras: <Text>시각과 장소</Text> })} />);
-    expect(
-      within(screen.getByTestId("settings-group-diary")).getByText("시각과 장소"),
-    ).toBeTruthy();
+describe("056 SR — 매일 쓰는 시각·장소 이름 행", () => {
+  it("SR1 — 켜짐이면 시각 행이 보이고 값은 넘겨받은 문자열 + ›", async () => {
+    await render(<SettingsScreen {...props({ autoWriteEnabled: true })} />);
+    const row = screen.getByTestId("settings-target-hour");
+    expect(within(row).getByText(SETTINGS_TEXT.autoWriteTime)).toBeTruthy();
+    expect(within(row).getByText("오후 10시쯤")).toBeTruthy();
+    expect(within(row).getByText("›")).toBeTruthy();
+  });
+
+  it("★ SR1 — 꺼짐이면 시각 행이 접혀 누를 수 없고 스크린리더에서 숨는다 (FR-002)", async () => {
+    await render(<SettingsScreen {...props({ autoWriteEnabled: false })} />);
+    expect(screen.queryByTestId("settings-target-hour")).toBeNull();
+    const wrap = screen.getByTestId("settings-target-hour-wrap", { includeHiddenElements: true });
+    expect(wrap.props.pointerEvents).toBe("none");
+    expect(wrap.props.importantForAccessibility).toBe("no-hide-descendants");
+    expect(wrap.props.accessibilityElementsHidden).toBe(true);
+  });
+
+  it("SR2 — 끄고 다시 켜도 같은 값이다 (FR-003)", async () => {
+    const p = props({ autoWriteEnabled: true, targetHourText: "오전 7시쯤" });
+    await render(<SettingsScreen {...p} />);
+    await screen.rerender(<SettingsScreen {...p} autoWriteEnabled={false} />);
+    await screen.rerender(<SettingsScreen {...p} autoWriteEnabled />);
+    expect(within(screen.getByTestId("settings-target-hour")).getByText("오전 7시쯤")).toBeTruthy();
+  });
+
+  it.each([true, false])("SR3 — 토글이 %s여도 장소 이름 행이 있다", async (enabled) => {
+    await render(
+      <SettingsScreen {...props({ autoWriteEnabled: enabled, placeNamesText: "끔" })} />,
+    );
+    const row = screen.getByTestId("settings-place-names");
+    expect(within(row).getByText(SETTINGS_TEXT.placeNames)).toBeTruthy();
+    expect(within(row).getByText("끔")).toBeTruthy();
+    expect(within(row).getByText("›")).toBeTruthy();
+  });
+
+  it("SR4 — 시각 행 → onOpenTargetHour, 장소 행 → onOpenPlaceNames", async () => {
+    const p = props();
+    await render(<SettingsScreen {...p} />);
+    await fireEvent.press(screen.getByTestId("settings-target-hour"));
+    expect(p.onOpenTargetHour).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByTestId("settings-place-names"));
+    expect(p.onOpenPlaceNames).toHaveBeenCalledTimes(1);
+  });
+
+  it("SR5 — 「일기」 묶음: 자동으로 쓰기 → 매일 쓰는 시각 → 장소 이름으로 보기", async () => {
+    await render(<SettingsScreen {...props()} />);
+    const group = screen.getByTestId("settings-group-diary");
+    const labels = within(group)
+      .getAllByText(
+        new RegExp(
+          `^(${SETTINGS_TEXT.autoWrite}|${SETTINGS_TEXT.autoWriteTime}|${SETTINGS_TEXT.placeNames})$`,
+        ),
+      )
+      .map((node) => node.props.children);
+    expect(labels).toEqual([
+      SETTINGS_TEXT.autoWrite,
+      SETTINGS_TEXT.autoWriteTime,
+      SETTINGS_TEXT.placeNames,
+    ]);
+  });
+
+  it("SR5 — 임시 자리(diaryExtras)가 없다 (소스)", () => {
+    const source = readFileSync(join(__dirname, "../../src/ui/SettingsScreen.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).not.toMatch(/diaryExtras/);
   });
 });
 

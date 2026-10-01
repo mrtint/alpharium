@@ -118,4 +118,15 @@ describe("applyTargetHour — S6 순서", () => {
     await applyTargetHour({ ...OFF, enabled: false }, 21, deps);
     expect(calls).toEqual(["save"]);
   });
+
+  it("★ 056 SE2 — 저장이 실패하면 지금 값을 돌려주고 다시 예약하지 않는다(FR-018)", async () => {
+    const { deps, calls } = mockDeps();
+    deps.settingsPort.write = async () => {
+      throw new Error("쓰지 못했다");
+    };
+    const current = { ...OFF, enabled: true };
+    const next = await applyTargetHour(current, 21, deps);
+    expect(next).toEqual(current);
+    expect(calls).not.toContain("reschedule");
+  });
 });
