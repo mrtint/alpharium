@@ -115,7 +115,9 @@ describe("DT4 — 팔레트가 WCAG AA를 만족한다 (spec FR-002, SC-005)", (
     ["text", "bg", 4.5],
     ["text", "surface", 4.5],
     ["textMuted", "bg", 4.5],
-    ["accentForeground", "accent", 4.5],
+    // 보드의 오프화이트(3.76:1) — AA 본문 기준 미달을 알고 따른다(2026-10-01 저장소 소유자 결정).
+    // 큰 글자·UI 기준(3:1)은 지킨다 — 더 옅은 글자로 바뀌는 것은 막는다.
+    ["accentForeground", "accent", 3.0],
     ["dangerForeground", "danger", 4.5],
     ["danger", "bg", 3.0],
   ];
@@ -176,8 +178,8 @@ describe("051 — 쓴 날 면 색의 대비 (research R7)", () => {
     // 11px 작은 글자 — 4.5:1이 필요하다. 경계에 가깝다(약 4.6).
     ["작성 시각 / 바", COLORS.textMuted, WRITTEN_DAY.rewriteBar, 4.5],
     ["읽을 수 없음 두 줄 / 지면", COLORS.text, WRITTEN_DAY.paper, 4.5],
-    // 배지 — accent 위 검정(043 R2와 같은 조합)
-    ["배지 글자 / accent", COLORS.accentForeground, COLORS.accent, 4.5],
+    // 배지 — accent 위 오프화이트(보드, 2026-10-01 저장소 소유자 결정 — 3:1만 지킨다)
+    ["배지 글자 / accent", COLORS.accentForeground, COLORS.accent, 3.0],
   ] as const)("%s — AA 이상", (_name, fg, bg, min) => {
     expect(contrastRatio(fg, bg)).toBeGreaterThanOrEqual(min);
   });

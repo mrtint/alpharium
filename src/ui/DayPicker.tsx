@@ -181,7 +181,7 @@ export function DayPicker({ cells, onSelect, onSwipe, canSwipeNext = false }: Da
 
 /**
  * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(032·047 관례). 색은 `COLORS.*`만.
- * 선택 칸 글자는 `accentForeground`(검정) — accent 위 AA를 만족하는 값은 검정뿐이다(043 R2).
+ * 선택 칸 글자는 `accentForeground`(보드의 오프화이트).
  */
 const STRIP = {
   flexDirection: "row",

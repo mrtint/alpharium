@@ -464,8 +464,9 @@
 
 ### 043 — Modernist 스플래시·권한 흐름
 
-- 디자인 토큰(`src/ui/tokens.ts`)은 오프화이트 배경·진한 레드·웜그레이이고 `theme-tokens.test.ts`가 WCAG AA 대비(4.5:1, UI 3:1)를
-  자동 검증한다(`accentForeground`는 블랙, `danger`는 딥레드). **accent 위 오프화이트는 AA 미달**이라 `primary` 버튼 글자는 검정이다.
+- 디자인 토큰(`src/ui/theme/tokens.ts`)은 오프화이트 배경·진한 레드·웜그레이이고 `theme-tokens.test.ts`가 WCAG 대비를 자동 검증한다.
+  **빨간(accent) 면 위 글자는 보드 그대로 오프화이트다**(3.76:1 — AA 본문 4.5:1 미달, 큰 글자·UI 3:1만 충족; 2026-10-01 저장소 소유자
+  결정으로 043의 「검정」을 뒤집었다). 테스트는 3:1을 하한으로 잠근다 — 대비를 이유로 다시 검정으로 바꾸지 않는다.
 - 사진·위치·알림 단계는 설명 카드·[허용]/[건너뛰기]를 없애고 **빈 배경 위에서 OS 다이얼로그를 연속 호출**한다. 거부는 자동으로
   건너뛰기이고 `blocked`(「다시 묻지 않음」)일 때만 [설정 열기]가 있다. `battery-exception`은 호출 통로가 없어 카드 + [설정 열기]/[건너뛰기]를 유지한다.
 - **★ `busy` stale closure**: `allow`가 `useState`의 `busy`를 캡처하고 effect deps에서 빠져 있어 첫 단계의 `busy = true`가 다음 단계
@@ -538,15 +539,16 @@
 
 ### 051 — 쓴 날 읽기
 
-- **홈이 곧 상세다.** 고른 날에 일기가 있으면 헤더 상태 줄에 제목, 스트립 아래 연회색 지면에 흑백 순환 캐러셀과 본문, 하단 바에 「다시 쓰기」(오늘이면
+- **홈이 곧 상세다.** 고른 날에 일기가 있으면 헤더 상태 줄에 제목, 스트립 아래 연회색 지면에 순환 캐러셀과 본문, 하단 바에 「다시 쓰기」(오늘이면
   「N시간 M분 전에 작성」)다. **「최근 · n편」 목록과 `DiaryDetailScreen`이 사라졌다** — 옛 일기는 스트립·달력으로 닿는다(`written-day-reach.test.ts` REACH).
   쓴 날인가는 목록 요약이 먼저 정한다(`paperFor`; 파일 읽기 전에 하단 바가 정해져 빨강이 깜빡이지 않는다, 늦게 온 읽기는 버린다). 쓰기 성공은 결과 화면 없이
   홈의 그 날이다. 화면 상태에 `detail`·`unreadable`·`written`이 없다.
 - 알림은 「적용」과 「확인」을 가른다 — `initialDay`는 홈의 고른 날이 되고 `onInitialDayApplied`에서 경로를 비운다. 확인(`acknowledgeNotified`)은 읽을 수 있는
   일기가 지면에 실제로 보였을 때 그 날마다 한 번이다.
 - 캐러셀은 `react-native-reanimated-carousel`을 2장 이상일 때만 쓴다(순환). `data`·`renderItem`은 `memo`로 뗀다(렌더마다 새로 만들면 안 된다, 046). **★ 세로 지면 안의
-  가로 캐러셀에는 `.failOffsetY([-10, 10])`이 필요했다**(`activeOffsetX`만 두면 세로로 끌다 가로로 20px 흔들린 손가락을 캐러셀이 잡아 지면이 안 스크롤된다). 흑백은
-  `filter: [{ grayscale: 1 }]`(새 아키텍처, 안드로이드에서 됨)를 사진 면 `View`에 주고 배지·인디케이터는 그 밖에 둔다.
+  가로 캐러셀에는 `.failOffsetY([-10, 10])`이 필요했다**(`activeOffsetX`만 두면 세로로 끌다 가로로 20px 흔들린 손가락을 캐러셀이 잡아 지면이 안 스크롤된다). **사진은 원본 색이다**
+  (보드의 흑백 필터를 2026-10-01 저장소 소유자가 거부했다). **배지·인디케이터는 `onSnapToItem`이 아니라 `onProgressChange`를
+  반올림해 움직인다** — `onSnapToItem`은 넘김 애니메이션이 끝난 뒤에 불려 한 박자 늦게 따라왔다(`indexAtProgress`).
 - **하단 바는 화면 폭 전체의 블록 하나이고 쓴 날의 바는 지면 끝(4px)에 닿아야 올라온다**(`reachedEnd`). 숨긴 바는 `pointerEvents="none"` + 접근성 트리에서 뺀다
   (jest·Maestro 모두 못 본다 — 테스트는 `__tests__/ui/paper-end.ts`, 흐름은 `scrollUntilVisible`). `translateY`로 내린 바가 edge-to-edge 아래 내비게이션 바 뒤로
   비쳐 쓴 날 루트에 `overflow: "hidden"`. 헤더·스트립은 고정이고 지면만 스크롤된다. 상태 줄·제목은 큰 숫자 오른쪽 세로 묶음의 요일 아래다.
