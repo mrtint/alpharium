@@ -203,6 +203,31 @@ describe("DLG5·DLG6 — 보드 모양 (인라인 style)", () => {
     expect(cancel.borderRadius).toBe(RADIUS.control);
   });
 
+  it('★ 058 UI6 — tone을 주지 않으면 accent, tone="danger"면 danger 면 + dangerForeground 글자', async () => {
+    captureBackHandlers();
+    await renderWithPortal(
+      <ConfirmDialog
+        actions={
+          <>
+            <DialogActionButton onPress={() => {}} testID="plain">
+              보통
+            </DialogActionButton>
+            <DialogActionButton onPress={() => {}} testID="danger" tone="danger">
+              지우기
+            </DialogActionButton>
+          </>
+        }
+        open
+        testID="dlg"
+        title="제목"
+      />,
+    );
+    expect(flat(screen.getByTestId("plain")).backgroundColor).toBe(COLORS.accent);
+    expect(flat(screen.getByText("보통")).color).toBe(COLORS.accentForeground);
+    expect(flat(screen.getByTestId("danger")).backgroundColor).toBe(COLORS.danger);
+    expect(flat(screen.getByText("지우기")).color).toBe(COLORS.dangerForeground);
+  });
+
   it("DLG6 — 버튼은 세로로 쌓이고 동작이 위다 (간격 8)", async () => {
     captureBackHandlers();
     await renderWithPortal(<Confirm onCancel={() => {}} />);

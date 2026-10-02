@@ -18,6 +18,9 @@
  *
  * 057 — 사진 행의 건너뜀 보조 줄 두 문장(보드 `perm.photos.skippedYesterday`·`perm.photos.skippedOn`)은 문장 틀을 쓰는
  * `src/app/skipped-line.ts`가 원문을 갖고 여기서는 그것을 가리킨다(한 곳에만 둔다).
+ *
+ * 058 — 「이 휴대폰」 묶음과 일기 모두 지우기 확인(보드 `6c` ⑥, 표 `settings.group.device`·`device.*`·`wipe.*`). 메모 원문
+ * (「되돌릴 수 없어요.」)과 표(`wipe.body`)가 다르면 표가 원문이다(분해 설계 §4.3). `wipeBlocked`는 보드에 없다(research R10).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -71,7 +74,21 @@ export const SETTINGS_TEXT = {
   /* ── 057 — 사진 권한 건너뜀 보조 줄 (보드 `6g`) ── */
   photoSkippedYesterday: SKIPPED_LINE.yesterday,
   photoSkippedOn: SKIPPED_LINE.on,
+  /* ── 058 — 이 휴대폰 (보드 `6c` ⑥) ── */
+  groupDevice: "이 휴대폰",
+  deviceModules: "쓰는 모듈",
+  deviceWipe: "일기 모두 지우기",
+  wipeBody: "되돌릴 수 없어요. 이름과 설정은 남아요.",
+  wipeConfirm: "지우기",
+  wipeCancel: "취소",
+  /** 보드 밖 — 백그라운드 자동 쓰기가 잠금을 쥐고 있어 지우지 못했다(058 FR-016a, research R10) */
+  wipeBlocked: "지금 자동으로 쓰는 중이라 지우지 못했어요.",
 } as const;
+
+/** 058 — 보드 `wipe.title` 「일기 {n}편을 모두 지울까요?」. 편수는 숫자 그대로(천 단위 구분 없음, FR-010) */
+export function wipeTitle(n: number): string {
+  return `일기 ${n}편을 모두 지울까요?`;
+}
 
 /** 진입점·머리의 ‹ 글리프. 문구와 따로 그린다(보드 마크업이 ‹ 를 22, 글자를 15로 다르게 그린다). */
 export const BACK_CHEVRON = "‹";

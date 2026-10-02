@@ -37,6 +37,11 @@ export interface DiaryStore {
   load(day: DayDate): Promise<DiaryEntry | null>;
   has(day: DayDate): Promise<boolean>;
   listDays(): Promise<DayDate[]>;
+  /**
+   * 058 — 일기를 모두 지운다(설정 「일기 모두 지우기」). **일기 파일만** — 날짜 파일과 그 임시 파일(`.writing`)이고, 같은 자리의
+   * 다른 이름은 건드리지 않는다(research R4). 하나가 실패해도 나머지를 지우고 끝에 첫 오류를 던진다 — 실패를 삼키지 않는다(불변식 4).
+   */
+  removeAll(): Promise<void>;
 }
 
 /* ────────────────────────────── 직렬화 ────────────────────────────── */
@@ -247,6 +252,10 @@ export function memoryStore(options: MemoryStoreOptions = {}): MemoryStore {
       return [...entries.keys()];
     },
 
+    async removeAll() {
+      entries.clear();
+    },
+
     failNextWith(reason) {
       failNext = reason;
     },
@@ -268,11 +277,18 @@ export interface FileSystemPort {
   writeAtomically(name: string, contents: string): Promise<void>;
   /** 있는 파일 이름 전부 */
   list(): Promise<string[]>;
+  /** 058 — 파일 하나를 지운다. 없으면 조용히 넘어간다 */
+  remove(name: string): Promise<void>;
 }
 
 /** 날짜 → 파일 이름. 파일명이 곧 날짜 키다(contracts/storage.md). */
 function fileNameFor(day: DayDate): string {
   return `${day}.json`;
+}
+
+/** 058 — 지우기 대상: 일기 파일과 그 임시 파일(`writeAtomically`의 `.writing`) */
+function isDiaryFileName(name: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}\.json(\.writing)?$/.test(name);
 }
 
 /** 파일 이름 → 날짜. 일기 파일이 아니면 null */
@@ -332,6 +348,19 @@ export function fileStore(fs: FileSystemPort): DiaryStore {
         .filter((day): day is DayDate => day !== null)
         .sort();
     },
+
+    async removeAll() {
+      const names = (await fs.list()).filter(isDiaryFileName);
+      let first: unknown;
+      for (const name of names) {
+        try {
+          await fs.remove(name);
+        } catch (error) {
+          first ??= error;
+        }
+      }
+      if (first !== undefined) throw first;
+    },
   };
 }
 
@@ -381,6 +410,12 @@ export function expoFileSystemPort(directoryName = "diary"): FileSystemPort {
     async list() {
       const { dir } = await openDirectory();
       return dir.list().map((item) => item.name ?? "");
+    },
+
+    async remove(name) {
+      const { dir, File } = await openDirectory();
+      const file = new File(dir, name);
+      if (file.exists) file.delete();
     },
   };
 }

@@ -768,9 +768,12 @@ function visionSupport(): VisionSupport {
  * `resizeExecutor`가 저장 직후 `moveSync()`로 이 디렉터리로 옮긴다. 새 의존을
  * 늘리지 않고 두 요구사항(리사이즈는 image-manipulator, "OS가 안 건드리는
  * 자리"는 file-system)을 함께 만족시킨다.
+ *
+ * 058 — 설정 「일기 모두 지우기」가 이 자리를 비운다(`src/app/wipe-port.ts`). 값을 두 곳에 두지
+ * 않으려고 export한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-const VISION_CACHE_DIRECTORY = "vision-cache";
+export const VISION_CACHE_DIRECTORY = "vision-cache";
 
 async function openVisionCacheDirectory() {
   const { Directory, Paths } = await import("expo-file-system");

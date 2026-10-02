@@ -167,11 +167,30 @@ export function DismissibleDialog({
 
 type ButtonProps = { onPress: () => void; children: string; testID?: string };
 
-/** 동작 버튼 — accent 배경, 검정 글자(C5). 보드 `AlertDialogAction` */
-export function DialogActionButton({ onPress, children, testID }: ButtonProps) {
+/**
+ * 동작 버튼 — accent 배경, 오프화이트 글자(C5). 보드 `AlertDialogAction`.
+ *
+ * 058 — `tone="danger"`는 되돌릴 수 없는 동작(일기 모두 지우기 — 보드 메모 「지우기 버튼은 빨강」)의 면이다: `danger`
+ * (보드 `accent-700`) + `dangerForeground`(6.41:1). 기본은 `accent`라 기존 대화상자는 그대로다(UI6, research R8 — 저장소 소유자
+ * 확인 대상).
+ */
+export function DialogActionButton({
+  onPress,
+  children,
+  testID,
+  tone = "accent",
+}: ButtonProps & { tone?: "accent" | "danger" }) {
+  const danger = tone === "danger";
   return (
-    <Button onPress={onPress} style={ACTION} testID={testID} variant="default">
-      <Text style={[LABEL, { color: COLORS.accentForeground }]}>{children}</Text>
+    <Button
+      onPress={onPress}
+      style={danger ? ACTION_DANGER : ACTION}
+      testID={testID}
+      variant="default"
+    >
+      <Text style={[LABEL, { color: danger ? COLORS.dangerForeground : COLORS.accentForeground }]}>
+        {children}
+      </Text>
     </Button>
   );
 }
@@ -265,6 +284,9 @@ const BUTTON_BASE = {
 } as const;
 
 const ACTION = { ...BUTTON_BASE, backgroundColor: COLORS.accent } as const;
+
+/** 058 — 되돌릴 수 없는 동작 */
+const ACTION_DANGER = { ...BUTTON_BASE, backgroundColor: COLORS.danger } as const;
 
 const CANCEL = {
   ...BUTTON_BASE,
