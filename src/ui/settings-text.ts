@@ -15,8 +15,13 @@
  * 문장(행 값·미리보기·시간대 줄)의 틀은 `src/app/target-hour.ts`가 갖는다(`src/app/`이 `src/ui/`를 import하지 않는다).
  * 보드의 `time.save` 「저장」은 쓰지 않는다 — 두 대화상자 모두 칸을 누르면 바로 적용된다(056 Clarification Q4).
  * 보드 표에 없는 `placeNotice`는 017 FR-006의 지도 고지를 해요체로 옮긴 것이다(056 FR-026).
+ *
+ * 057 — 사진 행의 건너뜀 보조 줄 두 문장(보드 `perm.photos.skippedYesterday`·`perm.photos.skippedOn`)은 문장 틀을 쓰는
+ * `src/app/skipped-line.ts`가 원문을 갖고 여기서는 그것을 가리킨다(한 곳에만 둔다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
+
+import { SKIPPED_LINE } from "../app/skipped-line";
 
 export const SETTINGS_TEXT = {
   title: "설정",
@@ -63,6 +68,9 @@ export const SETTINGS_TEXT = {
   placeOffDesc: "장소 이름을 옮기지 않아요",
   placeCancel: "취소",
   placeNotice: "좌표를 기기의 지도 서비스에 물어봐요.",
+  /* ── 057 — 사진 권한 건너뜀 보조 줄 (보드 `6g`) ── */
+  photoSkippedYesterday: SKIPPED_LINE.yesterday,
+  photoSkippedOn: SKIPPED_LINE.on,
 } as const;
 
 /** 진입점·머리의 ‹ 글리프. 문구와 따로 그린다(보드 마크업이 ‹ 를 22, 글자를 15로 다르게 그린다). */

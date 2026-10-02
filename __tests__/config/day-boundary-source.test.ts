@@ -64,7 +64,9 @@ describe("DB11 — 하루 기준을 옮기는 시(時) 계산은 경계 파일 �
 
 describe("DB13 — FR-021 사흘 범위의 소비처", () => {
   it("백그라운드 태스크가 selectableDays를 부른다", () => {
-    expect(read("src/schedule/task.ts")).toMatch(/selectableDays\(now\)/);
+    // 057 — 백그라운드와 앱 열기가 함께 쓰는 판정(`resolveAutoWrite`)이 사흘을 부른다. 태스크는 그것을 거친다.
+    expect(read("src/schedule/task.ts")).toMatch(/resolveAutoWrite\(/);
+    expect(read("src/schedule/auto-write.ts")).toMatch(/selectableDays\(deps\.now\)/);
   });
 
   it("App의 사진 있는 날 탐색과 canPrepare가 selectableDays를 부른다", () => {

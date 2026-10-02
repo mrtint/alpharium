@@ -67,7 +67,8 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
     expect(frame).toMatch(
       /const \[chosenDay, setChosenDay\] = useState<DayDate \| null>\(\(\) => dayOf\(new Date\(\)\)\)/,
     );
-    expect(frame).not.toMatch(/useState<DayDate \| null>\(null\)/);
+    // 057 — AppFrame에는 고른 날 말고도 `DayDate | null` 상태(건너뛴 날)가 있다. 고른 날만 본다.
+    expect(frame).not.toMatch(/\[chosenDay, setChosenDay\] = useState<DayDate \| null>\(null\)/);
     expect(frame).toMatch(/chosenDay=\{chosenDay\}/);
 
     const section = functionBody("DiarySection");

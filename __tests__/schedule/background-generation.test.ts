@@ -22,19 +22,36 @@ function at(hour: number): Date {
   return new Date(2026, 7, 28, hour, 30, 0, 0);
 }
 
+/** 057 — 그 날의 미리보기. 기본은 사진이 있는 날(지금처럼 쓴다). */
+function previewOf(
+  photos: { kind: "known"; count: number } | { kind: "none" } | { kind: "unknown" },
+  photoAccess: "ok" | "denied" | "blocked" = "ok",
+) {
+  return async (day: string) => ({
+    day,
+    photos,
+    places: { kind: "unknown" as const },
+    photoAccess,
+  });
+}
+const WITH_PHOTOS = previewOf({ kind: "known", count: 3 });
+
 /** decideSchedule이 act:true를 내는 최소 조합. */
 function baseDeps(overrides: Record<string, unknown> = {}) {
   const pipelineRun = jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false });
   const present = jest.fn().mockResolvedValue("notif-1");
   const dismiss = jest.fn().mockResolvedValue(undefined);
   const notifiedWrite = jest.fn().mockResolvedValue(undefined);
+  const skipWrite = jest.fn().mockResolvedValue(undefined);
 
   return {
     pipelineRun,
     present,
     dismiss,
     notifiedWrite,
+    skipWrite,
     deps: {
+      skipPort: { read: async () => null, write: skipWrite, remove: async () => {} },
       now: at(7),
       resolution: { ok: true, environment: "dev" } as never,
       settingsPort: {
@@ -56,10 +73,12 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
       },
       listDiaryDays: async () => [] as string[],
       loadCharacter: async () => "quiet" as const,
+      loadNames: async () => ({}),
       makePipeline: (() => ({
         ok: true,
         pipeline: { run: pipelineRun },
         location: "on-device",
+        previewDay: WITH_PHOTOS,
         store: {
           listDays: async () => [],
           load: async () => null,
@@ -122,6 +141,49 @@ describe("B2 — 판정 순서", () => {
   });
 });
 
+/** 057 BG1·BG2 — 자동 쓰기는 재료 없는 날·사진 권한 없는 날을 쓰지 않는다 (FR-007~FR-009). */
+describe("057 BG1·BG2 — 재료 없음·사진 권한 없음은 건너뛴다", () => {
+  function withPreview(preview: ReturnType<typeof previewOf>) {
+    const made = baseDeps();
+    made.deps.makePipeline = (() => ({
+      ok: true,
+      pipeline: { run: made.pipelineRun },
+      location: "on-device",
+      previewDay: preview,
+      store: { listDays: async () => [] },
+    })) as never;
+    return made;
+  }
+
+  it("사진이 관측된 0장이면 쓰지 않고 알림도 기록도 없다", async () => {
+    const { deps, pipelineRun, present, skipWrite } = withPreview(
+      previewOf({ kind: "known", count: 0 }),
+    );
+    expect(await runAutoDiaryTask(deps)).toBe("skipped");
+    expect(pipelineRun).not.toHaveBeenCalled();
+    expect(present).not.toHaveBeenCalled();
+    expect(skipWrite).not.toHaveBeenCalled();
+  });
+
+  it("사진 권한이 없으면 쓰지 않고 알림이 없으며 그 날을 기록한다", async () => {
+    const { deps, pipelineRun, present, skipWrite } = withPreview(
+      previewOf({ kind: "unknown" }, "denied"),
+    );
+    expect(await runAutoDiaryTask(deps)).toBe("skipped");
+    expect(pipelineRun).not.toHaveBeenCalled();
+    expect(present).not.toHaveBeenCalled();
+    expect(skipWrite).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(skipWrite.mock.calls[0][0])).toEqual({ day: "2026-08-27" });
+  });
+
+  it("사진이 있으면 지금처럼 쓴다", async () => {
+    const { deps, pipelineRun, skipWrite } = withPreview(previewOf({ kind: "known", count: 3 }));
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(pipelineRun).toHaveBeenCalledTimes(1);
+    expect(skipWrite).not.toHaveBeenCalled();
+  });
+});
+
 describe("B2-9 / N7 — 실패엔 알림이 없다 (FR-005, SC-006)", () => {
   it("pipeline.run()이 실패하면 present()를 부르지 않고 'failed'", async () => {
     const { deps, present } = baseDeps();
@@ -133,6 +195,7 @@ describe("B2-9 / N7 — 실패엔 알림이 없다 (FR-005, SC-006)", () => {
       ok: true,
       pipeline: { run: failingRun },
       location: "on-device",
+      previewDay: WITH_PHOTOS,
       store: { listDays: async () => [] },
     })) as never;
 
@@ -148,6 +211,7 @@ describe("B2-9 / N7 — 실패엔 알림이 없다 (FR-005, SC-006)", () => {
         run: jest.fn().mockResolvedValue({ ok: false, stage: "already-running", reason: "x" }),
       },
       location: "on-device",
+      previewDay: WITH_PHOTOS,
       store: { listDays: async () => [] },
     })) as never;
 
@@ -157,11 +221,23 @@ describe("B2-9 / N7 — 실패엔 알림이 없다 (FR-005, SC-006)", () => {
 });
 
 describe("B2-8 / N4 — 성공하면 알림을 쏜다 (FR-004)", () => {
-  it("성공 시 present(day)를 정확히 1회 부른다", async () => {
+  it("성공 시 present(day, title)를 정확히 1회 부른다", async () => {
     const { deps, present } = baseDeps();
     await runAutoDiaryTask(deps);
-    expect(present).toHaveBeenCalledWith("2026-08-27");
+    expect(present).toHaveBeenCalledWith("2026-08-27", "금동이가 8월 27일 일기를 다 썼어요");
     expect(present).toHaveBeenCalledTimes(1);
+  });
+
+  it("057 BG3 — 제목은 지금 이름과 쓴 날의 한 줄이다 (사용자가 지은 이름)", async () => {
+    const { deps, present } = baseDeps({ loadNames: async () => ({ quiet: "별님" }) });
+    await runAutoDiaryTask(deps);
+    expect(present).toHaveBeenCalledWith("2026-08-27", "별님이 8월 27일 일기를 다 썼어요");
+  });
+
+  it("057 BG3 — 이름을 읽지 못하면 기본 이름으로 (알림은 그대로 간다)", async () => {
+    const { deps, present } = baseDeps({ loadNames: () => Promise.reject(new Error("x")) });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(present).toHaveBeenCalledWith("2026-08-27", "금동이가 8월 27일 일기를 다 썼어요");
   });
 
   it("이미 확인된 날짜면 알림을 보내지 않는다 (FR-007 (2))", async () => {
@@ -190,7 +266,7 @@ describe("B2-8 / N4 — 성공하면 알림을 쏜다 (FR-004)", () => {
     });
     await runAutoDiaryTask(deps);
     expect(dismiss).toHaveBeenCalledWith("old-id");
-    expect(present).toHaveBeenCalledWith("2026-08-27");
+    expect(present).toHaveBeenCalledWith("2026-08-27", expect.any(String));
   });
 });
 
