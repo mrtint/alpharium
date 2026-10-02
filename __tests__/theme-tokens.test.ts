@@ -213,6 +213,13 @@ describe("055 — 설정 면 색의 대비 (research R10)", () => {
     expect(Object.values(COLORS)).not.toContain(SETTINGS.tagText);
   });
 
+  it("059 FR-029 — 「개발자」 행 강조 바탕은 보드 accent-100이고 본문색 라벨이 AA로 읽힌다", () => {
+    expect(SETTINGS.rowHighlight).toBe("#fff2ef");
+    expect(Object.values(COLORS)).not.toContain(SETTINGS.rowHighlight);
+    expect(contrastRatio(COLORS.text, SETTINGS.rowHighlight)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(COLORS.textMuted, SETTINGS.rowHighlight)).toBeGreaterThanOrEqual(4.5);
+  });
+
   it("056 FR-029·SC-007 — 토글 꺼짐 손잡이가 꺼짐 면과 3:1 이상 구분된다", () => {
     expect(contrastRatio(SETTINGS.toggle.knobOff, SETTINGS.tagFill)).toBeGreaterThanOrEqual(3);
   });

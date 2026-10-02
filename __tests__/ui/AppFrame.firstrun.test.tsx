@@ -71,7 +71,8 @@ describe("045 FR-008 — 작명 화면은 다운로드 완료 후에만 온다 (
     // 소스 검사용으로만 남아 있다.
     const call = APP_SOURCE.match(/const welcomeNeeded =([\s\S]*?);\n\n/);
     expect(call).not.toBeNull();
-    expect(call?.[0]).toMatch(/onboardingNeeded:\s*!permissionStepsDecided/);
+    // 059 — 로컬 값 이름이 `stepsDecided`다(`permissionStepsDecided`는 onboarding-gate.ts의 순수 함수 이름).
+    expect(call?.[0]).toMatch(/onboardingNeeded:\s*!stepsDecided/);
   });
 });
 

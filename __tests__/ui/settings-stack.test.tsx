@@ -202,15 +202,19 @@ describe("★ 055 — App.tsx 조립 (소스 검사)", () => {
 
   it("설정 겹은 SettingsFrame(‹ 일기 · 설정)이고 닫기는 goHome이다", () => {
     const frame = functionBody("AppFrame");
-    expect(frame).toMatch(/<StackLayer[^>]*open=\{route === "settings"\}/);
+    // 059 — 설정 겹은 개발자가 열린 동안에도 열려 있다(개발자가 그 위에 쌓인다, research R8).
+    expect(frame).toMatch(
+      /<StackLayer[^>]*open=\{route === "settings" \|\| route === "developer"\}/,
+    );
     expect(frame).toMatch(
       /<SettingsFrame\s+backLabel=\{SETTINGS_TEXT\.back\}\s+onBack=\{goHome\}\s+title=\{SETTINGS_TEXT\.title\}/,
     );
   });
 
-  it("개발자 겹은 showsDiagnostics 조건 안에서만 열린다 (048 FR-024)", () => {
+  it("개발자 겹은 켜져 있을 때만 열린다 — 진단은 showsDiagnostics 조건 안에서만 그린다 (059가 048 FR-024를 나눴다)", () => {
     const frame = functionBody("AppFrame");
-    expect(frame).toMatch(/open=\{showsDiagnostics && route === "developer"\}/);
+    expect(frame).toMatch(/open=\{developer\.enabled && route === "developer"\}/);
+    expect(frame).toMatch(/\{showsDiagnostics && \(\s*<StackLayer/);
   });
 
   it("S8 — 알림 응답은 홈으로 돌아온다 (020)", () => {
@@ -231,13 +235,14 @@ describe("★ 055 F6·D3 — 설정에서 걷은 것과 「모듈 다시 받기�
       "<AuthorPicker",
       "<PermissionsSection",
       "onRestartOnboarding",
-      "setForceOnboarding(true)",
       "openSettingsList",
       "function ModelSection",
     ]) {
       expect(app).not.toContain(absent);
     }
     expect(functionBody("SettingsSection")).toMatch(/<SettingsScreen\b/);
+    // 059 — 「온보딩부터 다시」는 개발자 화면으로 옮겨 갔다(설정 조립에는 여전히 없다).
+    expect(functionBody("SettingsSection")).not.toContain("setForceOnboarding");
   });
 
   it("★ D3 — onRedownload는 다운로드 시작 ref와 완료 확인을 되돌린 뒤 필수 에셋을 다시 읽는다", () => {
@@ -256,7 +261,7 @@ describe("★ 055 F6·D3 — 설정에서 걷은 것과 「모듈 다시 받기�
 
   it("이름 바꾸기 겹이 열린 동안 설정 겹은 뒤로 가기를 등록하지 않는다(active), 저장은 035 검증을 거친다", () => {
     const frame = functionBody("AppFrame");
-    expect(frame).toMatch(/active=\{!renaming\}/);
+    expect(frame).toMatch(/active=\{!renaming && route !== "developer"\}/);
     expect(frame).toMatch(/<StackLayer onClose=\{closeRename\} open=\{renaming\}>/);
     expect(frame).toMatch(/onRenameCharacter\(ONBOARDING_DEFAULT_CHARACTER, raw\)/);
   });

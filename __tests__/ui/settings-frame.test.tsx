@@ -88,3 +88,30 @@ describe("055 F2 — 회색 지면", () => {
     expect(screen.getByText("지면 내용")).toBeTruthy();
   });
 });
+
+describe("059 — 제목 오른쪽 작은 글자(titleAside)", () => {
+  it("주면 제목 줄 안에 12 보조색 글자로 보이고 안 주면 노드가 없다", async () => {
+    await render(
+      <SettingsFrame
+        backLabel={SETTINGS_TEXT.backToSettings}
+        onBack={jest.fn()}
+        title="개발자"
+        titleAside="DEV · 1.0.0 (24)"
+      >
+        <Text>내용</Text>
+      </SettingsFrame>,
+    );
+    const aside = screen.getByTestId("settings-title-aside");
+    expect(aside).toHaveTextContent("DEV · 1.0.0 (24)");
+    expect(flat(aside).fontSize).toBe(12);
+    expect(flat(aside).color).toBe(COLORS.textMuted);
+    expect(
+      within(screen.getByTestId("settings-title-row")).getByTestId("settings-title-aside"),
+    ).toBeTruthy();
+  });
+
+  it("안 주면 그리지 않는다", async () => {
+    await renderFrame();
+    expect(screen.queryByTestId("settings-title-aside")).toBeNull();
+  });
+});

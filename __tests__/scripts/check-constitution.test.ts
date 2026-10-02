@@ -194,14 +194,14 @@ describe("checkSourceFile — 어댑터 직접 사용 (006)", () => {
  * ─────────────────────────────────────────────────────────────────────────────
  * **「쓸 수 없다」를 사람의 주의력이 아니라 검사로 지킨다.**
  *
- * 003의 `CharacterListScreen`과 007의 `CharacterPicker`가 `roster.ts`를 import 하지
+ * 003의 목록 화면과 007의 선택기(059가 지웠다)가 `roster.ts`를 import 하지
  * 않는 것으로 방어를 세웠는데, **다음 사람이 무심코 넣으면 그 방어가 사라진다.**
  * ─────────────────────────────────────────────────────────────────────────────
  */
 describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)", () => {
   it("src/ui가 roster를 import 하면 잡는다", () => {
     const violations = checkSourceFile(
-      "src/ui/CharacterPicker.tsx",
+      "src/ui/SettingsScreen.tsx",
       'import { assetFor } from "../models/roster";',
     );
 
@@ -229,7 +229,7 @@ describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)"
    */
   it("준비 상태 타입은 막지 않는다 — 모델 정보가 아니다", () => {
     const violations = checkSourceFile(
-      "src/ui/CharacterListScreen.tsx",
+      "src/ui/DeveloperScreen.tsx",
       'import type { ModelReadiness } from "../models/types";',
     );
 
@@ -252,13 +252,13 @@ describe("checkSourceFile — 화면이 모델 자산에 닿는다 (007 FR-007)"
     expect(violations).toEqual([]);
   });
 
-  it("실제 CharacterPicker는 통과한다", () => {
+  it("실제 DeveloperScreen은 통과한다(059 — 모델 자산에 닿지 않는 화면)", () => {
     const source = readFileSync(
-      join(__dirname, "..", "..", "src", "ui", "CharacterPicker.tsx"),
+      join(__dirname, "..", "..", "src", "ui", "DeveloperScreen.tsx"),
       "utf8",
     );
 
-    expect(checkSourceFile("src/ui/CharacterPicker.tsx", source)).toEqual([]);
+    expect(checkSourceFile("src/ui/DeveloperScreen.tsx", source)).toEqual([]);
   });
 
   /**

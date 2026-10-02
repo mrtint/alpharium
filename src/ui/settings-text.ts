@@ -45,6 +45,8 @@ export const SETTINGS_TEXT = {
   permDenied: "허용 안 함",
   groupAbout: "정보",
   version: "버전",
+  /** 059 — 「정보」 맨 아래 개발자 행(보드 `about.developer`). 켜졌을 때만 그려진다 */
+  developer: "개발자",
   /** 진입점 점 세 개의 스크린리더 라벨(보드 `6a` 「스크린리더 라벨 "설정"」) */
   entryLabel: "설정",
   /** 이름 바꾸기의 확정 버튼 */
@@ -53,7 +55,7 @@ export const SETTINGS_TEXT = {
   backToSettings: "설정",
   /** 쓰기 시작 전 「캐릭터를 먼저 준비해야 한다」 안내의 버튼 */
   redownload: "모듈 다시 받기",
-  /** 개발자 겹의 제목(보드 `dev.title`) — 진입점은 개발자 메뉴 조각 몫 */
+  /** 개발자 겹의 제목(보드 `dev.title`) — 059 이후 본문 문구는 `developer-text.ts` */
   developerTitle: "개발자",
   /* ── 056 — 매일 쓰는 시각·장소 이름 (보드 `6c` ③·`6f`·`6l`) ── */
   autoWriteTime: "매일 쓰는 시각",

@@ -1,7 +1,5 @@
-# 055 — 설정 진입은 `home-settings`(홈 월 라벨 줄 오른쪽 점 세 개). 설정에 캐릭터 목록·권한 안내 다시 보기가 없다 —
-#       그 단계에 기대면 폐기 후보(대체 경로는 개발자 메뉴 조각). FLOWS 밖이다.
 # 056 — 시각 선택은 「매일 쓰는 시각」 행 + 시 격자 대화상자(`settings-time-place.yml`이 FLOWS에서 본다). 이 흐름은 M1~M3을
-#       새 자리로 고쳤고, 개발자 탭 단계(stale)는 그대로 둔다.
+#       새 자리로 고쳤다. 059 — 마지막 「지금 자동 생성」 단계는 설정 → 개발자 → 진단으로 간다(개발 환경 전용).
 # 실기기 자동 테스트 — 시간대 지정 자동 일기 작성과 완성 알림 (020)
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -79,11 +77,21 @@ appId: com.anonymous.alpharium
 - assertNotVisible: "hyperclova"
 - assertNotVisible: "gguf"
 
-# ★ 개발자 탭에 "지금 자동 생성 트리거" 디버그 버튼이 존재한다(경합 재현용,
+# ★ 개발자 → 진단에 "지금 자동 생성 트리거" 디버그 버튼이 존재한다(경합 재현용,
 #   quickstart.md §4). 눌러도 크래시하지 않는다(실제 생성 완주는 사람이 확인).
-- runFlow:
-    when:
-      visible: ".*지금.*자동.*생성.*"
-    commands:
-      - assertVisible:
-          text: ".*지금.*자동.*생성.*"
+- scrollUntilVisible:
+    element:
+      id: "settings-developer"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "settings-developer"
+- tapOn:
+    id: "developer-diagnostics"
+- scrollUntilVisible:
+    element:
+      text: ".*지금.*자동.*생성.*"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    text: ".*지금.*자동.*생성.*"

@@ -74,4 +74,15 @@ Metro는 셸만이 아니라 8081을 쥔 node 프로세스까지 끈다.
 
 ## 실기기 결과
 
-(구현 뒤 채운다.)
+2026-10-02, SM-S901N, dev 빌드(`assembleDebug` 22분, `adb install -r` 성공, `ACCESS_NETWORK_STATE` 확인). 백업은 시작 전에 떠 두었다. 「온보딩부터 다시」는 누르기 전에 코드(`onReplayOnboarding` = `stopHome` + 플래그 네 개)로 모델 파일을 지우지 않는 경로임을 확인했다.
+
+- **개발 환경**: 설정 「정보」에 「개발자」 행이 처음부터 있다. 개발자 화면에 「DEV · 1.0.0 (9)」·모듈 줄(읽는 모듈 `loaded · 482MB`, 쓰는 모듈 `loaded · 1.5GB`)·「진단」(「개발 빌드만」)·「온보딩부터 다시」·「개발자 메뉴 끄기」가 보인다.
+- **모듈 다시 받기(전부 준비됨)**: 「이미 모두 준비돼 있어요」 토스트, 개발자 화면에 머문다.
+- **끄기/켜기(개발 환경)**: 끄면 설정으로 돌아가고 「개발자」 행이 사라지며 `developer-menu.json`은 생기지 않는다. 버전 7번 탭으로 「개발자 메뉴가 켜졌어요 / 이 기기에서만」 토스트와 함께 다시 켜진다.
+- **온보딩부터 다시**: 결정되지 않은 배터리 단계(4/4)만 뜨고 「건너뛰기」 뒤 홈으로 돌아온다. `files/models`는 1,959,788KB 그대로(다운로드 없음).
+- **배포 환경**(Metro `EXPO_PUBLIC_APP_ENV=prod`, dev 빌드): 설정에 「개발자」 행이 없다 → 버전 7번 탭 → `preferences/developer-menu.json` = `{"enabled":true}` → 개발자 화면에 「진단」 그룹·「DEV」 표지가 없다 → 「개발자 메뉴 끄기」 → 파일이 없다.
+- **복원**: `developer-menu.json` 없음, `auto-diary.json`은 시작 때와 같다. Metro와 8081을 쥔 node 프로세스를 껐다.
+- **되살린 Maestro 흐름 넷**(실행기는 `pm clear`를 해 쓰지 않고 `maestro test .maestro/<흐름>.yml`로 직접): `skeleton`·`prompt-preview`·`scheduled-diary-notification` 통과, `diary-body-screen`은 첫 단언 「일기」(옛 홈 글자)가 실패해 `home-settings` 대기로 고친 뒤 통과(exit 0). `scheduled-diary-notification`이 켠 자동 쓰기는 설정 토글로 되돌렸다(`{"enabled":false,"targetHour":17}`).
+- **진단 왕복**: 진단 → 뒤로 세 번 → 개발자 → 설정 → 홈까지 겹마다 한 단계씩 돌아온다.
+- **미확인**: 쓰는 중에 「온보딩부터 다시」·쓰는 중 진단 왕복의 일기 완주(SC-008 뒷부분), 실제 내려받기 확인 대화상자(셀룰러 용량 문구 포함 — 모듈을 일부러 자르는 칸은 승인이 없어 하지 않았다).
+- **절차 이탈**: 배포 환경 Metro로 갈아탄 뒤 앱을 다시 띄우려고 `am start -S`를 한 번 썼다(`force-stop`과 같다). 그때 자동 쓰기가 꺼져 있어 취소될 WorkManager 잡은 없었다. 첫 시도에서 좌표를 잘못 눌러 시스템 앱 정보 화면이 열렸으나 아무것도 바꾸지 않고 뒤로 나왔다.

@@ -114,7 +114,7 @@ const DIRECT_BACKEND_FACTORY = /\b(?:onDeviceBackend|createDesktopServerBackend)
  * ─────────────────────────────────────────────────────────────────────────
  * **화면은 캐릭터만 알아야 하고 모델은 몰라야 한다.**
  *
- * 003의 `CharacterListScreen`과 007의 `CharacterPicker`가 `roster.ts`·`ModelAsset`을
+ * 003의 캐릭터 목록 화면과 007의 선택기(둘 다 059가 지웠다)가 `roster.ts`·`ModelAsset`을
  * import 하지 않는 것으로 이 방어를 세웠다 — **조심해서 안 쓰는 것이 아니라 쓸 수
  * 없는 것**이 방어이며, 그 성질을 사람의 주의력이 아니라 검사로 지킨다.
  *
@@ -126,7 +126,7 @@ const DIRECT_BACKEND_FACTORY = /\b(?:onDeviceBackend|createDesktopServerBackend)
  *
  * **⚠️ `models/types`는 막지 않는다.** `ModelReadiness`·`DownloadProgress`는
  * **「쓸 수 있는가·받는 중인가」이지 모델이 무엇인가가 아니다** — 003의
- * `CharacterListScreen`이 준비 상태를 그리려면 필요하고, 그것을 막으면 화면이
+ * 캐릭터 목록 화면이 준비 상태를 그리려면 필요했고, 그것을 막으면 화면이
  * 상태를 말할 수 없다. 막아야 할 것은 **자산에 닿는 길**이다.
  *
  * **045 — `onboarding/essential-assets`의 경로 자체는 막지 않는다.**

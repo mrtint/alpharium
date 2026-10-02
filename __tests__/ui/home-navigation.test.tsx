@@ -44,12 +44,13 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
 
   /**
    * 051 수정 — 홈의 `⋯` 메뉴(048 M1~M6)를 없앴다(저장소 소유자 지시). 설정·개발자 진입점은 설정 화면 구성
-   * 과제에서 다시 둔다. 개발자 화면은 여전히 `showsDiagnostics` 조건 안에서만 그려진다(FR-024).
+   * 과제에서 다시 둔다. 059가 진입점(설정 「버전」 7번 탭)을 두었고 개발자 겹은 켜져 있을 때만 열린다 — 진단은 여전히
+   * `showsDiagnostics` 조건 안에서만 그려진다(FR-024의 뒷부분, 059가 둘로 나눴다).
    */
-  it("★ M6 — 홈에 메뉴 항목이 없고, 개발자 겹은 showsDiagnostics 조건 안에서만 열린다 (055)", () => {
+  it("★ M6 — 홈에 메뉴 항목이 없고, 개발자 겹은 켜져 있을 때만 열린다 (059)", () => {
     const frame = functionBody("AppFrame");
     expect(frame).not.toMatch(/menuItems|HomeMenu|key: "developer"/);
-    expect(frame).toMatch(/open=\{showsDiagnostics && route === "developer"\}/);
+    expect(frame).toMatch(/open=\{developer\.enabled && route === "developer"\}/);
   });
 
   it("N4 — 설정 진입·알림 라우팅이 화면 상태를 쓴다 (055 — 설정 진입은 점 세 개, 실패 안내는 「모듈 다시 받기」)", () => {
@@ -80,10 +81,11 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
     );
   });
 
-  it("055 — 설정·개발자는 홈 위의 StackLayer 겹이고 닫으면 홈이다 (셋째 겹은 설정 위의 이름 바꾸기)", () => {
+  it("055·059 — 설정·개발자는 홈 위의 StackLayer 겹이다 (설정은 닫으면 홈, 개발자는 설정, 그 위에 이름 바꾸기·진단)", () => {
     const frame = functionBody("AppFrame");
-    expect(frame.match(/<StackLayer[\s>]/g)?.length).toBe(3);
-    expect(frame.match(/onClose=\{goHome\}/g)?.length).toBe(2);
+    expect(frame.match(/<StackLayer[\s>]/g)?.length).toBe(4);
+    expect(frame.match(/onClose=\{goHome\}/g)?.length).toBe(1);
+    expect(frame.match(/onClose=\{backToSettings\}/g)?.length).toBe(1);
   });
 
   it("신호 미리보기 통로가 홈 화면까지 온다 (US3)", () => {

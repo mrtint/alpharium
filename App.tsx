@@ -45,7 +45,10 @@ import {
   essentialAssetsReady,
   ONBOARDING_DEFAULT_CHARACTER,
 } from "./src/onboarding/essential-assets";
-import { expoEssentialAssetsPort } from "./src/app/essential-assets-port";
+import {
+  expoEssentialAssetsPort,
+  readEssentialRemainingBytes,
+} from "./src/app/essential-assets-port";
 import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
 import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
 import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
@@ -64,6 +67,13 @@ import { DownloadConsentDialog } from "./src/ui/DownloadConsentDialog";
 import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { SettingsFrame } from "./src/ui/SettingsFrame";
+import { DeveloperScreen } from "./src/ui/DeveloperScreen";
+import { DeveloperToast } from "./src/ui/DeveloperToast";
+import { RedownloadConfirmDialog } from "./src/ui/RedownloadConfirmDialog";
+import { DEVELOPER_TEXT } from "./src/ui/developer-text";
+import { useDeveloperMenu } from "./src/ui/use-developer-menu";
+import { useDeveloperTaps } from "./src/ui/use-developer-taps";
+import { useToastLine } from "./src/ui/use-toast-line";
 import { SettingsScreen } from "./src/ui/SettingsScreen";
 import { TargetHourDialog } from "./src/ui/TargetHourDialog";
 import { PlaceNameDialog } from "./src/ui/PlaceNameDialog";
@@ -74,6 +84,12 @@ import { usePermissionTags } from "./src/ui/use-permission-tags";
 import type { PermissionFacts } from "./src/app/permission-tags";
 import { photoLocationProbe } from "./src/app/photo-location-probe";
 import { formatVersion } from "./src/app/version";
+import { expoDeveloperMenuStorePort } from "./src/app/developer-menu-store";
+import { buildLabelFor } from "./src/app/developer-build-label";
+import { readDeviceModuleLines, type ModuleLines } from "./src/app/module-lines";
+import { planRedownload } from "./src/app/redownload-plan";
+import { readConnection } from "./src/app/network-port";
+import { onboardingGateNeeded, permissionStepsDecided } from "./src/app/onboarding-gate";
 import { skippedLineText } from "./src/app/skipped-line";
 import { formatModuleBytes, readModuleBytes } from "./src/app/module-size";
 import { wipeDiaries, type WipeOutcome } from "./src/app/wipe-diaries";
@@ -169,6 +185,48 @@ function AppFrame() {
    */
   const [route, setRoute] = useState<"home" | "settings" | "developer">("home");
   /**
+   * 059 — 개발자 메뉴가 켜져 있는가(보드 `6d`). 환경이 이긴다 — 개발 환경은 늘 켜짐이고 끄기는 그 실행 동안만(`use-developer-menu.ts`).
+   * 설정 겹은 닫히면 언마운트되므로 상태는 여기서 한 번 든다(056 설정 값과 같은 이유).
+   */
+  const developerStore = useMemo(() => expoDeveloperMenuStorePort(), []);
+  const developer = useDeveloperMenu({ devEnvironment: showsDiagnostics, port: developerStore });
+  /** 059 — 설정·개발자 겹이 함께 쓰는 토스트 한 줄(한 번에 하나, 2초) */
+  const toastLine = useToastLine();
+  /** 059 — 진단 겹이 개발자 겹 위에 열려 있는가(개발 환경에서만 참이 될 수 있다) */
+  const [diagnosing, setDiagnosing] = useState(false);
+  const openDiagnostics = useCallback(() => setDiagnosing(true), []);
+  const closeDiagnostics = useCallback(() => setDiagnosing(false), []);
+  /* ── 055 → 059 — 버전. 설치본의 값을 읽는다(R5). 읽지 못하면 비운다. 설정 「버전」 행과 개발자 화면 머리글이 함께 쓴다 ─── */
+  const [versionText, setVersionText] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void import("expo-application")
+      .then((Application) =>
+        formatVersion(Application.nativeApplicationVersion, Application.nativeBuildVersion),
+      )
+      .catch(() => null)
+      .then((text) => {
+        if (alive) setVersionText(text);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  /** 059 — 개발자 화면의 모듈 줄. 겹이 열릴 때 읽고, 읽기 전·실패한 줄은 `null`(값을 비운다) */
+  const [moduleLines, setModuleLines] = useState<ModuleLines>({ reading: null, writing: null });
+  useEffect(() => {
+    if (route !== "developer") return;
+    let alive = true;
+    void readDeviceModuleLines()
+      .catch((): ModuleLines => ({ reading: null, writing: null }))
+      .then((lines) => {
+        if (alive) setModuleLines(lines);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [route]);
+  /**
    * 055 — 이름 바꾸기 겹이 설정 위에 열려 있는가. 설정이 닫히면 함께 닫힌다(홈으로 돌아올 때 남지 않는다).
    */
   const [renaming, setRenaming] = useState(false);
@@ -176,7 +234,14 @@ function AppFrame() {
   const goHome = useCallback(() => {
     setRoute("home");
     setRenaming(false);
+    setDiagnosing(false);
   }, []);
+  /** 059 — 개발자 화면의 「‹ 설정」: 설정은 아래에 그대로 열려 있으므로 `route`만 되돌린다(R8) */
+  const backToSettings = useCallback(() => {
+    setDiagnosing(false);
+    setRoute("settings");
+  }, []);
+  const openDeveloper = useCallback(() => setRoute("developer"), []);
   const openSettings = useCallback(() => setRoute((r) => (r === "settings" ? r : "settings")), []);
 
   /**
@@ -379,8 +444,12 @@ function AppFrame() {
   // 플래그 로드 결과가 이미 "완료"라면 이번 세션에서 권한 스텝을 밟지
   // 않아도 결정된 것과 같다 — 렌더 중 파생값으로 합쳐 effect의
   // setState-in-effect 경고(react-hooks/set-state-in-effect)를 피한다.
-  const permissionStepsDecided =
-    permissionStepsDecidedThisSession || onboardingFlag?.completed === true;
+  // 059 R7 — 「이미 완료함」은 다시 보기(`forceOnboarding`)를 요청한 동안은 결정으로 세지 않는다(옛 식은 force를 죽였다).
+  const stepsDecided = permissionStepsDecided({
+    decidedThisSession: permissionStepsDecidedThisSession,
+    completed: onboardingFlag?.completed === true,
+    force: forceOnboarding,
+  });
   const setPermissionStepsDecided = setPermissionStepsDecidedThisSession;
 
   useEffect(() => {
@@ -545,7 +614,7 @@ function AppFrame() {
   const [downloadFraction, setDownloadFraction] = useState(0);
 
   useEffect(() => {
-    if (!permissionStepsDecided) return;
+    if (!stepsDecided) return;
     if (onboardingFlag?.downloadConsented !== true) return;
     if (essentialsReady === null || essentialsReady === true) return;
     if (essentialDownloadStarted.current) return;
@@ -564,7 +633,7 @@ function AppFrame() {
         setDownloadFailed(true);
       });
   }, [
-    permissionStepsDecided,
+    stepsDecided,
     onboardingFlag,
     essentialsReady,
     onboardingPorts,
@@ -653,6 +722,8 @@ function AppFrame() {
    */
   const onAllPermissionStepsDecided = useCallback(() => {
     setPermissionStepsDecided(true);
+    // 059 — 「온보딩부터 다시」가 켠 force 를 끈다(세션 결정이 참이라 게이트는 닫힌 채 남는다).
+    setForceOnboarding(false);
     setOnboardingFlag((prev) => {
       if (prev === null || prev.completed === true) return prev;
       const next = { ...prev, completed: true };
@@ -751,7 +822,7 @@ function AppFrame() {
     shouldShowWelcome({
       // 040 — 권한 스텝이 전부 결정돼야(에셋 준비와 무관) 여기로 넘어온다
       // (research.md #3).
-      onboardingNeeded: !permissionStepsDecided,
+      onboardingNeeded: !stepsDecided,
       essentialAssetsReady: essentialsReady ?? false,
       welcomeShown: onboardingFlag.welcomeShown === true,
     });
@@ -781,7 +852,7 @@ function AppFrame() {
   const firstRunStage =
     onboardingFlag !== null && essentialsReady !== null
       ? resolveFirstRunStage({
-          onboardingNeeded: !permissionStepsDecided,
+          onboardingNeeded: !stepsDecided,
           onboardingStarted,
           downloadConsented: onboardingFlag.downloadConsented,
           downloadReady: essentialsReady,
@@ -955,13 +1026,20 @@ function AppFrame() {
     waiter.resolve();
   }, []);
   const wipeTokenRef = useRef(0);
-  const requestWipe = useCallback(async (): Promise<WipeOutcome> => {
+  /**
+   * 059 — 쓰는 중인 홈을 먼저 멈춘다(058에서 뽑았다). 지우기·모듈 다시 받기·온보딩부터 다시가 함께 쓴다 — 셋 모두 홈을 곧 언마운트하거나 그 밑의
+   * 파일을 건드리므로, 멈추지 않으면 생성이 뒤에서 이어져 저장되거나 잠금을 쥔 채 남는다. 쓰는 중이 아니면 곧바로 끝난다.
+   */
+  const stopHome = useCallback(async (): Promise<void> => {
     const token = ++wipeTokenRef.current;
     const ready = new Promise<void>((resolve) => {
       wipeWaiter.current = { token, resolve };
     });
     setWipeRequest(token);
     await ready;
+  }, []);
+  const requestWipe = useCallback(async (): Promise<WipeOutcome> => {
+    await stopHome();
     const notifications = expoNotificationPort();
     const outcome = await wipeDiaries({
       store: fileStore(expoFileSystemPort("diary")),
@@ -977,7 +1055,7 @@ function AppFrame() {
       setDiaryKey((k) => k + 1);
     }
     return outcome;
-  }, [goHome]);
+  }, [goHome, stopHome]);
 
   /**
    * ★ 045 — 사용자가 동의 Dialog의 [확인/시작]을 눌렀다(FR-002a, C5).
@@ -1115,6 +1193,60 @@ function AppFrame() {
     }
   }, [onboardingPorts, setEssentialsReady]);
 
+  /**
+   * ★ 059 — 개발자 화면의 「모듈 다시 받기」(보드 `6e` ①, research R3·R5·R6).
+   *
+   * 받을 것이 없으면(필수 모듈이 모두 준비됨) 대화상자 대신 토스트 한 줄 — 개발자 화면에 머문다. 있으면 확인 대화상자(모바일이 확인될 때만 용량).
+   * **사실을 못 읽었으면 「다 있다」로 세지 않고 확인으로 간다**(`planRedownload`). 이 경로는 모듈 파일을 지우지 않는다(037) — 빠졌거나 잘린 것만
+   * 받는 것은 `onRedownload`(055)와 다운로드 흐름의 일이다.
+   */
+  const [redownloadDialog, setRedownloadDialog] = useState<{ cellularSize: string | null } | null>(
+    null,
+  );
+  const onRequestRedownload = useCallback(async () => {
+    const plan = await planRedownload({
+      readFacts: () => onboardingPorts.essentialAssets.readFacts(),
+      readRemainingBytes: readEssentialRemainingBytes,
+      readConnection,
+    });
+    if (plan.kind === "nothing") {
+      toastLine.show(DEVELOPER_TEXT.allReady);
+      return;
+    }
+    setRedownloadDialog({ cellularSize: plan.cellularSize });
+  }, [onboardingPorts, toastLine]);
+  const onCancelRedownload = useCallback(() => setRedownloadDialog(null), []);
+  /**
+   * 확정: 쓰는 중인 홈을 먼저 멈추고(`stopHome` — 필수 모듈이 빠져도 사진 없는 하루는 쓰기가 시작될 수 있다, R6) 055의 `onRedownload`(시작 표식·완료 확인을
+   * 되돌린 뒤 필수 모듈을 다시 읽는다)를 부른 다음 겹을 닫는다. `essentialsReady`가 거짓이면 프레임이 다운로드 진행 화면으로 갈라진다.
+   */
+  const onConfirmRedownload = useCallback(async () => {
+    setRedownloadDialog(null);
+    await stopHome();
+    await onRedownload();
+    goHome();
+  }, [stopHome, onRedownload, goHome]);
+
+  /**
+   * ★ 059 — 「온보딩부터 다시」(보드 `6e` ④, research R7). 일기·이름·설정·모듈은 건드리지 않고 첫 실행 흐름(로고 → 권한)만 다시 시작한다.
+   * 게이트가 켜지면 프레임이 온보딩 화면으로 바뀌어 홈이 언마운트되므로 **먼저 쓰는 중인 홈을 멈춘다**(`stopHome`). 로고가 다시 나오도록 세션 상태 둘도
+   * 되돌린다 — 안 그러면 로고 없이 권한 단계부터 뜨거나(`onboardingStarted`) 이번 세션에 이미 끝낸 것으로 보아 게이트가 안 열린다.
+   */
+  const onReplayOnboarding = useCallback(async () => {
+    await stopHome();
+    setForceOnboarding(true);
+    setPermissionStepsDecidedThisSession(false);
+    setOnboardingStarted(false);
+    goHome();
+  }, [stopHome, goHome]);
+
+  /** 059 — 「개발자 메뉴 끄기」: 꺼지고 개발자 겹은 설정으로 돌아간다(개발 환경은 그 실행 동안만, 배포는 저장된 켜짐을 지운다) */
+  const onDisableDeveloper = useCallback(() => {
+    developer.disable();
+    setDiagnosing(false);
+    setRoute("settings");
+  }, [developer]);
+
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
@@ -1129,8 +1261,12 @@ function AppFrame() {
    * 불렸으면(=`permissionStepsDecided`) 에셋 준비와 무관하게 이 화면을
    * 떠난다.
    */
-  const onboardingGateNeeded =
-    (onboardingFlag.completed !== true || forceOnboarding) && !permissionStepsDecided;
+  // 059 R7 — 판정은 `onboarding-gate.ts`(순수)다. `force`가 켜지면 완료한 기기에서도 열린다.
+  const gateNeeded = onboardingGateNeeded({
+    completed: onboardingFlag.completed === true,
+    force: forceOnboarding,
+    decidedThisSession: permissionStepsDecidedThisSession,
+  });
 
   /*
    * 로고는 온보딩이 필요하고 아직 이번 세션에서 스텝을 시작하지 않았을
@@ -1138,7 +1274,7 @@ function AppFrame() {
    * `onboardingGateNeeded`만 보고, "이미 시작했는가"는 `App.tsx`가 소유하는
    * 세션 로컬 상태로 가른다.
    */
-  if (onboardingGateNeeded && shouldShowLogo(onboardingGateNeeded) && !onboardingStarted) {
+  if (gateNeeded && shouldShowLogo(gateNeeded) && !onboardingStarted) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <LogoScreen onDone={() => setOnboardingStarted(true)} />
@@ -1147,7 +1283,7 @@ function AppFrame() {
     );
   }
 
-  if (onboardingGateNeeded) {
+  if (gateNeeded) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <OnboardingScreen
@@ -1273,11 +1409,12 @@ function AppFrame() {
           wipeRequest={wipeRequest}
           onWipeReady={onWipeReady}
         />
+        {/* 059 — 설정 겹은 개발자가 열린 동안에도 열려 있다(개발자가 그 위에 쌓인다, R8). 그동안 뒤로 가기는 등록하지 않는다. */}
         <StackLayer
-          active={!renaming}
+          active={!renaming && route !== "developer"}
           onClose={goHome}
           onSettled={onSettingsSettled}
-          open={route === "settings"}
+          open={route === "settings" || route === "developer"}
         >
           <SettingsFrame backLabel={SETTINGS_TEXT.back} onBack={goHome} title={SETTINGS_TEXT.title}>
             <SettingsSection
@@ -1292,6 +1429,11 @@ function AppFrame() {
               skippedDay={skippedDay}
               values={settingsValues}
               requestWipe={requestWipe}
+              versionText={versionText}
+              developerEnabled={developer.enabled}
+              onEnableDeveloper={developer.enable}
+              onOpenDeveloper={openDeveloper}
+              showToast={toastLine.show}
             />
           </SettingsFrame>
           {/*
@@ -1310,23 +1452,62 @@ function AppFrame() {
           </StackLayer>
         </StackLayer>
         {/*
-        **개발자 화면은 진단과 같은 조건에서만 열린다**(FR-024·SC-013). 진입점은 개발자 메뉴 조각 몫이라 지금은 닿을 길이
-        없지만, 한 번 더 지킨다.
-      */}
+          059 — 개발자 화면(보드 `6e` 개발 빌드·`6j` 배포 빌드). 켜져 있을 때만 열린다(`developer.enabled`). 진단 그룹은 `showsDiagnostics`일 때만
+          그려진다(S7). 뒤로 가기는 설정으로 돌아간다 — 설정 겹은 아래에 그대로 열려 있다.
+        */}
         <StackLayer
-          onClose={goHome}
+          active={!diagnosing}
+          onClose={backToSettings}
           onSettled={onDeveloperSettled}
-          open={showsDiagnostics && route === "developer"}
+          open={developer.enabled && route === "developer"}
         >
           <SettingsFrame
-            backLabel={SETTINGS_TEXT.back}
-            onBack={goHome}
-            title={SETTINGS_TEXT.developerTitle}
+            backLabel={SETTINGS_TEXT.backToSettings}
+            backTestID="back-to-settings"
+            onBack={backToSettings}
+            title={DEVELOPER_TEXT.title}
+            titleAside={buildLabelFor({ devEnvironment: showsDiagnostics, versionText })}
           >
-            {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
-            <DiagnosticsScreen characterNames={customNames} />
+            <DeveloperScreen
+              modules={moduleLines}
+              onDisable={onDisableDeveloper}
+              onOpenDiagnostics={showsDiagnostics ? openDiagnostics : undefined}
+              onRedownload={() => void onRequestRedownload()}
+              onReplayOnboarding={() => void onReplayOnboarding()}
+              showsDiagnostics={showsDiagnostics}
+            />
           </SettingsFrame>
         </StackLayer>
+        {/* 059 — 진단은 개발 환경에서만, 개발자 겹 위에 한 겹 더(R8). 배포에서는 트리에 없다(S7). */}
+        {showsDiagnostics && (
+          <StackLayer onClose={closeDiagnostics} open={diagnosing}>
+            <SettingsFrame
+              backLabel={DEVELOPER_TEXT.diagBack}
+              backTestID="back-to-developer"
+              onBack={closeDiagnostics}
+              title={DEVELOPER_TEXT.diag}
+            >
+              {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
+              <DiagnosticsScreen characterNames={customNames} />
+            </SettingsFrame>
+          </StackLayer>
+        )}
+        {redownloadDialog !== null && (
+          <RedownloadConfirmDialog
+            cellularSize={redownloadDialog.cellularSize}
+            onCancel={onCancelRedownload}
+            onConfirm={() => void onConfirmRedownload()}
+          />
+        )}
+        {toastLine.toast !== null && (
+          <DeveloperToast
+            bottom={24}
+            key={toastLine.toast.key}
+            onDismiss={toastLine.dismiss}
+            text={toastLine.toast.text}
+            {...(toastLine.toast.sub !== undefined ? { sub: toastLine.toast.sub } : {})}
+          />
+        )}
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
@@ -1710,7 +1891,8 @@ async function readyCharacters(): Promise<Character[]> {
  *   아래 한 줄(FR-016a). 지우는 동안 설정을 닫을 수 있다 — 끝난 뒤 언마운트된 화면은 건드리지 않는다.
  *
  * **걷은 것**(S5): 작성자 고르기(`AuthorPicker`), 캐릭터·사진 모델 받기(`CharacterListScreen`), 설명 카드형 권한 섹션과
- * 「온보딩 다시 하기」(`PermissionsSection`), 배터리 목록 인텐트 링크. 대체 경로는 개발자 메뉴 조각 몫이다.
+ * 「온보딩 다시 하기」(`PermissionsSection`), 배터리 목록 인텐트 링크. 059가 그 파일들을 지웠고 대체 경로는 개발자 화면(「모듈 다시 받기」·
+ * 「온보딩부터 다시」)이다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 function SettingsSection({
@@ -1725,7 +1907,19 @@ function SettingsSection({
   geoPort,
   skippedDay,
   requestWipe,
+  versionText,
+  developerEnabled,
+  onEnableDeveloper,
+  onOpenDeveloper,
+  showToast,
 }: {
+  /** 055 — 「1.0.0 (9)」. `AppFrame`이 한 번 읽어 든다(059 — 개발자 화면 머리글도 쓴다). 못 읽었으면 `null` */
+  versionText: string | null;
+  /** 059 — 개발자 메뉴가 켜져 있는가·켜기·열기·토스트 */
+  developerEnabled: boolean;
+  onEnableDeveloper: () => void;
+  onOpenDeveloper: () => void;
+  showToast: (text: string, sub?: string) => void;
   /** 058 — 일기 모두 지우기. `AppFrame`이 멈춤·지우기·홈으로를 맡는다 */
   requestWipe: () => Promise<WipeOutcome>;
   onboardingPorts: OnboardingPorts;
@@ -1819,22 +2013,12 @@ function SettingsSection({
     void onboardingPorts.osSettings.openAppSettings().catch(() => {});
   }, [onboardingPorts]);
 
-  /* ── 055 — 버전. 설치본의 값을 읽는다(R5). 읽지 못하면 비운다 ─── */
-  const [versionText, setVersionText] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    void import("expo-application")
-      .then((Application) =>
-        formatVersion(Application.nativeApplicationVersion, Application.nativeBuildVersion),
-      )
-      .catch(() => null)
-      .then((text) => {
-        if (alive) setVersionText(text);
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
+  /* ── 059 — 버전 7번 탭 → 개발자 메뉴. 판정은 `registerTap`(순수), 토스트는 `AppFrame`이 한 자리에서 그린다 ─── */
+  const { onPressVersion, highlight: developerHighlight } = useDeveloperTaps({
+    alreadyOn: developerEnabled,
+    onEnable: onEnableDeveloper,
+    showToast,
+  });
 
   /* ── 058 — 이 휴대폰: 모듈 용량·일기 편수·지우기 ─── */
   const diaryStore = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
@@ -1907,6 +2091,10 @@ function SettingsSection({
         placeNamesText={PLACE_NAME_TEXT[geocoding]}
         targetHourText={formatTargetHour(autoDiary.targetHour, clock.format)}
         versionText={versionText}
+        onPressVersion={onPressVersion}
+        developerEnabled={developerEnabled}
+        developerHighlight={developerHighlight}
+        onOpenDeveloper={onOpenDeveloper}
         // 057 SL3 — 기록이 있고 사진 꼬리표가 「허용 안 함」일 때만(읽지 못함·일부 허용·허용이면 그리지 않는다, FR-010).
         {...(skippedDay !== null && permissionTags.photos === "denied"
           ? { photoSkipText: skippedLineText(skippedDay, new Date()) }

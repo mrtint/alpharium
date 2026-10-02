@@ -75,9 +75,10 @@ describe("★ 온보딩 완료 게이트 (029 버그 수정)", () => {
   it("040 — permissionStepsDecided가 completed===true인 기존 사용자에게 시드된다", () => {
     // 시드하지 않으면 완료된 사용자가 OnboardingScreen도 WelcomeScreen도 못 보고
     // 곧장 깨진 탭 UI로 떨어진다(본문 주석 참조).
-    expect(APP_SOURCE).toMatch(
-      /permissionStepsDecidedThisSession\s*\|\|\s*onboardingFlag\?\.completed\s*===\s*true/,
-    );
+    // 059 R7 — 식이 `onboarding-gate.ts`로 옮겨 갔고, 다시 보기(`force`)를 요청한 동안은 완료로 세지 않는다.
+    const gate = readFileSync(join(__dirname, "../../src/app/onboarding-gate.ts"), "utf8");
+    expect(gate).toMatch(/decidedThisSession\s*\|\|\s*\(completed\s*&&\s*!force\)/);
+    expect(APP_SOURCE).toMatch(/completed:\s*onboardingFlag\?\.completed\s*===\s*true/);
   });
 });
 

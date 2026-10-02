@@ -23,14 +23,18 @@ function body(start: string, end: string): string {
 }
 
 describe("AF1 — 요청 → 홈의 응답을 기다린 뒤에만 지운다", () => {
-  it("setWipeRequest → await ready → wipeDiaries( 순서다", () => {
-    const fn = body("const requestWipe = useCallback(", "}, [goHome]);");
-    const request = fn.indexOf("setWipeRequest(");
-    const wait = fn.indexOf("await ready");
-    const wipe = fn.indexOf("wipeDiaries(");
+  it("stopHome: setWipeRequest → await ready 순서이고, requestWipe: await stopHome() → wipeDiaries( 순서다(059가 stopHome을 뽑았다)", () => {
+    const stop = body("const stopHome = useCallback(", "}, []);");
+    const request = stop.indexOf("setWipeRequest(");
+    const wait = stop.indexOf("await ready");
     expect(request).toBeGreaterThan(0);
     expect(wait).toBeGreaterThan(request);
-    expect(wipe).toBeGreaterThan(wait);
+
+    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
+    const stopCall = fn.indexOf("await stopHome()");
+    const wipe = fn.indexOf("wipeDiaries(");
+    expect(stopCall).toBeGreaterThan(0);
+    expect(wipe).toBeGreaterThan(stopCall);
   });
 
   it("응답은 기다리는 그 토큰일 때만 받는다", () => {
@@ -40,7 +44,7 @@ describe("AF1 — 요청 → 홈의 응답을 기다린 뒤에만 지운다", ()
 
 describe("AF2 — busy가 아니면 설정을 닫고 오늘로, 홈을 다시 마운트한다", () => {
   it("세 동작이 busy 조건 안에만 있다", () => {
-    const fn = body("const requestWipe = useCallback(", "}, [goHome]);");
+    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
     expect(fn).toMatch(
       /if \(outcome\.kind !== "busy"\) \{\s*goHome\(\);\s*setChosenDay\(dayOf\(new Date\(\)\)\);\s*setDiaryKey\(\(k\) => k \+ 1\);\s*\}/,
     );
