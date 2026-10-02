@@ -199,6 +199,19 @@ export type DiaryHomeScreenProps = {
    * 주지 않으면 언제나 참(옛 호출자·테스트).
    */
   canPrepare?: (day: DayDate) => boolean;
+  /**
+   * 057 — 목표 시각이 지난 뒤 앱을 열었을 때 자동으로 쓸 날 (보드 `6c` ③, FR-014).
+   *
+   * **판정은 조립부가 한다**(`resolveAutoWrite` — 백그라운드와 같은 판정). 이 화면은 그 날을 고르고 054의 제자리 쓰기로
+   * 쓰는 중에 들어간다 — 재료가 있다고 이미 판정됐으므로 053 확인을 거치지 않는다. 덮여 있거나 대화상자가 떠 있으면
+   * 시작하지 않는다(FR-018).
+   */
+  autoWriteDay?: DayDate | null;
+  /**
+   * 057 — 실제로 시작하는 순간에만 부른다. 거짓이면 이번 실행에서 이미 시작했거나 첫 실행 자동 첫 일기가 돌았다
+   * (FR-017·FR-020). 시작하지 않은 판정은 부르지 않는다 — 「한 번」을 소모하지 않는다.
+   */
+  claimAutoWrite?: () => boolean;
 };
 
 /**
@@ -251,6 +264,8 @@ export function DiaryHomeScreen({
   previewDay,
   photoAccessPort,
   canPrepare,
+  autoWriteDay,
+  claimAutoWrite,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -360,11 +375,15 @@ export function DiaryHomeScreen({
     }
   }, [store]);
 
+  /** 057 — 목록을 한 번이라도 읽었는가. 읽기 전의 빈 목록으로 자동 쓰기를 시작하지 않는다(헤더·스트립이 빈 채 쓰게 된다) */
+  const listRead = useRef(false);
+
   useEffect(() => {
     let alive = true;
     void (async () => {
       const items = await refresh();
       if (!alive) return;
+      listRead.current = true;
       setScreen(initialScreen(resolution, items));
     })();
     return () => {
@@ -657,7 +676,7 @@ export function DiaryHomeScreen({
    * 배선(`createAppPipeline`)이 이미 파이프라인에 넣어 두었다.
    */
   const generate = useCallback(
-    async (params: ResolvedParams, items: DiaryListItem[]) => {
+    async (params: ResolvedParams, items: DiaryListItem[], options: { auto?: boolean } = {}) => {
       if (pipeline === undefined) return;
 
       setToast(null);
@@ -712,7 +731,12 @@ export function DiaryHomeScreen({
         // 읽힌다). 054 — 실패도 결과 화면 없이 쓰기 전 상태의 홈이다(저장 실패도 — 글은 버려진다).
         const next = afterGeneration(result);
         setScreen(toList(await refresh()));
-        if (next.kind === "toast") setToast({ id: ++toastId.current, kind: next.toast });
+        // 057 FR-019 — 앱 열기 자동 쓰기가 백그라운드의 잠금에 막힌 것은 실패가 아니다(그쪽이 쓰고 있다). 토스트를 띄우지 않는다.
+        const busyElsewhere =
+          options.auto === true && !result.ok && result.stage === "already-running";
+        if (next.kind === "toast" && !busyElsewhere) {
+          setToast({ id: ++toastId.current, kind: next.toast });
+        }
       } finally {
         running.current = false;
       }
@@ -793,6 +817,42 @@ export function DiaryHomeScreen({
 
     await generate({ ...outcome.params, day: prompt.day }, items);
   }, [screen, now, chosenDay, resolve, generate, characterNames, previewDay]);
+
+  /**
+   * 057 — 앱을 열 때의 자동 쓰기 (FR-014~FR-019, contracts OP2~OP5).
+   *
+   * 조립부가 판정한 날을 받아, 사용자가 다른 일을 하고 있지 않을 때만(목록을 읽었고, 덮여 있지 않고, 어떤 대화상자도
+   * 없고, 쓰기 판정을 기다리지 않을 때) 시작한다. 쓸 캐릭터가 정해지고(`resolved`) 그 날이 아직 안 쓴 날일 때만
+   * `claimAutoWrite()`를 부른다 — 시작하지 않을 판정으로 「한 번」을 소모하지 않는다. 이미 쓴 날이면 덮어쓰지 않는다(판정
+   * 뒤에 그 날이 써졌을 수 있다).
+   */
+  useEffect(() => {
+    if (autoWriteDay == null || claimAutoWrite === undefined) return;
+    if (!listRead.current || screen.kind !== "list" || covered) return;
+    if (materialConfirm !== null || calendarOpen || settingsPromptOpen || deciding.current) return;
+    if (screen.items.some((item) => item.day === autoWriteDay)) return;
+    const outcome = resolve(autoWriteDay);
+    if (outcome.kind !== "resolved") return;
+    if (!claimAutoWrite()) return;
+    // 상태 바꿈은 effect 본문이 아니라 다음 차례에 한다(react-hooks/set-state-in-effect) — claim이 이미 한 번을 잡았다.
+    const day = autoWriteDay;
+    const items = screen.items;
+    void Promise.resolve().then(() => {
+      setChosenDay(day);
+      return generate({ ...outcome.params, day }, items, { auto: true });
+    });
+  }, [
+    autoWriteDay,
+    claimAutoWrite,
+    screen,
+    covered,
+    materialConfirm,
+    calendarOpen,
+    settingsPromptOpen,
+    resolve,
+    setChosenDay,
+    generate,
+  ]);
 
   /**
    * 혼잣말 교체 간격 (054 R4, 039의 타자기를 대체). 첫 진행 신호가 온 뒤부터 `WRITING.rotateMs`마다 **지금 단계의

@@ -12,7 +12,8 @@
  *
  * **019와 다른 점**:
  *  - 무조건 `pipeline.run()`을 부르지 않는다 — `decideSchedule`이 "지금
- *    돌려야 하는가 + 어느 하루를"을 먼저 판정한다(B2-3).
+ *    돌려야 하는가 + 어느 하루를"을 먼저 판정한다(B2-3). 057부터는 그 위에
+ *    재료·사진 권한 판정(`resolveAutoWrite`)이 얹힌다.
  *  - 성공하면 로컬 알림을 쏜다(B2-8, notification.md N4).
  *  - 검증 전용 로그(`verification-log`)를 남기지 않는다 — 019 하네스와 함께
  *    제거됐다(원칙 IV).
@@ -27,13 +28,15 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { selectableDays, type DayDate } from "../config/day-boundary";
+import type { DayDate } from "../config/day-boundary";
 import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createAppPipeline } from "../app/wiring";
 import { loadSelection, expoSelectionPort } from "../app/selection-store";
-import type { Character } from "../diary/types";
-import { decideSchedule } from "./decision";
+import { displayNameOf } from "../diary/character-name";
+import type { Character, CustomNames } from "../diary/types";
+import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
+import { resolveAutoWrite } from "./auto-write";
 import { decideNotify } from "./notify";
 import {
   expoNotifiedStorePort,
@@ -43,11 +46,13 @@ import {
   type NotifiedStorePort,
 } from "./notified-store";
 import { expoNotificationPort, type NotificationPort } from "./notification-port";
+import { autoWriteDoneText } from "./notification-text";
 import {
   expoAutoDiarySettingsPort,
   loadAutoDiarySettings,
   type AutoDiarySettingsPort,
 } from "./settings";
+import { expoSkipStorePort, type SkipStorePort } from "./skip-store";
 
 /** `TaskManager.defineTask()`에 등록하는 이름. `background-port.ts`도 이 값을 쓴다. */
 export const AUTO_DIARY_TASK_NAME = "alpharium-auto-diary";
@@ -65,8 +70,12 @@ export type AutoDiaryTaskDeps = {
   /** 저장된 일기 날짜들. 주지 않으면 `createAppPipeline`의 store에서 읽는다 */
   listDiaryDays?: () => Promise<readonly DayDate[]>;
   loadCharacter?: () => Promise<Character | null>;
+  /** 057 — 사용자가 지은 이름(035). 주지 않으면 `preferences/`의 이름 파일에서 읽는다 */
+  loadNames?: () => Promise<CustomNames>;
   /** 파이프라인 조립. 주지 않으면 `createAppPipeline(resolution)` */
   makePipeline?: typeof createAppPipeline;
+  /** 057 — 사진 권한 건너뜀 기록 통로. 주지 않으면 `preferences/auto-write-skipped.json` */
+  skipPort?: SkipStorePort;
 };
 
 /**
@@ -103,14 +112,17 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       ? await deps.listDiaryDays()
       : await app.store.listDays();
 
-    // B2-3 — 지금 돌려야 하는가.
-    const decision = decideSchedule({
+    // B2-3 — 지금 돌려야 하는가. 057 — 020 판정을 통과한 날도 재료가 없거나 사진 권한이 없으면 쓰지 않는다
+    // (FR-007~FR-009). 앱을 열 때의 자동 쓰기와 **같은 판정**이다(`resolveAutoWrite`, R1·R2). 건너뛰면 파이프라인을
+    // 부르지 않으므로 사진 모델도 쓰는 모델도 열리지 않고 알림도 없다. 사진 권한 건너뜀은 그 안에서 기록된다.
+    const decision = await resolveAutoWrite({
       settings,
       now,
-      selectableDays: selectableDays(now),
-      existingDiaryDays,
+      listDiaryDays: async () => existingDiaryDays,
+      previewDay: app.previewDay,
+      skipPort: deps.skipPort ?? expoSkipStorePort(),
     });
-    if (!decision.act) {
+    if (decision.kind !== "write") {
       return "skipped";
     }
 
@@ -145,7 +157,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
     });
 
     if (result.ok) {
-      await sendCompletionNotification(decision.day, deps);
+      await sendCompletionNotification(decision.day, character, deps);
       return "ran";
     }
 
@@ -166,7 +178,11 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
  * 알림 자체가 실패해도 예외를 밖으로 던지지 않는다 — 생성은 이미 저장됐고
  * 알림 실패가 그걸 되돌리지 않는다(notification.md N8).
  */
-async function sendCompletionNotification(day: DayDate, deps: AutoDiaryTaskDeps): Promise<void> {
+async function sendCompletionNotification(
+  day: DayDate,
+  character: Character,
+  deps: AutoDiaryTaskDeps,
+): Promise<void> {
   try {
     const notifiedPort = deps.notifiedPort ?? expoNotifiedStorePort();
     const notificationPort = deps.notificationPort ?? expoNotificationPort();
@@ -182,7 +198,14 @@ async function sendCompletionNotification(day: DayDate, deps: AutoDiaryTaskDeps)
     if (decision.mode === "replace") {
       await notificationPort.dismiss(decision.dismissId);
     }
-    const notificationId = await notificationPort.present(day);
+    // 057 — 「{이름}{이|가} {M}월 {d}일 일기를 다 썼어요」. 이름을 읽지 못하면 기본 이름이다(035 N3 — 빈 이름은 없다).
+    const names = await (
+      deps.loadNames ?? (() => loadCustomNames(expoCharacterNamesPort()))
+    )().catch((): CustomNames => ({}));
+    const notificationId = await notificationPort.present(
+      day,
+      autoWriteDoneText(displayNameOf(character, names), day),
+    );
 
     const next = pruneNotified(
       {

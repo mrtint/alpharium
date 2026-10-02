@@ -13,6 +13,9 @@
  * (보드 `6c` ③, specs/056-settings-time-place FR-001~FR-006·FR-019). 값 문자열은 조립부가 `src/app/target-hour.ts`로 만들어
  * 넘기고, 누르면 조립부가 대화상자를 연다. 055가 임시로 두었던 자리(옛 24칸 시각 목록·장소명 카드)는 걷었다.
  *
+ * 057 — 사진 권한 때문에 자동 쓰기를 건너뛴 날이 있으면 사진 행 라벨 아래에 빨간 보조 줄 하나(보드 `6g`). 문장과 「그릴지」는
+ * 조립부가 정한다(`skippedLineText`, 사진 꼬리표가 「허용 안 함」일 때만) — 이 화면은 받은 글자를 그린다.
+ *
  * 묶음 머리·행·토글·꼬리표 부품은 이 파일 안에 둔다 — 공용화는 그것이 필요한 조각의 몫이다(C7).
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -45,6 +48,8 @@ export type SettingsScreenProps = {
   onOpenAppSettings: () => void;
   /** 「1.0.0 (9)」. 읽지 못했으면 `null` — 값을 비운다 */
   versionText: string | null;
+  /** 057 — 사진 행의 건너뜀 보조 줄(보드 `6g`). 없으면 그리지 않는다 */
+  photoSkipText?: string;
 };
 
 export function SettingsScreen({
@@ -59,6 +64,7 @@ export function SettingsScreen({
   permissionTags,
   onOpenAppSettings,
   versionText,
+  photoSkipText,
 }: SettingsScreenProps) {
   return (
     <View testID="settings-screen">
@@ -103,6 +109,9 @@ export function SettingsScreen({
           <Row
             key={key}
             label={label}
+            {...(key === "photos" && photoSkipText !== undefined
+              ? { hint: photoSkipText, hintTone: "danger" as const }
+              : {})}
             onPress={onOpenAppSettings}
             testID={`settings-perm-${key}`}
             trailing={
@@ -168,12 +177,15 @@ function Group({
 function Row({
   label,
   hint,
+  hintTone = "muted",
   trailing,
   onPress,
   testID,
 }: {
   label: string;
   hint?: string;
+  /** 057 — 건너뜀 보조 줄은 빨강(보드 `6g` `accent-700` = `COLORS.danger`) */
+  hintTone?: "muted" | "danger";
   trailing?: ReactNode;
   onPress?: () => void;
   testID?: string;
@@ -193,7 +205,9 @@ function Row({
     <>
       <View style={{ flexShrink: 1, gap: row.hintGap }}>
         <AppText style={LABEL}>{label}</AppText>
-        {hint !== undefined && <AppText style={HINT}>{hint}</AppText>}
+        {hint !== undefined && (
+          <AppText style={hintTone === "danger" ? HINT_DANGER : HINT}>{hint}</AppText>
+        )}
       </View>
       {trailing}
     </>
@@ -359,3 +373,4 @@ const HINT: TextStyle = {
   lineHeight: row.hintSize * row.hintLineHeightRatio,
   color: COLORS.textMuted,
 };
+const HINT_DANGER: TextStyle = { ...HINT, color: COLORS.danger };

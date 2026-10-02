@@ -370,6 +370,41 @@ describe("055 C4·C5·C6 — 권한 네 행", () => {
   });
 });
 
+describe("057 SL2·SL4 — 사진 권한 건너뜀 보조 줄 (보드 `6g`)", () => {
+  it("SL4 — 문구가 보드 표 원문 그대로다", () => {
+    expect(SETTINGS_TEXT).toMatchObject({
+      photoSkippedYesterday: "어제 자동 쓰기를 건너뛰었어요",
+      photoSkippedOn: "{M}월 {d}일 자동 쓰기를 건너뛰었어요",
+    });
+  });
+
+  it("SL2 — photoSkipText를 주면 사진 행 라벨 아래에 빨간 보조 줄(12·1.35), 행 56", async () => {
+    await render(
+      <SettingsScreen
+        {...props({
+          permissionTags: { photos: "denied", location: "allowed", notifications: "allowed" },
+          photoSkipText: "어제 자동 쓰기를 건너뛰었어요",
+        })}
+      />,
+    );
+    const photos = screen.getByTestId("settings-perm-photos");
+    const line = within(photos).getByText("어제 자동 쓰기를 건너뛰었어요");
+    const style = flat(line);
+    expect(style.color).toBe(COLORS.danger);
+    expect(style.fontSize).toBe(12);
+    expect(style.lineHeight).toBeCloseTo(16.2, 5);
+    expect(flat(photos).minHeight).toBe(56);
+    expect(within(photos).getByTestId("settings-tag-photos")).toBeTruthy();
+  });
+
+  it("SL2 — 주지 않으면 055 그대로 (보조 줄 없음, 행 44)", async () => {
+    await render(<SettingsScreen {...props()} />);
+    const photos = screen.getByTestId("settings-perm-photos");
+    expect(within(photos).queryByText(/자동 쓰기를 건너뛰었어요/)).toBeNull();
+    expect(flat(photos).minHeight).toBe(44);
+  });
+});
+
 describe("055 C8 — 버전", () => {
   it("버전 값이 보이고 누름이 없다", async () => {
     await render(<SettingsScreen {...props()} />);

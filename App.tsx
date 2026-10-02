@@ -26,6 +26,13 @@ import { acknowledgeNotified, expoNotifiedStorePort } from "./src/schedule/notif
 import { clearStaleLocksOnStart } from "./src/schedule/lock";
 import { expoLockPort } from "./src/schedule/lock-port";
 import {
+  clearSkippedDay,
+  expoSkipStorePort,
+  loadSkippedDay,
+  type SkipStorePort,
+} from "./src/schedule/skip-store";
+import { resolveAutoWrite } from "./src/schedule/auto-write";
+import {
   expoAutoDiarySettingsPort,
   loadAutoDiarySettings,
   type AutoDiarySettings,
@@ -67,6 +74,7 @@ import { usePermissionTags } from "./src/ui/use-permission-tags";
 import type { PermissionFacts } from "./src/app/permission-tags";
 import { photoLocationProbe } from "./src/app/photo-location-probe";
 import { formatVersion } from "./src/app/version";
+import { skippedLineText } from "./src/app/skipped-line";
 import { SETTINGS_TEXT } from "./src/ui/settings-text";
 import { StackLayer } from "./src/ui/StackLayer";
 import { AppText } from "./src/ui/components/Text";
@@ -457,6 +465,39 @@ function AppFrame() {
       sub.remove();
     };
   }, [onboardingPorts, setEssentialsReady]);
+
+  /**
+   * ★ 057 — 사진 권한 때문에 자동 쓰기를 건너뛴 가장 최근 날 (보드 `6g`, FR-010·FR-012, research R4).
+   *
+   * 설정 겹은 닫히면 언마운트되므로 056의 설정 값처럼 여기서 들고 있는다. 앱이 실행될 때와 앞으로 돌아올 때 사진 권한을 읽어
+   * **허용(전체·부분)이면 기록을 지운다** — 사용자가 권한을 허용하고 돌아오면 줄이 사라지고, 다시 꺼도 옛 날짜는 되살아나지
+   * 않는다. **권한을 읽지 못하면 지우지 않는다**(모르는 것을 허용으로 채우지 않는다, 원칙 V). `AppState`는 다시 읽을 때를
+   * 알리는 신호일 뿐 판정 입력이 아니다. 앱을 연 채 자동 쓰기가 건너뛰면 `onSkipped`가 이 값을 바로 바꾼다.
+   */
+  const skipPort = useMemo(() => expoSkipStorePort(), []);
+  const [skippedDay, setSkippedDay] = useState<DayDate | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const sync = async () => {
+      const permission = await onboardingPorts.photo.photoPermission().catch(() => null);
+      if (permission === "granted" || permission === "limited") {
+        await clearSkippedDay(skipPort).catch(() => {});
+        if (alive) setSkippedDay(null);
+        return;
+      }
+      const day = await loadSkippedDay(skipPort);
+      if (alive) setSkippedDay(day);
+    };
+    void sync();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") void sync();
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, [onboardingPorts, skipPort]);
+  const onSkipped = useCallback((day: DayDate) => setSkippedDay(day), []);
 
   /**
    * ★ 045 — 필수 에셋 내려받기는 이제 **동의 후에만** 시작한다(FR-002).
@@ -873,6 +914,21 @@ function AppFrame() {
   }, [firstRunStage, livenessOutcome, environment]);
 
   /**
+   * ★ 057 — 앱을 열 때의 자동 쓰기는 한 실행에 한 번이다 (FR-017·FR-020, research R5).
+   *
+   * 홈이 **실제로 시작하는 순간** 이것을 부른다. 거짓이면 시작하지 않는다 — 이번 실행에서 이미 시작했거나(그만두거나 실패해도
+   * 다시 저절로 시작하지 않는다), 첫 실행 흐름의 자동 첫 일기(040)를 시도한 실행이다(첫 실행이 이긴다, Clarification Q3).
+   * 첫 실행 흐름이 아직 끝나지 않았으면 홈(`DiarySection`)이 아예 그려지지 않으므로 그것은 따로 보지 않는다. ref는 렌더가
+   * 아니라 이 콜백 안에서 읽는다.
+   */
+  const autoWriteClaimed = useRef(false);
+  const claimAutoWrite = useCallback(() => {
+    if (autoGenerateTried.current || autoWriteClaimed.current) return false;
+    autoWriteClaimed.current = true;
+    return true;
+  }, []);
+
+  /**
    * ★ 045 — 사용자가 동의 Dialog의 [확인/시작]을 눌렀다(FR-002a, C5).
    *
    * `downloadConsented: true`를 즉시 저장한다 — 되돌리는 코드 경로가
@@ -1156,6 +1212,11 @@ function AppFrame() {
           characterNames={customNames}
           chosenDay={chosenDay}
           onChooseDay={setChosenDay}
+          // 057 — 앱을 열 때의 자동 쓰기. 설정 값을 아직 못 읽었으면 판정하지 않는다.
+          autoDiarySettings={settingsValues?.autoDiary ?? null}
+          claimAutoWrite={claimAutoWrite}
+          onSkipped={onSkipped}
+          skipPort={skipPort}
         />
         <StackLayer
           active={!renaming}
@@ -1173,6 +1234,7 @@ function AppFrame() {
               onOpenRename={() => setRenaming(true)}
               onboardingPorts={onboardingPorts}
               settingsPort={settingsPort}
+              skippedDay={skippedDay}
               values={settingsValues}
             />
           </SettingsFrame>
@@ -1233,7 +1295,19 @@ function DiarySection({
   characterNames,
   chosenDay,
   onChooseDay,
+  autoDiarySettings,
+  claimAutoWrite,
+  onSkipped,
+  skipPort,
 }: {
+  /** 057 — 자동 쓰기 설정. `AppFrame`이 들고 있다. 아직 못 읽었으면 `null` — 앱 열기 판정을 하지 않는다 */
+  autoDiarySettings?: AutoDiarySettings | null;
+  /** 057 — 홈이 자동 쓰기를 실제로 시작하는 순간 부른다(한 실행에 한 번) */
+  claimAutoWrite?: () => boolean;
+  /** 057 — 앱 열기 판정이 사진 권한 때문에 건너뛰었다 — 설정의 보조 줄을 바로 갱신한다 */
+  onSkipped?: (day: DayDate) => void;
+  /** 057 — 사진 권한 건너뜀 기록 통로 */
+  skipPort?: SkipStorePort;
   /** 048 — 고른 하루. `AppFrame`이 들고 있다(Q4) */
   chosenDay?: DayDate | null;
   onChooseDay?: (day: DayDate) => void;
@@ -1433,6 +1507,45 @@ function DiarySection({
     [stored, ready, photoDays, locationPermission, geocodingPreference],
   );
 
+  /**
+   * ★ 057 — 목표 시각이 지난 뒤 앱을 열면 홈이 쓰는 중으로 시작한다 (보드 `6c` ③, FR-014~FR-022, research R5).
+   *
+   * 백그라운드와 **같은 판정**(`resolveAutoWrite` — 020 시도 창 · 사흘 중 안 쓴 날 · 사진 권한 · 053 재료)을 홈이 처음
+   * 그려질 때와 앱이 앞으로 돌아올 때 한다. `AppState`는 「다시 판정할 때」의 신호일 뿐 입력이 아니다(FR-022, AGENTS). 쓸 날이
+   * 나오면 홈에 넘기고, 홈이 054 제자리 쓰기로 시작한다(`runAutoDiaryTask`를 부르지 않는다 — 혼잣말·그만두기·토스트를 홈이
+   * 그대로 갖는다). 사진 권한 건너뜀은 판정 안에서 기록되고 `AppFrame`의 보조 줄 상태도 바꾼다(FR-021).
+   */
+  const [autoWriteDay, setAutoWriteDay] = useState<DayDate | null>(null);
+  const previewForAuto = wiring.ok ? wiring.previewDay : undefined;
+  useEffect(() => {
+    if (autoDiarySettings == null || previewForAuto === undefined || skipPort === undefined) return;
+    let alive = true;
+    const check = () =>
+      void resolveAutoWrite({
+        settings: autoDiarySettings,
+        now: new Date(),
+        listDiaryDays: () => store.listDays(),
+        previewDay: previewForAuto,
+        skipPort,
+      })
+        .then((decision) => {
+          if (!alive) return;
+          if (decision.kind === "write") setAutoWriteDay(decision.day);
+          else if (decision.kind === "skip" && decision.because === "no-photo-access") {
+            onSkipped?.(decision.day);
+          }
+        })
+        .catch(() => {});
+    check();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") check();
+    });
+    return () => {
+      alive = false;
+      sub.remove();
+    };
+  }, [autoDiarySettings, previewForAuto, skipPort, store, onSkipped]);
+
   /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
   const onGenerated = useCallback(
     (character: Character) => {
@@ -1468,6 +1581,9 @@ function DiarySection({
       previewDay={wiring.ok ? wiring.previewDay : undefined}
       // 053 — 권한 요청·설정 열기. 없으면 「권한이 없어요 ›」를 눌러도 아무 일도 없다.
       photoAccessPort={photoAccessPort}
+      // 057 — 앱을 열 때의 자동 쓰기. 판정은 위에서 했고 홈은 그 날을 쓴다.
+      autoWriteDay={autoWriteDay}
+      claimAutoWrite={claimAutoWrite}
     />
   );
 }
@@ -1539,6 +1655,7 @@ function SettingsSection({
   settingsPort,
   backgroundPort,
   geoPort,
+  skippedDay,
 }: {
   onboardingPorts: OnboardingPorts;
   /** 035 — 지금 부르는 이름 (`displayNameOf`) */
@@ -1551,6 +1668,8 @@ function SettingsSection({
   settingsPort: AutoDiarySettingsPort;
   backgroundPort: BackgroundSchedulePort;
   geoPort: GeocodingSettingPort;
+  /** 057 — 사진 권한 때문에 건너뛴 가장 최근 날. `AppFrame`이 들고 있다 */
+  skippedDay: DayDate | null;
 }) {
   const notificationPort = useMemo(() => expoNotificationPort(), []);
   const [clock] = useState(() => readDeviceClock(new Date()));
@@ -1669,6 +1788,10 @@ function SettingsSection({
         placeNamesText={PLACE_NAME_TEXT[geocoding]}
         targetHourText={formatTargetHour(autoDiary.targetHour, clock.format)}
         versionText={versionText}
+        // 057 SL3 — 기록이 있고 사진 꼬리표가 「허용 안 함」일 때만(읽지 못함·일부 허용·허용이면 그리지 않는다, FR-010).
+        {...(skippedDay !== null && permissionTags.photos === "denied"
+          ? { photoSkipText: skippedLineText(skippedDay, new Date()) }
+          : {})}
       />
       {openDialog === "time" && (
         <TargetHourDialog
