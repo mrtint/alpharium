@@ -7,7 +7,11 @@
  * **판정하지 않는다** — 이름·토글 상태·권한 꼬리표·버전 문자열을 조립부(`App.tsx`)에서 받아 그린다. 권한 꼬리표는
  * `permissionTagFor`(src/app)가 이미 정했고, 이 화면은 `expo-*`에도 로스터에도 닿지 않는다(원칙 III, 007 헌법 검사).
  *
- * 묶음은 넷 — 캐릭터 · 일기 · 권한 · 정보(FR-016). 「이 휴대폰」(§3.4)·말투(S1)는 없다.
+ * 묶음은 다섯 — 캐릭터 · 일기 · 권한 · 이 휴대폰(058) · 정보. 말투(S1)는 없다.
+ *
+ * 058 — 「이 휴대폰」(보드 `6c` ⑥): 「쓰는 모듈」(합계 문자열, 누를 수 없음 — 합계는 조립부가 `src/app/module-size.ts`로 구해 문자열만
+ * 넘긴다, `UI_TOUCHES_ASSET`)과 「일기 모두 지우기」(빨간 라벨. 0편·편수를 못 읽음·지우는 중이면 흐리고 누를 수 없다 — 조립부가
+ * `wipeEnabled`로 정한다). 잠금에 막혀 지우지 못했으면 그 행 아래 빨간 보조 줄(057 `6g`와 같은 모양).
  *
  * 056 — 「일기」 묶음은 자동으로 쓰기 토글 → 「매일 쓰는 시각」(토글이 켜졌을 때만 펼쳐진다) → 「장소 이름으로 보기」(늘)다
  * (보드 `6c` ③, specs/056-settings-time-place FR-001~FR-006·FR-019). 값 문자열은 조립부가 `src/app/target-hour.ts`로 만들어
@@ -50,6 +54,13 @@ export type SettingsScreenProps = {
   versionText: string | null;
   /** 057 — 사진 행의 건너뜀 보조 줄(보드 `6g`). 없으면 그리지 않는다 */
   photoSkipText?: string;
+  /** 058 — 「쓰는 모듈」 값(「2.0GB」). 못 읽었으면 `null` — 값을 비운다 */
+  moduleSizeText: string | null;
+  /** 058 — 「일기 모두 지우기」를 누를 수 있는가(편수 > 0, 지우는 중 아님) */
+  wipeEnabled: boolean;
+  onOpenWipe: () => void;
+  /** 058 — 잠금에 막혀 지우지 못했다는 한 줄. 없으면 그리지 않는다 */
+  wipeBlockedText?: string;
 };
 
 export function SettingsScreen({
@@ -65,6 +76,10 @@ export function SettingsScreen({
   onOpenAppSettings,
   versionText,
   photoSkipText,
+  moduleSizeText,
+  wipeEnabled,
+  onOpenWipe,
+  wipeBlockedText,
 }: SettingsScreenProps) {
   return (
     <View testID="settings-screen">
@@ -128,6 +143,25 @@ export function SettingsScreen({
         />
       </Group>
 
+      <Group label={SETTINGS_TEXT.groupDevice} testID="settings-group-device">
+        <Row
+          label={SETTINGS_TEXT.deviceModules}
+          testID="settings-device-modules"
+          trailing={<Value text={moduleSizeText ?? ""} />}
+        />
+        <Row
+          disabled={!wipeEnabled}
+          label={SETTINGS_TEXT.deviceWipe}
+          labelTone={wipeEnabled ? "danger" : "muted"}
+          // 누를 수 없을 때는 콜백도 넘기지 않는다 — 모양만이 아니라 동작도 막는다.
+          {...(wipeEnabled ? { onPress: onOpenWipe } : {})}
+          testID="settings-wipe"
+          {...(wipeBlockedText !== undefined
+            ? { hint: wipeBlockedText, hintTone: "danger" as const }
+            : {})}
+        />
+      </Group>
+
       <Group label={SETTINGS_TEXT.groupAbout} testID="settings-group-about">
         <Row
           label={SETTINGS_TEXT.version}
@@ -176,18 +210,27 @@ function Group({
 
 function Row({
   label,
+  labelTone = "default",
   hint,
   hintTone = "muted",
   trailing,
   onPress,
+  disabled = false,
   testID,
 }: {
   label: string;
+  /** 058 — 「일기 모두 지우기」는 빨강(`accent-700` = `COLORS.danger`), 누를 수 없으면 `textMuted` */
+  labelTone?: "default" | "danger" | "muted";
   hint?: string;
   /** 057 — 건너뜀 보조 줄은 빨강(보드 `6g` `accent-700` = `COLORS.danger`) */
   hintTone?: "muted" | "danger";
   trailing?: ReactNode;
   onPress?: () => void;
+  /**
+   * 058 — 누를 수 없는 행. `Pressable`을 쓰지 않고 `View` + `accessibilityState.disabled`로 알린다 — RN `Pressable`은
+   * `disabled={false}`로 호출부의 `accessibilityState.disabled`를 덮어쓴다(AGENTS).
+   */
+  disabled?: boolean;
   testID?: string;
 }) {
   const style: ViewStyle = {
@@ -204,7 +247,13 @@ function Row({
   const body = (
     <>
       <View style={{ flexShrink: 1, gap: row.hintGap }}>
-        <AppText style={LABEL}>{label}</AppText>
+        <AppText
+          style={
+            labelTone === "danger" ? LABEL_DANGER : labelTone === "muted" ? LABEL_MUTED : LABEL
+          }
+        >
+          {label}
+        </AppText>
         {hint !== undefined && (
           <AppText style={hintTone === "danger" ? HINT_DANGER : HINT}>{hint}</AppText>
         )}
@@ -212,6 +261,13 @@ function Row({
       {trailing}
     </>
   );
+  if (disabled) {
+    return (
+      <View accessibilityState={{ disabled: true }} style={style} testID={testID}>
+        {body}
+      </View>
+    );
+  }
   if (onPress === undefined) {
     return (
       <View style={style} testID={testID}>
@@ -363,6 +419,8 @@ const LABEL: TextStyle = {
   fontWeight: row.labelWeight,
   color: COLORS.text,
 };
+const LABEL_DANGER: TextStyle = { ...LABEL, color: COLORS.danger };
+const LABEL_MUTED: TextStyle = { ...LABEL, color: COLORS.textMuted };
 const VALUE: TextStyle = {
   fontSize: row.valueSize,
   color: COLORS.textMuted,

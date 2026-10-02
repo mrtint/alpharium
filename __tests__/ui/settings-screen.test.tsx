@@ -40,6 +40,9 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onOpenTargetHour: jest.fn(),
     placeNamesText: "자동",
     onOpenPlaceNames: jest.fn(),
+    moduleSizeText: "2.0GB",
+    wipeEnabled: true,
+    onOpenWipe: jest.fn(),
     ...over,
   };
 }
@@ -112,16 +115,17 @@ describe("055 FR-031 — 보드 KO 원문", () => {
     expect(screen.getByTestId("settings-group-diary-label")).toHaveTextContent("일기");
   });
 
-  it("★ S1·SC-006 — 말투·캐릭터 목록·온보딩 다시 하기·이 휴대폰이 없다", async () => {
+  // 058 — 「이 휴대폰」(§3.4)이 생겼다. 그 묶음의 자리·내용은 `settings-this-phone.test.tsx`가 잠근다.
+  it("★ S1·SC-006 — 말투·캐릭터 목록·온보딩 다시 하기가 없다", async () => {
     await render(<SettingsScreen {...props()} />);
-    for (const absent of [/말투/, /온보딩/, /권한 안내/, /이 휴대폰/, /받기/, /일기 모두 지우기/]) {
+    for (const absent of [/말투/, /온보딩/, /권한 안내/, /받기/]) {
       expect(screen.queryByText(absent)).toBeNull();
     }
   });
 });
 
 describe("055 F3·F5 — 묶음", () => {
-  it("F5 — 캐릭터 → 일기 → 권한 → 정보 순서", async () => {
+  it("F5 — 캐릭터 → 일기 → 권한 → 이 휴대폰(058) → 정보 순서", async () => {
     await render(<SettingsScreen {...props()} />);
     const ids = screen
       .getAllByTestId(/^settings-group-[a-z]+$/)
@@ -130,6 +134,7 @@ describe("055 F3·F5 — 묶음", () => {
       "settings-group-character",
       "settings-group-diary",
       "settings-group-perm",
+      "settings-group-device",
       "settings-group-about",
     ]);
   });
@@ -416,7 +421,8 @@ describe("055 C8 — 버전", () => {
 
   it("읽지 못했으면 값이 비어 있다(지어내지 않는다)", async () => {
     await render(<SettingsScreen {...props({ versionText: null })} />);
-    expect(screen.queryByText(/\d+\.\d+/)).toBeNull();
+    // 058 — 「쓰는 모듈」 값(「2.0GB」)도 숫자라 버전 행 안에서만 본다.
+    expect(within(screen.getByTestId("settings-version")).queryByText(/\d+\.\d+/)).toBeNull();
   });
 });
 

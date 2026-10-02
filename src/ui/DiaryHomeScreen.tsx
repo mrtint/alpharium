@@ -212,6 +212,13 @@ export type DiaryHomeScreenProps = {
    * (FR-017·FR-020). 시작하지 않은 판정은 부르지 않는다 — 「한 번」을 소모하지 않는다.
    */
   claimAutoWrite?: () => boolean;
+  /**
+   * 058 — 설정의 「일기 모두 지우기」 요청 토큰(research R1). 값이 바뀌면 쓰는 중이면 054 그만두기처럼 멈추고, **도는 생성이
+   * 끝난 뒤에** `onWipeReady(token)`을 부른다 — 멈춘 쓰기가 지운 뒤에 저장되지 않게(FR-014). 마운트 때의 값에는 응답하지 않는다
+   * (지운 뒤 다시 마운트된다, HS4). 덮여 있어도 응답한다 — 요청은 설정이 열린 동안 온다(HS5).
+   */
+  wipeRequest?: number;
+  onWipeReady?: (token: number) => void;
 };
 
 /**
@@ -266,6 +273,8 @@ export function DiaryHomeScreen({
   canPrepare,
   autoWriteDay,
   claimAutoWrite,
+  wipeRequest,
+  onWipeReady,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -362,6 +371,9 @@ export function DiaryHomeScreen({
 
   /** 사용자가 그만두었는가 (007 FR-014a). */
   const cancelled = useRef(false);
+
+  /** 058 — 지금 도는 생성 전체(`generate` 본문). 지우기 요청은 이것이 끝나기를 기다린다(research R1) */
+  const inFlight = useRef<Promise<void> | null>(null);
 
   /** 덮어쓰기 확인을 통과하면 쓸 params (012 흐름). */
   const pendingParams = useRef<ResolvedParams | null>(null);
@@ -679,6 +691,12 @@ export function DiaryHomeScreen({
     async (params: ResolvedParams, items: DiaryListItem[], options: { auto?: boolean } = {}) => {
       if (pipeline === undefined) return;
 
+      // 058 — 이 생성이 끝나는 순간을 밖에서 기다릴 수 있게 둔다(지우기 요청, research R1). `finally`에서 푼다.
+      let settle: () => void = () => {};
+      inFlight.current = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+
       setToast(null);
       setWritingItems(items);
       setWritingName(nameOf(params.character, characterNames));
@@ -739,6 +757,8 @@ export function DiaryHomeScreen({
         }
       } finally {
         running.current = false;
+        inFlight.current = null;
+        settle();
       }
     },
     // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
@@ -879,6 +899,28 @@ export function DiaryHomeScreen({
     await stop?.().catch(() => {});
     setScreen(toList(await refresh()));
   }, [stop, refresh]);
+
+  /**
+   * 058 — 설정의 「일기 모두 지우기」 요청에 응답한다(research R1, HS1~HS5).
+   *
+   * 쓰는 중이면 054 그만두기와 같이 `cancelled`를 세우고 `stop()`을 부른 뒤, **도는 생성(`inFlight`)이 끝날 때까지 기다린다** —
+   * `stop()`은 거부시키지 않고 `interrupted`로 정상 끝나므로(AGENTS) 이것을 기다려야 저장 여부가 확정된다. `cancelled`라 토스트는 없다.
+   * 화면을 되돌리지 않는다 — 조립부가 지운 뒤 홈을 다시 마운트한다. 마운트 때의 값에는 응답하지 않는다(HS4).
+   */
+  const answeredWipe = useRef(wipeRequest);
+  useEffect(() => {
+    if (wipeRequest === undefined || wipeRequest === answeredWipe.current) return;
+    answeredWipe.current = wipeRequest;
+    const token = wipeRequest;
+    void (async () => {
+      if (running.current) {
+        cancelled.current = true;
+        await stop?.().catch(() => {});
+        await inFlight.current;
+      }
+      onWipeReady?.(token);
+    })();
+  }, [wipeRequest, stop, onWipeReady]);
 
   useEffect(() => {
     // 055 — 겹이 덮인 동안 등록하지 않는다(위 `covered` 주석). 걷히면 다시 등록한다.
