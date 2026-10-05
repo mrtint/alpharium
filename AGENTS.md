@@ -23,8 +23,9 @@
   진행 → 작명 → 자동 첫 일기), **캐릭터 페르소나**(로스터는 검증된 하나, 037).
 - **홈 UI/UX 개편(Modernist)이 조각 단위로 진행 중이다**(049~054): 주간 스트립·날짜
   달력·쓴 날 읽기·읽기 스크롤·쓸 재료·제자리 쓰기.
-- **설정·개발자 화면 개편도 조각 단위로 진행 중이다**(055~058): 홈 위에 쌓이는 설정 틀, 매일 쓰는 시각·장소 이름 대화상자, 자동 쓰기 규칙
-  (재료 없는 날·사진 권한 없는 날 건너뜀, 앱을 열면 쓰는 중), 이 휴대폰(모듈 용량·일기 모두 지우기). 개발자 메뉴(버전 7번 탭)·진단·상태 흉내는 아직이다(분해 설계 `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`).
+- **설정·개발자 화면 개편도 조각 단위로 진행 중이다**(055~059): 홈 위에 쌓이는 설정 틀, 매일 쓰는 시각·장소 이름 대화상자, 자동 쓰기 규칙
+  (재료 없는 날·사진 권한 없는 날 건너뜀, 앱을 열면 쓰는 중), 이 휴대폰(모듈 용량·일기 모두 지우기), 개발자 메뉴(버전 7번 탭·모듈 상태·모듈 다시 받기·온보딩부터
+  다시·끄기). 진단 화면 내용 개편·상태 흉내는 아직이다(분해 설계 `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`).
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -228,13 +229,11 @@
   `DeviceServerDiedException`으로 전부 실패할 수 있다 — 한 번 더 돌린다. `clearState` 직후 Maestro 기기 서버가
   죽는 경우도 있어 그 흐름(`first-run-flow`)은 손으로 본다.
 - **`run-device-tests.mjs`가 값(`-e WRITTEN_DAY=…` 등)을 안 넘기는 흐름은 실행기로 돌리면 실패한다**
-  (`written-day-reading`·`reading-scroll`) — `maestro test`로 직접 돌린다. 이 화면을 지나는 흐름
-  (`download-conflict`·`parallel-model-download`·`photo-vision`)은 설정 탭 하단 `CharacterListScreen`을 지난다.
+  (`written-day-reading`·`reading-scroll`) — `maestro test`로 직접 돌린다.
 - **⚠️ 새 Maestro 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`에 등록해야 돈다.** 등록하지 않으면 파일이 있어도
-  아무것도 검증되지 않은 초록불이다. 지금 `FLOWS` 밖에 있는 것: 051이 `⋯` 메뉴를 없앤 뒤 설정·개발자 진입이
-  필요한 흐름 열한 개(055가 설정 진입 `home-settings`를 두었으나 설정에 캐릭터 목록·권한 안내 다시 보기가 없어 그 단계에
-  기대는 흐름은 폐기 후보 — 개발자 메뉴 조각에서 하나씩 정한다), `download-conflict`(026 이후)·
-  `parallel-model-download`(로스터 하나, 037)·`diary-user-path`(stale 메뉴)는 **알려진 실패**다.
+  아무것도 검증되지 않은 초록불이다. 059가 `FLOWS` 밖 흐름을 모두 정했다 — 되살린 넷(`skeleton`·`prompt-preview`·`diary-body-screen`·
+  `scheduled-diary-notification`)은 등록했고 폐기한 일곱은 파일을 지웠다(사유는 `FLOWS` 위 주석). 개발자·진단 화면에 닿는 흐름의 진입은
+  `home-settings` → `settings-developer` [→ `developer-diagnostics`]이다(개발 환경은 7번 탭 없이 처음부터 켜짐).
 
 ### 백그라운드 작업 소크·헤드리스 관찰
 
@@ -380,7 +379,7 @@
   잠근다). 화면은 그 문자열만 받는다 — `PromptPreviewPanel.tsx`가 `diary/prompt`·`signals`를 import하지 않고 헌법 검사
   `UI_TOUCHES_PROMPT`가 막는다(`signals/types`는 `DiaryDetailScreen` 등이 정당하게 써서 막지 않는다). 크기는 `text.length`
   근사치이고 「실측 토큰 아님」 라벨이 붙는다(원칙 IV, 소스에 `token` 어휘 금지, PP6).
-- **⚠️ 개발자 화면은 지금 진입점이 없다**(051이 `⋯` 메뉴를 없앴다) — 개발자 메뉴 조각(설정 「버전」 7번 탭)이 둔다.
+- 개발자 화면의 진입점은 059가 두었다 — 설정 「정보」의 「개발자」 행(개발 환경은 처음부터, 배포는 버전 7번 탭 뒤)에서 「진단」 행으로 닿는다.
 
 ### 023 — 사진 선별 알고리즘
 
@@ -620,7 +619,7 @@
   모두 같은 자리다. 쓰기 시작 전 실패 안내는 홈 헤더가 없는 별도 화면이라 진입점이 없다.
 - 설정 내용: 이름(→ `RenameScreen`, 1a 입력줄 `NameField` 공유, 빈 이름이면 「저장」 흐림 — 첫 실행 1a는 047대로 흐리지 않는다)·자동으로
   쓰기 토글(그 아래 시각·장소 행은 056)·권한 네 행·버전. **캐릭터 목록·작성자 고르기·`PermissionsSection`(온보딩
-  다시 하기)을 설정 조립에서 걷었다**(파일·자기 테스트는 남겼다 — 정리는 개발자 메뉴 조각). 배터리 행도 앱 정보 화면으로 간다(024의
+  다시 하기)을 설정 조립에서 걷었고** 059가 그 파일·자기 테스트(와 그것만 쓰던 `CharacterPicker`·`ListRow`·`SelectRow`)를 지웠다. 배터리 행도 앱 정보 화면으로 간다(024의
   「배터리 사용 관리」 목록 인텐트는 온보딩 배터리 단계에만 남는다).
 - 권한 꼬리표는 순수 함수 `permissionTagFor`(`src/app/permission-tags.ts`) — 읽지 못한 행은 `unread`로 꼬리표를 그리지 않는다. 사진의 위치
   정보는 조회 API가 없어 `photoLocationProbe`가 최근 사진 한 장의 `locationOf`를 실제로 불러 본다(실패 = 권한 없음으로 본다 — 「막 지운 사진」도
@@ -700,6 +699,17 @@
   **저장소 소유자 확인 대상**(R8).
 - **2026-10-02 dev 실기기(SM-S901N)**: 백업 → 11편 확인 → 쓰는 중에 지우기(205초 뒤에도 0편, 토스트 없음) → 남는 것 md5 동일 → 잠금에 막힘 → 복원. 상세는
   `specs/058-settings-this-phone/quickstart.md` 끝. **위반 주입 스크립트에서 `cp` 백업 경로가 디렉터리면 복원이 조용히 실패한다** — 주입 뒤 원래 문자열이 돌아왔는지 다시 grep한다.
+
+### 059 — 개발자 메뉴
+
+- **켜짐은 별도 파일이다**(`preferences/developer-menu.json` `{"enabled":true}` 하나, 끄면 파일을 지운다). 개발 환경(`local`·`dev`)은 **환경이 이긴다** — 처음부터 켜져 있고 파일을 읽지도 쓰지도 않으며 「끄기」는 그 실행 동안만이다. 켜는 길은 설정 「버전」 1초 안 7번 탭(4번째부터 「N번 남았어요」)이고 순수 판정은 `src/app/developer-taps.ts`다.
+- **설정 겹은 개발자 겹 아래에 열려 있다**(`route`는 단일값이라 겹이 닫히지 않게 설정 `open = settings||developer`, `active`는 개발자가 아닐 때만). 진단은 개발 환경에서만 개발자 위에 한 겹 더 그린다(배포에는 행도 트리도 없다).
+- **★ `forceOnboarding`이 완료된 기기에서 죽어 있었다**(옛 `permissionStepsDecided` 식이 `completed`면 무조건 참) — `src/app/onboarding-gate.ts`가 판정을 맡는다. 「온보딩부터 다시」는 끝난 단계를 건너뛰고(권한은 매번 실시간 재판정) **모델 파일을 지우지 않는다**.
+- **「모듈 다시 받기」도 모델 파일을 지우지 않는다**(037) — 빠지거나 잘린 것만 받고, 모두 준비돼 있으면 토스트(`planRedownload`). 용량 문구는 `expo-network`가 **`CELLULAR`일 때만** 낸다(Wi-Fi·모름·이더넷은 안 낸다 — 모르면 문구를 안 내는 쪽이 원칙 V). 새 네이티브 의존성이라 매니페스트(`ACCESS_NETWORK_STATE`)를 `dumpsys`로 확인했다.
+- **`stopHome()`은 058의 지우기·다시 받기·온보딩 다시가 함께 쓴다** — 쓰는 중 생성이 끝날 때까지 기다린 뒤에야 파일·플래그를 건드린다.
+- 모듈 줄의 「loaded」는 파일 준비 상태이지 메모리 적재가 아니다(어휘 어긋남, 보드 문구를 따랐다). 크기는 1000 기준.
+- 059가 지운 것: `CharacterListScreen`·`PermissionsSection`·`AuthorPicker`(와 그것만 쓰던 `CharacterPicker`·`ListRow`·`SelectRow`)·자기 테스트·`FLOWS` 밖 Maestro 흐름 일곱. 되살린 넷은 FLOWS에 등록했다.
+- **2026-10-02 dev 실기기(SM-S901N)**: 개발 환경 항상 켜짐·끄기/켜기·「이미 모두 준비돼 있어요」 토스트·온보딩 다시(배터리 단계만, `files/models` 그대로)·배포 환경(prod 번들) 7번 탭/저장/진단 없음/끄기 후 파일 삭제를 확인했다. 되살린 Maestro 넷도 `maestro test`로 직접 돌려 통과했다(실행기는 `pm clear`를 하므로 쓰지 않았다; `diary-body-screen`의 옛 「일기」 단언을 고쳤다). **미확인**: 잘린 모듈의 실제 내려받기 확인·쓰는 중의 온보딩 다시·release. 상세는 `specs/059-developer-menu/quickstart.md` 끝.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

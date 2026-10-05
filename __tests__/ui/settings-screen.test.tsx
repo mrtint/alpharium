@@ -477,3 +477,42 @@ describe("055 F7 — 설정 화면은 로스터·expo에 닿지 않는다 (소�
     }
   });
 });
+
+describe("059 DV1~DV3 — 버전 탭과 「개발자」 행", () => {
+  it("DV1 — onPressVersion 이 있으면 버전 행을 누를 수 있다", async () => {
+    const onPressVersion = jest.fn();
+    await render(<SettingsScreen {...props({ onPressVersion })} />);
+    await fireEvent.press(screen.getByTestId("settings-version"));
+    expect(onPressVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it("DV1 — 꺼져 있으면 「개발자」 행이 없고, 켜져 있으면 「정보」 묶음 맨 아래에 있다", async () => {
+    const { rerender } = await render(<SettingsScreen {...props()} />);
+    expect(screen.queryByTestId("settings-developer")).toBeNull();
+    await rerender(<SettingsScreen {...props({ developerEnabled: true })} />);
+    const group = screen.getByTestId("settings-group-about");
+    const labels = within(group).getAllByText(/버전|개발자/);
+    expect(labels.map((n) => n.props.children)).toEqual(["버전", "개발자"]);
+    expect(
+      within(screen.getByTestId("settings-developer")).getByTestId("settings-chevron"),
+    ).toBeTruthy();
+  });
+
+  it("DV2 — developerHighlight 가 참이면 행 바탕이 rowHighlight(보드 accent-100), 아니면 바탕이 없다", async () => {
+    const { rerender } = await render(
+      <SettingsScreen {...props({ developerEnabled: true, developerHighlight: true })} />,
+    );
+    expect(flat(screen.getByTestId("settings-developer")).backgroundColor).toBe(
+      SETTINGS.rowHighlight,
+    );
+    await rerender(<SettingsScreen {...props({ developerEnabled: true })} />);
+    expect(flat(screen.getByTestId("settings-developer")).backgroundColor).toBeUndefined();
+  });
+
+  it("DV3 — 「개발자」 행을 누르면 onOpenDeveloper", async () => {
+    const onOpenDeveloper = jest.fn();
+    await render(<SettingsScreen {...props({ developerEnabled: true, onOpenDeveloper })} />);
+    await fireEvent.press(screen.getByTestId("settings-developer"));
+    expect(onOpenDeveloper).toHaveBeenCalledTimes(1);
+  });
+});

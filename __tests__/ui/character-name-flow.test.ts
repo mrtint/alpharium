@@ -44,9 +44,7 @@ function codeOf(file: string): string {
  * **왜 이름을 아예 안 그리는지**를 함께 적어야 한다.
  */
 const NO_NAME_RENDERING: Readonly<Record<string, string>> = {
-  // 029가 홈에서 걷어낸 뒤 어디서도 렌더되지 않는다(주석에만 남음). 살아 있는
-  // 화면이 아니므로 이름이 갈릴 자리가 없다 — 지우는 것은 035의 범위 밖이다.
-  "CharacterPicker.tsx": "029 이후 렌더되지 않는 죽은 화면",
+  // 059 — 29 이후 렌더되지 않던 `CharacterPicker.tsx`를 개발자 메뉴 조각이 지웠다. 지금은 예외가 없다.
 };
 
 /**
@@ -91,13 +89,6 @@ describe("FR-017·FR-018 — 화면이 주입받은 이름을 무시하지 않�
     // 이 검사가 실제로 무언가를 잡는다는 증명(007~034 관례).
     expect(usesPersonaNameAsOnlySource("const name = personaOf(c).name;")).toBe(true);
     expect(usesPersonaNameAsOnlySource("const name = injected ?? personaOf(c).name;")).toBe(false);
-  });
-
-  it("tagline은 여전히 personaOf에서 온다 (헌법 1.4.0 — 이름만 사용자가 짓는다)", () => {
-    // 소개까지 주입으로 바꾸면 사용자가 말투를 바꿀 수 있게 되고, 그것이
-    // 원칙 III가 계속 막는 것이다.
-    const list = codeOf("CharacterListScreen.tsx");
-    expect(list).toMatch(/personaOf\([^)]*\)\.tagline/);
   });
 });
 

@@ -156,13 +156,12 @@ describe("037 C4 — 이름 되짚기가 로스터 밖을 견딘다", () => {
    * 것이 예외의 조건이다**: 새 화면이 목록에 빠져 조용히 통과하는 일을 막으려고
    * 파일 목록이 아니라 디렉터리 전수 훑기로 검사한다(037 converge T056).
    *
-   *  - `CharacterListScreen.tsx` — `CHARACTERS.map()`이 그린 줄의 캐릭터
-   *  - `CharacterPicker.tsx` — 부모가 `CHARACTERS`로 만든 `characters` prop
+   * 059 — 예외였던 `CharacterListScreen.tsx`·`CharacterPicker.tsx`를 지웠다. 지금은 예외가 없다.
    *
    * 이 목록에 더하려면 **그 자리가 로스터 밖 값을 받을 수 없다는 것을 근거와
    * 함께** 적는다. 저장된 `DiaryEntry.character`를 받는 자리는 예외가 아니다.
    */
-  const SAFE_BY_CONSTRUCTION = ["CharacterListScreen.tsx", "CharacterPicker.tsx"];
+  const SAFE_BY_CONSTRUCTION: readonly string[] = [];
 
   const uiFiles = readdirSync(join(__dirname, "../../src/ui")).filter(
     (f) => f.endsWith(".tsx") && !SAFE_BY_CONSTRUCTION.includes(f),

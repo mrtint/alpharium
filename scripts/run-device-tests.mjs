@@ -30,11 +30,15 @@ import { join } from "node:path";
  * **하나라도 실패하면 전체가 실패다.** 일부만 통과한 것을 통과로 보고하면, 기기 없이
  * 초록불인 것과 구분되지 않는다(헌법 원칙 V).
  */
-// ★ 051 — 홈의 `⋯` 메뉴를 없앴다(저장소 소유자 지시, 2026-09-28). 메뉴로 설정·개발자에 들어가던 흐름
-// 열한 개는 **여기서 뺐다** — 설정 화면 구성과 함께 전면 재개편한다(저장소 소유자 결정). 파일은 `.maestro/`에
-// 남아 있으나 돌지 않는다: skeleton, model-acquisition, diary-user-path, diary-character-select,
-// download-conflict, photo-vision, diary-body-screen, scheduled-diary-notification, prompt-preview,
-// parallel-model-download, welcome-naming.
+// ★ 059 — 051이 홈의 `⋯` 메뉴를 없애며 FLOWS 밖으로 뺐던 흐름 열한 개를 하나씩 정했다. **되살린 넷**(아래 등록): skeleton·prompt-preview·
+// diary-body-screen·scheduled-diary-notification — 새 진입(점 셋 → 설정 → 「개발자」 행 → 「진단」 행, 개발 환경은 7번 탭 없이 처음부터 켜짐)으로 고쳤다.
+// **폐기한 일곱**(파일 삭제 — 검증 대상이 제품에서 사라졌다):
+//  - model-acquisition·download-conflict·parallel-model-download: 설정의 캐릭터 목록·내려받기 화면이 없다(055 S5). 로스터가 하나이고(037) 다시 받기는
+//    개발자 화면의 「모듈 다시 받기」 한 경로다 — 그 경로는 059 quickstart를 사람이 본다.
+//  - diary-character-select·welcome-naming: 설정의 「일기 작성자」 고르기·이름 줄이 없다(이름 바꾸기는 설정 「이름」 행 + 이름 바꾸기 화면, 첫 실행 작명은
+//    first-run-flow가 본다).
+//  - photo-vision: 사진 보기 설정(보지 않음·빠르게·자세히)이 042에서 없어졌다 — 사진은 늘 본다(헌법 v1.7.0).
+//  - diary-user-path: 「⋯」 메뉴 경로였다. 진단을 거치지 않고 일기에 닿는 길은 generate-diary·today-diary가 본다.
 const FLOWS = [
   // 005 — 생성 패널. **여기 등록하지 않으면 흐름이 있어도 돌지 않고**, 그러면 초록불인데
   // 아무것도 검증되지 않은 상태가 된다(헌법 원칙 V).
@@ -147,6 +151,16 @@ const FLOWS = [
   // ⚠️ 펼침 움직임·다시 예약·바깥 누름·뒤로·「켬」의 권한 창·두 번째 열기의 읽는 중 없음·토글 꺼짐 손잡이·큰 글꼴은 여기
   // 없다 — 056 quickstart Q1·Q3·Q4·Q6~Q9를 사람이 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/settings-time-place.yml",
+  // 059 — 개발자 화면 → 진단(개발 환경 전용). **환경·추론 위치·모듈 상태(loaded)·저장 점검이 보이는가**를 본다. 설정 → 「개발자」 행 → 「진단」 행이 닿는 길이다.
+  // ⚠️ 배포 환경(7번 탭으로 켜기·진단 그룹 없음)·모듈 다시 받기·온보딩부터 다시는 여기 없다 — 059 quickstart를 사람이 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
+  ".maestro/skeleton.yml",
+  // 022 → 059 — 진단의 입력 프롬프트 미리보기. 프리셋 둘·근사 크기 라벨이 보이는가. 진입은 skeleton과 같다.
+  ".maestro/prompt-preview.yml",
+  // 017 → 051 → 059 — 쓴 날 본문과 장소 이름 대화상자. 설정의 「장소 이름으로 보기」 행이 새 자리다.
+  ".maestro/diary-body-screen.yml",
+  // 020 → 056 → 059 — 설정의 자동 쓰기·시각·배터리 행과 개발자 → 진단의 「지금 자동 생성」 버튼.
+  // ⚠️ 끝에서 기기의 자동 쓰기 설정이 바뀔 수 있다 — 실행 전에 원래 값을 읽어 둔다.
+  ".maestro/scheduled-diary-notification.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */

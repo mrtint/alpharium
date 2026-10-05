@@ -29,6 +29,7 @@ export function SettingsFrame({
   onBack,
   children,
   backTestID = "back-to-home",
+  titleAside,
 }: {
   /** 뒤로 글자 — 앞의 ‹ 는 틀이 그린다 */
   backLabel: string;
@@ -37,6 +38,8 @@ export function SettingsFrame({
   children: ReactNode;
   /** 048 흐름이 쓰는 `back-to-home`이 기본이다. 설정 위에 쌓인 화면은 다른 값을 준다 */
   backTestID?: string;
+  /** 059 — 제목 오른쪽 작은 글자(개발자 화면의 「DEV · 1.0.0 (24)」, 보드 `6e`). 없으면 그리지 않는다 */
+  titleAside?: string;
 }) {
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.bg }}>
@@ -71,6 +74,11 @@ export function SettingsFrame({
             paddingBottom: head.titlePaddingBottom,
             borderBottomWidth: head.ruleWidth,
             borderBottomColor: COLORS.text,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            columnGap: 12,
           }}
           testID="settings-title-row"
         >
@@ -86,6 +94,19 @@ export function SettingsFrame({
           >
             {title}
           </AppText>
+          {titleAside !== undefined && (
+            <AppText
+              style={{
+                fontSize: 12,
+                color: COLORS.textMuted,
+                paddingBottom: 6,
+                fontVariant: ["tabular-nums"],
+              }}
+              testID="settings-title-aside"
+            >
+              {titleAside}
+            </AppText>
+          )}
         </View>
       </View>
       <ScrollView

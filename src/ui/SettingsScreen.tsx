@@ -25,7 +25,7 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
+import { Platform, Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import type { PermissionTag, TaggedPermission } from "../app/permission-tags";
@@ -33,7 +33,7 @@ import { AppText } from "./components/Text";
 import { SETTINGS_TEXT } from "./settings-text";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
-const { group, row, tag, toggle } = SETTINGS;
+const { group, paperPadding, row, tag, toggle } = SETTINGS;
 
 export type SettingsScreenProps = {
   /** 지금 부르는 캐릭터 이름 — 조립부가 `displayNameOf()`로 만든 문자열 */
@@ -61,6 +61,15 @@ export type SettingsScreenProps = {
   onOpenWipe: () => void;
   /** 058 — 잠금에 막혀 지우지 못했다는 한 줄. 없으면 그리지 않는다 */
   wipeBlockedText?: string;
+  /**
+   * 059 — 「버전」 행 누름(7번 연속 탭 판정은 조립부의 `useDeveloperTaps`가 한다). 없으면 누를 수 없는 행이다(055).
+   */
+  onPressVersion?: () => void;
+  /** 059 — 개발자 메뉴가 켜져 있는가. 켜져 있으면 「정보」 맨 아래에 「개발자」 행 */
+  developerEnabled?: boolean;
+  /** 059 — 켜진 순간 1.5초 동안 「개발자」 행을 옅은 빨강 바탕으로 강조한다 */
+  developerHighlight?: boolean;
+  onOpenDeveloper?: () => void;
 };
 
 export function SettingsScreen({
@@ -80,6 +89,10 @@ export function SettingsScreen({
   wipeEnabled,
   onOpenWipe,
   wipeBlockedText,
+  onPressVersion,
+  developerEnabled = false,
+  developerHighlight = false,
+  onOpenDeveloper,
 }: SettingsScreenProps) {
   return (
     <View testID="settings-screen">
@@ -165,9 +178,19 @@ export function SettingsScreen({
       <Group label={SETTINGS_TEXT.groupAbout} testID="settings-group-about">
         <Row
           label={SETTINGS_TEXT.version}
+          {...(onPressVersion !== undefined ? { onPress: onPressVersion } : {})}
           testID="settings-version"
           trailing={<Value text={versionText ?? ""} />}
         />
+        {developerEnabled && (
+          <Row
+            highlight={developerHighlight}
+            label={SETTINGS_TEXT.developer}
+            {...(onOpenDeveloper !== undefined ? { onPress: onOpenDeveloper } : {})}
+            testID="settings-developer"
+            trailing={<Chevron />}
+          />
+        )}
       </Group>
     </View>
   );
@@ -175,7 +198,7 @@ export function SettingsScreen({
 
 /* ─────────────────────────────── 부품 ─────────────────────────────── */
 
-function Group({
+export function Group({
   label,
   first,
   children,
@@ -208,9 +231,10 @@ function Group({
   );
 }
 
-function Row({
+export function Row({
   label,
   labelTone = "default",
+  highlight = false,
   hint,
   hintTone = "muted",
   trailing,
@@ -221,6 +245,8 @@ function Row({
   label: string;
   /** 058 — 「일기 모두 지우기」는 빨강(`accent-700` = `COLORS.danger`), 누를 수 없으면 `textMuted` */
   labelTone?: "default" | "danger" | "muted";
+  /** 059 — 켜진 순간의 옅은 빨강 바탕(보드 `6d`: 지면 좌우 여백까지 바탕, `margin: 0 -20px; padding: 0 20px`) */
+  highlight?: boolean;
   hint?: string;
   /** 057 — 건너뜀 보조 줄은 빨강(보드 `6g` `accent-700` = `COLORS.danger`) */
   hintTone?: "muted" | "danger";
@@ -243,6 +269,13 @@ function Row({
     gap: row.gap,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    ...(highlight
+      ? {
+          backgroundColor: SETTINGS.rowHighlight,
+          marginHorizontal: -paperPadding.horizontal,
+          paddingHorizontal: paperPadding.horizontal,
+        }
+      : {}),
   };
   const body = (
     <>
@@ -282,16 +315,25 @@ function Row({
   );
 }
 
-function Value({ text, chevron }: { text: string; chevron?: boolean }) {
+export function Value({
+  text,
+  chevron,
+  mono,
+}: {
+  text: string;
+  chevron?: boolean;
+  /** 059 — 고정폭 글꼴(개발자 화면의 모듈 줄) */
+  mono?: boolean;
+}) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: row.valueGap }}>
-      <AppText style={VALUE}>{text}</AppText>
+      <AppText style={mono === true ? VALUE_MONO : VALUE}>{text}</AppText>
       {chevron === true && <Chevron />}
     </View>
   );
 }
 
-function Chevron() {
+export function Chevron() {
   return (
     <AppText
       style={{ fontSize: row.chevronSize, color: SETTINGS.chevron }}
@@ -425,6 +467,10 @@ const VALUE: TextStyle = {
   fontSize: row.valueSize,
   color: COLORS.textMuted,
   fontVariant: ["tabular-nums"],
+};
+const VALUE_MONO: TextStyle = {
+  ...VALUE,
+  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
 };
 const HINT: TextStyle = {
   fontSize: row.hintSize,

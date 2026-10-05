@@ -22,7 +22,6 @@ import { join } from "node:path";
 import { render, screen, fireEvent } from "@testing-library/react-native";
 
 import { Button } from "../../src/ui/components/Button";
-import { ListRow } from "../../src/ui/components/ListRow";
 import { PRESS } from "../../src/ui/theme/tokens";
 
 const SRC_DIR = join(__dirname, "../../src");
@@ -30,7 +29,6 @@ const COMPONENTS_DIR = join(SRC_DIR, "ui/components");
 
 const TOKENS_SRC = readFileSync(join(SRC_DIR, "ui/theme/tokens.ts"), "utf8");
 const BUTTON_SRC = readFileSync(join(COMPONENTS_DIR, "Button.tsx"), "utf8");
-const LIST_ROW_SRC = readFileSync(join(COMPONENTS_DIR, "ListRow.tsx"), "utf8");
 
 /** `src/` 아래 모든 `.ts`/`.tsx`를 훑는다. */
 function allSourceFiles(dir: string): string[] {
@@ -59,16 +57,15 @@ describe("PF1 — 세기·시간은 토큰 한 곳의 상수다", () => {
     expect(body).not.toMatch(/\?|\bif\b|=>/);
   });
 
-  it("★ PRESS를 참조하는 파일은 Button·ListRow 둘뿐이다 (SC-008)", () => {
+  it("★ PRESS를 참조하는 파일은 Button 하나뿐이다 (SC-008 — 059가 ListRow를 지웠다)", () => {
     const referencing = allSourceFiles(SRC_DIR)
       .filter((f) => !f.endsWith(join("ui", "theme", "tokens.ts")))
       .filter((f) => /\bPRESS\b/.test(readFileSync(f, "utf8")))
       .map((f) => f.replace(/\\/g, "/"))
       .sort();
 
-    expect(referencing).toHaveLength(2);
+    expect(referencing).toHaveLength(1);
     expect(referencing[0]).toMatch(/src\/ui\/components\/Button\.tsx$/);
-    expect(referencing[1]).toMatch(/src\/ui\/components\/ListRow\.tsx$/);
   });
 
   it("화면 파일은 PRESS를 import하지 않는다", () => {
@@ -83,7 +80,7 @@ describe("PF1 — 세기·시간은 토큰 한 곳의 상수다", () => {
 });
 
 describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
-  it("★ src/ui/components/의 파일이 10개다(033 7개 + 050 Dialog + 054 FadeLayer + 055 NameField — 038 TypewriterText는 054에서 지웠다)", () => {
+  it("★ src/ui/components/의 파일이 8개다(033 7개 + 050 Dialog + 054 FadeLayer + 055 NameField − 059가 지운 ListRow·SelectRow — 038 TypewriterText는 054에서 지웠다)", () => {
     // 032가 만들고 안 쓴 컴포넌트 4개를 남긴 것이 이 스펙의 존재 이유다.
     // 같은 실패(쓸 자리 없는 추상을 먼저 만듦)를 되풀이하지 않는다.
     //
@@ -98,7 +95,9 @@ describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
     //
     // 055 — `NameField.tsx`가 열 번째다. 1a 입력줄을 첫 실행 작명(`WelcomeScreen`)과 설정의 이름 바꾸기(`RenameScreen`) 두
     // 곳이 실제로 쓴다(보드 `6c` ② 「이름 짓기(1a)와 같은 입력 화면」).
-    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(10);
+    //
+    // 059 — `ListRow.tsx`·`SelectRow.tsx`를 지웠다(설정에서 걷은 캐릭터 목록·작성자 고르기·옛 선택기만 쓰던 부품).
+    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(8);
   });
 });
 
@@ -126,16 +125,8 @@ describe("PF3 — 눌린 것이 보이고 떼면 돌아온다", () => {
     expect(screen.getByTestId("b1")).toBeTruthy();
   });
 
-  it("ListRow가 onPress를 가지면 pressIn·pressOut을 받아들인다", async () => {
-    await render(<ListRow label="행" onPress={() => {}} testID="r1" />);
-    const node = screen.getByTestId("r1");
-    await fireEvent(node, "pressIn");
-    await fireEvent(node, "pressOut");
-    expect(screen.getByTestId("r1")).toBeTruthy();
-  });
-
-  it("★ 두 컴포넌트가 onPressIn·onPressOut을 실제로 배선한다 (소스)", () => {
-    for (const src of [BUTTON_SRC, LIST_ROW_SRC]) {
+  it("★ Button이 onPressIn·onPressOut을 실제로 배선한다 (소스)", () => {
+    for (const src of [BUTTON_SRC]) {
       expect(src).toMatch(/onPressIn=\{/);
       expect(src).toMatch(/onPressOut=\{/);
       // 눌림은 축소(PRESS.scale), 뗌은 복귀(1) — 둘 다 있어야 돌아온다.
@@ -158,8 +149,8 @@ describe("PF3 — 눌린 것이 보이고 떼면 돌아온다", () => {
     expect(screen.getByTestId("b2")).toBeTruthy();
   });
 
-  it("두 컴포넌트가 PRESS.scale·PRESS.durationMs를 쓴다", () => {
-    for (const src of [BUTTON_SRC, LIST_ROW_SRC]) {
+  it("Button이 PRESS.scale·PRESS.durationMs를 쓴다", () => {
+    for (const src of [BUTTON_SRC]) {
       expect(src).toMatch(/PRESS\.scale/);
       expect(src).toMatch(/PRESS\.durationMs/);
     }
@@ -168,7 +159,7 @@ describe("PF3 — 눌린 것이 보이고 떼면 돌아온다", () => {
 
 describe("PF4 — 자리·크기 배치를 바꾸지 않는다", () => {
   it("★ 애니메이션 대상이 transform(scale)뿐이다", () => {
-    for (const src of [BUTTON_SRC, LIST_ROW_SRC]) {
+    for (const src of [BUTTON_SRC]) {
       const animated = /useAnimatedStyle\(\(\) => \(\{[\s\S]*?\}\)\)/.exec(src);
       expect(animated).not.toBeNull();
       const body = animated![0];
@@ -181,7 +172,7 @@ describe("PF4 — 자리·크기 배치를 바꾸지 않는다", () => {
   });
 
   it("불투명도를 쓰지 않는다 (FR-013 — 기존 터치 영역이 이미 주던 효과)", () => {
-    for (const src of [BUTTON_SRC, LIST_ROW_SRC]) {
+    for (const src of [BUTTON_SRC]) {
       const animated = /useAnimatedStyle\(\(\) => \(\{[\s\S]*?\}\)\)/.exec(src);
       expect(animated![0]).not.toMatch(/opacity/);
     }
@@ -213,13 +204,6 @@ describe("PF5 — 탭의 결과를 바꾸지 않는다", () => {
     await fireEvent(node, "pressOut");
     expect(onPress).toHaveBeenCalledTimes(1);
   });
-
-  it("ListRow의 onPress가 한 번만 불린다", async () => {
-    const onPress = jest.fn();
-    await render(<ListRow label="행" onPress={onPress} testID="r2" />);
-    await fireEvent.press(screen.getByTestId("r2"));
-    expect(onPress).toHaveBeenCalledTimes(1);
-  });
 });
 
 describe("PF6 — 비활성은 반응하지 않는다", () => {
@@ -236,25 +220,18 @@ describe("PF6 — 비활성은 반응하지 않는다", () => {
 
   it("★ disabled면 눌림 반응이 없다 — 소스가 disabled를 판정에 쓴다", () => {
     // 반응만 있고 아무 일도 안 일어나면 008이 고쳤던 「버튼이 고장났다」가 돌아온다.
-    for (const src of [BUTTON_SRC, LIST_ROW_SRC]) {
+    for (const src of [BUTTON_SRC]) {
       for (const handler of ["onPressIn", "onPressOut"]) {
         const wiring = new RegExp(`${handler}=\\{disabled \\? undefined :`).exec(src);
         expect(wiring).not.toBeNull();
       }
     }
   });
-
-  it("disabled ListRow는 눌러도 onPress가 안 불린다", async () => {
-    const onPress = jest.fn();
-    await render(<ListRow label="행" onPress={onPress} disabled testID="r3" />);
-    await fireEvent.press(screen.getByTestId("r3"));
-    expect(onPress).not.toHaveBeenCalled();
-  });
 });
 
 describe("PF8 — 새 수치를 만들지 않는다 (원칙 IV)", () => {
   it("★ 소스에 성능 측정 어휘가 없다", () => {
-    for (const src of [BUTTON_SRC, LIST_ROW_SRC, TOKENS_SRC]) {
+    for (const src of [BUTTON_SRC, TOKENS_SRC]) {
       const code = src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "");
       for (const forbidden of ["fps", "frame", "elapsed", "measure", "benchmark"]) {
         expect(code.toLowerCase()).not.toMatch(new RegExp(`\\b${forbidden}\\b`));
