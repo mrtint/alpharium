@@ -307,7 +307,7 @@ function dayFromFileName(name: string): DayDate | null {
  *
  * **실기기에서 확인됨** (2026-08-13, Galaxy S20+ / SM-G986N / Android 13 / arm64-v8a):
  * 저장·조회·덮어쓰기·`listDays`가 실제로 돌고, **`unknown`이 파일 왕복에서 살아남는다.**
- * 확인 경로는 `src/diagnostics/storage-check.ts`이며 진단 화면에 결과가 뜬다.
+ * 확인 경로는 진단 화면의 「저장 점검」(`src/app/diary-inspect.ts`)이다.
  * 직렬화를 일부러 깨뜨렸을 때 그 점검이 실패로 뒤집히는 것까지 확인했다.
  */
 export function fileStore(fs: FileSystemPort): DiaryStore {

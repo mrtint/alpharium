@@ -2,7 +2,7 @@
 
 테스트가 잠그는 약속. 이름은 테스트 `describe`에 그대로 쓴다.
 
-## DT — 문구 원문 (`src/ui/diagnostics-text.ts`, `logic`)
+## DT — 문구 원문 (`src/app/diagnostics-text.ts`, `logic`)
 
 - **DT1** 분해 설계 §3.6 KO 문구표의 모든 키가 글자 단위로 같다: `diag.title` 「진단」 · `diag.env` 「환경」 · `diag.build` 「빌드」 · `diag.device` 「기기」 · `diag.inference` 「추론 위치」 ·
   `diag.inference.cpu` 「기기 · CPU」 · `diag.storage` 「저장 점검」 · `diag.storage.ok` 「{n}편 · 정상」 · `diag.storage.bad` 「{n}편 · {k}편 읽기 실패」 · `diag.photoPerm` 「사진 권한」 ·

@@ -53,6 +53,7 @@ describe("DB11 — 하루 기준을 옮기는 시(時) 계산은 경계 파일 �
     "src/config/day-boundary.ts",
     "src/diary/prompt.ts", // 사진 시각 표시
     "src/schedule/decision.ts", // 목표 시각 창
+    "src/schedule/manual.ts", // 060 진단 「지금 실행」 — 목표 시각을 지금 시로(하루 기준 계산이 아니다)
     "src/vision/select.ts", // 자정 기준 하루 안의 분
   ]);
 

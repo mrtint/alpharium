@@ -28,6 +28,7 @@ import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createPipeline, type LockHandle, type Pipeline } from "../diary/pipeline";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
+import { expoWriteFailurePort, recordWriteFailure, type WriteFailurePort } from "./write-failures";
 import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
@@ -309,7 +310,7 @@ export async function triggerFirstRunAutoDiary(
   resolution: EnvironmentResolution,
   input: { day: DayDate; now: Date; character: Character; vision: VisionSetting },
   /** 테스트가 갈아끼우는 자리 — 주지 않으면 `createAppPipeline(resolution)`. */
-  deps: { pipeline?: Pick<Pipeline, "run"> } = {},
+  deps: { pipeline?: Pick<Pipeline, "run">; failurePort?: WriteFailurePort } = {},
 ): Promise<void> {
   let pipeline = deps.pipeline;
   if (pipeline === undefined) {
@@ -325,8 +326,13 @@ export async function triggerFirstRunAutoDiary(
       character: input.character,
       vision: input.vision,
     })
+    .then((result) =>
+      // 060 — 쓰기 실패는 진단 「최근 실패」에 남는다. 기록은 던지지 않는다. 성공·already-running은 기록하지 않는다.
+      recordWriteFailure(deps.failurePort ?? expoWriteFailurePort(), result, input.now),
+    )
     .catch(() => {
       // 조용히 삼킨다 — 실패해도 평소 "일기 쓰기" 수동 경로가 살아있다
       // (FR-009, SC-004). 새 실패 안내 UI를 만들지 않는다(research.md #5).
+      // 060 — 파이프라인이 던진 예외는 기록하지 않는다(결과가 없다). 기록 통로는 던지지 않는다.
     });
 }

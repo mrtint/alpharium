@@ -96,3 +96,13 @@
   위치는 홈의 하단 바 위(054 `FailureToast`와 같은 바닥 기준). 새 토스트는 이전 것을 대신한다(한 번에 하나).
 - **Rationale**: 059가 만든 부품이고 문구·시간이 같다. 쓰는 중 화면은 하단 바가 「그만두기」 바라 바 높이 측정이 홈 안에 있다 — 실기기에서 겹치는지 본다(quickstart).
 - **Alternatives**: 홈 안에서 그린다 — 홈이 새 토스트 종류를 알게 된다(054 `AppScreen` 불변과 어긋남).
+
+## 참조 목록 (T002, 2026-10-06)
+
+삭제·변경 대상을 가리키는 곳 — 코드가 아닌 역사 언급(주석)은 그대로 둔다.
+
+- 소스를 읽어 계약을 잠그는 테스트(고쳐야 함): `__tests__/vision/photo-vision-always.test.ts:109`(`src/ui/GenerationProbe.tsx`), `__tests__/scripts/check-constitution.test.ts:341~361`(`src/ui/SignalProbe.tsx` 경로), `__tests__/ui/prompt-preview-panel.test.tsx:112~124`(PP7·PP6 — 새 부품 파일로 이월)
+- 옛 부품 테스트(삭제): `__tests__/ui/{generation-probe,permission-panel,prompt-preview-panel,signal-probe}.test.tsx`
+- 코드: `src/ui/DiagnosticsScreen.tsx`(다시 씀), `src/diagnostics/report.ts`·`types.ts`(`characterModels`·`checkStorage`), `src/diagnostics/storage-check.ts`(삭제), `scripts/constitution-rules.ts:187·245`(`SignalProbe.tsx` 경로 규칙 — `UI_TOUCHES_PROMPT`는 `src/ui/` 전체에 걸려 있어 이름 변경 불필요)
+- `__tests__/diagnostics/report.test.ts`: `characterModels` 단언
+- 주석 언급만(그대로): `src/app/failure-text.ts`·`src/app/README.md`·`src/app/wiring.ts`·`src/config/day-boundary.ts`·`src/inference/on-device.ts`·`src/signals/expo-port.ts`·`src/signals/types.ts`·`src/diary/store.ts:310`(storage-check 언급은 고친다)·여러 테스트 주석

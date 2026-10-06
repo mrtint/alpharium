@@ -354,7 +354,7 @@ function PermissionTrailing({ tag: kind, testID }: { tag: PermissionTag; testID:
 }
 
 /** 꼬리표 — 허용됨(회색 면) · 일부 허용(회색 테두리) · 허용 안 함(빨강 테두리). 보드 `6c` ④ */
-function Tag({ kind, testID }: { kind: Exclude<PermissionTag, "unread">; testID: string }) {
+export function Tag({ kind, testID }: { kind: Exclude<PermissionTag, "unread">; testID: string }) {
   const text =
     kind === "allowed"
       ? SETTINGS_TEXT.permAllowed

@@ -43,10 +43,8 @@ const PREVIEW_NOW = new Date("2026-06-01T12:00:00");
  * 직접 쓴다 — `fake.ts`·`collect.ts`에서 가져오지 않는다(경계 혼동 방지, research.md R2).
  */
 export type SignalPreset = {
-  /** 화면·테스트가 참조하는 안정적 식별자 */
+  /** 화면·테스트가 참조하는 안정적 식별자. 화면에 보이는 이름은 `src/app/diagnostics-text.ts`의 프리셋 문구가 정본이다(060) */
   id: string;
-  /** 화면에 보일 한국어 이름 */
-  label: string;
   /** `buildRequest`에 그대로 들어가는 하루치 신호 */
   signals: DaySignals;
 };
@@ -61,7 +59,6 @@ export type SignalPreset = {
 export const SIGNAL_PRESETS: readonly SignalPreset[] = [
   {
     id: "empty",
-    label: "신호 없음",
     signals: {
       date: PREVIEW_DATE,
       photos: { kind: "none" },
@@ -73,7 +70,6 @@ export const SIGNAL_PRESETS: readonly SignalPreset[] = [
   },
   {
     id: "photos",
-    label: "사진 있음",
     signals: {
       date: PREVIEW_DATE,
       photos: {
@@ -132,11 +128,6 @@ export function buildPreview(
   const text = buildPrompt(request.request);
   return { ok: true, text, approxChars: text.length };
 }
-
-/** 프리셋 id → 화면 라벨. 화면이 `SignalPreset` 전체를 알 필요 없이 이것만 받는다. */
-export const PRESET_LABELS: Readonly<Record<string, string>> = Object.fromEntries(
-  SIGNAL_PRESETS.map((preset) => [preset.id, preset.label]),
-);
 
 /**
  * 로스터의 캐릭터 × 모든 프리셋의 미리보기 (022 FR-005·FR-007, PP4).

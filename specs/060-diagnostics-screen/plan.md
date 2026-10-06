@@ -35,7 +35,7 @@
 D3(실패 기록은 별도 파일·이유와 시각·10건), 022 PP1·PP6·`UI_TOUCHES_PROMPT`, `DIAGNOSTICS_HIDES_AXES`, 059 DG2(개발자 화면이 진단을 import하지 않음), 054 `AppScreen` 불변, 055 겹 규칙,
 AGENTS 기기 안전 규칙(`pm clear`·`am force-stop` 금지, 파일은 백업 후)
 
-**Scale/Scope**: 새 소스 4(`src/app/write-failures.ts`·`src/app/diary-inspect.ts`·`src/app/diagnostics-view.ts`·`src/ui/diagnostics-text.ts`) + 새 화면 부품 파일 1(`src/ui/DiagnosticsParts.tsx`) + 테스트,
+**Scale/Scope**: 새 소스 4(`src/app/write-failures.ts`·`src/app/diary-inspect.ts`·`src/app/diagnostics-view.ts`·`src/app/diagnostics-text.ts`) + 새 화면 부품 파일 1(`src/ui/DiagnosticsParts.tsx`) + 테스트,
 고침 약 10(`DiagnosticsScreen.tsx`·`DiaryHomeScreen.tsx`·`App.tsx`·`task.ts`·`wiring.ts`·`diagnostics/report.ts`·`diagnostics/types.ts`·`scripts/constitution-rules.ts`·`.maestro/prompt-preview.yml`),
 삭제 5 화면(`GenerationProbe`·`AutoDiaryTriggerButton`·`PermissionPanel`·`SignalProbe`·`PromptPreviewPanel`)과 자기 테스트
 
@@ -75,6 +75,7 @@ specs/060-diagnostics-screen/
 src/app/
 ├── write-failures.ts     # 신규 — 갈래 판정(순수)·기록 읽기/더하기(통로 주입)·expo 통로 (R2·R3)
 ├── diary-inspect.ts      # 신규 — 일기를 다시 읽어 {편수, 읽기 실패} (R6)
+├── diagnostics-text.ts   # 신규 — §3.6 KO 문구표 정본 (글자 단위 계약). `src/app/`이 `src/ui/`를 import하지 않는 선례(`target-hour.ts`)를 따라 app에 둔다
 ├── diagnostics-view.ts   # 신규 — 환경 줄·사진 권한 줄·신호 칸·실패 줄 → 화면 문자열 (순수, R8·R9)
 └── wiring.ts             # 고침 — triggerFirstRunAutoDiary가 실패를 기록 (R3)
 src/schedule/task.ts      # 고침 — manual 옵션 (R5), 실패 기록 (R3)
@@ -84,7 +85,6 @@ src/diagnostics/
 src/ui/
 ├── DiagnosticsScreen.tsx # 다시 씀 — 일곱 묶음 (조립은 App.tsx가 값·핸들러 주입)
 ├── DiagnosticsParts.tsx  # 신규 — 신호 칸·프리셋 전환·미리보기 상자 같은 진단 전용 부품
-├── diagnostics-text.ts   # 신규 — §3.6 KO 문구표 정본 (글자 단위 계약)
 ├── DiaryHomeScreen.tsx   # 고침 — writeRequest 받기, 실패 기록 호출 (R3·R4)
 └── (삭제) GenerationProbe · AutoDiaryTriggerButton · PermissionPanel · SignalProbe · PromptPreviewPanel
 App.tsx                   # 고침 — `DiagnosticsLayer`(진단 겹에 값·핸들러 주입), writeRequest 상태, 진단 토스트, 홈에 recordFailure 연결 (R2·R4)

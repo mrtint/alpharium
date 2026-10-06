@@ -1,3 +1,4 @@
+# 060 — 진단 화면이 보드 6h의 일곱 묶음으로 바뀌었다(프롬프트 미리보기 = 「입력 프롬프트 미리보기」 묶음, 캐릭터 칩 없음 — 로스터 하나).
 # 059 — 개발자 화면은 설정 → 「개발자」 행(`settings-developer`)이다. 개발 환경(local·dev)은 7번 탭 없이 처음부터 켜져 있다.
 #       진단은 개발자 화면의 「진단」 행(`developer-diagnostics`) 뒤에 있다(개발 환경 전용 — 배포 빌드에는 행도 화면도 없다).
 # 실기기 자동 테스트 — 개발자 탭 입력 프롬프트 미리보기 (022)
@@ -37,25 +38,22 @@ appId: com.anonymous.alpharium
 - tapOn:
     id: "developer-diagnostics"
 
-# ★ D1 — 프롬프트 미리보기 패널이 있다.
-#    ⚠️ 패널이 길어 각 요소마다 스크롤한다. `scrollUntilVisible`이 화면에 올린다.
+# ★ D1 — 「입력 프롬프트 미리보기」 묶음이 있다.
+#    ⚠️ 화면이 길어 각 요소마다 스크롤한다. `scrollUntilVisible`이 화면에 올린다.
 - scrollUntilVisible:
     element:
-      text: "입력 프롬프트 미리보기"
+      id: "diagnostics-group-prompt"
+    direction: DOWN
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "프리셋 1 · 신호 없음"
     direction: DOWN
     timeout: 20000
 
-# ★ D2 — 첫 프리셋 "신호 없음"이 보인다.
-- scrollUntilVisible:
-    element:
-      text: "신호 없음"
-    direction: DOWN
-    timeout: 20000
-
-# ★ D1 — 첫 캐릭터(quiet)의 프롬프트 원본에 화자 규칙이 들어 있다.
-#    buildPrompt()가 실제로 불렸다는 증거.
-#    036 — 한국어 캐릭터는 E2SN 머리. 첫 줄이 "너는 '금동이'이라 불린다. 주인의
-#    휴대폰이다. ..."이고, E2_RULES가 "본 것으로 주인의 하루를 짐작하는 글"을 말한다.
+# ★ D1 — 첫 프리셋(신호 없음)이 기본이다. 프롬프트 원본에 화자 규칙이 들어 있다 — buildPrompt()가 실제로 불렸다는 증거.
+#    036 — 한국어 캐릭터는 E2SN 머리. 첫 줄이 "너는 '금동이'이라 불린다. 주인의 휴대폰이다. ..."이고, E2_RULES가
+#    "본 것으로 주인의 하루를 짐작하는 글"을 말한다.
 - assertVisible:
     text: ".*주인의 휴대폰이다.*"
 - assertVisible:
@@ -65,36 +63,17 @@ appId: com.anonymous.alpharium
 - assertVisible:
     text: ".*조립 시점 근사치, 실측 토큰 아님.*"
 
-# ★ D2 — 두 번째 프리셋 "사진 있음"으로 스크롤하면 사진 문장이 들어간
-#    다른 프롬프트가 보인다.
+# ★ D2 — 「프리셋 2 · 사진 있음」을 누르면 사진 문장이 들어간 다른 프롬프트가 보인다.
 - scrollUntilVisible:
     element:
-      text: "사진 있음"
-    direction: DOWN
-    timeout: 20000
-# 036 — 한국어 캐릭터(quiet)는 E2SN 문장형 신호를 쓴다: "사진은 두 장이 남았다."
-- scrollUntilVisible:
-    element:
-      text: ".*사진은 두 장이 남았다.*"
-    direction: DOWN
-    timeout: 20000
-
-# ★ D1 — 캐릭터를 바꾸면 프롬프트가 다시 조립된다.
-#
-# ★ 037(헌법 1.6.0) — **로스터가 하나라 바꿔 누를 칩이 없다.** 이 패널은 칩을
-# `CHARACTERS`에서 그리므로(PromptPreviewPanel.tsx) 칩이 하나다. 캐릭터가 늘면
-# 그 칩을 눌러 마지막 줄(출력 언어)이 바뀌는지 보는 원래 검사를 되살린다.
-#
-# 지금은 하나뿐인 칩이 실제로 있고, 그 캐릭터의 출력 언어 줄이 나오는지 본다.
-- scrollUntilVisible:
-    element:
-      id: "prompt-preview-character-quiet"
+      id: "diagnostics-preset-photos"
     direction: UP
     timeout: 20000
 - tapOn:
-    id: "prompt-preview-character-quiet"
-- scrollUntilVisible:
-    element:
-      text: ".*한국어로 써라.*"
-    direction: DOWN
-    timeout: 20000
+    id: "diagnostics-preset-photos"
+# 036 — 한국어 캐릭터(quiet)는 E2SN 문장형 신호를 쓴다: "사진은 두 장이 남았다."
+- assertVisible:
+    text: ".*사진은 두 장이 남았다.*"
+# 출력 언어 줄 — 캐릭터 칩이 없어도(로스터 하나) 그 캐릭터의 출력 언어 줄이 나온다.
+- assertVisible:
+    text: ".*한국어로 써라.*"

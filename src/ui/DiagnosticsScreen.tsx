@@ -1,207 +1,203 @@
-import { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
-
-import { createAppPipeline } from "../app/wiring";
-import { currentEnvironment } from "../config/environment";
-import { CHARACTERS, type Character, type CustomNames } from "../diary/types";
-import { collectReport } from "../diagnostics/report";
-import { PRESET_LABELS } from "../diagnostics/prompt-preview";
-import type { DiagnosticReport } from "../diagnostics/types";
-import { expoPhotoPort } from "../signals/expo-port";
-import { AutoDiaryTriggerButton } from "./AutoDiaryTriggerButton";
-import { GenerationProbe } from "./GenerationProbe";
-import { PermissionPanel } from "./PermissionPanel";
-import { PromptPreviewPanel } from "./PromptPreviewPanel";
-import { SignalProbe } from "./SignalProbe";
-
 /**
- * 진단 화면 — 개발자가 실기기에서 상태를 눈으로 확인한다(FR-006, SC-002).
+ * 진단 화면 — 개발자가 실기기에서 상태를 눈으로 확인한다 (보드 `6h`, 060).
  *
- * **헌법 원칙 IV — 이 화면이 원칙을 어기기 가장 쉬운 자리다.**
- * 추론 속도 측정, 출력 점수, 모델 비교를 여기에 넣지 않는다. 이 화면은 상태를 보여줄 뿐
- * 품질을 재지 않는다.
- *
- * **헌법 원칙 III** — 모델 식별자·파라미터 수·양자화 방식을 표시하지 않는다.
- *
- * prod에서 이 화면에 도달하는 경로가 존재하지 않아야 한다(SC-013). 그 판단은 호출자인
- * App.tsx가 sinksFor()로 한다.
- *
- * 화면 디자인은 이 기능의 범위 밖이다 — 상태가 읽히면 충분하다.
- */
-/**
- * 기기에 닿는 통로. 화면이 다시 그려질 때마다 새로 만들지 않도록 밖에 둔다.
- *
- * 지연 import 하는 통로이므로 여기서 만들어도 모듈이 즉시 해석되지 않는다.
- */
-const photoPort = expoPhotoPort();
-
-/**
- * 006 — 생성 파이프라인. 화면이 다시 그려질 때마다 새로 만들지 않는다.
+ * 계약: specs/060-diagnostics-screen/contracts/diagnostics.md DS1~DS11
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **005는 여기서 `onDeviceBackend()`를 직접 만들었고, 그것이 저장이 끊긴 원인이었다.**
- * 어댑터를 손에 쥐면 파이프라인을 건너뛰게 되고, 그러면 `store.save()`가 돌지 않는다.
+ * **판정하지 않고 파이프라인을 만들지 않는다** — 값(문자열·태그)과 핸들러를 조립부(`App.tsx`의 진단 겹)에서 받아 그린다. 059
+ * `DeveloperScreen`과 같은 방식이다. 옛 화면은 모듈 최상단에서 `createAppPipeline`을 만들고 진단 안에서 일기를 돌렸는데, 그래서
+ * 「지금 한 번 써 보기」가 제품 경로와 달랐다(042). 지금은 홈의 제자리 쓰기(054)로 넘어간다(`onTryOnce`).
  *
- * 지금은 **사용자 경로와 같은 `createAppPipeline()`을 쓴다**(006 FR-010a). 진단이라는
- * 이유로 저장을 건너뛰지 않으므로, 실기기에서 저장이 실제로 도는 것을 눈으로 확인할
- * 수 있다. 추론 위치도 `select.ts`가 고른다(FR-026).
+ * **헌법 원칙 IV** — 추론 속도·출력 점수·모델 비교를 넣지 않는다. 걸린 시간 같은 측정값도 두지 않는다. **원칙 III** — 모델 이름·
+ * 파라미터 수·양자화 표기를 어디에도 두지 않는다(옛 캐릭터별 모델 줄은 보드에 없어 지웠다).
+ *
+ * 개발 환경에서만 닿는다 — 진입은 059가 두었고(개발자 화면의 「진단」 행) 배포 환경에는 행도 트리도 없다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-const generation = createAppPipeline(currentEnvironment());
 
-/**
- * 진단에서 생성을 시험할 캐릭터.
- *
- * **어느 캐릭터의 모델이 기기에 있느냐에 달렸다** — 없으면 `model-load-failed`가 나오고
- * 그것이 정상이다. 캐릭터 목록에서 준비 상태를 보고 고르는 것은 사용자 화면의 몫이며,
- * 진단은 하나를 골라 두고 눌러 보기만 한다.
- *
- * 037(헌법 1.6.0)로 로스터가 `quiet` 하나가 됐다. **`CHARACTERS[0]`으로 쓰지 않고
- * 식별자를 직접 적는다** — 목록 순서에 기대면 캐릭터가 늘 때 진단이 조용히 다른
- * 캐릭터를 시험하게 된다.
- */
-const PROBE_CHARACTER: Character = "quiet";
+import { View } from "react-native";
 
-/**
- * 035 — `characterNames`가 프롬프트 미리보기의 호칭 줄에 흐른다(FR-018). 안 주면
- * 코드 기본 이름으로 미리보기가 조립된다(옛 호출자·테스트가 안 깨지도록 옵셔널).
- */
+import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
+import type {
+  EnvironmentLines,
+  FailureLine,
+  PhotoPermissionLines,
+  ProbeCell,
+} from "../app/diagnostics-view";
+import type { PromptPreview } from "../diagnostics/types";
+import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
+import { Chevron, Group, Row, Tag, Value } from "./SettingsScreen";
+
+/** 자동 쓰기 한 번의 결과 — 진단은 스케줄 계층 타입에 닿지 않는다(DS8) */
+export type AutoRunResult = "ran" | "skipped" | "failed";
+
 export type DiagnosticsScreenProps = {
-  characterNames?: CustomNames;
+  /** 아직 읽지 못했으면 `null` — 값을 비운다 */
+  environment: EnvironmentLines | null;
+  /** 저장 점검 행 값 — 점검 전·점검하지 못함은 빈 문자열이다 */
+  storage: string;
+  onInspectStorage: () => void;
+  photo: PhotoPermissionLines | null;
+  /** 사진 읽기 행을 눌러 권한을 물을 수 있는 상태인가(`blocked`·허용 상태에서는 아니다) */
+  canRequestPhoto: boolean;
+  onRequestPhoto: () => void;
+  /** 읽기 전에는 `null` */
+  probe: readonly ProbeCell[] | null;
+  onRefreshProbe: () => void;
+  /** 프리셋 id → 미리보기 (진단 계층이 조립한 문자열) */
+  previews: Readonly<Record<string, PromptPreview>> | null;
+  onTryOnce: () => void;
+  onRunAuto: () => void;
+  autoRunning: boolean;
+  autoResult: AutoRunResult | null;
+  /** 최신이 위 */
+  failures: readonly FailureLine[];
 };
 
-export function DiagnosticsScreen({ characterNames }: DiagnosticsScreenProps = {}) {
-  const [report, setReport] = useState<DiagnosticReport | null>(null);
+const AUTO_TEXT: Readonly<Record<AutoRunResult, string>> = {
+  ran: T.autoRan,
+  skipped: T.autoSkipped,
+  failed: T.autoFailed,
+};
 
-  useEffect(() => {
-    let alive = true;
-    collectReport({ customNames: characterNames }).then((r) => {
-      if (alive) setReport(r);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [characterNames]);
-
-  if (!report) {
-    return (
-      <View style={styles.container}>
-        <Text>진단 정보를 모으는 중…</Text>
-      </View>
-    );
-  }
-
-  const environmentText = report.environment.ok
-    ? report.environment.environment
-    : `판정 실패 (${report.environment.reason}: ${String(report.environment.received)})`;
-
-  const locationText = report.inferenceLocation.ok
-    ? report.inferenceLocation.location
-    : `선택되지 않음 (${report.inferenceLocation.reason})`;
+export function DiagnosticsScreen({
+  environment,
+  storage,
+  onInspectStorage,
+  photo,
+  canRequestPhoto,
+  onRequestPhoto,
+  probe,
+  onRefreshProbe,
+  previews,
+  onTryOnce,
+  onRunAuto,
+  autoRunning,
+  autoResult,
+  failures,
+}: DiagnosticsScreenProps) {
+  const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : AUTO_TEXT[autoResult];
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Row label="환경" value={environmentText} />
-      <Row label="추론 위치" value={locationText} />
-      <Row label="모듈 상태" value={formatModuleStatus(report)} />
-      <Row label="저장 점검" value={formatStorage(report)} />
+    <View testID="diagnostics-screen">
+      <Group first label={T.env} testID="diagnostics-group-env">
+        <Row
+          label={T.build}
+          testID="diagnostics-build"
+          trailing={<Value mono text={environment?.build ?? ""} />}
+        />
+        <Row
+          label={T.device}
+          testID="diagnostics-device"
+          trailing={<Value mono text={environment?.device ?? ""} />}
+        />
+        <Row
+          label={T.inference}
+          testID="diagnostics-inference"
+          trailing={<Value mono text={environment?.inference ?? ""} />}
+        />
+      </Group>
 
-      {/*
-        014 — 캐릭터별 모델 표시 이름 (local·dev 전용, FR-017·019). `report`가 이미
-        `roster.ts`의 `displayName()`을 담아 왔으므로 여기서는 그리기만 한다 —
-        이 파일이 `roster.ts`를 직접 import하지 않는다(007 헌법 검사 유지).
-      */}
-      {CHARACTERS.map((character) => (
-        <Row key={character} label={character} value={report.characterModels[character]} />
-      ))}
+      <Group label={T.storage} testID="diagnostics-group-storage">
+        <Row
+          label={T.storage}
+          onPress={onInspectStorage}
+          testID="diagnostics-storage"
+          trailing={
+            <View testID="diagnostics-storage-value">
+              <Value text={storage} />
+            </View>
+          }
+        />
+      </Group>
 
-      {/* 022 — 입력 프롬프트 미리보기. `report`가 이미 buildPrompt()의 출력을 담아 왔다
-          (이 파일이 diary/prompt를 import하지 않는다 — 헌법 검사가 잠근다). */}
-      <PromptPreviewPanel previews={report.promptPreviews} presetLabels={PRESET_LABELS} />
+      <Group label={T.photoPerm} testID="diagnostics-group-photo">
+        <Row
+          label={T.photoRead}
+          // 요청할 수 없는 상태에서는 콜백도 넘기지 않는다 — 모양만이 아니라 동작도 막는다(058)
+          {...(canRequestPhoto ? { onPress: onRequestPhoto } : {})}
+          testID="diagnostics-photo-read"
+          trailing={
+            photo?.read != null ? (
+              <Tag kind={photo.read} testID="diagnostics-photo-read-tag" />
+            ) : undefined
+          }
+        />
+        <Row
+          label={T.photoLocation}
+          testID="diagnostics-photo-location"
+          trailing={
+            photo?.location != null ? (
+              <Tag kind={photo.location} testID="diagnostics-photo-location-tag" />
+            ) : undefined
+          }
+        />
+        <Row
+          label={T.photoScope}
+          testID="diagnostics-photo-scope"
+          trailing={
+            <Value
+              text={
+                photo?.scope === "all"
+                  ? T.scopeAll
+                  : photo?.scope === "selected"
+                    ? T.scopeSelected
+                    : ""
+              }
+            />
+          }
+        />
+      </Group>
 
-      {/* 004 — 권한 상태와 요청. 이것이 없으면 실기기에서 영원히 unknown이다 */}
-      <PermissionPanel port={photoPort} />
-      <SignalProbe port={photoPort} />
+      <Group label={T.probe} testID="diagnostics-group-probe">
+        <ProbeGrid cells={probe} />
+        <Row
+          label={T.probeRefresh}
+          onPress={onRefreshProbe}
+          testID="diagnostics-probe-refresh"
+          trailing={<Chevron />}
+        />
+      </Group>
 
-      {/* 005 — 일기가 실제로 나오는지 확인한다(quickstart D2). 이것이 없으면
-          실기기에서 생성을 눌러 볼 방법이 없다 */}
-      {/*
-        조립이 실패하면 생성 패널을 띄우지 않는다 — 환경을 모르는 채로 추론 위치를
-        고를 수 없다(FR-035). 진단 화면이므로 까닭을 그대로 보인다.
-      */}
-      {generation.ok ? (
-        <GenerationProbe pipeline={generation.pipeline} character={PROBE_CHARACTER} />
-      ) : (
-        <Text style={styles.failure}>생성 준비 실패: {generation.detail}</Text>
-      )}
+      <Group label={T.prompt} testID="diagnostics-group-prompt">
+        <PromptPreviewBox previews={previews} />
+      </Group>
 
-      {/* 020 — "지금 자동 생성 트리거"(quickstart.md §4). 경합 재현·백그라운드
-          완주 시간 측정용. `runAutoDiaryTask()`를 그대로 부른다(로직 재사용). */}
-      <AutoDiaryTriggerButton />
+      <Group label={T.gen} testID="diagnostics-group-gen">
+        <Row
+          label={T.tryOnce}
+          onPress={onTryOnce}
+          testID="diagnostics-try-once"
+          trailing={<Chevron />}
+        />
+        <Row
+          label={T.runAuto}
+          // 도는 동안은 콜백도 넘기지 않는다 — 중복 실행을 막는다
+          {...(autoRunning ? {} : { onPress: onRunAuto })}
+          testID="diagnostics-run-auto"
+          trailing={
+            <View testID="diagnostics-auto-result">
+              <Value text={autoValue} />
+            </View>
+          }
+        />
+      </Group>
 
-      {report.failures.length > 0 && (
-        <View style={styles.failures}>
-          <Text style={styles.sectionTitle}>실패</Text>
-          {report.failures.map((f, i) => (
-            <Text key={i} style={styles.failure}>
-              {f.what}: {f.reason}
-            </Text>
-          ))}
-        </View>
-      )}
-    </ScrollView>
-  );
-}
-
-function formatModuleStatus(report: DiagnosticReport): string {
-  const status = report.moduleStatus;
-  return status.kind === "loaded" ? "loaded" : `${status.kind} — ${status.reason}`;
-}
-
-/**
- * 저장 점검 결과.
- *
- * `unavailable`을 `ok`로 적지 않는다 — 돌지 못한 것은 통과가 아니다(헌법 원칙 V).
- * 시뮬레이터에서는 unavailable이 정상이고, 실기기에서 unavailable이면 문제다.
- */
-function formatStorage(report: DiagnosticReport): string {
-  const check = report.storage;
-  return check.kind === "ok" ? `ok — ${check.detail}` : `${check.kind} — ${check.reason}`;
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.row}>
-      <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value}</Text>
+      <Group label={T.failures} testID="diagnostics-group-failures">
+        {failures.length === 0 ? (
+          <Row label={T.failuresEmpty} labelTone="muted" testID="diagnostics-failures-empty" />
+        ) : (
+          failures.map((line, index) => (
+            // 위치가 키다 — 같은 갈래·같은 시각이 이어질 수 있다(035)
+            <Row
+              key={index}
+              label={line.reasonText}
+              testID={`diagnostics-failure-${index}`}
+              trailing={<Value text={line.timeText} />}
+            />
+          ))
+        )}
+      </Group>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    gap: 12,
-  },
-  row: {
-    gap: 2,
-  },
-  label: {
-    fontSize: 12,
-    opacity: 0.6,
-  },
-  value: {
-    fontSize: 16,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    opacity: 0.6,
-    marginBottom: 4,
-  },
-  failures: {
-    marginTop: 8,
-  },
-  failure: {
-    fontSize: 14,
-  },
-});

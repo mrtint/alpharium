@@ -1,12 +1,9 @@
 /**
- * 진단 리포트 — 캐릭터별 모델 표시 이름 (014 US4).
+ * 진단 리포트 (014 → 060에서 캐릭터별 모델 줄·저장 점검·모듈 상태를 걷었다).
  *
- * 계약: specs/014-character-persona/plan.md 「Constitution Check」
+ * 계약: specs/060-diagnostics-screen/contracts/diagnostics.md RP1~RP3, specs/022-prompt-preview PP4·PP9
  *
- * **`collectReport()`는 기기 없이도 안전하게 돈다** — `checkStorage()`·
- * `selectBackend()`가 기기 통로 없이 예외를 던지지 않고 `unavailable`/`failed`로
- * 떨어지도록 이미 설계돼 있다(002·001의 기존 계약). 그래서 이 파일은 순수하게
- * `characterModels` 필드만 검사한다.
+ * **`collectReport()`는 기기 없이도 안전하게 돈다** — 환경 판정·위치 선택·프롬프트 조립은 순수하다.
  */
 
 import { readFileSync } from "node:fs";
@@ -16,14 +13,20 @@ import { CHARACTERS } from "../../src/diary/types";
 import { collectReport } from "../../src/diagnostics/report";
 import { SIGNAL_PRESETS } from "../../src/diagnostics/prompt-preview";
 
-describe("014 US4 — 캐릭터별 모델 표시 이름 (FR-017)", () => {
-  it("다섯 캐릭터 전부가 characterModels에 담긴다", async () => {
+describe("060 RP1·RP2 — 진단 리포트는 화면이 읽는 것만 담는다", () => {
+  it("environment·inferenceLocation·promptPreviews뿐이다", async () => {
     const report = await collectReport();
+    expect(Object.keys(report).sort()).toEqual([
+      "environment",
+      "inferenceLocation",
+      "promptPreviews",
+    ]);
+  });
 
-    for (const character of CHARACTERS) {
-      expect(typeof report.characterModels[character]).toBe("string");
-      expect(report.characterModels[character].length).toBeGreaterThan(0);
-    }
+  it("collectReport는 파일을 쓰거나 모델 모듈을 두드리지 않는다", () => {
+    const raw = readFileSync(join(__dirname, "../../src/diagnostics/report.ts"), "utf8");
+    const src = raw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(src).not.toMatch(/checkStorage|isAvailable|characterModels|displayName/);
   });
 });
 
