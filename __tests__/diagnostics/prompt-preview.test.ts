@@ -177,7 +177,7 @@ describe("035 — 사용자 지정 이름이 미리보기의 호칭 줄에 흐�
   // 진단 탭의 프롬프트 미리보기는 파이프라인을 거치지 않으므로 `buildRequest`가
   // 직접 `customNames`를 받아야 한다. 안 그러면 사용자가 이름을 "복실이"로 바꿔도
   // 미리보기는 계속 코드 기본 이름을 보인다 — spec.md §2-3 표가 이 자리에서
-  // `너는 '복실이'이라 불린다.`를 확인하라고 못 박았다.
+  // `너는 '복실이'…` 호칭을 확인하라고 못 박았다(061에서 호칭 줄이 「'복실이'라 불리는, …」로 바뀌었다).
 
   it("customNames를 주면 그 이름이 호칭 줄에 들어간다", () => {
     const named = buildPreview("quiet", SIGNAL_PRESETS[0], { quiet: "복실이" });
@@ -185,10 +185,10 @@ describe("035 — 사용자 지정 이름이 미리보기의 호칭 줄에 흐�
 
     expect(named.ok && plain.ok).toBe(true);
     if (named.ok && plain.ok) {
-      expect(named.text).toContain("너는 '복실이'이라 불린다.");
-      expect(named.text).not.toContain("너는 '금동이'이라 불린다.");
+      expect(named.text).toContain("너는 '복실이'라 불리는,");
+      expect(named.text).not.toContain("너는 '금동이'라 불리는,");
       // 안 주면 코드 기본 이름 그대로 — 옛 동작이 안 깨진다.
-      expect(plain.text).toContain("너는 '금동이'이라 불린다.");
+      expect(plain.text).toContain("너는 '금동이'라 불리는,");
     }
   });
 
@@ -197,7 +197,7 @@ describe("035 — 사용자 지정 이름이 미리보기의 호칭 줄에 흐�
     for (const preset of SIGNAL_PRESETS) {
       const p = previews.quiet[preset.id];
       expect(p.ok).toBe(true);
-      if (p.ok) expect(p.text).toContain("너는 '복실이'이라 불린다.");
+      if (p.ok) expect(p.text).toContain("너는 '복실이'라 불리는,");
     }
   });
 
@@ -205,11 +205,11 @@ describe("035 — 사용자 지정 이름이 미리보기의 호칭 줄에 흐�
     const named = buildPreview("quiet", SIGNAL_PRESETS[0], { quiet: "복실이" });
     const plain = buildPreview("quiet", SIGNAL_PRESETS[0]);
     if (named.ok && plain.ok) {
-      // 호칭 줄 한 줄만 다르다. 036 — 한국어 캐릭터의 E2SN 머리는 호칭 + 휴대폰
+      // 호칭 줄 한 줄만 다르다. 036·061 — 한국어 캐릭터의 머리는 호칭 + 휴대폰
       // 정체가 한 줄이므로, 그 한 줄 안에서 이름만 바뀐다.
       const diff = named.text.split("\n").filter((line, i) => line !== plain.text.split("\n")[i]);
       expect(diff).toEqual([
-        "너는 '복실이'이라 불린다. 주인의 휴대폰이다. 이 글의 '나'는 휴대폰이지 주인이 아니다.",
+        "너는 '복실이'라 불리는, 주인의 휴대폰이다. 하루가 끝나면 그날 본 것으로 일기를 쓴다. 이 글의 '나'는 휴대폰이지 주인이 아니다.",
       ]);
     }
   });

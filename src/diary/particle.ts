@@ -53,3 +53,14 @@ export function particleFor(name: string): "이" | "가" {
 export function topicParticleFor(name: string): "은" | "는" {
   return hasBatchim(name) ? "은" : "는";
 }
+
+/**
+ * 이름 뒤에 붙는 인용 조사(이라/라)를 고른다(061 — 프롬프트 호칭 줄
+ * 「너는 '{이름}'{이라|라} 불리는, …」).
+ *
+ * 받침이 있으면 "이라", 없거나 판정 불가면 "라"(예외를 던지지 않는다) —
+ * 다른 두 함수가 받침 없음 쪽을 기본값으로 삼는 것과 대응한다.
+ */
+export function quoteParticleFor(name: string): "이라" | "라" {
+  return hasBatchim(name) ? "이라" : "라";
+}

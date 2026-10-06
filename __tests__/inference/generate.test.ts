@@ -358,8 +358,8 @@ describe("011 — 사진을 읽는다", () => {
     expect("text" in result).toBe(true);
     expect(prompts).toHaveLength(1);
     expect(prompts[0]).toContain("창가에 놓인 커피잔");
-    // 036 — quiet은 한국어 캐릭터라 감싼 캡션 틀("내가 N시에 담은 장면:")을 쓴다.
-    expect(prompts[0]).toMatch(/내가 \d+시에 담은 장면: /);
+    // 036·061 — quiet은 한국어 캐릭터라 감싼 캡션 틀("{때}에 담은 장면:")을 쓴다.
+    expect(prompts[0]).toMatch(/(오전|오후|저녁|밤)에 담은 장면: /);
   });
 
   // ★ 042 — 옛 이름은 「보지 않음」이면…이었다. 그 설정이 사라졌으므로(헌법 v1.7.0
@@ -377,7 +377,7 @@ describe("011 — 사진을 읽는다", () => {
 
     await backend.generate(requestFor(emptyDay("2026-08-12"), "quick"));
 
-    expect(prompts[0]).not.toMatch(/내가 \d+시에 담은 장면: /);
+    expect(prompts[0]).not.toMatch(/(오전|오후|저녁|밤)에 담은 장면: /);
     expect(prompts[0]).not.toContain("사진에 담긴 것:");
     // **사진 읽기를 아예 시작하지 않는다** — 10초를 쓰지 않는다.
     expect(opened).toEqual([]);

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { particleFor, topicParticleFor } from "../../src/diary/particle";
+import { particleFor, quoteParticleFor, topicParticleFor } from "../../src/diary/particle";
 
 /**
  * 조사 선택(이/가) 계약 테스트.
@@ -94,6 +94,23 @@ describe("topicParticleFor — '은'·'는' 둘 중 하나만 돌려준다", () 
       expect(["은", "는"]).toContain(topicParticleFor(name));
     },
   );
+});
+
+describe("quoteParticleFor — 인용 조사 이라/라 (061 프롬프트 호칭 줄)", () => {
+  it("받침이 없으면 '라'", () => {
+    expect(quoteParticleFor("금동이")).toBe("라");
+    expect(quoteParticleFor("모카")).toBe("라");
+  });
+
+  it("받침이 있으면 '이라'", () => {
+    expect(quoteParticleFor("은동")).toBe("이라");
+    expect(quoteParticleFor("민준")).toBe("이라");
+  });
+
+  it("빈 문자열·비한글은 예외 없이 '라'", () => {
+    expect(quoteParticleFor("")).toBe("라");
+    expect(quoteParticleFor("Mocha")).toBe("라");
+  });
 });
 
 describe("particle.ts — roster.ts·persona.ts·Character를 import하지 않는다 (원칙 III)", () => {
