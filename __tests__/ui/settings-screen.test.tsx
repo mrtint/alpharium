@@ -141,16 +141,19 @@ describe("055 F3·F5 — 묶음", () => {
 
   it("F3 — 묶음 머리 11/600·자간 .1em·대문자·accent, 위 14(첫 묶음 0)·아래 6", async () => {
     await render(<SettingsScreen {...props()} />);
-    const first = flat(screen.getByTestId("settings-group-character-label"));
-    const next = flat(screen.getByTestId("settings-group-diary-label"));
-    for (const style of [first, next]) {
+    const first = flat(screen.getByTestId("settings-group-character-head"));
+    const next = flat(screen.getByTestId("settings-group-diary-head"));
+    for (const id of ["settings-group-character-label", "settings-group-diary-label"]) {
+      const style = flat(screen.getByTestId(id));
       expect(style.fontSize).toBe(11);
       expect(style.fontWeight).toBe("600");
       expect(style.letterSpacing).toBeCloseTo(1.1, 5);
       expect(style.textTransform).toBe("uppercase");
       expect(style.color).toBe(COLORS.accent);
-      expect(style.marginBottom).toBe(6);
     }
+    // 묶음 머리 줄이 위·아래 여백을 가진다(오른쪽 `aside`와 한 줄을 이루므로 줄이 갖는다)
+    expect(first.marginBottom).toBe(6);
+    expect(next.marginBottom).toBe(6);
     expect(first.marginTop).toBe(0);
     expect(next.marginTop).toBe(14);
   });

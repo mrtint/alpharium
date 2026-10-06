@@ -338,7 +338,7 @@ describe("checkSourceFile — 화면이 프롬프트 조립에 닿는다 (022 FR
     expect(violations).toHaveLength(1);
   });
 
-  it("signals/expo-port는 잡지 않는다 — PermissionPanel 배선은 정당하다", () => {
+  it("signals/expo-port는 잡지 않는다 — 사진 권한 배선은 정당하다", () => {
     const violations = checkSourceFile(
       "src/ui/DiagnosticsScreen.tsx",
       'import { expoPhotoPort } from "../signals/expo-port";',
@@ -347,18 +347,18 @@ describe("checkSourceFile — 화면이 프롬프트 조립에 닿는다 (022 FR
     expect(violations).toEqual([]);
   });
 
-  it("signals/types·collect는 잡지 않는다 — 기존 화면(SignalProbe)의 정당한 사용", () => {
+  it("signals/types·collect는 잡지 않는다 — 신호를 다루는 화면의 정당한 사용", () => {
     // 051 — 예시였던 `DiaryDetailScreen.tsx`가 사라졌다(홈이 곧 상세). 신호 타입을 쓰는 실재 화면은
-    // 이제 `SignalProbe.tsx`뿐이라 두 갈래 모두 그 파일로 검사한다.
+    // 060 이후 신호 칸은 `DiagnosticsParts.tsx`가 그리므로 두 갈래 모두 그 파일로 검사한다.
     expect(
       checkSourceFile(
-        "src/ui/SignalProbe.tsx",
+        "src/ui/DiagnosticsParts.tsx",
         'import type { DaySignals } from "../signals/types";',
       ),
     ).toEqual([]);
     expect(
       checkSourceFile(
-        "src/ui/SignalProbe.tsx",
+        "src/ui/DiagnosticsParts.tsx",
         'import { collectDaySignals } from "../signals/collect";',
       ),
     ).toEqual([]);
@@ -648,5 +648,94 @@ describe("checkMonologueFile", () => {
     const violations = checkMonologueFile("src/diary/monologue.ts", readFileSync(path, "utf8"));
 
     expect(violations).toEqual([]);
+  });
+});
+
+/**
+ * 060 — 진단 화면 개편이 헌법 검사를 옮긴 자리 (CC1~CC4).
+ *
+ * 옛 `SignalProbe.tsx`를 가리키던 규칙이 새 파일 이름으로 옮겨졌는지, 옮긴 뒤에도 위반 주입을 실제로 잡는지 본다 — 규칙이 사라진 파일을
+ * 가리키면 초록불이 아무것도 검증하지 않는다(AGENTS — 조용히 실패하는 결함의 계열).
+ */
+describe("checkSourceFile — 진단 신호 칸이 축 제외 상수를 본다 (060 CC1, 012 FR-009)", () => {
+  it.each([
+    "src/app/diagnostics-view.ts",
+    "src/ui/DiagnosticsParts.tsx",
+    "src/ui/DiagnosticsScreen.tsx",
+  ])("%s가 USER_VISIBLE_SIGNAL_AXES를 쓰면 잡는다", (file) => {
+    const violations = checkSourceFile(file, "const axes = USER_VISIBLE_SIGNAL_AXES;");
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("012 FR-009");
+  });
+
+  it("사용자 화면은 그 상수를 써도 된다 — 축을 숨기는 것이 맞는 동작이다", () => {
+    expect(
+      checkSourceFile("src/ui/DiaryListScreen.tsx", "const axes = USER_VISIBLE_SIGNAL_AXES;"),
+    ).toEqual([]);
+  });
+
+  it("옛 SignalProbe.tsx 경로는 더는 규칙의 대상이 아니다 (파일이 없다)", () => {
+    expect(
+      checkSourceFile("src/ui/SignalProbe.tsx", "const axes = USER_VISIBLE_SIGNAL_AXES;"),
+    ).toEqual([]);
+  });
+});
+
+describe("checkSourceFile — 화면이 프롬프트 조립에 닿는다: 새 진단 부품 (060 CC2)", () => {
+  it.each(["src/ui/DiagnosticsParts.tsx", "src/ui/DiagnosticsScreen.tsx"])(
+    "%s가 diary/prompt를 import하면 잡는다",
+    (file) => {
+      const violations = checkSourceFile(file, 'import { buildPrompt } from "../diary/prompt";');
+      expect(violations).toHaveLength(1);
+      expect(violations[0].rule).toContain("022 FR-008");
+    },
+  );
+});
+
+describe("규칙이 가리키는 파일이 실제로 있다 (060 CC3)", () => {
+  it("constitution-rules.ts가 적은 src/ 파일 경로가 모두 존재한다", () => {
+    const root = join(__dirname, "..", "..");
+    const source = readFileSync(join(root, "scripts", "constitution-rules.ts"), "utf8");
+    // 주석을 걷어내고 문자열 리터럴만 본다 — 역사 언급(사라진 파일 이름)은 주석에만 있어야 한다.
+    const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const paths = [...code.matchAll(/"(src\/[A-Za-z0-9_/.-]+\.(?:ts|tsx))"/g)].map(
+      (m) => m[1] as string,
+    );
+    expect(paths.length).toBeGreaterThan(0);
+    const { existsSync } = jest.requireActual<typeof import("node:fs")>("node:fs");
+    expect(paths.filter((p) => !existsSync(join(root, p)))).toEqual([]);
+  });
+});
+
+describe("checkSourceFile — 쓰기 실패 기록이 화면·파이프라인에 닿는다 (060 CC4)", () => {
+  it("write-failures.ts가 src/ui를 import하면 잡는다", () => {
+    const violations = checkSourceFile(
+      "src/app/write-failures.ts",
+      'import { Foo } from "../ui/Foo";',
+    );
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("060 CC4");
+  });
+
+  it("write-failures.ts가 diary/pipeline을 import하면 잡는다", () => {
+    const violations = checkSourceFile(
+      "src/app/write-failures.ts",
+      'import type { PipelineResult } from "../diary/pipeline";',
+    );
+    expect(violations).toHaveLength(1);
+  });
+
+  it("실제 write-failures.ts는 통과한다", () => {
+    const source = readFileSync(
+      join(__dirname, "..", "..", "src", "app", "write-failures.ts"),
+      "utf8",
+    );
+    expect(checkSourceFile("src/app/write-failures.ts", source)).toEqual([]);
+  });
+
+  it("다른 src/app 파일은 이 규칙의 대상이 아니다", () => {
+    expect(checkSourceFile("src/app/wiring.ts", 'import { x } from "../diary/pipeline";')).toEqual(
+      [],
+    );
   });
 });

@@ -57,9 +57,11 @@ describe("DV11 — 개발자는 설정 위에 쌓인다", () => {
 });
 
 describe("DG2·BD3 — 진단은 한 자리에서 showsDiagnostics 로 막는다", () => {
-  it("DiagnosticsScreen 은 한 번만 쓰이고 그것을 그리는 겹이 showsDiagnostics 로 감싸여 있다", () => {
+  it("DiagnosticsLayer 는 한 번만 쓰이고 그것을 그리는 겹이 showsDiagnostics 로 감싸여 있다", () => {
+    // 060 — 값·핸들러를 만드는 조립 컴포넌트(`DiagnosticsLayer`)가 겹 안에서 한 번 그려지고, 화면(`DiagnosticsScreen`)은 그 안에서만 쓰인다.
+    expect(APP.match(/<DiagnosticsLayer/g)).toHaveLength(1);
     expect(APP.match(/<DiagnosticsScreen/g)).toHaveLength(1);
-    const at = APP.indexOf("<DiagnosticsScreen");
+    const at = APP.indexOf("<DiagnosticsLayer");
     const guard = APP.lastIndexOf("{showsDiagnostics && (", at);
     expect(guard).toBeGreaterThan(0);
     expect(APP.indexOf("</StackLayer>", at)).toBeGreaterThan(at);

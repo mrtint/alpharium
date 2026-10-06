@@ -84,3 +84,80 @@ describe("triggerFirstRunAutoDiary — mock pipeline 호출", () => {
     expect(run).toHaveBeenCalledTimes(1);
   });
 });
+
+/** 060 — 첫 실행 자동 첫 일기의 실패도 진단 「최근 실패」에 남는다 (FR-015). 기록은 던지지 않는다(WF6). */
+describe("triggerFirstRunAutoDiary — 쓰기 실패 기록 (060)", () => {
+  function memoryPort() {
+    const port = {
+      content: null as string | null,
+      read: async () => port.content,
+      write: async (serialized: string) => {
+        port.content = serialized;
+      },
+    };
+    return port;
+  }
+  const input = {
+    day: "2026-09-11",
+    now: new Date("2026-09-11T13:00:00.000Z"),
+    character: "quiet" as const,
+    vision: "quick" as const,
+  };
+
+  it("실패 결과면 주입한 failurePort에 한 줄이 쓰인다", async () => {
+    const run = jest.fn(
+      async () => ({ ok: false, stage: "storage", reason: "disk" }) as unknown as PipelineResult,
+    );
+    const failurePort = memoryPort();
+    await triggerFirstRunAutoDiary(resolved, input, { pipeline: { run }, failurePort });
+    const items = (JSON.parse(failurePort.content ?? "{}") as { items: { reason: string }[] })
+      .items;
+    expect(items.map((i) => i.reason)).toEqual(["save"]);
+  });
+
+  it("성공·already-running은 기록하지 않는다", async () => {
+    const failurePort = memoryPort();
+    await triggerFirstRunAutoDiary(resolved, input, {
+      pipeline: { run: jest.fn(async () => okResult()) },
+      failurePort,
+    });
+    await triggerFirstRunAutoDiary(resolved, input, {
+      pipeline: {
+        run: jest.fn(
+          async () =>
+            ({ ok: false, stage: "already-running", reason: "x" }) as unknown as PipelineResult,
+        ),
+      },
+      failurePort,
+    });
+    expect(failurePort.content).toBeNull();
+  });
+
+  it("run()이 던져도 기록 통로가 던져도 함수는 던지지 않는다", async () => {
+    const broken = {
+      read: () => Promise.reject(new Error("io")),
+      write: () => Promise.reject(new Error("io")),
+    };
+    await expect(
+      triggerFirstRunAutoDiary(resolved, input, {
+        pipeline: {
+          run: jest.fn(
+            async () =>
+              ({ ok: false, stage: "storage", reason: "disk" }) as unknown as PipelineResult,
+          ),
+        },
+        failurePort: broken,
+      }),
+    ).resolves.toBeUndefined();
+    await expect(
+      triggerFirstRunAutoDiary(resolved, input, {
+        pipeline: {
+          run: jest.fn(async () => {
+            throw new Error("boom");
+          }),
+        },
+        failurePort: broken,
+      }),
+    ).resolves.toBeUndefined();
+  });
+});

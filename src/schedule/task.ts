@@ -32,11 +32,17 @@ import type { DayDate } from "../config/day-boundary";
 import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { createAppPipeline } from "../app/wiring";
+import {
+  expoWriteFailurePort,
+  recordWriteFailure,
+  type WriteFailurePort,
+} from "../app/write-failures";
 import { loadSelection, expoSelectionPort } from "../app/selection-store";
 import { displayNameOf } from "../diary/character-name";
 import type { Character, CustomNames } from "../diary/types";
 import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
 import { resolveAutoWrite } from "./auto-write";
+import { manualSettings } from "./manual";
 import { decideNotify } from "./notify";
 import {
   expoNotifiedStorePort,
@@ -76,6 +82,14 @@ export type AutoDiaryTaskDeps = {
   makePipeline?: typeof createAppPipeline;
   /** 057 — 사진 권한 건너뜀 기록 통로. 주지 않으면 `preferences/auto-write-skipped.json` */
   skipPort?: SkipStorePort;
+  /**
+   * 060 — 진단의 「자동 쓰기 지금 실행」. **설정 입력 둘만 덮는다**(켜짐 → 참, 목표 시각 → 지금 시) — 시도 창과 「자동으로 쓰기」 토글을
+   * 무시하고 언제 눌러도 동작한다. 판정(`decideSchedule`·`resolveAutoWrite`·`selectableDays`)은 한 줄도 건드리지 않는다 — 이미 쓴 날·
+   * 재료 없음·사진 권한 없음·정오 규칙(049)은 그대로 따른다. 백그라운드 경로 옆에 우회로를 만들지 않으려고 입력만 바꾼다.
+   */
+  manual?: boolean;
+  /** 060 — 쓰기 실패 기록 통로. 주지 않으면 `preferences/write-failures.json` */
+  failurePort?: WriteFailurePort;
 };
 
 /**
@@ -94,7 +108,8 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
 
   try {
     const settingsPort = deps.settingsPort ?? expoAutoDiarySettingsPort();
-    const settings = await loadAutoDiarySettings(settingsPort);
+    const loaded = await loadAutoDiarySettings(settingsPort);
+    const settings = deps.manual === true ? manualSettings(loaded, now) : loaded;
 
     const resolution = deps.resolution ?? currentEnvironment();
     const makePipeline = deps.makePipeline ?? createAppPipeline;
@@ -161,12 +176,22 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       return "ran";
     }
 
+    // 060 — 쓰기 실패를 기록한다(진단 「최근 실패」). `already-running`은 기록하지 않는다(다른 쪽이 쓰는 중이다) —
+    // 그 판정은 `recordWriteFailure` 안에 있고, 기록 실패는 삼킨다. 아래 매핑보다 **앞에서** 부른다.
+    await recordWriteFailure(deps.failurePort ?? expoWriteFailurePort(), result, now);
+
     // B2-9 — 잠금 외 사유로 실패했으면 알림을 보내지 않는다(FR-005, SC-006).
     if (result.stage === "already-running") {
       return "skipped";
     }
     return "failed";
   } catch {
+    // 060 — 예상 못 한 예외도 쓰기 실패다(`unwritten`). 던지지 않는다.
+    await recordWriteFailure(
+      deps.failurePort ?? expoWriteFailurePort(),
+      { ok: false, stage: "unexpected", reason: "" },
+      now,
+    );
     return "failed";
   }
 }

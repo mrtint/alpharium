@@ -13,7 +13,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 
 import { AppText } from "./components/Text";
 import { DEVELOPER_TEXT } from "./developer-text";
@@ -61,19 +61,30 @@ export function DeveloperScreen({
       </Group>
 
       {showsDiagnostics && (
-        <Group label={DEVELOPER_TEXT.groupDiag} testID="developer-group-diag">
+        <Group
+          aside={
+            <AppText
+              style={{
+                fontSize: 10,
+                fontWeight: "600",
+                color: COLORS.textMuted,
+                fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+              }}
+              testID="developer-diag-aside"
+            >
+              {DEVELOPER_TEXT.devOnly}
+            </AppText>
+          }
+          label={DEVELOPER_TEXT.groupDiag}
+          testID="developer-group-diag"
+        >
           <Row
+            hint={DEVELOPER_TEXT.diagSummary}
+            hintMono
             label={DEVELOPER_TEXT.diag}
             {...(onOpenDiagnostics !== undefined ? { onPress: onOpenDiagnostics } : {})}
             testID="developer-diagnostics"
-            trailing={
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <AppText style={{ fontSize: 12, color: COLORS.textMuted }}>
-                  {DEVELOPER_TEXT.devOnly}
-                </AppText>
-                <Chevron />
-              </View>
-            }
+            trailing={<Chevron />}
           />
         </Group>
       )}

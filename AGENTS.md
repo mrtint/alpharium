@@ -23,9 +23,9 @@
   진행 → 작명 → 자동 첫 일기), **캐릭터 페르소나**(로스터는 검증된 하나, 037).
 - **홈 UI/UX 개편(Modernist)이 조각 단위로 진행 중이다**(049~054): 주간 스트립·날짜
   달력·쓴 날 읽기·읽기 스크롤·쓸 재료·제자리 쓰기.
-- **설정·개발자 화면 개편도 조각 단위로 진행 중이다**(055~059): 홈 위에 쌓이는 설정 틀, 매일 쓰는 시각·장소 이름 대화상자, 자동 쓰기 규칙
+- **설정·개발자 화면 개편도 조각 단위로 진행 중이다**(055~060): 홈 위에 쌓이는 설정 틀, 매일 쓰는 시각·장소 이름 대화상자, 자동 쓰기 규칙
   (재료 없는 날·사진 권한 없는 날 건너뜀, 앱을 열면 쓰는 중), 이 휴대폰(모듈 용량·일기 모두 지우기), 개발자 메뉴(버전 7번 탭·모듈 상태·모듈 다시 받기·온보딩부터
-  다시·끄기). 진단 화면 내용 개편·상태 흉내는 아직이다(분해 설계 `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`).
+  다시·끄기), 진단 화면(보드 `6h`의 일곱 묶음·한 번 써 보기·최근 쓰기 실패). 상태 흉내는 아직이다(분해 설계 `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`).
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -305,8 +305,9 @@
 
 - **프롬프트의 `DAY_STILL_OPEN`(「오늘은 아직 끝나지 않았다…」)은 헌법 원칙 II MUST**로 사진 권한과 무관하게
   실린다. **신호가 빈약한 하루에서는 이 문장이 `echo` 거부를 유발할 수 있다**(재시도로 해소; 원칙 I의 방어는 정상).
-- **사용자 화면에 보이는 신호 축은 사진·장소뿐이다**(`USER_VISIBLE_SIGNAL_AXES`). 진단 화면(`SignalProbe.tsx`)은
-  다섯 축을 다 보이고, 헌법 검사가 진단 화면이 그 상수를 참조하지 못하게 막는다.
+- **사용자 화면에 보이는 신호 축은 사진·장소뿐이다**(`USER_VISIBLE_SIGNAL_AXES`). 진단 화면(060 이후
+  `diagnostics-view.ts`가 칸을 만들고 `DiagnosticsParts.tsx`·`DiagnosticsScreen.tsx`가 그린다)은 다섯 축을 다 보이고, 헌법 검사가 그 세 파일이 그 상수를
+  참조하지 못하게 막는다.
 - **가장 위험했던 결함**: 화면이 완벽해도 파이프라인 게이트가 옛 함수(`isDayClosed`)로 남으면 조용히
   `day-not-closed`로 막힌다. 신호 수집은 사진 상한이 없다(`DEFAULT_PHOTO_LIMIT` 제거) — VLM에 넘기는 상한은 023의 8장.
 
@@ -320,8 +321,8 @@
 
 - 캐릭터→이름·소개의 유일한 통과 지점은 `src/diary/persona.ts`(`roster.ts`를 import하지 않는다, 원칙 III). 소개는
   프롬프트에 들어가지 않는다(이름만). 일기에 제목이 붙는다(`extractTitle()`, **`judge()` 통과 후에만** 분리; 판정
-  갈래는 여전히 4개, 못 떼면 `title: undefined`로 저장). 진단 화면의 모델 이름은 `displayName()`이 주고
-  `DiagnosticsScreen`은 `roster.ts`를 직접 import하지 않는다.
+  갈래는 여전히 4개, 못 떼면 `title: undefined`로 저장). 진단 화면은 모델 이름을 보이지 않는다(060이 캐릭터별
+  모델 줄을 지웠다 — 보드 `6h`에 없고 원칙 III).
 - **헌법 1.1.1의 교훈**: 소개 문구가 강점의 언어로 「상상을 섞어 쓴다」를 담으면 별도 고지가 필요 없다. 진짜 문제는
   낱말의 반복이 아니라 **같은 사실의 이중 전달**이다(053에서 권한 없음 캡션이 같은 사실을 두 번 말하는 것도 같은
   계열로 남았다). 타입이 두 곳에 독립 정의된 것(`DiaryListItem`)은 `tsc`가 잡았다.
@@ -376,8 +377,8 @@
 
 - `src/diagnostics/prompt-preview.ts`가 사람이 못 박은 `SIGNAL_PRESETS`(`empty`·`photos`, 진단 계층 `fake.ts`·`collect.ts`에서
   안 가져온다)로 **실제 `buildPrompt()`를 불러** `DiagnosticReport.promptPreviews`에 문자열로 싣는다(PP1이 바이트 동일성을
-  잠근다). 화면은 그 문자열만 받는다 — `PromptPreviewPanel.tsx`가 `diary/prompt`·`signals`를 import하지 않고 헌법 검사
-  `UI_TOUCHES_PROMPT`가 막는다(`signals/types`는 `DiaryDetailScreen` 등이 정당하게 써서 막지 않는다). 크기는 `text.length`
+  잠근다). 화면은 그 문자열만 받는다 — `DiagnosticsParts.tsx`·`DiagnosticsScreen.tsx`가 `diary/prompt`·`signals`를 import하지 않고 헌법 검사
+  `UI_TOUCHES_PROMPT`(`src/ui/` 전체)가 막는다. 크기는 `text.length`
   근사치이고 「실측 토큰 아님」 라벨이 붙는다(원칙 IV, 소스에 `token` 어휘 금지, PP6).
 - 개발자 화면의 진입점은 059가 두었다 — 설정 「정보」의 「개발자」 행(개발 환경은 처음부터, 배포는 버전 7번 탭 뒤)에서 「진단」 행으로 닿는다.
 
@@ -710,6 +711,28 @@
 - 모듈 줄의 「loaded」는 파일 준비 상태이지 메모리 적재가 아니다(어휘 어긋남, 보드 문구를 따랐다). 크기는 1000 기준.
 - 059가 지운 것: `CharacterListScreen`·`PermissionsSection`·`AuthorPicker`(와 그것만 쓰던 `CharacterPicker`·`ListRow`·`SelectRow`)·자기 테스트·`FLOWS` 밖 Maestro 흐름 일곱. 되살린 넷은 FLOWS에 등록했다.
 - **2026-10-02 dev 실기기(SM-S901N)**: 개발 환경 항상 켜짐·끄기/켜기·「이미 모두 준비돼 있어요」 토스트·온보딩 다시(배터리 단계만, `files/models` 그대로)·배포 환경(prod 번들) 7번 탭/저장/진단 없음/끄기 후 파일 삭제를 확인했다. 되살린 Maestro 넷도 `maestro test`로 직접 돌려 통과했다(실행기는 `pm clear`를 하므로 쓰지 않았다; `diary-body-screen`의 옛 「일기」 단언을 고쳤다). **미확인**: 잘린 모듈의 실제 내려받기 확인·쓰는 중의 온보딩 다시·release. 상세는 `specs/059-developer-menu/quickstart.md` 끝.
+
+### 060 — 진단 화면
+
+- **화면은 값과 핸들러만 받는다**(`DiagnosticsScreen`, 059 `DeveloperScreen`과 같은 방식) — 조립은 `App.tsx`의 `DiagnosticsLayer`이고 값은 `src/app/diagnostics-view.ts`(순수)가 문자열·태그로 옮긴다.
+  문구 정본은 `src/app/diagnostics-text.ts`다(`src/app/`이 `src/ui/`를 import하지 않는 선례 — `target-hour.ts`). 옛 `GenerationProbe`가 만들던 진단 전용 파이프라인이 없어졌다 — **진단에서 일기를 쓰는 길은
+  홈의 제자리 쓰기 하나다**(`writeRequest` 번호표 + 누른 순간의 오늘; 홈은 덮어쓰기·재료 확인 없이 시작하고 이미 쓰는 중이면 요청만 비운다 — 042 「검증 경로가 제품과 다르면 검증이 아니다」).
+- **쓰기 실패 기록은 `preferences/write-failures.json`**(`src/app/write-failures.ts`) — **이유 갈래(다섯: 모듈·사진·빈 글·저장·그 밖)와 시각뿐, 최근 10건**(D3·원칙 IV; 보드 문구 넷에 안 맞는 시간 초과·판정 거부를 넷으로 뭉치지 않으려고
+  「일기를 쓰지 못함」을 다섯째로 더했다). **파이프라인 안이 아니라 결과를 소비하는 세 곳이 부른다**(홈 `generate`의 그만두기 걸러낸 뒤·`runAutoDiaryTask`·첫 실행 자동 첫 일기) — 파이프라인 안에서 기록하면
+  그만두기와 OS 중단을 가를 수 없다. 건너뜀·`already-running`·그만두기는 기록하지 않는다. 홈은 기록 통로를 모른다(`recordFailure` prop, 조립부가 연결). 058 지우기는 이 파일을 지우지 않는다.
+- **「자동 쓰기 지금 실행」은 `runAutoDiaryTask({ manual: true })`** — 설정 입력 둘(켜짐·목표 시각)만 덮고(`src/schedule/manual.ts`) 판정 함수(`decideSchedule`·`resolveAutoWrite`·`selectableDays`)는 한 줄도 안 건드린다.
+  그 파일의 `getHours()`가 DB11(하루 기준 계산) 허용 목록에 이유와 함께 올라 있다. 이미 쓴 날·재료 없음·사진 권한 없음·정오 규칙은 그대로라 재료 없는 날에 누르면 「건너뜀」이 정상이다.
+- **저장 점검은 일기를 다시 읽어 센다**(`inspectDiaries` — `listDays`·`load`만 받는다, 목록을 못 읽으면 정상이 아니라 빈 값). 옛 점검(`checkStorage`)은 먼 과거 날짜로 파일을 쓰고 되읽는 왕복이라 지웠고 `collectReport`는
+  환경·추론 위치·프롬프트 미리보기만 모은다. 「기기 · CPU」는 `llama-port.ts`의 `GPU_LAYERS = 0` 고정에 근거한다 — 그 상수가 바뀌면 소스 계약이 깨져 문구를 같이 고치게 한다.
+- **조용히 무력해질 뻔한 것**: `DIAGNOSTICS_HIDES_AXES`가 사라진 `SignalProbe.tsx` 경로만 가리켰다 — 새 세 파일로 옮겼고 「규칙이 적은 `src/` 경로가 모두 존재한다」는 테스트(CC3)가 이를 막는다. 옛 컴포넌트를 소스로 읽던
+  042 계약(`photo-vision-always.test.ts`)도 「진단은 `pipeline.run`을 안 부르고 사진 보기는 홈 `generate`의 `vision: "quick"` 한 곳」으로 옮겼다. **테스트 파일 이름이 대상을 가리키지 않을 수 있다**
+  (`auto-diary-trigger.test.ts`는 옛 버튼이 아니라 `triggerFirstRunAutoDiary`를 잠근다) — 삭제 전에 열어 본다.
+- **★ 문구 계약 테스트가 초록이어도 모양은 보드와 다를 수 있다**(047의 교훈이 060에서 되풀이됐다) — 개발자·진단 화면이 보드 `6e`·`6h`와 달라 사용자가 지적했다. 보드 마크업을 헤드리스 크롬(`--screenshot`은 윈도우 경로로 쓴다)으로 열고 인라인 스타일의 치수를 읽어 맞춘다. 이 기기는 360dp 폭이라 보드(402)보다 모든 것이 비례해 커 보인다 — 비교는 화면 비율이 아니라 dp 치수로 한다.
+- **★ 안드로이드 14+의 글꼴 배율은 비선형이다** — 큰 글자(62·48)는 거의 안 커져 옆의 작은 글자와 어긋난다. 큰 숫자는 `useFontScale()`(`src/ui/font-scale.ts`)를 선형으로 곱하고 `allowFontScaling={false}`로 한다(홈 큰 날짜·사진 수·장소 수). jest의 `Dimensions.get("window").fontScale`로 같은 값을 읽어 테스트한다.
+- **지면 안의 작은 스크롤 상자를 두지 않는다**(안드로이드 중첩 스크롤) — 프롬프트 미리보기가 안쪽 `ScrollView`일 때 끝에서 손가락이 바깥 지면으로 넘어가 화면 전체가 흘렀고(바깥 `scrollEnabled` 잠금도 무시됨) 마지막 줄이 잘렸다. 본문을 다 펼친다(보드 `6h` ⑤의 「안에서 따로 스크롤」을 뒤집음, 소유자 확인 대상).
+- **2026-10-06 dev 실기기(SM-S901N)**: 일곱 묶음·저장 점검 「11편 · 정상」·신호 칸(숫자 칸 테두리/모름 칸 회색)·한 번 써 보기(홈 쓰는 중 → 쓴 날, 덮어쓰기 확인 없음, 토스트가 「그만두기」 바 위)·`chmod 500`으로 유도한 저장 실패 →
+  「저장하지 못함」 한 줄(그만두기는 안 늘어남)·「건너뜀」·글꼴 2.0배·`prompt-preview.yml` 통과. 같은 날 후속으로 재료 있는 날의 자동 쓰기 지금 실행(일기·알림 생성)·깨진 일기의 「읽기 실패」(「13편 · 1편 읽기 실패」)·부분 허용의 「선택한 사진만」·앱 안 백그라운드 실행의 저장 실패 기록(`save`, 시각은 실행 시작 시각)도 확인했다. **미확인**: OS가 깨운 잡 자체의 실패 기록·앱 연 직후 첫 1분에 「자동 쓰기 지금 실행」이 「사진을 읽지 못함」으로 세 번 실패한 원인(이후엔 재현 안 됨)·240ms 겹 닫힘 녹화 확인. 상세는
+  `specs/060-diagnostics-screen/quickstart.md` 끝.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

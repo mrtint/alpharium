@@ -14,6 +14,7 @@ import { routeFromNotification } from "./src/app/notification-routing";
 import type { DayDate } from "./src/config/day-boundary";
 import {
   ensureAutoDiaryTaskDefined,
+  runAutoDiaryTask,
   // 부수 효과: 전역 스코프 TaskManager.defineTask 등록 경로를 모듈에 들인다.
 } from "./src/schedule/task";
 import {
@@ -81,7 +82,7 @@ import { formatTargetHour, timeZoneLine } from "./src/app/target-hour";
 import { readDeviceClock } from "./src/app/device-clock";
 import { RenameScreen } from "./src/ui/RenameScreen";
 import { usePermissionTags } from "./src/ui/use-permission-tags";
-import type { PermissionFacts } from "./src/app/permission-tags";
+import type { PermissionFacts, PhotoLocationReading } from "./src/app/permission-tags";
 import { photoLocationProbe } from "./src/app/photo-location-probe";
 import { formatVersion } from "./src/app/version";
 import { expoDeveloperMenuStorePort } from "./src/app/developer-menu-store";
@@ -110,13 +111,35 @@ import { dayBounds, dayOf, isDayWritable, selectableDays } from "./src/config/da
 import { createAppPipeline, triggerFirstRunAutoDiary } from "./src/app/wiring";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
+import { collectReport } from "./src/diagnostics/report";
+import type { DiagnosticReport } from "./src/diagnostics/types";
+import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
+import {
+  canRequestPhoto,
+  environmentLines,
+  failureLines,
+  photoPermissionLines,
+  probeCells,
+  storageValue,
+  type FailureLine,
+  type PhotoPermissionLines,
+  type ProbeCell,
+} from "./src/app/diagnostics-view";
+import { inspectDiaries, type DiaryInspection } from "./src/app/diary-inspect";
+import {
+  expoWriteFailurePort,
+  loadWriteFailures,
+  recordWriteFailure,
+} from "./src/app/write-failures";
+import type { PermissionState } from "./src/signals/port";
+import { collectDaySignals } from "./src/signals/collect";
 import { expoFileSystemPort, fileStore } from "./src/diary/store";
 import { CHARACTERS, type Character } from "./src/diary/types";
 import { expoModelPorts } from "./src/models/expo-port";
 import { readinessOf } from "./src/models/readiness";
 import { assetFor } from "./src/models/roster";
 import { pausedFor, readState, verdictFor } from "./src/models/storage";
-import { DiagnosticsScreen } from "./src/ui/DiagnosticsScreen";
+import { DiagnosticsScreen, type AutoRunResult } from "./src/ui/DiagnosticsScreen";
 import { DiaryHomeScreen } from "./src/ui/DiaryHomeScreen";
 
 /**
@@ -171,6 +194,12 @@ export default function App() {
  * 고정 값, 원칙 V). 성공할 때까지 이 간격으로 무한 반복한다.
  */
 const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;
+
+/**
+ * 060 — 홈에서 뜨는 토스트의 바닥(dp). 쓰는 중 하단 바(「그만두기」, 높이 56 안팎) 위로 12 + 여유. 사람이 정한 값이다 —
+ * 실기기에서 바와 겹치지 않는지 본다(quickstart 5).
+ */
+const HOME_TOAST_BOTTOM = 88;
 
 function AppFrame() {
   /*
@@ -241,6 +270,25 @@ function AppFrame() {
     setDiagnosing(false);
     setRoute("settings");
   }, []);
+  /**
+   * ★ 060 — 진단의 「지금 한 번 써 보기」(보드 `6k`). 설정·개발자·진단 세 겹을 닫아 홈의 오늘로 돌아가고, 홈에 쓰기 요청을 올린다.
+   * 홈이 054 제자리 쓰기로 시작한다 — 진단이 파이프라인을 따로 돌리지 않는다(042: 검증 경로가 제품과 다르면 검증이 아니다).
+   * 요청은 번호표(`id`)다 — 홈이 시작하거나 거절하면 `onWriteRequestHandled`로 비운다.
+   */
+  const [writeRequest, setWriteRequest] = useState<{ id: number; day: DayDate } | null>(null);
+  const writeRequestId = useRef(0);
+  const showToast = toastLine.show;
+  const onDiagnosticsTryOnce = useCallback(() => {
+    goHome();
+    writeRequestId.current += 1;
+    // 「오늘」은 누른 순간의 오늘이다 — 홈은 하루 경계를 따로 계산하지 않는다(051 BAR7)
+    setWriteRequest({ id: writeRequestId.current, day: dayOf(new Date()) });
+    showToast(DIAGNOSTICS_TEXT.tryOnceToast);
+  }, [goHome, showToast]);
+  const onWriteRequestHandled = useCallback(
+    (id: number) => setWriteRequest((request) => (request?.id === id ? null : request)),
+    [],
+  );
   const openDeveloper = useCallback(() => setRoute("developer"), []);
   const openSettings = useCallback(() => setRoute((r) => (r === "settings" ? r : "settings")), []);
 
@@ -259,6 +307,8 @@ function AppFrame() {
     [],
   );
   const homeCovered = route !== "home" || layersMounted.settings || layersMounted.developer;
+  /** 060 — 홈에서 뜨는 토스트(진단에서 쓰기를 시작했어요)는 하단 바 위로, 설정·개발자의 토스트는 아래 그대로 */
+  const toastBottom = route !== "home" ? 24 : HOME_TOAST_BOTTOM;
 
   /**
    * ★ 056 — 설정 값(자동 쓰기 설정·장소 갈래)은 여기서 **앱 실행마다 한 번** 읽어 들고 있는다(FR-030, research R5).
@@ -1408,6 +1458,9 @@ function AppFrame() {
           // 058 — 일기 모두 지우기 요청. 홈이 멈춘 뒤 응답한다.
           wipeRequest={wipeRequest}
           onWipeReady={onWipeReady}
+          // 060 — 진단 「지금 한 번 써 보기」가 홈에 올리는 쓰기 요청
+          writeRequest={writeRequest}
+          onWriteRequestHandled={onWriteRequestHandled}
         />
         {/* 059 — 설정 겹은 개발자가 열린 동안에도 열려 있다(개발자가 그 위에 쌓인다, R8). 그동안 뒤로 가기는 등록하지 않는다. */}
         <StackLayer
@@ -1486,9 +1539,14 @@ function AppFrame() {
               backTestID="back-to-developer"
               onBack={closeDiagnostics}
               title={DEVELOPER_TEXT.diag}
+              titleAside={DEVELOPER_TEXT.diagTag}
             >
-              {/* 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
-              <DiagnosticsScreen characterNames={customNames} />
+              {/* 060 — 값·핸들러는 조립 컴포넌트가 만든다. 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
+              <DiagnosticsLayer
+                buildLabel={buildLabelFor({ devEnvironment: showsDiagnostics, versionText })}
+                characterNames={customNames}
+                onTryOnce={onDiagnosticsTryOnce}
+              />
             </SettingsFrame>
           </StackLayer>
         )}
@@ -1501,7 +1559,8 @@ function AppFrame() {
         )}
         {toastLine.toast !== null && (
           <DeveloperToast
-            bottom={24}
+            // 060 — 진단에서 쓰기를 시작하면 홈의 하단 바(「그만두기」)를 가리지 않게 올린다
+            bottom={toastBottom}
             key={toastLine.toast.key}
             onDismiss={toastLine.dismiss}
             text={toastLine.toast.text}
@@ -1511,6 +1570,138 @@ function AppFrame() {
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>
+  );
+}
+
+/**
+ * 진단 프롬프트 미리보기가 쓰는 캐릭터 (060). 옛 `PROBE_CHARACTER`처럼 **목록 순서에 기대지 않고 식별자를 직접 적는다** — 캐릭터가
+ * 늘 때 진단이 조용히 다른 캐릭터를 보이는 일이 없게 한다(037).
+ */
+const PREVIEW_CHARACTER: Character = "quiet";
+
+/**
+ * ★ 060 — 진단 겹의 값·핸들러를 만든다 (보드 `6h`). `DiagnosticsScreen`은 값과 핸들러만 받고 기기 통로·파이프라인을 모른다(DS8).
+ *
+ * 겹이 열릴 때(마운트) 한 번 읽는다 — 환경·사진 권한·신호·실패 기록. **화면을 열 때와 「다시 읽기」를 누를 때만 읽는다**(DS4): `AppState`·
+ * 타이머로 읽지 않는다. 저장 점검은 행을 누를 때만 읽는다. 「지금 한 번 써 보기」는 홈의 쓰기 요청이다(`onTryOnce`, 진단이 파이프라인을
+ * 돌리지 않는다). 「자동 쓰기 지금 실행」은 `runAutoDiaryTask({ manual: true })`다 — 시도 창·토글만 무시하고 재료·사진 권한 규칙은 그대로다.
+ * 늦게 온 결과는 화면이 닫힌 뒤(언마운트)에는 버린다(DS11).
+ */
+function DiagnosticsLayer({
+  buildLabel,
+  characterNames,
+  onTryOnce,
+}: {
+  buildLabel: string;
+  characterNames: CustomNames;
+  onTryOnce: () => void;
+}) {
+  const photoPort = useMemo(() => expoPhotoPort(), []);
+  const diaryStore = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
+  const failurePort = useMemo(() => expoWriteFailurePort(), []);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const [report, setReport] = useState<DiagnosticReport | null>(null);
+  useEffect(() => {
+    void collectReport({ customNames: characterNames }).then((r) => {
+      if (alive.current) setReport(r);
+    });
+  }, [characterNames]);
+
+  const [photo, setPhoto] = useState<{
+    permission: PermissionState | "unknown";
+    location: PhotoLocationReading;
+  } | null>(null);
+  const [probe, setProbe] = useState<ProbeCell[] | null>(null);
+
+  const readPhoto = useCallback(async () => {
+    const permission = await photoPort.photoPermission().catch(() => "unknown" as const);
+    const location = await photoLocationProbe(photoPort, Date.now());
+    if (alive.current) setPhoto({ permission, location });
+  }, [photoPort]);
+  const readProbe = useCallback(async () => {
+    const signals = await collectDaySignals(photoPort, dayOf(new Date()));
+    if (alive.current) setProbe(probeCells(signals));
+  }, [photoPort]);
+  useEffect(() => {
+    void readPhoto();
+    void readProbe();
+  }, [readPhoto, readProbe]);
+
+  const onRequestPhoto = useCallback(() => {
+    void photoPort
+      .requestPhotoPermission()
+      .catch(() => undefined)
+      .then(() => Promise.all([readPhoto(), readProbe()]));
+  }, [photoPort, readPhoto, readProbe]);
+
+  const [inspection, setInspection] = useState<DiaryInspection | null>(null);
+  const onInspectStorage = useCallback(() => {
+    void inspectDiaries(diaryStore).then((result) => {
+      if (alive.current) setInspection(result);
+    });
+  }, [diaryStore]);
+
+  const [failures, setFailures] = useState<FailureLine[]>([]);
+  const readFailures = useCallback(async () => {
+    const items = await loadWriteFailures(failurePort);
+    if (alive.current) setFailures(failureLines(items));
+  }, [failurePort]);
+  useEffect(() => {
+    void readFailures();
+  }, [readFailures]);
+
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoResult, setAutoResult] = useState<AutoRunResult | null>(null);
+  const onRunAuto = useCallback(() => {
+    setAutoRunning(true);
+    setAutoResult(null);
+    void runAutoDiaryTask({ manual: true })
+      .catch((): AutoRunResult => "failed")
+      .then((result) => {
+        if (!alive.current) return;
+        setAutoResult(result);
+        setAutoRunning(false);
+        void readFailures();
+      });
+  }, [readFailures]);
+
+  const photoLines: PhotoPermissionLines | null =
+    photo === null ? null : photoPermissionLines(photo);
+
+  return (
+    <DiagnosticsScreen
+      autoResult={autoResult}
+      autoRunning={autoRunning}
+      canRequestPhoto={photo !== null && canRequestPhoto(photo.permission)}
+      environment={
+        report === null
+          ? null
+          : environmentLines({
+              buildLabel,
+              androidRelease: Platform.OS === "android" ? String(Platform.constants.Release) : null,
+              inference: report.inferenceLocation.ok
+                ? { ok: true, location: report.inferenceLocation.location }
+                : { ok: false },
+            })
+      }
+      failures={failures}
+      onInspectStorage={onInspectStorage}
+      onRefreshProbe={() => void readProbe()}
+      onRequestPhoto={onRequestPhoto}
+      onRunAuto={onRunAuto}
+      onTryOnce={onTryOnce}
+      photo={photoLines}
+      previews={report === null ? null : report.promptPreviews[PREVIEW_CHARACTER]}
+      probe={probe}
+      storage={storageValue(inspection)}
+    />
   );
 }
 
@@ -1538,7 +1729,12 @@ function DiarySection({
   skipPort,
   wipeRequest,
   onWipeReady,
+  writeRequest,
+  onWriteRequestHandled,
 }: {
+  /** 060 — 진단 「지금 한 번 써 보기」가 올린 쓰기 요청. 홈이 시작하거나 거절하면 `onWriteRequestHandled`로 비운다 */
+  writeRequest?: { id: number; day: DayDate } | null;
+  onWriteRequestHandled?: (id: number) => void;
   /** 058 — 일기 모두 지우기 요청 토큰. 홈이 멈춘 뒤 `onWipeReady`로 응답한다 */
   wipeRequest?: number;
   onWipeReady?: (token: number) => void;
@@ -1582,6 +1778,13 @@ function DiarySection({
   // 화면이 다시 그려질 때마다 새로 만들지 않는다. 지연 import 하는 통로이므로
   // 여기서 만들어도 모듈이 즉시 해석되지 않는다.
   const store = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
+  // 060 — 쓰기 실패 기록(진단 「최근 실패」). 홈이 결과를 받아 부르고 기록 실패는 삼킨다.
+  const failurePort = useMemo(() => expoWriteFailurePort(), []);
+  const recordFailure = useCallback(
+    (result: { ok: boolean; stage?: string; reason?: string }) =>
+      void recordWriteFailure(failurePort, result, new Date()),
+    [failurePort],
+  );
 
   /** 저장된 선택. 아직 읽지 않았으면 null이며 그것은 「고른 적 없음」과 다르다 */
   const [stored, setStored] = useState<Character | null>(null);
@@ -1829,6 +2032,10 @@ function DiarySection({
       // 058 — 홈이 늘 그려진다(조립이 실패해도 `DiaryHomeScreen`이 실패 화면을 그린다) — 요청은 언제나 홈이 받는다.
       wipeRequest={wipeRequest}
       onWipeReady={onWipeReady}
+      // 060 — 진단의 쓰기 요청과 쓰기 실패 기록(홈은 통로를 모른다 — 조립부가 연결한다)
+      writeRequest={writeRequest}
+      onWriteRequestHandled={onWriteRequestHandled}
+      recordFailure={recordFailure}
     />
   );
 }

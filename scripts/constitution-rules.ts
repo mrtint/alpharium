@@ -184,16 +184,35 @@ const UI_TOUCHES_WELCOME =
  * 진단 경로가 사용자 화면의 축 제외 상수를 보는 것 (012, 헌법 원칙 V).
  *
  * ─────────────────────────────────────────────────────────────────────────
- * **`SignalProbe.tsx`는 다섯 축을 전부 그려야 한다**(FR-009) — 사용자 화면에서
+ * **진단 신호 칸(`diagnostics-view.ts`·`DiagnosticsParts.tsx`·`DiagnosticsScreen.tsx`)은 다섯 축을 전부 그려야 한다**(FR-009, 060) — 사용자 화면에서
  * 걸음·배터리·연결이 빠지는 것과 저장소가 값을 잊는 것은 다르다. `USER_VISIBLE_
  * SIGNAL_AXES`를 이 파일이 import하면 진단 경로도 조용히 같은 축을 숨기게 되고,
  * 그러면 개발자가 실기기에서 그 값을 다시는 볼 수 없다.
  *
  * 008이 "주석을 걷어내고 검사한다"로 세운 것과 같은 이중 방어다 — 화면 테스트
- * (`signal-probe.test.tsx`)가 런타임을, 이 검사가 소스 자체를 본다.
+ * (`diagnostics-screen.test.tsx`·`diagnostics-view.test.ts`)가 런타임을, 이 검사가 소스 자체를 본다.
  * ─────────────────────────────────────────────────────────────────────────
  */
 const DIAGNOSTICS_HIDES_AXES = /\bUSER_VISIBLE_SIGNAL_AXES\b/;
+
+/**
+ * 위 규칙이 걸리는 진단 신호 칸의 소스 (060) — 값을 만드는 자리와 그리는 자리 둘 다다. 옛 `SignalProbe.tsx`는 사라졌고,
+ * 이 규칙이 사라진 파일 이름을 가리켜 조용히 무력해지지 않게 새 파일 이름을 적는다.
+ */
+const DIAGNOSTICS_PROBE_FILES: ReadonlySet<string> = new Set([
+  "src/app/diagnostics-view.ts",
+  "src/ui/DiagnosticsParts.tsx",
+  "src/ui/DiagnosticsScreen.tsx",
+]);
+
+/**
+ * 쓰기 실패 기록이 화면·파이프라인에 닿는 것 (060 CC4, research R2).
+ *
+ * `write-failures.ts`는 순수 판정 + 통로 주입이다. 화면(`src/ui/`)을 import하면 계층이 거꾸로 서고(`target-hour.ts`의 선례),
+ * 파이프라인(`diary/pipeline`)을 import하면 「기록은 결과를 소비하는 쪽이 부른다」는 구조가 깨진다 — 파이프라인 안에서
+ * 기록하면 그만두기와 OS 중단을 가를 수 없다.
+ */
+const WRITE_FAILURES_TOUCHES = /\bfrom\s+["'][^"']*(?:\/ui\/|diary\/pipeline)[^"']*["']/;
 
 /**
  * 소스 파일 하나를 검사한다.
@@ -240,9 +259,9 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
       });
     }
 
-    // **`SignalProbe.tsx`만 검사한다.** 사용자 화면(012 당시 DiaryDetailScreen 등)은 이 상수를
+    // **진단 신호 칸 소스만 검사한다.** 사용자 화면(012 당시 DiaryDetailScreen 등)은 이 상수를
     // import해서 사용자 화면에 축을 숨기는 것이 맞는 동작이다 — 문제는 진단 경로뿐이다.
-    if (normalized === "src/ui/SignalProbe.tsx" && DIAGNOSTICS_HIDES_AXES.test(code)) {
+    if (DIAGNOSTICS_PROBE_FILES.has(normalized) && DIAGNOSTICS_HIDES_AXES.test(code)) {
       violations.push({
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
@@ -257,6 +276,15 @@ export function checkSourceFile(fileName: string, contents: string): Violation[]
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
         rule: "화면이 프롬프트 조립에 닿는다 — 진단 리포트의 문자열만 받아야 한다 (022 FR-008, 원칙 II)",
+      });
+    }
+
+    // 060 CC4 — 쓰기 실패 기록은 화면·파이프라인에 닿지 않는다.
+    if (normalized === "src/app/write-failures.ts" && WRITE_FAILURES_TOUCHES.test(code)) {
+      violations.push({
+        file: `${normalized}:${index + 1}`,
+        key: code.trim(),
+        rule: "쓰기 실패 기록이 화면·파이프라인에 닿는다 — 순수 판정 + 통로여야 한다 (060 CC4, 원칙 IV)",
       });
     }
 

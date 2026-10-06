@@ -12,7 +12,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { render, screen } from "@testing-library/react-native";
-import { StyleSheet } from "react-native";
+import { Dimensions, StyleSheet } from "react-native";
 
 import type { DayPreview } from "../../src/app/state";
 import { MaterialGrid } from "../../src/ui/MaterialGrid";
@@ -116,7 +116,11 @@ describe("053 GRID — 두 칸", () => {
     await render(<MaterialGrid preview={preview({ kind: "none" }, { kind: "none" })} />);
 
     const number = styleOf("signal-photos-number");
-    expect(number.fontSize).toBe(MATERIAL_GRID.number.fontSize);
+    // 큰 숫자는 글꼴 배율을 선형으로 곱한다(안드로이드의 비선형 배율은 큰 글자를 안 키운다 — `font-scale.ts`)
+    const scale = Dimensions.get("window").fontScale || 1;
+    expect(number.fontSize).toBeCloseTo(MATERIAL_GRID.number.fontSize * scale, 5);
+    expect(number.lineHeight).toBeCloseTo(MATERIAL_GRID.number.lineHeight * scale, 5);
+    expect(screen.getByTestId("signal-photos-number").props.allowFontScaling).toBe(false);
     expect(number.fontWeight).toBe("800");
     expect(styleOf("signal-photos-unit").fontSize).toBe(MATERIAL_GRID.unitSize);
     expect(styleOf("signal-photos-unit").fontWeight).toBe("700");

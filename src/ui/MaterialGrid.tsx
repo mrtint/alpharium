@@ -21,6 +21,7 @@ import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 import { allZero, fromCountHint } from "../app/material";
 import type { CountHint, DayPreview } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
+import { useFontScale } from "./font-scale";
 import { AppText } from "./components/Text";
 import { MATERIAL_TEXT } from "./home-text";
 import { COLORS, MATERIAL_GRID } from "./theme/tokens";
@@ -121,6 +122,7 @@ function Cell({
   second?: boolean;
   onRequest?: () => void;
 }) {
+  const scale = useFontScale();
   return (
     <View
       style={[CELL, second ? { paddingLeft: MATERIAL_GRID.secondCellPaddingLeft } : null]}
@@ -130,11 +132,19 @@ function Cell({
         {label}
       </AppText>
       {/* testID는 값에 둔다 — 라벨과 값을 한 노드로 맞추면 「사진…」처럼 섞여 읽힌다 */}
-      <View style={VALUE_ROW} testID={testID}>
+      <View
+        style={[VALUE_ROW, { minHeight: MATERIAL_GRID.number.lineHeight * scale }]}
+        testID={testID}
+      >
         {display.kind === "count" || display.kind === "zero" ? (
           <>
             <AppText
-              style={[NUMBER, display.kind === "zero" ? { color: COLORS.textMuted } : null]}
+              allowFontScaling={false}
+              style={[
+                NUMBER,
+                scaledNumeral(scale),
+                display.kind === "zero" ? { color: COLORS.textMuted } : null,
+              ]}
               testID={`${testID}-number`}
             >
               {display.kind === "count" ? String(display.count) : "0"}
@@ -195,6 +205,13 @@ const VALUE_ROW: ViewStyle = {
   gap: 4,
   minHeight: MATERIAL_GRID.number.lineHeight,
 };
+
+/** 큰 숫자에 글꼴 배율을 곱한다(선형 — `font-scale.ts`) */
+const scaledNumeral = (scale: number): TextStyle => ({
+  fontSize: MATERIAL_GRID.number.fontSize * scale,
+  lineHeight: MATERIAL_GRID.number.lineHeight * scale,
+  letterSpacing: MATERIAL_GRID.number.letterSpacing * scale,
+});
 
 const NUMBER: TextStyle = {
   fontSize: MATERIAL_GRID.number.fontSize,

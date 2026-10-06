@@ -201,31 +201,44 @@ export function SettingsScreen({
 export function Group({
   label,
   first,
+  aside,
   children,
   testID,
 }: {
   label: string;
   first?: boolean;
+  /** 060 후속 — 묶음 머리 오른쪽(보드 `6e`의 「개발 빌드만」, `6h`의 「다시 읽기」). 머리와 같은 줄 밑선에 맞춘다 */
+  aside?: ReactNode;
   children: ReactNode;
   testID?: string;
 }) {
   return (
     <View testID={testID}>
-      <AppText
-        accessibilityRole="header"
+      <View
         style={{
-          fontSize: group.fontSize,
-          fontWeight: group.fontWeight,
-          letterSpacing: group.fontSize * group.letterSpacingEm,
-          textTransform: "uppercase",
-          color: COLORS.accent,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "baseline",
           marginTop: first ? 0 : group.marginTop,
           marginBottom: group.marginBottom,
         }}
-        testID={testID === undefined ? undefined : `${testID}-label`}
+        testID={testID === undefined ? undefined : `${testID}-head`}
       >
-        {label}
-      </AppText>
+        <AppText
+          accessibilityRole="header"
+          style={{
+            fontSize: group.fontSize,
+            fontWeight: group.fontWeight,
+            letterSpacing: group.fontSize * group.letterSpacingEm,
+            textTransform: "uppercase",
+            color: COLORS.accent,
+          }}
+          testID={testID === undefined ? undefined : `${testID}-label`}
+        >
+          {label}
+        </AppText>
+        {aside}
+      </View>
       {children}
     </View>
   );
@@ -237,6 +250,7 @@ export function Row({
   highlight = false,
   hint,
   hintTone = "muted",
+  hintMono = false,
   trailing,
   onPress,
   disabled = false,
@@ -250,6 +264,8 @@ export function Row({
   hint?: string;
   /** 057 — 건너뜀 보조 줄은 빨강(보드 `6g` `accent-700` = `COLORS.danger`) */
   hintTone?: "muted" | "danger";
+  /** 060 후속 — 보조 줄이 고정폭 11이다(보드 `6e` 「진단」 행의 「환경 · 저장 · …」) */
+  hintMono?: boolean;
   trailing?: ReactNode;
   onPress?: () => void;
   /**
@@ -288,7 +304,9 @@ export function Row({
           {label}
         </AppText>
         {hint !== undefined && (
-          <AppText style={hintTone === "danger" ? HINT_DANGER : HINT}>{hint}</AppText>
+          <AppText style={hintMono ? HINT_MONO : hintTone === "danger" ? HINT_DANGER : HINT}>
+            {hint}
+          </AppText>
         )}
       </View>
       {trailing}
@@ -354,7 +372,7 @@ function PermissionTrailing({ tag: kind, testID }: { tag: PermissionTag; testID:
 }
 
 /** 꼬리표 — 허용됨(회색 면) · 일부 허용(회색 테두리) · 허용 안 함(빨강 테두리). 보드 `6c` ④ */
-function Tag({ kind, testID }: { kind: Exclude<PermissionTag, "unread">; testID: string }) {
+export function Tag({ kind, testID }: { kind: Exclude<PermissionTag, "unread">; testID: string }) {
   const text =
     kind === "allowed"
       ? SETTINGS_TEXT.permAllowed
@@ -470,6 +488,14 @@ const VALUE: TextStyle = {
 };
 const VALUE_MONO: TextStyle = {
   ...VALUE,
+  // 보드 `6e`·`6h`: 고정폭 값은 13(일반 값 15보다 작다)
+  fontSize: 13,
+  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+};
+const HINT_MONO: TextStyle = {
+  fontSize: 11,
+  lineHeight: 11 * row.hintLineHeightRatio,
+  color: COLORS.textMuted,
   fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
 };
 const HINT: TextStyle = {

@@ -58,7 +58,7 @@ import {
   type DiaryListItem,
 } from "../app/state";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
-import { TOAST_TEXT, type ToastKind } from "../app/failure-toast";
+import { TOAST_TEXT, type PipelineFailure, type ToastKind } from "../app/failure-toast";
 import { paperFor, type LoadedEntry } from "../app/written-day";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
@@ -219,6 +219,18 @@ export type DiaryHomeScreenProps = {
    */
   wipeRequest?: number;
   onWipeReady?: (token: number) => void;
+  /**
+   * 060 — 진단 「지금 한 번 써 보기」가 올린 쓰기 요청(번호표 + 누른 순간의 오늘). 덮여 있지 않고 대화상자가 없으면 **그 날을 054 제자리 쓰기로 시작한다** —
+   * 오늘 일기가 이미 있어도 덮어쓰기 확인(050)·재료 확인(053)을 거치지 않는다(보드 `6k`). 이미 쓰는 중이면 시작하지 않고 요청만 비운다.
+   * 시작하거나 거절하면 `onWriteRequestHandled(id)`를 부른다. 같은 번호는 한 번만 처리한다.
+   */
+  writeRequest?: { id: number; day: DayDate } | null;
+  onWriteRequestHandled?: (id: number) => void;
+  /**
+   * 060 — 쓰기가 실패하면(그만두기는 제외) 그 결과로 부른다. **홈은 기록 통로를 모른다** — 조립부가 `recordWriteFailure`를 연결한다
+   * (진단 「최근 실패」). 성공·그만두기에는 부르지 않는다.
+   */
+  recordFailure?: (result: PipelineFailure) => void;
 };
 
 /**
@@ -275,6 +287,9 @@ export function DiaryHomeScreen({
   claimAutoWrite,
   wipeRequest,
   onWipeReady,
+  writeRequest,
+  onWriteRequestHandled,
+  recordFailure,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -741,6 +756,9 @@ export function DiaryHomeScreen({
 
         if (cancelled.current) return;
 
+        // 060 — 쓰기 실패를 기록한다(그만두기는 위에서 걸렀다 — 실패가 아니다). 기록은 던지지 않는다.
+        if (!result.ok) recordFailure?.(result);
+
         // 029 — 생성이 성공했으면 실제로 쓴 캐릭터를 기록한다(FR-008a). 옮겨졌으면
         // 옮겨진 쪽(params.character). 실패면 부르지 않는다(원칙 I).
         if (result.ok) onGenerated?.(params.character);
@@ -763,7 +781,7 @@ export function DiaryHomeScreen({
     },
     // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
     // 생성·독백이 돈다(조용히 틀리는 결함).
-    [pipeline, now, onGenerated, characterNames, refresh],
+    [pipeline, now, onGenerated, characterNames, refresh, recordFailure],
   );
 
   /**
@@ -864,6 +882,53 @@ export function DiaryHomeScreen({
   }, [
     autoWriteDay,
     claimAutoWrite,
+    screen,
+    covered,
+    materialConfirm,
+    calendarOpen,
+    settingsPromptOpen,
+    resolve,
+    setChosenDay,
+    generate,
+  ]);
+
+  /**
+   * 060 — 진단 「지금 한 번 써 보기」의 쓰기 요청 (contracts HR1~HR9, research R4).
+   *
+   * 057 앱 열기 자동 쓰기와 **같은 시작 조건**(목록을 읽었고, 덮이지 않았고, 대화상자·판정이 없다)에서 오늘을 쓴다. 다른 점: (1) 한 실행에
+   * 한 번이 아니라 요청마다 한 번이고(번호표를 기억한다), (2) 오늘 일기가 이미 있어도 덮어쓴다 — 덮어쓰기 확인·재료 확인을 거치지 않는다
+   * (보드 `6k`), (3) 이미 쓰는 중이면 시작하지 않고 요청만 비운다. 덮인 동안(닫히는 240ms 포함)에는 기다린다.
+   */
+  const handledWriteRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (writeRequest == null || handledWriteRequest.current === writeRequest.id) return;
+    if (covered) return;
+    const id = writeRequest.id;
+    if (running.current || screen.kind === "writing") {
+      handledWriteRequest.current = id;
+      onWriteRequestHandled?.(id);
+      return;
+    }
+    if (!listRead.current || screen.kind !== "list") return;
+    if (materialConfirm !== null || calendarOpen || settingsPromptOpen || deciding.current) return;
+
+    const day = writeRequest.day;
+    const outcome = resolve(day);
+    handledWriteRequest.current = id;
+    const items = screen.items;
+    // 상태 바꿈은 effect 본문이 아니라 다음 차례에 한다(react-hooks/set-state-in-effect).
+    void Promise.resolve().then(() => {
+      onWriteRequestHandled?.(id);
+      if (outcome.kind === "no-ready-character") {
+        setScreen(toFailed("일기 작성자를 준비해야 한다"));
+        return undefined;
+      }
+      setChosenDay(day);
+      return generate({ ...outcome.params, day }, items);
+    });
+  }, [
+    writeRequest,
+    onWriteRequestHandled,
     screen,
     covered,
     materialConfirm,

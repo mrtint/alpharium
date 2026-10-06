@@ -105,14 +105,15 @@ describe("C3 — 사진 설정으로 캡션을 거르는 분기가 없다", () =
     expect(TASK).not.toMatch(/"none"/);
   });
 
-  it("개발자 진단 화면에 사진 설정 인자가 없다 (FR-004a)", () => {
-    const PROBE = codeOf("src/ui/GenerationProbe.tsx");
-    const start = PROBE.indexOf("export type GenerationProbeProps");
-    const declaration = PROBE.slice(start, PROBE.indexOf("};", start));
-
-    // 슬라이스가 실제로 그 선언인지 함께 확인한다(008의 교훈).
-    expect(declaration).toContain("pipeline: Pipeline");
-    expect(declaration).not.toMatch(/vision/);
+  it("개발자 진단 화면에 사진 설정 인자가 없고 파이프라인을 직접 돌리지 않는다 (FR-004a, 060)", () => {
+    // 060 — 옛 `GenerationProbe`(자체 파이프라인)가 사라졌다. 「지금 한 번 써 보기」는 홈의 제자리 쓰기로 넘어가 제품과 같은 경로다
+    // (042: 검증 경로가 제품과 다르면 그 검증은 제품을 재현하지 못한다) — 사진 보기는 홈 `generate`의 `vision: "quick"` 한 곳이다.
+    for (const file of ["src/ui/DiagnosticsScreen.tsx", "src/ui/DiagnosticsParts.tsx"]) {
+      const code = codeOf(file);
+      expect(code).not.toMatch(/vision(?:Setting|Preference)|VisionSetting/);
+      expect(code).not.toMatch(/pipeline\.run|createAppPipeline/);
+    }
+    expect(codeOf("src/ui/DiaryHomeScreen.tsx")).toMatch(/vision: "quick"/);
   });
 });
 
