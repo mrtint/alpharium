@@ -171,6 +171,17 @@ describe("055 F4·C1 — 행과 이름", () => {
     expect(flat(screen.getByTestId("settings-perm-battery")).minHeight).toBe(56);
   });
 
+  it("F4 — 줄 바꿈을 허용한 행도 내용이 행 높이의 가운데에 선다(alignContent center, 보드 `align-items:center`)", async () => {
+    // 2026-10-06 실기기 — `flexWrap`이 있으면 Yoga가 줄 묶음을 `alignContent`(RN 기본 flex-start)로 놓는다.
+    // 그래서 `alignItems: "center"`는 줄 안에서만 가운데이고 줄 자체가 행 위쪽에 붙어 여분이 모두 구분선 위(아래쪽)로 갔다.
+    await render(<SettingsScreen {...props()} />);
+    for (const id of ["settings-name", "settings-perm-battery"]) {
+      const row = flat(screen.getByTestId(id));
+      expect(row.alignItems).toBe("center");
+      expect(row.alignContent).toBe("center");
+    }
+  });
+
   it("F4 — 라벨 15/600 본문색, 값 15 보조색 고정폭 숫자, › 18 neutral-500, 보조 줄 12·줄높이 1.35", async () => {
     await render(<SettingsScreen {...props()} />);
     const label = flat(screen.getByText("이름"));

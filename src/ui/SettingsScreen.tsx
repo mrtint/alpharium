@@ -282,6 +282,9 @@ export function Row({
     justifyContent: "space-between",
     // 053 교훈 — 글꼴 2.0배에서 라벨과 값이 한 줄에 안 들어가면 줄을 바꾸되 자르지 않는다.
     flexWrap: "wrap",
+    // ★ 줄 바꿈을 허용하면 Yoga가 줄 묶음을 `alignContent`(RN 기본 flex-start)로 놓는다 — 없으면 줄이 행 위쪽에 붙어
+    // 최소 높이의 여분이 모두 아래로 가고 구분선이 다음 행 글자에 붙어 보였다(2026-10-06 실기기). 글꼴이 커져 두 줄이 되어도 함께 가운데다.
+    alignContent: "center",
     gap: row.gap,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
