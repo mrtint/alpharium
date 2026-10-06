@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import {
   checkEnvFile,
+  checkI18nFile,
   checkMonologueFile,
   checkPhotoPortFile,
   checkSeedFile,
@@ -737,5 +738,102 @@ describe("checkSourceFile — 쓰기 실패 기록이 화면·파이프라인에
     expect(checkSourceFile("src/app/wiring.ts", 'import { x } from "../diary/pipeline";')).toEqual(
       [],
     );
+  });
+});
+
+describe("checkI18nFile — 화면 문구 카탈로그의 경계 (062 B1·B2·K5·K6·D4)", () => {
+  const root = join(__dirname, "..", "..");
+
+  it("B1 — 화면 파일의 한글 문자열·JSX 텍스트는 위반이다", () => {
+    expect(checkI18nFile("src/ui/X.tsx", 'const a = "설정";')).toHaveLength(1);
+    expect(checkI18nFile("src/ui/X.tsx", "  <AppText>설정</AppText>")).toHaveLength(1);
+    expect(checkI18nFile("App.tsx", "<AppText>읽는 중…</AppText>")).toHaveLength(1);
+  });
+
+  it("B1 — 주석의 한글·카탈로그·허용 목록 파일은 통과한다", () => {
+    expect(
+      checkI18nFile("src/ui/X.tsx", "// 설정 화면\n/* 주석\n 둘째 줄 */\nconst a = 1;"),
+    ).toEqual([]);
+    expect(checkI18nFile("src/i18n/catalogs/ko/home.ts", 'export const a = "설정";')).toEqual([]);
+    expect(checkI18nFile("src/diary/prompt.ts", 'const a = "모른다";')).toEqual([]);
+  });
+
+  it("B1 — 줄 번호가 블록 주석 뒤에도 맞다", () => {
+    const [v] = checkI18nFile("src/ui/X.tsx", '/*\n\n*/\nconst a = "설정";');
+    expect(v?.file).toBe("src/ui/X.tsx:4");
+  });
+
+  it("K5 — 카탈로그가 판정 계층을 값으로 import하면 위반, 타입·particle은 통과", () => {
+    expect(
+      checkI18nFile("src/i18n/catalogs/ko/x.ts", 'import { decide } from "../../../app/material";'),
+    ).toHaveLength(1);
+    expect(
+      checkI18nFile(
+        "src/i18n/catalogs/ko/x.ts",
+        'import type { DayDate } from "../../../config/x";',
+      ),
+    ).toEqual([]);
+    expect(
+      checkI18nFile(
+        "src/i18n/catalogs/ko/x.ts",
+        'import type { X } from "../../../inference/types";',
+      ),
+    ).toEqual([]);
+    expect(
+      checkI18nFile(
+        "src/i18n/catalogs/ko/x.ts",
+        'import { particleFor } from "../../../diary/particle";',
+      ),
+    ).toEqual([]);
+  });
+
+  it("K6 — 화면 문구를 만드는 자리가 particle을 import하면 위반", () => {
+    for (const file of [
+      "src/ui/X.tsx",
+      "src/app/x.ts",
+      "src/schedule/x.ts",
+      "src/onboarding/x.ts",
+      "App.tsx",
+    ]) {
+      expect(checkI18nFile(file, 'import { particleFor } from "../diary/particle";')).toHaveLength(
+        1,
+      );
+    }
+    expect(
+      checkI18nFile("src/diary/prompt.ts", 'import { quoteParticleFor } from "./particle";'),
+    ).toEqual([]);
+  });
+
+  it("D4 — expo-localization은 locale-port.ts만", () => {
+    expect(
+      checkI18nFile("src/app/x.ts", 'import { getLocales } from "expo-localization";'),
+    ).toHaveLength(1);
+    expect(checkI18nFile("src/i18n/locale-port.ts", 'require("expo-localization")')).toEqual([]);
+  });
+
+  it("B2 — 모델 입력·생성 경로는 src/i18n을 import하지 않는다", () => {
+    for (const file of [
+      "src/diary/prompt.ts",
+      "src/diary/pipeline.ts",
+      "src/inference/x.ts",
+      "src/signals/x.ts",
+      "src/vision/x.ts",
+    ]) {
+      expect(checkI18nFile(file, 'import { text } from "../i18n/current";')).toHaveLength(1);
+    }
+  });
+
+  it("실제 저장소의 src/와 App.tsx는 통과한다", () => {
+    const files: string[] = ["App.tsx"];
+    const walk = (dir: string) => {
+      for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
+        const child = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) walk(child);
+        else if (/\.tsx?$/.test(entry.name)) files.push(child);
+      }
+    };
+    walk("src");
+    const violations = files.flatMap((f) => checkI18nFile(f, readFileSync(join(root, f), "utf8")));
+    expect(violations).toEqual([]);
   });
 });

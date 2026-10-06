@@ -89,6 +89,7 @@ import {
   WRITING,
   WRITTEN_DAY,
 } from "./theme/tokens";
+import { text } from "../i18n/current";
 import { SETTINGS_TEXT } from "./settings-text";
 import { MaterialGrid, type PreviewState } from "./MaterialGrid";
 import { FailureToast } from "./FailureToast";
@@ -757,7 +758,9 @@ function WriteBar({ onWrite }: { onWrite: () => void }) {
       style={[BAR, { backgroundColor: COLORS.accent }]}
       testID="write-button"
     >
-      <AppText style={[BAR_TEXT, { color: COLORS.accentForeground }]}>일기 쓰기</AppText>
+      <AppText style={[BAR_TEXT, { color: COLORS.accentForeground }]}>
+        {text().home.writeButton}
+      </AppText>
     </Pressable>
   );
 }

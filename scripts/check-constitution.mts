@@ -17,6 +17,7 @@ import { join } from "node:path";
 import {
   checkEnvFile,
   checkFirstRunFile,
+  checkI18nFile,
   checkMonologueFile,
   checkOnboardingFile,
   checkPhotoPortFile,
@@ -86,6 +87,8 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 040 — 첫 실행 조율 계층이 로스터·프롬프트·판정·시간 지표에 닿지 못하게.
       // checkFirstRunFile이 경로로 대상(src/firstrun/)을 정한다.
       violations.push(...checkFirstRunFile(child, contents));
+      // 062 — 화면 문구는 카탈로그에만, 카탈로그는 판정 계층을 모르고, 모델 입력은 화면 언어를 모른다.
+      violations.push(...checkI18nFile(child, contents));
     }
   }
 
@@ -120,7 +123,13 @@ function checkSeedFiles(root: string, relative = "scripts"): Violation[] {
 
 /** 저장소를 훑는다. 설정과 소스와 심는 도구를 본다. */
 function checkRepository(root: string): Violation[] {
-  return [...checkEnvFiles(root), ...checkSourceFiles(root), ...checkSeedFiles(root)];
+  return [
+    ...checkEnvFiles(root),
+    ...checkSourceFiles(root),
+    ...checkSeedFiles(root),
+    // 062 — 앱 루트 조립 파일도 화면 문구를 그린다(B1·K6·D4)
+    ...checkI18nFile("App.tsx", readFileSync(join(root, "App.tsx"), "utf8")),
+  ];
 }
 
 const violations = checkRepository(process.cwd());

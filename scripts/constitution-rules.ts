@@ -203,6 +203,8 @@ const DIAGNOSTICS_PROBE_FILES: ReadonlySet<string> = new Set([
   "src/app/diagnostics-view.ts",
   "src/ui/DiagnosticsParts.tsx",
   "src/ui/DiagnosticsScreen.tsx",
+  // 062 — 진단 문구가 옮겨 간 카탈로그도 축을 숨기면 안 된다
+  "src/i18n/catalogs/ko/diagnostics.ts",
 ]);
 
 /**
@@ -529,10 +531,18 @@ const MONOLOGUE_TOUCHES_ROSTER =
  * 016이 조사 선택을 별도 파일로 뺐지만, `monologue.ts`가 그 파일을
  * import해 쓰는 이상 같은 격리(원칙 III)를 지켜야 한다 — 대상에서 빠지면
  * `particle.ts`를 거쳐 로스터에 닿는 우회로가 생긴다.
+ *
+ * **062 — 혼잣말 후보가 옮겨 간 언어별 카탈로그 파일(`src/i18n/catalogs/<언어>/monologue.ts`)도 대상이다.** 대상에서 빠지면 문구 자리가
+ * 바뀌었다는 이유만으로 격리가 조용히 풀린다(060 `DIAGNOSTICS_HIDES_AXES` 교훈).
  */
 export function checkMonologueFile(fileName: string, contents: string): Violation[] {
   const normalized = fileName.split("\\").join("/");
-  if (normalized !== "src/diary/monologue.ts" && normalized !== "src/diary/particle.ts") {
+  const isCatalogMonologue = /^src\/i18n\/catalogs\/[^/]+\/monologue\.ts$/.test(normalized);
+  if (
+    normalized !== "src/diary/monologue.ts" &&
+    normalized !== "src/diary/particle.ts" &&
+    !isCatalogMonologue
+  ) {
     return [];
   }
 
@@ -892,6 +902,125 @@ export function checkFirstRunFile(fileName: string, contents: string): Violation
         key: code.trim(),
         rule: "첫 실행 조율 계층이 로스터·프롬프트·판정에 닿거나 파이프라인을 직접 실행한다 (040 G7, 원칙 III)",
       });
+    }
+  }
+
+  return violations;
+}
+
+/* ─────────────────────── 화면 문구 카탈로그 검사 (062) ─────────────────────── */
+
+/**
+ * 한글이 남아 있어도 되는 카탈로그 밖 파일과 그 이유 (062 B1, research R5·R6).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * **화면에 보이는 한글 문구는 `src/i18n/catalogs/` 안에만 있다**(FR-013) — 그래야 언어 하나를 더하는 일이 카탈로그 하나로 끝난다.
+ * 여기 적힌 파일은 **화면 문구가 아닌 한글**만 갖는다. 모델 입력(061 바이트 확정안·신호 까닭·프롬프트 호칭)은 화면 언어와 무관하게
+ * 그대로여야 하고(FR-015·FR-016), 내부 이유 문자열은 화면에 그려지지 않는다(B3 — `__tests__/i18n/boundaries.test.ts`가 잠근다).
+ *
+ * **파일 단위다** — 이 파일들에 화면 문구가 새로 생기는 것은 이 검사로 못 잡는다. 그래서 B3가 「화면이 이 값을 읽지 않는다」를 따로 본다.
+ * 경로가 사라지면 조용히 무력해지므로 경로가 모두 있는지 테스트가 확인한다(060 CC3 교훈).
+ * ─────────────────────────────────────────────────────────────────────────
+ */
+export const SCREEN_TEXT_ALLOWLIST: Readonly<Record<string, string>> = {
+  "src/diary/prompt.ts": "모델 입력 — 061 바이트 확정안(my-ollama 실측)",
+  "src/diary/particle.ts": "한국어 문법 규칙 — 프롬프트 호칭 줄과 한국어 카탈로그가 함께 쓴다",
+  "src/diary/acceptance.ts":
+    "모델 출력 판정(언어·지시 어미 정규식) — 일기 출력 언어의 규칙이지 화면 문구가 아니다(005·061)",
+  "src/diary/persona.ts": "캐릭터 이름(프롬프트 호칭)·소개(화면이 읽지 않음, research R6)",
+  "src/signals/collect.ts":
+    "신호의 「모른다」 까닭 — 프롬프트에 「사진은 모른다. {까닭}.」으로 들어간다",
+  "src/signals/fake.ts": "테스트·개발용 신호 — 까닭은 모델 입력 모양",
+  "src/diagnostics/prompt-preview.ts":
+    "프리셋 신호의 까닭 — 실제 buildPrompt()에 들어간다(022 PP1)",
+  "src/welcome/liveness.ts": "LIVENESS_INPUT — 모델에게 보내는 말",
+  "src/diary/pipeline.ts": "중단 detail — 내부 값, 화면은 갈래만 본다(B3)",
+  "src/inference/on-device.ts": "추론 실패 reason — 내부 값(B3)",
+  "src/inference/desktop-server.ts": "추론 실패 reason — 내부 값(B3)",
+  "src/inference/select.ts": "추론 위치 선택 실패 detail — 내부 값(B3)",
+  "src/app/wiring.ts": "조립 실패 detail — 내부 값(B3)",
+  "src/models/readiness.ts": "모델 파일 준비 상태 reason — 내부 값(B3)",
+  "src/models/acquisition.ts": "내려받기 실패 reason — 내부 값, 화면은 갈래만 본다(B3)",
+  "src/vision/readiness.ts": "사진 모델 준비 상태 reason — 내부 값(B3)",
+  "src/vision/acquisition.ts": "내려받기 실패 reason — 내부 값, 화면은 갈래만 본다(B3)",
+};
+
+/** 주석을 걷는다. 줄 번호가 어긋나지 않게 블록 주석은 줄바꿈만 남긴다 */
+function stripCommentsKeepingLines(contents: string): string {
+  return contents
+    .replace(/\/\*[\s\S]*?\*\//g, (block) => block.replace(/[^\n]/g, ""))
+    .replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+}
+
+const HANGUL = /[가-힣]/;
+
+/** 카탈로그가 값으로 import하면 안 되는 계층 — 말만 알고 판정하지 않는다(K5). `diary/particle`만 예외 */
+const I18N_VALUE_IMPORT_FORBIDDEN =
+  /^\s*import\s+(?!type\b)[^;]*from\s+["'][^"']*(?:diary\/(?!particle["'])|signals\/|inference\/|models\/|vision\/|schedule\/|\/ui\/|\/app\/)[^"']*["']/;
+
+/** 화면 문구를 만드는 자리가 한국어 문법 규칙을 직접 부르는 것(K6, FR-005) */
+const TOUCHES_PARTICLE = /from\s+["'][^"']*\/particle["']/;
+
+/** 기기 언어 감지 모듈 — `src/i18n/locale-port.ts`만 만진다(D4) */
+const TOUCHES_LOCALIZATION = /["']expo-localization["']/;
+
+/** 화면 언어가 모델 입력·생성 경로로 새는 것(B2, FR-016) */
+const TOUCHES_I18N = /from\s+["'][^"']*\/i18n\//;
+
+function isUnder(file: string, ...dirs: string[]): boolean {
+  return dirs.some((dir) => file.startsWith(dir));
+}
+
+/**
+ * 화면 문구 카탈로그의 경계를 검사한다 (062 contracts B1·B2·K5·K6·D4). `src/` 아래 파일과 `App.tsx`가 대상이다.
+ */
+export function checkI18nFile(fileName: string, contents: string): Violation[] {
+  const file = fileName.split("\\").join("/");
+  const code = stripCommentsKeepingLines(contents);
+  const violations: Violation[] = [];
+  const push = (index: number, key: string, rule: string) =>
+    violations.push({ file: `${file}:${index + 1}`, key: key.trim(), rule });
+
+  const inCatalog = file.startsWith("src/i18n/catalogs/");
+  const allowed = file in SCREEN_TEXT_ALLOWLIST;
+  const screenWriter =
+    file === "App.tsx" || isUnder(file, "src/ui/", "src/app/", "src/schedule/", "src/onboarding/");
+  const modelPath =
+    file === "src/diary/prompt.ts" ||
+    file === "src/diary/pipeline.ts" ||
+    isUnder(file, "src/inference/", "src/signals/", "src/vision/");
+
+  for (const [index, line] of code.split(/\r?\n/).entries()) {
+    if (!inCatalog && !allowed && HANGUL.test(line)) {
+      push(
+        index,
+        line,
+        "화면 문구가 카탈로그 밖에 있다 — src/i18n/catalogs/에 두고 text()로 읽는다 (062 FR-013, B1)",
+      );
+    }
+    if (file.startsWith("src/i18n/") && I18N_VALUE_IMPORT_FORBIDDEN.test(line)) {
+      push(
+        index,
+        line,
+        "카탈로그 계층이 판정 계층을 값으로 import한다 — 말만 알고 판정하지 않는다 (062 K5)",
+      );
+    }
+    if (screenWriter && TOUCHES_PARTICLE.test(line)) {
+      push(
+        index,
+        line,
+        "화면 문구를 만드는 자리가 조사 규칙을 직접 부른다 — 한국어 카탈로그를 거친다 (062 FR-005, K6)",
+      );
+    }
+    if (file !== "src/i18n/locale-port.ts" && TOUCHES_LOCALIZATION.test(line)) {
+      push(index, line, "기기 언어 감지 모듈은 locale-port.ts만 만진다 (062 D4)");
+    }
+    if (modelPath && TOUCHES_I18N.test(line)) {
+      push(
+        index,
+        line,
+        "모델 입력·생성 경로가 화면 언어에 닿는다 — 출력 언어는 캐릭터의 언어 표에서 온다 (062 FR-016, B2, 원칙 III)",
+      );
     }
   }
 

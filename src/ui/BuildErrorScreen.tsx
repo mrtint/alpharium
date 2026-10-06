@@ -22,17 +22,17 @@
 
 import { View } from "react-native";
 
+import { text } from "../i18n/current";
 import { AppText } from "./components/Text";
 
 export function BuildErrorScreen() {
   return (
     <View className="flex-1 items-center justify-center" style={PAGE}>
       <AppText variant="title" style={{ textAlign: "center" }}>
-        이 빌드는 잘못 만들어졌다
+        {text().welcome.buildErrorTitle}
       </AppText>
       <AppText variant="body" style={{ textAlign: "center", opacity: 0.8 }}>
-        앱이 어떤 환경으로 만들어졌는지 알 수 없어 일기를 쓸 수 없다. 이 앱을 만든 사람에게 알려야
-        고쳐진다.
+        {text().welcome.buildErrorBody}
       </AppText>
     </View>
   );

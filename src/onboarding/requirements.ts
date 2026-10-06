@@ -20,6 +20,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { text } from "../i18n/current";
+
 /**
  * 권한 항목의 식별자. **정확히 4갈래**(contracts R2).
  *
@@ -43,18 +45,35 @@ export type PermissionRequirement = {
   key: PermissionKey;
   /** 온보딩 고정 순서상의 위치. 낮을수록 먼저. photos=1 … battery-exception=4 */
   order: number;
-  /** 이 권한을 요구하는 기능 (근거, 원칙 V — 문서화). */
-  neededBy: string;
   /**
    * 이 항목이 의미 있는 플랫폼. 현재 플랫폼이 없으면 온보딩에서 제시하지 않는다
    * (FR-003).
    */
   platforms: readonly ("android" | "ios")[];
-  /** 온보딩·설정에 보일 "왜 필요한지" 문안 (원칙 II·III, SC-008). */
-  rationale: string;
-  /** 이 권한이 거부됐을 때 어떤 기능이 어떻게 제한되는지 (FR-014, 020 N8의 일반화). */
-  ifDenied: string;
+  /** 온보딩·설정에 보일 "왜 필요한지" 문안 (원칙 II·III, SC-008). 062부터 화면 언어의 카탈로그에서 읽는다 */
+  readonly rationale: string;
+  /** 이 권한이 거부됐을 때 어떤 기능이 어떻게 제한되는지 (FR-014, 020 N8의 일반화). 062부터 카탈로그에서 읽는다 */
+  readonly ifDenied: string;
 };
+
+/**
+ * 062 — 문안(`rationale`·`ifDenied`)은 한국어 카탈로그(`src/i18n/catalogs/ko/onboarding.ts`)로 옮겼다. 목록의 키·순서·플랫폼은
+ * 여기 그대로 두고, 문안은 읽는 순간 화면 언어의 카탈로그에서 꺼낸다(모듈을 불러올 때 기기 언어를 읽지 않는다 — contracts C4).
+ * 「이 권한을 요구하는 기능」(옛 `neededBy` 필드)은 화면에 보이지 않는 근거라 각 항목 위 주석으로 옮겼다.
+ */
+function requirement(
+  base: Omit<PermissionRequirement, "rationale" | "ifDenied">,
+): PermissionRequirement {
+  return {
+    ...base,
+    get rationale() {
+      return text().onboarding.permissions[base.key].rationale;
+    },
+    get ifDenied() {
+      return text().onboarding.permissions[base.key].ifDenied;
+    },
+  };
+}
 
 /**
  * 사람이 정한 목록. 코드가 항목을 더하거나 빼지 않는다 (FR-002·FR-004, 원칙 V).
@@ -62,15 +81,14 @@ export type PermissionRequirement = {
  * 새 권한이 필요해지면 이 상수에 사람이 항목을 더하고 `order`를 재배치한다.
  */
 export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
-  {
+  // 요구하는 기능: 사진 수집(004) — 그날 찍힌 사진으로 하루를 짐작한다
+  requirement({
     key: "photos",
     order: 1,
-    neededBy: "사진 수집(004) — 그날 찍힌 사진으로 하루를 짐작한다",
     platforms: ["android", "ios"],
-    rationale: "그날 찍힌 사진 몇 장을 살펴 하루를 짐작해 씁니다.",
-    ifDenied: "사진을 볼 수 없어서 일기는 사진 없이 써요.",
-  },
-  {
+  }),
+  // 요구하는 기능: 장소명(017) — 좌표를 지명으로 옮긴다 (안드로이드·iOS 모두 권한 필요, T030 실측)
+  requirement({
     key: "location",
     order: 2,
     // T030 실측 완료 (2026-08-29, SM-S901N/Galaxy S22, Android 16): 안드로이드에서도
@@ -79,28 +97,21 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     // 같은 좌표(37.5172,127.0473)가 권한 있을 때 "강남구", 없을 때 `placeName: unknown`
     // 으로 갈렸다. 따라서 platforms는 ["android","ios"] 유지 — 안드로이드에서도 이
     // 단계가 실제로 의미가 있다.
-    neededBy: "장소명(017) — 좌표를 지명으로 옮긴다 (안드로이드·iOS 모두 권한 필요, T030 실측)",
     platforms: ["android", "ios"],
-    rationale: "그날 머문 곳을 지명으로 적기 위해 위치를 씁니다.",
-    ifDenied: "지명을 옮기지 못해서 장소는 비워 둬요.",
-  },
-  {
+  }),
+  // 요구하는 기능: 완성 알림(020) — 자동으로 쓴 일기를 알린다
+  requirement({
     key: "notifications",
     order: 3,
-    neededBy: "완성 알림(020) — 자동으로 쓴 일기를 알린다",
     platforms: ["android", "ios"],
-    rationale: "정한 시간대에 일기가 다 쓰이면 알려 드리기 위해 씁니다.",
-    ifDenied: "일기가 완성돼도 바로 알려 드리지 못해요.",
-  },
-  {
+  }),
+  // 요구하는 기능: 백그라운드 자동 생성(019/020) — 절전 중에도 정한 시간대에 쓴다
+  requirement({
     key: "battery-exception",
     order: 4,
-    neededBy: "백그라운드 자동 생성(019/020) — 절전 중에도 정한 시간대에 쓴다",
     // 043 FR-017 — iOS는 `expo-intent-launcher`를 지원하지 않는다(공식 README:
     // "동등한 API가 없어 iOS에서는 의미가 없다"). 021이 잘못 ["android","ios"]로
     // 선언했던 것을 정정 — 검증 환경 제약이 아니라 iOS 자체에 대응 API가 없다.
     platforms: ["android"],
-    rationale: "기기가 절전에 들어가도 정한 시간대에 일기를 쓰도록 허용을 요청합니다.",
-    ifDenied: "자동으로 쓰는 시간이 정한 때보다 많이 늦어질 수 있어요.",
-  },
-] as const;
+  }),
+];

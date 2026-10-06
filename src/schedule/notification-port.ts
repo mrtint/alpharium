@@ -24,6 +24,7 @@
 import type { NotificationResponse } from "expo-notifications";
 
 import type { DayDate } from "../config/day-boundary";
+import { text } from "../i18n/current";
 
 /** 안드로이드 채널 id. 채널이 없으면 권한 프롬프트도 안 뜨고 알림도 안 보인다. */
 const CHANNEL_ID = "diary-completed";
@@ -59,7 +60,7 @@ export function expoNotificationPort(): NotificationPort {
     async ensureChannel() {
       const Notifications = await import("expo-notifications");
       await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-        name: "일기 완성 알림",
+        name: text().notification.channelName,
         importance: Notifications.AndroidImportance.HIGH,
       });
     },

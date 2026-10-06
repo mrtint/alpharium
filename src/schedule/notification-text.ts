@@ -8,14 +8,14 @@
  * 어제를 쓰는 일이 흔해(오전 시도 창, 사흘 재시도) **사실과 다른 말**이 됐다(원칙 V). 이름과 날짜를 넣어 무엇이 일어났는지만 말한다.
  *
  * **일기 내용·요약·감상을 담지 않는다**(020 FR-012, 원칙 II) — 열어야 읽는다. 본문 줄도 없다(Clarification Q4).
- * 이름은 부르는 쪽이 035 `displayNameOf()`로 만든 호칭이다(원칙 III — 모델 정보가 아니다). 조사는 017 `particleFor()` 하나로 고른다.
+ * 이름은 부르는 쪽이 035 `displayNameOf()`로 만든 호칭이다(원칙 III — 모델 정보가 아니다). 062 — 문장 틀과 조사는 한국어 카탈로그(`src/i18n/catalogs/ko/notification.ts`)가 갖는다. 헤드리스에서도 같은 해석으로 언어를 정한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import type { DayDate } from "../config/day-boundary";
-import { particleFor } from "../diary/particle";
+import { text } from "../i18n/current";
 
 export function autoWriteDoneText(name: string, day: DayDate): string {
   const [, month, date] = day.split("-").map(Number);
-  return `${name}${particleFor(name)} ${month}월 ${date}일 일기를 다 썼어요`;
+  return text().notification.autoWriteDone(name, month, date);
 }

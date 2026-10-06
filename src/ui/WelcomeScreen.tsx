@@ -42,6 +42,7 @@
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, ScrollView, View } from "react-native";
 
+import { lazyText } from "../i18n/current";
 import { Button } from "./components/Button";
 import { NameField } from "./components/NameField";
 import { AppText } from "./components/Text";
@@ -85,32 +86,10 @@ const NAME_INPUT_MAX_LENGTH = 12;
  * (`welcomeTitle`·`welcomeBody`·`namePrompt`·`nameHint`·`submit`·`skip`).
  * 힌트의 상한 숫자는 `NAME_INPUT_MAX_LENGTH`에서 보간한다 — 상한이 바뀌면
  * 문구도 함께 바뀐다(047 A5).
+ *
+ * 062 — 원문은 한국어 카탈로그(`src/i18n/catalogs/ko/welcome.ts`)로 옮겼다. 읽는 순간 화면 언어의 카탈로그에서 꺼낸다.
  */
-const TEXT = {
-  checkingTitle: "잠깐만요",
-  checkingBody: "새로 온 친구가 깨어나는 중이에요.",
-  /** 마크업은 "Alpharium" + CSS uppercase — RN에는 그 속성이 없어 대문자 원문으로 둔다. */
-  kicker: "ALPHARIUM",
-  /**
-   * 얼굴 타일 — 047 Clarification Q2. 로스터가 금동이 하나(037)이고 어미 변형 없는
-   * 담백한 화자라 `1u`의 🤖와 같다. 캐릭터 심볼을 읽어 고르지 않는다(원칙 III).
-   */
-  face: "🤖",
-  welcomeTitle: "깨어났어요. 처음 뵙겠습니다.",
-  welcomeBody:
-    "이제부터 제가 주인님의 하루를 사진과 다닌 자리로 읽고, 일기로 적을게요. 모든 일은 이 휴대폰 안에서만 일어나요.",
-  namePrompt: "제 이름을 지어주세요.",
-  namePlaceholder: "이름을 입력하세요",
-  nameHint: `${NAME_INPUT_MAX_LENGTH}자까지. 나중에 설정에서 바꿀 수 있어요.`,
-  submit: "이 이름으로 할래요",
-  /** 1a의 화살표 아이콘 자리 — `Button`이 children을 글자로 감싸므로 문자로 둔다(research R3). */
-  submitArrow: "→",
-  skip: "나중에 할래요",
-  failedTitle: "아직 준비 중이에요",
-  failedBody: "친구를 깨우지 못했어요. 잠시 후 다시 시도해 주세요.",
-  retry: "다시 시도",
-  goHome: "그냥 시작하기",
-} as const;
+const TEXT = lazyText((c) => c.welcome);
 
 export function WelcomeScreen({
   phase,
@@ -203,7 +182,7 @@ export function WelcomeScreen({
                 value={draft}
               />
               <AppText style={HINT} variant="caption">
-                {TEXT.nameHint}
+                {TEXT.nameHint(NAME_INPUT_MAX_LENGTH)}
               </AppText>
             </View>
 

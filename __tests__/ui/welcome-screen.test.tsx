@@ -176,8 +176,8 @@ describe("L16·W15·W16 — 문구는 사람이 쓴 고정 상수다", () => {
   });
 
   it("소스에 추론 생성 텍스트가 흘러들 자리가 없다", () => {
-    // 문구는 TEXT 상수뿐이고 props의 characterName만 보간된다.
-    expect(CODE).toMatch(/const TEXT = \{/);
+    // 문구는 TEXT 상수뿐이고 props의 characterName만 보간된다. 062 — TEXT는 한국어 카탈로그의 `welcome`을 읽는 순간 꺼낸다.
+    expect(CODE).toMatch(/const TEXT = lazyText\(\(c\) => c\.welcome\)/);
     expect(CODE).not.toMatch(/generated|completion|streamed|onToken/);
   });
 });

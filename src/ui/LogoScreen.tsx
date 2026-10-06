@@ -26,6 +26,7 @@
 import { useEffect } from "react";
 import { StyleSheet, View } from "react-native";
 
+import { text } from "../i18n/current";
 import { AppText } from "./components/Text";
 import { COLORS, RADIUS } from "./theme/tokens";
 
@@ -54,7 +55,7 @@ export function LogoScreen({ onDone }: LogoScreenProps) {
       </View>
 
       <View style={styles.bottom}>
-        <AppText style={styles.caption}>휴대폰 안에서만</AppText>
+        <AppText style={styles.caption}>{text().welcome.logoCaption}</AppText>
         <View style={styles.dots}>
           <View
             style={[styles.dot, { backgroundColor: COLORS.accent }]}

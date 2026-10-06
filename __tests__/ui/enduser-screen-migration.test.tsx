@@ -106,12 +106,19 @@ describe("ES5 — 원칙 III: 모델에 닿는 경로가 없다", () => {
 // ES1 — 사용자가 읽는 문장이 문자 그대로 같다
 // ───────────────────────────────────────────────────────────────────────────
 describe("ES1 — 문안이 바이트 그대로다", () => {
+  // 062 — 문안은 한국어 카탈로그(`welcome.ts`의 `buildError*`)로 옮겼다. 원문 기대값은 그대로 두고 읽는 자리만 바꾼다(062 FR-021).
+  const CATALOG = load("../../src/i18n/catalogs/ko/welcome.ts");
   it.each([["이 빌드는 잘못 만들어졌다"], ["이 앱을 만든 사람에게 알려야"]])(
     "BuildErrorScreen: %s",
     (literal) => {
-      expect(BUILD.src).toContain(literal);
+      expect(CATALOG.src).toContain(literal);
     },
   );
+
+  it("062 — BuildErrorScreen은 문안을 카탈로그에서 읽는다", () => {
+    expect(BUILD.code).toMatch(/text\(\)\.welcome\.buildErrorTitle/);
+    expect(BUILD.code).toMatch(/text\(\)\.welcome\.buildErrorBody/);
+  });
 
   // 050 — 덮어쓰기 문구는 보드 `2d` 원문으로 바뀌었고 `home-text.ts`에서만 온다(contracts TXT1·TXT3).
   // 원문 자체는 `home-text.test.ts`가 글자 단위로 잠근다.

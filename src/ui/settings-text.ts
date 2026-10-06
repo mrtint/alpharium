@@ -24,72 +24,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { SKIPPED_LINE } from "../app/skipped-line";
+import { lazyText, text } from "../i18n/current";
 
-export const SETTINGS_TEXT = {
-  title: "설정",
-  /** 앞에 ‹ 를 따로 그린다 */
-  back: "일기",
-  groupCharacter: "캐릭터",
-  name: "이름",
-  groupDiary: "일기",
-  autoWrite: "자동으로 쓰기",
-  groupPerm: "권한 · 휴대폰 설정으로 이동",
-  permPhotos: "사진",
-  permLocation: "위치",
-  permNotif: "알림",
-  permBattery: "배터리",
-  permBatteryHint: "배터리 사용 · 제한 없음으로 두면 제때 써요",
-  permAllowed: "허용됨",
-  permPartial: "일부 허용",
-  permDenied: "허용 안 함",
-  groupAbout: "정보",
-  version: "버전",
-  /** 059 — 「정보」 맨 아래 개발자 행(보드 `about.developer`). 켜졌을 때만 그려진다 */
-  developer: "개발자",
-  /** 진입점 점 세 개의 스크린리더 라벨(보드 `6a` 「스크린리더 라벨 "설정"」) */
-  entryLabel: "설정",
-  /** 이름 바꾸기의 확정 버튼 */
-  save: "저장",
-  /** 설정 위에 쌓인 화면의 뒤로 — 앞에 ‹ 를 따로 그린다 */
-  backToSettings: "설정",
-  /** 쓰기 시작 전 「캐릭터를 먼저 준비해야 한다」 안내의 버튼 */
-  redownload: "모듈 다시 받기",
-  /** 개발자 겹의 제목(보드 `dev.title`) — 059 이후 본문 문구는 `developer-text.ts` */
-  developerTitle: "개발자",
-  /* ── 056 — 매일 쓰는 시각·장소 이름 (보드 `6c` ③·`6f`·`6l`) ── */
-  autoWriteTime: "매일 쓰는 시각",
-  placeNames: "장소 이름으로 보기",
-  timeTitle: "매일 쓰는 시각",
-  timeAm: "오전",
-  timePm: "오후",
-  timeCancel: "취소",
-  placeTitle: "장소 이름으로 보기",
-  placeAuto: "자동",
-  placeAutoDesc: "위치 권한이 있으면 이름으로, 없으면 비워 둬요",
-  placeOn: "켬",
-  placeOnDesc: "다닌 자리를 숫자 대신 이름으로 보여줘요",
-  placeOff: "끔",
-  placeOffDesc: "장소 이름을 옮기지 않아요",
-  placeCancel: "취소",
-  placeNotice: "좌표를 기기의 지도 서비스에 물어봐요.",
-  /* ── 057 — 사진 권한 건너뜀 보조 줄 (보드 `6g`) ── */
-  photoSkippedYesterday: SKIPPED_LINE.yesterday,
-  photoSkippedOn: SKIPPED_LINE.on,
-  /* ── 058 — 이 휴대폰 (보드 `6c` ⑥) ── */
-  groupDevice: "이 휴대폰",
-  deviceModules: "쓰는 모듈",
-  deviceWipe: "일기 모두 지우기",
-  wipeBody: "되돌릴 수 없어요. 이름과 설정은 남아요.",
-  wipeConfirm: "지우기",
-  wipeCancel: "취소",
-  /** 보드 밖 — 백그라운드 자동 쓰기가 잠금을 쥐고 있어 지우지 못했다(058 FR-016a, research R10) */
-  wipeBlocked: "지금 자동으로 쓰는 중이라 지우지 못했어요.",
-} as const;
+/** 062 — 문구는 한국어 카탈로그 `src/i18n/catalogs/ko/settings.ts`로 옮겼다. 이름은 그대로 두고 읽는 순간 카탈로그에서 꺼낸다 */
+export const SETTINGS_TEXT = lazyText((c) => c.settings);
 
 /** 058 — 보드 `wipe.title` 「일기 {n}편을 모두 지울까요?」. 편수는 숫자 그대로(천 단위 구분 없음, FR-010) */
 export function wipeTitle(n: number): string {
-  return `일기 ${n}편을 모두 지울까요?`;
+  return text().settings.wipeTitle(n);
 }
 
 /** 진입점·머리의 ‹ 글리프. 문구와 따로 그린다(보드 마크업이 ‹ 를 22, 글자를 15로 다르게 그린다). */

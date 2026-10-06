@@ -16,6 +16,9 @@
 import type { PermissionState } from "../signals/port";
 import type { DaySignals, SignalValue } from "../signals/types";
 import { DIAGNOSTICS_TEXT as T } from "./diagnostics-text";
+import { text } from "../i18n/current";
+import type { Language } from "../i18n/languages";
+import type { LanguageResolution } from "../i18n/resolve";
 import type { PhotoLocationReading } from "./permission-tags";
 import type { WriteFailure, WriteFailureReason } from "./write-failures";
 
@@ -53,6 +56,17 @@ export function environmentLines(input: {
   };
 }
 
+/**
+ * 062 FR-011b — 「감지한 기기 언어 → 고른 화면 언어」 (contracts V1). 감지한 것은 선호 순서의 첫 태그 원문이고, 감지하지 못했으면 「모름」이다.
+ * 고른 것은 언어 이름이다. 둘을 따로 보여 「영어 기기인데 한국어로 떨어졌다」를 기기에서 눈으로 확인할 수 있게 한다(원칙 V).
+ */
+export function languageLine(resolution: LanguageResolution<Language>): string {
+  // 고른 언어의 이름은 그 언어의 카탈로그가 스스로 말한다 — 지금 카탈로그가 곧 고른 언어의 것이다(current.ts가 함께 정한다)
+  const T = text().diagnosticsLanguage;
+  const detected = resolution.detected?.[0] ?? T.unknown;
+  return T.line(detected, T.selfName);
+}
+
 /* ───────────────────────────── 신호 프로브 ───────────────────────────── */
 
 export type ProbeAxis = "photos" | "places" | "steps" | "battery" | "network";
@@ -83,7 +97,7 @@ function cellFor<V>(
 /** 항상 다섯 칸, 순서는 사진·장소·걸음·배터리·연결. 걸음·배터리·연결은 입력과 무관하게 「모름」이다. */
 export function probeCells(signals: DaySignals): ProbeCell[] {
   const photos = cellFor("photos", signals.photos, (v) =>
-    v.complete ? `${v.photos.length}장` : `${v.photos.length}장 (일부)`,
+    v.complete ? T.photoCount(v.photos.length) : T.photoCountPartial(v.photos.length),
   );
 
   let places: ProbeCell;
@@ -94,7 +108,7 @@ export function probeCells(signals: DaySignals): ProbeCell[] {
     // 사진을 못 읽었는데 장소만 「없음」이라 하지 않는다 — 승격하지 않는다
     places = UNKNOWN_CELL("places");
   } else {
-    places = cellFor("places", signals.places, (v) => `${v.trace.visitCount}곳`);
+    places = cellFor("places", signals.places, (v) => T.placeCount(v.trace.visitCount));
   }
 
   return [photos, places, UNKNOWN_CELL("steps"), UNKNOWN_CELL("battery"), UNKNOWN_CELL("network")];
@@ -152,20 +166,28 @@ export function canRequestPhoto(state: PermissionState | "unknown"): boolean {
 
 export type FailureLine = { reasonText: string; timeText: string };
 
-const REASON_TEXT: Readonly<Record<WriteFailureReason, string>> = {
-  module: T.failModule,
-  photos: T.failPhotos,
-  empty: T.failEmpty,
-  save: T.failSave,
-  unwritten: T.failUnwritten,
-};
+/** 062 — 모듈을 불러올 때 문구를 읽지 않게 함수로 둔다(contracts C4) */
+function reasonText(reason: WriteFailureReason): string {
+  const byReason: Readonly<Record<WriteFailureReason, string>> = {
+    module: T.failModule,
+    photos: T.failPhotos,
+    empty: T.failEmpty,
+    save: T.failSave,
+    unwritten: T.failUnwritten,
+  };
+  return byReason[reason];
+}
 
 /** 기록 순서 그대로(최신이 위) 줄로 옮긴다. 시각은 현지 「M월 d일 HH:mm」 한 가지 형식이다. */
 export function failureLines(items: readonly WriteFailure[]): FailureLine[] {
   return items.map((item) => ({
-    reasonText: REASON_TEXT[item.reason],
+    reasonText: reasonText(item.reason),
     // `toTimeString()`은 현지 「HH:MM:SS GMT…」다 — 앞 다섯 글자가 현지 시:분이다(`getHours()`를 쓰지 않는다 — 하루 기준 계산과 섞이지 않게).
-    timeText: `${item.at.getMonth() + 1}월 ${item.at.getDate()}일 ${item.at.toTimeString().slice(0, 5)}`,
+    timeText: T.failureTime(
+      item.at.getMonth() + 1,
+      item.at.getDate(),
+      item.at.toTimeString().slice(0, 5),
+    ),
   }));
 }
 

@@ -36,11 +36,22 @@ describe("NT3 — 문장 틀에 본문·감상·모델 정보가 없다 (020 N2,
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, "");
 
+  // 062 — 문장 틀은 한국어 카탈로그(`notification.ts`)로 옮겼다. 이 파일은 그 함수를 부르고, 조사는 카탈로그 안에서 고른다.
+  const catalog = readFileSync(
+    join(__dirname, "../../src/i18n/catalogs/ko/notification.ts"),
+    "utf8",
+  )
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
   it("조사는 035의 particleFor 하나로 고른다", () => {
-    expect(code).toMatch(/\bparticleFor\(/);
+    expect(catalog).toMatch(/\bparticleFor\(/);
+    expect(code).toMatch(/text\(\)\.notification\.autoWriteDone\(/);
   });
 
   it("일기 본문·요약·감상·모델 이름 어휘가 없다", () => {
-    expect(code).not.toMatch(/entry|\.text\b|summary|즐거운|행복한|kanana|exaone|gguf/i);
+    for (const source of [code, catalog]) {
+      expect(source).not.toMatch(/entry|\.text\b|summary|즐거운|행복한|kanana|exaone|gguf/i);
+    }
   });
 });
