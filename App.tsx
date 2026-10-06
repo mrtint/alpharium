@@ -1539,6 +1539,7 @@ function AppFrame() {
               backTestID="back-to-developer"
               onBack={closeDiagnostics}
               title={DEVELOPER_TEXT.diag}
+              titleAside={DEVELOPER_TEXT.diagTag}
             >
               {/* 060 — 값·핸들러는 조립 컴포넌트가 만든다. 035 — 프롬프트 미리보기의 호칭 줄에 사용자 지정 이름이 흐른다(FR-018). */}
               <DiagnosticsLayer

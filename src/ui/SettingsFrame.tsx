@@ -15,7 +15,7 @@
  */
 
 import type { ReactNode } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Platform, Pressable, ScrollView, View } from "react-native";
 
 import { AppText } from "./components/Text";
 import { BACK_CHEVRON } from "./settings-text";
@@ -97,9 +97,13 @@ export function SettingsFrame({
           {titleAside !== undefined && (
             <AppText
               style={{
-                fontSize: 12,
+                // 보드 `6e`·`6h`: 고정폭 11/600·줄높이 1.3, 아래 2
+                fontSize: 11,
+                fontWeight: "600",
+                lineHeight: 11 * 1.3,
+                fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
                 color: COLORS.textMuted,
-                paddingBottom: 6,
+                paddingBottom: 2,
                 fontVariant: ["tabular-nums"],
               }}
               testID="settings-title-aside"

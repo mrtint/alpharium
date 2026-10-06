@@ -15,7 +15,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { View } from "react-native";
+import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 
 import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type {
@@ -26,7 +26,10 @@ import type {
 } from "../app/diagnostics-view";
 import type { PromptPreview } from "../diagnostics/types";
 import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
-import { Chevron, Group, Row, Tag, Value } from "./SettingsScreen";
+import { AppText } from "./components/Text";
+import { SETTINGS_TEXT } from "./settings-text";
+import { Group, Row, Value } from "./SettingsScreen";
+import { COLORS } from "./theme/tokens";
 
 /** 자동 쓰기 한 번의 결과 — 진단은 스케줄 계층 타입에 닿지 않는다(DS8) */
 export type AutoRunResult = "ran" | "skipped" | "failed";
@@ -53,6 +56,21 @@ export type DiagnosticsScreenProps = {
   /** 최신이 위 */
   failures: readonly FailureLine[];
 };
+
+/** 보드 `6h`는 권한 값을 고정폭 글자로만 적는다(꼬리표 모양이 아니다) — 말은 설정과 같은 한국어 */
+const PERMISSION_TEXT = {
+  allowed: SETTINGS_TEXT.permAllowed,
+  partial: SETTINGS_TEXT.permPartial,
+  denied: SETTINGS_TEXT.permDenied,
+} as const;
+
+const BUTTON: ViewStyle = {
+  height: 48,
+  borderRadius: 6,
+  alignItems: "center",
+  justifyContent: "center",
+};
+const BUTTON_TEXT: TextStyle = { fontSize: 15, fontWeight: "700" };
 
 const AUTO_TEXT: Readonly<Record<AutoRunResult, string>> = {
   ran: T.autoRan,
@@ -105,7 +123,7 @@ export function DiagnosticsScreen({
           testID="diagnostics-storage"
           trailing={
             <View testID="diagnostics-storage-value">
-              <Value text={storage} />
+              <Value chevron mono text={storage} />
             </View>
           }
         />
@@ -119,7 +137,9 @@ export function DiagnosticsScreen({
           testID="diagnostics-photo-read"
           trailing={
             photo?.read != null ? (
-              <Tag kind={photo.read} testID="diagnostics-photo-read-tag" />
+              <View testID="diagnostics-photo-read-tag">
+                <Value mono text={PERMISSION_TEXT[photo.read]} />
+              </View>
             ) : undefined
           }
         />
@@ -128,7 +148,9 @@ export function DiagnosticsScreen({
           testID="diagnostics-photo-location"
           trailing={
             photo?.location != null ? (
-              <Tag kind={photo.location} testID="diagnostics-photo-location-tag" />
+              <View testID="diagnostics-photo-location-tag">
+                <Value mono text={PERMISSION_TEXT[photo.location]} />
+              </View>
             ) : undefined
           }
         />
@@ -137,6 +159,7 @@ export function DiagnosticsScreen({
           testID="diagnostics-photo-scope"
           trailing={
             <Value
+              mono
               text={
                 photo?.scope === "all"
                   ? T.scopeAll
@@ -149,14 +172,22 @@ export function DiagnosticsScreen({
         />
       </Group>
 
-      <Group label={T.probe} testID="diagnostics-group-probe">
+      <Group
+        aside={
+          <Pressable
+            accessibilityRole="button"
+            onPress={onRefreshProbe}
+            testID="diagnostics-probe-refresh"
+          >
+            <AppText style={{ fontSize: 13, fontWeight: "700", textDecorationLine: "underline" }}>
+              {T.probeRefresh}
+            </AppText>
+          </Pressable>
+        }
+        label={T.probe}
+        testID="diagnostics-group-probe"
+      >
         <ProbeGrid cells={probe} />
-        <Row
-          label={T.probeRefresh}
-          onPress={onRefreshProbe}
-          testID="diagnostics-probe-refresh"
-          trailing={<Chevron />}
-        />
       </Group>
 
       <Group label={T.prompt} testID="diagnostics-group-prompt">
@@ -164,23 +195,30 @@ export function DiagnosticsScreen({
       </Group>
 
       <Group label={T.gen} testID="diagnostics-group-gen">
-        <Row
-          label={T.tryOnce}
-          onPress={onTryOnce}
-          testID="diagnostics-try-once"
-          trailing={<Chevron />}
-        />
-        <Row
-          label={T.runAuto}
-          // 도는 동안은 콜백도 넘기지 않는다 — 중복 실행을 막는다
-          {...(autoRunning ? {} : { onPress: onRunAuto })}
-          testID="diagnostics-run-auto"
-          trailing={
-            <View testID="diagnostics-auto-result">
-              <Value text={autoValue} />
-            </View>
-          }
-        />
+        {/* 보드 `6h` ⑦: 높이 48·모서리 6의 전폭 버튼 둘 — 위는 테두리, 아래는 검정 면 */}
+        <View style={{ gap: 8 }}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onTryOnce}
+            style={{ ...BUTTON, borderWidth: 1, borderColor: COLORS.text }}
+            testID="diagnostics-try-once"
+          >
+            <AppText style={{ ...BUTTON_TEXT, color: COLORS.text }}>{T.tryOnce}</AppText>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            // 도는 동안은 콜백도 넘기지 않는다 — 중복 실행을 막는다
+            {...(autoRunning ? {} : { onPress: onRunAuto })}
+            style={{ ...BUTTON, backgroundColor: COLORS.text }}
+            testID="diagnostics-run-auto"
+          >
+            <AppText style={{ ...BUTTON_TEXT, color: COLORS.bg }}>{T.runAuto}</AppText>
+          </Pressable>
+        </View>
+        {/* 결과 한 줄 — 보드에는 자리가 없어(보드 밖) 버튼 아래 작은 고정폭 글자로 둔다 */}
+        <View style={{ minHeight: 20, marginTop: 6 }} testID="diagnostics-auto-result">
+          <Value mono text={autoValue} />
+        </View>
       </Group>
 
       <Group label={T.failures} testID="diagnostics-group-failures">

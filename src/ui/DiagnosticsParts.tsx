@@ -13,7 +13,7 @@
  */
 
 import { useState } from "react";
-import { Platform, Pressable, ScrollView, View, type TextStyle } from "react-native";
+import { Platform, Pressable, View, type TextStyle } from "react-native";
 
 import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type { ProbeAxis, ProbeCell } from "../app/diagnostics-view";
@@ -33,34 +33,43 @@ const AXIS_LABEL: Readonly<Record<ProbeAxis, string>> = {
 const AXES: readonly ProbeAxis[] = ["photos", "places", "steps", "battery", "network"];
 
 export function ProbeGrid({ cells }: { cells: readonly ProbeCell[] | null }) {
+  // 보드 `6h` ④ — 다섯 칸이 한 줄이다: 위 2px 선·아래 1px 선, 칸마다 왼쪽 1px 선, 모름 칸은 회색 면
   return (
     <View
-      style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, paddingVertical: 8 }}
+      style={{
+        flexDirection: "row",
+        borderTopWidth: 2,
+        borderTopColor: COLORS.text,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+      }}
       testID="diagnostics-probe-grid"
     >
-      {AXES.map((axis) => {
+      {AXES.map((axis, index) => {
         const cell = cells?.find((c) => c.axis === axis);
         const unknown = cell === undefined || cell.kind === "unknown";
         return (
           <View
             key={axis}
             style={{
-              minWidth: 96,
-              flexGrow: 1,
-              flexBasis: 96,
-              gap: 2,
-              paddingVertical: 8,
-              paddingHorizontal: 10,
-              // 모름 칸 = 회색 면 + 회색 글자(보드 `6h` ④), 숫자 칸 = 면 없이 테두리
-              ...(unknown
-                ? { backgroundColor: SETTINGS.tagFill }
-                : { borderWidth: 1, borderColor: COLORS.border }),
+              flex: 1,
+              minWidth: 0,
+              gap: 6,
+              paddingTop: 10,
+              paddingBottom: 12,
+              paddingLeft: 8,
+              ...(index > 0 ? { borderLeftWidth: 1, borderLeftColor: COLORS.border } : {}),
+              // 모름 칸 = 회색 면 + 회색 글자, 숫자 칸 = 면 없음
+              ...(unknown ? { backgroundColor: SETTINGS.tagFill } : {}),
             }}
             testID={`diagnostics-probe-${axis}`}
           >
-            <AppText style={LABEL}>{AXIS_LABEL[axis]}</AppText>
-            {/* 값은 본문 글꼴이다 — 고정폭이 아니라 숫자와 「모름」이 같은 글꼴로 구분되는 것은 면 색뿐이다 */}
+            {/* 한 줄에 다섯 칸이라 글꼴 2.0배에서는 「배터리」가 낱글자로 갈라진다 — 칸 안의 글자만 1.4배까지 키운다 */}
+            <AppText maxFontSizeMultiplier={1.4} style={LABEL}>
+              {AXIS_LABEL[axis]}
+            </AppText>
             <AppText
+              maxFontSizeMultiplier={1.4}
               style={unknown ? VALUE_UNKNOWN : VALUE_KNOWN}
               testID={`diagnostics-probe-${axis}-value`}
             >
@@ -90,8 +99,9 @@ export function PromptPreviewBox({
   const preview = previews?.[selected];
 
   return (
-    <View style={{ gap: 8, paddingVertical: 8 }} testID="diagnostics-prompt-box">
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+    <View style={{ gap: 8 }} testID="diagnostics-prompt-box">
+      {/* 보드 `6h` ⑤ — 두 칸이 한 덩어리인 전환 막대: 2px 테두리, 높이 34, 고른 칸은 검정 면 */}
+      <View style={{ flexDirection: "row", borderWidth: 2, borderColor: COLORS.text }}>
         {PRESETS.map((preset) => {
           const on = preset.id === selected;
           return (
@@ -101,10 +111,11 @@ export function PromptPreviewBox({
               key={preset.id}
               onPress={() => setSelected(preset.id)}
               style={{
-                paddingVertical: 6,
-                paddingHorizontal: 10,
-                borderWidth: 1,
-                borderColor: on ? COLORS.text : COLORS.border,
+                flex: 1,
+                minHeight: 34,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingHorizontal: 4,
                 backgroundColor: on ? COLORS.text : "transparent",
               }}
               testID={`diagnostics-preset-${preset.id}`}
@@ -112,7 +123,8 @@ export function PromptPreviewBox({
               <AppText
                 style={{
                   fontSize: 13,
-                  fontWeight: "600",
+                  fontWeight: on ? "800" : "600",
+                  textAlign: "center",
                   color: on ? COLORS.bg : COLORS.text,
                 }}
               >
@@ -128,16 +140,21 @@ export function PromptPreviewBox({
           <AppText style={LABEL} testID="diagnostics-prompt-size">
             {`${preview.approxChars}자 (${T.sizeNote})`}
           </AppText>
-          {/* 상자 안에서 따로 스크롤된다 — 화면 전체 스크롤과 다투지 않는다. 글자는 선택만 된다 */}
-          <ScrollView
-            nestedScrollEnabled
-            style={{ maxHeight: 240, borderWidth: 1, borderColor: COLORS.border, padding: 10 }}
-            testID="diagnostics-prompt-scroll"
+          {/* 상자 안에서 따로 스크롤하지 않는다 — 지면 안의 작은 스크롤 상자는 끝에 닿은 손가락을 바깥 지면으로 넘겨(안드로이드 중첩 스크롤)
+              읽다가 화면 전체가 흐르고 마지막 줄이 잘렸다. 본문을 다 펼치고 지면 하나로만 스크롤한다. 글자는 선택만 된다 */}
+          <View
+            style={{
+              backgroundColor: COLORS.bg,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              padding: 12,
+            }}
+            testID="diagnostics-prompt-box-body"
           >
             <AppText selectable style={PROMPT} testID="diagnostics-prompt-text">
               {preview.text}
             </AppText>
-          </ScrollView>
+          </View>
         </>
       ) : (
         // 조립하지 못했으면 이유만 — 본문 자리를 비운다
@@ -149,12 +166,19 @@ export function PromptPreviewBox({
   );
 }
 
-const LABEL: TextStyle = { fontSize: 12, color: COLORS.textMuted };
-const VALUE_KNOWN: TextStyle = { fontSize: 15, fontWeight: "600", color: COLORS.text };
-const VALUE_UNKNOWN: TextStyle = { fontSize: 15, color: COLORS.textMuted };
+const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
+/** 보드 `6h` ④ — 칸 라벨 11/600, 숫자는 고정폭 15/700, 모름은 14/600 회색 */
+const LABEL: TextStyle = { fontSize: 11, fontWeight: "600", color: COLORS.textMuted };
+const VALUE_KNOWN: TextStyle = {
+  fontSize: 15,
+  fontWeight: "700",
+  fontFamily: MONO,
+  color: COLORS.text,
+};
+const VALUE_UNKNOWN: TextStyle = { fontSize: 14, fontWeight: "600", color: COLORS.textMuted };
 const PROMPT: TextStyle = {
   fontSize: 12,
   lineHeight: 18,
   color: COLORS.text,
-  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+  fontFamily: MONO,
 };

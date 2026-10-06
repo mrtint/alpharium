@@ -180,7 +180,7 @@ describe("DS4 — 신호 프로브 다섯 칸", () => {
     expect(screen.queryByText("모름")).toBeNull();
   });
 
-  it("모름 칸은 회색 면 + 회색 글자이고, 숫자 칸은 면 없이 테두리이며 값은 고정폭이 아니다", async () => {
+  it("보드 6h ④: 다섯 칸이 한 줄(위 2px·아래 1px 선), 칸마다 왼쪽 1px 선, 모름 칸은 회색 면 + 14/600 회색, 숫자 칸은 면 없이 고정폭 15/700", async () => {
     await render(<DiagnosticsScreen {...props()} />);
     const unknown = flat(screen.getByTestId("diagnostics-probe-steps"));
     expect(unknown.backgroundColor).toBe(SETTINGS.tagFill);
@@ -188,11 +188,22 @@ describe("DS4 — 신호 프로브 다섯 칸", () => {
 
     const known = flat(screen.getByTestId("diagnostics-probe-photos"));
     expect(known.backgroundColor).toBeUndefined();
-    expect(known.borderWidth).toBe(1);
+    expect(known.borderLeftWidth).toBeUndefined(); // 첫 칸은 왼쪽 선이 없다
+    expect(unknown.borderLeftWidth).toBe(1);
 
-    for (const id of ["diagnostics-probe-photos-value", "diagnostics-probe-steps-value"]) {
-      expect(String(flat(screen.getByTestId(id)).fontFamily ?? "")).not.toMatch(/mono|Menlo/i);
-    }
+    const grid = flat(screen.getByTestId("diagnostics-probe-grid"));
+    expect(grid.flexDirection).toBe("row");
+    expect(grid.flexWrap).toBeUndefined();
+    expect(grid.borderTopWidth).toBe(2);
+    expect(grid.borderBottomWidth).toBe(1);
+
+    const knownValue = flat(screen.getByTestId("diagnostics-probe-photos-value"));
+    expect(knownValue.fontSize).toBe(15);
+    expect(knownValue.fontWeight).toBe("700");
+    expect(String(knownValue.fontFamily ?? "")).toMatch(/mono|Menlo/i);
+    const unknownValue = flat(screen.getByTestId("diagnostics-probe-steps-value"));
+    expect(unknownValue.fontSize).toBe(14);
+    expect(unknownValue.fontWeight).toBe("600");
   });
 
   it("「다시 읽기」는 onRefreshProbe를 부른다", async () => {
@@ -222,11 +233,15 @@ describe("DS5 — 프롬프트 미리보기", () => {
     expect(SIGNAL_PRESETS.map((p) => p.id).sort()).toEqual(["empty", "photos"]);
   });
 
-  it("본문은 선택만 되고 상자 안에서 따로 스크롤된다", async () => {
+  it("본문은 선택만 되고 안쪽 스크롤 상자가 없다 (지면 하나로만 스크롤)", async () => {
     await render(<DiagnosticsScreen {...props()} />);
     expect(screen.getByTestId("diagnostics-prompt-text").props.selectable).toBe(true);
-    expect(screen.getByTestId("diagnostics-prompt-scroll").props.nestedScrollEnabled).toBe(true);
-    expect(flat(screen.getByTestId("diagnostics-prompt-scroll")).maxHeight).toBeGreaterThan(0);
+    // 안쪽 ScrollView는 끝에 닿은 손가락을 바깥 지면으로 넘겨 화면 전체가 흐르고 마지막 줄이 잘렸다
+    expect(screen.queryByTestId("diagnostics-prompt-scroll")).toBeNull();
+    const parts = readFileSync(join(__dirname, "..", "..", "src/ui/DiagnosticsParts.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(parts).not.toMatch(/ScrollView|nestedScrollEnabled/);
   });
 
   it("크기 줄은 근사치·실측 아님을 밝힌다 (022 PP6)", async () => {
@@ -343,9 +358,9 @@ describe("DS8 — 화면은 기기·파이프라인·신호·모델에 닿지 �
 });
 
 describe("DS9 — 글꼴 2.0배에서 자르지 않고 줄을 바꾼다", () => {
-  it("행(055 `Row`)과 신호 칸이 flexWrap을 쓴다", () => {
+  it("행(055 `Row`)은 flexWrap을 쓰고, 신호 칸 다섯은 한 줄에서 폭을 나눠 글자가 칸 안에서 줄을 바꾼다", () => {
     expect(code("src/ui/SettingsScreen.tsx")).toMatch(/flexWrap: "wrap"/);
-    expect(code("src/ui/DiagnosticsParts.tsx")).toMatch(/flexWrap: "wrap"/);
+    expect(code("src/ui/DiagnosticsParts.tsx")).toMatch(/flex: 1,\s*minWidth: 0/);
   });
 });
 

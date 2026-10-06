@@ -55,7 +55,7 @@
 - **DS3** 사진 읽기 행은 요청 가능 상태에서만 `onRequestPhoto`를 호출하고 그 밖에서는 `onPress`를 넘기지 않는다(058 「누를 수 없는 행은 onPress도 안 넘긴다」).
 - **DS4** 신호 프로브 다섯 칸이 `diagnostics-probe-photos|places|steps|battery|network`로 항상 렌더된다. 「모름」 칸은 회색 면 + 회색 글자 토큰(`textMuted`·`neutral-200`)이고 값 글꼴이 고정폭이 아니다.
   「다시 읽기」는 `onRefreshProbe`를 부른다. 화면 마운트 때 한 번 읽고(마운트 효과), 그 밖에는 읽지 않는다(`useEffect` 의존성에 시간·AppState 없음).
-- **DS5** 프롬프트 미리보기: 프리셋 두 토글(`diagnostics-preset-empty`·`diagnostics-preset-photos`), 선택한 프리셋의 문자열이 `selectable` 텍스트로 상자 안에서 따로 스크롤된다(`nestedScrollEnabled`). 크기 라벨은
+- **DS5** 프롬프트 미리보기: 프리셋 두 토글(`diagnostics-preset-empty`·`diagnostics-preset-photos`), 선택한 프리셋의 문자열이 `selectable` 텍스트로 테두리 상자에 다 펼쳐진다(안쪽 `ScrollView`·`nestedScrollEnabled` 없음 — 지면 하나로만 스크롤). 크기 라벨은
   「조립 시점 근사치, 실측 토큰 아님」 문구를 유지한다(022 PP6 — 금지 대상은 소스의 ASCII `token` 어휘와 측정값이고 이 한글 라벨 한 문장은 허용된다).
 - **DS6** 생성: 「지금 한 번 써 보기」(`diagnostics-try-once`) → `onTryOnce`, 「자동 쓰기 지금 실행」(`diagnostics-run-auto`) → `onRunAuto`; 자동 쓰기가 도는 동안은 `onRunAuto`를 다시 부르지 않고 값 줄(`diagnostics-auto-result`)이 결과를 보인다.
 - **DS7** 최근 실패: 항목이 없으면 빈 줄 하나(`diagnostics-failures-empty`), 있으면 줄마다 갈래 문구와 시각이 있고 `onPress`가 없다.

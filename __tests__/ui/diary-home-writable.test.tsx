@@ -13,7 +13,7 @@
  */
 
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-native";
-import { AppState } from "react-native";
+import { AppState, Dimensions, StyleSheet } from "react-native";
 
 import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { DayPreview } from "../../src/app/state";
@@ -79,6 +79,17 @@ describe("049 HS — 자정 전환과 미리 준비의 범위", () => {
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("24");
     expect(screen.getByTestId("write-button")).toBeTruthy();
     expect(screen.queryByTestId("write-unavailable")).toBeNull();
+  });
+
+  it("큰 날짜 숫자는 글꼴 배율을 선형으로 따라 자란다(옆 요일·상태 줄과 같이 움직인다)", async () => {
+    await renderAt(clock("2026-09-24T09:00:00"));
+
+    const number = screen.getByTestId("home-day-number");
+    const scale = Dimensions.get("window").fontScale || 1;
+    // 안드로이드의 비선형 글꼴 배율은 큰 글자를 거의 안 키운다 — 크기를 직접 곱하고 시스템 배율은 끈다
+    expect(number.props.allowFontScaling).toBe(false);
+    expect(StyleSheet.flatten(number.props.style).fontSize).toBeCloseTo(62 * scale, 5);
+    expect(StyleSheet.flatten(number.props.style).lineHeight).toBeCloseTo(62 * scale, 5);
   });
 
   it("★ HS2 — 켜 둔 채 자정이 지나면 고른 날은 그대로, 밑줄만 새 오늘로 (FR-019)", async () => {

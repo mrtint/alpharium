@@ -68,6 +68,7 @@ import {
 import { foldAfterScroll } from "../app/reading-scroll";
 import type { PaperState } from "../app/written-day";
 import type { DayDate } from "../config/day-boundary";
+import { useFontScale } from "./font-scale";
 import { AppText } from "./components/Text";
 import { FadeLayer } from "./components/FadeLayer";
 import { DayPicker } from "./DayPicker";
@@ -675,6 +676,7 @@ type DayPart = "number" | "weekday";
 
 function DayFace({ day, part, testIDs }: { day: DayDate; part: DayPart; testIDs?: boolean }) {
   const { date, weekday } = dayParts(day);
+  const scale = useFontScale();
   if (part === "weekday") {
     return (
       <AppText numberOfLines={1} style={WEEKDAY} testID={testIDs ? "home-weekday" : undefined}>
@@ -688,13 +690,15 @@ function DayFace({ day, part, testIDs }: { day: DayDate; part: DayPart; testIDs?
     <View>
       <AppText
         accessibilityElementsHidden
+        allowFontScaling={false}
         importantForAccessibility="no-hide-descendants"
-        style={[DAY_NUMBER, { opacity: 0 }]}
+        style={[DAY_NUMBER, scaledNumeral(scale), { opacity: 0 }]}
       >
         {DAY_NUMBER_WIDTH}
       </AppText>
       <AppText
-        style={[DAY_NUMBER, { position: "absolute", left: 0, bottom: 0 }]}
+        allowFontScaling={false}
+        style={[DAY_NUMBER, scaledNumeral(scale), { position: "absolute", left: 0, bottom: 0 }]}
         testID={testIDs ? "home-day-number" : undefined}
       >
         {String(date)}
@@ -898,6 +902,13 @@ const KICKER = {
  */
 /** 큰 날짜 칸의 폭을 잡는 글자 — 한 달의 가장 긴 날(두 자리). 숫자는 `tabular-nums`라 폭이 같다 */
 const DAY_NUMBER_WIDTH = "00";
+
+/** 큰 날짜 숫자의 크기·줄높이·자간에 글꼴 배율을 곱한다(선형 — `font-scale.ts`) */
+const scaledNumeral = (scale: number): TextStyle => ({
+  fontSize: DAY_NUMBER.fontSize! * scale,
+  lineHeight: DAY_NUMBER.lineHeight! * scale,
+  letterSpacing: DAY_NUMBER.letterSpacing! * scale,
+});
 
 const DAY_NUMBER: TextStyle = {
   fontSize: 62,

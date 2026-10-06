@@ -9,8 +9,9 @@
 **Input**: User description: "기존 진단 화면을 개발자의 하위 화면 「진단」(보드 `6h`, 개발 환경만)으로 다시 그린다. 환경·저장 점검·사진 권한(읽기/위치 정보/범위)·신호 프로브(사진·장소만 숫자, 나머지 「모름」)·고정 프리셋 프롬프트 미리보기·생성 두 버튼·최근 실패(쓰기 실패의 이유와 시각, 10건)를 담는다. 「지금 한 번 써 보기」는 홈의 오늘 쓰는 중으로 넘어가 제품과 같은 경로로 쓰고 저장한다(보드 `6k`). 측정값은 기록하지 않는다. 상태 흉내는 범위 밖."
 
 **설계 근거**:
+
 - [`docs/superpowers/specs/2026-10-06-diagnostics-design.md`](../../docs/superpowers/specs/2026-10-06-diagnostics-design.md) — 이 조각의 설계 골격
-- [`docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`](../../docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md) §0(S1~S14, 특히 S9~S12)·§1(D1~D4)·§2·§3.6 — 보드 메모 원문·문구표·현재 코드 대조
+- [`docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`](../../docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md) §0(S1~~S14, 특히 S9~~S12)·§1(D1~D4)·§2·§3.6 — 보드 메모 원문·문구표·현재 코드 대조
 - 앞 조각 [`specs/059-developer-menu/`](../059-developer-menu/spec.md)(개발자 화면·진단 진입 행·진단 겹)·[`specs/055-settings-entry-frame/`](../055-settings-entry-frame/spec.md)(설정 틀 부품)·[`specs/054-in-place-writing/`](../054-in-place-writing/spec.md)(제자리 쓰기·실패 토스트 갈래)·[`specs/057-auto-write-rules/`](../057-auto-write-rules/spec.md)(자동 쓰기 규칙)
 
 보드 원본은 `C:\Users\mrtin\Downloads\mdesign\Alpharium Mobile Screens.dc.html`의 `6h`·`6k`와 문구표 `diag.*`다. 보드 문구는 그대로 쓰고 다시 해석하지 않는다.
@@ -47,7 +48,7 @@
 - Q: 「자동으로 쓰기」 토글이 꺼진 기기에서도 쓰나? → A: 토글도 무시한다. 이미 쓴 날·재료 없음·사진 권한 규칙만 따른다 (FR-014).
 - 확정(질문 없이 근거로 닫음): 캐릭터별 모델 줄은 지운다(보드 `6h`에 없고 원칙 III). 추론 위치의 「CPU」는 기기 추론이 GPU 오프로드 0으로 고정(`n_gpu_layers` 0, `llama-port.ts`)이라 사실이므로 기기 추론이면 「기기 · CPU」, 로컬 서버면 서버 위치를 그대로 쓴다 (FR-005).
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - 환경과 저장 상태를 한눈에 본다 (Priority: P1)
 
@@ -122,7 +123,7 @@
 
 ### User Story 5 - 프롬프트 미리보기를 고정 프리셋 두 벌로 본다 (Priority: P2)
 
-「입력 프롬프트 미리보기」는 프리셋 둘(「프리셋 1 · 신호 없음」/「프리셋 2 · 사진 있음」)을 전환해 본다. 실제 신호가 아니라 고정값이라 날짜가 바뀌어도 내용이 같다. 텍스트 상자는 안에서 따로 스크롤되고 글자는 선택만 할 수 있다.
+「입력 프롬프트 미리보기」는 프리셋 둘(「프리셋 1 · 신호 없음」/「프리셋 2 · 사진 있음」)을 전환해 본다. 실제 신호가 아니라 고정값이라 날짜가 바뀌어도 내용이 같다. 텍스트 상자는 안쪽 스크롤 없이 본문을 다 펼치고(지면 하나로만 스크롤 — 실기기에서 안쪽 스크롤이 끝에서 화면 전체로 넘어가고 마지막 줄이 잘려 뒤집었다) 글자는 선택만 할 수 있다.
 
 **Why this priority**: 022의 기능을 새 모양으로 옮기는 일. 계약이 이미 잠겨 있어 위험이 낮다.
 
@@ -131,7 +132,7 @@
 **Acceptance Scenarios**:
 
 1. **Given** 미리보기를 연다, **When** 프리셋 2를 고른다, **Then** 사진 있음 프리셋의 프롬프트가 보인다(제품이 쓰는 프롬프트 조립 결과와 바이트가 같다 — 022 PP1).
-2. **Given** 본문이 길다, **When** 스크롤한다, **Then** 상자 안에서만 스크롤되고 화면 전체 스크롤과 다투지 않는다.
+2. **Given** 본문이 길다, **When** 스크롤한다, **Then** 본문이 다 펼쳐져 있고 화면 스크롤 하나로만 읽는다(안쪽 스크롤 상자가 없어 다투지 않는다).
 3. **Given** 본문, **When** 길게 누른다, **Then** 글자를 선택할 수 있다(편집은 안 된다).
 4. **Given** 화면에, **When** 문구를 본다, **Then** 크기는 문자 수 근사임을 밝히고 토큰·속도 어휘가 없다(022 PP6).
 
@@ -167,7 +168,7 @@
 - **실패 기록에 이유 갈래를 알 수 없는 실패**: 다섯째 「일기를 쓰지 못함」으로 기록한다. 문구 전체를 비교하지 않는다(054 규칙).
 - **기록 쓰기 실패**: 조용히 삼킨다 — 일기 쓰기·토스트에 영향이 없다.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -220,7 +221,7 @@
 - **진단 화면 값**: 환경·저장 점검 결과·사진 권한 셋·신호 프로브 다섯 칸·프리셋 미리보기 문자열. 읽은 시점의 값이고 저장하지 않는다.
 - **진단의 쓰기 요청**: 「지금 한 번 써 보기」가 홈에 넘기는 오늘 쓰기 시작 요청(한 번에 하나).
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

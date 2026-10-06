@@ -90,7 +90,7 @@ describe("055 F2 — 회색 지면", () => {
 });
 
 describe("059 — 제목 오른쪽 작은 글자(titleAside)", () => {
-  it("주면 제목 줄 안에 12 보조색 글자로 보이고 안 주면 노드가 없다", async () => {
+  it("주면 제목 줄 안에 11 고정폭 보조색 글자로 보이고 안 주면 노드가 없다", async () => {
     await render(
       <SettingsFrame
         backLabel={SETTINGS_TEXT.backToSettings}
@@ -103,7 +103,10 @@ describe("059 — 제목 오른쪽 작은 글자(titleAside)", () => {
     );
     const aside = screen.getByTestId("settings-title-aside");
     expect(aside).toHaveTextContent("DEV · 1.0.0 (24)");
-    expect(flat(aside).fontSize).toBe(12);
+    // 보드 `6e`·`6h`: 고정폭 11/600
+    expect(flat(aside).fontSize).toBe(11);
+    expect(flat(aside).fontWeight).toBe("600");
+    expect(String(flat(aside).fontFamily ?? "")).toMatch(/mono|Menlo/i);
     expect(flat(aside).color).toBe(COLORS.textMuted);
     expect(
       within(screen.getByTestId("settings-title-row")).getByTestId("settings-title-aside"),

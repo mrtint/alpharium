@@ -75,7 +75,12 @@ describe("DV5 — 진단 그룹은 개발 환경에서만", () => {
     await render(<DeveloperScreen {...props({ showsDiagnostics: true })} />);
     const row = screen.getByTestId("developer-diagnostics");
     expect(within(row).getByText(DEVELOPER_TEXT.diag)).toBeTruthy();
-    expect(within(row).getByText(DEVELOPER_TEXT.devOnly)).toBeTruthy();
+    // 보드 `6e`: 「개발 빌드만」은 행이 아니라 묶음 머리 오른쪽, 행에는 보조 줄이 있다
+    expect(within(row).queryByText(DEVELOPER_TEXT.devOnly)).toBeNull();
+    expect(
+      within(screen.getByTestId("developer-group-diag")).getByText(DEVELOPER_TEXT.devOnly),
+    ).toBeTruthy();
+    expect(within(row).getByText(DEVELOPER_TEXT.diagSummary)).toBeTruthy();
     const order = screen
       .getAllByRole("header")
       .map((node) => node.props.children as string)

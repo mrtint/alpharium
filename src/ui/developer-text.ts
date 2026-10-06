@@ -22,6 +22,10 @@ export const DEVELOPER_TEXT = {
   groupDiag: "진단",
   diag: "진단",
   devOnly: "개발 빌드만",
+  /** 보드 밖 — `6e` 마크업의 「진단」 행 보조 줄(KO 표에는 없다). 진단 화면의 묶음 순서와 같다 */
+  diagSummary: "환경 · 저장 · 사진 권한 · 프로브 · 프롬프트 · 실패",
+  /** 보드 `6h` 머리 오른쪽 작은 글자 */
+  diagTag: "DEV",
   groupReplay: "다시 보기",
   replayOnboarding: "온보딩부터 다시",
   off: "개발자 메뉴 끄기",
