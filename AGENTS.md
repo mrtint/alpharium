@@ -633,6 +633,9 @@
   (`downloadProceedConfirmed`)을 **먼저 되돌린 뒤** 필수 에셋을 다시 읽는다 — ref를 안 되돌리면 이번 세션에 이미 받은 적이 있을 때 진행 화면만 뜬 채
   아무것도 받지 않는다. 이미 준비돼 있으면 홈으로 돌아온다.
 - 큰 제목 줄높이는 보드 .9가 아니라 글자 크기(44)다(#98 — iOS가 윗부분을 자른다).
+- **★ `flexWrap: "wrap"` + `minHeight`인 행은 `alignContent: "center"`도 있어야 가운데다** — 줄 바꿈을 허용하면 Yoga가 줄 묶음을
+  `alignContent`(RN 기본 `flex-start`)로 놓아 `alignItems: "center"`는 줄 안에서만 가운데이고 여분이 모두 아래로 간다(2026-10-06 설정·개발자·
+  진단 `Row` — 글자가 위 구분선에 붙고 아래 22dp가 비었다). jest는 레이아웃을 재지 않으므로 `uiautomator dump`의 bounds로 위·아래 여백을 잰다.
 - 테스트 함정: fake timers를 쓰는 스위트에서 `act(() => …)`(동기)로 핸들러를 부르면 **다음 테스트의 effect가 flush되지 않았다** — `await act(async …)`.
   python으로 테스트에 정규식 `\b`를 쓰면 백스페이스가 박힌다(AGENTS 위 규칙 그대로 — `diary-list.test.tsx`·`day-preview.test.ts`·
   `material-grid.test.tsx`에 이전부터 박힌 것이 남아 있다, 그 단언들은 아무것도 검사하지 못한다).
