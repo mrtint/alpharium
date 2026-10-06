@@ -470,7 +470,7 @@ export function instructionLines(request: DiaryRequest, vision?: PhotoVision): s
       ...sentenceInstructionLines(request, vision, kind),
       titleQuestionFor(kind),
       languageLine(LANGUAGE[request.character]),
-      ...(kind === "scenes" ? [] : [noSceneTail(request, kind)]),
+      ...(kind === "scenes" ? [] : [noSceneTail(kind)]),
     ];
   }
 
@@ -695,12 +695,14 @@ function dayKindOf(request: DiaryRequest, vision?: PhotoVision): DayKind {
  * **061 — 숫자 시각을 걷었다**(REPORT §8.1): 사진 시각 나열(「낮 한 시, 낮 한 시, 오후 두 시,
  * …」)은 처음~끝 때 하나로, 자리가 한 곳일 때의 「가장 먼 두 곳은 0 미터쯤」은 뺀다.
  *
- * **본 장면 없는 날(②③④)은 머리줄 「오늘 내가 본 것은 이렇다.」와 `S_DAY_OPEN`을 싣지
- * 않는다**(원본 `P7`·`P8`) — 본 것이 없는 날에 「내가 본 것은 이렇다」는 비어 있는 말이고
- * 본문이 그 줄로 시작했다(17/72). 맨 위의 완성된 1인칭 문장(`S_DAY_OPEN`)은 글자 그대로
- * 베껴졌다(11/24) — 꼬리가 그 사실을 1인칭으로 말한다(`noSceneTail()`).
- * **본 장면 있는 날은 둘 다 남는다** — 그 날의 꼬리는 하루 미완료를 말하지 않는다(012).
- * 지시서 §2는 `S_DAY_OPEN`을 「뺀다」고 적었으나 원본 코드가 이긴다(061 research R2).
+ * **본 장면 없는 날(②③④)은 머리줄 「오늘 내가 본 것은 이렇다.」를 싣지 않는다**(원본 `P7`)
+ * — 본 것이 없는 날에 「내가 본 것은 이렇다」는 비어 있는 말이고 본문이 그 줄로 시작했다(17/72).
+ *
+ * **하루가 안 끝났으면 `S_DAY_OPEN`이 날의 갈래와 무관하게 기록 첫 줄이다**(063, 원본 `R18.y3`).
+ * 061은 본 장면 없는 날에 그것을 꼬리의 1인칭 문장으로 옮겼는데, 그 날의 꼬리가 가장 길어져
+ * 모델이 꼬리를 이어 읽었다(판정 통과 20/24, 거부가 전부 낭독). 기록으로 되돌리자 48/48 —
+ * 061 이전(P6)의 「기록 첫 줄 베낌 11/24」가 되풀이되지 않은 것은 꼬리가 「내 하루를 쓴다」로
+ * 쓸 거리를 이미 주기 때문이다(지시서 §10.2).
  *
  * **`none`/`unknown` 구분은 유지**("없었다" vs "모른다. {reason}.") — 헌법 원칙 V.
  * **걸음·배터리·연결은 안 만든다**(036 FR-009) — 통로가 없는 축이다.
@@ -716,10 +718,8 @@ function sentenceSignalLines(
   const lines: string[] = [];
   const seen = kind === "scenes" ? vision : undefined;
 
-  if (seen !== undefined) {
-    if (request.dayStillOpen) lines.push(S_DAY_OPEN);
-    lines.push("오늘 내가 본 것은 이렇다.");
-  }
+  if (request.dayStillOpen) lines.push(S_DAY_OPEN);
+  if (seen !== undefined) lines.push("오늘 내가 본 것은 이렇다.");
 
   // 사진
   const ph = signals.photos;
@@ -780,7 +780,7 @@ function sentenceInstructionLines(
   const lines: string[] = [];
   const seen = kind === "scenes" ? vision : undefined;
 
-  if (seen !== undefined && request.dayStillOpen) lines.push(S_DAY_OPEN);
+  if (request.dayStillOpen) lines.push(S_DAY_OPEN);
   if (
     signals.photos.kind === "known" &&
     signals.photos.value.photos.length > 0 &&
@@ -804,7 +804,8 @@ const SCENE_TAIL = "이 기록으로 그 하루의 일기를 써라.";
  *
  * **첫 문장이 뒤의 「~는 말로 시작하고」가 가리키는 문장을 품는다** — 둘이 다른 문장이면
  * 모델이 지시문을 끝까지 읽어 내려간다(72런 중 34편, 지시서 §3 규칙 1). 그래서 이 문장들은
- * 베껴도 일기 문장으로 읽히는 휴대폰의 1인칭 사실이다.
+ * 베껴도 일기 문장으로 읽히는 휴대폰의 1인칭 사실이다. **품되 같지는 않다** — 시작 문장과
+ * 글자까지 같게 두면 꼬리 전체를 이어 읽었다(10/48, 지시서 §10.4).
  */
 const NO_SCENE_WHY: Readonly<Record<NoSceneKind, string>> = {
   zero: "나는 오늘 사진을 한 장도 보지 못해서 본 것이 없다.",
@@ -820,9 +821,6 @@ const NO_SCENE_MINE: Readonly<Record<NoSceneKind, string>> = {
   unseen: "사진을 볼 길이 막혀 아무것도 보지 못한 내가 어땠는지",
 };
 
-/** 하루가 아직 끝나지 않았다 — 본 장면 없는 날의 꼬리 B (061, 원본 `DAY_OPEN_ME`, 012 FR-003) */
-const NO_SCENE_DAY_OPEN = "오늘은 아직 다 가지 않아서 이 뒤에 무슨 일이 더 있을지도 나는 모른다.";
-
 /**
  * 본 장면 없는 날(②③④)의 꼬리 (061, 원본 `X_TAIL`·`R17.x1`).
  *
@@ -833,7 +831,8 @@ const NO_SCENE_DAY_OPEN = "오늘은 아직 다 가지 않아서 이 뒤에 무�
  * 주인 행동 문장 61/96 → 4/96이 됐다(REPORT §8.2, 96런).
  *
  * 지켜야 할 규칙 셋 (어기면 지시문이 일기로 나온다, 지시서 §3):
- *  1. A의 첫 문장이 「~는 말로 시작하고」가 가리키는 문장을 품는다
+ *  1. A의 첫 문장이 「~는 말로 시작하고」가 가리키는 문장을 **품되 그것과 달라야** 한다 —
+ *     글자까지 같게 두면 「여기부터 베끼면 된다」로 읽혀 판정 통과가 10/48로 떨어졌다(지시서 §10.4)
  *  2. **금지문을 쓰지 않는다** — 「주인을 탓하지는 않는다」는 본문에 64% 나왔다.
  *     「짐작하지 않는다」는 3%로 안전한 쪽이다
  *  3. 「상상」을 쓰지 않는다
@@ -842,10 +841,9 @@ const NO_SCENE_DAY_OPEN = "오늘은 아직 다 가지 않아서 이 뒤에 무�
  * (네 묶음 중 하나는 낭독 14/96, 지시서 §3).
  * ─────────────────────────────────────────────────────────────────────────────
  */
-function noSceneTail(request: DiaryRequest, kind: NoSceneKind): string {
-  const open = request.dayStillOpen ? ` ${NO_SCENE_DAY_OPEN}` : "";
+function noSceneTail(kind: NoSceneKind): string {
   return (
-    `${NO_SCENE_WHY[kind]}${open} 그래서 오늘 일기는 주인의 하루가 아니라 내 하루를 쓴다. ` +
+    `${NO_SCENE_WHY[kind]} 그래서 오늘 일기는 주인의 하루가 아니라 내 하루를 쓴다. ` +
     `'나는 오늘 아무것도 보지 못했다'는 말로 시작하고, ${NO_SCENE_MINE[kind]} 적는다. ` +
     `'심심했다', '하품만 했다', '기다리다 지쳤다'처럼 가벼운 말로 쓴다. ` +
     `주인이 무엇을 했는지는 짐작하지 않는다. ` +
@@ -854,8 +852,8 @@ function noSceneTail(request: DiaryRequest, kind: NoSceneKind): string {
   );
 }
 
-function tailFor(request: DiaryRequest, kind: DayKind): string {
-  return kind === "scenes" ? SCENE_TAIL : noSceneTail(request, kind);
+function tailFor(kind: DayKind): string {
+  return kind === "scenes" ? SCENE_TAIL : noSceneTail(kind);
 }
 
 /** 언어 줄 (061 — 한국어 캐릭터) */
@@ -869,11 +867,14 @@ function languageLine(language: string): string {
  * 본문을 받아 판정을 통과한 **뒤에** 같은 대화에 이어 묻는다(`on-device.ts`). 제목을 본문과
  * 함께 쓰게 하면 제목이 떨어지지 않았다(19/144) — 따로 물으면 144/144.
  * 본 장면 없는 날에 「본 것이 없던 날이 드러나게」를 주면 제목이 매번 「본 것이 없던 하루」가
- * 됐다 — 그래서 그 날은 조건 없이 묻는다(원본 P3).
+ * 됐다(원본 P3). 조건 없이 물으면 권한이 없어 못 본 날에도 「사진 없는 하루」로 **없었다고
+ * 단정**했다(24/96) — 063은 제목이 사진이 아니라 **휴대폰의 마음**을 가리키게 해 0/96이 됐다
+ * (지시서 §10.3). 「없었다고 쓰지 마라」 같은 금지문은 본문에 그대로 베껴지므로 쓰지 않는다.
  */
 const TITLE_ASK_SCENE =
   "방금 쓴 일기에서 가장 마음에 남는 장면 하나를 골라, 그것을 가리키는 짧은 제목을 한 줄로 적어라. 제목만 적는다.";
-const TITLE_ASK = "방금 쓴 일기에 붙일 제목을 한 줄로 적어라. 제목만 적는다.";
+const TITLE_ASK =
+  "방금 쓴 일기에서 네 마음이 어땠는지를 가리키는 짧은 제목을 한 줄로 적어라. 제목만 적는다.";
 
 function titleQuestionFor(kind: DayKind): string {
   return kind === "scenes" ? TITLE_ASK_SCENE : TITLE_ASK;
@@ -918,7 +919,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
       ...head,
       ...sentenceSignalLines(request, vision, kind),
       "",
-      tailFor(request, kind),
+      tailFor(kind),
     ].join("\n");
   }
 

@@ -111,9 +111,10 @@ const headLine = (name: string, particle: string) =>
   `너는 '${name}'${particle} 불리는, 주인의 휴대폰이다. 하루가 끝나면 그날 본 것으로 일기를 쓴다. 이 글의 '나'는 휴대폰이지 주인이 아니다.`;
 
 const SCENE_TAIL = "이 기록으로 그 하루의 일기를 써라.";
+// 063 — 하루가 안 끝난 날에도 꼬리는 같다. 그 사실은 기록 첫 줄(S_DAY_OPEN)이 말한다(R18.y3).
 const B_OPEN = "오늘은 아직 다 가지 않아서 이 뒤에 무슨 일이 더 있을지도 나는 모른다.";
-const noSceneTail = (why: string, mine: string, open = false) =>
-  `${why}${open ? ` ${B_OPEN}` : ""} 그래서 오늘 일기는 주인의 하루가 아니라 내 하루를 쓴다. '나는 오늘 아무것도 보지 못했다'는 말로 시작하고, ${mine} 적는다. '심심했다', '하품만 했다', '기다리다 지쳤다'처럼 가벼운 말로 쓴다. 주인이 무엇을 했는지는 짐작하지 않는다. 끝은 '내일은 무엇이든 보여 줬으면 좋겠다'처럼 다음을 바라는 한 문장으로 맺는다. 본문은 서너 문장이면 된다.`;
+const noSceneTail = (why: string, mine: string) =>
+  `${why} 그래서 오늘 일기는 주인의 하루가 아니라 내 하루를 쓴다. '나는 오늘 아무것도 보지 못했다'는 말로 시작하고, ${mine} 적는다. '심심했다', '하품만 했다', '기다리다 지쳤다'처럼 가벼운 말로 쓴다. 주인이 무엇을 했는지는 짐작하지 않는다. 끝은 '내일은 무엇이든 보여 줬으면 좋겠다'처럼 다음을 바라는 한 문장으로 맺는다. 본문은 서너 문장이면 된다.`;
 const WHY = {
   zero: "나는 오늘 사진을 한 장도 보지 못해서 본 것이 없다.",
   unread: "나는 오늘 사진 속을 보지 못해서 본 것이 없다.",
@@ -126,7 +127,8 @@ const MINE = {
 };
 const TITLE_ASK_SCENE =
   "방금 쓴 일기에서 가장 마음에 남는 장면 하나를 골라, 그것을 가리키는 짧은 제목을 한 줄로 적어라. 제목만 적는다.";
-const TITLE_ASK = "방금 쓴 일기에 붙일 제목을 한 줄로 적어라. 제목만 적는다.";
+const TITLE_ASK =
+  "방금 쓴 일기에서 네 마음이 어땠는지를 가리키는 짧은 제목을 한 줄로 적어라. 제목만 적는다.";
 const S_DAY_OPEN = "오늘은 아직 다 가지 않았다. 이 뒤에 무슨 일이 더 있을지는 모른다.";
 const SIG_HEAD = "오늘 내가 본 것은 이렇다.";
 
@@ -324,21 +326,31 @@ describe("E9 — 꼬리는 날의 갈래 넷", () => {
     expect(p).not.toContain("한 장도 보지 못해서");
   });
 
-  it("본 장면 없는 날은 기록 머리줄과 S_DAY_OPEN을 싣지 않는다", () => {
+  it("본 장면 없는 날은 기록 머리줄을 싣지 않는다", () => {
     for (const s of [EMPTY, TRUNCATED, UNSEEN]) {
-      const p = buildPrompt(req(s, "quiet", OPEN));
-      expect(p).not.toContain(SIG_HEAD);
-      expect(p).not.toContain(S_DAY_OPEN);
+      expect(buildPrompt(req(s, "quiet", OPEN))).not.toContain(SIG_HEAD);
     }
   });
 
-  it("하루가 안 끝났으면 본 장면 없는 날 꼬리의 첫 문장(들) 뒤에 B가 붙는다", () => {
-    expect(lastLine(buildPrompt(req(EMPTY, "quiet", OPEN)))).toBe(
-      noSceneTail(WHY.zero, MINE.zero, true),
-    );
-    expect(lastLine(buildPrompt(req(UNSEEN, "quiet", OPEN)))).toBe(
-      noSceneTail(WHY.unseen, MINE.unseen, true),
-    );
+  it("063 — 하루가 안 끝난 본 장면 없는 날은 S_DAY_OPEN이 기록 첫 줄이고 꼬리에 B가 없다 (R18.y3)", () => {
+    const cases: [DaySignals, string, string][] = [
+      [EMPTY, WHY.zero, MINE.zero],
+      [TRUNCATED, WHY.unread, MINE.unread],
+      [UNSEEN, WHY.unseen, MINE.unseen],
+    ];
+    for (const [s, why, mine] of cases) {
+      const p = buildPrompt(req(s, "quiet", OPEN));
+      const record = p.split("\n").slice(promptPrefix("quiet").split("\n").length);
+      expect(record[0]).toBe(S_DAY_OPEN);
+      expect(lastLine(p)).toBe(noSceneTail(why, mine));
+      expect(p).not.toContain(B_OPEN);
+    }
+  });
+
+  it("063 — 하루가 끝난 본 장면 없는 날은 S_DAY_OPEN이 없다", () => {
+    for (const s of [EMPTY, TRUNCATED, UNSEEN]) {
+      expect(buildPrompt(req(s, "quiet"))).not.toContain(S_DAY_OPEN);
+    }
   });
 
   it("본 장면 있는 날이 안 끝났으면 S_DAY_OPEN이 기록 맨 위에 남는다 (원본 코드가 이긴다, research R2)", () => {
@@ -390,12 +402,19 @@ describe("E5 — instructionLines 한국어 분기 (원본 행과 같은 순서)
     ]);
   });
 
-  it("본 장면 없는 날: … → 제목 질문 → 언어 줄 → 꼬리 (S_DAY_OPEN은 꼬리가 말한다)", () => {
+  it("본 장면 없는 날: 머리 넷 → (안 끝났으면 S_DAY_OPEN) → 제목 질문 → 언어 줄 → 꼬리", () => {
     expect(instructionLines(req(EMPTY, "quiet", OPEN))).toEqual([
+      ...HEAD_RULES,
+      S_DAY_OPEN,
+      TITLE_ASK,
+      LANGUAGE_LINE,
+      noSceneTail(WHY.zero, MINE.zero),
+    ]);
+    expect(instructionLines(req(EMPTY, "quiet"))).toEqual([
       ...HEAD_RULES,
       TITLE_ASK,
       LANGUAGE_LINE,
-      noSceneTail(WHY.zero, MINE.zero, true),
+      noSceneTail(WHY.zero, MINE.zero),
     ]);
   });
 
