@@ -15,7 +15,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { buildPrompt, instructionLines, promptPrefix } from "../../src/diary/prompt";
+import { buildPrompt, instructionLines, promptPrefix, titleQuestion } from "../../src/diary/prompt";
 import { personaOf } from "../../src/diary/persona";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character, type DiaryRequest } from "../../src/diary/types";
@@ -45,6 +45,18 @@ function requestFor(signals: DaySignals, character: Character = "quiet"): DiaryR
 // ─────────────────────────────────────────────────────────────────────────────
 const PROMPT_SOURCE = readFileSync(join(__dirname, "../../src/diary/prompt.ts"), "utf8");
 
+/**
+ * 본문 프롬프트에 실려야 하는 지시문 줄 (061).
+ *
+ * 061부터 `instructionLines()`에 **제목 질문**이 들어 있다 — 두 번째 호출의 프롬프트라
+ * `buildPrompt()`에는 없지만, 본문이 그것을 옮겨 적으면 낭독이라 되뱉기 대상이다.
+ * P-7 「모든 줄이 프롬프트에 있다」는 그 한 줄을 빼고 성립한다.
+ */
+function bodyInstructionLines(request: DiaryRequest): string[] {
+  const question = titleQuestion(request);
+  return instructionLines(request).filter((line) => line !== question);
+}
+
 describe("P-1 화자 규칙이 항상 있다 (FR-013·013a)", () => {
   // 어떤 캐릭터, 어떤 신호에서도 빠지지 않아야 한다. 빠지는 조합이 하나라도 있으면
   // 그 조합에서 이 앱은 그냥 일기 앱이 된다.
@@ -64,11 +76,11 @@ describe("P-1 화자 규칙이 항상 있다 (FR-013·013a)", () => {
   });
 
   it("기록에 없는 것을 단언하지 말라는 지시가 담긴다", () => {
-    // 036 — 한국어 캐릭터의 E2SN 머리는 "단언" 대신 "단정"을 쓴다("있었다·했다 같은
-    // 단정은 기록에 있는 것에만 쓴다"). 둘 다 같은 규칙이다.
+    // 061 — 한국어 머리는 "기록에 없는 장소 이름, 사람, 물건, 사건은 쓰지 않는다"로 담는다.
+    // 036의 "단정은 기록에 있는 것에만"·현행의 "단언하지 마라"와 같은 규칙이다.
     for (const character of CHARACTERS) {
       const prompt = buildPrompt(requestFor(richDay(DAY), character));
-      expect(prompt).toMatch(/단언|단정/);
+      expect(prompt).toMatch(/단언|단정|기록에 없는 .*쓰지 않는다/);
     }
   });
 
@@ -109,17 +121,28 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
     expect(PROMPT_SOURCE).toMatch(/본 것만|기록에 있는 것만/);
   });
 
-  it("E2SN: 본 것으로 짐작하라는 지시가 담긴다 (한국어)", () => {
+  it("한국어: 본 것만 있다는 것과 주인의 일은 짐작으로 쓰라는 지시가 담긴다 (061)", () => {
     const prompt = buildPrompt(requestFor(unknownDay(DAY)));
-    expect(prompt).toMatch(/본 것으로 주인의 하루를 짐작|기록에 있는 것에만/);
+    expect(prompt).toContain("사진에 담긴 장면 말고는 본 것이 없다");
+    expect(prompt).toContain("주인이 무엇을 했는지는 '~했을 것 같다'");
+  });
+
+  it("★ 061: 본 장면 없는 날은 주인의 하루를 짐작하지 않고 내 하루를 쓴다", () => {
+    // 「상상으로 쓴다」가 지어내기의 직접 원인이었다(my-ollama REPORT §8.2).
+    for (const day of [emptyDay(DAY), unknownDay(DAY)]) {
+      const prompt = buildPrompt(requestFor(day));
+      expect(prompt).toContain("주인의 하루가 아니라 내 하루를 쓴다");
+      expect(prompt).toContain("주인이 무엇을 했는지는 짐작하지 않는다");
+      expect(prompt).not.toContain("상상");
+    }
   });
 
   it("기록이 적으면 짧게 쓰라는 지시가 담긴다", () => {
     // **길이를 채우려는 압력이 지어내기의 원인이다.** 짧아도 된다고 말해 준다.
-    // E2SN은 "두세 문장이면 된다", 현행은 "짧게".
+    // 061 한국어는 "짧게 쓴다. 본문은 서너 문장이면 된다", 현행은 "짧게".
     for (const character of CHARACTERS) {
       const prompt = buildPrompt(requestFor(unknownDay(DAY), character));
-      expect(prompt).toMatch(/짧(게|아도)|두세 문장/);
+      expect(prompt).toMatch(/짧(게|아도)|서너 문장/);
     }
   });
 
@@ -131,10 +154,13 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
 
   it("★ 지어내면 안 되는 예가 구체적으로 담긴다", () => {
     // 추상적 금지("단언하지 마라")만으로는 부족했다. 무엇이 위반인지 보여준다.
+    // 061 한국어는 「기록에 없는 장소 이름, 사람, 물건, 사건」(036의 「먹었는지·만났는지」
+    // 나열은 보고서 말투의 재료였다 — REPORT §2.2). 현행은 날씨·먹은 것·만난 사람(소스).
     for (const character of CHARACTERS) {
       const prompt = buildPrompt(requestFor(unknownDay(DAY), character));
-      expect(prompt).toMatch(/날씨|먹|만난/);
+      expect(prompt).toMatch(/날씨|먹|만난|장소 이름, 사람, 물건, 사건/);
     }
+    expect(PROMPT_SOURCE).toMatch(/날씨, 주인이 먹은 것, 만난 사람/);
   });
 
   it("★ 캐릭터가 달라도 같은 규칙이다 (FR-040)", () => {
@@ -142,8 +168,8 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
     // 갈리지만(036) 규칙 자체는 다섯 캐릭터가 같다.
     for (const c of CHARACTERS) {
       const prompt = buildPrompt(requestFor(unknownDay(DAY), c));
-      expect(prompt).toMatch(/본 것만|기록에 있는 것만|본 것으로 주인의 하루를 짐작/);
-      expect(prompt).toMatch(/짧(게|아도)|두세 문장/);
+      expect(prompt).toMatch(/본 것만|기록에 있는 것만|장면 말고는 본 것이 없다/);
+      expect(prompt).toMatch(/짧(게|아도)|서너 문장/);
     }
   });
 
@@ -425,10 +451,18 @@ describe("P-7 두 함수가 같은 상수에서 나온다", () => {
   ];
 
   it.each(days)("%s — 지시문의 모든 줄이 프롬프트에 들어 있다", (_label, signals) => {
+    // 061 — 제목 질문 한 줄은 두 번째 호출의 프롬프트다(bodyInstructionLines 주석).
     const request = requestFor(signals);
     const prompt = buildPrompt(request);
-    for (const line of instructionLines(request)) {
+    for (const line of bodyInstructionLines(request)) {
       expect(prompt).toContain(line);
+    }
+  });
+
+  it("061 — 제목 질문도 되뱉기 비교 대상이다", () => {
+    for (const [, signals] of days) {
+      const request = requestFor(signals);
+      expect(instructionLines(request)).toContain(titleQuestion(request));
     }
   });
 
@@ -527,12 +561,14 @@ describe("012 — DAY_STILL_OPEN, 하루가 아직 끝나지 않았다는 문장
 
   it("1. dayStillOpen: true, 사진 known → 문장이 있다", () => {
     const prompt = buildPrompt(requestWith(richDay(DAY), true));
-    expect(prompt).toMatch(/아직.*(끝나지 않았|다 가지 않았)/);
+    expect(prompt).toMatch(/아직.*(끝나지 않았|다 가지 않)/);
   });
 
   it("★ 2. dayStillOpen: true, 사진 unknown(권한 없음) → 문장이 여전히 있다 (FR-004, 이 계약의 핵심)", () => {
+    // 061 — 본 장면 없는 날은 기록 맨 위가 아니라 꼬리가 1인칭으로 말한다
+    // ("오늘은 아직 다 가지 않아서 이 뒤에 무슨 일이 더 있을지도 나는 모른다").
     const prompt = buildPrompt(requestWith(unknownDay(DAY), true));
-    expect(prompt).toMatch(/아직.*(끝나지 않았|다 가지 않았)/);
+    expect(prompt).toMatch(/아직.*(끝나지 않았|다 가지 않)/);
   });
 
   it("3. dayStillOpen: false(지난 하루) → 문장이 없고 011까지의 것과 바이트 단위로 같다", () => {
@@ -550,11 +586,11 @@ describe("012 — DAY_STILL_OPEN, 하루가 아직 끝나지 않았다는 문장
   it("P2 — DAY_STILL_OPEN이 instructionLines의 되뱉기 비교 대상에 포함된다", () => {
     const request = requestWith(richDay(DAY), true);
     const prompt = buildPrompt(request);
-    for (const line of instructionLines(request)) {
+    for (const line of bodyInstructionLines(request)) {
       expect(prompt).toContain(line);
     }
-    // 그 문장 자체가 지시문 목록에 있어야 한다.
-    expect(instructionLines(request).some((l) => /아직.*(끝나지 않았|다 가지 않았)/.test(l))).toBe(
+    // 그 문장 자체가 지시문 목록에 있어야 한다(본 장면 없는 날은 꼬리 안에 들어 있다).
+    expect(instructionLines(request).some((l) => /아직.*(끝나지 않았|다 가지 않)/.test(l))).toBe(
       true,
     );
   });
@@ -607,94 +643,43 @@ describe("011 — 캡션 기계가 소스에 남아 있다 (037 — 닿는 캐�
   });
 });
 
-describe("017 — 제목·본문 서두 지시문 보강 (contracts/title.md)", () => {
-  // 036 — 한국어 캐릭터의 제목 지시문은 E2_TITLE로 바뀌었다(FR-003): 이름 든 반례·
-  // 기호 나열·"반복하지" 문구를 뺐다(리포트 §5.1·§5.2). E2_TITLE 계약은
-  // prompt-e2sn.test.ts E1이 잠근다.
+describe("017 — 제목·본문 서두 지시문 (contracts/title.md) → 061 제목 분리", () => {
+  // ★ 061 — 한국어 캐릭터는 **제목 지시가 본문 프롬프트에 없다.** 제목을 먼저 쓰게 한 것이
+  // 제목 추출 실패 93%의 원인이었다(my-ollama REPORT §2.3). 판정 통과 뒤 같은 대화에 이어
+  // `titleQuestion()`으로 묻는다(on-device.ts). 그 문안은 prompt-e2sn.test.ts E10이 잠근다.
   //
-  // ★ 037 — 그 문구들을 유지하는 `TITLE_INSTRUCTION` 경로에 닿는 캐릭터가 로스터에
-  // 없다. 아래는 조립 대신 소스에서 보는 회귀 검사다(FR-014).
+  // ★ 037 — 017의 문구(반례·기호 나열·「반복하지」)를 유지하는 `TITLE_INSTRUCTION` 경로에
+  // 닿는 캐릭터가 로스터에 없다. 아래는 조립 대신 소스에서 보는 회귀 검사다(FR-014).
   const request = requestFor(partiallyUnknownDay(DAY));
 
-  it("재조합 패턴을 금지하는 구체적 예시를 포함한다 (TL2)", () => {
-    const lines = instructionLines(request);
-    const titleLines = lines.join("\n");
-
-    // "{이름}의 오늘 일기" 류의 반례를 구체적으로 든다.
-    expect(titleLines).toMatch(/의 오늘 일기|의 하루/);
+  it("한국어 본문 프롬프트에 제목 지시가 없다 (061)", () => {
+    expect(buildPrompt(request)).not.toContain("제목");
   });
 
-  it("짐작 어미 규칙이 제목에도 적용됨을 언급한다 (TL4)", () => {
-    const lines = instructionLines(request);
-    const titleLines = lines.join("\n");
-
-    expect(titleLines).toMatch(/제목/);
-    // 짐작 어미(014 SPEAKER_RULES 마지막 항목)가 제목에도 적용된다는 언급.
-    expect(titleLines).toMatch(/제목.*짐작|짐작.*제목/s);
+  it("제목 질문은 한 줄로 제목만 적으라고 묻는다 (061)", () => {
+    expect(titleQuestion(request)).toMatch(/한 줄로 적어라\. 제목만 적는다\.$/);
   });
 
-  it("마크다운 서식 기호를 쓰지 말라는 지시를 포함한다 (TL9, 036 이후)", () => {
-    const lines = instructionLines(request);
-    const titleLines = lines.join("\n");
-
-    // 036 — 기호 나열("#, *, **, -")을 "서식 기호"로 뭉뚱그렸다. 기호를 보여 주면
-    // 모델이 `#없음 *없음`을 베낀다(리포트 §5.2). 037 — 나열을 유지하는 현행 경로에
-    // 닿는 캐릭터가 없으므로 그 문안은 소스에서 확인한다.
-    expect(titleLines).toMatch(/서식 기호/);
-    expect(PROMPT_SOURCE).toContain("#");
-  });
-
-  it("'빈 줄'이라는 낱말이 지시문 문자열에 없다 (TL10 역검증)", () => {
-    const lines = instructionLines(request);
-    const titleLines = lines.join("\n");
-
-    expect(titleLines).not.toContain("빈 줄");
-  });
-
-  it("본문 서두 지시를 포함한다 (TL11, 036 이후)", () => {
-    const lines = instructionLines(request);
-    const titleLines = lines.join("\n");
-
-    // 036 — E2_TITLE은 "반복하지"를 뺐다(되뇜의 재료가 된다). 대신 본문 첫 문장을
-    // 무엇으로 시작할지 직접 말한다. 037 — "반복하지" 문안은 현행 경로에 남아 있다.
-    expect(titleLines).toMatch(/본문 첫 문장|반복하지|다시.*(쓰지|적지)/);
+  it("현행 경로의 제목 지시문(017)이 소스에 남아 있다 (TL2·TL4·TL9·TL11)", () => {
+    expect(PROMPT_SOURCE).toContain("TITLE_INSTRUCTION");
+    expect(PROMPT_SOURCE).toMatch(/의 오늘 일기/);
+    expect(PROMPT_SOURCE).toMatch(/서식 기호/);
     expect(PROMPT_SOURCE).toMatch(/반복하지/);
   });
 
+  it("'빈 줄'이라는 낱말이 지시문 문자열에 없다 (TL10 역검증)", () => {
+    expect(instructionLines(request).join("\n")).not.toContain("빈 줄");
+  });
+
   it("완성된 제목 형태의 긍정 예시가 없다 (TL3 역검증)", () => {
-    const lines = instructionLines(request);
-    const titleLines = lines.join("\n");
-
-    // "이렇게 써라: XXX" 같은 완결된 예시 문장을 담지 않는다 — 큰따옴표로
-    // 감싼 완성 문장이 없는지 확인한다.
-    expect(titleLines).not.toMatch(/["'『「].{2,20}["'』」]\s*(류로|처럼) 써라/);
+    const lines = instructionLines(request).join("\n");
+    expect(lines).not.toMatch(/["'『「].{2,20}["'』」]\s*(류로|처럼) 써라/);
   });
 
-  it("제목 지시문이 여전히 instructionLines()에 포함되어 되뱉기 판정 대상이다 (회귀)", () => {
-    const prompt = buildPrompt(request);
-    for (const line of instructionLines(request)) {
-      expect(prompt).toContain(line);
-    }
-  });
-
-  it("같은 언어 캐릭터는 같은 제목 지시문을 받는다 (TL5, 036 언어 분기)", () => {
-    // 제목 지시문은 이름 줄과 분리된 별도 상수다 — 같은 언어 안에서는 캐릭터별로
-    // 갈라지지 않는다. 036에서 언어로만 갈린다(한국어=E2_TITLE, 외국어=TITLE_INSTRUCTION).
-    const titleOf = (character: Character) =>
-      instructionLines(requestFor(partiallyUnknownDay(DAY), character)).find(
-        (line) => line.includes("제목") && line.startsWith("첫 줄에"),
-      );
-
-    // 037 — 로스터의 캐릭터가 하나라 "같은 언어끼리 같다"를 직접 비교할 수 없다.
-    // 제목 지시문이 캐릭터가 아니라 **언어**로 갈린다는 성질은 소스에서 본다 —
-    // 캐릭터가 늘면 위 비교를 되살린다(FR-014).
+  it("같은 언어 캐릭터는 같은 제목 질문을 받는다 (TL5)", () => {
     for (const c of CHARACTERS) {
-      expect(titleOf(c)).toBeDefined();
-      expect(titleOf(c)).toBe(titleOf("quiet"));
+      expect(titleQuestion(requestFor(partiallyUnknownDay(DAY), c))).toBe(titleQuestion(request));
     }
-    // 037 — 언어로 갈린다는 성질은 소스에서 본다(닿는 외국어 캐릭터가 없다).
-    expect(PROMPT_SOURCE).toContain("TITLE_INSTRUCTION");
-    expect(PROMPT_SOURCE).toContain("E2_TITLE");
   });
 });
 
@@ -719,8 +704,10 @@ describe("018 — 고정 접두사 (contracts/prompt-prefix.md)", () => {
     const prefix = promptPrefix("quiet");
     expect(prefix).not.toMatch(/\d{4}-\d{2}-\d{2}/); // 날짜
     expect(prefix).not.toContain("에 네가 본 것"); // 신호 절 머리
-    expect(prefix).not.toContain("사진");
+    // 061 — 머리가 「사진에 담긴 장면 말고는」을 말하므로 「사진」 낱말이 아니라 신호 문장을 본다.
+    expect(prefix).not.toContain("사진은");
     expect(prefix).not.toContain("다닌 자리");
+    expect(prefix).not.toContain("담은 장면:");
   });
 
   it("P11: 캐릭터마다 접두사가 다르다", () => {
@@ -759,15 +746,15 @@ describe("035 — 사용자 지정 이름이 호칭 줄에 흐른다 (N14~N17)",
 
   it("지정한 캐릭터의 호칭 줄이 사용자 이름을 쓴다 (FR-018)", () => {
     const prompt = buildPrompt({ ...requestFor(richDay(DAY), "quiet"), customNames: CUSTOM });
-    expect(prompt).toContain("너는 '복실이'이라 불린다.");
-    expect(prompt).not.toContain("너는 '금동이'이라 불린다.");
+    expect(prompt).toContain("너는 '복실이'라 불리는, 주인의 휴대폰이다.");
+    expect(prompt).not.toContain("너는 '금동이'라 불리는");
   });
 
   it("지정하지 않은 캐릭터는 기본 이름 그대로다", () => {
     // 037 — 로스터가 하나라 "다른 캐릭터에는 안 번진다"를 캐릭터로 비교할 수 없다.
     // 대신 **이 캐릭터의 이름을 지정하지 않았을 때** 기본 이름이 오는 것을 본다.
     const prompt = buildPrompt({ ...requestFor(richDay(DAY), "quiet"), customNames: {} });
-    expect(prompt).toContain("너는 '금동이'이라 불린다.");
+    expect(prompt).toContain("너는 '금동이'라 불리는, 주인의 휴대폰이다.");
   });
 
   it("customNames가 없으면 035 이전과 바이트 단위로 같다", () => {
@@ -825,7 +812,7 @@ describe("035 — 사용자 지정 이름이 호칭 줄에 흐른다 (N14~N17)",
   it("되뱉기 판정 줄도 같은 이름을 쓴다 (P-7 유지)", () => {
     const request = { ...requestFor(richDay(DAY), "quiet"), customNames: CUSTOM };
     const prompt = buildPrompt(request);
-    for (const line of instructionLines(request)) {
+    for (const line of bodyInstructionLines(request)) {
       expect(prompt).toContain(line);
     }
   });

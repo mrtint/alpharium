@@ -211,32 +211,28 @@ export function createLlamaEngine(
       // 같은 문자열을 보낸다. 모델마다 템플릿이 다르지만 **우리가 넣는 것은 하나**이며,
       // 그 동일성이 테스트로 검증된다.
       // ─────────────────────────────────────────────────────────────────────
-      const result = await context.completion({
-        messages: [{ role: "user", content: prompt }],
-        jinja: true,
-        temperature: SAMPLING.temperature,
-        top_p: SAMPLING.top_p,
-        top_k: SAMPLING.top_k,
-        n_predict: SAMPLING.n_predict,
-      });
+      return complete(context, [{ role: "user", content: prompt }]);
+    },
 
-      // ★ **여기가 원칙 IV의 경계다.** `text`와 `ending`만 꺼내고 나머지를 버린다.
-      // `timings`·`tokens_predicted`는 이 줄을 넘지 못한다.
-      // ─────────────────────────────────────────────────────────────────────
-      // **`content`를 먼저 본다** (실기기에서 찾은 것, 2026-08-17).
-      //
-      // `NativeCompletionResult`는 `text`와 `content`를 따로 준다:
-      //   text    — 원문 (reasoning_content·tool_calls를 걸러내지 않은 것)
-      //   content — 걸러낸 본문
-      //
-      // **처음에 `text`만 봤더니 실기기에서 빈 글이 나왔다**(`rejected: empty`).
-      // 채팅 템플릿 없이 평문을 넣으면 파서가 원문을 `text`에 채우지 않는 경우가 있다.
-      // 둘 중 **내용이 있는 쪽**을 쓰되, 없으면 빈 문자열이고 그때는 판정이 거부한다 —
-      // **없는 것을 지어내지 않는다**(원칙 I).
-      // ─────────────────────────────────────────────────────────────────────
-      const produced = (result.content ?? "").trim() || (result.text ?? "").trim();
-
-      return { text: produced, ending: endingOf(result) };
+    /**
+     * 본문에 이어 한 번 더 묻는다 (061, contracts/title-ask.md TA1).
+     *
+     * `run()`과 **같은 경로**(`complete()`)로 보낸다 — 샘플링·`jinja`·지표를 버리는 경계가
+     * 한 곳이다. 메시지가 셋일 뿐이다: 본문 프롬프트 → 모델이 쓴 본문 → 질문. 본문까지의
+     * 토큰 열이 첫 호출과 같아 KV 캐시가 그대로 이어진다(짐작, 실기기에서 본다).
+     */
+    async ask(
+      prompt: string,
+      body: string,
+      question: string,
+      _limits: RunLimits,
+    ): Promise<RunResult> {
+      if (context === null) return { text: "", ending: { kind: "length" } };
+      return complete(context, [
+        { role: "user", content: prompt },
+        { role: "assistant", content: body },
+        { role: "user", content: question },
+      ]);
     },
 
     async stop(): Promise<void> {
@@ -262,6 +258,43 @@ export function createLlamaEngine(
       }
     },
   };
+}
+
+/** `completion()`에 넘기는 대화 한 줄 */
+type ChatMessage = { role: "user" | "assistant"; content: string };
+
+/**
+ * 대화를 보내고 `{ text, ending }`만 꺼낸다 — `run()`·`ask()`가 함께 쓴다(061).
+ *
+ * **토큰 콜백(두 번째 인자)을 넘기지 않는다**(E3, FR-028b).
+ */
+async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<RunResult> {
+  const result = await context.completion({
+    messages,
+    jinja: true,
+    temperature: SAMPLING.temperature,
+    top_p: SAMPLING.top_p,
+    top_k: SAMPLING.top_k,
+    n_predict: SAMPLING.n_predict,
+  });
+
+  // ★ **여기가 원칙 IV의 경계다.** `text`와 `ending`만 꺼내고 나머지를 버린다.
+  // `timings`·`tokens_predicted`는 이 줄을 넘지 못한다.
+  // ─────────────────────────────────────────────────────────────────────
+  // **`content`를 먼저 본다** (실기기에서 찾은 것, 2026-08-17).
+  //
+  // `NativeCompletionResult`는 `text`와 `content`를 따로 준다:
+  //   text    — 원문 (reasoning_content·tool_calls를 걸러내지 않은 것)
+  //   content — 걸러낸 본문
+  //
+  // **처음에 `text`만 봤더니 실기기에서 빈 글이 나왔다**(`rejected: empty`).
+  // 채팅 템플릿 없이 평문을 넣으면 파서가 원문을 `text`에 채우지 않는 경우가 있다.
+  // 둘 중 **내용이 있는 쪽**을 쓰되, 없으면 빈 문자열이고 그때는 판정이 거부한다 —
+  // **없는 것을 지어내지 않는다**(원칙 I).
+  // ─────────────────────────────────────────────────────────────────────
+  const produced = (result.content ?? "").trim() || (result.text ?? "").trim();
+
+  return { text: produced, ending: endingOf(result) };
 }
 
 /**

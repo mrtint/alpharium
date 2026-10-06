@@ -105,15 +105,54 @@ function isEmpty(text: string): boolean {
 }
 
 /**
- * A2. 되뱉었는가 (FR-016b-1).
+ * 따옴표 모양과 공백을 지운다 — 모델이 ‘ ’로 바꿔 적거나 띄어쓰기를 달리해도 같은 말로 본다
+ * (061 EC3).
+ */
+const flat = (s: string): string => s.replace(/[‘’“”'"`´]/g, "'").replace(/\s/g, "");
+
+/**
+ * 지시 어미 — 일기 문장에는 올 수 없는 꼴이다(061 EC2).
  *
- * **부분 문자열 포함 여부만 본다. 불리언이다.**
+ * 출처: my-ollama `docs/alpharium-prompt-change-handoff.md` §5. 이 목록도 **무엇을 비교할지
+ * 고르는 값**이지 통과·거부를 가르는 점수가 아니다(FR-016b-2).
+ */
+const IMPERATIVE = /(적는다|쓴다|써라|맺는다|이면 된다|않는다|시작하고|시작한다)$/;
+
+/**
+ * 지시문 한 줄에서 **비교할 조각**을 고른다 (061 EC2·EC4).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **왜 줄 전체만으로는 모자라는가 (실측).** 061의 본 장면 없는 날 꼬리는 한 줄이 260자다.
+ * 모델이 그중 한 절만 옮기거나 한 글자만 바꿔 옮기면 줄 전체 비교는 빠져나간다 — my-ollama
+ * 1,008런에서 낭독 85편 중 3편만 걸렸다(REPORT §8.6). 절 단위로 보면 85편 전부, 오탐 0편.
+ *
+ *  · 작은따옴표 안은 뺀다 — 그것은 쓰라고 준 말이다(「나는 오늘 아무것도 보지 못했다」)
+ *  · 지시 어미로 끝나는 `MIN_ECHO_LENGTH + 4`(16)자 이상의 절만 본다
+ *
+ * FR-016b-2: **고르기까지가 값이고, 그다음은 불리언이다.**
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+function echoPieces(line: string): string[] {
+  return line
+    .replace(/'[^']*'/g, "§")
+    .split(/[.。]|,|§/)
+    .map((c) => c.trim())
+    .filter((c) => c.length >= MIN_ECHO_LENGTH + 4 && IMPERATIVE.test(c));
+}
+
+/**
+ * A2. 되뱉었는가 (FR-016b-1, 061 EC1~EC5).
+ *
+ * **부분 문자열 포함 여부만 본다. 불리언이다.** 지시문 줄 전체가 들어 있거나, 그 줄에서 고른
+ * 비교 조각 하나가 들어 있으면 되뱉음이다.
  * 유사도·비율·n-gram을 쓰지 않는다(FR-016b-2) — 전부 임계값을 필요로 하고 임계값은 점수다.
  */
 function isEcho(text: string, instructions: string[]): boolean {
+  const t = flat(text);
   return instructions.some((line) => {
     const trimmed = line.trim();
-    return trimmed.length >= MIN_ECHO_LENGTH && text.includes(trimmed);
+    if (trimmed.length >= MIN_ECHO_LENGTH && t.includes(flat(trimmed))) return true;
+    return echoPieces(line).some((piece) => t.includes(flat(piece)));
   });
 }
 

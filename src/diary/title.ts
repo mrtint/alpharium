@@ -18,7 +18,7 @@
  */
 
 /** 제목으로 채택할 첫 줄의 최대 길이. 짐작이며 실측 근거는 research.md R2 참조 */
-const MAX_TITLE_LENGTH = 40;
+export const MAX_TITLE_LENGTH = 40;
 
 export type TitleExtraction = {
   title?: string;

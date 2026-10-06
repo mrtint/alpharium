@@ -10,7 +10,7 @@
  *
  * 흐름은 이렇다(data-model.md 「생성 한 번의 흐름」):
  *
- *   시각 설정 검사 → buildPrompt → engine.load → engine.run → judge → unload
+ *   시각 설정 검사 → buildPrompt → engine.load → engine.run → judge → engine.ask(제목, 061) → unload
  *
  * **`unload()`가 흐름 바깥(finally)에 있는 것이 중요하다**(engine.md E2). 성공 경로에만
  * 두면 실패에서 새고, 새면 다음 요청이 메모리 부족으로 죽는다.
@@ -23,8 +23,9 @@
 
 import type { DayDate } from "../config/day-boundary";
 import { judge } from "../diary/acceptance";
-import { buildPrompt, instructionLines, promptPrefix } from "../diary/prompt";
+import { buildPrompt, instructionLines, promptPrefix, titleQuestion } from "../diary/prompt";
 import { buildRequest } from "../diary/request";
+import { MAX_TITLE_LENGTH } from "../diary/title";
 import type { Character, CustomNames, DiaryRequest, VisionSetting } from "../diary/types";
 import type { DaySignals, Photo } from "../signals/types";
 import { captionAll, type PhotoPathResolver, type ResizedPhotoCleaner } from "../vision/caption";
@@ -159,6 +160,58 @@ async function runWithTimeout(
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
+}
+
+/**
+ * 시간 한도 안에서 제목을 묻는다 (061, contracts/title-ask.md TA2).
+ *
+ * 한도는 본문 호출과 **같은 값을 한 번 더** 쓴다 — 제목용 숫자를 새로 짓지 않는다(원칙 V:
+ * 지을 근거가 없다). 실측으로는 제목 답이 중앙 9토큰·최대 16이다(my-ollama REPORT §4.4).
+ *
+ * **예외를 던지지 않는다** — 넘거나 실패하면 `undefined`이고, 부르는 쪽은 제목 없이 본문만
+ * 저장한다. 제목 호출 때문에 판정을 통과한 일기를 버리지 않는다.
+ */
+async function askWithTimeout(
+  engine: GenerationEngine,
+  prompt: string,
+  body: string,
+  question: string,
+  timeoutMs: number,
+): Promise<RunResult | undefined> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  const timeout = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      void engine.stop().catch(() => {});
+      resolve(undefined);
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([engine.ask(prompt, body, question, { timeoutMs }), timeout]);
+  } catch {
+    return undefined;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
+
+/**
+ * 제목 답을 본문 앞에 잇는다 (061, data-model.md 「제목 합치기」).
+ *
+ * 답이 **스스로 끝났고(`eos`) 한 줄이고 비지 않았고 `MAX_TITLE_LENGTH` 이하**일 때만
+ * `제목\n\n본문`이다 — 그러면 `pipeline.ts`의 `extractTitle()`이 지금처럼 뗀다(계약 불변).
+ * 그 밖은 본문만 돌려준다. **글을 고치지 않는다**(FR-017) — 모델이 쓴 두 조각을 잇기만 하고,
+ * 앞뒤 공백을 걷는 것 말고는 손대지 않는다. 판정 갈래도 늘리지 않는다(원칙 IV).
+ *
+ * 길이를 여기서도 보는 까닭: 41자 이상의 한 줄을 이어 붙이면 `extractTitle()`이 제목으로
+ * 떼지 않아 **그 줄이 본문 첫머리에 남는다.**
+ */
+export function withTitle(body: string, answer: RunResult | undefined): string {
+  if (answer === undefined || answer.ending.kind !== "eos") return body;
+  const title = answer.text.trim();
+  if (title.length === 0 || title.length > MAX_TITLE_LENGTH || /[\r\n]/.test(title)) return body;
+  return `${title}\n\n${body}`;
 }
 
 /**
@@ -654,9 +707,26 @@ export function createOnDeviceBackend(
           return { kind: "rejected", why: verdict.why };
         }
 
+        // 5. 061 — 판정을 통과한 본문에 이어 제목을 묻는다(contracts/title-ask.md TA2).
+        //
+        // **제목 호출이 실패해도 일기를 버리지 않는다** — 제목 없이 본문만 저장한다(지금의
+        // 「못 떼면 제목 없음」과 같다). 단 그만두기는 이긴다(FR-018).
+        const question = titleQuestion(request, seen);
+        const text =
+          question === undefined
+            ? run.run.text
+            : withTitle(
+                run.run.text,
+                await askWithTimeout(engine, prompt, run.run.text, question, timeoutMs),
+              );
+        if (cancel.cancelled) {
+          await cleanupUsedPhotos();
+          return { kind: "interrupted" };
+        }
+
         const usedPhotos = usedPhotosOf();
         return {
-          text: run.run.text,
+          text,
           ...(usedPhotos !== undefined ? { usedPhotos } : {}),
           timing: { ...(visionMs !== undefined ? { visionMs } : {}), writingMs },
         };

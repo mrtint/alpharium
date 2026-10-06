@@ -140,6 +140,17 @@ export interface GenerationEngine {
    */
   prewarm(character: Character, prefix: string): Promise<void>;
   run(prompt: string, limits: RunLimits): Promise<RunResult>;
+  /**
+   * 방금 쓴 본문에 이어 한 번 더 묻는다 (061, specs/061-diary-prompt-swap/contracts/title-ask.md TA1).
+   *
+   * 같은 대화로 보낸다 — `user(prompt)` → `assistant(body)` → `user(question)`. 제목을 본문과
+   * 함께 쓰게 하면 떨어지지 않았고(19/144) 이렇게 따로 물으면 떨어졌다(144/144, my-ollama
+   * REPORT §4.4). 샘플링은 `run()`과 같다.
+   *
+   * **결과의 모양은 `run()`과 같다** — `{ text, ending }` 둘뿐(E4, 원칙 IV). 판정·합치기는
+   * 부르는 쪽(`on-device.ts`)이 한다. 열린 모델이 없으면 던지지 않는다(E5).
+   */
+  ask(prompt: string, body: string, question: string, limits: RunLimits): Promise<RunResult>;
   stop(): Promise<void>;
   unload(): Promise<void>;
 }
