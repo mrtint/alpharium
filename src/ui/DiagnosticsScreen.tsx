@@ -28,6 +28,7 @@ import type { PromptPreview } from "../diagnostics/types";
 import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
 import { AppText } from "./components/Text";
 import { SETTINGS_TEXT } from "./settings-text";
+import { text } from "../i18n/current";
 import { Group, Row, Value } from "./SettingsScreen";
 import { COLORS } from "./theme/tokens";
 
@@ -37,6 +38,8 @@ export type AutoRunResult = "ran" | "skipped" | "failed";
 export type DiagnosticsScreenProps = {
   /** 아직 읽지 못했으면 `null` — 값을 비운다 */
   environment: EnvironmentLines | null;
+  /** 062 FR-011b — 「감지한 기기 언어 → 고른 화면 언어」 한 줄(`languageLine()`). 주지 않으면 값을 비운다 */
+  language?: string;
   /** 저장 점검 행 값 — 점검 전·점검하지 못함은 빈 문자열이다 */
   storage: string;
   onInspectStorage: () => void;
@@ -72,14 +75,19 @@ const BUTTON: ViewStyle = {
 };
 const BUTTON_TEXT: TextStyle = { fontSize: 15, fontWeight: "700" };
 
-const AUTO_TEXT: Readonly<Record<AutoRunResult, string>> = {
-  ran: T.autoRan,
-  skipped: T.autoSkipped,
-  failed: T.autoFailed,
-};
+/** 062 — 모듈을 불러올 때 문구를 읽지 않게 함수로 둔다(contracts C4) */
+function autoText(result: AutoRunResult): string {
+  const byResult: Readonly<Record<AutoRunResult, string>> = {
+    ran: T.autoRan,
+    skipped: T.autoSkipped,
+    failed: T.autoFailed,
+  };
+  return byResult[result];
+}
 
 export function DiagnosticsScreen({
   environment,
+  language = "",
   storage,
   onInspectStorage,
   photo,
@@ -94,7 +102,7 @@ export function DiagnosticsScreen({
   autoResult,
   failures,
 }: DiagnosticsScreenProps) {
-  const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : AUTO_TEXT[autoResult];
+  const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : autoText(autoResult);
 
   return (
     <View testID="diagnostics-screen">
@@ -113,6 +121,11 @@ export function DiagnosticsScreen({
           label={T.inference}
           testID="diagnostics-inference"
           trailing={<Value mono text={environment?.inference ?? ""} />}
+        />
+        <Row
+          label={text().diagnosticsLanguage.label}
+          testID="diagnostics-language"
+          trailing={<Value mono text={language} />}
         />
       </Group>
 

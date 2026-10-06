@@ -26,6 +26,7 @@
 - **설정·개발자 화면 개편도 조각 단위로 진행 중이다**(055~060): 홈 위에 쌓이는 설정 틀, 매일 쓰는 시각·장소 이름 대화상자, 자동 쓰기 규칙
   (재료 없는 날·사진 권한 없는 날 건너뜀, 앱을 열면 쓰는 중), 이 휴대폰(모듈 용량·일기 모두 지우기), 개발자 메뉴(버전 7번 탭·모듈 상태·모듈 다시 받기·온보딩부터
   다시·끄기), 진단 화면(보드 `6h`의 일곱 묶음·한 번 써 보기·최근 쓰기 실패). 상태 흉내는 아직이다(분해 설계 `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`).
+- **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -761,6 +762,32 @@
   같고, ④ 날의 **제목이 「사진 없는」으로 단정**했다(제목 질문에 날 갈래가 없다). 캡션이 많은 날은 「가족·카페·책」 지어내기와 「오전에는… 저녁에는…」 중계가
   남았다(지시서 §7 몫). 상세는 `specs/061-diary-prompt-swap/quickstart.md` 끝.
 
+### 062 — 화면 문구의 다국어 구조
+
+- **화면에 보이는 한글은 `src/i18n/catalogs/ko/`에만 있다**(헌법 검사 `checkI18nFile` B1). 카탈로그 밖에 한글이 남아도 되는 파일은
+  `SCREEN_TEXT_ALLOWLIST`(`scripts/constitution-rules.ts`)에 이유와 함께 있다 — **모델 입력**(`prompt.ts`·`collect.ts` 까닭·`persona.ts` 이름·
+  `liveness.ts`·`prompt-preview.ts` 프리셋)과 **화면에 안 그려지는 내부 이유**(pipeline·inference·readiness·acquisition·wiring)와 `acceptance.ts`(출력 판정).
+  새 화면 문구는 카탈로그에 두고 `text()`로 읽는다. 언어 하나를 더하는 일은 `languages.ts` 한 줄 + `catalogs/<언어>/` 모듈 하나 +
+  `CATALOGS`에 등록이다(`Catalog = typeof ko`라 빠진 항목·다른 함수 모양·요일 개수는 tsc가 짚는다 — `__tests__/i18n/catalog-types.ts`).
+- **언어는 프로세스마다 한 번 정한다**(`src/i18n/current.ts`, Clarification Q1). 헤드리스 완성 알림도 같은 `text()`를 탄다. **★ 실측: 기기 언어를
+  바꿔도 앱 프로세스는 다시 뜨지 않았다**(pid 그대로, 액티비티만 다시 만들어짐) — 그 프로세스는 옛 감지값을 들고 있다. 지금은 결과가 늘 한국어라
+  보이지 않지만, 지원 언어가 둘이 되면 이 자리를 다시 판단한다. `am kill`로는 안 죽어 `am force-stop`으로 새 프로세스를 띄웠다.
+- **`text()`를 모듈 최상단에서 평가하지 않는다**(C4) — 옛 이름(`SETTINGS_TEXT`·`OVERWRITE_CONFIRM`·`DIAGNOSTICS_TEXT` 등)은 `lazyText((c) => c.<영역>)`
+  Proxy로 남아 읽는 순간 카탈로그에서 꺼낸다(배열은 `lazyList`). **그 속성을 모듈 최상단 상수에서 읽으면 불러오는 순간 기기를 읽는다** — 함수나
+  처음 그릴 때 만드는 캐시로 둔다(`REASON_TEXT`·`AUTO_TEXT`·`SLIDE_ITEMS`를 그렇게 바꿨다). 카탈로그는 `as const`를 쓰지 않는다(K1).
+- **조사(`particleFor` 등)는 화면 쪽에서 한국어 카탈로그를 거쳐서만 쓴다**(K6) — 프롬프트는 계속 `particle.ts`를 직접 쓴다. **문구로 분기하지 않는다**
+  (`/준비/.test(screen.message)`를 값 비교로 바꿨다, B5).
+- **회귀 방어는 골든 두 겹**(`__tests__/i18n/ko-golden.test.ts`): 이관 전 화면 문구 리터럴 집합 == 카탈로그 리터럴 집합(G1), 문구 함수·상수 출력
+  바이트 동일(G2, 상수는 `JSON.stringify`로 키 짝까지). 그래서 카탈로그 영역은 옛 상수와 같은 키만 갖는다(새 문구는 `frame`·`diagnosticsLanguage` 같은
+  별도 영역). 골든은 `GOLDEN_WRITE=1`로 다시 쓰지 않는다(「이전」이 사라진다).
+- **`expo-localization`**: `npx expo install`이 `app.json`에 config plugin을 자동으로 넣는다 — 앱별 언어 목록을 선언하지 않기로 해서 되돌렸고, plugin
+  없이 `getLocales()`가 돈다(실측). 권한 추가 없음(`dumpsys package` 전후 같음). 감지는 `locale-port.ts`가 호출 시점 `require`로만 한다(D4) — jest
+  `logic`(node)에서는 「감지 못함 → 한국어」로 떨어진다.
+- **기기 언어 바꾸기**: `cmd locale`에는 시스템 언어 명령이 없다(앱별 `set-app-locales`뿐) — 설정 앱 「언어」에서 추가·기본으로 설정·삭제로 바꾸고 되돌린다.
+  진단 「환경」의 「언어 · {감지한 첫 태그} → {고른 언어}」가 통로를 눈으로 보는 유일한 자리다(FR-011b).
+- `failure-text.ts`(죽은 코드)를 지웠고, `requirements.ts`의 `neededBy`는 주석으로 옮겼다. 관찰(062 밖): 완성 알림이 `diary-completed`가 아니라 expo
+  기본 채널(「Miscellaneous」)로 게시되고 있었다. 상세는 `specs/062-ui-text-i18n/quickstart.md` 끝.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크
@@ -783,6 +810,7 @@ src/
 ├── firstrun/     첫 실행 단계 판정 (040)
 ├── app/          화면이 쓰는 순수 상태·조립 (wiring.ts, state.ts, material.ts …)
 ├── diagnostics/  진단 정보 수집과 출력 경로
+├── i18n/         화면 문구 카탈로그(catalogs/ko/)·기기 언어 감지·해석 (062)
 └── ui/           화면 (components/ 공용 부품, rnr/ 대화상자 프리미티브)
 
 scripts/          헌법 검사, 실기기 테스트 실행기, 합성 하루 심기(010)

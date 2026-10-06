@@ -23,6 +23,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { lazyText } from "../i18n/current";
 import { ConfirmDialog, DialogActionButton } from "./components/Dialog";
 
 export type DownloadConsentDialogProps = {
@@ -31,12 +32,8 @@ export type DownloadConsentDialogProps = {
   onConfirm: () => void;
 };
 
-/** 문구는 전부 사람이 쓴 고정 상수다(FR-003, 원칙 II). */
-const TEXT = {
-  title: "받을 것이 있어요",
-  body: "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
-  confirm: "받을게요",
-} as const;
+/** 문구는 전부 사람이 쓴 고정 상수다(FR-003, 원칙 II). 062 — 원문은 한국어 카탈로그(`src/i18n/catalogs/ko/download.ts`)에 있다 */
+const TEXT = lazyText((c) => c.download.consent);
 
 export function DownloadConsentDialog({ visible, onConfirm }: DownloadConsentDialogProps) {
   return (

@@ -123,3 +123,19 @@
   모델 입력 문자열이고 화면이 그리지 않는다(B3).
 - **Decision**: 저장된 화면 문구는 없다고 보고, 이것을 tasks에서 저장 타입의 필드 목록을 읽는 소스 계약으로 잠근다(새 문구 필드가 생기면 실패). 찾으면 기록하고
   저장값을 갈래로 바꾸는 것은 이 기능 밖의 결정으로 저장소 소유자에게 묻는다.
+
+## R14. 구현에서 정한 것 (062 구현 중)
+
+- **옛 이름을 Proxy로 남긴다(C6)** — `SETTINGS_TEXT`·`OVERWRITE_CONFIRM` 등을 쓰는 화면·테스트가 60개 파일 가까이라, 이름을 그대로 두고
+  `lazyText((c) => c.<영역>)`로 읽는 순간 카탈로그에서 꺼낸다. 이관 diff가 문구 자리에만 생기고, 기존 보드 원문 대조 테스트의 import는 그대로다.
+  배열(`CALENDAR_WEEKDAYS`)은 `lazyList()` — `Array.isArray`·`JSON.stringify`가 배열로 본다. 모듈 최상단에서 그 속성을 읽던 자리
+  (`diagnostics-view.ts` `REASON_TEXT`·`DiagnosticsScreen.tsx` `AUTO_TEXT`·`DownloadProgressScreen.tsx` `SLIDE_ITEMS`)는 함수·처음 그릴 때 만드는 캐시로 바꿨다.
+- **`requirements.ts`의 문안은 getter로 읽는다** — `PERMISSION_REQUIREMENTS`의 모양(키·순서·플랫폼)은 그대로 두고 `rationale`·`ifDenied`만
+  `text().onboarding.permissions[key]`를 읽는 getter다. 화면에 안 보이는 문서용 `neededBy`는 필드를 지우고 항목 위 주석으로 옮겼다(쓰는 곳 0).
+- **`expo install`이 `app.json`에 `expo-localization` config plugin을 자동으로 넣었다** — Clarification Q2(앱별 언어 목록 선언 안 함)대로 되돌렸다.
+  감지에는 plugin이 필요 없다(`getLocales()`는 plugin 없이 돈다 — 실기기로 확인할 것).
+- **`acceptance.ts`도 한글이 있다** — 모델 출력 판정(언어·지시 어미 정규식)이라 B1 허용 목록에 올렸다(헌법 검사가 처음 돌 때 찾았다).
+- **진단 프롬프트 미리보기의 「조립할 수 없음: {이유}」는 이유 원문을 그대로 보인다**(060, 원칙 I) — 원문은 `prompt-preview.ts`의 내부 값이라
+  번역되지 않는다. 개발 빌드 전용이라 B3 예외로 이유와 함께 적었다.
+- **`movedNotice`는 옛 템플릿처럼 이름이 없으면 「undefined」가 들어간다** — 062는 문구를 바꾸지 않으므로 `String()`으로 그대로 옮겼다(로스터가
+  하나라 지금은 도달하지 않는다).

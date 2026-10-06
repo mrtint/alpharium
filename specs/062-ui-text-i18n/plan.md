@@ -96,6 +96,8 @@ __tests__/i18n/                    # 새 테스트
 └── add-language.test.tsx          # X1~X3
 ```
 
+**구현 메모(R14)**: 옛 문구 모음 이름(`SETTINGS_TEXT` 등)은 `lazyText()` Proxy로 남겨 소비자·테스트 import를 바꾸지 않았다(C6).
+
 **Structure Decision**: 단일 프로젝트에 `src/i18n/` 계층 하나를 더한다. 카탈로그는 「말」만 알고 판정하지 않는다(K4) — 판정은 지금 자리(`src/app/`·`src/schedule/` 등)에 남고
 결과를 카탈로그 함수의 인자로 준다. 한국어 카탈로그는 영역별 파일로 나누되 진입 모듈 하나(`catalogs/ko/index.ts`)로 묶어 「언어 하나 = 카탈로그 모듈 하나 + 목록 한 줄」을 지킨다.
 

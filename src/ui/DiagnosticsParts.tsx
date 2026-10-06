@@ -138,7 +138,7 @@ export function PromptPreviewBox({
       {preview === undefined ? null : preview.ok ? (
         <>
           <AppText style={LABEL} testID="diagnostics-prompt-size">
-            {`${preview.approxChars}자 (${T.sizeNote})`}
+            {T.approxChars(preview.approxChars, T.sizeNote)}
           </AppText>
           {/* 상자 안에서 따로 스크롤하지 않는다 — 지면 안의 작은 스크롤 상자는 끝에 닿은 손가락을 바깥 지면으로 넘겨(안드로이드 중첩 스크롤)
               읽다가 화면 전체가 흐르고 마지막 줄이 잘렸다. 본문을 다 펼치고 지면 하나로만 스크롤한다. 글자는 선택만 된다 */}

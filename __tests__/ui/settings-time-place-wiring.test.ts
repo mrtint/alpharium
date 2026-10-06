@@ -40,7 +40,11 @@ describe("AS3 — 설정 값은 AppFrame이 들고 있다 (056 FR-030·T3)", () 
   it("「설정을 읽는 중…」은 값이 아직 없을 때만이다 (FR-031)", () => {
     const section = bodyOf("SettingsSection");
     expect(section).toMatch(/values === null/);
-    expect(section).toMatch(/설정을 읽는 중…/);
+    // 062 — 문구는 한국어 카탈로그(`settings.ts`의 `frame.settingsLoading`)로 옮겼다. 원문은 거기서 본다.
+    expect(section).toMatch(/text\(\)\.frame\.settingsLoading/);
+    expect(readFileSync(join(__dirname, "../../src/i18n/catalogs/ko/settings.ts"), "utf8")).toMatch(
+      /설정을 읽는 중…/,
+    );
   });
 });
 

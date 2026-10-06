@@ -93,6 +93,15 @@ describe("DS2 — 환경과 저장 점검", () => {
     ).toBeTruthy();
   });
 
+  it("062 FR-011b — 환경 묶음에 언어 줄(감지한 것 → 고른 것)이 보인다", async () => {
+    await render(<DiagnosticsScreen {...props({ language: "en-US → 한국어" })} />);
+    const row = within(screen.getByTestId("diagnostics-group-env")).getByTestId(
+      "diagnostics-language",
+    );
+    expect(within(row).getByText("언어")).toBeTruthy();
+    expect(within(row).getByText("en-US → 한국어")).toBeTruthy();
+  });
+
   it("아직 읽지 못했거나 기기 값이 null이면 값을 비운다", async () => {
     await render(
       <DiagnosticsScreen

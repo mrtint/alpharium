@@ -6,8 +6,8 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * **이것은 사람이 못 박은 표다**(012 `USER_VISIBLE_SIGNAL_AXES`·021 `PERMISSION_REQUIREMENTS` 선례,
  * 원칙 V) — 코드가 실패의 문구를 재서 갈래를 정하지 않는다. 파이프라인은 `generation`·`vision` 단계에
- * `` `${kind}: ${detail}` `` 꼴로 이유를 담아 오므로(`failure-text.ts`의 `describeGenerationReason`이 같은
- * 규칙을 쓴다) **앞 토큰(kind)과 `vision-failed`의 detail만** 본다. 문구 전체를 비교하면 문구를 고칠 때 조용히
+ * `` `${kind}: ${detail}` `` 꼴로 이유를 담아 오므로(옛 `failure-text.ts`가 같은
+ * 규칙을 썼다 — 062에서 죽은 코드라 지웠다) **앞 토큰(kind)과 `vision-failed`의 detail만** 본다. 문구 전체를 비교하면 문구를 고칠 때 조용히
  * 깨진다(053 `photoAccess`의 교훈).
  *
  * **갈래는 「다시 눌러 보면 되는가 / 무엇을 준비해야 하는가」다.** 사용자가 무언가를 해야 풀리는 실패에
@@ -20,6 +20,7 @@
  */
 
 import type { PipelineResult } from "../diary/pipeline";
+import { lazyText } from "../i18n/current";
 
 /** 실패한 파이프라인 결과 */
 export type PipelineFailure = Extract<PipelineResult, { ok: false }>;
@@ -36,21 +37,19 @@ export type ToastKind =
   /** 글은 나왔으나 저장하지 못했다 */
   | "save";
 
-/** 모든 갈래가 지금 쓰는 한 줄 (저장소 소유자 결정, 2026-09-30) */
-const FAILED = "일기를 쓰지 못했어요.";
-
 /**
  * 갈래 → 문구. **정본은 이 상수 하나다.** 지금은 저장소 소유자가 다섯 갈래를 한 줄로 통일했다(2026-09-30) —
  * 준비를 요청해도 쓰는 중 화면에서 설정으로 갈 길이 아직 없고, 「다시 써 볼 수 있어요」는 조치가 필요한 실패에
  * 거짓이 될 수 있어서다. 갈래 판정(`toastKindFor`)은 그대로 두어, 설정 진입점이 생기면 문구만 다시 가른다.
  */
-export const TOAST_TEXT: Readonly<Record<ToastKind, string>> = {
-  retry: FAILED,
-  "prepare-character": FAILED,
-  "prepare-vision": FAILED,
-  plain: FAILED,
-  save: FAILED,
-};
+export const TOAST_TEXT: Readonly<Record<ToastKind, string>> = lazyText((c) => ({
+  // 모든 갈래가 지금 쓰는 한 줄 (저장소 소유자 결정, 2026-09-30) — 062부터 한국어 카탈로그 `home.failToast`
+  retry: c.home.failToast,
+  "prepare-character": c.home.failToast,
+  "prepare-vision": c.home.failToast,
+  plain: c.home.failToast,
+  save: c.home.failToast,
+}));
 
 /**
  * `generation`·`vision` 단계의 `reason`(`` `${kind}: ${detail}` ``)을 갈래로 옮긴다. 모르는 것은 `retry` —

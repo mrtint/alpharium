@@ -23,123 +23,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { text } from "../i18n/current";
+import type { AtLeast10 } from "../i18n/catalogs/shapes";
 import type { MonologueBranch, ProgressStage } from "../inference/types";
 
-/** 최소 10개 원소를 강제하는 튜플 — 후보 부족을 컴파일 타임에 막는다(FR-009) */
-type AtLeast10 = readonly [
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  ...string[],
-];
-
-/** 신호 확인 단계 — 다른 신설 갈래와 동일하게 10개로 확장했다(사용자 요청) */
-const SIGNALS_CANDIDATES: AtLeast10 = [
-  "그날의 기록을 확인하는 중…",
-  "하루를 되짚어보는 중…",
-  "무엇이 있었는지 헤아리는 중…",
-  "오늘 하루의 흔적을 찾아보는 중…",
-  "남겨진 기록들을 모으는 중…",
-  "하루가 어땠는지 가늠해보는 중…",
-  "오늘의 흔적을 하나씩 확인하는 중…",
-  "기록을 차근차근 살펴보는 중…",
-  "하루의 자취를 따라가보는 중…",
-  "무슨 일이 있었는지 짚어보는 중…",
-];
-
-/**
- * 사진 보기 — "보통" 갈래 (011의 캡션 엔진 실측 범위 안에서만 작성).
- *
- * 캡션 엔진(`CAPTION_PROMPT`: "이 사진에 보이는 것을 한 문장으로 설명하라")이
- * 하는 일은 사진 한 장을 보고 짧은 서술 하나를 만드는 것뿐이다 — 인물 식별,
- * 촬영 시각·장소 판별, 장소에 대한 감상은 이 엔진의 출력 범위 밖이다.
+/*
+ * 062 — 후보 문장집합은 한국어 카탈로그(`src/i18n/catalogs/ko/monologue.ts`)로 옮겼다. 후보 수는 거기서 `AtLeast10`
+ * 튜플이 잠근다(FR-009). 이 파일은 고르는 일만 한다.
  */
-const VISION_NORMAL_CANDIDATES: AtLeast10 = [
-  "오늘 찍은 사진들을 살펴보는 중…",
-  "사진을 들여다보는 중…",
-  "사진 속에 뭐가 담겼는지 찬찬히 보는 중…",
-  "또 한 장을 살펴보는 중…",
-  "찬찬히 눈에 담는 중…",
-  "사진 한 장 한 장을 들여다보는 중…",
-  "무엇이 찍혔는지 살펴보는 중…",
-  "사진을 하나씩 넘겨보는 중…",
-  "오늘 남긴 사진들을 훑어보는 중…",
-  "사진에 담긴 모습을 살펴보는 중…",
-];
-
-/**
- * 사진 보기 — "많음" 갈래. 캡션 대상이 상한(5장)에 닿은 하루에만 쓰인다.
- * 숫자·정확한 장수는 담지 않는다(FR-007).
- */
-const VISION_MANY_CANDIDATES: AtLeast10 = [
-  "살펴볼 사진이 많아 반가워하는 중…",
-  "볼거리가 많은 하루라 부지런히 살펴보는 중…",
-  "사진이 넉넉해서 하나씩 꼼꼼히 보는 중…",
-  "오늘은 사진이 많아 즐겁게 살펴보는 중…",
-  "여러 장을 차례로 들여다보는 중…",
-  "이것저것 살펴볼 게 많아 부지런히 보는 중…",
-  "사진이 풍성해서 천천히 넘겨보는 중…",
-  "오늘 남긴 사진이 많아 흥미롭게 보는 중…",
-  "한 장씩 부지런히 넘겨가며 보는 중…",
-  "사진이 가득해서 살펴보는 중…",
-];
-
-/**
- * 모델 로드 — "콜드 스타트" 갈래. 실제로 하는 일(모델을 새로 올림)에
- * 근거한 문구만 쓴다. 캐릭터 이름은 화면 문구에 넣지 않는다(사용자 요청,
- * 2026-08-23 — 굳이 필요하지 않다고 판단해 철회) — 이름은 진단 로그에만
- * 쓰인다(`logCharacterForLoad()`).
- */
-const LOAD_COLD_TEMPLATES: AtLeast10 = [
-  "글을 쓸 준비를 하는 중…",
-  "연필과 지우개를 준비하는 중…",
-  "글쓸 준비를 위해 책상을 정리하는 중…",
-  "이제 막 자리에 앉는 중…",
-  "새로 글을 쓸 채비를 하는 중…",
-  "오늘의 이야기를 시작할 준비를 하는 중…",
-  "조용히 마음을 가다듬는 중…",
-  "처음부터 차근차근 준비하는 중…",
-  "글쓰기에 앞서 자리를 잡는 중…",
-  "오늘 쓸 이야기를 위해 준비하는 중…",
-];
-
-/**
- * 모델 로드 — "핫 스타트" 갈래. 이미 열려 있던 모델을 재사용하는 사실에
- * 근거한 문구만 쓴다(콜드와 다른 인상 — 처음 준비 vs 이어서 하기).
- */
-const LOAD_HOT_TEMPLATES: AtLeast10 = [
-  "이전에 썼던 글들을 정리하는 중…",
-  "지저분한 책상을 정돈하는 중…",
-  "다시 자리에 앉는 중…",
-  "이어서 쓸 준비를 하는 중…",
-  "잠깐 정리하고 다시 시작하는 중…",
-  "하던 일을 마저 정돈하는 중…",
-  "금방 다시 준비를 마치는 중…",
-  "익숙하게 자리를 잡는 중…",
-  "이어 쓸 채비를 하는 중…",
-  "잠시 정리한 뒤 다시 준비하는 중…",
-];
-
-/** 글쓰기 단계 — 015의 3개를 폐기하고 10개로 대체한다(spec Assumptions) */
-const GENERATION_CANDIDATES: AtLeast10 = [
-  "글을 쓰는 중…",
-  "생각을 문장으로 옮기는 중…",
-  "한 줄 한 줄 적어보는 중…",
-  "주인의 오늘 하루를 떠올려보는 중…",
-  "하루의 기록들을 멋진 글로 정리하는 중…",
-  "오늘 일상이 어땠는지 들여다보는 중…",
-  "떠오르는 생각을 정리해서 적는 중…",
-  "오늘 하루를 글로 옮기는 중…",
-  "차근차근 이야기를 엮어가는 중…",
-  "문장을 다듬어가며 적는 중…",
-];
 
 /**
  * 진행 단계에 맞는 독백 문구를 고른다.
@@ -172,13 +63,14 @@ export function pickMonologue(
 }
 
 function candidatesFor(stage: ProgressStage, branch: MonologueBranch | undefined): AtLeast10 {
-  if (stage === "signals") return SIGNALS_CANDIDATES;
-  if (stage === "generation") return GENERATION_CANDIDATES;
+  const T = text().monologue;
+  if (stage === "signals") return T.signals;
+  if (stage === "generation") return T.generation;
 
   if (stage === "vision") {
-    return branch === "many" ? VISION_MANY_CANDIDATES : VISION_NORMAL_CANDIDATES;
+    return branch === "many" ? T.visionMany : T.visionNormal;
   }
 
   // stage === "load"
-  return branch === "hot" ? LOAD_HOT_TEMPLATES : LOAD_COLD_TEMPLATES;
+  return branch === "hot" ? T.loadHot : T.loadCold;
 }

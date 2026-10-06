@@ -68,6 +68,7 @@ import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
 import type { Character, VisionSetting } from "../diary/types";
+import { text } from "../i18n/current";
 import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DateJumpDialog } from "./DateJumpDialog";
@@ -802,17 +803,18 @@ export function DiaryHomeScreen({
     const outcome = resolve(prompt.day);
 
     if (outcome.kind === "no-ready-character") {
-      setScreen(toFailed("일기 작성자를 준비해야 한다"));
+      setScreen(toFailed(text().home.needsAuthor));
       return;
     }
 
     // 029 — 캐릭터가 옮겨졌으면 화면에 알린다(FR-014). persona 이름으로 문장을 만든다.
     setMovedNotice(
       outcome.params.movedFrom !== undefined
-        ? `${nameOf(outcome.params.movedFrom, characterNames)}을(를) 쓸 수 없어 ${nameOf(
-            outcome.params.character,
-            characterNames,
-          )}(으)로 바꿨어요`
+        ? text().home.movedNotice(
+            // 이름이 없으면(로스터 밖) 옛 템플릿 문자열처럼 그대로 「undefined」가 된다 — 062는 문구를 바꾸지 않는다
+            String(nameOf(outcome.params.movedFrom, characterNames)),
+            String(nameOf(outcome.params.character, characterNames)),
+          )
         : undefined,
     );
 
@@ -920,7 +922,7 @@ export function DiaryHomeScreen({
     void Promise.resolve().then(() => {
       onWriteRequestHandled?.(id);
       if (outcome.kind === "no-ready-character") {
-        setScreen(toFailed("일기 작성자를 준비해야 한다"));
+        setScreen(toFailed(text().home.needsAuthor));
         return undefined;
       }
       setChosenDay(day);
@@ -1113,8 +1115,9 @@ export function DiaryHomeScreen({
 
               {/*
                 029 → 055 — 작성자를 준비해야 하는 실패면 다시 받는 길을 준다(FR-030). 이미 준비돼 있으면 쓰기 전 홈으로.
+                062 — 문구를 정규식으로 보지 않고 그 항목과 같은 값인지 본다(다른 언어에서 조용히 거짓이 되지 않게, research R8).
               */}
-              {onRedownload !== undefined && /준비/.test(screen.message) && (
+              {onRedownload !== undefined && screen.message === text().home.needsAuthor && (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() =>

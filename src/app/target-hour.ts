@@ -19,25 +19,15 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { text } from "../i18n/current";
+
 export type HourFormat = "h12" | "h24";
 export type Meridiem = "am" | "pm";
 
-/** 보드 `time.am`·`time.pm` */
-const MERIDIEM_TEXT: Record<Meridiem, string> = { am: "오전", pm: "오후" };
-
-/**
- * 시간대 식별자 → 도시 이름. **사람이 못 박은 표다**(056 Clarification Q3) — 코드가 도시 이름을 지어내지 않는다.
- * 표에 없으면 식별자의 도시 부분을 그대로 쓴다(`cityOf`).
+/*
+ * 062 — 문장 틀·오전/오후·도시 이름 표는 한국어 카탈로그(`src/i18n/catalogs/ko/settings.ts`의 `targetHour`)로 옮겼다. 여기는 시·형식·
+ * 시간대를 셈하고 어느 틀을 쓸지 정한다(판정은 이 파일, 말은 카탈로그).
  */
-const CITY_NAMES: Readonly<Record<string, string>> = {
-  "Asia/Seoul": "서울",
-  "Asia/Tokyo": "도쿄",
-  "Asia/Shanghai": "상하이",
-  "Asia/Hong_Kong": "홍콩",
-  "Asia/Singapore": "싱가포르",
-  "Europe/London": "런던",
-  "Europe/Paris": "파리",
-};
 
 /** 오전(0–11) / 오후(12–23) */
 export function meridiemOf(hour: number): Meridiem {
@@ -64,19 +54,21 @@ export function hourCells(format: HourFormat): readonly number[] {
 
 /** 「{오전|오후} {h}시」 또는 「{h}시」 — 「쯤」 앞까지 */
 function hourText(hour: number, format: HourFormat): string {
-  if (format === "h24") return `${hour}시`;
-  return `${MERIDIEM_TEXT[meridiemOf(hour)]} ${cellOf(hour)}시`;
+  const T = text().targetHour;
+  if (format === "h24") return T.hour24(hour);
+  return T.hour12(T.meridiem[meridiemOf(hour)], cellOf(hour));
 }
 
 /** 행 값 — 「오후 10시쯤」 / 「22시쯤」(보드 `settings.autoWriteTime.value12`·`value24`) */
 export function formatTargetHour(hour: number, format: HourFormat): string {
-  return `${hourText(hour, format)}쯤`;
+  return text().targetHour.approx(hourText(hour, format));
 }
 
 /** 미리보기 — 「매일 오후 10시쯤 그날 일기를 써요. 이미 쓴 날은 건너뛰어요.」(보드 `time.preview`, 오전은 「어제」) */
 export function previewSentence(hour: number, format: HourFormat): string {
-  const day = hour < 12 ? "어제" : "그날";
-  return `매일 ${hourText(hour, format)}쯤 ${day} 일기를 써요. 이미 쓴 날은 건너뛰어요.`;
+  const T = text().targetHour;
+  const day = hour < 12 ? T.previewYesterday : T.previewSameDay;
+  return T.preview(hourText(hour, format), day);
 }
 
 /** 동쪽으로 몇 분 → 「GMT+9」·「GMT-3:30」·「GMT」 */
@@ -92,7 +84,7 @@ export function formatGmt(offsetMinutes: number): string {
 }
 
 function cityOf(timeZoneId: string): string {
-  const known = CITY_NAMES[timeZoneId];
+  const known = text().targetHour.cityNames[timeZoneId];
   if (known !== undefined) return known;
   const tail = timeZoneId.slice(timeZoneId.lastIndexOf("/") + 1);
   return tail.replace(/_/g, " ");
@@ -104,7 +96,7 @@ function cityOf(timeZoneId: string): string {
  */
 export function timeZoneLine(timeZoneId: string | null, offsetMinutes: number): string | null {
   if (timeZoneId === null || timeZoneId === "") return null;
-  return `이 휴대폰의 시간대 · ${cityOf(timeZoneId)} (${formatGmt(offsetMinutes)})`;
+  return text().targetHour.timeZoneLine(cityOf(timeZoneId), formatGmt(offsetMinutes));
 }
 
 /**

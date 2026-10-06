@@ -21,37 +21,30 @@
 import type { CalendarMonth } from "../app/calendar";
 import { dayParts, type DiaryListItem } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
-import { particleFor } from "../diary/particle";
+import { lazyList, lazyText, text } from "../i18n/current";
 
-/** 요일 이름 — 0이 일요일(`Date.getDay()`와 같은 순서). 이 표는 여기에만 있다. */
-const WEEKDAY_LONG = [
-  "일요일",
-  "월요일",
-  "화요일",
-  "수요일",
-  "목요일",
-  "금요일",
-  "토요일",
-] as const;
-const WEEKDAY_SHORT = ["일", "월", "화", "수", "목", "금", "토"] as const;
+/*
+ * 062 — 문구는 한국어 카탈로그(`src/i18n/catalogs/ko/calendar.ts`·`home.ts`)로 옮겼다. 이 파일은 판정(어느 문구를 고르는가)과
+ * 옛 이름(`OVERWRITE_CONFIRM` 등)을 그대로 두는 얇은 층이다 — 화면·테스트는 이름을 바꾸지 않고 카탈로그의 말을 읽는다.
+ */
 
 export function weekdayLong(weekday: number): string {
-  return WEEKDAY_LONG[weekday] ?? "";
+  return text().calendar.weekdayLong[weekday] ?? "";
 }
 
 export function weekdayShort(weekday: number): string {
-  return WEEKDAY_SHORT[weekday] ?? "";
+  return text().calendar.weekdayShort[weekday] ?? "";
 }
 
 /** 헤더의 월 표시 — **고른 날의 달**(Clarification Q2). 예: 「2026년 9월」 */
 export function monthText(day: DayDate): string {
   const { year, month } = dayParts(day);
-  return `${year}년 ${month}월`;
+  return text().calendar.monthText(year, month);
 }
 
 /** 하단 바의 날짜 조각 — 누를 수 없는 글자(D7). 예: 「13일」 */
 export function dayOfMonthText(day: DayDate): string {
-  return `${dayParts(day).date}일`;
+  return text().calendar.dayOfMonthText(dayParts(day).date);
 }
 
 /**
@@ -69,11 +62,10 @@ export function dayOfMonthText(day: DayDate): string {
  * (FR-015)의 예외는 보드가 정한 첫 문장 하나뿐이다.
  */
 export function dayStateText(item: DiaryListItem | undefined, isToday: boolean): string {
-  if (item === undefined) {
-    return isToday ? "오늘 일기를 쓸 수 있어요" : "이 날 일기를 쓸 수 있어요";
-  }
-  if (!item.readable) return "읽을 수 없어요";
-  return item.title ?? "이 날 일기를 썼어요";
+  const T = text().home.dayState;
+  if (item === undefined) return isToday ? T.today : T.past;
+  if (!item.readable) return T.unreadable;
+  return item.title ?? T.writtenNoTitle;
 }
 
 /*
@@ -88,28 +80,22 @@ export function dayStateText(item: DiaryListItem | undefined, isToday: boolean):
  */
 
 /** 덮어쓰기 확인 (`2d`, 보드 `h2.confirm*`) */
-export const OVERWRITE_CONFIRM = {
-  title: "일기를 다시 쓸까요?",
-  body: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
-  todayNote: "지금까지의 하루로 써요.",
-  confirm: "다시 쓰기",
-  cancel: "취소",
-} as const;
+export const OVERWRITE_CONFIRM = lazyText((c) => c.home.overwriteConfirm);
 
 /** 날짜로 이동 (`2j`, 보드 `cal.title`·`cal.cancel`) */
-export const DATE_JUMP = { title: "날짜로 이동", cancel: "취소" } as const;
+export const DATE_JUMP = lazyText((c) => c.home.dateJump);
 
 /** 달력 요일 머리 — 일요일 시작 (보드 `cal.dows`) */
-export const CALENDAR_WEEKDAYS = WEEKDAY_SHORT;
+export const CALENDAR_WEEKDAYS = lazyList((c) => c.calendar.weekdayShort);
 
 /** 달력 머리의 월. 예: 「9월」 (보드 `cal.month`) */
 export function calendarMonthText(m: CalendarMonth): string {
-  return `${m.month}월`;
+  return text().calendar.calendarMonthText(m.month);
 }
 
 /** 달력 머리·연 목록의 해. 예: 「2026년」 (보드 `cal.year`) */
 export function calendarYearText(year: number): string {
-  return `${year}년`;
+  return text().calendar.calendarYearText(year);
 }
 
 /*
@@ -122,16 +108,7 @@ export function calendarYearText(year: number): string {
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-export const WRITTEN_DAY_TEXT = {
-  /** 쓴 날의 하단 바 (보드 `h2.rewrite`) */
-  rewrite: "다시 쓰기",
-  /** 읽을 수 없는 일기의 지면 두 줄 (006 FR-017a) */
-  unreadableLines: ["이 날의 일기 파일이 손상됐어요.", "다시 쓰면 새로 남아요."],
-  /** 사진 사본을 못 불러온 슬라이드 (017 FR-002) */
-  photoMissing: "이 사진은 이제 없어요",
-  /** 쓰기 시작 전 실패 화면에서 홈으로 (048 하위 화면의 뒤로와 같은 말이었다 — 055 설정은 「‹ 일기」) */
-  backToHome: "← 일기",
-} as const;
+export const WRITTEN_DAY_TEXT = lazyText((c) => c.home.writtenDay);
 
 /*
  * ─────────────────────────────────────────────────────────────────────────────
@@ -142,14 +119,7 @@ export const WRITTEN_DAY_TEXT = {
  * `writing-in-place.test.tsx`가 글자 단위로 잠근다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export const WRITING_TEXT = {
-  kicker: "쓰는 중",
-  stop: "그만두기",
-  fallback: "쓰고 있다",
-  /** 「{이름}{이/가} 쓰고 있어요. 진행률은 세지 않아요.」 — 진행률·시간을 말하지 않는다는 안내 */
-  byline: (name: string): string =>
-    `${name}${particleFor(name)} 쓰고 있어요. 진행률은 세지 않아요.`,
-} as const;
+export const WRITING_TEXT = lazyText((c) => c.home.writing);
 
 const MINUTE_MS = 60 * 1000;
 
@@ -162,9 +132,10 @@ const MINUTE_MS = 60 * 1000;
  */
 export function writtenAtText(createdAt: Date, now: Date): string {
   const minutes = Math.floor((now.getTime() - createdAt.getTime()) / MINUTE_MS);
-  if (minutes < 1) return "방금 작성";
-  if (minutes < 60) return `${minutes}분 전에 작성`;
-  return `${Math.floor(minutes / 60)}시간 ${minutes % 60}분 전에 작성`;
+  const T = text().home.writtenAt;
+  if (minutes < 1) return T.justNow;
+  if (minutes < 60) return T.minutesAgo(minutes);
+  return T.hoursAgo(Math.floor(minutes / 60), minutes % 60);
 }
 
 /*
@@ -176,26 +147,4 @@ export function writtenAtText(createdAt: Date, now: Date): string {
  * 「아무 기록도 없어요」라 단정하지 않는다, 원칙 V)과 `madeUpDay`(사용자 표현 그대로).
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export const MATERIAL_TEXT = {
-  photos: "사진",
-  places: "장소",
-  unitPhoto: "장",
-  unitPlace: "곳",
-  noPermission: "권한이 없어요",
-  /** 「권한이 없어요」 뒤의 화살표 — 누르면 요청한다는 표시 */
-  caret: "›",
-  /** 셀 수 없는데 권한 때문이 아닌 칸 — 0이 아니다(원칙 V) */
-  unknown: "모름",
-  /** 아직 읽는 중 */
-  loading: "…",
-  emptyNote: "기록 대신 상상으로 하루를 채워요.",
-  confirmTitleZero: "😢 아무 기록도 없어요",
-  confirmTitleUnseen: "😢 기록을 볼 수 없어요",
-  confirmBody: "이렇게 작성하면 하루를 상상해서 적어요.",
-  confirmYes: "확인",
-  confirmNo: "취소",
-  settingsTitle: "설정에서 사진 접근을 허용해 주세요",
-  settingsOpen: "설정 열기",
-  settingsCancel: "취소",
-  madeUpDay: "지어낸 하루",
-} as const;
+export const MATERIAL_TEXT = lazyText((c) => c.home.material);

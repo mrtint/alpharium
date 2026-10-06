@@ -113,10 +113,12 @@ import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { collectReport } from "./src/diagnostics/report";
 import type { DiagnosticReport } from "./src/diagnostics/types";
+import { languageResolution, text } from "./src/i18n/current";
 import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
 import {
   canRequestPhoto,
   environmentLines,
+  languageLine,
   failureLines,
   photoPermissionLines,
   probeCells,
@@ -1691,6 +1693,7 @@ function DiagnosticsLayer({
                 : { ok: false },
             })
       }
+      language={languageLine(languageResolution())}
       failures={failures}
       onInspectStorage={onInspectStorage}
       onRefreshProbe={() => void readProbe()}
@@ -2279,7 +2282,7 @@ function SettingsSection({
   if (values === null || autoDiary === null || geocoding === null) {
     return (
       <View style={styles.placeholder}>
-        <AppText variant="bodyStrong">설정을 읽는 중…</AppText>
+        <AppText variant="bodyStrong">{text().frame.settingsLoading}</AppText>
       </View>
     );
   }

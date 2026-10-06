@@ -118,7 +118,8 @@ describe("★ 051 DEL — 없어지는 것이 정말 없다", () => {
     // 055 — `expo-application`을 직접 의존성으로 올렸다(research R5 — 버전 표시). `expo-notifications`를 통해 이미 설치·자동
     // 링크돼 있던 모듈이라 새 네이티브 코드가 아니다. 이 브랜치가 main에 들어가면 두 목록이 다시 같아진다.
     // 059 — `expo-network`를 직접 의존성으로 올렸다(모듈 다시 받기 확인의 「모바일 데이터로」 — Clarification Q2, 새 네이티브 모듈 하나).
-    const known = new Set(["expo-application", "expo-network"]);
+    // 062 — `expo-localization`을 더했다(기기 언어 감지 — research R1, 새 네이티브 모듈 하나. dev 실기기에서 매니페스트 확인).
+    const known = new Set(["expo-application", "expo-network", "expo-localization"]);
     expect(now.filter((k) => !known.has(k)).sort()).toEqual(
       before.filter((k) => !known.has(k)).sort(),
     );

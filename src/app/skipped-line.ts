@@ -10,17 +10,16 @@
  *
  * **하루 경계를 다시 계산하지 않는다**(049 DB11) — 「어제」는 `latestClosedDay(now)`가 준다. 날짜는 문자열을 나눠 앞 0만 뗀다.
  *
- * 문장 틀(보드 `perm.photos.skippedYesterday`·`perm.photos.skippedOn` 원문)은 여기 둔다 — `src/app/`이 `src/ui/`를 import하지
- * 않는다(056 `target-hour.ts` 관례). `settings-text.ts`가 이 값을 가리킨다.
+ * 문장 틀(보드 `perm.photos.skippedYesterday`·`perm.photos.skippedOn` 원문)은 062부터 한국어 카탈로그에 있다 — 이 파일과 설정 문구가
+ * 같은 항목을 본다(한 곳에만 둔다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { latestClosedDay, type DayDate } from "../config/day-boundary";
+import { lazyText } from "../i18n/current";
 
-export const SKIPPED_LINE = {
-  yesterday: "어제 자동 쓰기를 건너뛰었어요",
-  on: "{M}월 {d}일 자동 쓰기를 건너뛰었어요",
-} as const;
+/** 062 — 문장 틀은 한국어 카탈로그(`src/i18n/catalogs/ko/settings.ts`의 `skippedLine`)로 옮겼다 */
+export const SKIPPED_LINE = lazyText((c) => c.skippedLine);
 
 export function skippedLineText(day: DayDate, now: Date): string {
   if (day === latestClosedDay(now)) return SKIPPED_LINE.yesterday;

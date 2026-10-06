@@ -51,6 +51,7 @@ import Animated, {
 import { Carousel } from "react-native-reanimated-carousel";
 
 import { progressSegments } from "../firstrun/consent";
+import { text } from "../i18n/current";
 import { Button } from "./components/Button";
 import { AppText } from "./components/Text";
 import { COLORS } from "./theme/tokens";
@@ -75,44 +76,25 @@ export type DownloadProgressScreenProps = {
   failed: boolean;
 };
 
-/** 실패 시 진행 바 하단에 보일 고정 문구 — 오류 원문을 담지 않는다(원칙 III). */
-const FAILED_PROGRESS_TEXT = "받다가 멈췄어요";
-
-/** 슬라이드 1~4의 사람이 쓴 고정 헤드라인·본문(FR-005, 045 그대로 유지). */
-const SLIDES = [
-  {
-    title: "쓰지 않아도 남는 하루",
-    body: "따로 적을 일이 없어요. 그날의 사진과 다닌 자리만으로 하루가 한 편 남습니다.",
-  },
-  {
-    title: "나중에 다시 읽고 싶은 기록",
-    body: "그날 무엇을 보고 어디를 다녔는지, 나중에 펼쳐 보면 그때가 다시 떠올라요.",
-  },
-  {
-    title: "잠들기 전에 도착해요",
-    body: "하루가 끝나갈 무렵, 오늘의 이야기가 조용히 완성돼 있어요.",
-  },
-  {
-    title: "휴대폰 안에서만 남아요",
-    body: "사진도 위치도 밖으로 나가지 않아요. 전부 이 안에서만 일어나요.",
-  },
-] as const;
+/**
+ * 062 — 고정 헤드라인·본문·진행 문구(045 FR-005·FR-006, 실패 문구는 오류 원문을 담지 않는다 — 원칙 III)는 한국어 카탈로그
+ * (`src/i18n/catalogs/ko/download.ts`)로 옮겼다.
+ */
+type Slide = { title: string; body: string };
 
 /**
- * `Carousel`의 `data` prop에 넘길 mutable 배열 — 모듈 스코프에서 딱 한 번만
- * 만든다. `data={[...SLIDES]}`로 렌더마다 새 배열을 만들면 `Carousel`이
- * 매번 "새 데이터"로 인식한다(아래 `CarouselSlides` 분리와 함께 필요 —
- * 실기기 실측, 2026-09-21 참조).
+ * `Carousel`의 `data` prop에 넘길 배열 — **처음 한 번만** 만든다. 렌더마다 새 배열을 만들면 `Carousel`이 매번 "새 데이터"로
+ * 인식한다(아래 `CarouselSlides` 분리와 함께 필요 — 실기기 실측, 2026-09-21 참조). 062 — 모듈을 불러올 때가 아니라 처음 그릴 때
+ * 카탈로그에서 꺼낸다(contracts C4). 화면 언어는 프로세스 동안 바뀌지 않으므로 한 번 만든 배열을 계속 쓴다.
  */
-const SLIDE_ITEMS: (typeof SLIDES)[number][] = [...SLIDES];
+let slideItems: Slide[] | undefined;
+function slides(): Slide[] {
+  slideItems ??= [...text().download.slides];
+  return slideItems;
+}
 
 /** 캐러셀 자동 전환 간격 — 045가 정한 값 그대로 유지(사람이 정한 고정값). */
 const SLIDE_INTERVAL_MS = 4000;
-
-/** 진행 문구 — 정상 진행 중 고정 상수(045 Clarifications, FR-006). */
-const PROGRESS_TEXT = "받는 중이에요";
-
-const KICKER = "준비하는 중";
 
 export function DownloadProgressScreen({
   downloadReady,
@@ -128,10 +110,10 @@ export function DownloadProgressScreen({
   if (downloadReady) {
     return (
       <View style={CONTAINER} testID="download-progress-complete">
-        <AppText variant="title">준비됐어요</AppText>
-        <AppText variant="body">이제 시작할 수 있어요.</AppText>
+        <AppText variant="title">{text().download.completeTitle}</AppText>
+        <AppText variant="body">{text().download.completeBody}</AppText>
         <Button onPress={onProceed} testID="download-progress-proceed">
-          시작할게요
+          {text().download.completeProceed}
         </Button>
       </View>
     );
@@ -145,7 +127,7 @@ export function DownloadProgressScreen({
     <View style={CONTAINER} testID="download-progress-screen">
       <View style={HEADER_ROW}>
         <AppText style={KICKER_TEXT}>{String(carouselIndex + 1).padStart(2, "0")} / 04</AppText>
-        <AppText style={KICKER_TEXT}>{KICKER}</AppText>
+        <AppText style={KICKER_TEXT}>{text().download.kicker}</AppText>
       </View>
 
       <CarouselSlides width={width} onSnapToItem={setCarouselIndex} />
@@ -156,7 +138,9 @@ export function DownloadProgressScreen({
             <ProgressSegmentBar key={i} fillRatio={fillRatio} />
           ))}
         </View>
-        <AppText variant="caption">{failed ? FAILED_PROGRESS_TEXT : PROGRESS_TEXT}</AppText>
+        <AppText variant="caption">
+          {failed ? text().download.failedProgress : text().download.progress}
+        </AppText>
       </View>
     </View>
   );
@@ -167,7 +151,7 @@ export function DownloadProgressScreen({
  * (`renderItem` prop이 안정적인 참조를 유지해야 `useAutoPlay`의 콜백 체인이
  * 리셋되지 않는다).
  */
-function renderSlide({ item }: { item: (typeof SLIDES)[number] }) {
+function renderSlide({ item }: { item: Slide }) {
   return (
     <View style={CARD}>
       {/* 그림 자리 — 실제 이미지 에셋은 후속 스펙(045 research.md R6). */}
@@ -211,10 +195,10 @@ const CarouselSlides = memo(function CarouselSlides({
   const style = useMemo(() => CAROUSEL_STYLE(width), [width]);
 
   return (
-    <Carousel<(typeof SLIDES)[number]>
+    <Carousel<Slide>
       testID="download-progress-carousel"
       style={style}
-      data={SLIDE_ITEMS}
+      data={slides()}
       loop
       autoplay
       autoplayInterval={SLIDE_INTERVAL_MS}

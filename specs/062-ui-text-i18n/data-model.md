@@ -41,6 +41,14 @@
 | `monologue` | `diary/monologue.ts` 후보 표 |
 | `notification` | `schedule/notification-text.ts`, `notification-port.ts` 채널 이름 |
 | `calendar` | 요일 표(긴·짧은), 월·일 표기 함수 — 홈·달력·설정이 함께 쓴다 |
+| `frame` | 설정 겹의 틀 — 「설정을 읽는 중…」(`App.tsx`) |
+| `skippedLine` | 사진 권한 건너뜀 보조 줄 틀(`src/app/skipped-line.ts`) |
+| `targetHour` | 매일 쓰는 시각의 문장 틀·오전/오후·도시 이름 표(`src/app/target-hour.ts`) |
+| `diagnosticsLanguage` | 진단 언어 줄(FR-011b) — 라벨·「모름」·자기 언어 이름(`selfName`)·줄 틀 |
+
+- **영역을 나눈 이유(구현)**: `settings`·`diagnostics` 영역은 옛 `SETTINGS_TEXT`·`DIAGNOSTICS_TEXT`와 **같은 키**만 갖는다 — 옛 이름이
+  `lazyText((c) => c.settings)`로 그 영역을 그대로 보이므로, 다른 문구를 섞으면 G2 골든의 `JSON.stringify` 결과(키 집합)가 바뀐다.
+  함수 항목(`wipeTitle`·`photoCount` 등)은 `JSON.stringify`에 안 나타나 같은 영역에 둘 수 있었다.
 
 - 실제 키 이름은 이관할 때 원래 상수 이름을 따른다(예: `SETTINGS_TEXT.autoWrite` → `settings.autoWrite`) — 원래 이름이 곧 보드 원문 대조 테스트의 참조점이라 이름을 새로 짓지 않는다.
 - 값의 종류: `string` · `readonly string[]`(개수 있는 튜플 포함) · 함수(`(…) => string`). 함수는 순수하고 던지지 않는다.
