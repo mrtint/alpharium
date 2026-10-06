@@ -565,8 +565,8 @@ describe("012 — DAY_STILL_OPEN, 하루가 아직 끝나지 않았다는 문장
   });
 
   it("★ 2. dayStillOpen: true, 사진 unknown(권한 없음) → 문장이 여전히 있다 (FR-004, 이 계약의 핵심)", () => {
-    // 061 — 본 장면 없는 날은 기록 맨 위가 아니라 꼬리가 1인칭으로 말한다
-    // ("오늘은 아직 다 가지 않아서 이 뒤에 무슨 일이 더 있을지도 나는 모른다").
+    // 063 — 본 장면 없는 날도 기록 첫 줄(S_DAY_OPEN)이 말한다. 061은 꼬리에 1인칭 문장을
+    // 붙였는데 꼬리가 길어져 낭독 거부가 났다(지시서 §10.2, R18.y3).
     const prompt = buildPrompt(requestWith(unknownDay(DAY), true));
     expect(prompt).toMatch(/아직.*(끝나지 않았|다 가지 않)/);
   });

@@ -1042,7 +1042,8 @@ describe("061 — 제목 두 번째 호출 (TA2)", () => {
       {
         prompt: runs[0],
         body: BODY,
-        question: "방금 쓴 일기에 붙일 제목을 한 줄로 적어라. 제목만 적는다.",
+        question:
+          "방금 쓴 일기에서 네 마음이 어땠는지를 가리키는 짧은 제목을 한 줄로 적어라. 제목만 적는다.",
       },
     ]);
     expect(result).toMatchObject({ text: `심심한 가방 속\n\n${BODY}` });
