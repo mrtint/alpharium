@@ -71,6 +71,8 @@ const anyVision = () => ({
 
 /** 늘 통과할 글을 돌려주는 엔진 대역 */
 const goodEngine = (): GenerationEngine => ({
+  // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+  ask: async () => ({ text: "", ending: { kind: "length" as const } }),
   async load() {
     return { ok: true, warm: false };
   },
@@ -291,6 +293,8 @@ describe("요청에 맞춘 그럴듯한 답을 만들지 않는다 (원칙 I)", 
 describe("011 — 사진을 읽는다", () => {
   /** 엔진이 받은 프롬프트를 기록하는 대역 */
   const recordingEngine = (seen: string[]): GenerationEngine => ({
+    // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+    ask: async () => ({ text: "", ending: { kind: "length" as const } }),
     async load() {
       return { ok: true, warm: false };
     },
@@ -392,6 +396,8 @@ describe("011 — 사진을 읽는다", () => {
   it("★ E1. 캐릭터 모델을 열기 전에 사진 엔진을 완전히 닫는다", async () => {
     const order: string[] = [];
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         order.push("character:load");
         return { ok: true, warm: false };
@@ -572,6 +578,8 @@ describe("015 — onStage 진행 신호", () => {
   it("engine.run() 직전에 onStage가 'generation'으로 불린다", async () => {
     const stages: string[] = [];
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: false };
       },
@@ -678,6 +686,8 @@ describe("016 — onStage 모델 로드 신호", () => {
   it("engine.load() 직전에 onStage가 ('load')(branch 없음)로 불린다", async () => {
     const signals: Signal[] = [];
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         // load()가 불린 시점에는 이미 로드 시작 신호가 보내졌어야 한다.
         expect(signals).toContainEqual(["load", undefined]);
@@ -710,6 +720,8 @@ describe("016 — onStage 모델 로드 신호", () => {
   it("로드 성공(warm: true)이면 그 직후 onStage가 ('load', 'hot')로 불린다", async () => {
     const signals: Signal[] = [];
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: true };
       },
@@ -731,6 +743,8 @@ describe("016 — onStage 모델 로드 신호", () => {
   it("로드 실패 시 확정 신호(cold/hot)도 generation도 오지 않는다 (FR-011)", async () => {
     const signals: Signal[] = [];
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: false, reason: "not-found" };
       },
@@ -779,6 +793,8 @@ describe("016 — 로드 도중 취소 (FR-013)", () => {
     const signals: [string, string | undefined][] = [];
     let unloaded = false;
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: false };
       },

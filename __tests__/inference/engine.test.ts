@@ -64,6 +64,8 @@ function fakeEngine(
   let openCount = 0;
 
   const engine: GenerationEngine = {
+    // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+    ask: async () => ({ text: "", ending: { kind: "length" as const } }),
     async load(character) {
       calls.push(`load:${character}`);
       const result = options.load?.(character) ?? { ok: true, warm: false };

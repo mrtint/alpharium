@@ -648,3 +648,83 @@ describe("018 — prewarm() (contracts/prewarm-engine.md)", () => {
     await expect(engine.prewarm(QUIET, promptPrefix(QUIET))).resolves.toBeUndefined();
   });
 });
+
+describe("061 — ask() (specs/061-diary-prompt-swap/contracts/title-ask.md TA1)", () => {
+  function recordingLoader(result: Record<string, unknown>) {
+    const calls: Record<string, unknown>[] = [];
+    const loader = async () => ({
+      async completion(params: Record<string, unknown>) {
+        calls.push(params);
+        return result;
+      },
+      async stopCompletion() {},
+      async release() {},
+    });
+    return { calls, loader };
+  }
+
+  it("같은 대화로 보낸다 — user(프롬프트) → assistant(본문) → user(질문), 샘플링은 run()과 같다", async () => {
+    const { calls, loader } = recordingLoader({ content: "고양이의 밤", stopped_eos: true });
+    const engine = createLlamaEngine(loader, pathFor);
+    await engine.load(QUIET);
+
+    await engine.ask("프롬프트", "본문", "제목을 적어라.", { timeoutMs: 1000 });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual({
+      messages: [
+        { role: "user", content: "프롬프트" },
+        { role: "assistant", content: "본문" },
+        { role: "user", content: "제목을 적어라." },
+      ],
+      jinja: true,
+      temperature: SAMPLING.temperature,
+      top_p: SAMPLING.top_p,
+      top_k: SAMPLING.top_k,
+      n_predict: SAMPLING.n_predict,
+    });
+  });
+
+  it("결과는 { text, ending } 둘뿐이다 — 지표가 경계를 넘지 못한다 (원칙 IV)", async () => {
+    const { loader } = recordingLoader({
+      content: " 고양이의 밤 ",
+      stopped_eos: true,
+      timings: { predicted_per_second: 9 },
+      tokens_predicted: 5,
+    });
+    const engine = createLlamaEngine(loader, pathFor);
+    await engine.load(QUIET);
+
+    const result = await engine.ask("p", "b", "q", { timeoutMs: 1000 });
+    expect(result).toEqual({ text: "고양이의 밤", ending: { kind: "eos" } });
+  });
+
+  it("load() 없이 부르면 네이티브를 건드리지 않고 끝나지 않은 결과를 준다 (E5)", async () => {
+    const { calls, loader } = recordingLoader({ content: "x", stopped_eos: true });
+    const engine = createLlamaEngine(loader, pathFor);
+
+    expect(await engine.ask("p", "b", "q", { timeoutMs: 1000 })).toEqual({
+      text: "",
+      ending: { kind: "length" },
+    });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("토큰 콜백을 넘기지 않는다 (E3)", async () => {
+    const seen: unknown[][] = [];
+    const engine = createLlamaEngine(
+      async () => ({
+        async completion(...args: unknown[]) {
+          seen.push(args);
+          return { content: "t", stopped_eos: true };
+        },
+        async stopCompletion() {},
+        async release() {},
+      }),
+      pathFor,
+    );
+    await engine.load(QUIET);
+    await engine.ask("p", "b", "q", { timeoutMs: 1000 });
+    expect(seen[0]).toHaveLength(1);
+  });
+});

@@ -1,4 +1,8 @@
-import { createOnDeviceBackend, type VisionSupport } from "../../src/inference/on-device";
+import {
+  createOnDeviceBackend,
+  type VisionSupport,
+  withTitle,
+} from "../../src/inference/on-device";
 import type { GenerationEngine, LoadResult, RunResult } from "../../src/inference/engine-port";
 import { emptyDay } from "../../src/signals/fake";
 import type { DaySignals, Photo } from "../../src/signals/types";
@@ -119,6 +123,8 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
     load: LoadResult = { ok: true, warm: true },
   ): GenerationEngine {
     return {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return load;
       },
@@ -168,6 +174,8 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
   it("타임아웃 실패에서도 캡션 성공한 사본이 정리된다", async () => {
     const { support, cleaned } = visionSupportWith();
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: true };
       },
@@ -261,6 +269,8 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
 
   function engineReturning(run: RunResult, delayMs = 0): GenerationEngine {
     return {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: true };
       },
@@ -344,6 +354,8 @@ describe("017 — generate()의 timing (contracts/elapse-time.md T1~T4)", () => 
     const support = visionSupportWith();
     let loadDelayed = false;
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         // 로드에 시간이 걸리는 대역 — writingMs에 반영되면 안 된다.
         await new Promise((resolve) => setTimeout(resolve, 30));
@@ -404,6 +416,8 @@ describe("018 — prepare()/release()", () => {
     const calls: string[] = [];
     let loadResult: LoadResult = { ok: true, warm: false };
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load(character) {
         calls.push(`load:${character}`);
         return loadResult;
@@ -567,6 +581,8 @@ describe("018 — generate(request, onStage, seen)", () => {
 
   function goodEngine(): GenerationEngine {
     return {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: false };
       },
@@ -756,6 +772,8 @@ describe("018 — captionDay()", () => {
   it("captionDay()가 돌려준 결과를 generate()의 seen으로 그대로 쓸 수 있다 (E1 순서)", async () => {
     const { support } = visionSupportWith();
     const engine: GenerationEngine = {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load() {
         return { ok: true, warm: false };
       },
@@ -853,6 +871,8 @@ describe("023 T041 — 잡사진 필터링 통합 경로", () => {
 
   function passingEngine(): GenerationEngine {
     return {
+      // 061 — 제목은 묻지 않은 것처럼 끝난다(제목 없이 본문만 저장된다).
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
       async load(): Promise<LoadResult> {
         return { ok: true, warm: true };
       },
@@ -950,5 +970,161 @@ describe("023 T041 — 잡사진 필터링 통합 경로", () => {
 
     expect("text" in result).toBe(true);
     expect(called).toBe(false);
+  });
+});
+
+/**
+ * 061 — 제목은 판정 통과 뒤 두 번째 호출로 묻는다.
+ *
+ * 계약: specs/061-diary-prompt-swap/contracts/title-ask.md TA2, data-model.md 「제목 합치기」
+ */
+describe("061 — 제목 두 번째 호출 (TA2)", () => {
+  const BODY =
+    "나는 오늘 아무것도 보지 못했다. 가방 속은 조용했다. 내일은 무엇이든 보여 줬으면 좋겠다.";
+  const request: DiaryRequest = {
+    signals: emptyDay("2026-08-20"),
+    character: "quiet",
+    vision: "quick",
+    dayStillOpen: false,
+  };
+
+  type AskCall = { prompt: string; body: string; question: string };
+
+  /** 사진 엔진 대역 — 사진이 없는 날은 열리지 않는다(011). 042: 없으면 생성하지 않는다 */
+  const vision: VisionSupport = {
+    engine: {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(): Promise<VisionRunResult> {
+        return { text: "" };
+      },
+      async stop() {},
+      async unload() {},
+    },
+    resolvePath: async (p) => `/photo/${p.id}.jpg`,
+  };
+
+  function titledEngine(
+    body: RunResult,
+    answer: () => Promise<RunResult>,
+  ): { engine: GenerationEngine; asks: AskCall[]; runs: string[] } {
+    const asks: AskCall[] = [];
+    const runs: string[] = [];
+    const engine: GenerationEngine = {
+      async load() {
+        return { ok: true, warm: false };
+      },
+      async prewarm() {},
+      async run(prompt) {
+        runs.push(prompt);
+        return body;
+      },
+      async ask(prompt, b, question) {
+        asks.push({ prompt, body: b, question });
+        return answer();
+      },
+      async stop() {},
+      async unload() {},
+    };
+    return { engine, asks, runs };
+  }
+
+  const eos = (text: string): RunResult => ({ text, ending: { kind: "eos" } });
+
+  it("판정을 통과하면 같은 프롬프트·본문으로 제목을 묻고, 한 줄 답이면 「제목 + 빈 줄 + 본문」이다", async () => {
+    const { engine, asks, runs } = titledEngine(eos(BODY), async () => eos("심심한 가방 속"));
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+    const result = await backend.generate(request);
+
+    expect(asks).toEqual([
+      {
+        prompt: runs[0],
+        body: BODY,
+        question: "방금 쓴 일기에 붙일 제목을 한 줄로 적어라. 제목만 적는다.",
+      },
+    ]);
+    expect(result).toMatchObject({ text: `심심한 가방 속\n\n${BODY}` });
+  });
+
+  it("판정에서 거부되면 제목을 묻지 않는다", async () => {
+    const { engine, asks } = titledEngine(eos(""), async () => eos("제목"));
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+    const result = await backend.generate(request);
+
+    expect(result).toEqual({ kind: "rejected", why: "empty" });
+    expect(asks).toEqual([]);
+  });
+
+  it.each<[string, () => Promise<RunResult>]>([
+    ["여러 줄", async () => eos("첫 줄\n둘째 줄")],
+    ["끝나지 않음", async () => ({ text: "제목", ending: { kind: "length" } })],
+    ["빈 답", async () => eos("   ")],
+    ["41자", async () => eos("가".repeat(41))],
+    [
+      "예외",
+      async () => {
+        throw new Error("boom");
+      },
+    ],
+  ])("제목 답이 %s이면 일기를 버리지 않고 본문만 저장한다", async (_label, answer) => {
+    const { engine } = titledEngine(eos(BODY), answer);
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+    expect(await backend.generate(request)).toMatchObject({ text: BODY });
+  });
+
+  it("제목 호출이 한도를 넘으면 멈추고 본문만 저장한다", async () => {
+    let stopped = 0;
+    const { engine } = titledEngine(eos(BODY), () => new Promise<RunResult>(() => {}));
+    engine.stop = async () => {
+      stopped += 1;
+    };
+    const backend = createOnDeviceBackend(async () => [], engine, 30, vision);
+
+    expect(await backend.generate(request)).toMatchObject({ text: BODY });
+    expect(stopped).toBe(1);
+  });
+
+  it("제목을 묻는 동안 그만두면 일기를 저장하지 않는다 (FR-018)", async () => {
+    let backend: ReturnType<typeof createOnDeviceBackend>;
+    const { engine } = titledEngine(eos(BODY), async () => {
+      await backend.stop?.();
+      return { text: "", ending: { kind: "interrupted" } };
+    });
+    backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+    expect(await backend.generate(request)).toEqual({ kind: "interrupted" });
+  });
+
+  it("캡션이 있는 날은 장면을 고르는 질문을 쓴다", async () => {
+    const { engine, asks } = titledEngine(eos(BODY), async () => eos("고양이의 밤"));
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+    const seen: PhotoVision = {
+      captions: [{ photoId: "p", takenAt: new Date(2026, 7, 20, 22, 0, 0), text: "A cat." }],
+      considered: 1,
+      available: 1,
+    };
+    const photos: DaySignals = {
+      ...request.signals,
+      photos: {
+        kind: "known",
+        value: { photos: [{ id: "p", takenAt: new Date(2026, 7, 20, 22, 0, 0) }], complete: true },
+      },
+    };
+
+    await backend.generate({ ...request, signals: photos }, undefined, seen);
+
+    expect(asks[0].question).toBe(
+      "방금 쓴 일기에서 가장 마음에 남는 장면 하나를 골라, 그것을 가리키는 짧은 제목을 한 줄로 적어라. 제목만 적는다.",
+    );
+  });
+
+  it("withTitle — 40자 한 줄은 잇고 글자를 고치지 않는다(앞뒤 공백만 걷는다)", () => {
+    const forty = "가".repeat(40);
+    expect(withTitle("본문", eos(` ${forty} `))).toBe(`${forty}\n\n본문`);
+    expect(withTitle("본문", undefined)).toBe("본문");
   });
 });
