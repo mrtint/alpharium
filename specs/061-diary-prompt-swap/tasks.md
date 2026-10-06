@@ -48,8 +48,8 @@
 - [x] T020 `npm run lint`(eslint·tsc·`check:constitution`·prettier)
 - [x] T021 계약 넷: prompt-signature·acceptance A-7·title·018 접두사 같은 배열(소스)
 - [x] T022 my-ollama `gen-prompts.ts`로 공식 바이트 대조(SC-①) — 결과를 `prompts.json`에 쓰므로 끝나면 my-ollama 작업 트리를 되돌린다
-- [ ] T023 SC-④ 기기 등가 재측정(my-ollama, llama-server + GGUF가 있을 때) — 합격선 여덟 줄
-- [ ] T024 SC-⑤ 실기기 dev 6편 — 갈래 섞어 생성, 제목·본문 그대로 기록
+- [x] T023 SC-④ 기기 등가 재측정(my-ollama, llama-server + GGUF가 있을 때) — 합격선 여덟 줄
+- [x] T024 SC-⑤ 실기기 dev 6편 — 갈래 섞어 생성, 제목·본문 그대로 기록
 - [x] T025 문서: `AGENTS.md`에 061 결론(지금도 유효한 것만), quickstart.md 끝에 실기기 결과, `src/diary/prompt.ts` 주석의 문안 출처 갱신
 
 ## Dependencies
