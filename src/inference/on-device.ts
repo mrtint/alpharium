@@ -23,6 +23,7 @@
 
 import type { DayDate } from "../config/day-boundary";
 import { judge } from "../diary/acceptance";
+import { VISION_CACHE_DIRECTORY } from "../diary/photo-path";
 import { buildPrompt, instructionLines, promptPrefix, titleQuestion } from "../diary/prompt";
 import { buildRequest } from "../diary/request";
 import { MAX_TITLE_LENGTH } from "../diary/title";
@@ -843,7 +844,7 @@ function visionSupport(): VisionSupport {
  * 않으려고 export한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export const VISION_CACHE_DIRECTORY = "vision-cache";
+export { VISION_CACHE_DIRECTORY };
 
 async function openVisionCacheDirectory() {
   const { Directory, Paths } = await import("expo-file-system");

@@ -112,7 +112,11 @@ export interface VisionEngine {
 
 /** `llama.rn`의 컨텍스트에서 **우리가 쓰는 부분만**. 전체를 들고 다니지 않는다 */
 type VisionContext = {
-  initMultimodal(params: { path: string; image_max_tokens?: number }): Promise<boolean>;
+  initMultimodal(params: {
+    path: string;
+    image_max_tokens?: number;
+    use_gpu?: boolean;
+  }): Promise<boolean>;
   getMultimodalSupport(): Promise<{ vision: boolean; audio: boolean }>;
   releaseMultimodal(): Promise<void>;
   completion(params: Record<string, unknown>): Promise<NativeResult>;
@@ -178,9 +182,14 @@ export function createVisionEngine(
 
       try {
         // ★ mmproj를 붙인다. **이것이 없으면 사진을 못 본다.**
+        // 066 — **GPU를 쓰지 않는다.** 기본값(`use_gpu: true`)이 iOS 시뮬레이터의 Metal 드라이버
+        // 안에서 앱을 죽였다(`clip_model_loader::load_tensors` → `lm_ggml_metal_buffer_set_tensor`
+        // → `_xpc_api_misuse`, 2026-10-08). 본문 모델이 `n_gpu_layers: 0`인 것(`llama-port.ts`)과
+        // 같은 결정이다 — 실제 iPhone에서 GPU 경로가 서는지는 재지 않았다(원칙 V).
         await opened.initMultimodal({
           path: projectorPath,
           image_max_tokens: IMAGE_TOKENS[depth],
+          use_gpu: false,
         });
 
         // ★ 물어본다 — 짐작하지 않는다(V2, 원칙 V).

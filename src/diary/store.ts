@@ -12,6 +12,7 @@
  */
 
 import type { DayDate } from "../config/day-boundary";
+import { rehomeResizedPath } from "./photo-path";
 import type { DiaryEntry } from "./types";
 
 /**
@@ -279,6 +280,11 @@ export interface FileSystemPort {
   list(): Promise<string[]>;
   /** 058 — 파일 하나를 지운다. 없으면 조용히 넘어간다 */
   remove(name: string): Promise<void>;
+  /**
+   * 066 — 지금의 앱 문서 디렉터리. 있으면 `load()`가 사진 사본 경로를 그 아래로 옮긴다
+   * (`photo-path.ts`). 메모리 통로처럼 디렉터리가 없는 곳은 두지 않는다.
+   */
+  documentDirectory?(): Promise<string>;
 }
 
 /** 날짜 → 파일 이름. 파일명이 곧 날짜 키다(contracts/storage.md). */
@@ -330,7 +336,17 @@ export function fileStore(fs: FileSystemPort): DiaryStore {
       if (contents === null) return null;
 
       try {
-        return deserializeEntry(contents);
+        const entry = deserializeEntry(contents);
+        // 066 — iOS는 업데이트마다 컨테이너 경로가 바뀐다. 사본 경로를 지금 자리로 옮긴다.
+        const documentDirectory = await fs.documentDirectory?.();
+        if (documentDirectory === undefined || entry.photos === undefined) return entry;
+        return {
+          ...entry,
+          photos: entry.photos.map((p) => ({
+            ...p,
+            resizedPath: rehomeResizedPath(p.resizedPath, documentDirectory),
+          })),
+        };
       } catch {
         // 읽을 수 없는 파일을 빈 일기로 만들지 않는다. 없는 것과 같이 다룬다.
         return null;
@@ -386,6 +402,11 @@ export function expoFileSystemPort(directoryName = "diary"): FileSystemPort {
       const { dir, File } = await openDirectory();
       const file = new File(dir, name);
       return file.exists ? file.text() : null;
+    },
+
+    async documentDirectory() {
+      const { Paths } = await import("expo-file-system");
+      return Paths.document.uri.replace(/^file:\/\//, "");
     },
 
     /**

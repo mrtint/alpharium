@@ -22,6 +22,7 @@ export function NameField({
   inputTestID,
   counterTestID,
   autoFocus,
+  onSubmitEditing,
 }: {
   value: string;
   onChangeText: (text: string) => void;
@@ -30,6 +31,8 @@ export function NameField({
   inputTestID: string;
   counterTestID: string;
   autoFocus?: boolean;
+  /** 066 — 리턴 키. 확정 규칙은 화면이 정하므로 여기서는 알리기만 한다. */
+  onSubmitEditing?: () => void;
 }) {
   const counter = `${value.length}/${maxLength}`;
   return (
@@ -43,8 +46,10 @@ export function NameField({
         autoFocus={autoFocus}
         maxLength={maxLength}
         onChangeText={onChangeText}
+        onSubmitEditing={onSubmitEditing}
         placeholder={placeholder}
         placeholderTextColor={COLORS.textMuted}
+        returnKeyType="done"
         style={INPUT}
         testID={inputTestID}
         value={value}

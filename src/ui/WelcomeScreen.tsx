@@ -178,6 +178,10 @@ export function WelcomeScreen({
                 inputTestID="welcome-name-input"
                 maxLength={NAME_INPUT_MAX_LENGTH}
                 onChangeText={setDraft}
+                // 066 — iOS에서 버튼 줄이 키보드 뒤로 들어간다. 리턴 키가 버튼과 같은 규칙으로 확정한다.
+                onSubmitEditing={() => {
+                  if (canSubmit) onSubmitName(draft);
+                }}
                 placeholder={TEXT.namePlaceholder}
                 value={draft}
               />

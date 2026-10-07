@@ -68,14 +68,19 @@
         "expo-media-library",
         {
           "granularPermissions": ["photo"],
-          "isAccessMediaLocationEnabled": true
+          "isAccessMediaLocationEnabled": true,
+          "photosPermission": "그날 찍힌 사진을 읽어 하루를 일기로 씁니다. 사진은 휴대폰 밖으로 나가지 않습니다.",
+          "savePhotosPermission": false
         }
       ],
       "expo-background-task",
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "사진에 담긴 장소를 사람이 읽을 수 있는 이름으로 바꾸는 데 위치를 씁니다."
+          "locationWhenInUsePermission": "사진에 담긴 장소를 사람이 읽을 수 있는 이름으로 바꾸는 데 위치를 씁니다.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false
         }
       ]
     ]

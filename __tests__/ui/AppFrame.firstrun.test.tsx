@@ -230,6 +230,20 @@ describe("046 D8 — 다운로드 실패 자동 재시도는 App.tsx가 스스�
     expect(body).toMatch(/return \(\) => clearTimeout\(id\);/);
   });
 
+  // 066 — `downloadEssentials()`는 실패를 던지지 않고 `{ ok: false }`로 돌려준다
+  // (`essential-assets-port.ts`). `.catch`만 보면 실패해도 「받는 중이에요」에 영영 머문다
+  // (iOS 시뮬레이터 TLS 실패에서 관측, 2026-10-08). 값으로 온 실패도 `downloadFailed`로 옮겨야
+  // 위 자동 재시도가 돈다.
+  it("downloadEssentials가 { ok: false }를 돌려주면 downloadFailed를 세운다 (066)", () => {
+    const region = APP_SOURCE.slice(
+      APP_SOURCE.indexOf(".downloadEssentials("),
+      APP_SOURCE.indexOf(".catch(", APP_SOURCE.indexOf(".downloadEssentials(")),
+    );
+    expect(region).toMatch(/\.then\(\(result\) => \{/);
+    expect(region).toMatch(/if \(!result\.ok\)[\s\S]*setDownloadFailed\(true\)/);
+    expect(region).toMatch(/refreshEssentialsReady\(\)/);
+  });
+
   it("DownloadProgressScreen에 onRetry를 더 이상 넘기지 않는다(재시도 콜백 제거, contracts D8)", () => {
     const region = APP_SOURCE.slice(
       APP_SOURCE.indexOf("<DownloadProgressScreen"),

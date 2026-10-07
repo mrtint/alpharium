@@ -29,6 +29,8 @@
   `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`의 조각 일곱이 모두 들어갔다.
 - **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. 절차는 아래 「release 빌드·서명·Google Play」.
+- **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
+  절차와 함정은 아래 「iOS 시뮬레이터」.
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -163,6 +165,12 @@
 1. **Metro가 dev 환경으로 떠 있어야 한다** — `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client`.
    **Expo는 `NODE_ENV`로 env 파일을 고르지 `EXPO_PUBLIC_APP_ENV`로 고르지 않는다** — 변수를 셸에서
    직접 준다(`@expo/env`의 `load()`는 이미 설정된 `process.env`를 보존한다).
+   **★ macOS·SDK 57에서는 셸 변수가 번들에 들어가지 않았다**(066, 2026-10-08): Metro가 `.env*` 파일을 **각각 모듈로 번들에 싣고**
+   (`__d(…, ".env.development")`) 런타임에 고른다. `export EXPO_PUBLIC_APP_ENV=dev` 뒤 `--clear`로 띄워도(Metro 로그는 셸 값을
+   존중해 파일 값을 export하지 않는 것처럼 보인다) 앱은 `.env.development`의 `local`로 떴다. 번들이 `local`이면 온디바이스 엔진이
+   조립되지 않아 **liveness가 조용히 실패하고 쓰기가 `not-implemented`**로 끝난다. gitignore된 `.env.development.local`에
+   `EXPO_PUBLIC_APP_ENV=dev` 한 줄을 두면 그 모듈이 이긴다(실측). **번들을 믿지 말고 본다** —
+   `curl -s "localhost:8081/index.bundle?platform=ios&dev=true" | grep -B1 '"EXPO_PUBLIC_APP_ENV"'`에 `.env.development.local` 모듈이 있어야 한다.
 2. **기기 잠금이 풀려 있고 화면이 켜져 있어야 한다** — `adb shell dumpsys trust`의 `deviceLocked=0`.
    PIN은 사람이 넣는다.
 3. **한글 검증 문구는 `-Dfile.encoding=UTF-8`이 있어야 읽힌다**(한국어 Windows는 CP949).
@@ -817,6 +825,31 @@
   글꼴을 빼서 고쳤다. 세로 묶음의 고정폭 보조 줄은 폭이 넉넉해 드러나지 않는다. 고정폭 글꼴은 라틴 문자에만 쓴다.
 - 회색 쓰기 바 글자는 보드 neutral-700이 면 위 4.39:1이라 neutral-800(`SIMULATION.barText`, 6.81:1)이다. 날짜 대화상자는 `DateJumpDialog`를 쓰지 않는다(미래 칸을 막는다) —
   같은 datepicker 격자 위에 「끄기」·「취소」.
+
+### 066 — iOS 시뮬레이터 스파이크
+
+- **되는 것**(iPhone 17 시뮬레이터, iOS 26.5, Xcode 26.6, dev 빌드): 권한 셋 → 동의 → 모듈 내려받기(약 2GB) → 작명 → 홈 사진 3장 인식 → 사진 읽기 →
+  본문·제목 → 저장 → 쓴 날 홈(약 50초). **안 보는 것**: 백그라운드 자동 쓰기(시뮬레이터가 BGTask를 스케줄하지 않는다), 실제 iPhone의 메모리·속도, release·서명·TestFlight.
+- **★ `initMultimodal`의 기본값(`use_gpu: true`)이 시뮬레이터 Metal 드라이버 안에서 앱을 죽인다** — `clip_model_loader::load_tensors` → `lm_ggml_metal_buffer_set_tensor`
+  → `_xpc_api_misuse`(SIGTRAP). JS에는 아무것도 안 오고 앱이 홈 화면으로 사라진다(크래시 보고서는 `~/Library/Logs/DiagnosticReports/Pocketlog-*.ips`). `use_gpu: false`로
+  고정했다(`vision-port.ts`, engine.test.ts가 잠근다) — 본문 모델의 `n_gpu_layers: 0`과 같은 결정. 실제 iPhone에서 GPU 경로가 서는지는 재지 않았다.
+- **★ 내려받기 실패가 화면에 안 보였다** — `downloadEssentials()`는 실패를 `{ ok: false }` 값으로 돌려주는데 `App.tsx`가 `.catch`만 봐서 「받는 중이에요」에 영영 머물렀다
+  (안드로이드에도 같은 코드). 값 실패도 `downloadFailed`로 옮겼다(AppFrame.firstrun.test.tsx 066).
+- **일기의 사본 경로는 절대 경로로 저장된다** — iOS는 업데이트마다 컨테이너 UUID가 바뀌어 옛 일기의 사진이 「이제 없어요」가 된다. 저장 형식은 두고 `fileStore.load()`가
+  `rehomeResizedPath()`(`src/diary/photo-path.ts`)로 지금 자리에 옮긴다(`FileSystemPort.documentDirectory?`). 리사이즈를 건너뛴 원본 경로(013 C1)는 손대지 않는다.
+  **`VISION_CACHE_DIRECTORY`의 자리는 이제 `diary/photo-path.ts`다**(`on-device.ts`는 재export).
+- **iOS 권한 문구는 `app.json`의 플러그인 옵션이 유일한 자리다** — 안 주면 "Allow Pocketlog to access your photos" 영어 기본값이 권한 창에 그대로 뜬다. 사진 저장·항상 위치·
+  모션은 `false`로 키 자체를 뺐다(`__tests__/config/ios-permissions.test.ts`). 생성된 `ios/Pocketlog/Info.plist`의 `UsageDescription`으로 확인한다.
+- **iOS 기본 줄바꿈은 글자 단위다** — 「처음 뵙겠습/니다.」. `AppText`가 `lineBreakStrategyIOS="hangul-word"`를 기본으로 준다. 작명 화면은 키보드가 뜨면 버튼 줄이 키보드 뒤라
+  리턴 키(`returnKeyType="done"`·`onSubmitEditing`)가 버튼과 같은 규칙으로 확정한다.
+- **앱 아이콘은 자리표시자다**(토큰 색의 빨간 사각형 + 「P」, `assets/icon.png`) — Expo 기본 아이콘이 iOS에 그대로 나왔다. 안드로이드 adaptive icon도 아직 Expo 기본이다(미교체).
+- **도구**: `xcodebuild`는 `sudo xcode-select` 없이 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`로 쓴다. `pod install`은 `~/.netrc`가 644면 거부한다 — 파일을
+  안 고치려면 `NETRC=<빈 디렉터리>`. **사내망은 Hugging Face CDN(`us.aws.cdn.hf.co`)의 TLS를 바꿔치므로** 시뮬레이터에 회사 루트 인증서를 넣어야 모델이 받아진다
+  (`security find-certificate -a -c NEXON -p /Library/Keychains/System.keychain > nexon.pem; xcrun simctl keychain <UDID> add-root-cert nexon.pem`) — 그 전에는
+  `UnableToDownloadException: … TLS 오류`. 화면 조작은 Maestro(`brew install mobile-dev-inc/tap/maestro`, `JAVA_HOME`을 Homebrew openjdk로 줘야 뜬다)로
+  `maestro --device <UDID> test <flow>`. 사진은 `xcrun simctl addmedia <UDID> *.jpg`로 넣되 **EXIF 촬영일이 있으면 그 날로 들어간다** — 오늘로 넣으려면 EXIF를 걷어낸 JPEG
+  (`sips -s format bmp` → 다시 jpeg). 앱 데이터는 `xcrun simctl get_app_container <UDID> com.a810labs.pocketlog data` 아래 `Documents/`(일기·모델·preferences 모두).
+- **미확인**: 다운로드 실패 화면(계약 테스트로만), 재설치 뒤 사본 경로 복원(코드 추정), 설정·개발자·진단 화면, 글꼴 배율.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

@@ -79,6 +79,18 @@ describe("load — 본체를 열고 mmproj를 붙인다", () => {
     expect(kinds).toContain("initMultimodal");
   });
 
+  // 066 — iOS 시뮬레이터에서 `initMultimodal`의 기본값(GPU)이 Metal 드라이버 안에서 앱을 죽였다
+  // (`lm_ggml_metal_buffer_set_tensor` → `_xpc_api_misuse`, 2026-10-08). 본문 모델이 `n_gpu_layers: 0`으로
+  // CPU에 고정된 것(`llama-port.ts`)과 같은 결정 — 사진 모델도 CPU다.
+  it("mmproj는 GPU를 쓰지 않는다 (use_gpu: false, 066)", async () => {
+    const calls: Call[] = [];
+    const engine = createVisionEngine(loaderFor(calls), paths);
+    await engine.load("quick");
+
+    const init = calls.find((c) => c.kind === "initMultimodal");
+    expect(init?.detail).toMatchObject({ use_gpu: false });
+  });
+
   // V2 — 짐작하지 않고 물어본다 (원칙 V).
   it("사진을 볼 수 있는지 물어본다", async () => {
     const calls: Call[] = [];

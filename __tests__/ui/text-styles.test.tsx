@@ -37,6 +37,14 @@ describe("UC5 — AppText", () => {
     expect(screen.getByText("캡션")).toBeTruthy();
   });
 
+  // 066 — iOS는 기본 줄바꿈이 글자 단위라 「처음 뵙겠습/니다.」처럼 낱말 가운데서 줄이 바뀐다
+  // (시뮬레이터 관측). 모든 화면 문구가 한국어이므로 래퍼가 기본값으로 낱말 단위를 준다.
+  // 안드로이드는 이 prop을 무시한다(RN 문서) — 그쪽의 `word-break: keep-all` 부재는 057에 적혀 있다.
+  it("iOS 줄바꿈은 한글 낱말 단위다 (lineBreakStrategyIOS: hangul-word, 066)", async () => {
+    await render(<AppText testID="t-hangul">깨어났어요. 처음 뵙겠습니다.</AppText>);
+    expect(screen.getByTestId("t-hangul").props.lineBreakStrategyIOS).toBe("hangul-word");
+  });
+
   it("variant 없이 쓰면 body로 렌더된다", async () => {
     await render(<AppText testID="t-default">기본</AppText>);
     expect(screen.getByTestId("t-default")).toBeTruthy();
