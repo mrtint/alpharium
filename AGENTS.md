@@ -927,13 +927,16 @@ POCKETLOG_KEY_PASSWORD=<비밀번호>
 ```
 npx expo prebuild --platform android --clean
 cp ~/.pocketlog-signing/pocketlog.jks android/app/     # ★ prebuild가 지웠다
-cd android && NODE_ENV=production ./gradlew bundleRelease     # Play용 AAB
-cd android && NODE_ENV=production ./gradlew assembleRelease   # 손으로 설치할 APK
+cd android && NODE_ENV=production ./gradlew bundleRelease -PreactNativeArchitectures=arm64-v8a     # Play용 AAB
+cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a   # 손으로 설치할 APK
 ```
 
 **`--clean`을 건너뛰지 않는다**(004에서 권한이 빠진 APK가 설치됐다). **가운데 줄을 건너뛰지 않는다.** **`NODE_ENV=production`이 필요하다** — 없으면 `.env.production`이 로드되지 않고 앱이
 「이 빌드는 잘못 만들어졌다」로 뜬다. 산출물: `android/app/build/outputs/bundle/release/app-release.aab`, `android/app/build/outputs/apk/release/app-release.apk`(APK 빌드 약 19분).
 
+- **★ `-PreactNativeArchitectures=arm64-v8a`를 빼지 않는다**(065 실측). 네 ABI를 다 빌드하면 `llama.rn`의 CPU 갈래 10여 벌을 release 최적화로 동시에 컴파일하다
+  clang이 `LLVM ERROR: out of memory`로 죽었다(34분 뒤 실패). arm64 하나면 13분 39초에 끝난다. 2GB 모델을 기기에서 돌리는 앱이라 출시 대상도 arm64뿐이다 —
+  32비트·x86 기기에는 Play에서 앱이 보이지 않는다. 첫 release 빌드는 `react-android-*-release.aar`(약 168MB)를 받다 연결 시간 초과가 난 적이 있다(다시 돌리면 된다).
 - **Play에 올릴 때마다 `app.json`의 `android.versionCode`를 1 올린다** — 같은 번호는 Play가 거부한다. 사람이 보는 버전은 `expo.version`(versionName)이다. 올린 번호는 커밋에 남긴다.
 - 실측(065): `targetSdk`는 36(RN 0.86 기본), 모든 arm64 네이티브 라이브러리(`llama.rn` 포함)의 LOAD 정렬이 16KB다 — Play의 16KB 페이지 요구를 충족한다. `llama.rn`을 올리면 다시 본다
   (`.so`의 ELF 프로그램 헤더 `p_align`; 개발 기계에 `readelf`가 없어 node로 읽었다).
