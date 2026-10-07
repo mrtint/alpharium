@@ -943,6 +943,7 @@ cd android && NODE_ENV=production ./gradlew assembleRelease   # 손으로 설치
 - **`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`** — Play가 메신저·자동화·운동·기기 연결·안전·VPN에만 허용한다(선언만으로 심사 대상). 배터리 예외는 권한이 필요 없는 설정 목록
   (`IGNORE_BATTERY_OPTIMIZATION_SETTINGS`)으로만 안내한다. `app.json`의 `blockedPermissions`가 다른 라이브러리를 거쳐 들어오는 것까지 걷고 `battery-exception-port.test.ts`가 잠근다.
   대가: 삼성 밖 기기에서 「한 번 눌러 허용」이 「목록에서 직접 끄기」가 됐다 — 백그라운드 자동 쓰기가 늦어질 수 있고 앱을 열면 쓰는 경로(057)가 메운다.
+- **`SYSTEM_ALERT_WINDOW`(다른 앱 위에 그리기)** — Expo 템플릿 기본 매니페스트가 넣을 뿐 앱이 쓰지 않는다. `blockedPermissions`로 걷는다(debug 매니페스트에는 개발 메뉴용으로 남는다).
 - **`READ_MEDIA_IMAGES`는 둔다** — 사진 및 동영상 권한 정책의 신고서에 「매일 그날 찍힌 사진 전체를 자동으로 읽어 일기를 쓰는 것이 핵심 기능」이라고 적는다(사진 선택기로는 대체할 수 없다).
 
 ### 확인 — 빌드 성공을 믿지 않는다
