@@ -22,7 +22,7 @@
 # ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다(008 실측) —
 # `testID`를 하루마다 따로 준다.
 # ─────────────────────────────────────────────────────────────────────────────
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp
 

@@ -84,7 +84,6 @@ export type OnboardingPorts = {
     getPermission(): Promise<"granted" | "denied" | "undetermined" | "blocked">;
   };
   battery: {
-    requestException(): Promise<void>;
     openSettingsList(): Promise<void>;
   };
   location: LocationPermissionPort;
@@ -267,7 +266,8 @@ export function OnboardingScreen({
             break;
           }
           case "battery-exception":
-            await ports.battery.requestException();
+            // 065 — 예외를 직접 요청하지 않고 설정 목록을 연다(Play 정책, battery-exception-port.ts).
+            await ports.battery.openSettingsList();
             if (alive.current) setBatteryNoticeShown(true);
             await refresh();
             return;

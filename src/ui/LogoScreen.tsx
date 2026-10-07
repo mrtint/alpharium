@@ -13,7 +13,7 @@
  * `src/ui/`가 "얼마나 보여줄지"를 정한다(040 research.md #1과 같은 판단).
  *
  * **043 — 리뷰 보드 프레임 1k 레이아웃 그대로** — 상단(flex:1, 세로 중앙 정렬,
- * 좌측 정렬): 72×72 accent 정사각 로고 마크(모서리 반경 0) + "Alpharium"
+ * 좌측 정렬): 72×72 accent 정사각 로고 마크(모서리 반경 0) + "Pocketlog"
  * 브랜드 타이틀. 하단(구분선 위): 좌측 안내 문구 "휴대폰 안에서만", 우측 로딩
  * 점 3개(정적 표시 — FR-005, 원칙 IV. 진행률·모델명을 계산해 보이지 않는다).
  *
@@ -51,7 +51,7 @@ export function LogoScreen({ onDone }: LogoScreenProps) {
     <View style={styles.container} testID="first-run-logo">
       <View style={styles.top}>
         <View style={styles.logoMark} testID="splash-logo-mark" />
-        <AppText style={styles.title}>Alpharium</AppText>
+        <AppText style={styles.title}>Pocketlog</AppText>
       </View>
 
       <View style={styles.bottom}>

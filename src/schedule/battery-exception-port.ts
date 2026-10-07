@@ -1,5 +1,5 @@
 /**
- * 배터리 최적화 예외 안내·요청 통로 (020).
+ * 배터리 최적화 예외 안내 통로 (020, 065에서 직접 요청을 걷었다).
  *
  * 계약: specs/020-scheduled-diary-notification/contracts/battery-exception.md
  *       E1
@@ -9,9 +9,13 @@
  * `expo-intent-launcher`로 시스템 설정 화면·다이얼로그를 띄운다. 이 저장소가
  * 005·011에서 겪은 "손으로 짠 JNI"의 위험이 없는 표준 Expo 모듈이다.
  *
- * **`requestException()`은 반환값이 없다**(원칙 IV) — 사용자가 수락/거부/취소
- * 무엇을 했는지 측정하지 않는다. 실패해도 다음 `run()`이 그냥 느릴 뿐
- * 틀리지 않으므로 알릴 것이 없다.
+ * **설정 목록을 여는 것뿐이고 예외를 직접 요청하지 않는다**(065). 직접 요청
+ * (`ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`)은 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`
+ * 권한 선언이 필요한데, Google Play는 그 권한을 메신저·자동화·운동·기기 연결·안전·VPN처럼
+ * 예외 없이는 핵심 기능이 망가지는 앱에만 허용한다. 이 앱은 예외가 없어도 하루 1~2회는
+ * 돌고(019) 앱을 열면 바로 쓴다(057) — 늦어질 뿐 망가지지 않는다. 그래서 권한을 선언하지
+ * 않고(`app.json`의 `blockedPermissions`가 다른 경로로 들어와도 걷는다) 사용자가 직접 끄는
+ * 설정 목록만 연다. 반환값이 없다(원칙 IV) — 사용자가 무엇을 했는지 재지 않는다.
  *
  * 지연 import: `expo-intent-launcher`를 메서드 안에서 `await import`한다.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -19,17 +23,8 @@
 
 export interface BatteryExceptionPort {
   /**
-   * `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 인텐트를 띄운다. 매니페스트에
-   * 권한이 선언돼 있으면 앱을 나가지 않고 시스템 다이얼로그로 예외를
-   * 요청한다(config plugin이 선언, E2). 자동 생성을 처음 켤 때 1회만
-   * 불린다(FR-010 MUST NOT — 그 판정은 호출부가 한다).
-   *
-   * **반환값 없음**(원칙 IV). 인텐트가 실패해도 예외를 밖으로 던지지 않는다.
-   */
-  requestException(): Promise<void>;
-  /**
-   * 배터리 최적화 예외 설정 "목록" 화면을 연다. 거부 후 설정 화면의
-   * 상시 링크가 이걸 부른다(E4).
+   * 배터리 최적화 예외 설정 "목록" 화면을 연다. 온보딩 배터리 단계의 [허용]·[설정 열기]가
+   * 이걸 부른다. 인텐트가 실패해도 예외를 밖으로 던지지 않는다.
    */
   openSettingsList(): Promise<void>;
 }
@@ -39,20 +34,6 @@ export interface BatteryExceptionPort {
  */
 export function expoBatteryExceptionPort(): BatteryExceptionPort {
   return {
-    async requestException() {
-      try {
-        const IntentLauncher = await import("expo-intent-launcher");
-        await IntentLauncher.startActivityAsync(
-          IntentLauncher.ActivityAction.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-          { data: "package:com.anonymous.alpharium" },
-        );
-      } catch {
-        // 인텐트가 실패(액티비티 없음 등)해도 예외를 밖으로 던지지 않는다.
-        // 자동 생성은 이것과 무관하게 동작한다(느릴 뿐).
-        await openAppSettingsFallback();
-      }
-    },
-
     async openSettingsList() {
       try {
         const IntentLauncher = await import("expo-intent-launcher");

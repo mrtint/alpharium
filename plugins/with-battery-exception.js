@@ -1,5 +1,5 @@
 /**
- * 020 — 배터리 최적화 예외 요청과 알림 권한을 매니페스트에 선언한다
+ * 020 — 알림 권한을 매니페스트에 선언한다 (배터리 예외 권한은 065에서 걷었다)
  * (contracts/battery-exception.md E2, FR-010).
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -11,29 +11,25 @@
  * 한 것과 같은 이유다(004에서 `expo run:android`가 prebuild를 건너뛰어
  * 권한이 빠진 APK가 설치된 사고가 근거).
  *
- * **넣는 권한 둘**:
+ * **넣는 권한 하나**:
  *  - `POST_NOTIFICATIONS` — Android 13(API 33)+에서 `expo-notifications`의
  *    런타임 권한 요청(`requestPermissionsAsync()`)이 먹으려면 매니페스트
  *    선언이 선행돼야 한다(contracts/notification.md N3).
- *  - `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` — 이 권한이 선언돼야
- *    `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 인텐트가 앱을 나가지
- *    않고 시스템 다이얼로그로 예외를 요청할 수 있다. 없으면 설정 목록
- *    화면으로만 보낼 수 있다(contracts/battery-exception.md E1·E2).
  *
- * **남용 경계**: `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`는 스토어 정책상
- * "왜 필요한지" 설명 없이 요청하면 위반이 될 수 있다 — 그 설명 화면은
- * `AutoDiarySettingsScreen`(E3)이 담당하고, 이 플러그인은 매니페스트 선언만
- * 한다. 요청 자체는 자동 생성을 처음 켤 때 1회뿐이다(FR-010 MUST NOT).
+ * **`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`는 넣지 않는다**(065). 020은 이 권한으로
+ * 시스템 다이얼로그에서 예외를 직접 요청했지만, Google Play가 그 권한을 예외 없이는
+ * 핵심 기능이 망가지는 앱(메신저·자동화·운동·기기 연결·안전·VPN)에만 허용한다 —
+ * 선언만으로 심사 대상이 된다. 배터리 예외는 권한이 필요 없는 설정 목록
+ * (`IGNORE_BATTERY_OPTIMIZATION_SETTINGS`)으로만 안내하고, `app.json`의
+ * `blockedPermissions`가 다른 라이브러리를 거쳐 들어오는 것까지 걷는다.
+ * 파일 이름은 020 그대로 둔다(플러그인 목록·이력이 이 이름을 가리킨다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 const { withAndroidManifest, AndroidConfig } = require("@expo/config-plugins");
 
 /** 매니페스트에 선언할 권한들. */
-const PERMISSIONS = [
-  "android.permission.POST_NOTIFICATIONS",
-  "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-];
+const PERMISSIONS = ["android.permission.POST_NOTIFICATIONS"];
 
 /**
  * `<manifest>` 바로 아래에 `<uses-permission>` 항목을 더한다.

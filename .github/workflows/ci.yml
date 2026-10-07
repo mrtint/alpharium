@@ -1,4 +1,4 @@
-name: Alpharium CI
+name: Pocketlog CI
 
 on:
   push:

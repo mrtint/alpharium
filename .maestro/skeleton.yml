@@ -22,7 +22,7 @@
 # local에서 실기기를 붙였든, 실기기라면 네이티브 모듈이 적재되고 추론은 기기에서
 # 돌아야 한다. 환경 이름 자체는 검증하지 않는다 — Metro를 어느 env로 띄웠는지에
 # 따라 달라지므로, 그것까지 고정하면 테스트가 실행 방식에 묶인다.
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp
 

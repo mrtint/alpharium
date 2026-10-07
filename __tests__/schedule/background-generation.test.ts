@@ -305,7 +305,7 @@ describe("B3 / B8 — wiring.ts만 거친다 (원칙 IV)", () => {
 
 describe("B1 — 태스크 이름", () => {
   it("AUTO_DIARY_TASK_NAME이 정의돼 있다", () => {
-    expect(AUTO_DIARY_TASK_NAME).toBe("alpharium-auto-diary");
+    expect(AUTO_DIARY_TASK_NAME).toBe("pocketlog-auto-diary");
   });
 });
 

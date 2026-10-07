@@ -28,6 +28,7 @@
   다시·끄기), 진단 화면(보드 `6h`의 일곱 묶음·한 번 써 보기·최근 쓰기 실패), 상태 흉내(개발 환경 — 홈 표시만 바꾸고 흉내 중엔 쓰지 않음). 분해 설계
   `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`의 조각 일곱이 모두 들어갔다.
 - **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
+- **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. 절차는 아래 「release 빌드·서명·Google Play」.
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -171,8 +172,8 @@
    기기 연결 시 자동으로 먼저 한다:
    ```bash
    adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-   adb shell pm clear com.anonymous.alpharium
-   adb shell am start -n com.anonymous.alpharium/.MainActivity
+   adb shell pm clear com.a810labs.pocketlog
+   adb shell am start -n com.a810labs.pocketlog/.MainActivity
    ```
    **`pm clear`는 모델 파일(~2GB)·일기·설정을 지운다.** 모델·일기를 보존해야 하면 `pm clear` 없이
    `welcomeShown` 등 플래그 파일만 고친다(`files/preferences/onboarding.json`; JSON을 `adb shell "echo {...}"`로
@@ -761,7 +762,7 @@
   `instructionLines()`에 **제목 질문과 언어 줄이 들어 있다** — P-7 「모든 줄이 프롬프트에 있다」는 제목 질문 한 줄을 빼고 성립한다.
 - **남은 위험**: 받침 있는 이름(`'은동'이라`)은 재지 않았다 · 장면 중계·캡션 많은 날의 지어내기는 못 고쳤다(**캡션 상한은 8로 둔다** — 2026-10-06 소유자 결정, 지시서 §7. 다시 제안하지 않는다) · 053의 「기록 대신 상상으로 하루를 채워요」
   안내와 새 글(상상하지 않는다)이 다른 말을 할 수 있다 · 본 장면 없는 ③ 갈래에 `vision.available > considered`인 조합은 원본 케이스에 없어 「일부만 보았다」를 싣지 않기로 정했다.
-- **기기와 같은 GGUF는 기기에서 꺼낼 수 있다**: `adb exec-out run-as com.anonymous.alpharium cat files/models/a1.bin > …gguf`(md5가 지시서 값과 같았다). 이 개발 기계
+- **기기와 같은 GGUF는 기기에서 꺼낼 수 있다**: `adb exec-out run-as com.a810labs.pocketlog cat files/models/a1.bin > …gguf`(md5가 지시서 값과 같았다). 이 개발 기계
   (i5-1240P, GPU 없음)에서 llama.cpp `win-cpu-x64` `-np 4 -t 8`로 240런에 약 50분.
 - **합격선은 「판정 통과 100% = 지시문 낭독 0%」 한 줄이다** — 새 `isEcho`에서는 낭독이 곧 거부라 지시서가 따로 적은 두 줄이 겹친다(지시서 §10.1).
   본 장면 없는 날의 글은 매번 거의 같고 꼬리의 보기 낱말을 옮긴다(거짓은 없다). 캡션이 많은 날은 「가족·카페·책」 지어내기와 「오전에는… 저녁에는…」
@@ -884,59 +885,78 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 
 환경은 실행 시점에 `EXPO_PUBLIC_APP_ENV`로 정해진다. 빌드는 하나다. **Expo Go로는 실행할 수 없다**(`llama.rn`이 없다) — `npx expo run:android`로 development build를 쓴다.
 
-## release 빌드와 서명 — 요청받았을 때만 탄다
+## release 빌드·서명·Google Play — 요청받았을 때만 탄다
 
-**손으로 설치할 수 있는 배포물을 만드는 절차다**(006). 스토어 등록은 범위 밖이다.
+**배포물을 만드는 절차다**(006, Google Play는 065). 손으로 설치할 APK와 Play에 올릴 AAB가 같은 서명·같은 빌드 설정에서 나온다.
 
 > **⚠️ 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug)로만 하며(아래 「테스트」), 이 절차는 저장소 소유자가 그 세션에서 명시적으로 요청했을 때만 탄다. **release를 설치하려면 debug 앱을
-> 지워야 하고 그때 모델 파일·일기·설정이 함께 사라진다** — 시작 전에 모델 백업(`~/.alpharium-signing/model-backup/`)을 확인한다.
+> 지워야 하고 그때 모델 파일·일기·설정이 함께 사라진다** — 시작 전에 모델 백업(`~/.pocketlog-signing/model-backup/`)을 확인한다.
+
+### 앱 식별자 (065)
+
+- **패키지는 `com.a810labs.pocketlog`다** — Play에 한 번 올리면 영영 바꿀 수 없다. 앱 이름은 `Pocketlog`, 한국어 기기의 런처·스토어 이름은 「포켓로그」(`app.json`의 `locales.ko`).
+  저장소 이름(GitHub `alpharium`)만 옛 이름이다.
+- 옛 패키지 `com.anonymous.alpharium`과는 **다른 앱**이다 — 옛 앱의 일기·모델은 넘어오지 않는다. 옛 서명 키(`alpharium.jks`)는 옛 패키지의 덮어 설치에만 쓰므로 `~/.pocketlog-signing/legacy/`에 보관한다.
 
 ### 서명 키 (최초 1회)
 
-**⚠️ 이 키를 잃으면 이미 설치된 앱을 덮어쓸 수 없다.** 지우고 다시 깔면 사용자의 일기가 함께 사라진다. **저장소 밖에 백업한다.**
+**Play 앱 서명을 쓴다** — 사용자 기기에 깔리는 APK는 Google이 보관한 **앱 서명 키**로 서명되고, 우리 키(`pocketlog.jks`)는 Play에 올릴 때만 쓰는 **업로드 키**다. 업로드 키를 잃으면
+Play Console에서 재설정을 요청할 수 있지만(며칠 걸린다) 손으로 설치한 release APK는 그 키로 덮어 설치하므로 **저장소 밖에 백업한다.**
 
 ```
-keytool -genkeypair -v -keystore <경로>/alpharium.jks   -alias alpharium -keyalg RSA -keysize 2048 -validity 10000
+keytool -genkeypair -v -keystore ~/.pocketlog-signing/pocketlog.jks -alias pocketlog -keyalg RSA -keysize 2048 -validity 10000
 ```
 
-**원본은 저장소 밖(`~/.alpharium-signing/`)에 두고 `android/app/`에는 사본을 놓는다** — `prebuild --clean`이 `android/`를 통째로 지우므로 거기 둔 키는 함께 사라진다.
+**원본은 저장소 밖(`~/.pocketlog-signing/`)에 두고 `android/app/`에는 사본을 놓는다** — `prebuild --clean`이 `android/`를 통째로 지우므로 거기 둔 키는 함께 사라진다.
 
 ```
-mkdir -p ~/.alpharium-signing
-cp android/app/alpharium.jks ~/.alpharium-signing/     # 원본 보관
-cp ~/.alpharium-signing/alpharium.jks android/app/     # prebuild 뒤 되돌리기
+cp ~/.pocketlog-signing/pocketlog.jks android/app/     # prebuild 뒤 되돌리기
 ```
 
 비밀번호는 `~/.gradle/gradle.properties`에 적는다 — **저장소가 아니다**:
 
 ```
-ALPHARIUM_STORE_PASSWORD=<비밀번호>
-ALPHARIUM_KEY_PASSWORD=<비밀번호>
+POCKETLOG_STORE_PASSWORD=<비밀번호>
+POCKETLOG_KEY_PASSWORD=<비밀번호>
 ```
 
-**서명 설정은 `plugins/with-release-signing.js`가 선언으로 넣는다.** `android/app/build.gradle`은 gitignore된 생성물이라 직접 고치지 않는다(`prebuild --clean`에 지워진다).
+**서명 설정은 `plugins/with-release-signing.js`가 선언으로 넣는다**(`assembleRelease`·`bundleRelease` 모두). `android/app/build.gradle`은 gitignore된 생성물이라 직접 고치지 않는다.
 
 ### 빌드
 
 ```
 npx expo prebuild --platform android --clean
-cp ~/.alpharium-signing/alpharium.jks android/app/     # ★ prebuild가 지웠다
-cd android && NODE_ENV=production ./gradlew assembleRelease
+cp ~/.pocketlog-signing/pocketlog.jks android/app/     # ★ prebuild가 지웠다
+cd android && NODE_ENV=production ./gradlew bundleRelease     # Play용 AAB
+cd android && NODE_ENV=production ./gradlew assembleRelease   # 손으로 설치할 APK
 ```
 
 **`--clean`을 건너뛰지 않는다**(004에서 권한이 빠진 APK가 설치됐다). **가운데 줄을 건너뛰지 않는다.** **`NODE_ENV=production`이 필요하다** — 없으면 `.env.production`이 로드되지 않고 앱이
-「이 빌드는 잘못 만들어졌다」로 뜬다. 산출물: `android/app/build/outputs/apk/release/app-release.apk`(빌드 약 19분).
+「이 빌드는 잘못 만들어졌다」로 뜬다. 산출물: `android/app/build/outputs/bundle/release/app-release.aab`, `android/app/build/outputs/apk/release/app-release.apk`(APK 빌드 약 19분).
+
+- **Play에 올릴 때마다 `app.json`의 `android.versionCode`를 1 올린다** — 같은 번호는 Play가 거부한다. 사람이 보는 버전은 `expo.version`(versionName)이다. 올린 번호는 커밋에 남긴다.
+- 실측(065): `targetSdk`는 36(RN 0.86 기본), 모든 arm64 네이티브 라이브러리(`llama.rn` 포함)의 LOAD 정렬이 16KB다 — Play의 16KB 페이지 요구를 충족한다. `llama.rn`을 올리면 다시 본다
+  (`.so`의 ELF 프로그램 헤더 `p_align`; 개발 기계에 `readelf`가 없어 node로 읽었다).
+
+### Play 정책상 매니페스트에 두지 않는 것 (065)
+
+- **`REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`** — Play가 메신저·자동화·운동·기기 연결·안전·VPN에만 허용한다(선언만으로 심사 대상). 배터리 예외는 권한이 필요 없는 설정 목록
+  (`IGNORE_BATTERY_OPTIMIZATION_SETTINGS`)으로만 안내한다. `app.json`의 `blockedPermissions`가 다른 라이브러리를 거쳐 들어오는 것까지 걷고 `battery-exception-port.test.ts`가 잠근다.
+  대가: 삼성 밖 기기에서 「한 번 눌러 허용」이 「목록에서 직접 끄기」가 됐다 — 백그라운드 자동 쓰기가 늦어질 수 있고 앱을 열면 쓰는 경로(057)가 메운다.
+- **`READ_MEDIA_IMAGES`는 둔다** — 사진 및 동영상 권한 정책의 신고서에 「매일 그날 찍힌 사진 전체를 자동으로 읽어 일기를 쓰는 것이 핵심 기능」이라고 적는다(사진 선택기로는 대체할 수 없다).
 
 ### 확인 — 빌드 성공을 믿지 않는다
 
 | 무엇 | 어떻게 | 통과 |
 | --- | --- | --- |
-| 서명 | `apksigner verify --print-certs <apk>` | `CN=Android Debug`가 **아니다** |
+| 서명 | `apksigner verify --print-certs <apk>`, AAB는 `keytool -printcert -jarfile <aab>` | `CN=Android Debug`가 **아니다** |
 | 키 비커밋 | `git status`, `git ls-files \| grep -i jks` | 아무것도 안 나온다 |
+| 매니페스트 | `aapt2 dump permissions <apk>` 또는 설치 뒤 `dumpsys package com.a810labs.pocketlog` | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`가 **없다** |
 | Metro 없이 도는가 | **Metro를 끄고 USB를 뽑거나 `adb reverse --remove-all` 하고** 앱을 연다 | `Unable to load script`가 없다 |
 | 환경 | 앱 화면 | 「이 빌드는 잘못 만들어졌다」가 **아니다** |
 
 **debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V) — minify·R8이 켜지면 동적 `import`·`llama.rn` JNI 심볼이 깨질 수 있다(현재는 꺼져 있다, 위 실측 규칙).
+**Play에서 받은 앱은 Play가 다시 서명한 것이다** — 내부 테스트 트랙으로 받은 앱에서 설치·모델 내려받기·일기 쓰기를 한 번 본다.
 
 ## 테스트
 

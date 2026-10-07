@@ -9,7 +9,7 @@
  * research.md §1의 실측:
  *
  * ```
- * adb push probe.jpg /sdcard/Pictures/AlphariumProbe/probe.jpg
+ * adb push probe.jpg /sdcard/Pictures/PocketlogProbe/probe.jpg
  * → 1 file pushed. 성공.
  *
  * content query ... --projection _id:_data:datetaken
@@ -36,7 +36,7 @@ const row = (path: string, datetakenMs: number | null): MediaRow => ({ path, dat
 
 const goodRows = (count: number): MediaRow[] =>
   Array.from({ length: count }, (_, i) =>
-    row(`/sdcard/Pictures/AlphariumSeed/seed-${i}.jpg`, startMs + (i + 1) * 60_000),
+    row(`/sdcard/Pictures/PocketlogSeed/seed-${i}.jpg`, startMs + (i + 1) * 60_000),
   );
 
 describe("확인 — 색인이 됐는가", () => {
@@ -50,7 +50,7 @@ describe("확인 — 색인이 됐는가", () => {
    * 행은 생겼는데 `datetaken`이 NULL이다. 앱은 이 사진을 어느 하루에서도 못 본다.
    */
   it("datetaken이 NULL이면 index-failed다", () => {
-    const rows = [...goodRows(2), row("/sdcard/Pictures/AlphariumSeed/seed-2.jpg", null)];
+    const rows = [...goodRows(2), row("/sdcard/Pictures/PocketlogSeed/seed-2.jpg", null)];
     const result = verifySeeded(rows, DAY, 3);
 
     expect(result.ok).toBe(false);
@@ -85,7 +85,7 @@ describe("확인 — 그 하루가 맞는가", () => {
     const rows = [
       ...goodRows(2),
       // 하루가 끝난 뒤 — 옆 하루에 걸렸다
-      row("/sdcard/Pictures/AlphariumSeed/seed-2.jpg", endMs + 60_000),
+      row("/sdcard/Pictures/PocketlogSeed/seed-2.jpg", endMs + 60_000),
     ];
     const result = verifySeeded(rows, DAY, 3);
 
@@ -96,7 +96,7 @@ describe("확인 — 그 하루가 맞는가", () => {
   it("하루가 시작하기 전이어도 verify-mismatch다", () => {
     const rows = [
       ...goodRows(2),
-      row("/sdcard/Pictures/AlphariumSeed/seed-2.jpg", startMs - 60_000),
+      row("/sdcard/Pictures/PocketlogSeed/seed-2.jpg", startMs - 60_000),
     ];
     const result = verifySeeded(rows, DAY, 3);
 

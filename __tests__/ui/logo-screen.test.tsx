@@ -30,9 +30,9 @@ describe("LogoScreen — 렌더 (FR-001~FR-004)", () => {
     expect(mark).toBeTruthy();
   });
 
-  it("브랜드 타이틀 'Alpharium'이 원문 그대로 보인다(Clarifications)", async () => {
+  it("브랜드 타이틀 'Pocketlog'이 원문 그대로 보인다(Clarifications)", async () => {
     await render(<LogoScreen onDone={() => {}} />);
-    expect(screen.getByText("Alpharium")).toBeTruthy();
+    expect(screen.getByText("Pocketlog")).toBeTruthy();
   });
 
   it("하단 안내 문구 '휴대폰 안에서만'이 보인다", async () => {

@@ -34,15 +34,15 @@
   같은 상대 경로는 「용어가 인식되지 않습니다」로 실패한다. 절대 경로로 부른다:
 
       Set-ExecutionPolicy -Scope Process Bypass -Force
-      & "C:\Users\mrtin\Workspace\alpharium\scripts\windows-dev-exclusions.ps1"
+      & "C:\Users\mrtin\Workspace\pocketlog\scripts\windows-dev-exclusions.ps1"
 
   되돌리려면 -Remove를 붙인다:
 
-      & "C:\Users\mrtin\Workspace\alpharium\scripts\windows-dev-exclusions.ps1" -Remove
+      & "C:\Users\mrtin\Workspace\pocketlog\scripts\windows-dev-exclusions.ps1" -Remove
 
   저장소로 옮긴 뒤 상대 경로로 불러도 된다:
 
-      Set-Location C:\Users\mrtin\Workspace\alpharium
+      Set-Location C:\Users\mrtin\Workspace\pocketlog
       .\scripts\windows-dev-exclusions.ps1
 
   **보안상의 판단이 필요하다.** 제외한 경로는 실시간 검사를 받지 않는다. 여기서

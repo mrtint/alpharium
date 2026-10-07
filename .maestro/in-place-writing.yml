@@ -23,7 +23,7 @@
 # 글자가 아니라 `id: "stop-button"`으로 가른다(「쓰는 중」은 헤더 상태 줄과 머리말에 둘이라 글자로는 겹친다).
 # ⚠️ `pm clear` 없이 돌린다(모델 보존).
 # ─────────────────────────────────────────────────────────────────────────────
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp
 

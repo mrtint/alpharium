@@ -304,9 +304,9 @@ describe("025 회귀 — 접근성 라벨", () => {
 });
 
 describe("047 — 작명 화면이 디자인 보드 1a와 같다 (contracts/welcome-1a.md)", () => {
-  it("A1 — 표지 ALPHARIUM", async () => {
+  it("A1 — 표지 POCKETLOG", async () => {
     await setup();
-    expect(screen.getByTestId("welcome-kicker").props.children).toBe("ALPHARIUM");
+    expect(screen.getByTestId("welcome-kicker").props.children).toBe("POCKETLOG");
   });
 
   it("A2 — 얼굴 타일은 하나이고 🤖다", async () => {

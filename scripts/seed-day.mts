@@ -127,7 +127,7 @@ async function main(): Promise<never> {
   // ── 2단계: EXIF 패치 (개발 기계 안, 기기에 안 닿는다) ─────────────────────
   // 사진마다 새로 고른다 — `scripts/samples/`에 여럿 있으면 장마다 다른 실사
   // 이미지가 쓰인다(scripts/samples/README.md). 비어 있으면 검은 단색 템플릿이다.
-  const workDir = mkdtempSync(join(tmpdir(), "alpharium-seed-"));
+  const workDir = mkdtempSync(join(tmpdir(), "pocketlog-seed-"));
   const pushed: string[] = [];
   const recorded: SeededPhoto[] = [];
 

@@ -38,7 +38,7 @@
 # ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ `childOf`를 쓰지 않는다(008 실측).
 # ⚠️ 단계·버튼은 testID로 짚는다(R8·ProGuard 생존, 007 실측).
 # ─────────────────────────────────────────────────────────────────────────────
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp:
     clearState: true

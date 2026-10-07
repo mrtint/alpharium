@@ -30,8 +30,8 @@
 const { withAppBuildGradle } = require("@expo/config-plugins");
 
 /** gradle이 비밀번호를 읽어 올 속성 이름. 값은 저장소 밖에 있다 */
-const STORE_PASSWORD_PROPERTY = "ALPHARIUM_STORE_PASSWORD";
-const KEY_PASSWORD_PROPERTY = "ALPHARIUM_KEY_PASSWORD";
+const STORE_PASSWORD_PROPERTY = "POCKETLOG_STORE_PASSWORD";
+const KEY_PASSWORD_PROPERTY = "POCKETLOG_KEY_PASSWORD";
 
 /**
  * release `signingConfig`를 만들고 `buildTypes.release`가 그것을 쓰게 한다.
@@ -41,10 +41,10 @@ const KEY_PASSWORD_PROPERTY = "ALPHARIUM_KEY_PASSWORD";
  */
 function addReleaseSigning(contents, { keystorePath, keyAlias }) {
   // 이미 넣었으면 다시 넣지 않는다. prebuild가 여러 번 돌 수 있다.
-  if (contents.includes("alphariumRelease")) return contents;
+  if (contents.includes("pocketlogRelease")) return contents;
 
   const signingConfig = `
-        alphariumRelease {
+        pocketlogRelease {
             // **경로와 별칭만 여기 있다.** 비밀번호는 gradle 속성에서 온다(FR-004).
             storeFile file('${keystorePath}')
             keyAlias '${keyAlias}'
@@ -58,7 +58,7 @@ function addReleaseSigning(contents, { keystorePath, keyAlias }) {
   // release가 debug 키를 쓰던 것을 우리 것으로 바꾼다.
   next = next.replace(
     /(buildTypes\s*\{[\s\S]*?release\s*\{[\s\S]*?)signingConfig signingConfigs\.debug/,
-    "$1signingConfig signingConfigs.alphariumRelease",
+    "$1signingConfig signingConfigs.pocketlogRelease",
   );
 
   // **템플릿의 "Caution! ... generate your own keystore" 주석을 지운다.**

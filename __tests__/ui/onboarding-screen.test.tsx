@@ -80,9 +80,6 @@ function makePorts(overrides?: {
         getPermission: async () => notifState.value,
       },
       battery: {
-        requestException: async () => {
-          calls.push("requestBattery");
-        },
         openSettingsList: async () => {
           calls.push("openBatterySettings");
         },
@@ -189,6 +186,23 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
     expect(screen.getByTestId("onboarding-skip")).toBeTruthy();
     expect(screen.getByTestId("onboarding-allow")).toBeTruthy();
   });
+
+  it("065 — 배터리 단계의 [허용]은 예외를 직접 요청하지 않고 설정 목록을 연다(Play 정책)", async () => {
+    const { ports, calls } = makePorts({
+      photo: "granted",
+      location: "granted",
+      notification: "granted",
+    });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId("onboarding-allow"));
+
+    await waitFor(() => expect(calls).toContain("openBatterySettings"));
+    expect("requestException" in ports.battery).toBe(false);
+  });
 });
 
 describe("043 — 스텝 진입 즉시 자동 호출 (FR-007a)", () => {
@@ -283,7 +297,7 @@ describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2,
     jest.useRealTimers();
   });
 
-  it("지연이 지나도 requestBattery가 자동 호출되지 않는다", async () => {
+  it("지연이 지나도 배터리 설정 목록이 자동으로 열리지 않는다", async () => {
     jest.useFakeTimers();
     const { ports, calls } = makePorts({
       photo: "granted",
@@ -298,7 +312,7 @@ describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2,
 
     await advance(ONBOARDING_STEP_AUTO_ADVANCE_MS * 3);
 
-    expect(calls).not.toContain("requestBattery");
+    expect(calls).not.toContain("openBatterySettings");
     expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy();
   });
 });

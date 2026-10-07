@@ -21,26 +21,38 @@ const SOURCE = readFileSync(
 const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 describe("E1 — 인터페이스 시그니처", () => {
-  it("requestException / openSettingsList를 갖는다", () => {
+  it("openSettingsList 하나만 갖는다", () => {
     const port: BatteryExceptionPort = {
-      requestException: async () => {},
       openSettingsList: async () => {},
     };
-    expect(typeof port.requestException).toBe("function");
-    expect(typeof port.openSettingsList).toBe("function");
+    expect(Object.keys(port)).toEqual(["openSettingsList"]);
   });
 });
 
-describe("E1 / 원칙 IV — requestException은 결과를 반환하지 않는다", () => {
-  it("소스에서 requestException이 Promise<void>다 (수락/거부를 측정하지 않음)", () => {
-    // 반환 타입 표기 또는 body에 return 값이 없음을 본다.
-    expect(CODE).toMatch(
-      /requestException\s*\(\s*\)\s*:\s*Promise<void>|requestException\s*\(\s*\)\s*\{/,
+describe("065 — 예외를 직접 요청하지 않는다 (Google Play 정책)", () => {
+  it("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 인텐트를 쓰지 않는다", () => {
+    expect(CODE).not.toMatch(/REQUEST_IGNORE_BATTERY_OPTIMIZATIONS/);
+    expect(CODE).not.toMatch(/requestException/);
+  });
+
+  it("config plugin이 그 권한을 매니페스트에 넣지 않는다", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const plugin = require("../../plugins/with-battery-exception") as { PERMISSIONS: string[] };
+    expect(plugin.PERMISSIONS).not.toContain(
+      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
     );
-    const implMatch = CODE.match(/async requestException\s*\(\s*\)\s*\{[\s\S]*?\n {4}\}/);
-    const body = implMatch?.[0] ?? "";
-    // `return <something>;` (return; 또는 return 없음은 허용)
-    expect(body).not.toMatch(/return\s+[^;\s}]/);
+  });
+
+  it("app.json이 다른 라이브러리를 거쳐 들어오는 그 권한도 걷는다(blockedPermissions)", () => {
+    const app = JSON.parse(readFileSync(join(__dirname, "../../app.json"), "utf8")) as {
+      expo: { android: { blockedPermissions?: string[]; permissions?: string[] } };
+    };
+    expect(app.expo.android.blockedPermissions).toContain(
+      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    );
+    expect(app.expo.android.permissions).not.toContain(
+      "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+    );
   });
 });
 
@@ -51,10 +63,6 @@ describe("E5 / FR-002 — 정밀도를 암시하는 문구가 없다", () => {
 });
 
 describe("E1 — 인텐트 액션", () => {
-  it("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS를 쓴다", () => {
-    expect(CODE).toMatch(/REQUEST_IGNORE_BATTERY_OPTIMIZATIONS/);
-  });
-
   it("openSettingsList는 IGNORE_BATTERY_OPTIMIZATION_SETTINGS를 쓴다", () => {
     expect(CODE).toMatch(/IGNORE_BATTERY_OPTIMIZATION_SETTINGS/);
   });
