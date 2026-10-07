@@ -21,6 +21,7 @@ import { monologue } from "./monologue";
 import { notification } from "./notification";
 import { onboarding } from "./onboarding";
 import { frame, settings, skippedLine, targetHour } from "./settings";
+import { simulation } from "./simulation";
 import { welcome } from "./welcome";
 
 export const ko = {
@@ -33,6 +34,7 @@ export const ko = {
   developer,
   diagnostics,
   diagnosticsLanguage,
+  simulation,
   welcome,
   download,
   onboarding,

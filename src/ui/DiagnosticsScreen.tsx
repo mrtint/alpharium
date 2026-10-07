@@ -27,6 +27,7 @@ import type {
 import type { PromptPreview } from "../diagnostics/types";
 import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
 import { AppText } from "./components/Text";
+import { SIMULATION_TEXT } from "./developer-text";
 import { SETTINGS_TEXT } from "./settings-text";
 import { text } from "../i18n/current";
 import { Group, Row, Value } from "./SettingsScreen";
@@ -58,6 +59,11 @@ export type DiagnosticsScreenProps = {
   autoResult: AutoRunResult | null;
   /** 최신이 위 */
   failures: readonly FailureLine[];
+  /**
+   * 064 — 상태 흉내가 켜져 있다(S8). 참이면 두 쓰기 버튼에 콜백을 넘기지 않고(058 — 누를 수 없는 것은 `onPress`도 없다) 흐리게 그리며 아래에
+   * 차단 문구를 보인다. 홈·백그라운드도 각각 막는다 — 이 화면은 첫 방어다.
+   */
+  writeBlocked?: boolean;
 };
 
 /** 보드 `6h`는 권한 값을 고정폭 글자로만 적는다(꼬리표 모양이 아니다) — 말은 설정과 같은 한국어 */
@@ -66,6 +72,9 @@ const PERMISSION_TEXT = {
   partial: SETTINGS_TEXT.permPartial,
   denied: SETTINGS_TEXT.permDenied,
 } as const;
+
+/** 064 — 차단 문구(설정 행 보조 줄과 같은 크기·색) */
+const BLOCKED_TEXT: TextStyle = { marginTop: 8, fontSize: 13, color: COLORS.textMuted };
 
 const BUTTON: ViewStyle = {
   height: 48,
@@ -101,6 +110,7 @@ export function DiagnosticsScreen({
   autoRunning,
   autoResult,
   failures,
+  writeBlocked = false,
 }: DiagnosticsScreenProps) {
   const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : autoText(autoResult);
 
@@ -209,10 +219,11 @@ export function DiagnosticsScreen({
 
       <Group label={T.gen} testID="diagnostics-group-gen">
         {/* 보드 `6h` ⑦: 높이 48·모서리 6의 전폭 버튼 둘 — 위는 테두리, 아래는 검정 면 */}
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 8, opacity: writeBlocked ? 0.35 : 1 }}>
           <Pressable
             accessibilityRole="button"
-            onPress={onTryOnce}
+            accessibilityState={{ disabled: writeBlocked }}
+            {...(writeBlocked ? {} : { onPress: onTryOnce })}
             style={{ ...BUTTON, borderWidth: 1, borderColor: COLORS.text }}
             testID="diagnostics-try-once"
           >
@@ -221,13 +232,20 @@ export function DiagnosticsScreen({
           <Pressable
             accessibilityRole="button"
             // 도는 동안은 콜백도 넘기지 않는다 — 중복 실행을 막는다
-            {...(autoRunning ? {} : { onPress: onRunAuto })}
+            accessibilityState={{ disabled: writeBlocked }}
+            {...(autoRunning || writeBlocked ? {} : { onPress: onRunAuto })}
             style={{ ...BUTTON, backgroundColor: COLORS.text }}
             testID="diagnostics-run-auto"
           >
             <AppText style={{ ...BUTTON_TEXT, color: COLORS.bg }}>{T.runAuto}</AppText>
           </Pressable>
         </View>
+        {/* 064 — 흉내 중이면 왜 눌리지 않는지 알린다(문구는 홈 차단 토스트와 같다, 새 문구를 만들지 않는다) */}
+        {writeBlocked && (
+          <AppText style={BLOCKED_TEXT} testID="diagnostics-write-blocked">
+            {SIMULATION_TEXT.blockedToast}
+          </AppText>
+        )}
         {/* 결과 한 줄 — 보드에는 자리가 없어(보드 밖) 버튼 아래 작은 고정폭 글자로 둔다 */}
         <View style={{ minHeight: 20, marginTop: 6 }} testID="diagnostics-auto-result">
           <Value mono text={autoValue} />

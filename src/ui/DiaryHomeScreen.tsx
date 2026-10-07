@@ -232,6 +232,17 @@ export type DiaryHomeScreenProps = {
    * (진단 「최근 실패」). 성공·그만두기에는 부르지 않는다.
    */
   recordFailure?: (result: PipelineFailure) => void;
+  /**
+   * 064 — 상태 흉내가 하나라도 켜져 있다(보드 `6i`, S8). 참이면 **새 쓰기를 시작하지 않는다** — 쓰기 바는 `onWriteBlocked`만 부르고(재료·덮어쓰기
+   * 확인·`resolve`를 거치지 않는다), 057 앱 열기 자동 시작은 시작하지 않고, 060 쓰기 요청은 비운다. 이미 쓰는 중인 쓰기는 멈추지 않는다.
+   * 판정은 조립부가 한다(`simulationBlocksWriting`) — 홈은 흉내 값을 모른다.
+   */
+  writeBlocked?: boolean;
+  onWriteBlocked?: () => void;
+  /** 064 — 흉내가 켜졌을 때만 온다. 월 라벨 옆 DEV 꼬리표(누르면 개발자 화면)와 회색 쓰기 바를 그린다 */
+  simulation?: { onOpenDeveloper: () => void };
+  /** 064 — 「실패 토스트 보기」. 켜져 있으면 홈이 다시 보일 때(마운트·덮개가 걷힐 때)마다 054 토스트를 한 번 올린다 */
+  simulatedFailToast?: boolean;
 };
 
 /**
@@ -291,6 +302,10 @@ export function DiaryHomeScreen({
   writeRequest,
   onWriteRequestHandled,
   recordFailure,
+  writeBlocked = false,
+  onWriteBlocked,
+  simulation,
+  simulatedFailToast = false,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -301,6 +316,15 @@ export function DiaryHomeScreen({
    */
   const [toast, setToast] = useState<{ id: number; kind: ToastKind } | null>(null);
   const toastId = useRef(0);
+
+  /**
+   * 064 — 「실패 토스트 보기」(설계 B1). 홈이 다시 보일 때(마운트·덮개가 걷힐 때)마다 054 토스트를 한 번 올린다 — 갈래는 `plain`(다섯 갈래의
+   * 문구가 같다, 054 소유자 결정). 날을 바꾸면 054 FR-018대로 사라진다. effect 본문에서 `setState`를 부르지 않고 다음 차례로 미룬다.
+   */
+  useEffect(() => {
+    if (!simulatedFailToast || covered) return;
+    void Promise.resolve().then(() => setToast({ id: ++toastId.current, kind: "plain" }));
+  }, [simulatedFailToast, covered]);
 
   /**
    * 사용자가 고른 하루 (009 FR-006). `null`이면 고른 적이 없다는 뜻이고 그때
@@ -794,6 +818,11 @@ export function DiaryHomeScreen({
    */
   const write = useCallback(async () => {
     if (screen.kind !== "list") return;
+    // 064 — 흉내 중에는 아무 판정도 하지 않고 알리기만 한다(보드 `6i` ②, HM1).
+    if (writeBlocked) {
+      onWriteBlocked?.();
+      return;
+    }
     const items = screen.items;
     const prompt = writePromptFor(items, now(), chosenDay);
 
@@ -856,7 +885,17 @@ export function DiaryHomeScreen({
     }
 
     await generate({ ...outcome.params, day: prompt.day }, items);
-  }, [screen, now, chosenDay, resolve, generate, characterNames, previewDay]);
+  }, [
+    screen,
+    now,
+    chosenDay,
+    resolve,
+    generate,
+    characterNames,
+    previewDay,
+    writeBlocked,
+    onWriteBlocked,
+  ]);
 
   /**
    * 057 — 앱을 열 때의 자동 쓰기 (FR-014~FR-019, contracts OP2~OP5).
@@ -868,6 +907,8 @@ export function DiaryHomeScreen({
    */
   useEffect(() => {
     if (autoWriteDay == null || claimAutoWrite === undefined) return;
+    // 064 — 흉내 중에는 시작하지 않는다(HM2). 한 번의 소모는 조립부의 `claimAutoWrite`가 맡는다.
+    if (writeBlocked) return;
     if (!listRead.current || screen.kind !== "list" || covered) return;
     if (materialConfirm !== null || calendarOpen || settingsPromptOpen || deciding.current) return;
     if (screen.items.some((item) => item.day === autoWriteDay)) return;
@@ -884,6 +925,7 @@ export function DiaryHomeScreen({
   }, [
     autoWriteDay,
     claimAutoWrite,
+    writeBlocked,
     screen,
     covered,
     materialConfirm,
@@ -906,7 +948,8 @@ export function DiaryHomeScreen({
     if (writeRequest == null || handledWriteRequest.current === writeRequest.id) return;
     if (covered) return;
     const id = writeRequest.id;
-    if (running.current || screen.kind === "writing") {
+    // 064 — 흉내 중에는 시작하지 않고 요청만 비운다(HM2). 진단 행도 막히지만 홈이 마지막 방어다.
+    if (writeBlocked || running.current || screen.kind === "writing") {
       handledWriteRequest.current = id;
       onWriteRequestHandled?.(id);
       return;
@@ -931,6 +974,7 @@ export function DiaryHomeScreen({
   }, [
     writeRequest,
     onWriteRequestHandled,
+    writeBlocked,
     screen,
     covered,
     materialConfirm,
@@ -1051,6 +1095,7 @@ export function DiaryHomeScreen({
               onStop={() => void cancel()}
               onSwipe={onSwipe}
               onWrite={() => void write()}
+              simulation={simulation}
               paper={paper}
               preview={shownPreview}
               toast={toast === null ? undefined : { id: toast.id, text: TOAST_TEXT[toast.kind] }}

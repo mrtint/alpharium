@@ -33,7 +33,8 @@ describe("SL3 — 건너뜀 보조 줄은 사진 꼬리표가 「허용 안 함�
 describe("OP1 — 앱 열기 자동 쓰기의 문", () => {
   it("claimAutoWrite가 040 autoGenerateTried와 이미 시작했는가를 읽는다", () => {
     expect(APP).toMatch(
-      /const claimAutoWrite = useCallback\(\(\) => \{\s*if \(autoGenerateTried\.current \|\| autoWriteClaimed\.current\) return false;\s*autoWriteClaimed\.current = true;\s*return true;/,
+      // 064 — 흉내 기록을 읽기 전에는 판정하지 않고, 흉내 중이면 한 번을 소모하고 거짓이다(simulation-wiring AF3)
+      /const claimAutoWrite = useCallback\(\(\) => \{\s*if \(!simulationLoaded\) return false;\s*if \(autoGenerateTried\.current \|\| autoWriteClaimed\.current\) return false;\s*autoWriteClaimed\.current = true;\s*return !writeBlocked;/,
     );
   });
 

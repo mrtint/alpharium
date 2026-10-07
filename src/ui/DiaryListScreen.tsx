@@ -50,7 +50,14 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, ScrollView, View, type TextStyle, type ViewStyle } from "react-native";
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+  type TextStyle,
+  type ViewStyle,
+} from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -85,11 +92,13 @@ import {
   MATERIAL_GRID,
   READING_SCROLL,
   SETTINGS,
+  SIMULATION,
   TOAST,
   WRITING,
   WRITTEN_DAY,
 } from "./theme/tokens";
 import { text } from "../i18n/current";
+import { SIMULATION_TEXT } from "./developer-text";
 import { SETTINGS_TEXT } from "./settings-text";
 import { MaterialGrid, type PreviewState } from "./MaterialGrid";
 import { FailureToast } from "./FailureToast";
@@ -167,6 +176,11 @@ export type DiaryListScreenProps = {
   toast?: { id: number; text: string };
   /** 토스트가 스스로 사라졌거나 쓸어 닫혔다 */
   onDismissToast?: () => void;
+  /**
+   * 064 — 상태 흉내가 켜졌다(보드 `6i`). 있으면 월 라벨 옆에 DEV 꼬리표(누르면 `onOpenDeveloper`)를 두고 쓰기 바(「일기 쓰기」·「다시 쓰기」)를
+   * 회색 면 + DEV로 그린다. 누름은 그대로 `onWrite`다 — 막는 판단은 부르는 쪽이 한다(눌러야 이유를 알 수 있으니 누를 수 있게 둔다).
+   */
+  simulation?: { onOpenDeveloper: () => void };
 };
 
 export function DiaryListScreen({
@@ -189,6 +203,7 @@ export function DiaryListScreen({
   onStop,
   toast,
   onDismissToast,
+  simulation,
 }: DiaryListScreenProps) {
   const written = paper !== undefined && paper.kind !== "unwritten" ? paper : undefined;
   // 쓴 날의 지면이 끝에 닿았는가 — **그 날의 값만** 믿는다. 날을 바꾸면 새 지면이 잴 때까지 바는 내려가 있다.
@@ -262,6 +277,7 @@ export function DiaryListScreen({
       <Header
         cells={cells ?? []}
         items={items}
+        onOpenDeveloper={simulation?.onOpenDeveloper}
         onOpenSettings={onOpenSettings}
         onPressDate={writing !== undefined ? undefined : onPressDate}
         paper={paper}
@@ -330,6 +346,7 @@ export function DiaryListScreen({
         <RewriteBar
           onLayoutHeight={setBarHeight}
           onWrite={onWrite}
+          simulated={simulation !== undefined}
           visible={atEnd}
           writtenAt={writtenAt}
         />
@@ -357,7 +374,7 @@ export function DiaryListScreen({
           style={REWRITE_SLOT}
           testID="write-bar"
         >
-          <WriteBar onWrite={onWrite} />
+          <WriteBar onWrite={onWrite} simulated={simulation !== undefined} />
         </View>
         {toastNode}
       </View>
@@ -383,6 +400,7 @@ function Header({
   write,
   items,
   cells,
+  onOpenDeveloper,
   onOpenSettings,
   onPressDate,
   paper,
@@ -393,6 +411,8 @@ function Header({
   write: WritePrompt;
   items: readonly DiaryListItem[];
   cells: readonly StripCell[];
+  /** 064 — 있으면 상태 흉내가 켜져 있다 — 월 라벨 옆 DEV 꼬리표가 이것을 부른다 */
+  onOpenDeveloper?: () => void;
   onOpenSettings?: () => void;
   onPressDate?: () => void;
   paper?: PaperState;
@@ -425,9 +445,22 @@ function Header({
         이 줄은 안 쓴 날·쓴 날·접힘·쓰는 중 모두 같은 자리에 그려진다(헤더는 접히지 않는다, 052).
       */}
       <View style={MONTH_ROW}>
-        <AppText style={[KICKER, { color: COLORS.accent }]} testID="home-month">
-          {monthText(write.day)}
-        </AppText>
+        <View style={MONTH_LABEL}>
+          <AppText style={[KICKER, { color: COLORS.accent }]} testID="home-month">
+            {monthText(write.day)}
+          </AppText>
+          {/* 064 — 상태 흉내가 켜졌으면 월 라벨 옆 DEV(보드 `6i` ①). 누르면 개발자 화면으로 바로 간다 */}
+          {onOpenDeveloper !== undefined && (
+            <Pressable
+              accessibilityLabel={SIMULATION_TEXT.badgeLabel}
+              accessibilityRole="button"
+              onPress={onOpenDeveloper}
+              testID="home-dev-badge"
+            >
+              <DevBadge color={SIMULATION.badgeBorder} />
+            </Pressable>
+          )}
+        </View>
         <SettingsButton onPress={onOpenSettings} />
       </View>
 
@@ -750,18 +783,37 @@ function Notices({
  *
  * 049 — 고른 날은 언제나 쓸 수 있다(정오 제한 폐지, 미래는 오늘로 떨어진다).
  */
-function WriteBar({ onWrite }: { onWrite: () => void }) {
+function WriteBar({ onWrite, simulated = false }: { onWrite: () => void; simulated?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => onWrite()}
-      style={[BAR, { backgroundColor: COLORS.accent }]}
+      style={[BAR, { backgroundColor: simulated ? SIMULATION.barFill : COLORS.accent }]}
       testID="write-button"
     >
-      <AppText style={[BAR_TEXT, { color: COLORS.accentForeground }]}>
-        {text().home.writeButton}
-      </AppText>
+      <View style={BAR_LINE}>
+        <AppText
+          style={[BAR_TEXT, { color: simulated ? SIMULATION.barText : COLORS.accentForeground }]}
+        >
+          {text().home.writeButton}
+        </AppText>
+        {simulated && <DevBadge color={SIMULATION.barText} testID="write-button-dev" />}
+      </View>
     </Pressable>
+  );
+}
+
+/**
+ * DEV 꼬리표 (064, 보드 `6i` ①·③) — 1px 테두리, 고정폭 10/700, 안쪽 3·5. 색은 놓이는 자리의 글자색이다(월 라벨 옆은 본문색, 회색 바 위는
+ * 바 글자색).
+ */
+function DevBadge({ color, testID }: { color: string; testID?: string }) {
+  return (
+    <View style={[DEV_BADGE, { borderColor: color }]} testID={testID}>
+      <AppText allowFontScaling={false} style={[DEV_BADGE_TEXT, { color }]}>
+        {SIMULATION_TEXT.badge}
+      </AppText>
+    </View>
   );
 }
 
@@ -799,8 +851,11 @@ function RewriteBar({
   writtenAt,
   visible,
   onLayoutHeight,
+  simulated = false,
 }: {
   onWrite: () => void;
+  /** 064 — 상태 흉내가 켜졌다 — 회색 면 + DEV(보드 `6i` ③) */
+  simulated?: boolean;
   writtenAt?: string;
   visible: boolean;
   /** 잰 높이를 위로 알린다 — 토스트가 바의 자리 기준으로 놓인다 (054) */
@@ -833,10 +888,15 @@ function RewriteBar({
       <Pressable
         accessibilityRole="button"
         onPress={() => onWrite()}
-        style={[BAR, { backgroundColor: WRITTEN_DAY.rewriteBar }]}
+        style={[BAR, { backgroundColor: simulated ? SIMULATION.barFill : WRITTEN_DAY.rewriteBar }]}
         testID="write-button"
       >
-        <AppText style={[BAR_TEXT, { color: COLORS.text }]}>{WRITTEN_DAY_TEXT.rewrite}</AppText>
+        <View style={BAR_LINE}>
+          <AppText style={[BAR_TEXT, { color: simulated ? SIMULATION.barText : COLORS.text }]}>
+            {WRITTEN_DAY_TEXT.rewrite}
+          </AppText>
+          {simulated && <DevBadge color={SIMULATION.barText} testID="write-button-dev" />}
+        </View>
         {writtenAt !== undefined && (
           <AppText style={WRITTEN_AT} testID="written-at">
             {writtenAt}
@@ -989,6 +1049,21 @@ const BAR_TEXT = {
   fontSize: WRITTEN_DAY.rewrite.fontSize,
   fontWeight: WRITTEN_DAY.rewrite.fontWeight,
 } as const;
+
+/** 064 — 쓰기 바 한 줄(글자 + DEV 꼬리표, 보드 `6i` ③ gap 10) */
+const BAR_LINE: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 10 };
+
+/** 064 — 월 라벨과 DEV 꼬리표(보드 `6i` ① gap 8) */
+const MONTH_LABEL: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 };
+
+/** 064 — DEV 꼬리표(보드 `6i`: `font:700 10px/1 mono; padding:3px 5px; border:1px`) */
+const DEV_BADGE: ViewStyle = { borderWidth: 1, paddingVertical: 3, paddingHorizontal: 5 };
+const DEV_BADGE_TEXT: TextStyle = {
+  fontSize: 10,
+  lineHeight: 10,
+  fontWeight: "700",
+  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+};
 
 /** 쓴 날의 바 자리 — 지면 위에 겹쳐 화면 바닥에 붙는다 */
 const REWRITE_SLOT: ViewStyle = { position: "absolute", left: 0, right: 0, bottom: 0 };

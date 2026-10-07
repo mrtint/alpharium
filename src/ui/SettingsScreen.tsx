@@ -447,10 +447,21 @@ function ExpandingRow({ open, children }: { open: boolean; children: ReactNode }
  * 토글 — 44×26, 안쪽 3. 켜짐 = accent 면 + 오른쪽 바탕색 손잡이, 꺼짐 = 회색 면 + 왼쪽 진한 손잡이.
  * 꺼짐 손잡이는 056 FR-029가 바탕색에서 `knobOff`로 바꿨다(055 실기기 — 바탕색 손잡이가 회색 면 위에서 거의 안 보였다).
  */
-function Toggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => void }) {
+export function Toggle({
+  on,
+  onChange,
+  accessibilityLabel,
+  testID = "auto-diary-toggle",
+}: {
+  on: boolean;
+  onChange: (next: boolean) => void;
+  /** 064 — 개발자 화면의 상태 흉내 토글이 같은 모양을 쓴다. 없으면 「자동으로 쓰기」 */
+  accessibilityLabel?: string;
+  testID?: string;
+}) {
   return (
     <Pressable
-      accessibilityLabel={SETTINGS_TEXT.autoWrite}
+      accessibilityLabel={accessibilityLabel ?? SETTINGS_TEXT.autoWrite}
       accessibilityRole="switch"
       accessibilityState={{ checked: on }}
       onPress={() => onChange(!on)}
@@ -463,7 +474,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => vo
         backgroundColor: on ? COLORS.accent : SETTINGS.tagFill,
       }}
       // 020의 Maestro(`scheduled-diary-notification.yml`)가 이 id로 누른다 — 그대로 둔다.
-      testID="auto-diary-toggle"
+      testID={testID}
     >
       <View
         style={{
@@ -471,7 +482,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (next: boolean) => vo
           height: toggle.knob,
           backgroundColor: on ? COLORS.bg : toggle.knobOff,
         }}
-        testID="auto-diary-toggle-knob"
+        testID={`${testID}-knob`}
       />
     </Pressable>
   );

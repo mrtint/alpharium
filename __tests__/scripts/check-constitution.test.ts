@@ -7,6 +7,7 @@ import {
   checkMonologueFile,
   checkPhotoPortFile,
   checkSeedFile,
+  checkSimulationFile,
   checkSourceFile,
   checkVisionFile,
   formatViolations,
@@ -835,5 +836,69 @@ describe("checkI18nFile — 화면 문구 카탈로그의 경계 (062 B1·B2·K5
     walk("src");
     const violations = files.flatMap((f) => checkI18nFile(f, readFileSync(join(root, f), "utf8")));
     expect(violations).toEqual([]);
+  });
+});
+
+/**
+ * 064 — 상태 흉내 값이 생성 경로에 닿지 않는다 (contracts/simulation.md LK1~LK3, FR-015·SC-005).
+ */
+describe("checkSimulationFile — 상태 흉내의 경계 (064 LK1~LK3)", () => {
+  it.each([
+    ['import { run } from "../diary/pipeline";', "src/app/simulation.ts"],
+    ['import { decideSchedule } from "../schedule/decision";', "src/app/simulation.ts"],
+    ['import type { DaySignals } from "../signals/types";', "src/app/simulation-store.ts"],
+  ])("LK1 %s (%s)", (line, file) => {
+    const violations = checkSimulationFile(file, line);
+    expect(violations).toHaveLength(1);
+    expect(violations[0].rule).toContain("원칙 I");
+  });
+
+  it.each([
+    "src/diary/pipeline.ts",
+    "src/signals/collect.ts",
+    "src/inference/on-device.ts",
+    "src/vision/select.ts",
+    "src/schedule/auto-write.ts",
+  ])("LK2 %s가 app/simulation을 import하면 잡는다", (file) => {
+    const line = 'import { simulationBlocksWriting } from "../app/simulation";';
+    expect(checkSimulationFile(file, line)).toHaveLength(1);
+  });
+
+  it("LK2 task.ts는 차단 판정을 import해도 된다", () => {
+    const lines = [
+      'import { effectiveSimulation, simulationBlocksWriting } from "../app/simulation";',
+      'import { expoSimulationStorePort, loadSimulation } from "../app/simulation-store";',
+    ].join("\n");
+    expect(checkSimulationFile("src/schedule/task.ts", lines)).toEqual([]);
+  });
+
+  it.each(["const now = simulatedNow(date, new Date());", "const p = simulatedPreviewDay(state);"])(
+    "LK3 task.ts가 흉내 값을 쓰면 잡는다 — %s",
+    (line) => {
+      expect(checkSimulationFile("src/schedule/task.ts", line)).toHaveLength(1);
+    },
+  );
+
+  it("화면·조립은 보지 않는다", () => {
+    const line = 'import { simulatedNow } from "../app/simulation";';
+    expect(checkSimulationFile("src/ui/use-simulation.ts", line)).toEqual([]);
+    expect(checkSimulationFile("App.tsx", line)).toEqual([]);
+  });
+
+  it("주석은 위반이 아니다", () => {
+    expect(
+      checkSimulationFile("src/diary/pipeline.ts", ' * from "../app/simulation"을 쓰지 않는다'),
+    ).toEqual([]);
+  });
+
+  it("실제 파일들이 규칙을 지킨다", () => {
+    const root = join(__dirname, "..", "..");
+    for (const file of [
+      "src/app/simulation.ts",
+      "src/app/simulation-store.ts",
+      "src/schedule/task.ts",
+    ]) {
+      expect(checkSimulationFile(file, readFileSync(join(root, file), "utf8"))).toEqual([]);
+    }
   });
 });

@@ -385,3 +385,27 @@ describe("DS10 — 측정 어휘가 없다 (FR-021, 원칙 IV)", () => {
     expect(body).not.toMatch(/duration|elapsed|timing|\btokens?\b/i);
   });
 });
+
+/* ═══════════════════ 064 — 상태 흉내 중 쓰기 버튼 (DG1) ═══════════════════ */
+
+describe("064 DG1 — 흉내가 켜져 있으면 두 쓰기 버튼을 누를 수 없다", () => {
+  it("onPress가 불리지 않고 차단 문구가 보인다", async () => {
+    const p = props({ writeBlocked: true });
+    await render(<DiagnosticsScreen {...p} />);
+    await fireEvent.press(screen.getByTestId("diagnostics-try-once"));
+    await fireEvent.press(screen.getByTestId("diagnostics-run-auto"));
+    expect(p.onTryOnce).not.toHaveBeenCalled();
+    expect(p.onRunAuto).not.toHaveBeenCalled();
+    expect(screen.getByTestId("diagnostics-write-blocked")).toHaveTextContent(
+      "상태 흉내가 켜져 있어서 일기를 쓰지 않아요. 개발자 화면에서 끌 수 있어요.",
+    );
+  });
+
+  it("꺼져 있으면 그대로 눌리고 문구가 없다", async () => {
+    const p = props();
+    await render(<DiagnosticsScreen {...p} />);
+    await fireEvent.press(screen.getByTestId("diagnostics-try-once"));
+    expect(p.onTryOnce).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("diagnostics-write-blocked")).toBeNull();
+  });
+});

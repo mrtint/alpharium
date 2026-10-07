@@ -13,11 +13,12 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { Platform, View } from "react-native";
+import { View } from "react-native";
 
 import { AppText } from "./components/Text";
-import { DEVELOPER_TEXT } from "./developer-text";
-import { Chevron, Group, Row, Value } from "./SettingsScreen";
+import type { SimulationState } from "../app/simulation";
+import { DEVELOPER_TEXT, SIMULATION_TEXT } from "./developer-text";
+import { Chevron, Group, Row, Toggle, Value } from "./SettingsScreen";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
 export type DeveloperScreenProps = {
@@ -29,7 +30,19 @@ export type DeveloperScreenProps = {
   onReplayOnboarding?: () => void;
   onDisable?: () => void;
   onOpenDiagnostics?: () => void;
+  /**
+   * 064 — 「상태 흉내」 묶음(보드 `6e` ③). **개발 환경일 때만 조립부가 넘긴다**(S7) — 없으면 묶음 자체가 없다. 화면은 상태를 그리고 누름을
+   * 알릴 뿐이다(저장·효력은 `use-simulation.ts`).
+   */
+  simulation?: {
+    state: SimulationState;
+    onPressDate: () => void;
+    onToggle: (key: SimulationToggle) => void;
+  };
 };
+
+/** 토글로 켜고 끄는 흉내 셋(날짜는 대화상자로 고른다) */
+export type SimulationToggle = "failToast" | "noMaterial" | "noPhoto";
 
 export function DeveloperScreen({
   modules,
@@ -38,6 +51,7 @@ export function DeveloperScreen({
   onReplayOnboarding,
   onDisable,
   onOpenDiagnostics,
+  simulation,
 }: DeveloperScreenProps) {
   return (
     <View testID="developer-screen">
@@ -62,19 +76,7 @@ export function DeveloperScreen({
 
       {showsDiagnostics && (
         <Group
-          aside={
-            <AppText
-              style={{
-                fontSize: 10,
-                fontWeight: "600",
-                color: COLORS.textMuted,
-                fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
-              }}
-              testID="developer-diag-aside"
-            >
-              {DEVELOPER_TEXT.devOnly}
-            </AppText>
-          }
+          aside={<DevOnlyAside testID="developer-diag-aside" />}
           label={DEVELOPER_TEXT.groupDiag}
           testID="developer-group-diag"
         >
@@ -85,6 +87,39 @@ export function DeveloperScreen({
             {...(onOpenDiagnostics !== undefined ? { onPress: onOpenDiagnostics } : {})}
             testID="developer-diagnostics"
             trailing={<Chevron />}
+          />
+        </Group>
+      )}
+
+      {simulation !== undefined && (
+        <Group
+          aside={<DevOnlyAside />}
+          label={SIMULATION_TEXT.groupSim}
+          testID="developer-group-sim"
+        >
+          <Row
+            label={SIMULATION_TEXT.date}
+            onPress={simulation.onPressDate}
+            testID="sim-date"
+            trailing={<Value chevron mono text={simulation.state.date ?? ""} />}
+          />
+          <SimulationToggleRow
+            label={SIMULATION_TEXT.fail}
+            on={simulation.state.failToast}
+            onToggle={() => simulation.onToggle("failToast")}
+            testID="sim-fail"
+          />
+          <SimulationToggleRow
+            label={SIMULATION_TEXT.empty}
+            on={simulation.state.noMaterial}
+            onToggle={() => simulation.onToggle("noMaterial")}
+            testID="sim-empty"
+          />
+          <SimulationToggleRow
+            label={SIMULATION_TEXT.noPhoto}
+            on={simulation.state.noPhoto}
+            onToggle={() => simulation.onToggle("noPhoto")}
+            testID="sim-nophoto"
           />
         </Group>
       )}
@@ -107,5 +142,55 @@ export function DeveloperScreen({
         />
       </View>
     </View>
+  );
+}
+
+/**
+ * 묶음 머리 오른쪽 「개발 빌드만」(보드 `6e` ②·③ — 10/600).
+ *
+ * ★ 보드는 고정폭 글꼴이지만 **고정폭으로 두면 안드로이드가 한글을 좁게 재서 「개발」만 보이고 나머지가 잘린다**(2026-10-07 실기기 — 머리 줄의 가로
+ * 배치에서 잰 폭 147px에 여섯 글자가 안 들어가 두 줄로 접힌 뒤 한 줄 높이에서 잘렸다. 060부터 진단 묶음에도 있던 결함). 글꼴을 빼면 다 보인다.
+ * 세로 묶음의 보조 줄(`hintMono`)은 폭이 넉넉해 드러나지 않는다.
+ */
+function DevOnlyAside({ testID }: { testID?: string }) {
+  return (
+    <AppText
+      style={{
+        fontSize: 10,
+        fontWeight: "600",
+        color: COLORS.textMuted,
+      }}
+      testID={testID}
+    >
+      {DEVELOPER_TEXT.devOnly}
+    </AppText>
+  );
+}
+
+/** 흉내 토글 한 행 — 설정 「자동으로 쓰기」와 같은 토글(보드 `6e` ③) */
+function SimulationToggleRow({
+  label,
+  on,
+  onToggle,
+  testID,
+}: {
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+  testID: string;
+}) {
+  return (
+    <Row
+      label={label}
+      testID={testID}
+      trailing={
+        <Toggle
+          accessibilityLabel={label}
+          on={on}
+          onChange={() => onToggle()}
+          testID={`${testID}-toggle`}
+        />
+      }
+    />
   );
 }

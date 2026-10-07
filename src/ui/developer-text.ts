@@ -17,3 +17,6 @@ import { lazyText } from "../i18n/current";
 
 /** 062 — 문구는 한국어 카탈로그 `src/i18n/catalogs/ko/developer.ts`로 옮겼다. 이름은 그대로 두고 읽는 순간 카탈로그에서 꺼낸다 */
 export const DEVELOPER_TEXT = lazyText((c) => c.developer);
+
+/** 064 — 상태 흉내 문구(보드 `dev.group.sim`·`sim.*`). 카탈로그 `src/i18n/catalogs/ko/simulation.ts`에서 읽는 순간 꺼낸다 */
+export const SIMULATION_TEXT = lazyText((c) => c.simulation);

@@ -565,6 +565,67 @@ export function checkMonologueFile(fileName: string, contents: string): Violatio
 }
 
 /**
+ * 상태 흉내 값이 생성 경로에 닿는 것 (064 LK1~LK3, FR-015·SC-005, 원칙 I).
+ *
+ * 흉내(날짜·미리보기)는 **홈 표시에만** 들어간다. 파이프라인·신호·추론·사진 읽기·자동 쓰기 판정에 흉내 값이 흘러들면 가짜 상태로
+ * 진짜 일기가 쓰인다(S8). 그쪽에 닿아도 되는 것은 「쓰기를 막는가」 하나뿐이고, 그것을 실제로 보는 생성 쪽 자리는 헤드리스 자동 쓰기
+ * (`src/schedule/task.ts`) 하나다.
+ *
+ *  - **LK1** 흉내 판정(`src/app/simulation*.ts`)이 `diary/pipeline`·`schedule/`·`signals/`를 import한다
+ *  - **LK2** 생성 쪽 계층(`src/diary/`·`src/signals/`·`src/inference/`·`src/vision/`·`src/schedule/` — `task.ts` 제외)이 `app/simulation`을 import한다
+ *  - **LK3** `task.ts`가 흉내 값을 만드는 함수(`simulatedNow`·`simulatedPreviewDay`)를 쓴다
+ */
+const SIMULATION_TOUCHES_GENERATION =
+  /\bfrom\s+["'][^"']*(?:diary\/pipeline|\/schedule\/|\/signals\/)[^"']*["']/;
+const IMPORTS_SIMULATION = /\bfrom\s+["'][^"']*app\/simulation(?:-store)?["']/;
+const SIMULATED_VALUES = /\b(?:simulatedNow|simulatedPreviewDay)\b/;
+const GENERATION_LAYERS = [
+  "src/diary/",
+  "src/signals/",
+  "src/inference/",
+  "src/vision/",
+  "src/schedule/",
+];
+const SIMULATION_TASK_FILE = "src/schedule/task.ts";
+
+export function checkSimulationFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  const isSimulation = /^src\/app\/simulation(?:-store)?\.ts$/.test(normalized);
+  const isTask = normalized === SIMULATION_TASK_FILE;
+  const isGeneration = !isTask && GENERATION_LAYERS.some((dir) => normalized.startsWith(dir));
+  if (!isSimulation && !isTask && !isGeneration) return [];
+
+  const violations: Violation[] = [];
+
+  for (const [index, line] of contents.split(/\r?\n/).entries()) {
+    // 주석은 규칙을 설명하는 자리다. 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+    const code = line.replace(/\/\/.*$/, "").replace(/^\s*\*.*$/, "");
+    const at = { file: `${normalized}:${index + 1}`, key: code.trim() };
+
+    if (isSimulation && SIMULATION_TOUCHES_GENERATION.test(code)) {
+      violations.push({
+        ...at,
+        rule: "상태 흉내 판정이 생성 경로(파이프라인·스케줄·신호)에 닿는다 (064 LK1, 원칙 I)",
+      });
+    }
+    if (isGeneration && IMPORTS_SIMULATION.test(code)) {
+      violations.push({
+        ...at,
+        rule: "생성 쪽 계층이 상태 흉내를 import한다 — 흉내 값은 홈 표시에만 들어간다 (064 LK2, 원칙 I)",
+      });
+    }
+    if (isTask && SIMULATED_VALUES.test(code)) {
+      violations.push({
+        ...at,
+        rule: "자동 쓰기가 흉내 값(지금·미리보기)을 쓴다 — 닿아도 되는 것은 쓰기 차단 판정뿐이다 (064 LK3, 원칙 I)",
+      });
+    }
+  }
+
+  return violations;
+}
+
+/**
  * 스케줄·알림·잠금의 순수 판정 코드가 제품 계층에 직접 닿는 것을 잡는다
  * (020, contracts/background-generation.md B3·B8, 원칙 III·IV).
  *

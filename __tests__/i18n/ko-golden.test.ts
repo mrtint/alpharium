@@ -64,8 +64,18 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
  * 골든을 만들 때 뺀 것: `requirements.ts`의 `neededBy` 넷(화면에 안 보이는 문서용 필드 — 062에서 주석으로 옮겼다).
  */
 
-/** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b) */
-const ADDED_AFTER_GOLDEN: readonly string[] = ["언어", "한국어"];
+/** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`) */
+const ADDED_AFTER_GOLDEN: readonly string[] = [
+  "언어",
+  "한국어",
+  "상태 흉내",
+  "오늘 날짜",
+  "실패 토스트 보기",
+  "쓸 재료 0으로 보기",
+  "사진 권한 없음으로 보기",
+  "상태 흉내가 켜져 있어서 일기를 쓰지 않아요. 개발자 화면에서 끌 수 있어요.",
+  "끄기",
+];
 
 /** 한국어 카탈로그 파일 전부 */
 function catalogFiles(): string[] {
