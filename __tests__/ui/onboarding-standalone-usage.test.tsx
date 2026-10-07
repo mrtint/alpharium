@@ -31,7 +31,6 @@ function makePorts() {
       getPermission: async () => "undetermined" as const,
     },
     battery: {
-      requestException: async () => {},
       openSettingsList: async () => {},
     },
     location: {

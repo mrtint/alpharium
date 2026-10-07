@@ -1,4 +1,8 @@
 <!--
+Amendment 2.0.1 (2026-10-07)
+- Version change: 2.0.0 → 2.0.1 (PATCH)
+- 근거: 앱 이름을 포켓로그(Pocketlog)로 정했다(065, Google Play 배포). 제목만 바뀌고 원칙은 그대로다.
+
 Amendment 2.0.0 (2026-09-19)
 - Version change: 1.8.0 → 2.0.0 (MAJOR)
 - 근거: 헌법의 비대화를 해소하고 스펙킷(Spec-Kit) 표준 아키텍처 원칙 중심 체계로 전면 재편.
@@ -11,7 +15,7 @@ Amendment 2.0.0 (2026-09-19)
   - 과거 1.0.0~1.8.0의 상세 개정 이력과 실험 일화는 `constitution-archive.md`로 분리 보존.
 -->
 
-# Alpharium Constitution
+# Pocketlog Constitution
 
 ## 이 앱이 무엇인가
 
@@ -98,4 +102,4 @@ GPS 궤적, 걸음 수, 배터리와 연결 상태뿐이다. 그 조각으로 �
 - 원칙을 어기려면 헌법을 먼저 고친다. 예외를 코드에 몰래 두지 않는다(MUST NOT).
 - 개정할 때는 무엇이 왜 바뀌었는지 명확히 기록한다(MUST).
 
-**Version**: 2.0.0 | **Ratified**: 2026-08-12 | **Last Amended**: 2026-09-19
+**Version**: 2.0.1 | **Ratified**: 2026-08-12 | **Last Amended**: 2026-10-07

@@ -15,6 +15,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { act, render, screen } from "@testing-library/react-native";
+import { StyleSheet } from "react-native";
 
 import { LogoScreen, LOGO_DISPLAY_MS } from "../../src/ui/LogoScreen";
 
@@ -30,9 +31,18 @@ describe("LogoScreen — 렌더 (FR-001~FR-004)", () => {
     expect(mark).toBeTruthy();
   });
 
-  it("브랜드 타이틀 'Alpharium'이 원문 그대로 보인다(Clarifications)", async () => {
+  it("브랜드 타이틀 'Pocketlog'이 원문 그대로 보인다(Clarifications)", async () => {
     await render(<LogoScreen onDone={() => {}} />);
-    expect(screen.getByText("Alpharium")).toBeTruthy();
+    expect(screen.getByText("Pocketlog")).toBeTruthy();
+  });
+
+  it("065 — 브랜드 글자의 줄높이가 글자 크기보다 커서 g의 아랫부분이 잘리지 않는다", async () => {
+    await render(<LogoScreen onDone={() => {}} />);
+    const style = StyleSheet.flatten(screen.getByTestId("splash-title").props.style) as {
+      fontSize: number;
+      lineHeight: number;
+    };
+    expect(style.lineHeight).toBeGreaterThanOrEqual(style.fontSize * 1.2);
   });
 
   it("하단 안내 문구 '휴대폰 안에서만'이 보인다", async () => {

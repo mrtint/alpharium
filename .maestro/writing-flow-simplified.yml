@@ -24,7 +24,7 @@
 #
 # ⚠️ 부분 문자열은 정규식으로 준다(007 실측). ⚠️ testID로 짚는다(R8 생존).
 # ─────────────────────────────────────────────────────────────────────────────
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp
 

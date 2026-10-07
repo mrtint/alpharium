@@ -27,7 +27,7 @@
 # ⚠️ 어느 권한 단계가 처음 뜨는지는 기기의 현재 권한 상태에 달렸다(021 실측) —
 #    특정 단계 id를 박지 않고 정규식으로 짚는다.
 # ─────────────────────────────────────────────────────────────────────────────
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp:
     clearState: true

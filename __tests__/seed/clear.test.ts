@@ -95,7 +95,7 @@ describe("치운 뒤 볼륨 스캔을 반드시 돈다", () => {
    * **★ 빠뜨리면 MediaStore에 유령 행이 남는다**(research.md §5 실측).
    *
    * ```
-   * rm -rf /sdcard/Pictures/AlphariumProbe
+   * rm -rf /sdcard/Pictures/PocketlogProbe
    * content call ... scan_volume
    * → 이후 질의: No result found.   ✅
    * ```

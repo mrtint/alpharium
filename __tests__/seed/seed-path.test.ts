@@ -31,8 +31,8 @@ describe("seedPathFor", () => {
     // 이름을 뽑아 잡사진으로 갈라내야 한다.
     expect(folderNameOf(`file://${seedPathFor("s.jpg", "Screenshots")}`)).toBe("Screenshots");
     expect(folderNameOf(`file://${seedPathFor("d.jpg", "Download")}`)).toBe("Download");
-    // folder 미지정이면 마지막 폴더는 "AlphariumSeed" — 잡사진 목록에 없어
+    // folder 미지정이면 마지막 폴더는 "PocketlogSeed" — 잡사진 목록에 없어
     // 카메라 원본으로 분류된다(의도된 동작).
-    expect(folderNameOf(`file://${seedPathFor("c.jpg")}`)).toBe("AlphariumSeed");
+    expect(folderNameOf(`file://${seedPathFor("c.jpg")}`)).toBe("PocketlogSeed");
   });
 });

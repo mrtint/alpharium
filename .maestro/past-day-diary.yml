@@ -30,7 +30,7 @@
 # 글자가 **형제**로 나온다 — 그래서 하루마다 `testID`를 따로 준다. `testID`는
 # release(R8·ProGuard)에서 살아남는 것이 008에서 확인됐다.
 # ─────────────────────────────────────────────────────────────────────────────
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp
 

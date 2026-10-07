@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-
 
 import { OnboardingScreen, ONBOARDING_STEP_AUTO_ADVANCE_MS } from "../../src/ui/OnboardingScreen";
 import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
+import { text } from "../../src/i18n/current";
 import type { PermissionState } from "../../src/signals/port";
 
 /**
@@ -80,9 +81,6 @@ function makePorts(overrides?: {
         getPermission: async () => notifState.value,
       },
       battery: {
-        requestException: async () => {
-          calls.push("requestBattery");
-        },
         openSettingsList: async () => {
           calls.push("openBatterySettings");
         },
@@ -156,6 +154,27 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
     expect(screen.queryByText(photoReq.ifDenied)).toBeNull();
   });
 
+  it("065 — 사진 단계의 배경은 스플래시 그림이고 제목·설명 글이 없다", async () => {
+    const { ports } = makePorts();
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+    expect(screen.getByTestId("onboarding-screen")).toBeTruthy();
+    expect(screen.getByTestId("splash-logo-mark")).toBeTruthy();
+    expect(screen.getByText("Pocketlog")).toBeTruthy();
+    expect(screen.queryByText(text().onboarding.title)).toBeNull();
+    expect(screen.queryByText(text().onboarding.intro)).toBeNull();
+  });
+
+  it("065 — blocked(설정 열기 안내)는 글이 필요해 스플래시가 아니라 제목·안내를 그린다", async () => {
+    const { ports } = makePorts({ photo: "blocked" });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-open-settings")).toBeTruthy());
+    expect(screen.getByText(text().onboarding.title)).toBeTruthy();
+    expect(screen.queryByTestId("splash-logo-mark")).toBeNull();
+  });
+
   it("사진·위치·알림 단계에는 onboarding-allow 버튼이 없다", async () => {
     const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
@@ -188,6 +207,23 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
     // openSettingsList 경로)이며 이 상태에서는 렌더되지 않는다.
     expect(screen.getByTestId("onboarding-skip")).toBeTruthy();
     expect(screen.getByTestId("onboarding-allow")).toBeTruthy();
+  });
+
+  it("065 — 배터리 단계의 [허용]은 예외를 직접 요청하지 않고 설정 목록을 연다(Play 정책)", async () => {
+    const { ports, calls } = makePorts({
+      photo: "granted",
+      location: "granted",
+      notification: "granted",
+    });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
+    await fireEvent.press(screen.getByTestId("onboarding-allow"));
+
+    await waitFor(() => expect(calls).toContain("openBatterySettings"));
+    expect("requestException" in ports.battery).toBe(false);
   });
 });
 
@@ -283,7 +319,7 @@ describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2,
     jest.useRealTimers();
   });
 
-  it("지연이 지나도 requestBattery가 자동 호출되지 않는다", async () => {
+  it("지연이 지나도 배터리 설정 목록이 자동으로 열리지 않는다", async () => {
     jest.useFakeTimers();
     const { ports, calls } = makePorts({
       photo: "granted",
@@ -298,7 +334,7 @@ describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2,
 
     await advance(ONBOARDING_STEP_AUTO_ADVANCE_MS * 3);
 
-    expect(calls).not.toContain("requestBattery");
+    expect(calls).not.toContain("openBatterySettings");
     expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy();
   });
 });

@@ -68,7 +68,7 @@ import {
 import { expoSkipStorePort, type SkipStorePort } from "./skip-store";
 
 /** `TaskManager.defineTask()`에 등록하는 이름. `background-port.ts`도 이 값을 쓴다. */
-export const AUTO_DIARY_TASK_NAME = "alpharium-auto-diary";
+export const AUTO_DIARY_TASK_NAME = "pocketlog-auto-diary";
 
 /** 태스크 결과. `"skipped"`도 `Success`로 매핑된다(B6). */
 export type AutoDiaryTaskResult = "ran" | "skipped" | "failed";

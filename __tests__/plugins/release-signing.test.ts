@@ -40,7 +40,7 @@ android {
 }
 `;
 
-const OPTIONS = { keystorePath: "alpharium.jks", keyAlias: "alpharium" };
+const OPTIONS = { keystorePath: "pocketlog.jks", keyAlias: "pocketlog" };
 
 describe("addReleaseSigning (R1)", () => {
   it("★ release가 더 이상 debug 키를 쓰지 않는다", () => {
@@ -48,7 +48,7 @@ describe("addReleaseSigning (R1)", () => {
 
     // **이것이 이 plugin의 존재 이유다.** 이 줄이 남아 있으면 나중에 키를 바꿀 때
     // 덮어 설치가 끊기고 사용자의 일기가 사라진다.
-    expect(out).toContain("signingConfig signingConfigs.alphariumRelease");
+    expect(out).toContain("signingConfig signingConfigs.pocketlogRelease");
     expect(out).not.toMatch(/release\s*\{[\s\S]*?signingConfig signingConfigs\.debug/);
   });
 
@@ -71,9 +71,9 @@ describe("addReleaseSigning (R1)", () => {
   it("signingConfigs 안에 설정이 생긴다", () => {
     const out = addReleaseSigning(TEMPLATE, OPTIONS);
 
-    expect(out).toContain("alphariumRelease {");
-    expect(out).toContain("storeFile file('alpharium.jks')");
-    expect(out).toContain("keyAlias 'alpharium'");
+    expect(out).toContain("pocketlogRelease {");
+    expect(out).toContain("storeFile file('pocketlog.jks')");
+    expect(out).toContain("keyAlias 'pocketlog'");
   });
 });
 
@@ -85,8 +85,8 @@ describe("★ 비밀번호가 소스에 없다 (R2)", () => {
     const out = addReleaseSigning(TEMPLATE, OPTIONS);
 
     // gradle 속성에서 읽어야 한다. 값이 여기 있으면 커밋된다.
-    expect(out).toContain("project.findProperty('ALPHARIUM_STORE_PASSWORD')");
-    expect(out).toContain("project.findProperty('ALPHARIUM_KEY_PASSWORD')");
+    expect(out).toContain("project.findProperty('POCKETLOG_STORE_PASSWORD')");
+    expect(out).toContain("project.findProperty('POCKETLOG_KEY_PASSWORD')");
   });
 
   it("plugin 소스 자체에 비밀번호처럼 보이는 값이 없다", () => {
@@ -109,7 +109,7 @@ describe("여러 번 돌아도 안전하다", () => {
     const twice = addReleaseSigning(once, OPTIONS);
 
     expect(twice).toBe(once);
-    expect(twice.match(/alphariumRelease \{/g)).toHaveLength(1);
+    expect(twice.match(/pocketlogRelease \{/g)).toHaveLength(1);
   });
 });
 
@@ -124,7 +124,7 @@ describe("선언이 없으면 손대지 않는다", () => {
   const withReleaseSigning = require("../../plugins/with-release-signing");
 
   it("경로가 없으면 config를 그대로 돌려준다", () => {
-    const config = { name: "alpharium" };
+    const config = { name: "pocketlog" };
 
     expect(withReleaseSigning(config, {})).toBe(config);
     expect(withReleaseSigning(config, { keyAlias: "a" })).toBe(config);

@@ -63,7 +63,6 @@ function makePorts(overrides?: {
       getPermission: async () => notifState.value,
     },
     battery: {
-      requestException: async () => {},
       openSettingsList: async () => {},
     },
     location: {

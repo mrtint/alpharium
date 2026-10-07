@@ -25,7 +25,7 @@
 #
 # 한글 검증 문구가 CP949로 뭉개지지 않는 것은 run-device-tests.mjs가
 # JAVA_TOOL_OPTIONS=-Dfile.encoding=UTF-8로 보장한다.
-appId: com.anonymous.alpharium
+appId: com.a810labs.pocketlog
 ---
 - launchApp
 

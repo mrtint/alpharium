@@ -8,8 +8,8 @@
 export const welcome = {
   checkingTitle: "잠깐만요",
   checkingBody: "새로 온 친구가 깨어나는 중이에요.",
-  /** 마크업은 "Alpharium" + CSS uppercase — RN에는 그 속성이 없어 대문자 원문으로 둔다 */
-  kicker: "ALPHARIUM",
+  /** 마크업은 "Pocketlog" + CSS uppercase — RN에는 그 속성이 없어 대문자 원문으로 둔다 */
+  kicker: "POCKETLOG",
   /** 얼굴 타일 — 047 Clarification Q2. 캐릭터 심볼을 읽어 고르지 않는다(원칙 III) */
   face: "🤖",
   welcomeTitle: "깨어났어요. 처음 뵙겠습니다.",

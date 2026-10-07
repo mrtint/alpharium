@@ -24,7 +24,7 @@ import { spawnSync } from "node:child_process";
  * **`DCIM/Camera/`에 두지 않는다** — 사용자의 진짜 사진 자리이며, 섞이면 「폴더 안의
  * 것만 지운다」(FR-016a)가 위험해진다.
  */
-export const SEED_FOLDER = "/sdcard/Pictures/AlphariumSeed";
+export const SEED_FOLDER = "/sdcard/Pictures/PocketlogSeed";
 
 /**
  * 023 — 하위 폴더 이름을 붙인 심을 자리.
@@ -33,7 +33,7 @@ export const SEED_FOLDER = "/sdcard/Pictures/AlphariumSeed";
  * `folderNameOf()`가 "마지막 `/` 앞 세그먼트"를 뽑으므로 그 사진의 폴더
  * 이름이 `folder`가 되어 스크린샷·다운로드로 분류된다.
  *
- * **`SEED_FOLDER` 밖으로 나가지 않는다** — `queryFolder()`의 `%AlphariumSeed%`
+ * **`SEED_FOLDER` 밖으로 나가지 않는다** — `queryFolder()`의 `%PocketlogSeed%`
  * LIKE와 `removeSeedFolder()`의 `rm -rf SEED_FOLDER`가 하위 폴더까지 그대로
  * 잡으므로 FR-016a(폴더 밖을 못 지운다)가 유지된다. 실제 시스템
  * 폴더(`DCIM/Camera` 등)에 흩뿌리지 않는다.
@@ -139,7 +139,7 @@ export function queryFolder(): Outcome<MediaRow[]> {
   const queried = run([
     "shell",
     `"content query --uri content://media/external/images/media ` +
-      `--projection _data:datetaken --where \\"_data LIKE '%AlphariumSeed%'\\""`,
+      `--projection _data:datetaken --where \\"_data LIKE '%PocketlogSeed%'\\""`,
   ]);
   if (!queried.ok) return queried;
 

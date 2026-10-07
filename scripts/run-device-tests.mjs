@@ -237,7 +237,7 @@ function main() {
   // 버전 확인할 것 없이 테스트를 위한 버전으로 대치(replace: adb install -r),
   // pm clear로 날리고 다시 시작한다.
   const APK_PATH = "android/app/build/outputs/apk/debug/app-debug.apk";
-  const PKG = "com.anonymous.alpharium";
+  const PKG = "com.a810labs.pocketlog";
   const ACTIVITY = `${PKG}/.MainActivity`;
 
   console.log("▶ 테스트 전 앱 초기화 루틴 (대치 설치 + pm clear + 재시작)");
@@ -279,7 +279,7 @@ function main() {
   // 인자로 흐름 파일을 주면 그것만 돈다: `node scripts/run-device-tests.mjs .maestro/a.yml`
   const requested = process.argv.slice(2);
   const flows = requested.length > 0 ? requested : FLOWS;
-  const junit = join(mkdtempSync(join(tmpdir(), "alpharium-maestro-")), "report.xml");
+  const junit = join(mkdtempSync(join(tmpdir(), "pocketlog-maestro-")), "report.xml");
 
   console.log(`▶ 흐름 ${flows.length}개를 한 번에 실행`);
   const run = spawnSync(
