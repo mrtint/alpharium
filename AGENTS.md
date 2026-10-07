@@ -832,7 +832,12 @@
   본문·제목 → 저장 → 쓴 날 홈(약 50초). **안 보는 것**: 백그라운드 자동 쓰기(시뮬레이터가 BGTask를 스케줄하지 않는다), 실제 iPhone의 메모리·속도, release·서명·TestFlight.
 - **★ `initMultimodal`의 기본값(`use_gpu: true`)이 시뮬레이터 Metal 드라이버 안에서 앱을 죽인다** — `clip_model_loader::load_tensors` → `lm_ggml_metal_buffer_set_tensor`
   → `_xpc_api_misuse`(SIGTRAP). JS에는 아무것도 안 오고 앱이 홈 화면으로 사라진다(크래시 보고서는 `~/Library/Logs/DiagnosticReports/Pocketlog-*.ips`). `use_gpu: false`로
-  고정했다(`vision-port.ts`, engine.test.ts가 잠근다) — 본문 모델의 `n_gpu_layers: 0`과 같은 결정. 실제 iPhone에서 GPU 경로가 서는지는 재지 않았다.
+  고정했다(`vision-port.ts`, engine.test.ts가 잠근다) — 본문 모델의 `n_gpu_layers: 0`과 같은 결정. **근거(2026-10-08 조사)**: llama.rn README가 「iOS 시뮬레이터는 Metal 미지원」을
+  명시하고 `initLlama`는 네이티브가 `TARGET_OS_SIMULATOR`에서 `n_gpu_layers`를 0으로 꺾지만(`RNLlamaJSI.cpp` `getMetalAvailability`), **`initMultimodal`의 `use_gpu`는
+  그 가드 없이 그대로 `mtmd`로 간다**(`RNLlamaJSI.cpp` 1910행 → `rn-llama.cpp` 722행) — 시뮬레이터 크래시는 llama.rn의 빈 구멍이다. 실기기도 안전하지 않다: llama.rn
+  #176(iPhone 15 Pro Max, iOS 18.5/26, Gemma 3 4B)에서 `use_gpu: true`가 「Failed to evaluate chunks」로 실패했고 우회가 `use_gpu: false`였다(미해결로 닫힘). 그 실패는
+  우리 코드에선 크래시가 아니라 `vision-failed`로 떨어져 **사진 있는 날이 전부 안 써진다.** 대가는 속도다 — Metal이 서는 기기에서는 CLIP 인코딩이 CPU보다 느리다(수치는
+  미실측; llama.cpp 본문 생성 기준 A17 Pro에서 GPU 32 vs CPU 12 tok/s). 실제 iPhone이 생기면 「GPU로 켠 뒤 캡션 성공·시간」을 한 번 재고 그때 되돌릴지 정한다.
 - **★ 내려받기 실패가 화면에 안 보였다** — `downloadEssentials()`는 실패를 `{ ok: false }` 값으로 돌려주는데 `App.tsx`가 `.catch`만 봐서 「받는 중이에요」에 영영 머물렀다
   (안드로이드에도 같은 코드). 값 실패도 `downloadFailed`로 옮겼다(AppFrame.firstrun.test.tsx 066).
 - **일기의 사본 경로는 절대 경로로 저장된다** — iOS는 업데이트마다 컨테이너 UUID가 바뀌어 옛 일기의 사진이 「이제 없어요」가 된다. 저장 형식은 두고 `fileStore.load()`가
