@@ -22,6 +22,7 @@ import {
   TYPE,
   contrastRatio,
   SETTINGS,
+  SIMULATION,
   WRITTEN_DAY,
 } from "../src/ui/theme/tokens";
 
@@ -188,6 +189,17 @@ describe("051 — 쓴 날 면 색의 대비 (research R7)", () => {
   it("COLORS 아홉 역할은 그대로다 — 보드 램프 색은 WRITTEN_DAY에만 있다", () => {
     expect(Object.values(COLORS)).not.toContain(WRITTEN_DAY.paper);
     expect(Object.values(COLORS)).not.toContain(WRITTEN_DAY.rewriteBar);
+  });
+});
+
+describe("064 — 상태 흉내 쓰기 바의 대비 (research R7)", () => {
+  it("회색 면 위 글자·DEV 꼬리표가 AA 4.5:1 이상이다 — 보드 neutral-700(#605d5d)은 4.39:1이라 neutral-800을 쓴다", () => {
+    expect(contrastRatio(SIMULATION.barText, SIMULATION.barFill)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("#605d5d", SIMULATION.barFill)).toBeLessThan(4.5);
+  });
+
+  it("DEV 꼬리표 테두리는 홈 배경 위 글자색이다", () => {
+    expect(SIMULATION.badgeBorder).toBe(COLORS.text);
   });
 });
 

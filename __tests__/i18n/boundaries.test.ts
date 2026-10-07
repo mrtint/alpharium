@@ -131,6 +131,8 @@ describe("B6 — 저장된 데이터에 화면 문구가 없다 (research R13)",
       "notified.json",
       "onboarding.json",
       "selected-character.json",
+      // 064 — 상태 흉내 기록(날짜·토글 셋, 화면 문구 없음)
+      "simulation.json",
       "state.json",
       "write-failures.json",
     ]);

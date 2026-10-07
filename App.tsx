@@ -68,11 +68,13 @@ import { DownloadConsentDialog } from "./src/ui/DownloadConsentDialog";
 import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { SettingsFrame } from "./src/ui/SettingsFrame";
-import { DeveloperScreen } from "./src/ui/DeveloperScreen";
+import { DeveloperScreen, type SimulationToggle } from "./src/ui/DeveloperScreen";
 import { DeveloperToast } from "./src/ui/DeveloperToast";
 import { RedownloadConfirmDialog } from "./src/ui/RedownloadConfirmDialog";
-import { DEVELOPER_TEXT } from "./src/ui/developer-text";
+import { DEVELOPER_TEXT, SIMULATION_TEXT } from "./src/ui/developer-text";
 import { useDeveloperMenu } from "./src/ui/use-developer-menu";
+import { SimulationDateDialog } from "./src/ui/SimulationDateDialog";
+import { useSimulation } from "./src/ui/use-simulation";
 import { useDeveloperTaps } from "./src/ui/use-developer-taps";
 import { useToastLine } from "./src/ui/use-toast-line";
 import { SettingsScreen } from "./src/ui/SettingsScreen";
@@ -86,6 +88,14 @@ import type { PermissionFacts, PhotoLocationReading } from "./src/app/permission
 import { photoLocationProbe } from "./src/app/photo-location-probe";
 import { formatVersion } from "./src/app/version";
 import { expoDeveloperMenuStorePort } from "./src/app/developer-menu-store";
+import {
+  simulatedNow,
+  simulatedPreviewDay,
+  simulationBlocksWriting,
+  type SimulationState,
+} from "./src/app/simulation";
+import { expoSimulationStorePort } from "./src/app/simulation-store";
+import type { DayPreview } from "./src/app/state";
 import { buildLabelFor } from "./src/app/developer-build-label";
 import { readDeviceModuleLines, type ModuleLines } from "./src/app/module-lines";
 import { planRedownload } from "./src/app/redownload-plan";
@@ -363,6 +373,52 @@ function AppFrame() {
    * 깨진다. 마운트 시점의 오늘을 값으로 들고 있는다(AF1).
    */
   const [chosenDay, setChosenDay] = useState<DayDate | null>(() => dayOf(new Date()));
+
+  /** 064 — 흉내 기록을 읽었다. 날짜 흉내가 있으면 홈이 그 날을 고른다(앱을 열면 오늘이다 — 049) */
+  const onSimulationLoaded = useCallback((loaded: SimulationState) => {
+    if (loaded.date !== null) setChosenDay(loaded.date);
+  }, []);
+  /**
+   * ★ 064 — 상태 흉내(보드 `6e` ③·`6i`). 개발 환경에서만 읽고 쓴다(S7). 흉내 값은 **홈 표시에만** 들어간다 — 홈의 「지금」(`homeNow`)과
+   * 미리보기(`homePreviewDay`). 하나라도 켜져 있으면 다섯 쓰기 진입점이 쓰지 않는다(`writeBlocked`, S8): 홈 쓰기 바·앱 열기 자동 시작·
+   * 진단 쓰기 요청은 홈이, 진단 두 버튼은 진단 화면이, 백그라운드는 `runAutoDiaryTask`가 기록을 직접 읽어 막는다.
+   */
+  const simulationStore = useMemo(() => expoSimulationStorePort(), []);
+  const simulation = useSimulation({
+    devEnvironment: showsDiagnostics,
+    port: simulationStore,
+    // 064 — 앱을 열면 오늘이다(049) — 날짜 흉내가 저장돼 있으면 그 날이 오늘이므로 읽은 뒤 홈이 그 날을 고른다(AF1)
+    onLoaded: onSimulationLoaded,
+  });
+  const writeBlocked = simulationBlocksWriting(simulation.state);
+  const simulationDate = simulation.state.date;
+  const homeNow = useCallback(() => simulatedNow(simulationDate, new Date()), [simulationDate]);
+  const homePreviewDay = useMemo(() => simulatedPreviewDay(simulation.state), [simulation.state]);
+  const [simulationDateOpen, setSimulationDateOpen] = useState(false);
+
+  /**
+   * 064 — 날짜 흉내를 켜거나 바꾸면 홈이 그 날을 고르고, 끄면 실제 오늘을 고른다(Clarification Q1, AF1). 대화상자는 닫는다.
+   */
+  const simulationState = simulation.state;
+  const setSimulationState = simulation.set;
+  const setSimulationDate = useCallback(
+    (date: DayDate | null) => {
+      setSimulationState({ ...simulationState, date });
+      setChosenDay(date ?? dayOf(new Date()));
+      setSimulationDateOpen(false);
+    },
+    [simulationState, setSimulationState, setSimulationDateOpen],
+  );
+  const toggleSimulation = useCallback(
+    (key: SimulationToggle) =>
+      setSimulationState({ ...simulationState, [key]: !simulationState[key] }),
+    [simulationState, setSimulationState],
+  );
+  const showToastLine = toastLine.show;
+  const onWriteBlocked = useCallback(
+    () => showToastLine(SIMULATION_TEXT.blockedToast),
+    [showToastLine],
+  );
 
   /*
    * 051 수정 — 홈의 `⋯` 메뉴(048)를 없앴다(저장소 소유자 지시 — 보드 `1d`·`2c`의 하단 바에 메뉴가
@@ -1049,11 +1105,18 @@ function AppFrame() {
    * 아니라 이 콜백 안에서 읽는다.
    */
   const autoWriteClaimed = useRef(false);
+  // 064 — 흉내가 켜진 실행에서는 앱 열기 자동 쓰기가 없다 — 흉내를 꺼도 같은 실행에서 저절로 시작하지 않게 한 번을 소모한다(AF3).
+  useEffect(() => {
+    if (writeBlocked) autoWriteClaimed.current = true;
+  }, [writeBlocked]);
+  const simulationLoaded = simulation.loaded;
   const claimAutoWrite = useCallback(() => {
+    // 064 — 흉내 기록을 읽기 전에는 판정하지 않는다(소모하지도 않는다) — 읽은 뒤 이 콜백이 바뀌어 홈이 다시 판정한다.
+    if (!simulationLoaded) return false;
     if (autoGenerateTried.current || autoWriteClaimed.current) return false;
     autoWriteClaimed.current = true;
-    return true;
-  }, []);
+    return !writeBlocked;
+  }, [simulationLoaded, writeBlocked]);
 
   /**
    * ★ 058 — 일기 모두 지우기 (설정 「이 휴대폰」, research R1·R2·R11).
@@ -1293,11 +1356,15 @@ function AppFrame() {
   }, [stopHome, goHome]);
 
   /** 059 — 「개발자 메뉴 끄기」: 꺼지고 개발자 겹은 설정으로 돌아간다(개발 환경은 그 실행 동안만, 배포는 저장된 켜짐을 지운다) */
+  const simulationClear = simulation.clear;
   const onDisableDeveloper = useCallback(() => {
     developer.disable();
+    // 064 — 끄면 상태 흉내도 모두 꺼진다(보드 `6e` ⑤, AF2). 날짜 흉내가 있었으면 홈을 실제 오늘로 되돌린다.
+    simulationClear();
+    setChosenDay(dayOf(new Date()));
     setDiagnosing(false);
     setRoute("settings");
-  }, [developer]);
+  }, [developer, simulationClear]);
 
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
@@ -1463,6 +1530,13 @@ function AppFrame() {
           // 060 — 진단 「지금 한 번 써 보기」가 홈에 올리는 쓰기 요청
           writeRequest={writeRequest}
           onWriteRequestHandled={onWriteRequestHandled}
+          // 064 — 상태 흉내: 홈 표시(지금·미리보기·실패 토스트)와 쓰기 차단
+          now={homeNow}
+          homePreviewDay={homePreviewDay}
+          writeBlocked={writeBlocked}
+          onWriteBlocked={onWriteBlocked}
+          simulation={writeBlocked ? { onOpenDeveloper: openDeveloper } : undefined}
+          simulatedFailToast={simulation.state.failToast}
         />
         {/* 059 — 설정 겹은 개발자가 열린 동안에도 열려 있다(개발자가 그 위에 쌓인다, R8). 그동안 뒤로 가기는 등록하지 않는다. */}
         <StackLayer
@@ -1530,6 +1604,15 @@ function AppFrame() {
               onRedownload={() => void onRequestRedownload()}
               onReplayOnboarding={() => void onReplayOnboarding()}
               showsDiagnostics={showsDiagnostics}
+              simulation={
+                showsDiagnostics
+                  ? {
+                      state: simulation.state,
+                      onPressDate: () => setSimulationDateOpen(true),
+                      onToggle: toggleSimulation,
+                    }
+                  : undefined
+              }
             />
           </SettingsFrame>
         </StackLayer>
@@ -1548,9 +1631,21 @@ function AppFrame() {
                 buildLabel={buildLabelFor({ devEnvironment: showsDiagnostics, versionText })}
                 characterNames={customNames}
                 onTryOnce={onDiagnosticsTryOnce}
+                writeBlocked={writeBlocked}
               />
             </SettingsFrame>
           </StackLayer>
+        )}
+        {/* 064 — 「오늘 날짜」 흉내 대화상자. 개발 환경에서만 트리에 있다(S7) */}
+        {showsDiagnostics && (
+          <SimulationDateDialog
+            date={simulation.state.date}
+            initialDay={dayOf(new Date())}
+            onClose={() => setSimulationDateOpen(false)}
+            onOff={() => setSimulationDate(null)}
+            onPick={(day) => setSimulationDate(day)}
+            open={simulationDateOpen}
+          />
         )}
         {redownloadDialog !== null && (
           <RedownloadConfirmDialog
@@ -1593,10 +1688,13 @@ function DiagnosticsLayer({
   buildLabel,
   characterNames,
   onTryOnce,
+  writeBlocked,
 }: {
   buildLabel: string;
   characterNames: CustomNames;
   onTryOnce: () => void;
+  /** 064 — 상태 흉내가 켜져 있으면 두 쓰기 버튼을 누를 수 없다 */
+  writeBlocked: boolean;
 }) {
   const photoPort = useMemo(() => expoPhotoPort(), []);
   const diaryStore = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
@@ -1704,6 +1802,7 @@ function DiagnosticsLayer({
       previews={report === null ? null : report.promptPreviews[PREVIEW_CHARACTER]}
       probe={probe}
       storage={storageValue(inspection)}
+      writeBlocked={writeBlocked}
     />
   );
 }
@@ -1734,7 +1833,22 @@ function DiarySection({
   onWipeReady,
   writeRequest,
   onWriteRequestHandled,
+  now,
+  homePreviewDay,
+  writeBlocked,
+  onWriteBlocked,
+  simulation,
+  simulatedFailToast,
 }: {
+  /** 064 — 홈의 「지금」(날짜 흉내가 있으면 그 날). 홈에만 간다 — 자동 쓰기 판정은 실제 시각을 쓴다(FR-015) */
+  now?: () => Date;
+  /** 064 — 흉내 미리보기. 있으면 **홈에만** 넘기고 자동 쓰기 판정은 실제 `wiring.previewDay`를 쓴다(AF4) */
+  homePreviewDay?: (day: DayDate) => Promise<DayPreview>;
+  /** 064 — 상태 흉내가 하나라도 켜져 있다 — 홈이 새 쓰기를 시작하지 않는다 */
+  writeBlocked?: boolean;
+  onWriteBlocked?: () => void;
+  simulation?: { onOpenDeveloper: () => void };
+  simulatedFailToast?: boolean;
   /** 060 — 진단 「지금 한 번 써 보기」가 올린 쓰기 요청. 홈이 시작하거나 거절하면 `onWriteRequestHandled`로 비운다 */
   writeRequest?: { id: number; day: DayDate } | null;
   onWriteRequestHandled?: (id: number) => void;
@@ -2026,7 +2140,8 @@ function DiarySection({
       //   사흘 밖의 날에 캐릭터 모델을 미리 열면 쓰기 때 VLM과 겹쳐 기기가 죽는다(FR-020a).
       canPrepare={(day) => selectableDays(new Date()).includes(day)}
       // 048 US3 — 신호 줄. 파이프라인과 같은 신호 통로에서 개수로 좁혀 온다.
-      previewDay={wiring.ok ? wiring.previewDay : undefined}
+      // 064 — 상태 흉내(재료 0·권한 없음)가 있으면 그 미리보기를 **홈에만** 넘긴다(AF4).
+      previewDay={homePreviewDay ?? (wiring.ok ? wiring.previewDay : undefined)}
       // 053 — 권한 요청·설정 열기. 없으면 「권한이 없어요 ›」를 눌러도 아무 일도 없다.
       photoAccessPort={photoAccessPort}
       // 057 — 앱을 열 때의 자동 쓰기. 판정은 위에서 했고 홈은 그 날을 쓴다.
@@ -2039,6 +2154,12 @@ function DiarySection({
       writeRequest={writeRequest}
       onWriteRequestHandled={onWriteRequestHandled}
       recordFailure={recordFailure}
+      // 064 — 상태 흉내
+      {...(now !== undefined ? { now } : {})}
+      writeBlocked={writeBlocked}
+      onWriteBlocked={onWriteBlocked}
+      simulation={simulation}
+      simulatedFailToast={simulatedFailToast}
     />
   );
 }

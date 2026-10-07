@@ -1,0 +1,78 @@
+# 064 — 상태 흉내 (보드 `6e` ③·`6i`, 개발 환경 전용)
+#
+# 검증 항목 (contracts/simulation.md):
+#   DV1   개발자 화면에 「상태 흉내」 묶음과 네 행이 있다
+#   HM3   흉내를 하나 켜면 홈 월 라벨 옆에 DEV가 있고, 누르면 개발자 화면으로 간다
+#   HM1   쓰기 바를 누르면 차단 토스트만 뜨고 쓰는 중으로 넘어가지 않는다
+#   SC-004 흉내를 끄면 DEV가 사라진다
+#
+# **여기서 자동화하지 않는 것** — quickstart.md 실기기 2~8·10: 날짜 흉내(달력·미래 날), 실패 토스트 보기, 권한 없음 칸 모양, 진단 두 버튼,
+# 헤드리스 자동 쓰기, 앱 재시작 뒤 유지, 개발자 메뉴 끄기, 큰 글꼴. 사람이 본다. **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
+#
+# ⚠️ 흉내를 **끈 채로 끝낸다** — 기기의 상태를 바꾸지 않는다. 중간에 실패하면 흉내가 남을 수 있다 — 개발자 화면에서 끈다.
+# ⚠️ 오늘 일기가 이미 있으면 「다시 쓰기」 바가 지면 끝에 닿아야 올라오므로 쓰기 바 블록은 안 쓴 날에만 돈다(없으면 건너뜀).
+appId: com.anonymous.alpharium
+---
+- launchApp
+
+# 설정 → 개발자 → 「쓸 재료 0으로 보기」 켬
+- tapOn:
+    id: "home-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-developer"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "settings-developer"
+- scrollUntilVisible:
+    element:
+      id: "sim-nophoto"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "상태 흉내"
+- assertVisible:
+    id: "sim-date"
+- assertVisible:
+    id: "sim-fail"
+- tapOn:
+    id: "sim-empty-toggle"
+
+# 홈으로 — 개발자 → 설정 → 홈
+- back
+- back
+- extendedWaitUntil:
+    visible:
+      id: "home-dev-badge"
+    timeout: 10000
+
+# 안 쓴 날이면 쓰기 바를 눌러 본다 — 차단 토스트만, 쓰는 중으로 안 간다
+- runFlow:
+    when:
+      visible:
+        id: "write-bar"
+    commands:
+      - tapOn:
+          id: "write-button"
+      - extendedWaitUntil:
+          visible: "상태 흉내가 켜져 있어서 일기를 쓰지 않아요.*"
+          timeout: 5000
+      - assertNotVisible:
+          id: "stop-button"
+
+# DEV를 누르면 개발자 화면 — 흉내를 끈다
+- tapOn:
+    id: "home-dev-badge"
+- scrollUntilVisible:
+    element:
+      id: "sim-empty-toggle"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "sim-empty-toggle"
+- back
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: "home-dev-badge"
+    timeout: 10000

@@ -31,7 +31,14 @@
 import type { DayDate } from "../config/day-boundary";
 import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
+import { effectiveSimulation, simulationBlocksWriting } from "../app/simulation";
+import {
+  expoSimulationStorePort,
+  loadSimulation,
+  type SimulationStorePort,
+} from "../app/simulation-store";
 import { createAppPipeline } from "../app/wiring";
+import { showsOnScreen } from "../diagnostics/sink";
 import {
   expoWriteFailurePort,
   recordWriteFailure,
@@ -90,6 +97,8 @@ export type AutoDiaryTaskDeps = {
   manual?: boolean;
   /** 060 — 쓰기 실패 기록 통로. 주지 않으면 `preferences/write-failures.json` */
   failurePort?: WriteFailurePort;
+  /** 064 — 상태 흉내 기록 통로. 주지 않으면 `preferences/simulation.json` */
+  simulationPort?: SimulationStorePort;
 };
 
 /**
@@ -112,6 +121,17 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
     const settings = deps.manual === true ? manualSettings(loaded, now) : loaded;
 
     const resolution = deps.resolution ?? currentEnvironment();
+
+    // ★ 064 — 상태 흉내가 하나라도 켜져 있으면 쓰지 않는다(S8, BG1). 헤드리스에는 화면이 없으므로 기록을 직접 읽는다. 파이프라인을 만들기 전에
+    // 끝내므로 모델도 알림도 실패 기록도 없다(`"skipped"`는 060이 기록하지 않는 갈래). 흉내는 개발 환경에서만 효력이 있고(BG2), 못 읽으면
+    // 꺼짐이다(BG3). **여기 닿는 것은 「막는가」 하나뿐이다** — 흉내 날짜·미리보기는 이 판정에 들어오지 않는다(헌법 검사 LK3).
+    const simulation = effectiveSimulation(
+      await loadSimulation(deps.simulationPort ?? expoSimulationStorePort()),
+      showsOnScreen(resolution),
+    );
+    if (simulationBlocksWriting(simulation)) {
+      return "skipped";
+    }
     const makePipeline = deps.makePipeline ?? createAppPipeline;
     // 020 L5 — 백그라운드 owner로 조립한다. wiring.ts가 owner-bound
     // acquireLock을 만들어 pipeline.run()이 프로세스 경계 잠금을 취득한다.

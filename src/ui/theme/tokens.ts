@@ -435,6 +435,21 @@ export const SETTINGS = {
 } as const;
 
 /**
+ * 상태 흉내가 켜진 홈의 쓰기 바·DEV 꼬리표 (064, 보드 `6i`).
+ *
+ * 면은 보드 neutral-300. 글자는 보드 neutral-700(`#605d5d`)이 이 면 위 4.39:1이라 AA(4.5:1)에 못 미쳐 한 칸 진한 neutral-800을 쓴다
+ * (043 `textMuted` 조정과 같은 관례, research R7). 꼬리표 테두리는 글자색(보드 `1px solid var(--color-text)`).
+ */
+export const SIMULATION = {
+  /** 쓰기 바 면 — 보드 neutral-300 */
+  barFill: "#d7d3d3",
+  /** 쓰기 바 글자·꼬리표 — 보드 neutral-800(보드 neutral-700은 AA 미달) */
+  barText: "#444141",
+  /** 월 라벨 옆 DEV 꼬리표 테두리 */
+  badgeBorder: COLORS.text,
+} as const;
+
+/**
  * WCAG 상대 명암비 — `(L1 + 0.05) / (L2 + 0.05)`.
  *
  * 순수 함수. 팔레트 값이 AA를 넘는지 **빌드 시** 검증하는 용도이지(theme-tokens.

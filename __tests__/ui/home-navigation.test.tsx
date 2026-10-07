@@ -90,6 +90,9 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
 
   it("신호 미리보기 통로가 홈 화면까지 온다 (US3)", () => {
     const section = functionBody("DiarySection");
-    expect(section).toMatch(/previewDay=\{wiring\.ok \? wiring\.previewDay : undefined\}/);
+    // 064 — 상태 흉내 미리보기가 있으면 그것이 먼저다(홈에만). 실제 통로는 그 뒤에 그대로 온다
+    expect(section).toMatch(
+      /previewDay=\{homePreviewDay \?\? \(wiring\.ok \? wiring\.previewDay : undefined\)\}/,
+    );
   });
 });

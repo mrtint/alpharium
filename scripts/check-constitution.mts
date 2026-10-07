@@ -25,6 +25,7 @@ import {
   checkScheduleFile,
   checkSeedFile,
   checkSegmentedFile,
+  checkSimulationFile,
   checkSourceFile,
   checkVisionFile,
   checkWelcomeFile,
@@ -87,6 +88,8 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       // 040 — 첫 실행 조율 계층이 로스터·프롬프트·판정·시간 지표에 닿지 못하게.
       // checkFirstRunFile이 경로로 대상(src/firstrun/)을 정한다.
       violations.push(...checkFirstRunFile(child, contents));
+      // 064 — 상태 흉내 값이 생성 경로에 닿지 못하게. checkSimulationFile이 경로로 대상을 정한다.
+      violations.push(...checkSimulationFile(child, contents));
       // 062 — 화면 문구는 카탈로그에만, 카탈로그는 판정 계층을 모르고, 모델 입력은 화면 언어를 모른다.
       violations.push(...checkI18nFile(child, contents));
     }

@@ -142,3 +142,92 @@ describe("DG2·BD1·BD2·BD4 — 소스 계약", () => {
     expect(literals).toEqual([]);
   });
 });
+
+/* ═══════════════════ 064 — 상태 흉내 묶음 (DV1·DV2) ═══════════════════ */
+
+describe("064 DV1 — 상태 흉내 묶음", () => {
+  const OFF_STATE = { date: null, failToast: false, noMaterial: false, noPhoto: false };
+  const sim = (over: Partial<typeof OFF_STATE> = {}) => ({
+    state: { ...OFF_STATE, ...over },
+    onPressDate: jest.fn(),
+    onToggle: jest.fn(),
+  });
+
+  it("simulation이 없으면(배포 환경) 묶음이 없다", async () => {
+    await render(<DeveloperScreen {...props()} />);
+    expect(screen.queryByTestId("developer-group-sim")).toBeNull();
+  });
+
+  it("보드 원문 네 행과 「개발 빌드만」, 진단 다음·다시 보기 앞", async () => {
+    await render(<DeveloperScreen {...props({ showsDiagnostics: true, simulation: sim() })} />);
+    const group = screen.getByTestId("developer-group-sim");
+    expect(within(group).getByText("상태 흉내")).toBeTruthy();
+    expect(within(group).getByText("개발 빌드만")).toBeTruthy();
+    expect(within(screen.getByTestId("sim-date")).getByText("오늘 날짜")).toBeTruthy();
+    expect(within(screen.getByTestId("sim-fail")).getByText("실패 토스트 보기")).toBeTruthy();
+    expect(within(screen.getByTestId("sim-empty")).getByText("쓸 재료 0으로 보기")).toBeTruthy();
+    expect(
+      within(screen.getByTestId("sim-nophoto")).getByText("사진 권한 없음으로 보기"),
+    ).toBeTruthy();
+    // 묶음 머리 등 같은 testID가 여러 노드에 붙을 수 있다 — 처음 나온 순서만 본다
+    const order = [
+      ...new Set(
+        screen
+          .getAllByTestId(/^developer-group-(?:modules|diag|sim|replay|off)$/)
+          .map((n) => (n.props as { testID: string }).testID),
+      ),
+    ];
+    expect(order.indexOf("developer-group-sim")).toBe(order.indexOf("developer-group-diag") + 1);
+    expect(order.indexOf("developer-group-replay")).toBe(order.indexOf("developer-group-sim") + 1);
+  });
+
+  it("토글을 누르면 그 키로 onToggle", async () => {
+    const s = sim({ noMaterial: true });
+    await render(<DeveloperScreen {...props({ simulation: s })} />);
+    await fireEvent.press(screen.getByTestId("sim-fail-toggle"));
+    await fireEvent.press(screen.getByTestId("sim-empty-toggle"));
+    await fireEvent.press(screen.getByTestId("sim-nophoto-toggle"));
+    expect(s.onToggle.mock.calls.map((c) => c[0])).toEqual(["failToast", "noMaterial", "noPhoto"]);
+    expect(screen.getByTestId("sim-empty-toggle").props.accessibilityState).toEqual({
+      checked: true,
+    });
+    expect(screen.getByTestId("sim-fail-toggle").props.accessibilityState).toEqual({
+      checked: false,
+    });
+  });
+});
+
+describe("064 DV2 — 오늘 날짜 행", () => {
+  it("켜졌으면 YYYY-MM-DD, 누르면 onPressDate", async () => {
+    const onPressDate = jest.fn();
+    await render(
+      <DeveloperScreen
+        {...props({
+          simulation: {
+            state: { date: "2026-09-13", failToast: false, noMaterial: false, noPhoto: false },
+            onPressDate,
+            onToggle: jest.fn(),
+          },
+        })}
+      />,
+    );
+    expect(within(screen.getByTestId("sim-date")).getByText("2026-09-13")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("sim-date"));
+    expect(onPressDate).toHaveBeenCalledTimes(1);
+  });
+
+  it("꺼졌으면 값이 비어 있다", async () => {
+    await render(
+      <DeveloperScreen
+        {...props({
+          simulation: {
+            state: { date: null, failToast: false, noMaterial: false, noPhoto: false },
+            onPressDate: jest.fn(),
+            onToggle: jest.fn(),
+          },
+        })}
+      />,
+    );
+    expect(within(screen.getByTestId("sim-date")).queryByText(/\d{4}-\d{2}-\d{2}/)).toBeNull();
+  });
+});
