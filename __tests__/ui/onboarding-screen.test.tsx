@@ -5,6 +5,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react-
 
 import { OnboardingScreen, ONBOARDING_STEP_AUTO_ADVANCE_MS } from "../../src/ui/OnboardingScreen";
 import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
+import { text } from "../../src/i18n/current";
 import type { PermissionState } from "../../src/signals/port";
 
 /**
@@ -151,6 +152,27 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
     const photoReq = PERMISSION_REQUIREMENTS.find((r) => r.key === "photos")!;
     expect(screen.queryByText(photoReq.rationale)).toBeNull();
     expect(screen.queryByText(photoReq.ifDenied)).toBeNull();
+  });
+
+  it("065 — 사진 단계의 배경은 스플래시 그림이고 제목·설명 글이 없다", async () => {
+    const { ports } = makePorts();
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-photos")).toBeTruthy());
+    expect(screen.getByTestId("onboarding-screen")).toBeTruthy();
+    expect(screen.getByTestId("splash-logo-mark")).toBeTruthy();
+    expect(screen.getByText("Pocketlog")).toBeTruthy();
+    expect(screen.queryByText(text().onboarding.title)).toBeNull();
+    expect(screen.queryByText(text().onboarding.intro)).toBeNull();
+  });
+
+  it("065 — blocked(설정 열기 안내)는 글이 필요해 스플래시가 아니라 제목·안내를 그린다", async () => {
+    const { ports } = makePorts({ photo: "blocked" });
+    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
+
+    await waitFor(() => expect(screen.getByTestId("onboarding-open-settings")).toBeTruthy());
+    expect(screen.getByText(text().onboarding.title)).toBeTruthy();
+    expect(screen.queryByTestId("splash-logo-mark")).toBeNull();
   });
 
   it("사진·위치·알림 단계에는 onboarding-allow 버튼이 없다", async () => {

@@ -17,6 +17,10 @@
  * 브랜드 타이틀. 하단(구분선 위): 좌측 안내 문구 "휴대폰 안에서만", 우측 로딩
  * 점 3개(정적 표시 — FR-005, 원칙 IV. 진행률·모델명을 계산해 보이지 않는다).
  *
+ * **065 — 그림은 `SplashView`로 떼어 권한 단계(사진·위치·알림)의 배경으로도 쓴다** — OS 권한 창 뒤에
+ * 설명 글이 비치면 흐려서 읽히지 않으므로 스플래시 그대로 두고 그 위에 창이 뜬다.
+ * 브랜드 글자의 줄높이는 글자 크기보다 커야 한다 — 같으면 안드로이드가 「Pocketlog」의 g 아랫부분을 자른다.
+ *
  * 로딩 점 3번째 색(마크업 neutral-300 `#d7d3d3`)은 `COLORS`의 9개 역할에 없는
  * 순수 장식색이라 파일 로컬 상수로 둔다(DT1 "정확히 9개" 제약 보호,
  * 043 tasks.md T009).
@@ -47,11 +51,18 @@ export function LogoScreen({ onDone }: LogoScreenProps) {
     return () => clearTimeout(timer);
   }, [onDone]);
 
+  return <SplashView testID="first-run-logo" />;
+}
+
+/** 스플래시 그림 — 로고 화면과 권한 단계의 배경이 같이 쓴다(065). 시간·전환은 부르는 쪽이 정한다. */
+export function SplashView({ testID }: { testID?: string }) {
   return (
-    <View style={styles.container} testID="first-run-logo">
+    <View style={styles.container} testID={testID}>
       <View style={styles.top}>
         <View style={styles.logoMark} testID="splash-logo-mark" />
-        <AppText style={styles.title}>Pocketlog</AppText>
+        <AppText style={styles.title} testID="splash-title">
+          Pocketlog
+        </AppText>
       </View>
 
       <View style={styles.bottom}>
@@ -100,7 +111,8 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontWeight: "800",
     letterSpacing: -0.03 * 30,
-    lineHeight: 30,
+    // 065 — 30이면 g의 아랫부분이 잘렸다(실기기). 글자 크기의 1.25배.
+    lineHeight: 38,
     color: COLORS.text,
   },
   bottom: {

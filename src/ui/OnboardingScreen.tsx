@@ -57,6 +57,7 @@ import { AppState, Pressable, ScrollView, StyleSheet, View } from "react-native"
 
 import { AppText } from "./components/Text";
 import { Button } from "./components/Button";
+import { SplashView } from "./LogoScreen";
 import { COLORS } from "./theme/tokens";
 import { text } from "../i18n/current";
 import {
@@ -348,6 +349,23 @@ export function OnboardingScreen({
   const showAssetsStep = current === null && !assetsReady;
   const T = text().onboarding;
 
+  // ★ 065 — 사진·위치·알림 단계는 OS 권한 창이 자동으로 뜨는 동안 스플래시 그림만 둔다. 창 뒤에 비치는
+  // 제목·설명은 흐려서 읽히지 않았다(소유자 실기기 확인). `blocked`(설정 열기 안내)와 배터리 단계는 글이 필요해 그대로다.
+  if (
+    !showAssetsStep &&
+    current !== null &&
+    current.requirement.key !== "battery-exception" &&
+    current.status !== "blocked"
+  ) {
+    return (
+      <View style={styles.splashBackdrop} testID="onboarding-screen">
+        <View style={styles.splashBackdrop} testID={`onboarding-step-${current.requirement.key}`}>
+          <SplashView />
+        </View>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       className="bg-bg"
@@ -484,4 +502,5 @@ const styles = StyleSheet.create({
   // ★ 043 — 사진·위치·알림 단계의 배경 컨테이너. 설명 카드가 없으므로
   // blocked일 때만 안내+버튼이 뜬다(FR-008a), 그 외엔 빈 배경(FR-009).
   permissionBackground: { flex: 1, minHeight: 200, justifyContent: "center" },
+  splashBackdrop: { flex: 1, backgroundColor: COLORS.bg },
 });
