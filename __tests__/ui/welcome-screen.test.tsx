@@ -85,6 +85,28 @@ describe("FR-012 — 빈 입력·공백만은 확정할 수 없다", () => {
   });
 });
 
+// 066 — iOS에서 키보드가 뜨면 버튼 줄이 키보드 뒤로 들어간다(시뮬레이터 관측). 리턴 키가
+// 키보드만 내리고 아무것도 하지 않으면 사용자는 키보드를 내린 뒤 버튼을 찾아야 한다.
+describe("066 — 키보드의 리턴 키로 확정한다", () => {
+  it("리턴 키는 「완료」다", async () => {
+    await setup();
+    expect(screen.getByTestId("welcome-name-input").props.returnKeyType).toBe("done");
+  });
+
+  it("이름을 넣고 리턴을 누르면 버튼과 같이 확정된다", async () => {
+    const { props } = await setup();
+    await fireEvent.changeText(screen.getByTestId("welcome-name-input"), "복실이");
+    await fireEvent(screen.getByTestId("welcome-name-input"), "submitEditing");
+    expect(props.onSubmitName).toHaveBeenCalledWith("복실이");
+  });
+
+  it("빈 이름에서 리턴을 눌러도 확정되지 않는다 (035 FR-012)", async () => {
+    const { props } = await setup();
+    await fireEvent(screen.getByTestId("welcome-name-input"), "submitEditing");
+    expect(props.onSubmitName).not.toHaveBeenCalled();
+  });
+});
+
 describe("FR-013 — 글자 수 상한", () => {
   it("입력창의 maxLength가 12다", async () => {
     await setup();

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  066 — TestFlight용 아카이브 내보내기 설정. `xcodebuild -exportArchive -exportOptionsPlist`가 읽는다.
+	  서명은 수동이다: 팀 PGNGG84B39(개인 계정)가 만들어 준 배포 인증서·프로파일을 쓴다(AGENTS.md 「iOS 빌드·서명·TestFlight」).
+	  `destination`이 `export`라 IPA 파일까지만 만든다 — 업로드는 사람이 확인한 뒤 따로 한다.
+	-->
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>destination</key>
+	<string>export</string>
+	<key>teamID</key>
+	<string>PGNGG84B39</string>
+	<key>signingStyle</key>
+	<string>manual</string>
+	<key>signingCertificate</key>
+	<string>Apple Distribution</string>
+	<key>provisioningProfiles</key>
+	<dict>
+		<key>com.a810labs.pocketlog</key>
+		<string>Pocketlog App Store</string>
+	</dict>
+	<key>uploadSymbols</key>
+	<true/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

@@ -23,6 +23,7 @@
 
 import type { DayDate } from "../config/day-boundary";
 import { judge } from "../diary/acceptance";
+import { VISION_CACHE_DIRECTORY } from "../diary/photo-path";
 import { buildPrompt, instructionLines, promptPrefix, titleQuestion } from "../diary/prompt";
 import { buildRequest } from "../diary/request";
 import { MAX_TITLE_LENGTH } from "../diary/title";
@@ -782,6 +783,21 @@ export function onDeviceBackend(
 }
 
 /**
+ * 066 — 지금 iOS인가. 호출 시점 `require`로 본다(062 `locale-port.ts` D4와 같은 방식) —
+ * jest `logic`(node)에서는 `react-native` 해석이 실패해 거짓으로 떨어지고, 그때 안드로이드와
+ * 같은 기본값을 탄다.
+ */
+function isIOS(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Platform } = require("react-native") as { Platform: { OS: string } };
+    return Platform.OS === "ios";
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 실제 사진 읽기 수단 (011).
  *
  * `llamaEngine()`과 같은 방식으로 지연 import 한다 — 시뮬레이터·웹에서 네이티브 모듈
@@ -789,14 +805,19 @@ export function onDeviceBackend(
  */
 function visionSupport(): VisionSupport {
   return {
-    engine: createVisionEngine(async (path: string) => {
-      const llama = await import("llama.rn");
-      return (await llama.initLlama({
-        model: path,
-        n_ctx: VISION_CONTEXT_SIZE,
-        n_gpu_layers: 0,
-      })) as never;
-    }),
+    engine: createVisionEngine(
+      async (path: string) => {
+        const llama = await import("llama.rn");
+        return (await llama.initLlama({
+          model: path,
+          n_ctx: VISION_CONTEXT_SIZE,
+          n_gpu_layers: 0,
+        })) as never;
+      },
+      undefined,
+      // 066 — iOS만 mmproj를 CPU에 둔다. 안드로이드는 라이브러리 기본값 그대로다(`VisionEngineOptions`).
+      { projectorOnGpu: !isIOS() },
+    ),
     /**
      * ★ **사진 id를 실제 파일 경로로 바꾼다** (2026-08-22 실기기에서 고쳤다).
      *
@@ -843,7 +864,7 @@ function visionSupport(): VisionSupport {
  * 않으려고 export한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export const VISION_CACHE_DIRECTORY = "vision-cache";
+export { VISION_CACHE_DIRECTORY };
 
 async function openVisionCacheDirectory() {
   const { Directory, Paths } = await import("expo-file-system");

@@ -29,6 +29,8 @@
   `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`의 조각 일곱이 모두 들어갔다.
 - **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. 절차는 아래 「release 빌드·서명·Google Play」.
+- **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
+  절차와 함정은 아래 「iOS 시뮬레이터」.
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -163,6 +165,12 @@
 1. **Metro가 dev 환경으로 떠 있어야 한다** — `EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client`.
    **Expo는 `NODE_ENV`로 env 파일을 고르지 `EXPO_PUBLIC_APP_ENV`로 고르지 않는다** — 변수를 셸에서
    직접 준다(`@expo/env`의 `load()`는 이미 설정된 `process.env`를 보존한다).
+   **★ macOS·SDK 57에서는 셸 변수가 번들에 들어가지 않았다**(066, 2026-10-08): Metro가 `.env*` 파일을 **각각 모듈로 번들에 싣고**
+   (`__d(…, ".env.development")`) 런타임에 고른다. `export EXPO_PUBLIC_APP_ENV=dev` 뒤 `--clear`로 띄워도(Metro 로그는 셸 값을
+   존중해 파일 값을 export하지 않는 것처럼 보인다) 앱은 `.env.development`의 `local`로 떴다. 번들이 `local`이면 온디바이스 엔진이
+   조립되지 않아 **liveness가 조용히 실패하고 쓰기가 `not-implemented`**로 끝난다. gitignore된 `.env.development.local`에
+   `EXPO_PUBLIC_APP_ENV=dev` 한 줄을 두면 그 모듈이 이긴다(실측). **번들을 믿지 말고 본다** —
+   `curl -s "localhost:8081/index.bundle?platform=ios&dev=true" | grep -B1 '"EXPO_PUBLIC_APP_ENV"'`에 `.env.development.local` 모듈이 있어야 한다.
 2. **기기 잠금이 풀려 있고 화면이 켜져 있어야 한다** — `adb shell dumpsys trust`의 `deviceLocked=0`.
    PIN은 사람이 넣는다.
 3. **한글 검증 문구는 `-Dfile.encoding=UTF-8`이 있어야 읽힌다**(한국어 Windows는 CP949).
@@ -818,6 +826,41 @@
 - 회색 쓰기 바 글자는 보드 neutral-700이 면 위 4.39:1이라 neutral-800(`SIMULATION.barText`, 6.81:1)이다. 날짜 대화상자는 `DateJumpDialog`를 쓰지 않는다(미래 칸을 막는다) —
   같은 datepicker 격자 위에 「끄기」·「취소」.
 
+### 066 — iOS 시뮬레이터 스파이크
+
+- **되는 것**(iPhone 17 시뮬레이터, iOS 26.5, Xcode 26.6, dev 빌드): 권한 셋 → 동의 → 모듈 내려받기(약 2GB) → 작명 → 홈 사진 3장 인식 → 사진 읽기 →
+  본문·제목 → 저장 → 쓴 날 홈(약 50초). **안 보는 것**: 백그라운드 자동 쓰기(시뮬레이터가 BGTask를 스케줄하지 않는다), 실제 iPhone의 메모리·속도, release·서명·TestFlight.
+- **★ `initMultimodal`의 기본값(`use_gpu: true`)이 시뮬레이터 Metal 드라이버 안에서 앱을 죽인다** — `clip_model_loader::load_tensors` → `lm_ggml_metal_buffer_set_tensor`
+  → `_xpc_api_misuse`(SIGTRAP). JS에는 아무것도 안 오고 앱이 홈 화면으로 사라진다(크래시 보고서는 `~/Library/Logs/DiagnosticReports/Pocketlog-*.ips`). `use_gpu: false`로
+  고정했다 — **iOS에서만**(`on-device.ts`가 `createVisionEngine`에 `projectorOnGpu: !isIOS()`를 넘기고, 안드로이드는 `use_gpu`를 보내지 않아 라이브러리 기본값 그대로다 —
+  013·023의 안드로이드 캡션 실측이 그 기본값으로 쟀으므로 손대지 않는다; engine.test.ts·on-device.test.ts가 잠근다). 본문 모델의 `n_gpu_layers: 0`과 같은 결정. **근거(2026-10-08 조사)**: llama.rn README가 「iOS 시뮬레이터는 Metal 미지원」을
+  명시하고 `initLlama`는 네이티브가 `TARGET_OS_SIMULATOR`에서 `n_gpu_layers`를 0으로 꺾지만(`RNLlamaJSI.cpp` `getMetalAvailability`), **`initMultimodal`의 `use_gpu`는
+  그 가드 없이 그대로 `mtmd`로 간다**(`RNLlamaJSI.cpp` 1910행 → `rn-llama.cpp` 722행) — 시뮬레이터 크래시는 llama.rn의 빈 구멍이다. 실기기도 안전하지 않다: llama.rn
+  #176(iPhone 15 Pro Max, iOS 18.5/26, Gemma 3 4B)에서 `use_gpu: true`가 「Failed to evaluate chunks」로 실패했고 우회가 `use_gpu: false`였다(미해결로 닫힘). 그 실패는
+  우리 코드에선 크래시가 아니라 `vision-failed`로 떨어져 **사진 있는 날이 전부 안 써진다.** 대가는 속도다 — Metal이 서는 기기에서는 CLIP 인코딩이 CPU보다 느리다(수치는
+  미실측; llama.cpp 본문 생성 기준 A17 Pro에서 GPU 32 vs CPU 12 tok/s). 실제 iPhone이 생기면 「GPU로 켠 뒤 캡션 성공·시간」을 한 번 재고 그때 되돌릴지 정한다.
+- **★ 내려받기 실패가 화면에 안 보였다** — `downloadEssentials()`는 실패를 `{ ok: false }` 값으로 돌려주는데 `App.tsx`가 `.catch`만 봐서 「받는 중이에요」에 영영 머물렀다
+  (안드로이드에도 같은 코드). 값 실패도 `downloadFailed`로 옮겼다(AppFrame.firstrun.test.tsx 066).
+- **일기의 사본 경로는 절대 경로로 저장된다** — iOS는 업데이트마다 컨테이너 UUID가 바뀌어 옛 일기의 사진이 「이제 없어요」가 된다. 저장 형식은 두고 `fileStore.load()`가
+  `rehomeResizedPath()`(`src/diary/photo-path.ts`)로 지금 자리에 옮긴다(`FileSystemPort.documentDirectory?`). 리사이즈를 건너뛴 원본 경로(013 C1)는 손대지 않는다.
+  **`VISION_CACHE_DIRECTORY`의 자리는 이제 `diary/photo-path.ts`다**(`on-device.ts`는 재export).
+- **iOS 권한 문구는 `app.json`의 플러그인 옵션이 유일한 자리다** — 안 주면 "Allow Pocketlog to access your photos" 영어 기본값이 권한 창에 그대로 뜬다. 사진 저장·항상 위치·
+  모션은 `false`로 키 자체를 뺐다(`__tests__/config/ios-permissions.test.ts`). 생성된 `ios/Pocketlog/Info.plist`의 `UsageDescription`으로 확인한다.
+- **iOS 기본 줄바꿈은 글자 단위다** — 「처음 뵙겠습/니다.」. `AppText`가 `lineBreakStrategyIOS="hangul-word"`를 기본으로 준다. 작명 화면은 키보드가 뜨면 버튼 줄이 키보드 뒤라
+  리턴 키(`returnKeyType="done"`·`onSubmitEditing`)가 버튼과 같은 규칙으로 확정한다.
+- **앱 아이콘은 자리표시자다**(토큰 색의 빨간 사각형 + 「P」, `assets/icon.png`) — Expo 기본 아이콘이 iOS에 그대로 나왔다. 안드로이드 adaptive icon도 아직 Expo 기본이다(미교체).
+- **도구**: `xcodebuild`는 `sudo xcode-select` 없이 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`로 쓴다. `pod install`은 `~/.netrc`가 644면 거부한다 — 파일을
+  안 고치려면 `NETRC=<빈 디렉터리>`. **사내망은 Hugging Face CDN(`us.aws.cdn.hf.co`)의 TLS를 바꿔치므로** 시뮬레이터에 회사 루트 인증서를 넣어야 모델이 받아진다
+  (`security find-certificate -a -c NEXON -p /Library/Keychains/System.keychain > nexon.pem; xcrun simctl keychain <UDID> add-root-cert nexon.pem`) — 그 전에는
+  `UnableToDownloadException: … TLS 오류`. 화면 조작은 Maestro(`brew install mobile-dev-inc/tap/maestro`, `JAVA_HOME`을 Homebrew openjdk로 줘야 뜬다)로
+  `maestro --device <UDID> test <flow>`. 사진은 `xcrun simctl addmedia <UDID> *.jpg`로 넣되 **EXIF 촬영일이 있으면 그 날로 들어간다** — 오늘로 넣으려면 EXIF를 걷어낸 JPEG
+  (`sips -s format bmp` → 다시 jpeg). 앱 데이터는 `xcrun simctl get_app_container <UDID> com.a810labs.pocketlog data` 아래 `Documents/`(일기·모델·preferences 모두).
+- **재설치로 컨테이너 UUID가 실제로 바뀌었고**(`C1CE7ED7…` → `2150CF50…`) 옛 경로가 남은 일기의 사진이 `rehomeResizedPath`로 정상 표시됐다. 그 뒤 iOS 한정 `projectorOnGpu`로 바꾼
+  번들에서 「다시 쓰기」가 두 번 연속 `photos`(사진 읽기) 실패로 기록된 뒤(09:01·09:05, 크래시 없음, 원인 미상 — 그 프로세스는 Metro 재시작 뒤 홈 화면으로 튕겼다 돌아온 상태였다)
+  앱을 다시 띄우니 두 번 연속 저장됐다(`isIOS()` 참, 캡션 `seen`). **같은 프로세스에서 Metro를 다시 띄웠으면 앱도 다시 띄운다.**
+- **미확인**: 다운로드 실패 화면(계약 테스트로만), 위 `photos` 실패 2건의 원인, 설정·개발자·진단 화면, 글꼴 배율. 안드로이드는 이번 변경(내려받기 실패 처리·리턴 키 확정·
+  사본 경로 옮기기)을 실기기로 다시 보지 않았다.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크
@@ -961,6 +1004,71 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 
 **debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V) — minify·R8이 켜지면 동적 `import`·`llama.rn` JNI 심볼이 깨질 수 있다(현재는 꺼져 있다, 위 실측 규칙).
 **Play에서 받은 앱은 Play가 다시 서명한 것이다** — 내부 테스트 트랙으로 받은 앱에서 설치·모델 내려받기·일기 쓰기를 한 번 본다.
+
+## iOS 빌드·서명·TestFlight — 요청받았을 때만 탄다 (066)
+
+**아이폰 배포물을 만드는 절차다.** 안드로이드 절차(위)와 같은 성격 — 기본 작업 흐름이 아니며 저장소 소유자가 그 세션에서 요청했을 때만 탄다.
+**실제 iPhone이 한 대도 없다**(2026-10-08) — 아래에서 「실측」이라 적은 것은 iPhone 17 시뮬레이터(iOS 26.5, Xcode 26.6)에서 본 것이고, 업로드·TestFlight 설치는 미실측이다.
+
+### 서명 주체 — 개인 계정의 수동 서명 (2026-10-08 확정)
+
+- **Apple 계정 구조**: 소유주 Hyunmin Lee 님의 **개인(Individual) Apple Developer Program**(팀 `PGNGG84B39`)이고, 저장소 소유자(`mrtint0729@gmail.com`)는 그 App Store
+  Connect의 **Admin**이다. 개인 가입은 팀원을 Developer Program 팀에 넣지 못하므로(Apple 「roles」: *"Certificates, Identifiers & Profiles is only available to Account Holders and
+  members of an organization's team"*) **Xcode 자동 서명이 안 된다** — Accounts에는 `Hyunmin Lee|208773025|1`로 보이지만 Signing의 Team 드롭다운에는 안 뜬다. App Store Connect
+  쪽(앱 레코드·TestFlight·업로드)은 Admin 권한으로 된다. `app.json`의 옛 `S6B8RQH6YQ`는 8월 다른 맥의 Personal Team이었다.
+- **그래서 수동 서명이다.** 이 맥에서 만든 CSR로 소유주가 발급한 **Apple Distribution 인증서** + **App Store 프로파일 「Pocketlog App Store」**(App ID `com.a810labs.pocketlog`,
+  entitlement는 `increased-memory-limit` 하나)를 쓴다. 파일은 **저장소 밖** `~/.pocketlog-signing/ios/`(`distribution.key`·`distribution.cer`·`Pocketlog_App_Store.mobileprovision`;
+  키는 600). 인증서 만료 2027-10-08 — 그때 CSR을 다시 보낸다. **`distribution.key`를 잃으면 인증서도 못 쓴다**(안드로이드 `pocketlog.jks`와 같이 밖에 백업).
+- **키체인 설치**(한 번): `security import distribution.key -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign`, `security import distribution.cer …`, 그리고
+  **Apple WWDR G3 중간 인증서**(`https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer`)도 넣어야 `security find-identity -v -p codesigning`에 **valid**로 선다(없으면 0 valid).
+  **프로파일은 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision`에 둔다** — 옛 자리 `~/Library/MobileDevice/Provisioning Profiles`는 이 맥에서 root 소유(MDM)라 못 쓴다.
+- **entitlements는 프로파일과 정확히 같아야 한다.** `expo-notifications` 플러그인이 넣는 `aps-environment`(원격 푸시, 이 앱은 안 쓴다)가 남아 있으면
+  `Provisioning profile … doesn't include the aps-environment entitlement`로 아카이브가 실패한다 → `plugins/with-no-push-entitlement.js`가 **plugins 맨 마지막에서** 걷는다.
+  llama.rn의 `enableEntitlements`는 `extended-virtual-addressing`까지 둘을 넣으므로 꺼 두고 `ios.entitlements`에 `increased-memory-limit`만 직접 선언한다(`__tests__/config/ios-permissions.test.ts`).
+- **App Store Connect 앱 레코드**(`com.a810labs.pocketlog`)는 Admin이 App Store Connect > 나의 앱 > ＋에서 만들거나, Xcode Organizer 첫 업로드가 만든다(Xcode 13+).
+
+### 빌드
+
+```
+npx expo prebuild --platform ios --clean          # ~/.netrc가 644면 NETRC=<빈 디렉터리>를 앞에 준다
+xcodebuild -workspace ios/Pocketlog.xcworkspace -scheme Pocketlog -configuration Release \
+  -sdk iphoneos -destination 'generic/platform=iOS' -archivePath build/Pocketlog.xcarchive archive \
+  CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=PGNGG84B39 PROVISIONING_PROFILE_SPECIFIER="Pocketlog App Store" CODE_SIGN_IDENTITY="Apple Distribution"
+xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsPlist scripts/ios/ExportOptions.plist -exportPath build/export
+```
+
+- `scripts/ios/ExportOptions.plist`는 `method: app-store-connect`·`signingStyle: manual`·프로파일 매핑이고 **`destination: export`**다 — IPA까지만 만든다. 업로드는 사람이 확인한 뒤
+  따로 한다: Xcode Organizer(Distribute App → App Store Connect → Upload, 본인 Apple ID의 Admin 권한) 또는 `xcrun altool --upload-app -f build/export/Pocketlog.ipa -t ios
+  -u mrtint0729@gmail.com -p <앱 암호>`(appleid.apple.com의 앱 암호) 또는 App Store Connect API 키(`--apiKey/--apiIssuer`).
+- **Release는 `NODE_ENV`를 셸에서 줄 필요가 없다** — Xcode의 「Bundle React Native code and images」 단계가 `export:embed`로 번들하며 `.env.development*`는 싣지 않는다(실측: Release
+  시뮬레이터 앱 번들에 `localhost:8080`이 0건, Metro 없이 홈이 뜨고 설정에 「개발자」 행이 없다). 서명 없는 Release 아카이브(`CODE_SIGNING_ALLOWED=NO`)는 약 10분, 45MB.
+- EAS Build/Submit(`eas-cli`)은 이 저장소가 안 쓴다(안드로이드도 로컬 gradle).
+- **업로드는 사람의 터미널에서 돌린다** — `-p @keychain:AC_PASSWORD`는 처음 읽을 때 macOS 키체인 「허용」 창이 뜨는데, 화면 없는 셸(에이전트)에서는 창을 못 띄워
+  `Failed to find item AC_PASSWORD … in keychain`으로 떨어진다. 앱 암호 저장은 Xcode 26 altool이 도움말과 달리 `--item`을 요구한다:
+  `xcrun altool --store-password-in-keychain-item --item AC_PASSWORD -u <Apple ID> -p <앱 암호>`(앱 암호는 appleid.apple.com이 발급하는 값, 임의로 못 정한다).
+- **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널). 다음 업로드는 `ios.buildNumber`를 먼저 올린다(저장소는 2로 올려 두었다).
+
+### 다른 맥에서 올리려면
+
+1. `~/.pocketlog-signing/ios/` 통째로 옮긴다(`distribution.key`·`.cer`·`.mobileprovision`). 옮기기 쉽게 한 파일로 묶으려면 `openssl pkcs12 -export -inkey distribution.key -in distribution.pem
+   -out distribution.p12`(비밀번호는 그때 정한다; `.cer`는 DER라 바로 못 넣는다 — `distribution.pem`이 PEM 변환본) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
+2. 받는 맥 키체인에 **WWDR G3**를 넣고(위), 프로파일을 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`에 둔다. `security find-identity -v -p codesigning`에 valid 1개.
+3. Xcode(26 기준 실측)·CocoaPods(`brew install cocoapods`)·Node 20+. `~/.netrc`가 644면 `NETRC=<빈 디렉터리>`.
+4. 앱 암호를 그 맥 키체인에 다시 저장한다(위 `--item` 명령; 암호 자체는 Apple ID에 묶여 어디서나 같다).
+5. `app.json`의 `ios.buildNumber`를 올리고 커밋 → 위 「빌드」 세 줄 → 사람의 터미널에서 `--validate-app` → `--upload-app`.
+
+### 확인 — 빌드 성공을 믿지 않는다
+
+| 무엇 | 어떻게 | 통과 |
+| --- | --- | --- |
+| 서명 | `codesign -dv --verbose=2 <app>` | `Authority=Apple Distribution: …` (`Apple Development`·unsigned가 **아니다**) |
+| 번호 | `PlistBuddy -c "Print :CFBundleVersion"` | 지난 업로드보다 크다 |
+| 권한 문구 | `PlistBuddy -c "Print :NSPhotoLibraryUsageDescription"` | 한국어 |
+| Metro 없이 도는가 | Release 시뮬레이터 빌드(`-sdk iphonesimulator -configuration Release`)를 Metro 끄고 연다 | 홈이 뜨고 일기가 써진다 (2026-10-08 실측) |
+| 환경 | 설정에 「개발자」 행 | 배포 환경이면 버전 7번 탭 전까지 **없다** |
+
+**TestFlight에서 받은 앱은 실제 iPhone의 첫 실측이다** — 2GB 모델 적재(메모리), 사진 읽기 시간(mmproj CPU), 백그라운드 자동 쓰기(BGTask)가 거기서 처음 재진다. 테스터에게
+「설치 → 권한 → 내려받기 → 첫 일기 → 다음 날 자동 쓰기 알림」을 확인해 달라고 한다.
 
 ## 테스트
 

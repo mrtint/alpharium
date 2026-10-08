@@ -15,7 +15,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { VISION_CACHE_DIRECTORY } from "../inference/on-device";
+import { VISION_CACHE_DIRECTORY } from "../diary/photo-path";
 
 export async function clearPhotoCopies(): Promise<void> {
   const { Directory, File, Paths } = await import("expo-file-system");

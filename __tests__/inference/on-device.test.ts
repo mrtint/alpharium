@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import {
   createOnDeviceBackend,
   type VisionSupport,
@@ -1127,5 +1129,24 @@ describe("061 — 제목 두 번째 호출 (TA2)", () => {
     const forty = "가".repeat(40);
     expect(withTitle("본문", eos(` ${forty} `))).toBe(`${forty}\n\n본문`);
     expect(withTitle("본문", undefined)).toBe("본문");
+  });
+});
+
+/**
+ * 066 — 사진 모델 mmproj의 GPU 사용은 **iOS에서만** 끈다. iOS 시뮬레이터에서 Metal 로더가 앱을
+ * 죽였고 실기기 이슈(llama.rn #176)도 `use_gpu: false`가 우회다. 안드로이드는 013·023의 캡션
+ * 실측이 라이브러리 기본값으로 쟀으므로 그대로 둔다(원칙 V — 안 잰 값을 바꾸지 않는다).
+ */
+describe("066 — mmproj GPU는 iOS에서만 끈다", () => {
+  const code = readFileSync(join(__dirname, "../../src/inference/on-device.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
+  it("createVisionEngine에 projectorOnGpu를 iOS 여부로 넘긴다", () => {
+    expect(code).toMatch(/projectorOnGpu:\s*!isIOS\(\)/);
+  });
+
+  it("iOS 판정은 호출 시점 require로 한다 — jest(node)에서는 거짓으로 떨어진다 (062 D4 선례)", () => {
+    expect(code).toMatch(/function isIOS\(\)[\s\S]*?require\("react-native"\)[\s\S]*?catch/);
   });
 });
