@@ -70,6 +70,7 @@ async function renderHome(pipeline: Pipeline, resolve = resolveQuiet) {
   const store = memoryStore();
   await renderWithPortal(
     <DiaryHomeScreen
+      barLockMs={0}
       now={() => NOW}
       pipeline={pipeline}
       resolution={resolved}
@@ -216,6 +217,7 @@ describe("FR-024 — 쓰기 시작 전 no-ready-character는 그대로다", () =
     const store = memoryStore();
     await renderWithPortal(
       <DiaryHomeScreen
+        barLockMs={0}
         now={() => NOW}
         onRedownload={onRedownload}
         pipeline={scriptedPipeline()}
@@ -241,6 +243,7 @@ describe("FR-024 — 쓰기 시작 전 no-ready-character는 그대로다", () =
     const onRedownload = jest.fn(async () => true);
     await renderWithPortal(
       <DiaryHomeScreen
+        barLockMs={0}
         now={() => NOW}
         onRedownload={onRedownload}
         pipeline={scriptedPipeline()}

@@ -81,6 +81,7 @@ beforeEach(() => {
 async function renderHome(store: DiaryStore, pipeline: Pipeline, stop = jest.fn(async () => {})) {
   await renderWithPortal(
     <DiaryHomeScreen
+      barLockMs={0}
       now={() => NOW}
       pipeline={pipeline}
       resolution={resolved}

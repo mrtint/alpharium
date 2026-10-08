@@ -844,8 +844,10 @@
 - **일기의 사본 경로는 절대 경로로 저장된다** — iOS는 업데이트마다 컨테이너 UUID가 바뀌어 옛 일기의 사진이 「이제 없어요」가 된다. 저장 형식은 두고 `fileStore.load()`가
   `rehomeResizedPath()`(`src/diary/photo-path.ts`)로 지금 자리에 옮긴다(`FileSystemPort.documentDirectory?`). 리사이즈를 건너뛴 원본 경로(013 C1)는 손대지 않는다.
   **`VISION_CACHE_DIRECTORY`의 자리는 이제 `diary/photo-path.ts`다**(`on-device.ts`는 재export).
-- **iOS 권한 문구는 `app.json`의 플러그인 옵션이 유일한 자리다** — 안 주면 "Allow Pocketlog to access your photos" 영어 기본값이 권한 창에 그대로 뜬다. 사진 저장·항상 위치·
-  모션은 `false`로 키 자체를 뺐다(`__tests__/config/ios-permissions.test.ts`). 생성된 `ios/Pocketlog/Info.plist`의 `UsageDescription`으로 확인한다.
+- **iOS 권한 문구는 `app.json`의 플러그인 옵션이 유일한 자리다** — 안 주면 "Allow Pocketlog to access your photos" 영어 기본값이 권한 창에 그대로 뜬다. 사진 저장·항상 위치는
+  `false`로 키 자체를 뺐다(`__tests__/config/ios-permissions.test.ts`). 생성된 `ios/Pocketlog/Info.plist`의 `UsageDescription`으로 확인한다.
+  **★ 모션(`NSMotionUsageDescription`)은 빼면 안 된다** — 빌드 1이 업로드는 통과하고 **처리 단계에서 ITMS-90683으로 거부**됐다(메일로만 온다, TestFlight 목록에는 아무것도 안 뜬다).
+  앱은 모션을 안 쓰지만 `expo-location`이 CoreMotion API를 참조해 Apple 정적 검사가 문구를 요구한다. `altool --validate-app`은 이것을 못 잡는다.
 - **iOS 기본 줄바꿈은 글자 단위다** — 「처음 뵙겠습/니다.」. `AppText`가 `lineBreakStrategyIOS="hangul-word"`를 기본으로 준다. 작명 화면은 키보드가 뜨면 버튼 줄이 키보드 뒤라
   리턴 키(`returnKeyType="done"`·`onSubmitEditing`)가 버튼과 같은 규칙으로 확정한다.
 - **앱 아이콘은 자리표시자다**(토큰 색의 빨간 사각형 + 「P」, `assets/icon.png`) — Expo 기본 아이콘이 iOS에 그대로 나왔다. 안드로이드 adaptive icon도 아직 Expo 기본이다(미교체).
@@ -858,6 +860,16 @@
 - **재설치로 컨테이너 UUID가 실제로 바뀌었고**(`C1CE7ED7…` → `2150CF50…`) 옛 경로가 남은 일기의 사진이 `rehomeResizedPath`로 정상 표시됐다. 그 뒤 iOS 한정 `projectorOnGpu`로 바꾼
   번들에서 「다시 쓰기」가 두 번 연속 `photos`(사진 읽기) 실패로 기록된 뒤(09:01·09:05, 크래시 없음, 원인 미상 — 그 프로세스는 Metro 재시작 뒤 홈 화면으로 튕겼다 돌아온 상태였다)
   앱을 다시 띄우니 두 번 연속 저장됐다(`isIOS()` 참, 캡션 `seen`). **같은 프로세스에서 Metro를 다시 띄웠으면 앱도 다시 띄운다.**
+- **★ `await import("react-native")`는 iOS에서 앱을 죽인다**(TestFlight 빌드 2 — 설정의 권한·배터리 행을 누르는 즉시 종료). Metro의 동적 import는 index의 모든
+  export getter를 훑고(`metroImportAll`), `PushNotificationIOS` getter가 네이티브 모듈 없이 `new NativeEventEmitter()`를 만들다 던진다. 그 예외는 모듈 로드 가드가
+  fatal로 보고해 **호출부의 try/catch를 지나친다**(Release는 SIGABRT, 크래시 보고서 없이 SpringBoard 로그에만 남는 경우가 있다). `react-native`는 호출 시점
+  `require`로 읽는다(`os-settings-port.ts`·`battery-exception-port.ts`; 계약 테스트가 동적 import를 막는다). 안드로이드는 그 getter가 던지지 않아 드러나지 않았다.
+- **★ iOS Hermes의 `formatToParts`는 `GMT+9`의 「9」를 `minute`으로 돌려준다** — dayjs 시간대 플러그인이 시간대 차이를 `+09:09`로 재고, datepicker의 `onChange`가
+  주는 「그 날의 자정」이 전날 23:51이 된다(달력에서 5일을 누르면 4일이 골라졌다). `dayDateFromPicker()`가 Date를 가장 가까운 로컬 자정의 날로 읽는다(반나절을 더해
+  `dayOf`). 칸에 그려지는 날(dayjs `format`)은 처음부터 옳았다 — 어긋난 것은 `onChange`의 Date뿐이다.
+- **하단 바는 쓰기·그만두기 직후 `WRITING.barLockMs`(1.5초) 동안 잠긴다**(흐리고 눌리지 않음, 2026-10-08 저장소 소유자 지시). 화면 버튼만 막는다 — 자동 쓰기·진단
+  쓰기 요청·지우기는 바를 거치지 않는다. 잠금과 무관한 화면 테스트는 `barLockMs={0}`으로 끄고, `bar-lock.test.tsx`만 켠다. Maestro 흐름이 쓰기 직후 `stop-button`을
+  누르면 무시될 수 있다.
 - **미확인**: 다운로드 실패 화면(계약 테스트로만), 위 `photos` 실패 2건의 원인, 설정·개발자·진단 화면, 글꼴 배율. 안드로이드는 이번 변경(내려받기 실패 처리·리턴 키 확정·
   사본 경로 옮기기)을 실기기로 다시 보지 않았다.
 
@@ -1046,7 +1058,8 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 - **업로드는 사람의 터미널에서 돌린다** — `-p @keychain:AC_PASSWORD`는 처음 읽을 때 macOS 키체인 「허용」 창이 뜨는데, 화면 없는 셸(에이전트)에서는 창을 못 띄워
   `Failed to find item AC_PASSWORD … in keychain`으로 떨어진다. 앱 암호 저장은 Xcode 26 altool이 도움말과 달리 `--item`을 요구한다:
   `xcrun altool --store-password-in-keychain-item --item AC_PASSWORD -u <Apple ID> -p <앱 암호>`(앱 암호는 appleid.apple.com이 발급하는 값, 임의로 못 정한다).
-- **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널). 다음 업로드는 `ios.buildNumber`를 먼저 올린다(저장소는 2로 올려 두었다).
+- **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널) — **처리 단계에서 ITMS-90683(모션 문구 없음)으로 거부**됐다. 같은 날 빌드 2에 문구를 넣어 다시 올렸다.
+  **업로드 성공 ≠ 처리 통과** — 「has one or more issues」 메일을 기다려 본다. 다음 업로드는 `ios.buildNumber`를 먼저 올린다.
 
 ### 다른 맥에서 올리려면
 

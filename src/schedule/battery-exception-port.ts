@@ -50,7 +50,9 @@ export function expoBatteryExceptionPort(): BatteryExceptionPort {
 /** 인텐트가 통하지 않는 기기의 마지막 수단 — 앱 설정 화면을 연다. */
 async function openAppSettingsFallback(): Promise<void> {
   try {
-    const { Linking } = await import("react-native");
+    // `await import`가 아니다 — iOS에서 앱이 죽는다(066, `os-settings-port.ts` 머리말).
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Linking } = require("react-native") as { Linking: { openSettings(): Promise<void> } };
     await Linking.openSettings();
   } catch {
     // 여기서도 실패하면 할 수 있는 게 없다 — 조용히 넘어간다.

@@ -81,4 +81,11 @@ describe("기기 통로 — 지연 import", () => {
   it("모듈 최상단에서 정적 import하지 않는다", () => {
     expect(CODE).not.toMatch(/^import .* from ["']expo-intent-launcher["']/m);
   });
+
+  // 066 — `import("react-native")`는 Metro가 index의 모든 getter를 훑어(`metroImportAll`)
+  // iOS에서 `PushNotificationIOS`가 던지고, 그 예외는 try/catch를 지나쳐 앱을 죽인다.
+  it("react-native는 동적 import가 아니라 호출 시점 require로 읽는다", () => {
+    expect(CODE).not.toMatch(/import\(\s*["']react-native["']\s*\)/);
+    expect(CODE).toMatch(/require\(\s*["']react-native["']\s*\)/);
+  });
 });

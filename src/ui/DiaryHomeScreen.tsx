@@ -239,6 +239,11 @@ export type DiaryHomeScreenProps = {
    */
   writeBlocked?: boolean;
   onWriteBlocked?: () => void;
+  /**
+   * 쓰기·그만두기 뒤 하단 바를 잠가 두는 시간(ms). 안 주면 `WRITING.barLockMs`. 0이면 잠그지 않는다 — 잠금과 무관한
+   * 것을 보는 테스트가 기다리지 않게 하는 자리다.
+   */
+  barLockMs?: number;
   /** 064 — 흉내가 켜졌을 때만 온다. 월 라벨 옆 DEV 꼬리표(누르면 개발자 화면)와 회색 쓰기 바를 그린다 */
   simulation?: { onOpenDeveloper: () => void };
   /** 064 — 「실패 토스트 보기」. 켜져 있으면 홈이 다시 보일 때(마운트·덮개가 걷힐 때)마다 054 토스트를 한 번 올린다 */
@@ -304,6 +309,7 @@ export function DiaryHomeScreen({
   recordFailure,
   writeBlocked = false,
   onWriteBlocked,
+  barLockMs = WRITING.barLockMs,
   simulation,
   simulatedFailToast = false,
 }: DiaryHomeScreenProps) {
@@ -315,6 +321,28 @@ export function DiaryHomeScreen({
    * 뜬다. 새 쓰기·날 바꿈에서 즉시 비운다(FR-018).
    */
   const [toast, setToast] = useState<{ id: number; kind: ToastKind } | null>(null);
+  /**
+   * 하단 바의 잠깐 잠금 — 쓰기를 시작한 직후의 「그만두기」, 그만둔 직후의 「일기 쓰기」가 `WRITING.barLockMs` 동안
+   * 눌리지 않는다(연달아 눌러 쓰기·멈춤이 되풀이되지 않게). 화면 버튼만 막는다 — 자동 쓰기·진단 쓰기 요청·지우기는
+   * 바를 거치지 않는다.
+   */
+  const [barLocked, setBarLocked] = useState(false);
+  const barLockTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lockBar = useCallback(() => {
+    if (barLockMs <= 0) return;
+    if (barLockTimer.current !== null) clearTimeout(barLockTimer.current);
+    setBarLocked(true);
+    barLockTimer.current = setTimeout(() => {
+      barLockTimer.current = null;
+      setBarLocked(false);
+    }, barLockMs);
+  }, [barLockMs]);
+  useEffect(
+    () => () => {
+      if (barLockTimer.current !== null) clearTimeout(barLockTimer.current);
+    },
+    [],
+  );
   const toastId = useRef(0);
 
   /**
@@ -741,6 +769,7 @@ export function DiaryHomeScreen({
       setWritingItems(items);
       setWritingName(nameOf(params.character, characterNames));
       setScreen({ kind: "writing" });
+      lockBar();
       running.current = true;
       cancelled.current = false;
 
@@ -806,7 +835,7 @@ export function DiaryHomeScreen({
     },
     // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
     // 생성·독백이 돈다(조용히 틀리는 결함).
-    [pipeline, now, onGenerated, characterNames, refresh, recordFailure],
+    [pipeline, now, onGenerated, characterNames, refresh, recordFailure, lockBar],
   );
 
   /**
@@ -1007,9 +1036,12 @@ export function DiaryHomeScreen({
 
   const cancel = useCallback(async () => {
     cancelled.current = true;
+    lockBar();
     await stop?.().catch(() => {});
     setScreen(toList(await refresh()));
-  }, [stop, refresh]);
+    // 멈추는 데 걸린 시간만큼 잠금이 먼저 풀리지 않게 — 쓰기 바가 돌아온 순간부터 다시 센다.
+    lockBar();
+  }, [stop, refresh, lockBar]);
 
   /**
    * 058 — 설정의 「일기 모두 지우기」 요청에 응답한다(research R1, HS1~HS5).
@@ -1092,6 +1124,7 @@ export function DiaryHomeScreen({
               onSelectDay={setChosenDay}
               onRequestPhoto={() => void requestPhoto()}
               onDismissToast={() => setToast(null)}
+              barLocked={barLocked}
               onStop={() => void cancel()}
               onSwipe={onSwipe}
               onWrite={() => void write()}

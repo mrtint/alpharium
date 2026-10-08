@@ -135,6 +135,12 @@ export const WRITING = {
   /** 혼잣말 교체 간격·페이드 (ms) */
   rotateMs: 4000,
   fadeMs: 250,
+  /**
+   * 쓰기 ↔ 그만두기를 누른 뒤 하단 바가 다시 눌리기까지 (ms) — 연달아 눌러 쓰기·멈춤이 되풀이되지 않게.
+   * 잠긴 동안 바는 `barLockedOpacity`로 흐리다.
+   */
+  barLockMs: 1500,
+  barLockedOpacity: 0.35,
 } as const;
 
 /**

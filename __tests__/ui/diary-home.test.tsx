@@ -123,6 +123,7 @@ async function renderHome(
   const store = memoryStore();
   await render(
     <DiaryHomeScreen
+      barLockMs={0}
       pipeline={options.pipeline}
       resolution={resolved}
       resolve={options.resolve ?? resolveQuiet()}
@@ -368,6 +369,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     const store = memoryStore();
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         now={at}
         pipeline={pipeline}
         resolution={resolved}
@@ -436,6 +438,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
     // 050 — 확인은 홈 위의 대화상자다(포털). 호스트와 함께 그린다.
     await renderWithPortal(
       <DiaryHomeScreen
+        barLockMs={0}
         now={at}
         pipeline={pipeline}
         resolution={resolved}
@@ -473,6 +476,7 @@ describe("★ 009 — 고른 하루가 생성까지 간다 (W-T1~W-T4)", () => {
 
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         now={() => current}
         pipeline={pipeline}
         resolution={resolved}
@@ -532,6 +536,7 @@ describe("029 — 자동 판정한 사진 설정이 파이프라인까지 간다
       const seen: PipelineInput[] = [];
       await render(
         <DiaryHomeScreen
+          barLockMs={0}
           pipeline={recordingPipeline(seen)}
           resolution={resolved}
           resolve={resolveQuiet({ hasPhotos })}
@@ -549,6 +554,7 @@ describe("029 — 자동 판정한 사진 설정이 파이프라인까지 간다
   it("★ 029 — 홈 화면에 사진 설정 선택기가 없다 (FR-001·006)", async () => {
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={hangingPipeline()}
         resolution={resolved}
         resolve={resolveQuiet()}
@@ -589,6 +595,7 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
   async function writeWith(pipeline: Pipeline) {
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={pipeline}
         resolution={resolved}
         resolve={resolveQuiet()}
@@ -922,6 +929,7 @@ describe("018 — prepare()/release() 트리거", () => {
     const prepared: string[] = [];
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={hangingPipeline()}
         prepare={async (character) => {
           prepared.push(character);
@@ -943,6 +951,7 @@ describe("018 — prepare()/release() 트리거", () => {
     {
       await render(
         <DiaryHomeScreen
+          barLockMs={0}
           pipeline={hangingPipeline()}
           prepare={async (character) => {
             prepared.push(character);
@@ -964,6 +973,7 @@ describe("018 — prepare()/release() 트리거", () => {
     const prepared: string[] = [];
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={hangingPipeline()}
         prepare={async (character) => {
           prepared.push(character);
@@ -984,6 +994,7 @@ describe("018 — prepare()/release() 트리거", () => {
     };
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={pipeline}
         resolution={resolved}
         resolve={resolveQuiet()}
@@ -1008,6 +1019,7 @@ describe("018 — prepare()/release() 트리거", () => {
     let released = false;
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={hangingPipeline()}
         release={async () => {
           released = true;
@@ -1042,6 +1054,7 @@ describe("018 — prepare()/release() 트리거", () => {
     const pipeline = hangingPipeline();
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         pipeline={pipeline}
         release={async () => {
           released = true;
@@ -1108,6 +1121,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
 
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         captionDay={captionDay as never}
         now={at}
         pipeline={recordingPipeline()}
@@ -1145,6 +1159,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
 
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         captionDay={captionDay as never}
         now={at}
         pipeline={pipeline}
@@ -1173,6 +1188,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
 
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         captionDay={captionDay as never}
         now={at}
         pipeline={pipeline}
@@ -1226,6 +1242,7 @@ describe("018 — captionDay 순서·재사용·폐기", () => {
 
     await render(
       <DiaryHomeScreen
+        barLockMs={0}
         captionDay={captionDay as never}
         now={at}
         pipeline={pipeline}
@@ -1279,6 +1296,7 @@ describe("050 — 날짜로 이동 (CAL1·CAL7)", () => {
       );
     await renderWithPortal(
       <DiaryHomeScreen
+        barLockMs={0}
         now={() => NOW}
         resolution={resolved}
         resolve={resolveQuiet()}

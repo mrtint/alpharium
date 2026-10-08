@@ -40,12 +40,17 @@ describe("066 — iOS 권한 문구", () => {
     expect(optionsOf("expo-media-library").savePhotosPermission).toBe(false);
   });
 
-  it("위치 권한은 「앱을 사용하는 동안」 하나뿐이다 — 항상·모션 문구는 넣지 않는다", () => {
+  it("위치 권한은 「앱을 사용하는 동안」 하나뿐이다 — 항상 문구는 넣지 않는다", () => {
     const location = optionsOf("expo-location");
     expect(location.locationWhenInUsePermission).toMatch(HANGUL);
     expect(location.locationAlwaysAndWhenInUsePermission).toBe(false);
     expect(location.locationAlwaysPermission).toBe(false);
-    expect(location.motionUsagePermission).toBe(false);
+  });
+
+  // 066 빌드 1이 ITMS-90683으로 거부됐다 — 앱은 모션을 안 쓰지만 `expo-location`이 CoreMotion API를
+  // 참조하므로 Apple 정적 검사가 NSMotionUsageDescription을 요구한다. 키를 빼면(false) 업로드 뒤 거부된다.
+  it("모션 문구는 한국어로 둔다 — 빼면 App Store Connect 처리에서 ITMS-90683으로 거부된다", () => {
+    expect(optionsOf("expo-location").motionUsagePermission).toMatch(HANGUL);
   });
 });
 

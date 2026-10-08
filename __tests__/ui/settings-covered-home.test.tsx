@@ -85,6 +85,7 @@ const store = memoryStore();
 function home({ pipeline, covered, names, stop, resolve }: Props) {
   return (
     <DiaryHomeScreen
+      barLockMs={0}
       characterNames={names}
       covered={covered}
       now={NOW}
