@@ -145,9 +145,21 @@ export type VisionLoader = (modelPath: string) => Promise<VisionContext>;
  * `loader`를 주입받아 기기 없이도 규칙(E2~E4)을 검증할 수 있게 한다 — 005의
  * `createLlamaEngine`, 003·004의 포트 주입과 같은 구조다.
  */
+export type VisionEngineOptions = {
+  /**
+   * 066 — mmproj를 GPU에 둘 것인가. **주지 않으면 라이브러리 기본값 그대로**(`use_gpu`를 보내지
+   * 않는다) — 안드로이드의 캡션 실측(013·023)이 그 기본값으로 쟀기 때문에 손대지 않는다.
+   * iOS만 `false`다(`on-device.ts`): 시뮬레이터의 Metal 로더가 앱을 죽였고(`clip_model_loader::
+   * load_tensors` → `_xpc_api_misuse`) 실기기도 llama.rn #176이 `use_gpu: false`를 우회로 적었다.
+   * `initLlama`와 달리 `initMultimodal`에는 llama.rn의 시뮬레이터 가드가 없다(RNLlamaJSI.cpp).
+   */
+  projectorOnGpu?: boolean;
+};
+
 export function createVisionEngine(
   loader: VisionLoader,
   resolvePath: (key: string) => Promise<string> = modelFilePath,
+  options: VisionEngineOptions = {},
 ): VisionEngine {
   /** 지금 열려 있는 것. **하나뿐이다** */
   let context: VisionContext | null = null;
@@ -182,14 +194,11 @@ export function createVisionEngine(
 
       try {
         // ★ mmproj를 붙인다. **이것이 없으면 사진을 못 본다.**
-        // 066 — **GPU를 쓰지 않는다.** 기본값(`use_gpu: true`)이 iOS 시뮬레이터의 Metal 드라이버
-        // 안에서 앱을 죽였다(`clip_model_loader::load_tensors` → `lm_ggml_metal_buffer_set_tensor`
-        // → `_xpc_api_misuse`, 2026-10-08). 본문 모델이 `n_gpu_layers: 0`인 것(`llama-port.ts`)과
-        // 같은 결정이다 — 실제 iPhone에서 GPU 경로가 서는지는 재지 않았다(원칙 V).
+        // 066 — `projectorOnGpu`를 받았을 때만 `use_gpu`를 보낸다(`VisionEngineOptions` 주석).
         await opened.initMultimodal({
           path: projectorPath,
           image_max_tokens: IMAGE_TOKENS[depth],
-          use_gpu: false,
+          ...(options.projectorOnGpu === undefined ? {} : { use_gpu: options.projectorOnGpu }),
         });
 
         // ★ 물어본다 — 짐작하지 않는다(V2, 원칙 V).

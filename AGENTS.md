@@ -832,7 +832,8 @@
   본문·제목 → 저장 → 쓴 날 홈(약 50초). **안 보는 것**: 백그라운드 자동 쓰기(시뮬레이터가 BGTask를 스케줄하지 않는다), 실제 iPhone의 메모리·속도, release·서명·TestFlight.
 - **★ `initMultimodal`의 기본값(`use_gpu: true`)이 시뮬레이터 Metal 드라이버 안에서 앱을 죽인다** — `clip_model_loader::load_tensors` → `lm_ggml_metal_buffer_set_tensor`
   → `_xpc_api_misuse`(SIGTRAP). JS에는 아무것도 안 오고 앱이 홈 화면으로 사라진다(크래시 보고서는 `~/Library/Logs/DiagnosticReports/Pocketlog-*.ips`). `use_gpu: false`로
-  고정했다(`vision-port.ts`, engine.test.ts가 잠근다) — 본문 모델의 `n_gpu_layers: 0`과 같은 결정. **근거(2026-10-08 조사)**: llama.rn README가 「iOS 시뮬레이터는 Metal 미지원」을
+  고정했다 — **iOS에서만**(`on-device.ts`가 `createVisionEngine`에 `projectorOnGpu: !isIOS()`를 넘기고, 안드로이드는 `use_gpu`를 보내지 않아 라이브러리 기본값 그대로다 —
+  013·023의 안드로이드 캡션 실측이 그 기본값으로 쟀으므로 손대지 않는다; engine.test.ts·on-device.test.ts가 잠근다). 본문 모델의 `n_gpu_layers: 0`과 같은 결정. **근거(2026-10-08 조사)**: llama.rn README가 「iOS 시뮬레이터는 Metal 미지원」을
   명시하고 `initLlama`는 네이티브가 `TARGET_OS_SIMULATOR`에서 `n_gpu_layers`를 0으로 꺾지만(`RNLlamaJSI.cpp` `getMetalAvailability`), **`initMultimodal`의 `use_gpu`는
   그 가드 없이 그대로 `mtmd`로 간다**(`RNLlamaJSI.cpp` 1910행 → `rn-llama.cpp` 722행) — 시뮬레이터 크래시는 llama.rn의 빈 구멍이다. 실기기도 안전하지 않다: llama.rn
   #176(iPhone 15 Pro Max, iOS 18.5/26, Gemma 3 4B)에서 `use_gpu: true`가 「Failed to evaluate chunks」로 실패했고 우회가 `use_gpu: false`였다(미해결로 닫힘). 그 실패는
@@ -854,7 +855,11 @@
   `UnableToDownloadException: … TLS 오류`. 화면 조작은 Maestro(`brew install mobile-dev-inc/tap/maestro`, `JAVA_HOME`을 Homebrew openjdk로 줘야 뜬다)로
   `maestro --device <UDID> test <flow>`. 사진은 `xcrun simctl addmedia <UDID> *.jpg`로 넣되 **EXIF 촬영일이 있으면 그 날로 들어간다** — 오늘로 넣으려면 EXIF를 걷어낸 JPEG
   (`sips -s format bmp` → 다시 jpeg). 앱 데이터는 `xcrun simctl get_app_container <UDID> com.a810labs.pocketlog data` 아래 `Documents/`(일기·모델·preferences 모두).
-- **미확인**: 다운로드 실패 화면(계약 테스트로만), 재설치 뒤 사본 경로 복원(코드 추정), 설정·개발자·진단 화면, 글꼴 배율.
+- **재설치로 컨테이너 UUID가 실제로 바뀌었고**(`C1CE7ED7…` → `2150CF50…`) 옛 경로가 남은 일기의 사진이 `rehomeResizedPath`로 정상 표시됐다. 그 뒤 iOS 한정 `projectorOnGpu`로 바꾼
+  번들에서 「다시 쓰기」가 두 번 연속 `photos`(사진 읽기) 실패로 기록된 뒤(09:01·09:05, 크래시 없음, 원인 미상 — 그 프로세스는 Metro 재시작 뒤 홈 화면으로 튕겼다 돌아온 상태였다)
+  앱을 다시 띄우니 두 번 연속 저장됐다(`isIOS()` 참, 캡션 `seen`). **같은 프로세스에서 Metro를 다시 띄웠으면 앱도 다시 띄운다.**
+- **미확인**: 다운로드 실패 화면(계약 테스트로만), 위 `photos` 실패 2건의 원인, 설정·개발자·진단 화면, 글꼴 배율. 안드로이드는 이번 변경(내려받기 실패 처리·리턴 키 확정·
+  사본 경로 옮기기)을 실기기로 다시 보지 않았다.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
