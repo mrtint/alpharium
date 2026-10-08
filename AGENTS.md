@@ -1043,6 +1043,19 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 - **Release는 `NODE_ENV`를 셸에서 줄 필요가 없다** — Xcode의 「Bundle React Native code and images」 단계가 `export:embed`로 번들하며 `.env.development*`는 싣지 않는다(실측: Release
   시뮬레이터 앱 번들에 `localhost:8080`이 0건, Metro 없이 홈이 뜨고 설정에 「개발자」 행이 없다). 서명 없는 Release 아카이브(`CODE_SIGNING_ALLOWED=NO`)는 약 10분, 45MB.
 - EAS Build/Submit(`eas-cli`)은 이 저장소가 안 쓴다(안드로이드도 로컬 gradle).
+- **업로드는 사람의 터미널에서 돌린다** — `-p @keychain:AC_PASSWORD`는 처음 읽을 때 macOS 키체인 「허용」 창이 뜨는데, 화면 없는 셸(에이전트)에서는 창을 못 띄워
+  `Failed to find item AC_PASSWORD … in keychain`으로 떨어진다. 앱 암호 저장은 Xcode 26 altool이 도움말과 달리 `--item`을 요구한다:
+  `xcrun altool --store-password-in-keychain-item --item AC_PASSWORD -u <Apple ID> -p <앱 암호>`(앱 암호는 appleid.apple.com이 발급하는 값, 임의로 못 정한다).
+- **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널). 다음 업로드는 `ios.buildNumber`를 먼저 올린다(저장소는 2로 올려 두었다).
+
+### 다른 맥에서 올리려면
+
+1. `~/.pocketlog-signing/ios/` 통째로 옮긴다(`distribution.key`·`.cer`·`.mobileprovision`). 옮기기 쉽게 한 파일로 묶으려면 `openssl pkcs12 -export -inkey distribution.key -in distribution.cer
+   -out distribution.p12`(비밀번호는 그때 정한다) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
+2. 받는 맥 키체인에 **WWDR G3**를 넣고(위), 프로파일을 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`에 둔다. `security find-identity -v -p codesigning`에 valid 1개.
+3. Xcode(26 기준 실측)·CocoaPods(`brew install cocoapods`)·Node 20+. `~/.netrc`가 644면 `NETRC=<빈 디렉터리>`.
+4. 앱 암호를 그 맥 키체인에 다시 저장한다(위 `--item` 명령; 암호 자체는 Apple ID에 묶여 어디서나 같다).
+5. `app.json`의 `ios.buildNumber`를 올리고 커밋 → 위 「빌드」 세 줄 → 사람의 터미널에서 `--validate-app` → `--upload-app`.
 
 ### 확인 — 빌드 성공을 믿지 않는다
 
