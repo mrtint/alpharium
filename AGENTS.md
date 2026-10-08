@@ -1016,7 +1016,10 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
   약 10분, 산출물 45MB), **Release 설정(Metro 없이, `export:embed` 번들)으로 시뮬레이터에서 홈·일기 쓰기가 돈다** — Hermes 바이트코드·minify에서 `llama.rn`·동적 `import`가 산다(안드로이드의 R8 걱정과 달리 실측).
 - **없음: 코드 서명 ID**(`security find-identity -v -p codesigning` → 0건). 키체인의 유일한 프로비저닝 프로파일은 Intune(Microsoft)이지 우리 것이 아니다. **Apple Developer Program 가입 상태와
   팀 `S6B8RQH6YQ`에서의 역할은 사람이 확인한다** — 인증서를 만들려면 그 팀의 Admin 이상이어야 한다.
-- **없음: App Store Connect 앱 레코드**(`com.a810labs.pocketlog`). 코드로 만들 수 없다 — 사람이 App Store Connect에서 만든다(이름 Pocketlog, 기본 언어 한국어, 번들 ID는 Certificates, Identifiers & Profiles에 먼저 등록).
+- **없음: App Store Connect 앱 레코드**(`com.a810labs.pocketlog`). 코드로 만들 수 없다. 두 길: (a) **Xcode Organizer가 첫 업로드 때 만든다**(Xcode 13+ — Distribute App → App Store Connect
+  → Upload에서 「Preparing app record」로 이름·SKU를 묻는다; 번들 ID는 자동 서명이 App ID로 등록해 준다) — 첫 업로드는 이 길로 간다, (b) App Store Connect > 나의 앱 > ＋에서 손으로
+  (번들 ID를 Certificates, Identifiers & Profiles > Identifiers에 먼저 등록). **＋ 버튼이 없으면** 유료 Apple Developer Program 가입이 없거나(무료 Apple ID로는 TestFlight 불가) 팀 역할이 Developer뿐인 것이다.
+  `xcodebuild -exportArchive … destination: upload`가 레코드를 만들어 주는지는 미확인 — 레코드가 생긴 뒤에만 쓴다.
 
 ### 선언 자리 (`app.json`, `__tests__/config/ios-permissions.test.ts`가 잠근다)
 
