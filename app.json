@@ -8,11 +8,14 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "appleTeamId": "S6B8RQH6YQ",
+      "appleTeamId": "PGNGG84B39",
       "bundleIdentifier": "com.a810labs.pocketlog",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.developer.kernel.increased-memory-limit": true
       }
     },
     "android": {
@@ -86,7 +89,8 @@
           "locationAlwaysPermission": false,
           "motionUsagePermission": false
         }
-      ]
+      ],
+      "./plugins/with-no-push-entitlement"
     ]
   }
 }

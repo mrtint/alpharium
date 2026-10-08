@@ -1010,41 +1010,39 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 **아이폰 배포물을 만드는 절차다.** 안드로이드 절차(위)와 같은 성격 — 기본 작업 흐름이 아니며 저장소 소유자가 그 세션에서 요청했을 때만 탄다.
 **실제 iPhone이 한 대도 없다**(2026-10-08) — 아래에서 「실측」이라 적은 것은 iPhone 17 시뮬레이터(iOS 26.5, Xcode 26.6)에서 본 것이고, 업로드·TestFlight 설치는 미실측이다.
 
-### 이 맥에 갖춰진 것 / 아직 없는 것
+### 서명 주체 — 개인 계정의 수동 서명 (2026-10-08 확정)
 
-- 갖춰짐: Xcode 26.6(`DEVELOPER_DIR`로 씀, `sudo xcode-select` 불필요), CocoaPods 1.17, `ios/` prebuild, **서명 없는 Release 아카이브가 성공한다**(`xcodebuild archive … CODE_SIGNING_ALLOWED=NO`,
-  약 10분, 산출물 45MB), **Release 설정(Metro 없이, `export:embed` 번들)으로 시뮬레이터에서 홈·일기 쓰기가 돈다** — Hermes 바이트코드·minify에서 `llama.rn`·동적 `import`가 산다(안드로이드의 R8 걱정과 달리 실측).
-- **없음: 코드 서명 ID**(`security find-identity -v -p codesigning` → 0건). 키체인의 유일한 프로비저닝 프로파일은 Intune(Microsoft)이지 우리 것이 아니다. **Apple Developer Program 가입 상태와
-  팀 `S6B8RQH6YQ`에서의 역할은 사람이 확인한다** — 인증서를 만들려면 그 팀의 Admin 이상이어야 한다.
-- **없음: App Store Connect 앱 레코드**(`com.a810labs.pocketlog`). 코드로 만들 수 없다. 두 길: (a) **Xcode Organizer가 첫 업로드 때 만든다**(Xcode 13+ — Distribute App → App Store Connect
-  → Upload에서 「Preparing app record」로 이름·SKU를 묻는다; 번들 ID는 자동 서명이 App ID로 등록해 준다) — 첫 업로드는 이 길로 간다, (b) App Store Connect > 나의 앱 > ＋에서 손으로
-  (번들 ID를 Certificates, Identifiers & Profiles > Identifiers에 먼저 등록). **＋ 버튼이 없으면** 유료 Apple Developer Program 가입이 없거나(무료 Apple ID로는 TestFlight 불가) 팀 역할이 Developer뿐인 것이다.
-  `xcodebuild -exportArchive … destination: upload`가 레코드를 만들어 주는지는 미확인 — 레코드가 생긴 뒤에만 쓴다.
+- **Apple 계정 구조**: 소유주 Hyunmin Lee 님의 **개인(Individual) Apple Developer Program**(팀 `PGNGG84B39`)이고, 저장소 소유자(`mrtint0729@gmail.com`)는 그 App Store
+  Connect의 **Admin**이다. 개인 가입은 팀원을 Developer Program 팀에 넣지 못하므로(Apple 「roles」: *"Certificates, Identifiers & Profiles is only available to Account Holders and
+  members of an organization's team"*) **Xcode 자동 서명이 안 된다** — Accounts에는 `Hyunmin Lee|208773025|1`로 보이지만 Signing의 Team 드롭다운에는 안 뜬다. App Store Connect
+  쪽(앱 레코드·TestFlight·업로드)은 Admin 권한으로 된다. `app.json`의 옛 `S6B8RQH6YQ`는 8월 다른 맥의 Personal Team이었다.
+- **그래서 수동 서명이다.** 이 맥에서 만든 CSR로 소유주가 발급한 **Apple Distribution 인증서** + **App Store 프로파일 「Pocketlog App Store」**(App ID `com.a810labs.pocketlog`,
+  entitlement는 `increased-memory-limit` 하나)를 쓴다. 파일은 **저장소 밖** `~/.pocketlog-signing/ios/`(`distribution.key`·`distribution.cer`·`Pocketlog_App_Store.mobileprovision`;
+  키는 600). 인증서 만료 2027-10-08 — 그때 CSR을 다시 보낸다. **`distribution.key`를 잃으면 인증서도 못 쓴다**(안드로이드 `pocketlog.jks`와 같이 밖에 백업).
+- **키체인 설치**(한 번): `security import distribution.key -k ~/Library/Keychains/login.keychain-db -T /usr/bin/codesign`, `security import distribution.cer …`, 그리고
+  **Apple WWDR G3 중간 인증서**(`https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer`)도 넣어야 `security find-identity -v -p codesigning`에 **valid**로 선다(없으면 0 valid).
+  **프로파일은 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/<UUID>.mobileprovision`에 둔다** — 옛 자리 `~/Library/MobileDevice/Provisioning Profiles`는 이 맥에서 root 소유(MDM)라 못 쓴다.
+- **entitlements는 프로파일과 정확히 같아야 한다.** `expo-notifications` 플러그인이 넣는 `aps-environment`(원격 푸시, 이 앱은 안 쓴다)가 남아 있으면
+  `Provisioning profile … doesn't include the aps-environment entitlement`로 아카이브가 실패한다 → `plugins/with-no-push-entitlement.js`가 **plugins 맨 마지막에서** 걷는다.
+  llama.rn의 `enableEntitlements`는 `extended-virtual-addressing`까지 둘을 넣으므로 꺼 두고 `ios.entitlements`에 `increased-memory-limit`만 직접 선언한다(`__tests__/config/ios-permissions.test.ts`).
+- **App Store Connect 앱 레코드**(`com.a810labs.pocketlog`)는 Admin이 App Store Connect > 나의 앱 > ＋에서 만들거나, Xcode Organizer 첫 업로드가 만든다(Xcode 13+).
 
-### 선언 자리 (`app.json`, `__tests__/config/ios-permissions.test.ts`가 잠근다)
-
-- `ios.buildNumber` — **TestFlight에 올릴 때마다 1 올린다**(안드로이드 `versionCode`와 같은 규칙, 같은 번호는 거부된다). 사람이 보는 버전은 `expo.version`.
-- `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` — 암호화 수출 문항을 미리 답한다(없으면 빌드마다 App Store Connect에서 손으로 답해야 TestFlight가 열린다).
-- 권한 문구는 플러그인 옵션(위 066 조각). `ios/`는 생성물이라 **선언을 바꾸면 `npx expo prebuild --platform ios`를 다시 돌려야 Info.plist에 들어간다**(`PlistBuddy -c "Print :CFBundleVersion" ios/Pocketlog/Info.plist`로 확인).
-
-### 빌드 (서명은 Xcode 자동 서명에 맡긴다)
+### 빌드
 
 ```
-npx expo prebuild --platform ios --clean          # ios/를 통째로 다시 만든다
-NETRC=<빈 디렉터리> pod install                   # ~/.netrc가 644면 prebuild의 pod install이 거부된다 (ios/에서)
+npx expo prebuild --platform ios --clean          # ~/.netrc가 644면 NETRC=<빈 디렉터리>를 앞에 준다
 xcodebuild -workspace ios/Pocketlog.xcworkspace -scheme Pocketlog -configuration Release \
   -sdk iphoneos -destination 'generic/platform=iOS' -archivePath build/Pocketlog.xcarchive archive \
-  -allowProvisioningUpdates DEVELOPMENT_TEAM=S6B8RQH6YQ
-xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsPlist ios/ExportOptions.plist \
-  -exportPath build/export -allowProvisioningUpdates
+  CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=PGNGG84B39 PROVISIONING_PROFILE_SPECIFIER="Pocketlog App Store" CODE_SIGN_IDENTITY="Apple Distribution"
+xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsPlist scripts/ios/ExportOptions.plist -exportPath build/export
 ```
 
-- `-allowProvisioningUpdates`가 Xcode에 로그인된 Apple 계정으로 인증서·프로파일을 만들어 받는다 — **Xcode > Settings > Accounts에 그 계정이 먼저 들어가 있어야 한다**(GUI, 사람이 한다). 계정이 없으면 `archive`가 서명 단계에서 선다.
-- `ExportOptions.plist`는 `method: app-store-connect`, `teamID: S6B8RQH6YQ`, `destination: upload`면 `-exportArchive`가 업로드까지 한다(Xcode 13+). 저장소에는 두지 않았다 — 첫 업로드 때 만들고 그때 커밋한다.
-- **Release는 `NODE_ENV`를 셸에서 줄 필요가 없다** — Xcode의 「Bundle React Native code and images」 단계가 `export:embed`로 번들하며 `.env.development*`는 싣지 않는다(실측: Release 시뮬레이터 앱 번들에 `localhost:8080`이 0건, Metro 없이 홈이 뜬다).
-  `.env.development.local`이 있어도 Release에는 안 들어간다.
-- 업로드 대안: Xcode > Product > Archive → Organizer → Distribute App → TestFlight & App Store(GUI). 또는 `xcrun altool --upload-app -f <ipa> -t ios --apiKey <ID> --apiIssuer <ID>`(App Store Connect API 키 필요).
-  EAS Build/Submit(`eas-cli`)은 이 저장소가 안 쓴다(안드로이드도 로컬 gradle) — 필요해지면 그때 정한다.
+- `scripts/ios/ExportOptions.plist`는 `method: app-store-connect`·`signingStyle: manual`·프로파일 매핑이고 **`destination: export`**다 — IPA까지만 만든다. 업로드는 사람이 확인한 뒤
+  따로 한다: Xcode Organizer(Distribute App → App Store Connect → Upload, 본인 Apple ID의 Admin 권한) 또는 `xcrun altool --upload-app -f build/export/Pocketlog.ipa -t ios
+  -u mrtint0729@gmail.com -p <앱 암호>`(appleid.apple.com의 앱 암호) 또는 App Store Connect API 키(`--apiKey/--apiIssuer`).
+- **Release는 `NODE_ENV`를 셸에서 줄 필요가 없다** — Xcode의 「Bundle React Native code and images」 단계가 `export:embed`로 번들하며 `.env.development*`는 싣지 않는다(실측: Release
+  시뮬레이터 앱 번들에 `localhost:8080`이 0건, Metro 없이 홈이 뜨고 설정에 「개발자」 행이 없다). 서명 없는 Release 아카이브(`CODE_SIGNING_ALLOWED=NO`)는 약 10분, 45MB.
+- EAS Build/Submit(`eas-cli`)은 이 저장소가 안 쓴다(안드로이드도 로컬 gradle).
 
 ### 확인 — 빌드 성공을 믿지 않는다
 

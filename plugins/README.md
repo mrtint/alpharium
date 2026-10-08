@@ -21,8 +21,11 @@
 - **`with-battery-exception.js`** — 알림 권한을 매니페스트에 선언한다. 이름과 달리
   배터리 예외 권한은 더 이상 넣지 않는다(065에서 Play 정책 때문에 걷었다).
 - **`with-force-light-theme.js`** — One UI 8.5+의 다크 모드에서 앱을 라이트로 고정한다(031).
+- **`with-no-push-entitlement.js`** — iOS entitlements에서 `expo-notifications`가 넣는 `aps-environment`(원격 푸시)를 걷는다(066).
+  배포 프로파일에 푸시 기능이 없어 남아 있으면 서명이 실패한다. **plugins 맨 마지막**에 둔다.
 
-셋 다 안드로이드 설정만 다룬다. 어느 플러그인을 쓰는지는 `app.json`의 `plugins`가 정한다.
+위 셋은 안드로이드, 마지막 하나는 iOS 설정이다. 어느 플러그인을 쓰는지는 `app.json`의 `plugins`가 정한다. iOS도 `ios/`가 gitignore된 생성물이라
+같은 규칙이다 — `npx expo prebuild --platform ios --clean` 뒤 `ios/Pocketlog/Pocketlog.entitlements`·`Info.plist`로 확인한다.
 
 ## 고친 뒤에 할 일
 

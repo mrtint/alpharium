@@ -14,7 +14,12 @@ type Plugin = string | [string, Record<string, unknown>];
 const APP = JSON.parse(readFileSync(join(__dirname, "../../app.json"), "utf8")) as {
   expo: {
     plugins: Plugin[];
-    ios: { buildNumber?: string; infoPlist?: Record<string, unknown> };
+    ios: {
+      appleTeamId?: string;
+      buildNumber?: string;
+      infoPlist?: Record<string, unknown>;
+      entitlements?: Record<string, unknown>;
+    };
   };
 };
 
@@ -56,5 +61,28 @@ describe("066 — TestFlight 업로드 선언", () => {
 
   it("ITSAppUsesNonExemptEncryption이 false다", () => {
     expect(APP.expo.ios.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(false);
+  });
+});
+
+/**
+ * 066 — 서명 주체는 Hyunmin Lee 님의 개인 Apple Developer 계정(팀 `PGNGG84B39`)이다. 인증서·App Store
+ * 프로파일(`Pocketlog App Store`)은 그 계정이 만들어 줬고 `~/.pocketlog-signing/ios/`에 있다 — 저장소에는 없다.
+ * 프로파일이 허용하는 entitlement는 `increased-memory-limit` 하나뿐이라, llama.rn 플러그인의
+ * `enableEntitlements`(extended-virtual-addressing까지 둘을 넣는다)는 꺼 두고 하나만 직접 선언한다 —
+ * 앱의 entitlements에 프로파일에 없는 키가 있으면 서명이 실패한다.
+ */
+describe("066 — iOS 서명 선언", () => {
+  it("appleTeamId가 프로파일의 팀(PGNGG84B39)이다", () => {
+    expect(APP.expo.ios.appleTeamId).toBe("PGNGG84B39");
+  });
+
+  it("increased-memory-limit entitlement를 app.json이 직접 선언한다 (2GB 모델 적재)", () => {
+    expect(APP.expo.ios.entitlements?.["com.apple.developer.kernel.increased-memory-limit"]).toBe(
+      true,
+    );
+  });
+
+  it("llama.rn 플러그인의 enableEntitlements는 꺼져 있다 (프로파일에 없는 키를 넣는다)", () => {
+    expect(optionsOf("llama.rn").enableEntitlements).toBe(false);
   });
 });
