@@ -860,6 +860,16 @@
 - **재설치로 컨테이너 UUID가 실제로 바뀌었고**(`C1CE7ED7…` → `2150CF50…`) 옛 경로가 남은 일기의 사진이 `rehomeResizedPath`로 정상 표시됐다. 그 뒤 iOS 한정 `projectorOnGpu`로 바꾼
   번들에서 「다시 쓰기」가 두 번 연속 `photos`(사진 읽기) 실패로 기록된 뒤(09:01·09:05, 크래시 없음, 원인 미상 — 그 프로세스는 Metro 재시작 뒤 홈 화면으로 튕겼다 돌아온 상태였다)
   앱을 다시 띄우니 두 번 연속 저장됐다(`isIOS()` 참, 캡션 `seen`). **같은 프로세스에서 Metro를 다시 띄웠으면 앱도 다시 띄운다.**
+- **★ `await import("react-native")`는 iOS에서 앱을 죽인다**(TestFlight 빌드 2 — 설정의 권한·배터리 행을 누르는 즉시 종료). Metro의 동적 import는 index의 모든
+  export getter를 훑고(`metroImportAll`), `PushNotificationIOS` getter가 네이티브 모듈 없이 `new NativeEventEmitter()`를 만들다 던진다. 그 예외는 모듈 로드 가드가
+  fatal로 보고해 **호출부의 try/catch를 지나친다**(Release는 SIGABRT, 크래시 보고서 없이 SpringBoard 로그에만 남는 경우가 있다). `react-native`는 호출 시점
+  `require`로 읽는다(`os-settings-port.ts`·`battery-exception-port.ts`; 계약 테스트가 동적 import를 막는다). 안드로이드는 그 getter가 던지지 않아 드러나지 않았다.
+- **★ iOS Hermes의 `formatToParts`는 `GMT+9`의 「9」를 `minute`으로 돌려준다** — dayjs 시간대 플러그인이 시간대 차이를 `+09:09`로 재고, datepicker의 `onChange`가
+  주는 「그 날의 자정」이 전날 23:51이 된다(달력에서 5일을 누르면 4일이 골라졌다). `dayDateFromPicker()`가 Date를 가장 가까운 로컬 자정의 날로 읽는다(반나절을 더해
+  `dayOf`). 칸에 그려지는 날(dayjs `format`)은 처음부터 옳았다 — 어긋난 것은 `onChange`의 Date뿐이다.
+- **하단 바는 쓰기·그만두기 직후 `WRITING.barLockMs`(1.5초) 동안 잠긴다**(흐리고 눌리지 않음, 2026-10-08 저장소 소유자 지시). 화면 버튼만 막는다 — 자동 쓰기·진단
+  쓰기 요청·지우기는 바를 거치지 않는다. 잠금과 무관한 화면 테스트는 `barLockMs={0}`으로 끄고, `bar-lock.test.tsx`만 켠다. Maestro 흐름이 쓰기 직후 `stop-button`을
+  누르면 무시될 수 있다.
 - **미확인**: 다운로드 실패 화면(계약 테스트로만), 위 `photos` 실패 2건의 원인, 설정·개발자·진단 화면, 글꼴 배율. 안드로이드는 이번 변경(내려받기 실패 처리·리턴 키 확정·
   사본 경로 옮기기)을 실기기로 다시 보지 않았다.
 
