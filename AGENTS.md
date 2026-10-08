@@ -1050,8 +1050,8 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 
 ### 다른 맥에서 올리려면
 
-1. `~/.pocketlog-signing/ios/` 통째로 옮긴다(`distribution.key`·`.cer`·`.mobileprovision`). 옮기기 쉽게 한 파일로 묶으려면 `openssl pkcs12 -export -inkey distribution.key -in distribution.cer
-   -out distribution.p12`(비밀번호는 그때 정한다) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
+1. `~/.pocketlog-signing/ios/` 통째로 옮긴다(`distribution.key`·`.cer`·`.mobileprovision`). 옮기기 쉽게 한 파일로 묶으려면 `openssl pkcs12 -export -inkey distribution.key -in distribution.pem
+   -out distribution.p12`(비밀번호는 그때 정한다; `.cer`는 DER라 바로 못 넣는다 — `distribution.pem`이 PEM 변환본) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
 2. 받는 맥 키체인에 **WWDR G3**를 넣고(위), 프로파일을 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`에 둔다. `security find-identity -v -p codesigning`에 valid 1개.
 3. Xcode(26 기준 실측)·CocoaPods(`brew install cocoapods`)·Node 20+. `~/.netrc`가 644면 `NETRC=<빈 디렉터리>`.
 4. 앱 암호를 그 맥 키체인에 다시 저장한다(위 `--item` 명령; 암호 자체는 Apple ID에 묶여 어디서나 같다).
