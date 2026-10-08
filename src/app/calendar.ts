@@ -66,6 +66,8 @@ export function isLatestYearPage(page: readonly number[], now: Date): boolean {
   return page[page.length - 1] === monthOf(dayOf(now)).year;
 }
 
+const HALF_DAY_MS = 12 * 60 * 60 * 1000;
+
 /** dayjs 객체의 필요한 부분만 — 이 파일이 dayjs를 import하지 않게 한다 */
 export type DayjsLike = { format(template: string): string };
 
@@ -76,11 +78,15 @@ export type DayjsLike = { format(template: string): string };
  *   `date: string`이라 적었지만 실제 값은 `generateCalendarDay()`가 넣은 dayjs다(구현 중 jest에서 실측,
  *   `utils.ts:562-580`). 기기 로컬 날짜로 `YYYY-MM-DD`를 뽑는다.
  * - 문자열(`'YYYY-MM-DD HH:mm'` 등) → 앞 10글자. 시간대 계산이 없다.
- * - `Date`(`onChange`가 주는 기기 로컬 자정) → `dayOf()`.
+ * - `Date`(`onChange`가 주는 「그 날의 자정」) → **가장 가까운 로컬 자정의 날**.
+ *   ★ 그 Date를 그대로 `dayOf()`에 넣지 않는다(066). datepicker는 누른 날을 dayjs 시간대 플러그인에
+ *   한 번 통과시키는데, iOS에서는 그 플러그인이 잰 시간대 차이가 몇 분 어긋나(실측: 서울이 `+09:09`)
+ *   자정이 전날 23:51로 온다 — 5일을 누르면 4일이 골라졌다. 반나절을 더해 그 날의 한낮으로 옮긴 뒤 읽는다.
+ *   하루 기준을 옮기는 것이 아니라 부정확한 자정을 바로잡는 것이다(경계는 여전히 `dayOf()` 하나).
  */
 export function dayDateFromPicker(value: string | Date | DayjsLike): DayDate {
   if (typeof value === "string") return value.slice(0, 10);
-  if (value instanceof Date) return dayOf(value);
+  if (value instanceof Date) return dayOf(new Date(value.getTime() + HALF_DAY_MS));
   return value.format("YYYY-MM-DD");
 }
 

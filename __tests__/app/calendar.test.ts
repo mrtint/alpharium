@@ -72,8 +72,14 @@ describe("CAL12 — 피커 날짜 변환과 가장 늦은 날", () => {
     expect(dayDateFromPicker("2026-09-28 00:00")).toBe("2026-09-28");
     expect(dayDateFromPicker("2016-03-15")).toBe("2016-03-15");
     expect(dayDateFromPicker(new Date(2026, 8, 28))).toBe("2026-09-28");
-    // 기기 로컬 자정 직전의 Date도 그 날이다(시간대를 따로 계산하지 않는다)
-    expect(dayDateFromPicker(new Date(2026, 8, 28, 23, 59))).toBe("2026-09-28");
+    // ★ 066 — `onChange`의 Date는 「그 날의 자정」인데 iOS에서는 몇 분 이르게 온다(실측: 10월 5일을
+    // 누르면 10월 4일 23:51). 가장 가까운 자정의 날로 읽는다 — 누른 숫자와 고른 날이 같아야 한다.
+    expect(dayDateFromPicker(new Date(2026, 9, 4, 23, 51))).toBe("2026-10-05");
+    expect(dayDateFromPicker(new Date(2026, 9, 5, 0, 9))).toBe("2026-10-05");
+    expect(dayDateFromPicker(new Date(2026, 9, 9, 23, 51))).toBe("2026-10-10");
+    // 달·해 경계
+    expect(dayDateFromPicker(new Date(2026, 8, 30, 23, 51))).toBe("2026-10-01");
+    expect(dayDateFromPicker(new Date(2026, 11, 31, 23, 51))).toBe("2027-01-01");
     // ★ 날짜 칸·disabledDates가 실제로 주는 것은 dayjs 객체다(설치본 타입 선언과 다르다 — 구현 중 실측)
     expect(
       dayDateFromPicker({ format: (t: string) => (t === "YYYY-MM-DD" ? "2016-03-15" : "?") }),
