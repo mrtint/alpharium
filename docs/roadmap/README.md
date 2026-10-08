@@ -125,6 +125,60 @@ iPhone 미확인」으로 적는다. 안드로이드는 바뀐 자리만 dev 실
 **위험**: 흐름을 늘리는 것 자체가 목표가 되기 쉽다 — Maestro 흐름은 행 높이·문구·좌표에 깨지기 쉬워(「Maestro」 절)
 유지 비용이 흐름 수에 비례한다. 대응표에서 「이미 계약 테스트가 지키는 것」은 e2e로 다시 만들지 않는다.
 
+### CI에 네이티브 빌드 확인 추가
+
+**배경**: 지금 CI(`.github/workflows/ci.yml`)는 lint·tsc·헌법 검사·jest와 안드로이드 JS 번들(`expo export`)까지다.
+gradle·xcodebuild는 돌지 않아 「JS는 멀쩡한데 네이티브가 깨짐」(의존성 올림·config plugin·prebuild 결과)은 로컬
+release 빌드 때에야 드러난다.
+
+**할 일**:
+
+1. **네이티브에 닿는 변경에서만** 돈다 — 경로 필터 `package.json`·`package-lock.json`·`app.json`·`plugins/**`
+   (그리고 `main` 머지·수동 실행). 모든 PR에 걸지 않는다.
+2. **안드로이드**: `prebuild --clean` → arm64 하나로 debug(또는 서명 없는 release) 빌드. gradle·ccache 캐시.
+   **먼저 러너에서 한 번 재서** 시간·메모리를 본다 — 로컬에서 네 ABI는 clang OOM, arm64는 13분 39초였다.
+3. **iOS**: `prebuild` → `pod install` → 서명 없는 시뮬레이터 빌드(`CODE_SIGNING_ALLOWED=NO`). macOS 러너.
+4. 서명·업로드는 이 과제에 넣지 않는다(아래 「무료 빌드 머신으로 iOS 빌드·업로드」 과제).
+
+**완료 조건**: 의도적으로 네이티브를 깨뜨린 PR(예: 없는 config plugin 이름)에서 두 잡이 빨갛게 되고, 되돌리면 초록이 된다(위반 주입).
+걸린 시간·캐시 적중 뒤 시간을 기록한다.
+
+**위험**: 이 앱이 실제로 아팠던 결함(iOS `await import` 튕김, ITMS-90683, 004 권한 누락)은 **빌드가 성공한 상태에서** 났다 —
+빌드 확인은 컴파일 깨짐만 막는다. 실행 경로는 e2e 과제의 몫이다. 빌드 잡을 「품질 보증」으로 읽지 않는다.
+
+### 무료 빌드 머신으로 iOS 빌드·업로드 — 개인 맥 없이
+
+**배경**: 저장소 소유자는 회사 맥 밖에서는 맥이 없다 — 지금 iOS 빌드·TestFlight 업로드(066 절차)는 회사 맥에서만 된다.
+무료 빌드 머신을 쓰고 싶다. 사전 검토(2026-10-08, 소유자)의 후보:
+
+| 후보 | 무료 조건 | 메모 |
+| --- | --- | --- |
+| GitHub Actions macOS | 퍼블릭 저장소는 표준 러너 분 제한 없음 · 프라이빗은 월 2,000분이고 macOS는 10배 소모 | **이 저장소는 퍼블릭이다**(2026-10-08 확인) — 사실상 무료 |
+| Xcode Cloud | Apple Developer Program에 월 25시간 포함 | 서명을 Apple이 관리 |
+| Codemagic · EAS Build | 무료 티어(월 횟수·분 제한, EAS는 대기열 느림) | 한도는 자주 바뀐다 — 쓰기 전에 요금표 확인 |
+
+**먼저 풀어야 할 질문 (설계 전에 소유자 결정)**:
+
+- **서명 키를 어디에 두는가가 후보를 가른다.** 배포 인증서·개인 키(`~/.pocketlog-signing/ios/`)는 소유주 Hyunmin Lee 님의
+  **개인** Developer Program 것이다(066). GitHub Actions·Codemagic·EAS는 그 키를 그들의 비밀 저장소에 올려야 한다 —
+  **소유주 동의가 먼저다**(코드가 정하지 않는다). Xcode Cloud는 키를 넘기지 않고 Apple이 클라우드 관리 서명을 하지만,
+  개인 계정에서 Admin(저장소 소유자)이 Xcode Cloud를 켤 수 있는지, 그리고 첫 워크플로를 Xcode에서 한 번 만들어야
+  하는지(회사 맥 1회 방문) 확인이 필요하다.
+- **퍼블릭 저장소의 비밀 관리**: 포크 PR에는 비밀이 안 넘어가지만, 업로드 잡은 `main`의 `workflow_dispatch`(또는 태그)와
+  GitHub Environment 보호 규칙(승인자 = 소유자)으로만 돌게 한다. 앱 암호 대신 App Store Connect API 키(`.p8`)를 쓴다.
+- **Expo·RN 빌드가 그 머신에서 도는가**: Xcode Cloud는 Node·CocoaPods를 기본으로 갖지 않는다 — `ci_scripts/ci_post_clone.sh`에서
+  설치하고 `expo prebuild`를 돌려야 한다(`ios/`는 gitignore된 생성물). 러너의 Xcode 버전이 066 실측(Xcode 26.6)과 맞는지,
+  llama.rn 컴파일 시간·메모리도 잰다.
+- **맥이 없으면 iOS 시뮬레이터도 없다** — 빌드·업로드가 클라우드로 가도 iOS 화면 확인·Maestro iOS 갈래(e2e 과제)는
+  실제 iPhone(TestFlight) 아니면 회사 맥이다. 이 과제가 그 공백까지 메우지는 않는다.
+
+**할 일**: 후보 하나를 골라(권장 검토 순서: 퍼블릭이라 무료인 GitHub Actions → 키를 안 넘기는 Xcode Cloud) 수동 실행 워크플로
+하나로 「prebuild → 아카이브 → 서명 → TestFlight 업로드」를 끝까지 한 번 돈다. `ios.buildNumber` 올림은 사람이 커밋한다(지금처럼).
+**AGENTS.md 「iOS 빌드·서명·TestFlight」 절을 그 경로로 고친다**(로컬 맥 절차는 「다른 맥에서 올리려면」 옆에 대안으로 남긴다).
+
+**완료 조건**: 회사 맥에 손대지 않고 올린 빌드가 App Store Connect **처리 단계까지 통과**하고(업로드 성공 ≠ 처리 통과, ITMS 메일 확인)
+TestFlight에서 실제 iPhone에 설치된다. 같은 경로로 안드로이드 AAB까지 할지는 그 뒤에 정한다(안드로이드는 리눅스 러너라 맥 문제가 없다).
+
 ## 완료 이력
 
 과제별 상세 기록(배경·실측·결정)은 각 `specs/NNN-*/`와 이 파일의 git 히스토리

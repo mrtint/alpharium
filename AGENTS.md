@@ -852,8 +852,8 @@
   리턴 키(`returnKeyType="done"`·`onSubmitEditing`)가 버튼과 같은 규칙으로 확정한다.
 - **앱 아이콘은 자리표시자다**(토큰 색의 빨간 사각형 + 「P」, `assets/icon.png`) — Expo 기본 아이콘이 iOS에 그대로 나왔다. 안드로이드 adaptive icon도 아직 Expo 기본이다(미교체).
 - **도구**: `xcodebuild`는 `sudo xcode-select` 없이 `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`로 쓴다. `pod install`은 `~/.netrc`가 644면 거부한다 — 파일을
-  안 고치려면 `NETRC=<빈 디렉터리>`. **사내망은 Hugging Face CDN(`us.aws.cdn.hf.co`)의 TLS를 바꿔치므로** 시뮬레이터에 회사 루트 인증서를 넣어야 모델이 받아진다
-  (`security find-certificate -a -c NEXON -p /Library/Keychains/System.keychain > nexon.pem; xcrun simctl keychain <UDID> add-root-cert nexon.pem`) — 그 전에는
+  안 고치려면 `NETRC=<빈 디렉터리>`. **TLS를 가로채는 네트워크에서는** 시뮬레이터에 그 네트워크의 루트 인증서를 넣어야 모델이 받아진다
+  (`xcrun simctl keychain <UDID> add-root-cert <루트 인증서>.pem`) — 그 전에는
   `UnableToDownloadException: … TLS 오류`. 화면 조작은 Maestro(`brew install mobile-dev-inc/tap/maestro`, `JAVA_HOME`을 Homebrew openjdk로 줘야 뜬다)로
   `maestro --device <UDID> test <flow>`. 사진은 `xcrun simctl addmedia <UDID> *.jpg`로 넣되 **EXIF 촬영일이 있으면 그 날로 들어간다** — 오늘로 넣으려면 EXIF를 걷어낸 JPEG
   (`sips -s format bmp` → 다시 jpeg). 앱 데이터는 `xcrun simctl get_app_container <UDID> com.a810labs.pocketlog data` 아래 `Documents/`(일기·모델·preferences 모두).
