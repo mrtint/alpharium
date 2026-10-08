@@ -1005,6 +1005,57 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 **debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V) — minify·R8이 켜지면 동적 `import`·`llama.rn` JNI 심볼이 깨질 수 있다(현재는 꺼져 있다, 위 실측 규칙).
 **Play에서 받은 앱은 Play가 다시 서명한 것이다** — 내부 테스트 트랙으로 받은 앱에서 설치·모델 내려받기·일기 쓰기를 한 번 본다.
 
+## iOS 빌드·서명·TestFlight — 요청받았을 때만 탄다 (066)
+
+**아이폰 배포물을 만드는 절차다.** 안드로이드 절차(위)와 같은 성격 — 기본 작업 흐름이 아니며 저장소 소유자가 그 세션에서 요청했을 때만 탄다.
+**실제 iPhone이 한 대도 없다**(2026-10-08) — 아래에서 「실측」이라 적은 것은 iPhone 17 시뮬레이터(iOS 26.5, Xcode 26.6)에서 본 것이고, 업로드·TestFlight 설치는 미실측이다.
+
+### 이 맥에 갖춰진 것 / 아직 없는 것
+
+- 갖춰짐: Xcode 26.6(`DEVELOPER_DIR`로 씀, `sudo xcode-select` 불필요), CocoaPods 1.17, `ios/` prebuild, **서명 없는 Release 아카이브가 성공한다**(`xcodebuild archive … CODE_SIGNING_ALLOWED=NO`,
+  약 10분, 산출물 45MB), **Release 설정(Metro 없이, `export:embed` 번들)으로 시뮬레이터에서 홈·일기 쓰기가 돈다** — Hermes 바이트코드·minify에서 `llama.rn`·동적 `import`가 산다(안드로이드의 R8 걱정과 달리 실측).
+- **없음: 코드 서명 ID**(`security find-identity -v -p codesigning` → 0건). 키체인의 유일한 프로비저닝 프로파일은 Intune(Microsoft)이지 우리 것이 아니다. **Apple Developer Program 가입 상태와
+  팀 `S6B8RQH6YQ`에서의 역할은 사람이 확인한다** — 인증서를 만들려면 그 팀의 Admin 이상이어야 한다.
+- **없음: App Store Connect 앱 레코드**(`com.a810labs.pocketlog`). 코드로 만들 수 없다 — 사람이 App Store Connect에서 만든다(이름 Pocketlog, 기본 언어 한국어, 번들 ID는 Certificates, Identifiers & Profiles에 먼저 등록).
+
+### 선언 자리 (`app.json`, `__tests__/config/ios-permissions.test.ts`가 잠근다)
+
+- `ios.buildNumber` — **TestFlight에 올릴 때마다 1 올린다**(안드로이드 `versionCode`와 같은 규칙, 같은 번호는 거부된다). 사람이 보는 버전은 `expo.version`.
+- `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` — 암호화 수출 문항을 미리 답한다(없으면 빌드마다 App Store Connect에서 손으로 답해야 TestFlight가 열린다).
+- 권한 문구는 플러그인 옵션(위 066 조각). `ios/`는 생성물이라 **선언을 바꾸면 `npx expo prebuild --platform ios`를 다시 돌려야 Info.plist에 들어간다**(`PlistBuddy -c "Print :CFBundleVersion" ios/Pocketlog/Info.plist`로 확인).
+
+### 빌드 (서명은 Xcode 자동 서명에 맡긴다)
+
+```
+npx expo prebuild --platform ios --clean          # ios/를 통째로 다시 만든다
+NETRC=<빈 디렉터리> pod install                   # ~/.netrc가 644면 prebuild의 pod install이 거부된다 (ios/에서)
+xcodebuild -workspace ios/Pocketlog.xcworkspace -scheme Pocketlog -configuration Release \
+  -sdk iphoneos -destination 'generic/platform=iOS' -archivePath build/Pocketlog.xcarchive archive \
+  -allowProvisioningUpdates DEVELOPMENT_TEAM=S6B8RQH6YQ
+xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsPlist ios/ExportOptions.plist \
+  -exportPath build/export -allowProvisioningUpdates
+```
+
+- `-allowProvisioningUpdates`가 Xcode에 로그인된 Apple 계정으로 인증서·프로파일을 만들어 받는다 — **Xcode > Settings > Accounts에 그 계정이 먼저 들어가 있어야 한다**(GUI, 사람이 한다). 계정이 없으면 `archive`가 서명 단계에서 선다.
+- `ExportOptions.plist`는 `method: app-store-connect`, `teamID: S6B8RQH6YQ`, `destination: upload`면 `-exportArchive`가 업로드까지 한다(Xcode 13+). 저장소에는 두지 않았다 — 첫 업로드 때 만들고 그때 커밋한다.
+- **Release는 `NODE_ENV`를 셸에서 줄 필요가 없다** — Xcode의 「Bundle React Native code and images」 단계가 `export:embed`로 번들하며 `.env.development*`는 싣지 않는다(실측: Release 시뮬레이터 앱 번들에 `localhost:8080`이 0건, Metro 없이 홈이 뜬다).
+  `.env.development.local`이 있어도 Release에는 안 들어간다.
+- 업로드 대안: Xcode > Product > Archive → Organizer → Distribute App → TestFlight & App Store(GUI). 또는 `xcrun altool --upload-app -f <ipa> -t ios --apiKey <ID> --apiIssuer <ID>`(App Store Connect API 키 필요).
+  EAS Build/Submit(`eas-cli`)은 이 저장소가 안 쓴다(안드로이드도 로컬 gradle) — 필요해지면 그때 정한다.
+
+### 확인 — 빌드 성공을 믿지 않는다
+
+| 무엇 | 어떻게 | 통과 |
+| --- | --- | --- |
+| 서명 | `codesign -dv --verbose=2 <app>` | `Authority=Apple Distribution: …` (`Apple Development`·unsigned가 **아니다**) |
+| 번호 | `PlistBuddy -c "Print :CFBundleVersion"` | 지난 업로드보다 크다 |
+| 권한 문구 | `PlistBuddy -c "Print :NSPhotoLibraryUsageDescription"` | 한국어 |
+| Metro 없이 도는가 | Release 시뮬레이터 빌드(`-sdk iphonesimulator -configuration Release`)를 Metro 끄고 연다 | 홈이 뜨고 일기가 써진다 (2026-10-08 실측) |
+| 환경 | 설정에 「개발자」 행 | 배포 환경이면 버전 7번 탭 전까지 **없다** |
+
+**TestFlight에서 받은 앱은 실제 iPhone의 첫 실측이다** — 2GB 모델 적재(메모리), 사진 읽기 시간(mmproj CPU), 백그라운드 자동 쓰기(BGTask)가 거기서 처음 재진다. 테스터에게
+「설치 → 권한 → 내려받기 → 첫 일기 → 다음 날 자동 쓰기 알림」을 확인해 달라고 한다.
+
 ## 테스트
 
 | 명령 | 무엇 | 기기 |

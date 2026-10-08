@@ -12,7 +12,10 @@ import { join } from "node:path";
 type Plugin = string | [string, Record<string, unknown>];
 
 const APP = JSON.parse(readFileSync(join(__dirname, "../../app.json"), "utf8")) as {
-  expo: { plugins: Plugin[]; ios: { infoPlist?: Record<string, unknown> } };
+  expo: {
+    plugins: Plugin[];
+    ios: { buildNumber?: string; infoPlist?: Record<string, unknown> };
+  };
 };
 
 function optionsOf(name: string): Record<string, unknown> {
@@ -38,5 +41,20 @@ describe("066 — iOS 권한 문구", () => {
     expect(location.locationAlwaysAndWhenInUsePermission).toBe(false);
     expect(location.locationAlwaysPermission).toBe(false);
     expect(location.motionUsagePermission).toBe(false);
+  });
+});
+
+/**
+ * 066 — TestFlight에 올릴 때마다 `ios.buildNumber`를 1 올린다(안드로이드 `versionCode`와 같은 규칙).
+ * 같은 번호는 App Store Connect가 거부한다. 암호화 수출 문항은 앱이 자체 암호화를 쓰지 않으므로
+ * `ITSAppUsesNonExemptEncryption: false`로 미리 답해 둔다(없으면 빌드마다 App Store Connect에서 손으로 답해야 한다).
+ */
+describe("066 — TestFlight 업로드 선언", () => {
+  it("ios.buildNumber가 양의 정수 문자열이다", () => {
+    expect(APP.expo.ios.buildNumber).toMatch(/^[1-9]\d*$/);
+  });
+
+  it("ITSAppUsesNonExemptEncryption이 false다", () => {
+    expect(APP.expo.ios.infoPlist?.ITSAppUsesNonExemptEncryption).toBe(false);
   });
 });

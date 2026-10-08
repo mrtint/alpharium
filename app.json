@@ -9,7 +9,11 @@
     "ios": {
       "supportsTablet": true,
       "appleTeamId": "S6B8RQH6YQ",
-      "bundleIdentifier": "com.a810labs.pocketlog"
+      "bundleIdentifier": "com.a810labs.pocketlog",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
