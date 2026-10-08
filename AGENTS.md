@@ -844,8 +844,10 @@
 - **일기의 사본 경로는 절대 경로로 저장된다** — iOS는 업데이트마다 컨테이너 UUID가 바뀌어 옛 일기의 사진이 「이제 없어요」가 된다. 저장 형식은 두고 `fileStore.load()`가
   `rehomeResizedPath()`(`src/diary/photo-path.ts`)로 지금 자리에 옮긴다(`FileSystemPort.documentDirectory?`). 리사이즈를 건너뛴 원본 경로(013 C1)는 손대지 않는다.
   **`VISION_CACHE_DIRECTORY`의 자리는 이제 `diary/photo-path.ts`다**(`on-device.ts`는 재export).
-- **iOS 권한 문구는 `app.json`의 플러그인 옵션이 유일한 자리다** — 안 주면 "Allow Pocketlog to access your photos" 영어 기본값이 권한 창에 그대로 뜬다. 사진 저장·항상 위치·
-  모션은 `false`로 키 자체를 뺐다(`__tests__/config/ios-permissions.test.ts`). 생성된 `ios/Pocketlog/Info.plist`의 `UsageDescription`으로 확인한다.
+- **iOS 권한 문구는 `app.json`의 플러그인 옵션이 유일한 자리다** — 안 주면 "Allow Pocketlog to access your photos" 영어 기본값이 권한 창에 그대로 뜬다. 사진 저장·항상 위치는
+  `false`로 키 자체를 뺐다(`__tests__/config/ios-permissions.test.ts`). 생성된 `ios/Pocketlog/Info.plist`의 `UsageDescription`으로 확인한다.
+  **★ 모션(`NSMotionUsageDescription`)은 빼면 안 된다** — 빌드 1이 업로드는 통과하고 **처리 단계에서 ITMS-90683으로 거부**됐다(메일로만 온다, TestFlight 목록에는 아무것도 안 뜬다).
+  앱은 모션을 안 쓰지만 `expo-location`이 CoreMotion API를 참조해 Apple 정적 검사가 문구를 요구한다. `altool --validate-app`은 이것을 못 잡는다.
 - **iOS 기본 줄바꿈은 글자 단위다** — 「처음 뵙겠습/니다.」. `AppText`가 `lineBreakStrategyIOS="hangul-word"`를 기본으로 준다. 작명 화면은 키보드가 뜨면 버튼 줄이 키보드 뒤라
   리턴 키(`returnKeyType="done"`·`onSubmitEditing`)가 버튼과 같은 규칙으로 확정한다.
 - **앱 아이콘은 자리표시자다**(토큰 색의 빨간 사각형 + 「P」, `assets/icon.png`) — Expo 기본 아이콘이 iOS에 그대로 나왔다. 안드로이드 adaptive icon도 아직 Expo 기본이다(미교체).
@@ -1046,7 +1048,8 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 - **업로드는 사람의 터미널에서 돌린다** — `-p @keychain:AC_PASSWORD`는 처음 읽을 때 macOS 키체인 「허용」 창이 뜨는데, 화면 없는 셸(에이전트)에서는 창을 못 띄워
   `Failed to find item AC_PASSWORD … in keychain`으로 떨어진다. 앱 암호 저장은 Xcode 26 altool이 도움말과 달리 `--item`을 요구한다:
   `xcrun altool --store-password-in-keychain-item --item AC_PASSWORD -u <Apple ID> -p <앱 암호>`(앱 암호는 appleid.apple.com이 발급하는 값, 임의로 못 정한다).
-- **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널). 다음 업로드는 `ios.buildNumber`를 먼저 올린다(저장소는 2로 올려 두었다).
+- **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널) — **처리 단계에서 ITMS-90683(모션 문구 없음)으로 거부**됐다. 같은 날 빌드 2에 문구를 넣어 다시 올렸다.
+  **업로드 성공 ≠ 처리 통과** — 「has one or more issues」 메일을 기다려 본다. 다음 업로드는 `ios.buildNumber`를 먼저 올린다.
 
 ### 다른 맥에서 올리려면
 
