@@ -170,6 +170,11 @@ export type DiaryListScreenProps = {
   /** 「그만두기」 (054) */
   onStop?: () => void;
   /**
+   * 하단 바(쓰기·다시 쓰기·그만두기)가 잠깐 잠겼다 — 쓰기를 시작하거나 그만둔 직후다. 참이면 바가 흐리고
+   * 눌리지 않는다. 언제 잠그고 푸는지는 부르는 쪽이 정한다.
+   */
+  barLocked?: boolean;
+  /**
    * 실패 토스트 (054, 보드 `2i`). **문자열만 받는다** — 화면은 갈래·실패 종류·이유를 모른다(FR-016). `id`는
    * 토스트마다 다르다(같은 문구가 연달아 나도 새로 뜬다).
    */
@@ -201,6 +206,7 @@ export function DiaryListScreen({
   writtenAt,
   writing,
   onStop,
+  barLocked = false,
   toast,
   onDismissToast,
   simulation,
@@ -299,7 +305,7 @@ export function DiaryListScreen({
           style={REWRITE_SLOT}
           testID="stop-bar"
         >
-          <StopBar onStop={onStop} />
+          <StopBar locked={barLocked} onStop={onStop} />
         </View>
         {toastNode}
       </View>
@@ -344,6 +350,7 @@ export function DiaryListScreen({
           </StripOverlay>
         </View>
         <RewriteBar
+          locked={barLocked}
           onLayoutHeight={setBarHeight}
           onWrite={onWrite}
           simulated={simulation !== undefined}
@@ -374,7 +381,7 @@ export function DiaryListScreen({
           style={REWRITE_SLOT}
           testID="write-bar"
         >
-          <WriteBar onWrite={onWrite} simulated={simulation !== undefined} />
+          <WriteBar locked={barLocked} onWrite={onWrite} simulated={simulation !== undefined} />
         </View>
         {toastNode}
       </View>
@@ -783,12 +790,26 @@ function Notices({
  *
  * 049 — 고른 날은 언제나 쓸 수 있다(정오 제한 폐지, 미래는 오늘로 떨어진다).
  */
-function WriteBar({ onWrite, simulated = false }: { onWrite: () => void; simulated?: boolean }) {
+function WriteBar({
+  onWrite,
+  simulated = false,
+  locked = false,
+}: {
+  onWrite: () => void;
+  simulated?: boolean;
+  /** 잠깐 잠겼다 — 흐리고 눌리지 않는다 */
+  locked?: boolean;
+}) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={locked || undefined}
       onPress={() => onWrite()}
-      style={[BAR, { backgroundColor: simulated ? SIMULATION.barFill : COLORS.accent }]}
+      style={[
+        BAR,
+        { backgroundColor: simulated ? SIMULATION.barFill : COLORS.accent },
+        locked && BAR_LOCKED,
+      ]}
       testID="write-button"
     >
       <View style={BAR_LINE}>
@@ -822,12 +843,13 @@ function DevBadge({ color, testID }: { color: string; testID?: string }) {
  *
  * 배경 `text`(검정), 글자 `bg`. 누르면 바로 멈추고 쓰기 전 상태로 돌아간다 — 그 판단은 부르는 쪽이 한다.
  */
-function StopBar({ onStop }: { onStop?: () => void }) {
+function StopBar({ onStop, locked = false }: { onStop?: () => void; locked?: boolean }) {
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={locked || undefined}
       onPress={() => onStop?.()}
-      style={[BAR, { backgroundColor: COLORS.text }]}
+      style={[BAR, { backgroundColor: COLORS.text }, locked && BAR_LOCKED]}
       testID="stop-button"
     >
       <AppText style={[BAR_TEXT, { color: COLORS.bg }]}>{WRITING_TEXT.stop}</AppText>
@@ -852,8 +874,11 @@ function RewriteBar({
   visible,
   onLayoutHeight,
   simulated = false,
+  locked = false,
 }: {
   onWrite: () => void;
+  /** 잠깐 잠겼다 — 흐리고 눌리지 않는다 */
+  locked?: boolean;
   /** 064 — 상태 흉내가 켜졌다 — 회색 면 + DEV(보드 `6i` ③) */
   simulated?: boolean;
   writtenAt?: string;
@@ -887,8 +912,13 @@ function RewriteBar({
     >
       <Pressable
         accessibilityRole="button"
+        disabled={locked || undefined}
         onPress={() => onWrite()}
-        style={[BAR, { backgroundColor: simulated ? SIMULATION.barFill : WRITTEN_DAY.rewriteBar }]}
+        style={[
+          BAR,
+          { backgroundColor: simulated ? SIMULATION.barFill : WRITTEN_DAY.rewriteBar },
+          locked && BAR_LOCKED,
+        ]}
         testID="write-button"
       >
         <View style={BAR_LINE}>
@@ -1044,6 +1074,9 @@ const BAR: ViewStyle = {
   borderTopLeftRadius: WRITTEN_DAY.bar.radius,
   borderTopRightRadius: WRITTEN_DAY.bar.radius,
 };
+
+/** 잠깐 잠긴 바 — 잠긴 것이 보이게 흐리다 */
+const BAR_LOCKED: ViewStyle = { opacity: WRITING.barLockedOpacity };
 
 const BAR_TEXT = {
   fontSize: WRITTEN_DAY.rewrite.fontSize,

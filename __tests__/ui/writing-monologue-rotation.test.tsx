@@ -68,6 +68,7 @@ const VISION_1 = "오늘 찍은 사진들을 살펴보는 중…";
 async function startWriting(pipeline: Pipeline) {
   await render(
     <DiaryHomeScreen
+      barLockMs={0}
       now={NOW}
       pipeline={pipeline}
       resolution={resolved}

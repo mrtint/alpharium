@@ -90,6 +90,7 @@ function element(over: Over) {
   }));
   return (
     <DiaryHomeScreen
+      barLockMs={0}
       now={() => NOW}
       pipeline={over.pipeline}
       resolution={resolved}
