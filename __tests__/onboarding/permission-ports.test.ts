@@ -64,9 +64,15 @@ describe("P3 — OsSettingsPort", () => {
     expect(typeof port.openAppSettings).toBe("function");
   });
 
-  it("Linking.openSettings를 지연 import로 부른다", () => {
-    expect(OS_CODE).toMatch(/await import\(\s*["']react-native["']\s*\)/);
+  it("Linking.openSettings를 호출 시점 require로 부른다", () => {
+    expect(OS_CODE).toMatch(/require\(\s*["']react-native["']\s*\)/);
     expect(OS_CODE).toContain("openSettings");
+  });
+
+  // 066 — `import("react-native")`는 Metro가 index의 모든 getter를 훑어(`metroImportAll`)
+  // iOS에서 `PushNotificationIOS`가 던지고, 그 예외는 try/catch를 지나쳐 앱을 죽인다.
+  it("react-native를 동적 import하지 않는다", () => {
+    expect(OS_CODE).not.toMatch(/import\(\s*["']react-native["']\s*\)/);
   });
 
   it("try/catch로 감싸 예외를 밖으로 던지지 않는다", () => {
