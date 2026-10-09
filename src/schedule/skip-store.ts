@@ -71,7 +71,7 @@ export function expoSkipStorePort(): SkipStorePort {
     async read() {
       const { dir, File } = await openDirectory();
       const file = new File(dir, SKIP_FILE);
-      return file.exists ? file.text() : null;
+      return file.exists ? file.textSync() : null;
     },
 
     async write(serialized) {

@@ -147,7 +147,7 @@ export function expoNotifiedStorePort(): NotifiedStorePort {
     async read() {
       const { dir, File } = await openDirectory();
       const file = new File(dir, STATE_FILE);
-      return file.exists ? file.text() : null;
+      return file.exists ? file.textSync() : null;
     },
 
     async write(serialized) {

@@ -165,7 +165,8 @@ describe("경계 — 소스 검사", () => {
 
   it("임시 파일에 쓰고 옮긴다 (반쯤 쓰인 파일을 남기지 않는다)", () => {
     expect(SOURCE).toContain(".writing");
-    expect(SOURCE).toMatch(/\.move\(/);
+    // 비동기 move()는 기다리지 않으면 공유 객체가 먼저 놓여 조용히 실패한다 — 동기로 옮긴다(`__tests__/diary/expo-file-sync.test.ts`)
+    expect(SOURCE).toMatch(/\.moveSync\(/);
   });
 
   it("검증을 복제하지 않고 validateCharacterName을 공유한다", () => {

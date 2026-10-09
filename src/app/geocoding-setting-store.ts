@@ -88,7 +88,7 @@ export function expoGeocodingSettingPort(): GeocodingSettingPort {
     async read() {
       const { dir, File } = await openDirectory();
       const file = new File(dir, SETTING_FILE);
-      return file.exists ? file.text() : null;
+      return file.exists ? file.textSync() : null;
     },
 
     /** 임시 파일에 쓰고 제자리로 옮긴다 — 쓰는 도중 죽어도 반쯤 쓰인 파일이 안 남는다. */

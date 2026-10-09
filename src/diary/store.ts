@@ -401,7 +401,7 @@ export function expoFileSystemPort(directoryName = "diary"): FileSystemPort {
     async read(name) {
       const { dir, File } = await openDirectory();
       const file = new File(dir, name);
-      return file.exists ? file.text() : null;
+      return file.exists ? file.textSync() : null;
     },
 
     async documentDirectory() {
