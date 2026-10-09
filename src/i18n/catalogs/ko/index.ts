@@ -22,6 +22,7 @@ import { notification } from "./notification";
 import { onboarding } from "./onboarding";
 import { photoViewer } from "./photo-viewer";
 import { frame, settings, skippedLine, targetHour } from "./settings";
+import { settingsPlatform } from "./settings-platform";
 import { simulation } from "./simulation";
 import { welcome } from "./welcome";
 
@@ -29,6 +30,7 @@ export const ko = {
   calendar,
   home,
   settings,
+  settingsPlatform,
   frame,
   skippedLine,
   targetHour,

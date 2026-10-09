@@ -41,7 +41,8 @@ export type EnvironmentLines = {
  */
 export function environmentLines(input: {
   buildLabel: string;
-  androidRelease: string | null;
+  /** 운영체제 이름과 버전 — 읽지 못하면 `null`. iOS에서도 값이 있다(068, 안드로이드 전제였던 줄) */
+  os: { platform: "android" | "ios"; version: string } | null;
   inference: InferenceChoice;
 }): EnvironmentLines {
   let inference: string;
@@ -51,7 +52,10 @@ export function environmentLines(input: {
 
   return {
     build: input.buildLabel,
-    device: input.androidRelease === null ? null : `Android ${input.androidRelease}`,
+    device:
+      input.os === null
+        ? null
+        : `${input.os.platform === "ios" ? "iOS" : "Android"} ${input.os.version}`,
     inference,
   };
 }

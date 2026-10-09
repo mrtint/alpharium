@@ -20,7 +20,7 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
 ## Pipeline (순서 고정 — 생략·대체·순서변경 금지)
 
 1. **과제 선택**: 로드맵에서 대상 과제 확인. 사용자가 지정하지 않았으면 질문한다. 과제에 목적이 적혀 있지 않으면 brainstorming 초입에서 목표부터 확인한다. `git branch --show-current`가 `main`이면 **여기서** 작업 브랜치를 만든다(`main` 직접 커밋 금지 — AGENTS.md).
-2. **superpowers:brainstorming** 호출 → 과제를 구체화한 설계문서를 `docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md`로 저장. 이미 분해 설계 문서가 그 과제를 다루고 있으면 그 문서를 brainstorming의 입력으로 삼는다(brainstorming 자체는 생략하지 않는다).
+2. **brainstorming (superpowers:brainstorming)** 호출 → 과제를 구체화한 설계문서를 `docs/superpowers/specs/YYYY-MM-DD-<slug>-design.md`로 저장. 이미 분해 설계 문서가 그 과제를 다루고 있으면 그 문서를 brainstorming의 입력으로 삼는다(brainstorming 자체는 생략하지 않는다).
 3. **speckit-specify** — 설계문서를 입력으로 실행. 생성된 스펙 번호를 로드맵의 해당 과제에 기록하고(스펙이 열린 뒤에만 번호를 적는다), 브랜치 이름을 `NNN-<slug>`로 바꾼다(`git branch -m`).
 4. **speckit-clarify** — 필수.
 5. **speckit-plan** 실행.
