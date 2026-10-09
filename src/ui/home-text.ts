@@ -110,6 +110,9 @@ export function calendarYearText(year: number): string {
 
 export const WRITTEN_DAY_TEXT = lazyText((c) => c.home.writtenDay);
 
+/** 067 — 사진 확대 화면의 스크린리더 이름(닫기·사진 크게 보기). 보드 밖 — 사람이 쓴 문장 */
+export const PHOTO_VIEWER_TEXT = lazyText((c) => c.photoViewer);
+
 /*
  * ─────────────────────────────────────────────────────────────────────────────
  * 054 — 쓰는 중 문구 (보드 `2b` KO 원문: `t.writingKicker`·`t.writingBy`·`t.stop`).
