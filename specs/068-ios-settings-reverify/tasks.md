@@ -86,3 +86,10 @@
 - [X] T029 iOS 시뮬레이터에서 진단의 「지금 한 번 써 보기」(`diagnostics-try-once`)·「저장 점검」(`diagnostics-storage`)·「다시 읽기」(`diagnostics-probe-refresh`)·입력 프롬프트 프리셋 탭 둘을 눌러 Metro `ERROR`가 없는지 확인하고 `.maestro/ios/developer-diagnostics-sweep.yml`과 기록 칸에 반영한다 per FR-005 (partial)
 - [X] T030 iOS 시뮬레이터에서 상태 흉내의 `sim-fail`·`sim-empty`·`sim-nophoto` 토글을 각각 켜고 끄며 홈 표시가 바뀌고 오류가 없는지 확인한다(끝에 모두 끈다) — 흐름 파일과 기록 칸에 반영한다 per FR-005 (partial)
 - [X] T031 plan.md·research.md의 구조·결정에 구현에서 더해진 것을 반영한다: `src/app/platform.ts`(`appPlatform`), `.maestro/ios/_dismiss-open-prompt.yml`(개발 클라이언트 「열겠습니까?」 닫기), 진단 「기기」 줄의 `os: { platform, version }` 변경(`src/app/diagnostics-view.ts`·`App.tsx`) per plan: Source Code (unrequested)
+
+
+## Phase 8: Convergence
+
+- [X] T032 `specs/068-ios-settings-reverify/quickstart.md` 기록 칸의 「진단 › 지금 한 번 써 보기(`diagnostics-try-once`)」 줄을 실측대로 고친다: 누르면 설정·개발자·진단이 닫히고 홈에서 쓰기가 시작되지만 **끝에 「일기를 쓰지 못했어요.」 토스트로 실패**하고 `preferences/write-failures.json`에 `unwritten`이 쌓인다(2026-10-10 실측 3건: 첫 실행 자동 첫 일기·안티그랩 실행·직접 실행). 「정상」으로 읽히는 문구를 지우고 조치 칸에 로드맵 과제 이름을 적는다 per FR-005 · Constitution V (contradicts)
+- [X] T033 `.maestro/ios/developer-diagnostics-sweep.yml`에 「온보딩부터 다시」(`developer-replay-onboarding`: 누른 뒤 로고 → 홈 복귀를 기다림)와 「지금 한 번 써 보기」(`diagnostics-try-once`: 누른 뒤 `stop-button`이 사라지길 기다림 — 실패 토스트가 정상 결과가 아님을 주석으로 적는다)를 넣고, 두 단계는 다른 단계의 상태를 바꾸므로 흐름 맨 끝에 둔다. 새 흐름을 시뮬레이터에서 끝까지 돌려 통과를 확인하고 Metro `ERROR`를 읽는다 per FR-005 (partial)
+- [X] T034 `docs/roadmap/README.md`의 「iOS 시뮬레이터에서 「정상 동작 확인」(liveness)이 실패하는 원인 찾기」 과제를 갱신한다: 새 `ios/` 빌드에서 liveness는 통과했지만 **일기 생성이 3회 연속 `unwritten`으로 실패**(진단 「지금 한 번 써 보기」·자동 첫 일기)한다는 것을 배경에 적고 과제 제목을 일기 생성 실패까지 포함하게 바꾼다. `AGENTS.md`의 068 항목에도 「시뮬레이터에서 일기 생성은 실패한다(미해결)」를 한 줄 더한다 per FR-008a (missing)

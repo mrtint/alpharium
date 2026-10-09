@@ -46,7 +46,7 @@
 | 개발자 › 개발자 메뉴 끄기(`developer-off`) | 오류 로그 없음. 누르면 개발자 겹이 닫히고 설정으로 복귀하며 `settings-developer` 행 사라짐. dev 환경에서 앱 재실행 시 다시 나타남 | 없음(정상) | 시뮬레이터 |
 | 개발자 › 온보딩부터 다시(`developer-replay-onboarding`) | 오류 로그 없음. 누르면 온보딩 게이트가 열려 권한 스텝을 거치고 모델은 지우지 않은 채 홈으로 복귀 | 없음(정상) | 시뮬레이터 |
 | 진단 › 저장 점검(`diagnostics-storage`)·다시 읽기(`diagnostics-probe-refresh`)·프리셋 둘 | 오류 로그 없음. 저장 크기(`2.0GB`) 갱신, 신호 셀 갱신, 프리셋 탭 전환 정상 | 없음 | 시뮬레이터 |
-| 진단 › 지금 한 번 써 보기(`diagnostics-try-once`) | 오류 로그 없음. 설정·개발자·진단 세 겹이 닫히고 홈으로 복귀하여 오늘 일기 쓰기 시작(토스트+제자리 쓰기) | 없음 | 시뮬레이터 |
+| 진단 › 지금 한 번 써 보기(`diagnostics-try-once`) | Metro `ERROR`는 없다. 누르면 설정·개발자·진단 세 겹이 닫히고 홈에서 쓰기가 시작되지만 **끝에 「일기를 쓰지 못했어요.」 토스트로 실패한다** — `preferences/write-failures.json`에 `unwritten`이 쌓인다(2026-10-10 실측 3건: 첫 실행 자동 첫 일기 23:52·두 번째 실행·직접 실행). **iOS 시뮬레이터에서 일기 생성이 안 되는 상태다** | 세 화면 밖(생성 경로) — 로드맵 「iOS 시뮬레이터에서 일기 생성이 실패하는 원인 찾기」 과제 | 시뮬레이터 |
 | 상태 흉내 › `sim-fail`·`sim-empty`·`sim-nophoto` 토글 | 오류 로그 없음. 켜면 홈에 `home-dev-badge` 출현, 누르면 개발자 겹 복귀, 끄면 DEV 배지 사라짐 | 없음 | 시뮬레이터 |
 
 **시뮬레이터 전용 표시**: 화면 아래 노란 `!` 알림 = `WARN Background tasks are not supported on iOS simulators`(시뮬레이터는 BGTask를 스케줄하지 않는다 — 066).

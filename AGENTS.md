@@ -905,6 +905,7 @@
 - **`ios/`가 옛 `prebuild`면 이름·패키지가 옛 것이다**(`com.anonymous.alpharium`) — 현재 `app.json`으로 `prebuild --platform ios --clean`을 다시 해야 `com.a810labs.pocketlog`다(`NETRC=<빈 디렉터리>`). 새 `ios/`로 다시 만들자 시뮬레이터의 「정상 동작 확인」이 통과했다.
 - **iOS에는 배터리 최적화 예외가 없다.** 온보딩 배터리 단계는 043부터 안드로이드 전용이고(`platforms: ["android"]`, `battery-ios.test.ts`가 잠근다), 설정의 「배터리」 행은 iOS에서 보조 줄이 「저전력 모드를 끄면 제때 써요」다(`src/app/battery-row.ts`의
   `batteryRowHint(platform)` — 화면은 `Platform`으로 문구를 고르지 않고 조립부가 넘긴다, `src/app/platform.ts`의 `appPlatform`이 플랫폼 값 한 곳). 자동 쓰기 토글·「매일 쓰는 시각」은 iOS에서도 그대로 두었고 BGTask의 실제 시각은 미확인이다.
+- **iOS 시뮬레이터에서 일기 생성은 지금 실패한다**(미해결, 2026-10-10) — 새 `ios/`로 다시 만든 빌드에서 자동 첫 일기·진단 「지금 한 번 써 보기」가 모두 「일기를 쓰지 못했어요.」(`unwritten` 3건)로 끝났다. 「오류 로그 없음」은 생성이 된다는 뜻이 아니다. 로드맵 「iOS 시뮬레이터에서 일기 생성이 실패하는 원인 찾기」.
 - 진단 화면의 「기기」 줄은 iOS에서 비어 있었다(안드로이드 릴리스만 읽었다) — `os: { platform, version }`으로 「iOS 26.5」를 보인다. 「사진 위치 정보」 값이 비는 것은 최근 30일에 사진이 없는 정상 상태(`no-photo`)다.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
