@@ -79,6 +79,12 @@
   유일한 통로다. 큰 파일은 `expo-file-system`의 `DownloadTask`에 `headers: { Range }`를 준다
   (네이티브가 디스크에 직접 쓴다).
 
+- **★ 짧게 사는 `expo-file-system` `File` 객체에 비동기 호출(`text()`·`bytes()`·`move()`·`copy()`)을 쓰지 않는다 — `*Sync()`다**(2026-10-09).
+  `File`은 네이티브 공유 객체라 비동기 호출 도중 JS 참조가 끝나면 GC가 먼저 놓아 「Cannot use shared object that was already released」로
+  거부된다 — `file.exists ? file.text() : null` 꼴이 열세 곳에 있었고, 강제 종료 후 콜드 스타트에서 멀쩡한 일기가 「손상됐어요」로 보였다
+  (A/B: `text()` 12회 중 5회, `textSync()` 0/15). GC 시점에 달려 가끔만 나고 jest에는 이 런타임이 없다 — 소스를 세는 계약
+  `__tests__/diary/expo-file-sync.test.ts`가 막는다. 재현은 Metro를 `CI=1`로 띄웠을 때 잘 됐다(감시를 끈 Metro가 메모리 사정을 바꾼다는 짐작).
+
 ### 추론·프롬프트
 
 - **`llama.rn`의 `completion()`은 요청하지 않아도 `timings`·`tokens_predicted`를 준다.**
@@ -891,7 +897,7 @@
 - **핀치는 `adb`로 못 만든다** — `input`은 한 손가락이고 production 기기는 `sendevent`의 `/dev/input/*` 권한이 없다. 핀치는 사람 손으로 본다.
 - 범위 밖 기록: 「세게 넘기면 OS 뒤로 가기가 걸린다」는 **화면 가장자리 30dp(이 기기 84px)에서 시작한 넘김**이었다(실측 6/6, 가운데 시작 0) — 여백을 36dp로 넓히는 안은
   「가득 찬 느낌이 떨어진다」로 기각, 대응은 하지 않았다. 실측·검토안은 `docs/superpowers/specs/2026-10-09-photo-zoom-viewer-design.md`.
-- **관찰(원인 미확인)**: 강제 종료 후 다시 열면 멀쩡한 일기가 가끔 「손상됐어요」로 보인다(파일은 정상, 다시 열면 정상). 상세는 `specs/067-photo-zoom-viewer/quickstart.md` 끝.
+- 067 실기기 중 본 「강제 종료 후 멀쩡한 일기가 가끔 손상됐어요」는 067과 무관한 `File.text()` 공유 객체 해제였다 — 위 「안드로이드·Expo·기기」의 `*Sync()` 규칙.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

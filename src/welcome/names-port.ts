@@ -137,7 +137,7 @@ export function expoCharacterNamesPort(): CharacterNamesPort {
     async read() {
       const { dir, File } = await openDirectory();
       const file = new File(dir, NAMES_FILE);
-      return file.exists ? file.text() : null;
+      return file.exists ? file.textSync() : null;
     },
 
     /**
@@ -156,7 +156,7 @@ export function expoCharacterNamesPort(): CharacterNamesPort {
 
       const target = new File(dir, NAMES_FILE);
       if (target.exists) target.delete();
-      temporary.move(target);
+      temporary.moveSync(target);
     },
   };
 }

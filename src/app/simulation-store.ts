@@ -64,7 +64,7 @@ export function expoSimulationStorePort(): SimulationStorePort {
     async read() {
       const { dir, File } = await openDirectory();
       const file = new File(dir, SIMULATION_FILE);
-      return file.exists ? file.text() : null;
+      return file.exists ? file.textSync() : null;
     },
 
     async write(serialized) {
