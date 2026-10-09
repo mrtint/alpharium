@@ -54,7 +54,7 @@ export function expoLockPort(): LockPort {
         const { dir, File } = await openDirectory();
         const file = new File(dir, LOCK_FILE);
         if (!file.exists) return null;
-        return parseRecord(await file.text());
+        return parseRecord(file.textSync());
       } catch {
         // 읽지 못하면 "잠금 없음"으로 다룬다 — stale 타임아웃이 최악을 회복한다.
         return null;

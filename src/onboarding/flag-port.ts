@@ -52,7 +52,7 @@ export function expoOnboardingFlagPort(): OnboardingFlagPort {
       try {
         const { dir, File } = await openDirectory();
         const file = new File(dir, FLAG_FILE);
-        return file.exists ? file.text() : null;
+        return file.exists ? file.textSync() : null;
       } catch {
         return null;
       }
@@ -76,7 +76,7 @@ export function expoOnboardingFlagPort(): OnboardingFlagPort {
       try {
         const { dir, File } = await openDirectory();
         const file = new File(dir, AUTO_DIARY_FILE);
-        return file.exists ? file.text() : null;
+        return file.exists ? file.textSync() : null;
       } catch {
         // 시드는 편의다 — 읽지 못하면 기본값으로 간다.
         return null;
