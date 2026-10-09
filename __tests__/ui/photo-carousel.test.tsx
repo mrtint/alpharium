@@ -1,7 +1,8 @@
 /**
  * 051 — 쓴 날 캐러셀 (보드 `2c`·`2k`).
  *
- * 계약: specs/051-home-written-day/contracts/written-day.md CAR1~CAR11
+ * 계약: specs/051-home-written-day/contracts/written-day.md CAR1~CAR11 (CAR9는 067이 뒤집었다 —
+ *       specs/067-photo-zoom-viewer/contracts/photo-viewer.md ZC1~ZC7)
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **jest는 배선만 본다**(C9). `react-native-reanimated-carousel`은 `jest/setup-ui.ts`의 목이 첫
@@ -16,6 +17,7 @@ import { join } from "node:path";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 import type { DiaryEntry } from "../../src/diary/types";
+import { PHOTO_VIEWER_TEXT } from "../../src/ui/home-text";
 import { indexAtProgress, PhotoCarousel } from "../../src/ui/PhotoCarousel";
 import { WrittenDayPaper } from "../../src/ui/WrittenDayPaper";
 import { COLORS, WRITTEN_DAY } from "../../src/ui/theme/tokens";
@@ -179,11 +181,89 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
     expect(indexAtProgress(1, 0)).toBe(0);
   });
 
-  it("CAR9 — 사진에 누름이 없다 (갤러리 없음)", async () => {
+  /*
+   * 067 — 051 CAR9(「사진에 누름이 없다」)를 뒤집었다. 사진을 누르면 확대 화면이 열린다(contracts/photo-viewer.md ZC1~ZC4).
+   */
+  it("★ ZC1 — 여러 장: 각 사진은 누를 수 있다 (사진 크게 보기)", async () => {
+    await render(<PhotoCarousel photos={three} width={320} />);
+    // 캐러셀 목은 첫 장만 그린다
+    const open = screen.getByTestId("photo-open-p1");
+    expect(open.props.accessibilityRole).toBe("imagebutton");
+    expect(open.props.accessibilityLabel).toBe(PHOTO_VIEWER_TEXT.open);
+  });
+
+  it("ZC2 — 1장도 누를 수 있다", async () => {
     await render(<PhotoCarousel photos={[photo(1)]} width={320} />);
-    expect(screen.getByTestId("diary-photo").props.onPress).toBeUndefined();
-    expect(screen.getByTestId("photo-face-p1").props.onPress).toBeUndefined();
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByTestId("photo-open-p1").props.accessibilityLabel).toBe(
+      PHOTO_VIEWER_TEXT.open,
+    );
+  });
+
+  it("★ ZC3 — 누르면 확대 화면이 누른 장부터 열린다", async () => {
+    await render(<PhotoCarousel photos={three} width={320} />);
+    expect(screen.queryByTestId("photo-viewer")).toBeNull();
+    await fireEvent.press(screen.getByTestId("photo-open-p1"));
+    expect(screen.getByTestId("photo-viewer")).toBeTruthy();
+    expect(screen.getByTestId("photo-viewer-badge")).toHaveTextContent("1 / 3");
+    expect(screen.getByTestId("photo-viewer-carousel").props.defaultIndex).toBe(0);
+  });
+
+  it("ZC4 — 사본을 못 불러온 칸은 누를 수 없다", async () => {
+    await render(<PhotoCarousel photos={[photo(1)]} width={320} />);
+    await fireEvent(screen.getByTestId("diary-photo"), "error");
+    expect(screen.getByTestId("diary-photo-missing")).toBeTruthy();
+    expect(screen.queryByTestId("photo-open-p1")).toBeNull();
+  });
+
+  it("★ ZC8 — 사진 한 장을 가로로 쓸고 떼면 열리지 않는다, 제자리에서 떼면 열린다 (실기기에서 드러남)", async () => {
+    await render(<PhotoCarousel photos={[photo(1)]} width={320} />);
+    const open = screen.getByTestId("photo-open-p1");
+    await fireEvent(open, "pressIn", { nativeEvent: { pageX: 300, pageY: 500 } });
+    await fireEvent(open, "press", { nativeEvent: { pageX: 60, pageY: 505 } });
+    expect(screen.queryByTestId("photo-viewer")).toBeNull();
+
+    await fireEvent(open, "pressIn", { nativeEvent: { pageX: 300, pageY: 500 } });
+    await fireEvent(open, "press", { nativeEvent: { pageX: 303, pageY: 502 } });
+    expect(screen.getByTestId("photo-viewer")).toBeTruthy();
+  });
+
+  it("★ ZC5 — 확대 화면을 셋째 장에서 닫으면 지면도 셋째 장", async () => {
+    await render(<PhotoCarousel photos={three} width={320} />);
+    await fireEvent.press(screen.getByTestId("photo-open-p1"));
+    await act(async () => {
+      screen.getByTestId("photo-viewer").props.onRequestClose();
+    });
+    // 시작 장(0)으로 닫힌 경우 — 그대로 첫 장
+    expect(screen.queryByTestId("photo-viewer")).toBeNull();
+    expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("1 / 3");
+
+    await fireEvent.press(screen.getByTestId("photo-open-p1"));
+    await act(async () => {
+      screen.getByTestId("photo-viewer-carousel").props.onProgressChange(2);
+    });
+    await act(async () => {
+      screen.getByTestId("photo-viewer").props.onRequestClose();
+    });
+    expect(screen.queryByTestId("photo-viewer")).toBeNull();
+    expect(screen.getByTestId("photo-carousel-badge")).toHaveTextContent("3 / 3");
+    expect(screen.getByTestId("photo-carousel-dot-2")).toHaveStyle({ width: 18 });
+  });
+
+  it("ZC6 — 닫힐 때 지면 캐러셀을 애니메이션 없이 그 장으로 옮긴다 (소스 — 목에는 ref가 없다)", () => {
+    const source = readFileSync(join(__dirname, "../../src/ui/PhotoCarousel.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).toMatch(/scrollTo\(\{\s*index[^}]*animated:\s*false/);
+  });
+
+  it("ZC7 — 누름이 넘김을 빼앗지 않는다: 지면 캐러셀의 팬 설정은 그대로", async () => {
+    await render(<PhotoCarousel photos={three} width={320} />);
+    const gesture: Record<string, jest.Mock> = {};
+    gesture.activeOffsetX = jest.fn(() => gesture);
+    gesture.failOffsetY = jest.fn(() => gesture);
+    screen.getByTestId("photo-carousel").props.onConfigurePanGesture(gesture);
+    expect(gesture.activeOffsetX).toHaveBeenCalledWith([-10, 10]);
+    expect(gesture.failOffsetY).toHaveBeenCalledWith([-10, 10]);
   });
 
   it("★ CAR10 — 날이 바뀌면 캐러셀이 새로 마운트되어 1장부터", async () => {

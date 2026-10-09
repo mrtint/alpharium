@@ -56,7 +56,17 @@ jest.mock("react-native-reanimated", () => {
       Image: View,
       createAnimatedComponent: (component: unknown) => component,
     },
-    useSharedValue: (initial: unknown) => ({ value: initial }),
+    // 067 — `.set()`도 둔다(React Compiler가 훅에 넘긴 공유값의 `.value =` 대입을 막아 `.set()`으로 고치는 자리가 있다).
+    useSharedValue: (initial: unknown) => {
+      const shared = {
+        value: initial,
+        get: () => shared.value,
+        set: (next: unknown) => {
+          shared.value = next;
+        },
+      };
+      return shared;
+    },
     // 스타일 계산 결과를 테스트가 검사하지 않는다(PF7) — 빈 스타일로 충분하다.
     useAnimatedStyle: () => ({}),
     withTiming: (toValue: unknown) => toValue,
@@ -110,7 +120,8 @@ jest.mock("react-native-reanimated-carousel", () => {
   return {
     __esModule: true,
     // 051 — 배선 검사용으로 `loop`·`onSnapToItem`·`onProgressChange`·`onConfigurePanGesture`·`data`·
-    // `style`을 host props로 넘긴다(계약 CAR3·CAR5). 넘김·순환은 이 목으로 검증할 수 없다 — 실기기(C9).
+    // `style`을 host props로 넘긴다(계약 CAR3·CAR5). 067 — `defaultIndex`·`scrollEnabled`도(ZC3·ZP5). `ref`는 받지 않는다
+    // (React 19에서 함수 컴포넌트의 `ref`는 그냥 prop이라 무시된다 — `scrollTo` 호출은 소스 계약 ZC6). 넘김·순환은 이 목으로 검증할 수 없다 — 실기기(C9).
     Carousel: ({
       data,
       renderItem,
@@ -120,6 +131,8 @@ jest.mock("react-native-reanimated-carousel", () => {
       onProgressChange,
       onConfigurePanGesture,
       style,
+      defaultIndex,
+      scrollEnabled,
     }: {
       data: unknown[];
       renderItem: (info: { item: unknown; index: number }) => unknown;
@@ -129,10 +142,22 @@ jest.mock("react-native-reanimated-carousel", () => {
       onProgressChange?: (progress: number) => void;
       onConfigurePanGesture?: (gesture: unknown) => void;
       style?: unknown;
+      defaultIndex?: number;
+      scrollEnabled?: boolean;
     }) =>
       createElement(
         View,
-        { testID, loop, onSnapToItem, onProgressChange, onConfigurePanGesture, data, style },
+        {
+          testID,
+          loop,
+          onSnapToItem,
+          onProgressChange,
+          onConfigurePanGesture,
+          data,
+          style,
+          defaultIndex,
+          scrollEnabled,
+        },
         data.length > 0 ? renderItem({ item: data[0], index: 0 }) : null,
       ),
   };

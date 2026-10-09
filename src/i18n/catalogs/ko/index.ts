@@ -20,6 +20,7 @@ import { home } from "./home";
 import { monologue } from "./monologue";
 import { notification } from "./notification";
 import { onboarding } from "./onboarding";
+import { photoViewer } from "./photo-viewer";
 import { frame, settings, skippedLine, targetHour } from "./settings";
 import { simulation } from "./simulation";
 import { welcome } from "./welcome";
@@ -40,4 +41,5 @@ export const ko = {
   onboarding,
   monologue,
   notification,
+  photoViewer,
 };
