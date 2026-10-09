@@ -64,7 +64,7 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
  * 골든을 만들 때 뺀 것: `requirements.ts`의 `neededBy` 넷(화면에 안 보이는 문서용 필드 — 062에서 주석으로 옮겼다).
  */
 
-/** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`) */
+/** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
   "언어",
   "한국어",
@@ -77,6 +77,7 @@ const ADDED_AFTER_GOLDEN: readonly string[] = [
   "끄기",
   "닫기",
   "사진 크게 보기",
+  "저전력 모드를 끄면 제때 써요",
 ];
 
 /** 한국어 카탈로그 파일 전부 */

@@ -893,6 +893,20 @@
   「가득 찬 느낌이 떨어진다」로 기각, 대응은 하지 않았다. 실측·검토안은 `docs/superpowers/specs/2026-10-09-photo-zoom-viewer-design.md`.
 - **관찰(원인 미확인)**: 강제 종료 후 다시 열면 멀쩡한 일기가 가끔 「손상됐어요」로 보인다(파일은 정상, 다시 열면 정상). 상세는 `specs/067-photo-zoom-viewer/quickstart.md` 끝.
 
+### 068 — iOS 설정·개발자·진단 화면 재검증
+
+- **iOS 시뮬레이터는 합성 마우스 클릭(`CGEvent`·`osascript`)을 무시한다**(손쉬운 사용 권한이 있어도). 조작은 **Maestro**(`brew install openjdk mobile-dev-inc/tap/maestro`,
+  `JAVA_HOME=/opt/homebrew/opt/openjdk`)로 한다 — 흐름은 `.maestro/ios/`(FLOWS 미등록, 훑기 도구다). **`launchApp`은 기본이 앱 종료 후 재실행이라 상태가 사라져 크래시와 구분되지 않는다** —
+  앱 설정을 다녀오는 흐름은 `launchApp: stopApp: false`로 돌아와 화면 상태가 남았는지로 가른다. 개발 클라이언트를 다시 앞으로 올리면 iOS가 「'포켓로그'에서 열겠습니까?」를 묻는다(`_dismiss-open-prompt.yml`).
+  XCUITest는 접힘 애니메이션 안쪽 행의 `testID`(`settings-target-hour`)를 못 찾는다 — 글자로 짚는다.
+- **개발 빌드는 오류를 화면 아래 알림(LogBox)으로만 보이고 앱을 죽이지 않는다** — 066의 `await import("react-native")` 결함은 시뮬레이터 dev에서 `ERROR [Invariant Violation: new NativeEventEmitter() requires a non-null argument.]`
+  로그로만 드러났고 배포 빌드에서는 종료다. 훑기는 Metro `ERROR`와 `xcrun simctl spawn booted log show`를 읽는다(흐름이 끝까지 간다는 것은 「앱이 살아 있다」뿐이다). 수정 전 코드 재현·수정 후 정상은 시뮬레이터(iOS 26.5)에서 확인했고
+  `__tests__/onboarding/no-react-native-dynamic-import.test.ts`가 잠근다. **실제 iPhone(iOS 27.0.1 TestFlight)은 미확인이다.**
+- **`ios/`가 옛 `prebuild`면 이름·패키지가 옛 것이다**(`com.anonymous.alpharium`) — 현재 `app.json`으로 `prebuild --platform ios --clean`을 다시 해야 `com.a810labs.pocketlog`다(`NETRC=<빈 디렉터리>`). 새 `ios/`로 다시 만들자 시뮬레이터의 「정상 동작 확인」이 통과했다.
+- **iOS에는 배터리 최적화 예외가 없다.** 온보딩 배터리 단계는 043부터 안드로이드 전용이고(`platforms: ["android"]`, `battery-ios.test.ts`가 잠근다), 설정의 「배터리」 행은 iOS에서 보조 줄이 「저전력 모드를 끄면 제때 써요」다(`src/app/battery-row.ts`의
+  `batteryRowHint(platform)` — 화면은 `Platform`으로 문구를 고르지 않고 조립부가 넘긴다, `src/app/platform.ts`의 `appPlatform`이 플랫폼 값 한 곳). 자동 쓰기 토글·「매일 쓰는 시각」은 iOS에서도 그대로 두었고 BGTask의 실제 시각은 미확인이다.
+- 진단 화면의 「기기」 줄은 iOS에서 비어 있었다(안드로이드 릴리스만 읽었다) — `os: { platform, version }`으로 「iOS 26.5」를 보인다. 「사진 위치 정보」 값이 비는 것은 최근 30일에 사진이 없는 정상 상태(`no-photo`)다.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크

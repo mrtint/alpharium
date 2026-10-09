@@ -42,7 +42,10 @@ const placesKnown = (visitCount: number) => ({
 });
 
 describe("DV1 — 환경 줄", () => {
-  const input = { buildLabel: "DEV · 1.0.0 (24)", androidRelease: "16" };
+  const input = {
+    buildLabel: "DEV · 1.0.0 (24)",
+    os: { platform: "android", version: "16" } as const,
+  };
 
   it("기기 추론은 「기기 · CPU」, 로컬 서버는 「로컬 서버」, 못 골랐으면 「선택되지 않음」", () => {
     expect(environmentLines({ ...input, inference: { ok: true, location: "on-device" } })).toEqual({
@@ -59,9 +62,26 @@ describe("DV1 — 환경 줄", () => {
   });
 
   it("릴리스를 못 읽으면 기기 값이 null이다", () => {
+    expect(environmentLines({ ...input, os: null, inference: { ok: false } }).device).toBeNull();
+  });
+
+  it("068 — iOS는 「iOS 버전」이다(iOS에서 기기 줄이 비어 있던 것을 막는다)", () => {
     expect(
-      environmentLines({ ...input, androidRelease: null, inference: { ok: false } }).device,
-    ).toBeNull();
+      environmentLines({
+        ...input,
+        os: { platform: "ios", version: "26.5" },
+        inference: { ok: false },
+      }).device,
+    ).toBe("iOS 26.5");
+  });
+});
+
+describe("068 — 진단 화면의 기기 줄은 iOS에서도 값을 준다 (조립 계약)", () => {
+  it("App.tsx가 iOS에서 `Platform.Version`으로 os를 만든다", () => {
+    const app = readFileSync(join(__dirname, "../../App.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(app).toMatch(/platform:\s*"ios",\s*version:\s*String\(Platform\.Version\)/);
   });
 });
 

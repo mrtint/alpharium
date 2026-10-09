@@ -1,0 +1,86 @@
+# iOS 시뮬레이터 — 새 설치에서 첫 실행 흐름을 지나 홈까지 간다 (068).
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **`scripts/run-device-tests.mjs`의 `FLOWS`에 등록하지 않았다** — 등록하지 않은 흐름은 아무것도 검증하지 않는다(AGENTS 「Maestro」).
+# 이 파일은 훑기(`settings-sweep.yml`·`developer-diagnostics-sweep.yml`)를 하려는 사람이 손으로 홈에 가는 수고를 덜려는 도구다 —
+# 검증이 아니라 준비 단계다. 실행: `maestro --device <UDID> test .maestro/ios/first-run-to-home.yml`
+# (`JAVA_HOME=/opt/homebrew/opt/openjdk`, Metro는 `EXPO_PUBLIC_APP_ENV=dev`).
+#
+# 시스템 권한 창(사진·위치·알림)은 한국어 시뮬레이터 기준 버튼 글자로 누른다. 모델 약 2GB를 받으므로 10분까지 기다린다.
+# 시뮬레이터에서는 작명 뒤 「정상 동작 확인」이 실패할 수 있다(로드맵 「iOS 시뮬레이터 liveness」) — 「그냥 시작하기」로 홈에 간다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.a810labs.pocketlog
+---
+- launchApp:
+    clearState: true
+    permissions:
+      all: unset
+
+# 권한 창이 뜨는 동안 보이는 것을 누른다(순서는 기기 상태에 달렸다).
+- repeat:
+    times: 14
+    commands:
+      # 개발 클라이언트가 자기 주소를 열 때 iOS가 묻는다(「'포켓로그'에서 열겠습니까?」)
+      - runFlow:
+          when:
+            visible: "열기"
+          commands:
+            - tapOn: "열기"
+      - runFlow:
+          when:
+            visible: "전체 접근 허용"
+          commands:
+            - tapOn: "전체 접근 허용"
+      - runFlow:
+          when:
+            visible: "앱을 사용하는 동안 허용"
+          commands:
+            - tapOn: "앱을 사용하는 동안 허용"
+      - runFlow:
+          when:
+            visible: "허용"
+          commands:
+            - tapOn: "허용"
+      - runFlow:
+          when:
+            visible:
+              id: "download-consent-confirm"
+          commands:
+            - tapOn:
+                id: "download-consent-confirm"
+      - waitForAnimationToEnd:
+          timeout: 3000
+
+- extendedWaitUntil:
+    visible:
+      id: "download-progress-proceed"
+    timeout: 600000
+- tapOn:
+    id: "download-progress-proceed"
+
+- extendedWaitUntil:
+    visible:
+      id: "welcome-name-input"
+    timeout: 30000
+- tapOn:
+    id: "welcome-name-input"
+- inputText: "금동"
+- tapOn:
+    id: "welcome-name-submit"
+
+# 「정상 동작 확인」 결과를 기다린다 — 홈이 뜨거나 실패 화면(「그냥 시작하기」)이 뜬다.
+- repeat:
+    while:
+      notVisible:
+        id: "home-settings"
+    times: 60
+    commands:
+      - runFlow:
+          when:
+            visible: "그냥 시작하기"
+          commands:
+            - tapOn: "그냥 시작하기"
+      - waitForAnimationToEnd:
+          timeout: 2000
+- assertVisible:
+    id: "home-settings"

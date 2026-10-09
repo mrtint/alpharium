@@ -48,8 +48,10 @@ export type SettingsScreenProps = {
   placeNamesText: string;
   onOpenPlaceNames: () => void;
   permissionTags: Record<TaggedPermission, PermissionTag>;
-  /** 네 행 모두 — 이 앱의 안드로이드 앱 정보 화면(FR-026) */
+  /** 네 행 모두 — 이 앱의 OS 설정 화면(안드로이드 앱 정보·iOS 포켓로그 설정, FR-026) */
   onOpenAppSettings: () => void;
+  /** 068 — 「배터리」 행 보조 줄. 플랫폼마다 달라서 조립부가 `batteryRowHint(platform)`으로 골라 넘긴다(화면은 플랫폼을 읽지 않는다) */
+  batteryHint: string;
   /** 「1.0.0 (9)」. 읽지 못했으면 `null` — 값을 비운다 */
   versionText: string | null;
   /** 057 — 사진 행의 건너뜀 보조 줄(보드 `6g`). 없으면 그리지 않는다 */
@@ -83,6 +85,7 @@ export function SettingsScreen({
   onOpenPlaceNames,
   permissionTags,
   onOpenAppSettings,
+  batteryHint,
   versionText,
   photoSkipText,
   moduleSizeText,
@@ -148,7 +151,7 @@ export function SettingsScreen({
           />
         ))}
         <Row
-          hint={SETTINGS_TEXT.permBatteryHint}
+          hint={batteryHint}
           label={SETTINGS_TEXT.permBattery}
           onPress={onOpenAppSettings}
           testID="settings-perm-battery"

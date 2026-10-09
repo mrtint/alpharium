@@ -1,0 +1,157 @@
+# iOS 시뮬레이터 — 개발자 메뉴·진단·상태 흉내를 눌러 본다 (068, 훑기).
+#
+# **`scripts/run-device-tests.mjs`의 `FLOWS`에 등록하지 않았다** — 등록하지 않은 흐름은 아무것도 검증하지 않는다(AGENTS 「Maestro」).
+# `settings-sweep.yml`과 같다: 끝까지 간다는 것은 앱이 살아 있다는 뜻뿐이고 Metro `ERROR`·`simctl log show`는 따로 읽는다.
+# 개발 환경(`dev`)에서만 의미가 있다(개발자 행이 처음부터 있다). 홈에서 시작한다.
+appId: com.a810labs.pocketlog
+---
+- launchApp:
+    stopApp: false
+- runFlow: _dismiss-open-prompt.yml
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "settings-developer"
+- tapOn:
+    id: "settings-developer"
+- extendedWaitUntil:
+    visible:
+      id: "developer-screen"
+    timeout: 5000
+- takeScreenshot: ios-developer-top
+
+# 모듈 다시 받기 — 모두 준비돼 있으면 토스트(파일을 지우지 않는다)
+- tapOn:
+    id: "developer-redownload"
+- waitForAnimationToEnd
+- takeScreenshot: ios-developer-redownload
+
+# 상태 흉내 — 날짜 대화상자
+- scrollUntilVisible:
+    element:
+      id: "sim-date"
+- tapOn:
+    id: "sim-date"
+- extendedWaitUntil:
+    visible:
+      id: "sim-date-dialog"
+    timeout: 5000
+- tapOn:
+    id: "sim-date-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "sim-date-dialog"
+    timeout: 5000
+
+# T030: 상태 흉내 토글 (sim-fail, sim-empty, sim-nophoto) 켜고 끄기
+- scrollUntilVisible:
+    element:
+      id: "sim-fail-toggle"
+- tapOn:
+    id: "sim-fail-toggle"
+- tapOn:
+    id: "sim-empty-toggle"
+- tapOn:
+    id: "sim-nophoto-toggle"
+- waitForAnimationToEnd:
+    timeout: 2000
+# 토글 끄기 (원래 상태로 복구)
+- tapOn:
+    id: "sim-fail-toggle"
+- tapOn:
+    id: "sim-empty-toggle"
+- tapOn:
+    id: "sim-nophoto-toggle"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# 진단 겹
+- scrollUntilVisible:
+    element:
+      id: "developer-diagnostics"
+- tapOn:
+    id: "developer-diagnostics"
+- extendedWaitUntil:
+    visible:
+      id: "diagnostics-screen"
+    timeout: 5000
+- takeScreenshot: ios-diagnostics-top
+
+# T029: 저장 점검
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-storage"
+- tapOn:
+    id: "diagnostics-storage"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# T029: 신호 다시 읽기
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-probe-refresh"
+- tapOn:
+    id: "diagnostics-probe-refresh"
+- waitForAnimationToEnd:
+    timeout: 3000
+
+# T029: 프리셋 전환
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-preset-photos"
+- tapOn:
+    id: "diagnostics-preset-photos"
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    id: "diagnostics-preset-empty"
+- waitForAnimationToEnd:
+    timeout: 2000
+
+# 자동 쓰기 지금 실행
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-run-auto"
+- tapOn:
+    id: "diagnostics-run-auto"
+- waitForAnimationToEnd:
+    timeout: 5000
+- takeScreenshot: ios-diagnostics-run-auto
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-failures"
+- takeScreenshot: ios-diagnostics-bottom
+
+# 닫는 수단 — iOS에는 BackHandler가 없다: 「← 설정」(back-to-developer)·「← 일기」로 돌아온다
+- tapOn:
+    id: "back-to-developer"
+- extendedWaitUntil:
+    visible:
+      id: "developer-screen"
+    timeout: 5000
+
+# T028: 개발자 메뉴 끄기 (설정 화면으로 가고 settings-developer가 사라짐)
+- scrollUntilVisible:
+    element:
+      id: "developer-off"
+- tapOn:
+    id: "developer-off"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 5000
+- assertNotVisible:
+    id: "settings-developer"
+
+# 홈으로 돌아오기
+- tapOn:
+    id: "back-to-home"
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 5000

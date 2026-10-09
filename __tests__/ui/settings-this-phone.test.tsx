@@ -35,6 +35,7 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onToggleAutoWrite: jest.fn(),
     permissionTags: { photos: "allowed", location: "allowed", notifications: "allowed" },
     onOpenAppSettings: jest.fn(),
+    batteryHint: "배터리 사용 · 제한 없음으로 두면 제때 써요",
     versionText: "1.0.0 (9)",
     targetHourText: "오후 10시쯤",
     onOpenTargetHour: jest.fn(),

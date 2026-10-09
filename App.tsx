@@ -82,6 +82,8 @@ import { TargetHourDialog } from "./src/ui/TargetHourDialog";
 import { PlaceNameDialog } from "./src/ui/PlaceNameDialog";
 import { formatTargetHour, timeZoneLine } from "./src/app/target-hour";
 import { readDeviceClock } from "./src/app/device-clock";
+import { batteryRowHint } from "./src/app/battery-row";
+import { appPlatform } from "./src/app/platform";
 import { RenameScreen } from "./src/ui/RenameScreen";
 import { usePermissionTags } from "./src/ui/use-permission-tags";
 import type { PermissionFacts, PhotoLocationReading } from "./src/app/permission-tags";
@@ -774,7 +776,7 @@ function AppFrame() {
     return () => clearTimeout(id);
   }, [downloadFailed]);
 
-  const platform: "android" | "ios" = Platform.OS === "ios" ? "ios" : "android";
+  const platform = appPlatform(Platform.OS);
 
   /**
    * 021 — 거부된 권한으로 제한되는 기능의 정직한 안내 (FR-014, SC-004).
@@ -1794,7 +1796,12 @@ function DiagnosticsLayer({
           ? null
           : environmentLines({
               buildLabel,
-              androidRelease: Platform.OS === "android" ? String(Platform.constants.Release) : null,
+              os:
+                Platform.OS === "android"
+                  ? { platform: "android", version: String(Platform.constants.Release) }
+                  : Platform.OS === "ios"
+                    ? { platform: "ios", version: String(Platform.Version) }
+                    : null,
               inference: report.inferenceLocation.ok
                 ? { ok: true, location: report.inferenceLocation.location }
                 : { ok: false },
@@ -2423,6 +2430,8 @@ function SettingsSection({
         autoWriteEnabled={autoDiary.enabled}
         characterName={characterName}
         onOpenAppSettings={onOpenAppSettings}
+        // 068 FR-003 — iOS에는 배터리 최적화 예외가 없다: 보조 줄만 플랫폼별로 고른다(행 이름·동작은 같다).
+        batteryHint={batteryRowHint(appPlatform(Platform.OS))}
         onOpenPlaceNames={() => setOpenDialog("place")}
         onOpenRename={onOpenRename}
         onOpenTargetHour={() => setOpenDialog("time")}

@@ -66,7 +66,9 @@ specs/068-ios-settings-reverify/
 ```text
 src/
 ├── app/
-│   └── battery-row.ts            # 신규 — 플랫폼 → 배터리 행 안내 문구(순수)
+│   ├── battery-row.ts            # 신규 — 플랫폼 → 배터리 행 안내 문구(순수)
+│   ├── platform.ts               # 신규 — Platform.OS 문자열을 "android" | "ios" 유니온으로 좁히는 순수 함수 appPlatform
+│   └── diagnostics-view.ts       # 기기 줄 os: { platform, version } 지원(iOS에서도 환경 기기 줄 표시)
 ├── i18n/catalogs/ko/
 │   └── settings-platform.ts      # 신규 — permBatteryHintIos(안드로이드 값은 settings.ts에 그대로)
 ├── ui/
@@ -76,13 +78,15 @@ App.tsx                           # 이미 만드는 platform으로 hint를 골�
 __tests__/
 ├── app/battery-row.test.ts       # 순수 판정·문구
 ├── ui/settings-battery-row.test.tsx
+├── onboarding/battery-ios.test.ts # iOS 온보딩 배터리 제외 계약
 ├── onboarding/no-react-native-dynamic-import.test.ts   # 소스 계약(FR-006)
 └── ...                           # 훑기에서 걸린 것의 테스트(추가)
 
 .maestro/ios/                    # 시뮬레이터 흐름(전부 FLOWS 미등록 — spec FR-009)
+├── _dismiss-open-prompt.yml     # 개발 클라이언트 「열겠습니까?」 닫기
 ├── first-run-to-home.yml        # 첫 실행 → 홈
 ├── settings-sweep.yml           # 설정 훑기
-└── developer-diagnostics-sweep.yml  # 개발자·진단 훑기
+└── developer-diagnostics-sweep.yml  # 개발자·진단 훑기 (T028~T030 포함)
 ```
 
 **Structure Decision**: 기존 구조 안에서 닫는다. 순수 판정은 `src/app/`(화면이 쓰는 순수 상태), 문구는 062 카탈로그, 플랫폼 값은 `App.tsx`의 기존 `platform`.

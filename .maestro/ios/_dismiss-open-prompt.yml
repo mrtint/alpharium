@@ -1,0 +1,9 @@
+# 개발 클라이언트를 다시 앞으로 올릴 때 iOS가 묻는 「'포켓로그'에서 열겠습니까?」를 닫는다 (068). 다른 흐름이 부르는 하위 흐름이다 —
+# 최상위로 돌리지 않는다. FLOWS에 등록하지 않는다.
+appId: com.a810labs.pocketlog
+---
+- runFlow:
+    when:
+      visible: "열기"
+    commands:
+      - tapOn: "열기"

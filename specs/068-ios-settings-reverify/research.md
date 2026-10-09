@@ -45,3 +45,16 @@
 ## R7 — iOS에서 `BackHandler` 없이 겹을 닫는 수단
 
 - **Decision**: 훑기에서 닫을 수 없는 겹이 발견되면 그때 판정한다. 코드로 확인된 것: 설정 틀은 「‹ 일기」, 사진 확대는 닫기 버튼, 대화상자는 버튼이 있다. 개발자·진단 겹과 상태 흉내 대화상자는 훑기로 확인한다.
+
+## R8 — 플랫폼 타입 좁히기 (`appPlatform`)
+
+- **Decision**: `Platform.OS`는 `string`이므로 순수 함수 `appPlatform(os: string): "android" | "ios"`(`src/app/platform.ts`)를 만들어 안전하게 좁힌다. 조립부(`App.tsx`)가 이를 통해 `platform`을 만들어 화면에 전달한다.
+
+## R9 — 진단 환경 기기 줄의 크로스 플랫폼 지원
+
+- **Decision**: 진단 화면의 「기기」 줄이 기존에는 안드로이드 릴리스(`androidRelease`)만 읽어 iOS에서 비어 있었다. `os: { platform: "android" | "ios"; version: string } | null` 구조로 바꾸어 iOS에서도 「iOS 26.5」가 표시되도록 확장했다.
+
+## R10 — iOS 개발 클라이언트 「열겠습니까?」 대응
+
+- **Decision**: Expo dev-client가 로컬 주소를 열 때 iOS 시스템이 「'포켓로그'에서 열겠습니까?」 확인창을 띄운다. Maestro 조작 시 타이밍 이슈를 방지하기 위해 공용 서브플로우 `.maestro/ios/_dismiss-open-prompt.yml`로 자동 닫기를 구현했다.
+
