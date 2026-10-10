@@ -914,6 +914,21 @@
 - **iOS 시뮬레이터에서 일기 생성은 지금 실패한다**(미해결, 2026-10-10) — 새 `ios/`로 다시 만든 빌드에서 자동 첫 일기·진단 「지금 한 번 써 보기」가 모두 「일기를 쓰지 못했어요.」(`unwritten` 3건)로 끝났다. 「오류 로그 없음」은 생성이 된다는 뜻이 아니다. 로드맵 「iOS 시뮬레이터에서 일기 생성이 실패하는 원인 찾기」.
 - 진단 화면의 「기기」 줄은 iOS에서 비어 있었다(안드로이드 릴리스만 읽었다) — `os: { platform, version }`으로 「iOS 26.5」를 보인다. 「사진 위치 정보」 값이 비는 것은 최근 30일에 사진이 없는 정상 상태(`no-photo`)다.
 
+### 069 — 기능→흐름 대응표와 안드로이드 층 1
+
+- **층 1은 생성 없이 기준 상태에서 끝나는 화면 흐름이다**: `npm run test:layer1`(= `run-device-tests.mjs --layer1`) — `pm clear`·재설치 없이 `run-as`로 `preferences/*.json`만 기준값으로 되돌리고
+  `files/diary/`를 픽스처(오늘부터 사흘, 사진 1·3·1장)로 덮어쓴다. **전용 테스트 기기에서만 돈다 — 그 기기의 일기를 지운다.** 모델(`files/models`)이 없으면 멈춘다.
+  기준 상태는 모델 있음·온보딩 완료·**자동 쓰기 꺼짐**(켜져 있으면 앱을 열 때 생성이 시작될 수 있다)이다. 값의 표는 `scripts/layer1/baseline.ts`, 앱이 새 설정 파일을 읽기 시작하면
+  `__tests__/e2e/baseline.test.ts`(G-1)가 실패해 한 줄을 더하게 한다.
+- **기능 → 흐름 대응표의 정본은 `docs/e2e/feature-flow-map.md` 하나다**(실행기 주석은 경로만). 표가 흐름 파일·`FLOWS`·`LAYER1_FLOWS`와 어긋나면 `flow-map.test.ts`가 실패한다.
+  흐름을 더하면 표의 두 곳(기능 행·인벤토리)을 같이 고친다. 층 1 목록은 `LAYER1_FLOWS`, 층 1 기준 상태를 전제하는 새 흐름은 `NEEDS_LAYER1_BASELINE`이라 **일반 실행(`pm clear` 뒤)에서는 돌지 않는다**.
+- **기존 흐름 셋이 이미 낡았다**(실측, 고치지 않았다): `skeleton`·`prompt-preview`·`today-diary`는 `FLOWS`에 있지만 현재 화면과 맞지 않아 수정 없이는 실패한다.
+- **★ 위반 주입은 원래 결함의 꼴 그대로 해야 한다**: `File.text()` 결함을 `await file.text()`로 되돌리면 30회 반복해도 안 나고(`file`이 async 프레임에 살아 있다), 원래의 `return file.exists ? file.text() : null`(await 없음)에서만
+  `restart-persistence`가 실패한다. **`CI=1`로 띄운 Metro는 파일 감시가 없어** 소스를 바꿔도 번들이 안 바뀐다 — 주입·되돌림마다 Metro를 다시 띄우고 `curl`한 번들에서 치환된 줄을 grep으로 확인한다.
+- **`run-device-tests.mjs`의 JUnit 실패 흐름 집계에 버그가 있었다**: 자기 닫힘 `<testcase/>`를 건너뛰지 않아 통과한 흐름을 실패로 보고했다(`scripts/layer1/junit.ts`와 같은 규칙으로 고쳤다).
+- **실측(2026-10-10, SM-G986N, dev, Metro CI=1)**: 층 1 8개 흐름이 7분 37초에 통과(새 3 + 기존 `dialog-foundation`·`diary-home-1d`·`week-strip-swipe`·`diary-body-screen`·`state-simulation`).
+  위반 주입 둘이 실패로 뒤집혔다. 권한 행 넷(사진·위치·알림·배터리)의 OS 설정 왕복과 모델 없음 중단(`ABORTED`)도 같은 기기에서 확인했다. **미확인**: release 빌드·재부팅 직후 잠금 해제 전의 `run-as` 실패(실제 상황), iOS, 층 2(실제 생성 스모크).
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크

@@ -1,0 +1,28 @@
+# 층 1 — 강제 종료 후 재시작을 10번 반복해도 쓴 날이 읽힌다 (069, 출발점: 067 세션의 「손상됐어요」 결함 / #122)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 무엇을 지키나: 앱을 종료했다 다시 띄우기를 되풀이해도 멀쩡한 일기가 「이 날의 일기 파일이 손상됐어요」로 바뀌지 않는다.
+#   원인은 짧게 사는 `expo-file-system` `File`에 비동기 `text()`를 부르면 GC가 네이티브 공유 객체를 먼저 놓아 가끔 거부되던 것이었다
+#   (AGENTS 「안드로이드·Expo·기기」). 가끔만 나고 jest에는 그 런타임이 없어 **반복해서만** 드러난다 — 그래서 10회다.
+#
+# 단언하는 것: 매 회 홈에서 쓴 날 지면의 본문 자리(`written-body`)가 보이고 읽을 수 없는 일기의 자리(`written-unreadable`)가 없다.
+# 본문의 내용·문장·길이는 단언하지 않는다(헌법 원칙 IV, 069 FR-023).
+#
+# 선행: `node scripts/run-device-tests.mjs --layer1`이 만든 기준 상태 — 오늘이 쓴 날이다(픽스처 사진 1장). 앱이 홈을 오늘로 연다(049).
+# `launchApp`은 기본이 앱을 종료한 뒤 다시 띄운다.
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.a810labs.pocketlog
+---
+- repeat:
+    times: 10
+    commands:
+      - launchApp
+      - extendedWaitUntil:
+          visible:
+            id: "written-paper"
+          timeout: 20000
+      - assertVisible:
+          id: "written-body"
+      - assertNotVisible:
+          id: "written-unreadable"
+      - assertNotVisible: "이 날의 일기 파일이 손상됐어요."

@@ -1,0 +1,54 @@
+# 층 1 — 사진 한 장인 날에서 가로로 쓸어도 확대 화면이 열리지 않는다 (069, 출발점: 067 세션 실기기 결함)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 무엇을 지키나: 사진이 한 장이면 캐러셀 팬이 누름을 빼앗지 않아, 가로로 쓸고 뗀 손가락이 `Pressable`의 누름이 됐다
+#   (AGENTS 067 「사진이 한 장이면 가로로 쓸고 뗀 손가락이 누름이 됐다」). 누른 자리와 뗀 자리가 10 안일 때만 연다(`isTap`).
+#   여러 장일 때는 캐러셀이 가로 팬을 잡아 드러나지 않으므로 **한 장인 날**이 필요하다.
+#
+# 단언하는 것: (1) 쓸기 → 확대 화면이 없다, (2) 짧은 누름 → 열린다, (3) 뒤로 가기 → 닫히고 홈이 그대로다.
+# 핀치 확대는 `adb`로 만들 수 없어 여기서 보지 않는다(대응표 「사람이 봄」).
+#
+# 선행: `node scripts/run-device-tests.mjs --layer1`이 만든 기준 상태 — 오늘이 사진 1장짜리 쓴 날이다(photoId `e2e-0-1`).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.a810labs.pocketlog
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "photo-carousel-single"
+    timeout: 20000
+
+# (1) 가로 쓸기 — 두 방향. 확대 화면이 열리면 안 된다.
+- swipe:
+    from:
+      id: "photo-face-e2e-0-1"
+    direction: LEFT
+    duration: 400
+- assertNotVisible:
+    id: "photo-viewer"
+- swipe:
+    from:
+      id: "photo-face-e2e-0-1"
+    direction: RIGHT
+    duration: 400
+- assertNotVisible:
+    id: "photo-viewer"
+- assertVisible:
+    id: "written-paper"
+
+# (2) 짧은 누름 — 확대 화면이 열린다.
+- tapOn:
+    id: "photo-open-e2e-0-1"
+- extendedWaitUntil:
+    visible:
+      id: "photo-viewer"
+    timeout: 5000
+
+# (3) 뒤로 가기 — 확대 화면만 닫히고 앱은 홈에 그대로다.
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: "photo-viewer"
+    timeout: 5000
+- assertVisible:
+    id: "written-paper"
