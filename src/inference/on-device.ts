@@ -620,26 +620,42 @@ export function createOnDeviceBackend(
         if (outcome.kind !== "no-photos") visionMs = Date.now() - visionStart;
       }
 
-      // 017 — 캡션 성공한 사진(resizedPath가 있는 것)의 사본 정리 헬퍼
-      // (research.md §1 흐름 4). `judge()` 거부·타임아웃·끊김 등 `generate()`
+      // 017 — 캡션 성공한 사진 중 **이 기능이 관리하는 사본뿐**(`ownsResizedPath`)의
+      // 정리 헬퍼(research.md §1 흐름 4). `judge()` 거부·타임아웃·끊김 등 `generate()`
       // 내부에서 실패가 확정되는 모든 경로 직전에 부른다 — 저장 실패
       // (`storage` 단계)는 이 함수의 범위 밖이며 `pipeline.ts`가 다룬다.
+      //
+      // **원본과 같은 경로(`ownsResizedPath === false`)는 절대 넘기지 않는다**
+      // (2026-10-10, FR-006) — 넘기면 `cleanupResizedPhoto`가 사용자의 원본 사진을
+      // 지운다.
       const cleanupUsedPhotos = async (): Promise<void> => {
         if (seen === undefined || vision?.cleanupResized === undefined) return;
         const cleaner = vision.cleanupResized;
         await Promise.all(
           seen.captions
-            .filter((c): c is PhotoCaption & { resizedPath: string } => c.resizedPath !== undefined)
+            .filter(
+              (c): c is PhotoCaption & { resizedPath: string } =>
+                c.resizedPath !== undefined && c.ownsResizedPath === true,
+            )
             .map((c) => cleaner(c.resizedPath).catch(() => {})),
         );
       };
 
       // 017 — 캡션 성공한 사진을 `usedPhotos` 형태로 뽑는다(data-model.md §5).
+      //
+      // **원본과 같은 경로여도 포함한다**(2026-10-10) — 캡션이 성공했다는 것은
+      // 그 장을 실제로 봤다는 뜻이고 051 캐러셀이 보여줘야 한다. `ownsResizedPath`를
+      // 그대로 옮겨 지우기 판정(`pipeline.ts`)이 원본을 지우지 않게 한다.
       const usedPhotosOf = (): DiaryDraft["usedPhotos"] => {
         if (seen === undefined) return undefined;
         const used = seen.captions
           .filter((c): c is PhotoCaption & { resizedPath: string } => c.resizedPath !== undefined)
-          .map((c) => ({ photoId: c.photoId, takenAt: c.takenAt, resizedPath: c.resizedPath }));
+          .map((c) => ({
+            photoId: c.photoId,
+            takenAt: c.takenAt,
+            resizedPath: c.resizedPath,
+            ownsResizedPath: c.ownsResizedPath === true,
+          }));
         return used.length > 0 ? used : undefined;
       };
 

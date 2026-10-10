@@ -838,8 +838,18 @@ describe("014 — 제목이 사후 분리된다 (FR-006·007·009)", () => {
  */
 describe("017 — 사진 보존 판정 (contracts/photo-preservation.md P4)", () => {
   const usedPhotos = [
-    { photoId: "a", takenAt: new Date("2026-08-12T08:00:00"), resizedPath: "/resized/a.jpg" },
-    { photoId: "b", takenAt: new Date("2026-08-12T14:00:00"), resizedPath: "/resized/b.jpg" },
+    {
+      photoId: "a",
+      takenAt: new Date("2026-08-12T08:00:00"),
+      resizedPath: "/resized/a.jpg",
+      ownsResizedPath: true,
+    },
+    {
+      photoId: "b",
+      takenAt: new Date("2026-08-12T14:00:00"),
+      resizedPath: "/resized/b.jpg",
+      ownsResizedPath: true,
+    },
   ];
 
   function backendWithPhotos(text: string): InferenceBackend {
@@ -888,6 +898,51 @@ describe("017 — 사진 보존 판정 (contracts/photo-preservation.md P4)", ()
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.entry.photos).toBeUndefined();
+  });
+
+  /**
+   * ★ 2026-10-10 — 원본과 같은 경로(`ownsResizedPath: false`, 013 C1)는 저장 실패시에도
+   * 절대 지우지 않는다. 그 경로는 사용자의 원본 사진이다(FR-006).
+   */
+  it("저장 실패 시 ownsResizedPath가 거짓인 사진(원본 경로)은 지우지 않는다", async () => {
+    const store = memoryStore({ failWith: "저장 공간이 없다" });
+    const cleaned: string[] = [];
+    const mixedPhotos = [
+      {
+        photoId: "a",
+        takenAt: new Date("2026-08-12T08:00:00"),
+        resizedPath: "/resized/a.jpg",
+        ownsResizedPath: true,
+      },
+      {
+        photoId: "b",
+        takenAt: new Date("2026-08-12T14:00:00"),
+        resizedPath: "/photo/b.jpg",
+        ownsResizedPath: false,
+      },
+    ];
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        return { text: "오늘 사진을 찍었다.", usedPhotos: mixedPhotos };
+      },
+    };
+    const { pipeline } = makePipeline({
+      backend,
+      store,
+      cleanupResizedPhoto: async (path) => {
+        cleaned.push(path);
+      },
+    });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result.ok).toBe(false);
+    expect(cleaned).toEqual(["/resized/a.jpg"]);
+    expect(cleaned).not.toContain("/photo/b.jpg");
   });
 
   it("cleanupResizedPhoto를 주지 않아도 저장 실패가 정상 동작한다 (옵셔널)", async () => {

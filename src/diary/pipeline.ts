@@ -352,9 +352,16 @@ async function runStages(
     // 017 — **저장이 실패하면 usedPhotos의 사본을 정리한다**
     // (contracts/photo-preservation.md P4). 저장이 성공해야만 그 일기가
     // 존재하는 한 사본이 보존된다 — 실패하면 아무도 참조하지 않는다.
+    //
+    // **`ownsResizedPath`가 거짓인 것(원본과 같은 경로, 013 C1)은 절대 지우지
+    // 않는다**(2026-10-10, FR-006) — 그 경로는 사용자의 원본 사진이다.
     if (generated.usedPhotos !== undefined && deps.cleanupResizedPhoto !== undefined) {
       const cleanup = deps.cleanupResizedPhoto;
-      await Promise.all(generated.usedPhotos.map((p) => cleanup(p.resizedPath).catch(() => {})));
+      await Promise.all(
+        generated.usedPhotos
+          .filter((p) => p.ownsResizedPath)
+          .map((p) => cleanup(p.resizedPath).catch(() => {})),
+      );
     }
     // **만든 글을 버리지 않는다**(006 FR-012a). 30초를 들인 글이고 다시 생성해도
     // 같은 글이 나오지 않는다. 실패는 실패로 두되 읽을 기회를 빼앗지 않는다.

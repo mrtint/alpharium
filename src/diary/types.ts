@@ -174,8 +174,12 @@ export type DiaryEntry = {
    * `signalsUsed.photos`(그날 수집된 사진 전부)와 다르다 — 이것은 VLM이
    * 실제로 캡션한 것만, 최대 5장(VISION_PHOTO_LIMIT)이다. 옵셔널이며 옛
    * 일기에는 없다.
+   *
+   * `ownsResizedPath`가 거짓이면 `resizedPath`는 원본 사진 경로다(013 C1 — 이미
+   * 작아 리사이즈를 건너뛴 경우) — 051 캐러셀 표시에는 쓰지만 058 「일기 모두
+   * 지우기」·저장 실패 정리 어느 쪽도 그 경로를 지우지 않는다(FR-006).
    */
-  photos?: { photoId: string; takenAt: Date; resizedPath: string }[];
+  photos?: { photoId: string; takenAt: Date; resizedPath: string; ownsResizedPath: boolean }[];
   /**
    * 소요 시간 (017, 헌법 1.2.0).
    *

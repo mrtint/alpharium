@@ -69,13 +69,18 @@ export type DiaryDraft = {
   /**
    * 이번 생성이 실제로 캡션한 사진들 (017).
    *
-   * `PhotoCaption`의 부분집합(`photoId`·`takenAt`·`resizedPath`)만 옮긴다 —
-   * 캡션 텍스트(`text`)는 옮기지 않는다. **여기 실린 사본은 아직 삭제되지
-   * 않은 상태다** — `pipeline.ts`가 저장 성공을 확인해야 최종적으로
-   * 지켜진다. 사진을 보지 않은 생성(vision === "none" 또는 그날 사진
-   * 0장)에는 이 필드 자체가 없다.
+   * `PhotoCaption`의 부분집합(`photoId`·`takenAt`·`resizedPath`·`ownsResizedPath`)만
+   * 옮긴다 — 캡션 텍스트(`text`)는 옮기지 않는다. **`ownsResizedPath`가 참인 사본만
+   * 아직 삭제되지 않은 상태다** — `pipeline.ts`가 저장 성공을 확인해야 최종적으로
+   * 지켜진다(거짓이면 원본이라 이 기능의 지우기 대상이 아니다, FR-006). 사진을
+   * 보지 않은 생성(vision === "none" 또는 그날 사진 0장)에는 이 필드 자체가 없다.
    */
-  usedPhotos?: { photoId: string; takenAt: Date; resizedPath: string }[];
+  usedPhotos?: {
+    photoId: string;
+    takenAt: Date;
+    resizedPath: string;
+    ownsResizedPath: boolean;
+  }[];
   /**
    * 이번 생성 한 번의 소요 시간 (017, 헌법 1.2.0).
    *

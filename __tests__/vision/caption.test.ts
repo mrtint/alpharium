@@ -147,6 +147,8 @@ describe("한 장씩 읽는다 (FR-001a)", () => {
       photoId: "a",
       takenAt: FIVE[0].takenAt,
       text: "사진 a의 내용",
+      resizedPath: "/photo/a.jpg",
+      ownsResizedPath: false,
     });
   });
 });
@@ -365,6 +367,8 @@ describe("017 — 성공한 캡션은 즉시 지우지 않는다 (contracts/phot
     expect(vision?.captions.map((c) => c.resizedPath)).toEqual(
       FIVE.map((p) => `/resized/${p.id}.jpg`),
     );
+    // 실제로 새 사본이 만들어졌으므로 이 기능이 지우기를 관리한다.
+    expect(vision?.captions.every((c) => c.ownsResizedPath === true)).toBe(true);
   });
 });
 
@@ -428,13 +432,20 @@ describe("017 — 캡션이 실패한 장의 사본은 즉시 지운다 (contrac
     expect(cleaned).toHaveLength(0);
   });
 
-  it("이미 작아 원본 경로를 그대로 쓴 장은 resizedPath가 없다 (data-model.md §1)", async () => {
+  /**
+   * ★ 2026-10-10 — 070의 e2e 표본 사진(960px)이 전부 1024px 미만이라 이 분기를
+   * 타자 051 캐러셀의 `entry.photos`가 통째로 비어 그날 사진이 하나도 안 보였다.
+   * **캡션이 성공했으면 원본 경로라도 표시용으로 싣는다** — 지우기 관리 대상이
+   * 아니라는 것(`ownsResizedPath: false`)과 "화면에 안 보인다"는 서로 다른 사실이다.
+   */
+  it("이미 작아 원본 경로를 그대로 쓴 장도 표시용 resizedPath를 싣되 지우기 대상은 아니다", async () => {
     const resize: ResizeExecutor = async (sourcePath) => ({ ok: true, path: sourcePath });
 
     const vision = await captionAll(engineWith(), FIVE, 5, resolve, undefined, resize);
 
     for (const caption of vision?.captions ?? []) {
-      expect(caption.resizedPath).toBeUndefined();
+      expect(caption.resizedPath).toBe(`/photo/${caption.photoId}.jpg`);
+      expect(caption.ownsResizedPath).toBe(false);
     }
   });
 
