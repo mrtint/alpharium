@@ -75,7 +75,7 @@ jobs:
           npx expo prebuild --platform android --clean
       # 캐시가 없어도 결과는 같다 — 느릴 뿐이다. android/는 prebuild --clean이 지우는 생성물이라
       # 그 안은 캐시하지 않는다.
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -130,7 +130,7 @@ jobs:
           start=$(date +%s)
           trap 'echo "| prebuild | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           npx expo prebuild --platform ios --clean --no-install
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ~/Library/Caches/CocoaPods
           key: pods-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
@@ -142,7 +142,7 @@ jobs:
           start=$(date +%s)
           trap 'echo "| pod install | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           pod install
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/dd
           key: dd-${{ runner.os }}-${{ hashFiles('package-lock.json', 'app.json') }}
