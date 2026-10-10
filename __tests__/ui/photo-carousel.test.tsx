@@ -28,6 +28,7 @@ const photo = (i: number) => ({
   photoId: `p${i}`,
   takenAt: new Date(`2026-09-26T0${i}:00:00`),
   resizedPath: `/data/photos/p${i}.jpg`,
+  ownsResizedPath: true,
 });
 const three = [photo(1), photo(2), photo(3)];
 

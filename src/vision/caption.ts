@@ -156,13 +156,19 @@ export async function captionAll(
     // (contracts/photo-preservation.md P1). 013까지는 `finally`에서 장마다
     // 즉시 지웠지만, 이 시점에는 이 일기가 결국 저장될지 아직 모른다 —
     // 최종 보존/정리는 파이프라인이 저장 결과를 확인한 뒤에 정한다
-    // (research.md §1). `resizedPath`에 경로만 실어 올린다.
+    // (research.md §1).
+    //
+    // **`resizedPath`는 늘 실린다**(2026-10-10) — 051 캐러셀의 표시 경로다.
+    // 원본과 같은 경로(C1)여도 캡션이 성공했다는 것은 그 장을 실제로 봤다는
+    // 뜻이고, 화면도 그 장을 보여줘야 한다. `ownsResizedPath`만 지우기 대상
+    // 여부를 가른다 — 원본을 지우는 경로가 생기면 안 되기 때문이다(FR-006).
     // ─────────────────────────────────────────────────────────────────────
     captions.push({
       photoId: photo.id,
       takenAt: photo.takenAt,
       text: result.text,
-      resizedPath: shouldCleanup ? captionPath : undefined,
+      resizedPath: captionPath,
+      ownsResizedPath: shouldCleanup,
     });
   }
 

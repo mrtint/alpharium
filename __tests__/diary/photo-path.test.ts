@@ -73,11 +73,13 @@ describe("066 PP — fileStore.load가 사본 경로를 옮긴다", () => {
         photoId: "ph://A/L0/001",
         takenAt: new Date("2026-10-08T10:00:00"),
         resizedPath: `${OLD_DOC}/${VISION_CACHE_DIRECTORY}/ph___A_L0_001.jpg`,
+        ownsResizedPath: true,
       },
       {
         photoId: "ph://B/L0/001",
         takenAt: new Date("2026-10-08T11:00:00"),
         resizedPath: "/somewhere/original.jpg",
+        ownsResizedPath: false,
       },
     ],
   };

@@ -224,8 +224,18 @@ describe("직렬화 왕복 — unknown이 살아남는다 (SC-007, 원칙 V)", (
     const entry: DiaryEntry = {
       ...entryFor("2026-08-12"),
       photos: [
-        { photoId: "a", takenAt: new Date("2026-08-12T08:00:00"), resizedPath: "/resized/a.jpg" },
-        { photoId: "b", takenAt: new Date("2026-08-12T14:00:00"), resizedPath: "/resized/b.jpg" },
+        {
+          photoId: "a",
+          takenAt: new Date("2026-08-12T08:00:00"),
+          resizedPath: "/resized/a.jpg",
+          ownsResizedPath: true,
+        },
+        {
+          photoId: "b",
+          takenAt: new Date("2026-08-12T14:00:00"),
+          resizedPath: "/resized/b.jpg",
+          ownsResizedPath: true,
+        },
       ],
     };
 

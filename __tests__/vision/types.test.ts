@@ -53,13 +53,20 @@ function declarationOf(name: string): string {
 describe("PhotoCaption — 원칙 IV의 첫 방어선", () => {
   const declaration = declarationOf("PhotoCaption");
 
-  it("자리가 넷이다 — photoId·takenAt·text·resizedPath (017)", () => {
+  it("자리가 다섯이다 — photoId·takenAt·text·resizedPath·ownsResizedPath (017·2026-10-10)", () => {
     const fields = [...declaration.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1]);
-    expect(fields.sort()).toEqual(["photoId", "resizedPath", "takenAt", "text"]);
+    expect(fields.sort()).toEqual(["ownsResizedPath", "photoId", "resizedPath", "takenAt", "text"]);
   });
 
-  it("resizedPath는 옵셔널이다 (017 — 원본과 같은 경로면 없다)", () => {
+  it("resizedPath는 옵셔널이다 (017 — 캡션이 실패하면 캡션 자체가 담기지 않는다)", () => {
     expect(declaration).toMatch(/resizedPath\?:\s*string/);
+  });
+
+  // ★ 2026-10-10 — 지우기 가능 여부와 표시 경로를 같은 필드로 묶지 않는다. 묶으면
+  // 원본과 같은 경로(013 C1)인 사진의 resizedPath를 undefined로 날려야 했고,
+  // 그것이 051 캐러셀에서 그날 사진이 전부 사라지는 결함으로 이어졌다.
+  it("ownsResizedPath는 옵셔널 불이다 (지우기 관리 대상인지만 가른다)", () => {
+    expect(declaration).toMatch(/ownsResizedPath\?:\s*boolean/);
   });
 
   // ★ 이것이 이 파일의 핵심이다. 자리가 없으면 담을 수 없다.

@@ -216,6 +216,98 @@ describe("017 — generate()의 usedPhotos (contracts/photo-preservation.md P4)"
     expect("text" in result).toBe(true);
     expect((result as { usedPhotos?: unknown }).usedPhotos).toBeUndefined();
   });
+
+  /**
+   * ★ 2026-10-10 — 070의 e2e 표본 사진(960px)처럼 그날 사진이 전부 1024px
+   * 미만이면 리사이즈가 건너뛰어지고(013 C1) `resize`가 원본과 같은 경로를
+   * 돌려준다. 이때도 캡션은 성공했으므로 `usedPhotos`가 비어선 안 된다 —
+   * 비면 051 캐러셀의 `entry.photos`가 통째로 사라져 그날 사진이 하나도
+   * 안 보인다(실기기에서 관측된 결함).
+   */
+  it("리사이즈를 건너뛴(원본과 같은 경로) 하루도 usedPhotos가 채워진다", async () => {
+    const cleaned: string[] = [];
+    const engine: VisionEngine = {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(path: string): Promise<VisionRunResult> {
+        const id = (path.split("/").pop() ?? path).replace(".jpg", "");
+        return { text: `사진 ${id}` };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const support: VisionSupport = {
+      engine,
+      resolvePath: async (p) => `/photo/${p.id}.jpg`,
+      // 이미 작아 리사이즈를 건너뛴다 — 013 C1과 같은 경로를 그대로 돌려준다.
+      resize: async (sourcePath) => ({ ok: true, path: sourcePath }),
+      cleanupResized: async (path) => {
+        cleaned.push(path);
+      },
+    };
+    const genEngine = engineReturning({
+      text: "2026년 8월 20일. 오늘은 공원에 갔다. 사진 세 장을 찍었다.",
+      ending: { kind: "eos" },
+    });
+
+    const backend = createOnDeviceBackend(async () => [], genEngine, 60_000, support);
+    const result = await backend.generate(requestWith(signalsWithPhotos(THREE)));
+
+    expect("text" in result).toBe(true);
+    if (!("text" in result)) throw new Error("expected success");
+
+    const used = (
+      result as unknown as {
+        usedPhotos?: { photoId: string; resizedPath: string; ownsResizedPath: boolean }[];
+      }
+    ).usedPhotos;
+    expect(used).toBeDefined();
+    expect(used).toHaveLength(3);
+    expect(used?.every((u) => u.ownsResizedPath === false)).toBe(true);
+    expect(used?.map((u) => u.resizedPath)).toEqual([
+      "/photo/a.jpg",
+      "/photo/b.jpg",
+      "/photo/c.jpg",
+    ]);
+    // 원본이므로 이 과정에서 지우기가 전혀 불리지 않는다(FR-006).
+    expect(cleaned).toHaveLength(0);
+  });
+
+  /**
+   * ★ FR-006 — 원본과 같은 경로인 사진은 판정 거부 등 실패 경로에서도 지워지지
+   * 않는다. 지우면 사용자의 원본 사진을 삭제하게 된다.
+   */
+  it("원본과 같은 경로인 사진은 실패 경로에서도 cleanupResized가 불리지 않는다", async () => {
+    const cleaned: string[] = [];
+    const engine: VisionEngine = {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(path: string): Promise<VisionRunResult> {
+        const id = (path.split("/").pop() ?? path).replace(".jpg", "");
+        return { text: `사진 ${id}` };
+      },
+      async stop() {},
+      async unload() {},
+    };
+    const support: VisionSupport = {
+      engine,
+      resolvePath: async (p) => `/photo/${p.id}.jpg`,
+      resize: async (sourcePath) => ({ ok: true, path: sourcePath }),
+      cleanupResized: async (path) => {
+        cleaned.push(path);
+      },
+    };
+    // 빈 글 → judge()가 empty로 거부한다.
+    const genEngine = engineReturning({ text: "", ending: { kind: "eos" as const } });
+
+    const backend = createOnDeviceBackend(async () => [], genEngine, 60_000, support);
+    const result = await backend.generate(requestWith(signalsWithPhotos(THREE)));
+
+    expect("kind" in result).toBe(true);
+    expect(cleaned).toHaveLength(0);
+  });
 });
 
 /**
