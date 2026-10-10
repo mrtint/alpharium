@@ -143,7 +143,7 @@ TestFlight에서 실제 iPhone에 설치된다. 같은 경로로 안드로이드
 
 **위험**: 퍼블릭 저장소에서 비밀이 새지 않게 업로드 잡은 `main`의 수동 실행으로만 돌린다(포크 PR에는 비밀이 안 넘어간다). 러너 실측(스펙 072, `specs/072-ci-native-build-check/quickstart.md` §5): ubuntu-latest(4코어·16GB)에서 arm64 debug는 gradle 5~10분·최대 메모리 약 12GB/16GB로 OOM이 없었다 — release 최적화 컴파일은 이 값으로 추정하지 말고 다시 잰다. `ubuntu-latest`가 2026-10-19부터 Ubuntu 26으로 바뀐다.
 
-### 사진 있는 날의 VLM 캡션 전량 스킵(SharedObject GC 레이스) 방어
+### 사진 있는 날의 VLM 캡션 전량 스킵(SharedObject GC 레이스) 방어 (073)
 
 상세 분석 문서: [`docs/superpowers/specs/2026-10-10-photo-caption-silent-failure.md`](../superpowers/specs/2026-10-10-photo-caption-silent-failure.md)
 
