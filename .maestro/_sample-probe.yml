@@ -1,0 +1,61 @@
+# 실기기 자동 테스트 — 표본의 대표 날 하나로 이동해 사진 칸·장소 칸을 본다 (070, 보조 흐름)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# `sample-days.yml`이 대표 날마다 부른다. 단독으로 돌리지 않는다 — env `DATE`·`BACK`·`PHOTOS`·`PLACES`가 필요하다.
+#
+#   DATE    이동할 날 (YYYY-MM-DD)
+#   BACK    달력을 이전 달로 몇 번 넘기나 (오늘의 달과 그 날의 달 차이, 0~2)
+#   PHOTOS  사진 칸이 보여야 할 숫자 (문자열)
+#   PLACES  장소 칸이 보여야 할 숫자 (문자열)
+#
+# 값은 표(`scripts/e2e-sample/manifest.ts`)에서 실행기가 만든다 — 흐름에는 날짜·기대 수 리터럴이 없다(계약 테스트가 잠근다).
+#
+# **단언하는 것**: 사진 칸 숫자와 장소 칸 숫자가 표의 기대와 같다. **일기 본문은 단언하지 않는다**(원칙 IV).
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# **매번 앱을 다시 연다** — 앱을 열면 고른 날이 오늘이고(049) 달력은 **고른 날의 달**에서 열린다. 앞 대표 날의 달에서 열리면 `BACK`(오늘의 달 기준)이
+# 어긋나 먼 날을 못 찾는다(2026-10-10 첫 실측: 9월 28일 다음 9월 14일에서 이전 달을 한 번 더 눌러 8월로 갔다).
+appId: com.a810labs.pocketlog
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 20000
+- tapOn:
+    id: "home-date-button"
+- extendedWaitUntil:
+    visible:
+      id: "calendar-dialog"
+    timeout: 10000
+
+# 이전 달로 BACK번 (0~2)
+- runFlow:
+    when:
+      true: ${BACK >= 1}
+    commands:
+      - tapOn:
+          id: "calendar-prev"
+- runFlow:
+    when:
+      true: ${BACK >= 2}
+    commands:
+      - tapOn:
+          id: "calendar-prev"
+
+- tapOn:
+    id: "calendar-day-${DATE}"
+- extendedWaitUntil:
+    notVisible:
+      id: "calendar-dialog"
+    timeout: 10000
+
+# 안 쓴 날이므로 재료 두 칸이 보인다. 읽는 동안은 「읽는 중」이라 숫자가 설 때까지 기다린다.
+- extendedWaitUntil:
+    visible:
+      id: "signal-photos-number"
+      text: "${PHOTOS}"
+    timeout: 30000
+- assertVisible:
+    id: "signal-places-number"
+    text: "${PLACES}"

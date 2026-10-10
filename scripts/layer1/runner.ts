@@ -32,6 +32,8 @@ export type Layer1Options = {
   log?: (line: string) => void;
   /** 테스트가 틀·사진을 갈아 끼운다. 기본은 저장소의 픽스처 */
   fixtures?: { diaries: FixtureFile[]; photos: { name: string; localPath: string }[] };
+  /** 070 — 흐름에 넘길 `-e` 값(표본 대표 날). 없으면 넘기지 않는다 */
+  env?: Readonly<Record<string, string>>;
 };
 
 /** L0에서 출력하는 안내 한 줄 (FR-013) — 확인 질문은 없다 */
@@ -141,7 +143,7 @@ export function runLayer1(options: Layer1Options): Layer1Result {
 
   // L7 — 흐름을 한 번의 maestro 실행으로
   log(`▶ 층 1 흐름 ${flows.length}개를 한 번에 실행`);
-  const run = device.runMaestro(flows);
+  const run = device.runMaestro(flows, options.env);
   if (run.status === 0) return { status: "passed" };
   const failedNames = run.failed?.join(", ") ?? `알 수 없음 (종료 코드 ${run.status})`;
   return { status: "failed", reason: `실패한 흐름: ${failedNames}` };

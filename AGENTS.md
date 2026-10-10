@@ -929,6 +929,23 @@
 - **실측(2026-10-10, SM-G986N, dev, Metro CI=1)**: 층 1 8개 흐름이 7분 37초에 통과(새 3 + 기존 `dialog-foundation`·`diary-home-1d`·`week-strip-swipe`·`diary-body-screen`·`state-simulation`).
   위반 주입 둘이 실패로 뒤집혔다. 권한 행 넷(사진·위치·알림·배터리)의 OS 설정 왕복과 모델 없음 중단(`ABORTED`)도 같은 기기에서 확인했다. **미확인**: release 빌드·재부팅 직후 잠금 해제 전의 `run-as` 실패(실제 상황), iOS, 층 2(실제 생성 스모크).
 
+### 070 — e2e 표본: 30일치 가상의 하루
+
+- **층 1 실행기 앞단이 「표본 보장」을 한다**(`scripts/layer1/with-sample.ts` → `scripts/e2e-sample/ensure.ts`): 기기의 `PocketlogSeed/` 아래 `s30-*.jpg` 129장(1~30일 전, **오늘은 심지 않는다**)이 표와 맞으면 건너뛰고(3.3초), 아니면 `s30-` 사진·표식만 지우고
+  다시 심는다(7.5초). `npm run sample:seed`는 같은 코드를 직접 돌린다. **사진은 실제 무료 사진 210장**(Wikimedia Commons CC0·퍼블릭 도메인, 소유자 결정 — 풀 200장 이상)이고 저장소에는 목록 `scripts/e2e-sample/photos.json`(URL·sha256·라이선스)과 스크립트만 있다.
+  받은 파일은 gitignore된 `.cache/`에 있다 — `npm run sample:fetch`(처음 한 번 `-- --record-hashes`), **외부 서비스를 부르므로 목록을 소유자가 본 뒤에만 돈다**.
+- **★ 직접 쓴 EXIF가 이 기기에서는 받아들여졌다**(010의 「손으로 만든 EXIF는 스캐너가 무시한다」와 다르다): 받은 사진의 EXIF를 걷고 IFD0(해상도·방향·`DateTime`)·ExifIFD(`ExifVersion`·`DateTimeOriginal/Digitized`·`OffsetTime*`·
+  `ComponentsConfiguration`·화소 크기)·GPS(`GPSVersionID`·위경도·`GPSDateStamp`)를 새로 쓰면 좌표 있는 사진도 없는 사진도 `datetaken`이 정확했다(`scripts/e2e-sample/exif-write.ts`). **어느 태그가 결정적인지는 모른다**(짐작으로 넉넉히 넣었다).
+  **색인은 `scan_volume` 한 번이 `scan_file` 장마다보다 빠르다**(20장 1.5초 vs 25.8초) — 010의 「`scan_file`만 동작한다」는 이 기기(Android 13)에서 맞지 않다. 볼륨 전체를 훑으므로 전용 기기 전제다.
+- **「장소 N곳」은 군집 수가 아니라 순차 방문 수다**(`src/signals/places.ts`: 시각순으로 훑으며 직전 자리와 100m를 넘으면 새 자리 — 집→직장→집 = 3곳). 표의 기대 장소 수는 **사람이 적은 값**이고(`manifest.ts`) 코드가 앱 규칙을 재구현해 계산하지 않는다(원칙 IV).
+  방문 안 흔들림 ≤ 40m, 군집 사이 ≥ 1km, 「걸어 다닌 날」은 150m씩 떨어진 5장 = 5곳.
+- **표식은 기기에 있다**(`PocketlogSeed/s30-marker.txt` — 기준일·표 지문·장수; 개발 기계에는 기록이 없다). **표식만 믿지 않는다**: 건너뛰려면 기기의 `s30-` 사진을 되읽은 결과(수·`datetaken`이 NULL이 아님·같은 하루·시각 오차 ≤ 2분)도 표와 맞아야 한다.
+  `seed:clear`(010)는 폴더째 지우므로 표식도 같이 사라져 다음 층 1이 다시 심는다. 010 사진·소유자의 진짜 사진은 건드리지 않는다(삭제 명령은 `find … -name 's30-*' -delete` 하나 — 소스 계약이 잠근다).
+- **새 흐름 `sample-days`**: 대표 날 8곳(`P0`~`P7`)의 날짜·사진 수·장소 수는 표에서 실행기가 만들어 `maestro test -e`로 넘긴다(흐름에는 리터럴이 없다). **★ 달력은 고른 날의 달에서 열린다** — 앞 대표 날의 달에서 열리면 `BACK`이 어긋나므로
+  프로브마다 `launchApp`으로 오늘부터 시작한다(첫 실측에서 9/28 다음 9/14를 못 찾았다). 문서 `docs/e2e/sample-table.md`는 `scripts/sample-doc.mts`가 표에서 그리고 테스트가 글자 단위로 대조한다.
+- **실측(2026-10-10, SM-G986N, dev)**: 층 1 9개(기존 8 + `sample-days`)가 표본 위에서 11분 47초에 통과, 기존 8개는 수정 없이 통과. 위반 주입 셋(기대 장소 수를 틀리게·`s30-` 일부 삭제·표식 기준일 어제)이 각각 실패/재심기로 뒤집혔다. 상세는 `specs/070-e2e-sample-seed/quickstart.md` 끝.
+- **미확인**: iOS 시뮬레이터(맥 필요 — 범위 밖), 다른 기기·OS에서 `scan_volume` 색인, 장소 이름(역지오코딩) 묶기의 단언, 위치 권한이 없는 기기에서의 표본 화면.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크

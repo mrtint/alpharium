@@ -170,6 +170,8 @@ const FLOWS = [
   ".maestro/restart-persistence.yml",
   ".maestro/single-photo-swipe.yml",
   ".maestro/settings-developer-sweep.yml",
+  // 070 — 30일치 표본(MediaStore 사진)을 전제한다. `--layer1`의 「표본 보장」 단계가 심고 대표 날 값을 `-e`로 넘긴다 — 일반 실행(`pm clear`)에서는 표본도 값도 없어 실패한다.
+  ".maestro/sample-days.yml",
 ];
 
 /**
@@ -189,6 +191,8 @@ const LAYER1_FLOWS = [
   ".maestro/diary-body-screen.yml",
   // 상태 흉내를 켰다 끄므로 마지막에 둔다 — 중간에 실패해도 다음 실행의 기준 상태 복원이 흉내 기록을 지운다
   ".maestro/state-simulation.yml",
+  // 070 — 표본 위에서 날마다 다른 상황의 사진·장소 칸을 본다(대표 날 값은 실행기가 만든다)
+  ".maestro/sample-days.yml",
 ];
 
 /**
@@ -199,6 +203,8 @@ const NEEDS_LAYER1_BASELINE = [
   ".maestro/restart-persistence.yml",
   ".maestro/single-photo-swipe.yml",
   ".maestro/settings-developer-sweep.yml",
+  // 070 — 기준 상태에 더해 30일치 표본과 실행기가 넘기는 `-e` 값이 필요하다
+  ".maestro/sample-days.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */
@@ -246,10 +252,13 @@ function report(status, reason) {
 
 async function runLayer1Mode() {
   const { adbDevice } = await import("./layer1/device.ts");
-  const { runLayer1 } = await import("./layer1/runner.ts");
+  const { runLayer1WithSample } = await import("./layer1/with-sample.ts");
+  const { realSampleStep } = await import("./e2e-sample/layer1-step.ts");
   const requested = process.argv.slice(2).filter((arg) => arg !== "--layer1");
   const flows = requested.length > 0 ? requested : LAYER1_FLOWS;
-  const result = runLayer1({ device: adbDevice(), flows, log: (line) => console.log(line) });
+  const log = (line) => console.log(line);
+  // 070 — 흐름 앞에 30일치 표본을 보장하고(없거나 낡았으면 s30- 사진만 지우고 다시 심는다) 대표 날 값을 `-e`로 넘긴다.
+  const result = await runLayer1WithSample({ device: adbDevice(), flows, log }, realSampleStep(log));
   if (result.status === PASSED) {
     report(PASSED);
     process.exit(0);

@@ -73,3 +73,6 @@ scripts/samples/**/*.jpeg
 # 028 — 조사용 원시 logcat 덤프. 기기 노이즈가 섞이고 커질 수 있다
 # (specs/028-chinese-english-diary-failure/tasks.md T006). 폴더는 .gitkeep으로 유지
 specs/028-chinese-english-diary-failure/logs/*.log
+
+# 070 — e2e 표본 사진 캐시. 받은 무료 사진은 저장소에 커밋하지 않는다(목록 scripts/e2e-sample/photos.json과 스크립트만)
+scripts/e2e-sample/.cache/

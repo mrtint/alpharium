@@ -1,0 +1,81 @@
+# 실기기 자동 테스트 — 30일치 표본의 대표 날 여덟 곳 (070)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# **날이 많은 기기에서 날마다 다른 상황이 맞는 칸으로 보이는가.** 0장·1장·여러 장·상한(8장) 초과·GPS 없음·잡사진 섞임·밤만·걸어 다닌 날·주말 나들이
+# 중 대표 날 여덟 곳으로 달력에서 이동해 사진 칸·장소 칸의 숫자를 표의 기대와 비교한다. 「0장」(관측된 0)과 「모름」·「권한 없음」이 서로 다른 칸으로
+# 보이는지가 대상이다(원칙 V).
+#
+# **전제**: `npm run test:layer1`이 만든 기준 상태 + 30일치 표본(MediaStore 사진, `PocketlogSeed/…/s30-*.jpg`). 실행기가 대표 날 값을 `-e`로 넘긴다:
+#   P0_DATE … P7_DATE   (YYYY-MM-DD)     P0_BACK … P7_BACK  (달력 이전 달 횟수)
+#   P0_PHOTOS … P7_PHOTOS                P0_PLACES … P7_PLACES
+# 값은 `scripts/e2e-sample/manifest.ts`의 표에서 온다 — 이 파일에 날짜·기대 수를 쓰지 않는다. 실행기 밖에서 돌리면 첫 단계에서 실패한다.
+#
+# **단언하지 않는 것**: 일기 본문(원칙 IV), 장소 이름(역지오코딩은 네트워크·위치 권한에 달렸다), 사진 속 내용.
+# **「장소 N곳」은 군집 수가 아니라 순차 방문 수다**(집→직장→집 = 3곳, `src/signals/places.ts`).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.a810labs.pocketlog
+---
+- assertTrue: ${P0_DATE.length > 0}
+
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 20000
+
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P0_DATE}
+      BACK: ${P0_BACK}
+      PHOTOS: ${P0_PHOTOS}
+      PLACES: ${P0_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P1_DATE}
+      BACK: ${P1_BACK}
+      PHOTOS: ${P1_PHOTOS}
+      PLACES: ${P1_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P2_DATE}
+      BACK: ${P2_BACK}
+      PHOTOS: ${P2_PHOTOS}
+      PLACES: ${P2_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P3_DATE}
+      BACK: ${P3_BACK}
+      PHOTOS: ${P3_PHOTOS}
+      PLACES: ${P3_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P4_DATE}
+      BACK: ${P4_BACK}
+      PHOTOS: ${P4_PHOTOS}
+      PLACES: ${P4_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P5_DATE}
+      BACK: ${P5_BACK}
+      PHOTOS: ${P5_PHOTOS}
+      PLACES: ${P5_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P6_DATE}
+      BACK: ${P6_BACK}
+      PHOTOS: ${P6_PHOTOS}
+      PLACES: ${P6_PLACES}
+- runFlow:
+    file: _sample-probe.yml
+    env:
+      DATE: ${P7_DATE}
+      BACK: ${P7_BACK}
+      PHOTOS: ${P7_PHOTOS}
+      PLACES: ${P7_PLACES}

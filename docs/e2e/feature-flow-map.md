@@ -17,11 +17,11 @@
 | 쓴 날 읽기(홈이 곧 상세) | `.maestro/restart-persistence.yml`, `.maestro/diary-body-screen.yml` | `__tests__/ui/written-day-home.test.tsx`, `__tests__/app/written-day.test.ts`, `__tests__/diary/store.test.ts`(직렬화 왕복) | 범위 밖(069) | — |
 | 강제 종료 후 재시작해도 읽힘 | `.maestro/restart-persistence.yml` | `__tests__/diary/expo-file-sync.test.ts`(비동기 `text()` 호출이 소스에 없음 — 소스만 센다) | 범위 밖(069) | — (GC가 끼는 확률 결함은 jest에 런타임이 없어 이 흐름이 유일한 방어) |
 | 읽기 스크롤(스트립 접힘) | — | `__tests__/ui/reading-scroll.test.tsx`, `__tests__/app/reading-scroll.test.ts`(접힘 판정) | 범위 밖(069) | 접힘 움직임·손맛 — 기존 `reading-scroll`이 `-e` 변수를 받아 실행기로 못 돈다. 사람이 `maestro test`로 직접 돌린다 |
-| 날 고르기(주간 스트립) | `.maestro/week-strip-swipe.yml`, `.maestro/diary-home-1d.yml` | `__tests__/ui/day-picker.test.tsx`, `__tests__/ui/diary-home-week.test.tsx` | 범위 밖(069) | 스트립 끌림의 손맛 |
-| 날짜로 이동(달력) | `.maestro/dialog-foundation.yml` | `__tests__/ui/date-jump-dialog.test.tsx`, `__tests__/app/calendar.test.ts` | 범위 밖(069) | 월·연 목록, 미래 칸 — `dialog-foundation` 머리말에 「사람이 눈으로 본다」로 적혀 있다 |
+| 날 고르기(주간 스트립) | `.maestro/week-strip-swipe.yml`, `.maestro/diary-home-1d.yml`, `.maestro/sample-days.yml`(30일치 표본 위 대표 날 여덟 곳으로 이동) | `__tests__/ui/day-picker.test.tsx`, `__tests__/ui/diary-home-week.test.tsx` | 범위 밖(069) | 스트립 끌림의 손맛 |
+| 날짜로 이동(달력) | `.maestro/dialog-foundation.yml`, `.maestro/sample-days.yml`(이전 달을 넘겨 먼 날로 이동) | `__tests__/ui/date-jump-dialog.test.tsx`, `__tests__/app/calendar.test.ts` | 범위 밖(069) | 월·연 목록, 미래 칸 — `dialog-foundation` 머리말에 「사람이 눈으로 본다」로 적혀 있다 |
 | 덮어쓰기 확인 | `.maestro/dialog-foundation.yml`(열고 취소) | `__tests__/ui/overwrite-confirm.test.tsx` | 범위 밖(069) | 다시 쓰기를 끝까지 하는 것은 생성이라 층 2 |
 | 사진 확대 화면 | `.maestro/single-photo-swipe.yml`(쓸기에 안 열림·탭에 열림·뒤로 가기에 닫힘) | `__tests__/ui/photo-viewer.test.tsx`(배선), `__tests__/app/photo-viewer.test.ts`(문턱 판정) | 범위 밖(069) | 핀치·두 번 탭·이동 — `adb`로 두 손가락 입력을 만들 수 없다 |
-| 쓸 재료(사진·장소 두 칸) | — | `__tests__/ui/material-grid.test.tsx`, `__tests__/app/material.test.ts`(없음/모름/있음 구분) | 범위 밖(069) | 사진 권한이 없는 기기 상태를 전제한다 — 기존 `writing-material` |
+| 쓸 재료(사진·장소 두 칸) | `.maestro/sample-days.yml`(표본 위에서 0장·1장·상한 초과·GPS 없음·잡사진·밤만 등 날마다 칸 숫자가 표의 기대와 같다 — 권한 없음 칸은 아님) | `__tests__/ui/material-grid.test.tsx`, `__tests__/app/material.test.ts`(없음/모름/있음 구분) | 범위 밖(069) | 사진 권한이 없는 기기 상태를 전제한다 — 기존 `writing-material` |
 | 설정 — 이름 바꾸기 | `.maestro/settings-developer-sweep.yml` | `__tests__/ui/rename-screen.test.tsx`, `__tests__/ui/settings-screen.test.tsx` | 범위 밖(069) | — |
 | 설정 — 자동으로 쓰기·매일 쓰는 시각·장소 이름 | `.maestro/settings-developer-sweep.yml`(켜서 대화상자를 열고 취소, 다시 끔) | `__tests__/ui/target-hour-dialog.test.tsx`, `__tests__/ui/place-name-dialog.test.tsx`, `__tests__/app/target-hour.test.ts` | 범위 밖(069) | 시각 적용 뒤 값이 바뀌는 흐름은 기존 `settings-time-place`가 본다(토글을 켠 채 끝나 층 1 아님) |
 | 설정 — 권한 행 | `.maestro/settings-developer-sweep.yml`(사진·위치·알림·배터리 행을 눌러 OS 설정에서 뒤로 가기 — 실기기에서 왕복 확인) | `__tests__/app/permission-tags.test.ts`(꼬리표 판정), `__tests__/onboarding/no-react-native-dynamic-import.test.ts`(066 튕김 원인 재발 방지) | 범위 밖(069) | 권한 창에서 실제로 허용·거부했을 때의 화면 변화, 큰 글꼴 |
@@ -49,6 +49,8 @@
 | `.maestro/week-strip-swipe.yml` | ○ | ○ | 날 고르기 | — (실측 통과) |
 | `.maestro/diary-body-screen.yml` | ○ | ○ | 쓴 날 읽기 | — (실측 통과) |
 | `.maestro/state-simulation.yml` | ○ | ○ | 상태 흉내 | — (실측 통과, 마지막에 둔다) |
+| `.maestro/sample-days.yml` | ○ | ○ | 쓸 재료, 날 고르기, 날짜로 이동 | — (표본 30일치 위에서만 돈다 — `--layer1`의 「표본 보장」이 심고 대표 날 값을 `-e`로 넘긴다. 일반 실행에서는 제외) |
+| `.maestro/_sample-probe.yml` | — | — | (보조) `sample-days`가 대표 날 하나로 이동해 사진·장소 칸을 단언 | 보조 흐름이다 — 단독으로 검증하는 기능이 없다(`DATE`·`BACK`·`PHOTOS`·`PLACES` env가 필요) |
 | `.maestro/skeleton.yml` | ○ | — | 앱이 뜬다·추론 위치(뼈대) | 실측 실패: `"모듈 상태" is visible` — 그 문구가 지금 카탈로그에 없다(낡았다). 이번 조각은 흐름을 고치지 않는다 |
 | `.maestro/prompt-preview.yml` | ○ | — | 진단의 프롬프트 미리보기 | 실측 실패: `".*주인의 휴대폰이다.*" is visible` — 프롬프트 문안이 바뀐 것으로 보이나 원인은 확인하지 않았다 |
 | `.maestro/today-diary.yml` | ○ | — | 오늘 쓰기, 덮어쓰기 확인 | 실측 실패: `"일기" is visible` — 원인은 확인하지 않았다(기준 상태 탓인지 낡은 문구인지 가르지 않았다) |
