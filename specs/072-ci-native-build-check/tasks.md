@@ -14,19 +14,19 @@
 - [ ] T003 계약 테스트 뼈대를 쓴다: 워크플로 파일을 읽고 주석을 걷어내는 도우미(`/^\s*#.*$/gm`와 줄 끝 ` #…` 제거), 파일이 없으면 실패하는 첫 테스트. `.ts`라 jest `logic` 프로젝트에서 돈다 (__tests__/ci/native-build-workflow.test.ts)
 - [ ] T004 T003 테스트가 파일 부재로 **실패**하는 것을 `npx jest __tests__/ci/native-build-workflow.test.ts`로 확인한다
 
-## Phase 3: User Story 2 — PR과 머지를 느리게 하지 않는다 (P1) 🎯 워크플로 뼈대
+## Phase 3: User Story 2 — 네이티브와 무관한 PR과 머지를 느리게 하지 않는다 (P1) 🎯 워크플로 뼈대
 
-**Goal**: `main` push·수동 실행에서만 시작하고, PR에서는 시작하지 않으며, 실패가 가려지지 않는다.
+**Goal**: 네이티브 입력이 바뀐 PR·`main` push·수동 실행에서만 시작하고, 네이티브와 무관한 PR에서는 시작하지 않으며, 실패가 가려지지 않는다.
 **Independent Test**: 트리거·동시성·`continue-on-error` 부재를 소스로 단언하는 테스트가 통과한다.
 
-- [ ] T005 [US2] 트리거 계약 테스트를 쓴다: `pull_request`·`paths`·`schedule` 없음, `push.branches`가 `main`뿐, `workflow_dispatch` 있음 (__tests__/ci/native-build-workflow.test.ts)
+- [ ] T005 [US2] 트리거 계약 테스트를 쓴다: `pull_request.paths`가 정확히 `package.json`·`package-lock.json`·`app.json`·`plugins/**`·`.github/workflows/native-build.yml` 다섯, `pull_request_target`·`schedule` 없음, `push.branches`가 `main`뿐이고 push에 `paths` 없음, `workflow_dispatch` 있음 (__tests__/ci/native-build-workflow.test.ts)
 - [ ] T006 [US2] 동시성·실패 처리 계약 테스트를 쓴다: `concurrency.group`에 `github.ref` 포함·`cancel-in-progress: true`, `continue-on-error` 어디에도 없음 (__tests__/ci/native-build-workflow.test.ts)
 - [ ] T007 [US2] 테스트가 실패하는 것을 확인한 뒤, 워크플로 뼈대(`name: Pocketlog Native Build`, `on`, `concurrency`)를 쓴다. 잡은 아직 없다 — T005·T006이 통과해야 한다 (.github/workflows/native-build.yml)
 
 ## Phase 4: User Story 1 — 네이티브가 깨진 채 main에 들어가면 빨간불로 안다 (P1) 🎯 MVP
 
 **Goal**: 안드로이드·iOS 두 잡이 서로 독립으로 돌며 각자 네이티브 빌드를 끝까지 한다.
-**Independent Test**: 없는 config plugin을 넣은 브랜치에서 실행하면(머지 전 일회용 브랜치 push) 두 잡이 모두 실패하고, 되돌리면 둘 다 성공한다.
+**Independent Test**: 없는 config plugin을 넣은 브랜치에서 실행하면(PR을 열면) 두 잡이 모두 실패하고, 되돌리면 둘 다 성공한다.
 
 - [ ] T008 [US1] 잡 계약 테스트를 쓴다: `android`·`ios` 잡이 있고 어느 잡에도 `needs:`가 없음 · 안드로이드 `runs-on: ubuntu-latest`, `expo prebuild --platform android --clean`, `./gradlew assembleDebug`, `-PreactNativeArchitectures=arm64-v8a`가 있고 `armeabi`·`x86`이 없음 · iOS `runs-on: macos-latest`, `expo prebuild --platform ios --clean`, `pod install`, `-sdk iphonesimulator`, `CODE_SIGNING_ALLOWED=NO` · 두 잡 모두 `timeout-minutes`가 있음(러너가 시간 제한으로 죽이면 실패로 표시되게 하는 안전망) (__tests__/ci/native-build-workflow.test.ts)
 - [ ] T009 [US1] 서명·결과물 금지 계약 테스트를 쓴다: `secrets.`·`upload-artifact`·`.jks`·`signingConfig`·`keystore`가 없음, 안드로이드에 `assembleRelease`·`bundleRelease`가 없음 (__tests__/ci/native-build-workflow.test.ts)
@@ -50,23 +50,25 @@
 ## Phase 6: Polish & 검증
 
 - [ ] T020 `npm test`·`npm run lint`(prettier 포함 — 워크플로 YAML도 포맷 검사 대상인지 확인)를 실행해 통과를 확인한다. `git diff --stat main...HEAD -- src .github/workflows/ci.yml`이 비어 있음을 확인한다 (원칙 IV·FR-011·SC-005)
-- [ ] T021 **일회용 검증 브랜치**를 만든다. 피처 브랜치의 커밋은 kickoff 규칙상 구현 구간 종료 뒤 한 번이므로 여기서 피처 브랜치에는 커밋하지 않는다. 사용자 확인을 받은 뒤 `git switch -c 072-measure`(작업 트리 변경이 따라온다)로 옮겨 **그 브랜치에** 작업 트리 전체를 커밋하고 push한다. 되가져오기는 끝에 `git switch 072-ci-native-build-check` 후 `git checkout 072-measure -- .github/workflows/native-build.yml`로 최종 워크플로 파일만 받고 임시 push 트리거 줄을 지운다(테스트가 `push`가 `main`뿐임을 단언하므로 남기면 잡힌다). 이 브랜치에서만 `native-build.yml`의 `on.push.branches`에 `072-measure`를 더한다 — `workflow_dispatch`만 있는 워크플로는 `main`에 파일이 있어야 Actions에서 실행할 수 있어 머지 전에는 이 방법뿐이다. 계약 테스트는 이 브랜치에서 빨갛게 되는 것이 정상이고 이 브랜치는 머지하지 않는다. push하면 **첫 실행**이 돈다. 러너에서만 드러나는 문제(NDK/CMake 버전, Xcode 버전, 캐시 키)는 `072-measure`에서 고치고 plan의 「실측 전이라 확정하지 않는 것」 표에 따라 research.md에 기록한다 (.github/workflows/native-build.yml, specs/072-ci-native-build-check/research.md)
-- [ ] T022 `072-measure`에 빈 커밋을 push해 **둘째 실행**을 하고 캐시 적중 시간을 얻는다. 같은 브랜치의 앞선 실행이 아직 돌고 있으면 취소되는지(FR-001a)도 한 번 겹쳐 push해 본다 (러너)
-- [ ] T023 `072-measure`에서 `app.json`의 `plugins`에 없는 이름(`"./plugins/does-not-exist"`)을 넣어 push하고 두 잡이 빨갛게 되는 것을 본다. 되돌려 다시 push해 초록을 본다 (SC-001) (app.json)
+- [ ] T021 사용자 확인을 받고 현재 구현을 피처 브랜치에 커밋한 뒤 push하고 **초안 PR**을 연다(워크플로 파일이 경로 필터에 들어 있어 첫 실행이 돈다). 러너에서만 드러나는 문제(NDK/CMake 버전, Xcode 버전, 캐시 키)는 고쳐서 같은 커밋에 합치고(`--amend` + `--force-with-lease`, 자기 브랜치, 매번 확인) plan의 「실측 전이라 확정하지 않는 것」 표에 따라 research.md에 기록한다 (.github/workflows/native-build.yml, specs/072-ci-native-build-check/research.md)
+- [ ] T022 `gh run rerun`으로 같은 ref에서 **둘째 실행**을 해 캐시 적중 시간을 얻는다. 러너 수정 push가 진행 중이던 앞선 실행을 취소하는지(FR-001a)는 관찰되면 기록한다(계약 테스트가 설정을 잠근다) (러너)
+- [ ] T023 위반 주입(SC-001): 피처 브랜치에서 `072-inject`를 따 `app.json`의 `plugins`에 없는 이름(`"./plugins/does-not-exist"`)을 넣고 **피처 브랜치를 base로** 초안 PR을 연다 → 두 잡이 빨갛게 되는 것을 본다. 되돌려 push해 초록을 본다 (app.json)
+- [ ] T028 경로 필터 음성 확인(FR-003): 피처 브랜치에서 `072-docs-only`를 따 문서 파일 하나만 바꾸고 피처 브랜치를 base로 PR을 연다 → 이 확인이 시작되지 않고 `ci.yml`만 도는 것을 본다 (docs)
 - [ ] T024 첫·둘째 실행의 값으로 quickstart §5 표를 채우고, `timeout-minutes`를 실측에 맞게 확정한다. 안드로이드가 지나치게 길면 ccache를 후속 과제로 로드맵에 한 줄 남긴다 (specs/072-ci-native-build-check/quickstart.md, .github/workflows/native-build.yml, docs/roadmap/README.md)
 - [ ] T025 FR-013 확인 사항(브랜치 보호의 필수 체크에 이 잡이 없다)을 소유자에게 확인해 quickstart에 결과를 적는다 (specs/072-ci-native-build-check/quickstart.md)
-
-- [ ] T026 `docs/roadmap/README.md`를 갱신한다: 이 과제의 할 일 1번(경로 필터 서술)을 「`main` 머지·수동 실행에서만, PR에서는 돌지 않는다」로 고치고, 「안드로이드 release 빌드·서명·보관을 CI로」와 「무료 빌드 머신으로 iOS 빌드·업로드」에 「release 빌드 종류와 PR 선검사 여부는 여기서 정한다」를 한 줄씩 더한다 (docs/roadmap/README.md)
-- [ ] T027 T023 뒤 `072-measure`를 로컬·원격에서 지운다(`git branch -D`, `git push origin --delete`) — 사용자 확인 후 (git)
+- [ ] T026 `docs/roadmap/README.md`를 갱신한다: 이 과제의 할 일 1번을 「네이티브 입력(`package.json`·`package-lock.json`·`app.json`·`plugins/**`)이 바뀐 PR과 `main` push·수동 실행에서만, 필수 체크는 아님」으로 고치고, 「안드로이드 release 빌드·서명·보관을 CI로」와 「무료 빌드 머신으로 iOS 빌드·업로드」에 「Tier 3(서명·업로드)는 태그·수동 트리거로, release 빌드 종류는 여기서 정한다」를 한 줄씩 더한다 (docs/roadmap/README.md)
+- [ ] T027 T023·T028 뒤 두 PR을 닫고 `072-inject`·`072-docs-only`를 로컬·원격에서 지운다(`git branch -D`, `git push origin --delete`) — 사용자 확인 후 (git)
 
 ## Dependencies & 실행 순서
 
 - Phase 1 → Phase 2 → **Phase 3(US2: 뼈대)** → **Phase 4(US1)** → Phase 5(US3) → Phase 6. 같은 두 파일(`native-build.yml`·테스트 파일)을 모든 스토리가 건드리므로 **병렬 가능한 태스크는 없다**.
 - US1과 US2는 둘 다 P1이다. US2의 뼈대가 파일을 만들어 US1이 그 위에 잡을 얹으므로 US2가 먼저다.
-- T021~T023은 일회용 브랜치 `072-measure`에서 한다(수동 실행은 `main` 머지 뒤에야 가능하므로). T026은 어느 단계 뒤에도 된다.
-- T021~T023은 러너가 필요하고 push를 동반한다 — 커밋·push는 구현 구간 종료 규칙(kickoff)에 따라 사용자 확인을 받은 뒤에 한다.
+- T021~T023·T028은 PR 실행으로 한다(`pull_request`는 파일이 `main`에 없어도 PR 브랜치의 워크플로를 쓴다). T026은 어느 단계 뒤에도 된다.
+- **머지 뒤에만 관찰 가능**: FR-001(`main` push 실행)과 FR-002(수동 실행)는 워크플로가 `main`에 들어간 뒤에야 확인된다. 이 구현 구간에서는 닫을 수 없으므로 최종 보고의 미확인 잔여로 올리고, 머지 뒤 quickstart §2.4로 한 번 본다.
+- T021~T023·T028은 러너가 필요하고 push를 동반한다 — 커밋·push는 구현 구간 종료 규칙(kickoff)에 따라 사용자 확인을 받은 뒤에 한다.
 
 ## 구현 전략
 
 - **MVP**: Phase 2~4(뼈대 + 두 잡). 측정(Phase 5)은 그 위의 추가다.
+- 3티어 모델: 이 워크플로가 Tier 2이고 Tier 1은 `ci.yml`, Tier 3(서명·업로드)는 후속 과제다.
 - 러너에서 처음 돌리면 예상 못 한 환경 문제가 나올 수 있다(NDK·Xcode 버전). T021에서 고치고 기록하되 새 도구를 임의로 들이지 않는다.

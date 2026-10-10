@@ -6,8 +6,14 @@ Technical Context에 `NEEDS CLARIFICATION`은 없다. 아래는 plan에서 고�
 
 ### R1 — 새 워크플로 파일
 - **결정**: `native-build.yml`을 새로 만든다.
-- **근거**: `paths`·`on` 트리거는 워크플로 단위다. `pull_request` 없이 `main` push만 받는 트리거는 `ci.yml`(PR·push 모두)과 한 파일에 섞을 수 없다.
-- **대안**: `ci.yml`에 잡을 더하고 `if: github.event_name == 'push'`로 거른다 → PR마다 빈 잡이 생기고 `needs` 의존이 얽힌다. 기각.
+- **근거**: `paths` 필터는 워크플로 단위다. `ci.yml`(모든 PR·push)에 섞으면 기존 잡까지 경로에 묶인다.
+- **대안**: `ci.yml`에 잡을 더하고 잡 안에서 변경 파일을 걸러 건너뛴다 → 건너뛴 잡이 매 PR에 남고 별도 paths-filter 액션이 필요하다. 기각.
+
+### R1a — 3티어 모델과 PR 경로 필터 (재결정)
+- **결정**: Tier 1(모든 PR: `ci.yml`), Tier 2(이 워크플로: 네이티브 입력이 바뀐 PR + `main` push + 수동), Tier 3(서명·업로드: 후속 두 과제, 태그·수동). 소유자가 실무 관행에 맞춰 이전 "PR에서는 돌리지 않는다"를 대체했다.
+- **근거**: 네이티브를 깨뜨리는 주범은 의존성·config plugin 변경 PR이고 그런 PR은 드물어 10~20분대 빌드의 비용이 작다. 머지 전에 보는 편이 머지 뒤보다 낫다. `pull_request`는 PR 브랜치의 워크플로 파일을 쓰므로 새 워크플로도 파일이 `main`에 없어도 PR에서 곧바로 돈다.
+- **필수 체크 아님**: 경로 필터로 건너뛴 워크플로의 필수 체크는 「대기 중」에 머물러 PR을 막는다. 우회(항상 도는 게이트 잡)는 이번 범위에 넣지 않는다.
+- **적용하지 않은 부분**: 빌드 산출물로 도는 E2E(우리 E2E는 실기기에서 2GB 모델을 내려받아 돌린다), `android/**`·`ios/**` 경로(gitignore된 생성물), 서명 없는 release(`with-release-signing`이 키스토어를 요구).
 
 ### R2 — 안드로이드는 `assembleDebug` arm64
 - **결정**: debug 변형, `-PreactNativeArchitectures=arm64-v8a`.
@@ -35,7 +41,7 @@ Technical Context에 `NEEDS CLARIFICATION`은 없다. 아래는 plan에서 고�
 
 ### R7 — 동시성
 - **결정**: `group: native-build-${{ github.ref }}`, `cancel-in-progress: true`(스펙 Clarification).
-- **근거**: 소유자 결정. 같은 브랜치 수동 실행끼리도 취소되는 부작용은 받아들인다.
+- **근거**: 소유자 결정. 같은 ref에서 연달아 push하면 앞선 실행이 취소되고 중간 커밋의 깨짐은 확인되지 않을 수 있다.
 
 ### R8 — 테스트는 소스 텍스트로
 - **결정**: YAML 파서 없이 텍스트에서 주석을 걷고 정규식으로 단언한다.
