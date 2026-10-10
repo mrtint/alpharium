@@ -61,6 +61,7 @@
     "test:ui": "jest --selectProjects ui --maxWorkers=50%",
     "test:device": "node scripts/run-device-tests.mjs",
     "test:layer1": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/run-device-tests.mjs --layer1",
+    "test:layer2": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/run-device-tests.mjs --layer2",
     "lint": "eslint . && tsc --noEmit && npm run check:constitution && npm run format:check",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",

@@ -923,7 +923,8 @@
   `__tests__/e2e/baseline.test.ts`(G-1)가 실패해 한 줄을 더하게 한다.
 - **기능 → 흐름 대응표의 정본은 `docs/e2e/feature-flow-map.md` 하나다**(실행기 주석은 경로만). 표가 흐름 파일·`FLOWS`·`LAYER1_FLOWS`와 어긋나면 `flow-map.test.ts`가 실패한다.
   흐름을 더하면 표의 두 곳(기능 행·인벤토리)을 같이 고친다. 층 1 목록은 `LAYER1_FLOWS`, 층 1 기준 상태를 전제하는 새 흐름은 `NEEDS_LAYER1_BASELINE`이라 **일반 실행(`pm clear` 뒤)에서는 돌지 않는다**.
-- **기존 흐름 셋이 이미 낡았다**(실측, 고치지 않았다): `skeleton`·`prompt-preview`·`today-diary`는 `FLOWS`에 있지만 현재 화면과 맞지 않아 수정 없이는 실패한다.
+- **낡은 흐름 셋은 073이 고쳤다**: `skeleton`·`prompt-preview`·`today-diary`는 055·060이 화면 문구를 바꿔 실패하던 것이었다(앱 결함 아님) — 현재 화면에 맞게 고치고 층 1로 올렸다.
+  **일반 실행(`node scripts/run-device-tests.mjs`, 인자를 줘도)은 먼저 `pm clear`를 하므로 모델 2GB가 지워진다 — 전용 기기에서 개별 흐름 확인은 `npm run test:layer1 -- .maestro/<흐름>.yml`로 한다.**
 - **★ 위반 주입은 원래 결함의 꼴 그대로 해야 한다**: `File.text()` 결함을 `await file.text()`로 되돌리면 30회 반복해도 안 나고(`file`이 async 프레임에 살아 있다), 원래의 `return file.exists ? file.text() : null`(await 없음)에서만
   `restart-persistence`가 실패한다. **`CI=1`로 띄운 Metro는 파일 감시가 없어** 소스를 바꿔도 번들이 안 바뀐다 — 주입·되돌림마다 Metro를 다시 띄우고 `curl`한 번들에서 치환된 줄을 grep으로 확인한다.
 - **`run-device-tests.mjs`의 JUnit 실패 흐름 집계에 버그가 있었다**: 자기 닫힘 `<testcase/>`를 건너뛰지 않아 통과한 흐름을 실패로 보고했다(`scripts/layer1/junit.ts`와 같은 규칙으로 고쳤다).
@@ -952,6 +953,19 @@
 - **관측**(2026-10-10, SM-G986N dev, 오늘 사진 0장 쓰기 약 24초·사진 6장 쓰기 약 2분): 쓰기 → 그만두기 → 다시 쓰기를 간격 0~10초로 되풀이했다. 잠금 파일·`.json.writing`·같은 날 중복·메모리 누적은 문제가 없었다. 드러난 것은 셋이다 — (SE-1) **그만두면 화면은 곧바로 홈이지만 앞 쓰기는 모델 적재를 못 끊어(016 FR-013) 잠금을 5~12초 더 쥔다**(중단 2.5초 시점 10~12.5초, 15초 시점 0.7초). 그 사이 새 쓰기는 `already-running`으로 거절되고 토스트가 떴다. (SE-2) 새 쓰기가 `cancelled` 불리언을 되돌려, 앞 쓰기가 풀릴 때 **사용자가 그만둔 쓰기가 `write-failures.json`에 `unwritten`으로 기록됐다**(4/4, 060 위반). (SE-3) 생성이 끝나는 순간(약 26초)의 그만두기가 일기를 저장했다.
 - **고침**: `DiaryHomeScreen`이 쓰기 시도마다 번호를 붙여 취소·`finally` 정리를 시도별로 하고(`attempt`·`cancelledThrough`), 새 시도는 앞 시도(`inFlight`)가 풀리기를 기다린 뒤 시작한다. `PipelineInput.isCancelled?`가 저장 직전에 한 번 취소를 본다(새 `PipelineStage` 없음). 재검증: 같은 간격 15/15·5/5에서 실패 기록·토스트 0. **불리언 하나로 「그만두었는가」를 들지 않는다** — 시도가 겹치면 뒤 시도가 앞 시도의 판단을 덮는다.
 - **남은 것**: 저장 I/O가 시작된 뒤의 그만두기는 일기를 남긴다(저장은 대상을 지우고 옮기는 것이라 되돌리면 다시 쓰기에서 옛 일기까지 잃고 `DiaryStore`에 하루 단위 삭제가 없다) — 소유자 확정(2026-10-10). 그만두기 뒤 잠금이 남는 5~12초 동안 백그라운드 자동 쓰기는 건너뛴다(보지 않았다). 앱을 내렸다 올리면 쓰기가 끊겨 `unwritten`이 기록되는 것은 054·005 FR-014b의 알려진 동작이다. 상세·표는 `specs/071-rapid-repeat-side-effects/quickstart.md` 끝.
+
+### 073 — 층 2: 실제 모델로 쓰는 스모크
+
+- **`npm run test:layer2`**(= `run-device-tests.mjs --layer2`) — 흐름 넷(`.maestro/layer2-*.yml`: 쓰기 → 쓴 날 홈, 앱을 열면 쓰는 중(057), 진단 한 번 써 보기(060), 첫 실행 자동 첫 일기(040))이
+  실제 모델로 돈다. 단언은 상태 전이까지이고 **본문은 단언하지 않는다**(원칙 IV) — 끝나면 `.cache/layer2/<시각>/`로 가져온 일기 경로를 출력해 사람이 읽는다. 표는 `scripts/layer2/flows.ts`, 실행기는 `scripts/layer2/runner.ts`.
+  **층 1과 달리 흐름마다 `maestro test`를 따로 부르고 호출 사이마다 기준 상태(설정·일기 픽스처)를 다시 만든다** — 앞 흐름이 쓴 일기가 뒤 흐름의 출발을 바꾸지 않게(Maestro 기동 약 35초는 감수). 기준 상태 코드는 층 1과 같다(`prepareBaseline`).
+  `pm clear`·재설치를 하지 않으므로 모델은 남는다 — 모델이 없으면 중단(`ABORTED`, 통과 아님). 릴리스 전 체크리스트는 `docs/e2e/layer2-release-checklist.md`.
+- **흐름마다 출발 상태가 다르다**: 쓰기·앱 열기 흐름은 **어제**를 비운다(표본 1일 전 = `commute`, 사진 5장이라 사진 읽기 경로가 돈다 — 오늘은 표본 사진이 없다). 앱 열기 흐름은 자동 쓰기를 켜고 목표 시각을 지금 시로 둔다(시도 창 3시간)
+  그리고 **오늘 일기를 남겨 둔다** — `pickRetryDay`가 가장 최근 미작성일을 고르므로 오늘이 비면 사진 없는 오늘을 골라 「재료 없음」으로 건너뛴다. 첫 실행 흐름은 `onboarding.json`만 되돌린다(`downloadConsented:true`라 동의 화면 없음, 권한은 OS가 이미 부여해 저절로 지난다).
+- **★ 자동 첫 일기(040)는 홈의 「쓰는 중」(`stop-button`)을 세우지 않는다** — `triggerFirstRunAutoDiary()`가 파이프라인을 직접 부른다. `stop-button` 대기가 3분 만에 실패했고 화면은 이미 「2분 전에 작성」이었다. 이 흐름은 `home-settings` 뒤 `written-paper`만 기다린다.
+- **Maestro는 이 Windows 기계에 없었다** — GitHub 릴리스 `maestro.zip`을 `~/.maestro-install/maestro/bin`에 풀고 PATH에 얹어 썼다(2.11.0). `maestro --version`이 JVM(17)을 기동하는 데 수십 초 걸린다.
+- **실측(2026-10-10, SM-G986N, dev)**: 흐름 넷이 각각 1m49s(쓰기)·1m31s(앱 열기)·약 1분(진단)·57s(첫 실행)에 통과했다. 위반 주입(완료 표식을 틀리게) 실패·모델 파일 이름을 바꾸면 `ABORTED` 확인.
+  낡은 흐름 셋도 위반 주입(단언을 틀리게)으로 실패를 확인했다. **미확인**: release 빌드·iOS·다른 기기.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
@@ -1097,6 +1111,8 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 **debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V) — minify·R8이 켜지면 동적 `import`·`llama.rn` JNI 심볼이 깨질 수 있다(현재는 꺼져 있다, 위 실측 규칙).
 **Play에서 받은 앱은 Play가 다시 서명한 것이다** — 내부 테스트 트랙으로 받은 앱에서 설치·모델 내려받기·일기 쓰기를 한 번 본다.
 
+**올리기 전에 실제 모델로 쓰는 경로를 한 번 본다** — [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md)(`npm run test:layer2` + 일기 본문 읽기 + 사람이 보는 항목). 층 1은 생성을 일부러 피하므로 이 확인을 대신하지 못한다.
+
 ## iOS 빌드·서명·TestFlight — 요청받았을 때만 탄다 (066)
 
 **아이폰 배포물을 만드는 절차다.** 안드로이드 절차(위)와 같은 성격 — 기본 작업 흐름이 아니며 저장소 소유자가 그 세션에서 요청했을 때만 탄다.
@@ -1162,6 +1178,8 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 
 **TestFlight에서 받은 앱은 실제 iPhone의 첫 실측이다** — 2GB 모델 적재(메모리), 사진 읽기 시간(mmproj CPU), 백그라운드 자동 쓰기(BGTask)가 거기서 처음 재진다. 테스터에게
 「설치 → 권한 → 내려받기 → 첫 일기 → 다음 날 자동 쓰기 알림」을 확인해 달라고 한다.
+
+올리기 전 안드로이드 쪽 층 2 확인은 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md) — iOS 갈래는 없다(맥이 필요해 로드맵에 남아 있다).
 
 ## 테스트
 

@@ -8,7 +8,7 @@
 #
 # 검증 항목 (quickstart.md D1~D3):
 #   FR-005  개발자 탭에서 캐릭터별 프롬프트 원본이 보인다              (D1)
-#   FR-007  "신호 없음" / "사진 있음" 두 프리셋이 렌더된다             (D2)
+#   FR-007  프리셋 둘(`diagnostics-preset-empty`·`-photos`)이 렌더되고 눌러 바뀐다 (D2)
 #   FR-011  근사 크기가 "실측 토큰 아님" 라벨과 함께 보인다            (D3)
 #
 # **여기서 자동화하지 않는 것** — quickstart.md D4~D6:
@@ -45,35 +45,46 @@ appId: com.a810labs.pocketlog
       id: "diagnostics-group-prompt"
     direction: DOWN
     timeout: 20000
+
+# 073 — 프롬프트 문안 글자(「주인의 휴대폰이다」 등)는 단언하지 않는다 — 문안은 prompt.ts에서 바뀌고(061·063), 바이트 동일성은
+# 기기 없는 테스트(PP1)가 잠근다. 이 흐름이 보는 것은 구조다: 프리셋 둘이 있고, 눌러 바꿀 수 있고, 본문 상자와 근사 크기 라벨이 있다.
+- assertVisible:
+    id: "diagnostics-preset-empty"
+- assertVisible:
+    id: "diagnostics-preset-photos"
+
+# 프리셋 2로 바꾸고 본문 상자·근사 크기 라벨까지 내려가서 본다
+- tapOn:
+    id: "diagnostics-preset-photos"
 - scrollUntilVisible:
     element:
-      text: "프리셋 1 · 신호 없음"
+      id: "diagnostics-prompt-size"
     direction: DOWN
     timeout: 20000
-
-# ★ D1 — 첫 프리셋(신호 없음)이 기본이다. 프롬프트 원본에 화자 규칙이 들어 있다 — buildPrompt()가 실제로 불렸다는 증거.
-#    036 — 한국어 캐릭터는 E2SN 머리. 첫 줄이 "너는 '금동이'이라 불린다. 주인의 휴대폰이다. ..."이고, E2_RULES가
-#    "본 것으로 주인의 하루를 짐작하는 글"을 말한다.
 - assertVisible:
-    text: ".*주인의 휴대폰이다.*"
-- assertVisible:
-    text: ".*본 것으로 주인의 하루를 짐작하는 글이다.*"
-
-# ★ D3 — 근사 크기가 "실측 토큰 아님" 라벨과 함께 보인다(원칙 IV).
+    id: "diagnostics-prompt-size"
 - assertVisible:
     text: ".*조립 시점 근사치, 실측 토큰 아님.*"
-
-# ★ D2 — 「프리셋 2 · 사진 있음」을 누르면 사진 문장이 들어간 다른 프롬프트가 보인다.
 - scrollUntilVisible:
     element:
-      id: "diagnostics-preset-photos"
+      id: "diagnostics-prompt-text"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "diagnostics-prompt-text"
+
+# 프리셋 1로 되돌린다
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-preset-empty"
     direction: UP
     timeout: 20000
 - tapOn:
-    id: "diagnostics-preset-photos"
-# 036 — 한국어 캐릭터(quiet)는 E2SN 문장형 신호를 쓴다: "사진은 두 장이 남았다."
+    id: "diagnostics-preset-empty"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-prompt-text"
+    direction: DOWN
+    timeout: 20000
 - assertVisible:
-    text: ".*사진은 두 장이 남았다.*"
-# 출력 언어 줄 — 캐릭터 칩이 없어도(로스터 하나) 그 캐릭터의 출력 언어 줄이 나온다.
-- assertVisible:
-    text: ".*한국어로 써라.*"
+    id: "diagnostics-prompt-text"

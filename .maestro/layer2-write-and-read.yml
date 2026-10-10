@@ -1,0 +1,76 @@
+# 073 — 층 2: 실제 모델로 쓴다. 「쓰기 → 저장 → 쓴 날 홈」.
+#
+# 전제(실행기 `npm run test:layer2`가 만든다): 어제 일기가 없고(오늘·그제는 있다), 070 표본의 어제(`commute`, 사진 5장)가 사진 보관함에 있다.
+# `-e YESTERDAY=YYYY-MM-DD`는 실행기가 넘긴다 — 흐름에 날짜 리터럴이 없다. 모델이 받아져 있어야 한다(없으면 실행기가 중단한다).
+#
+# 단언은 상태 전이까지다: 어제를 고르고 쓰기를 누르면 쓰는 중이 되고, 끝나면 쓴 날 홈(지면·「다시 쓰기」)이 된다.
+# **일기 본문 글자는 단언하지 않는다**(원칙 IV) — 실행기가 끝나고 가져온 파일을 사람이 읽는다.
+# 사진이 있는 날이라 사진 읽기(VLM) → 본문 경로가 실제로 돈다. 완료 대기 한도 300초(쓰기 1~4분).
+appId: com.a810labs.pocketlog
+env:
+  YESTERDAY: ${YESTERDAY || ""}
+---
+- assertTrue: ${YESTERDAY != ""}
+
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 30000
+
+# 어제가 지난 주에 있을 수 있다(월요일) — 보일 때까지 한두 주 넘긴다
+- repeat:
+    times: 2
+    while:
+      notVisible:
+        id: "day-${YESTERDAY}"
+    commands:
+      - swipe:
+          from:
+            id: "day-strip"
+          direction: RIGHT
+- tapOn:
+    id: "day-${YESTERDAY}"
+
+- extendedWaitUntil:
+    visible:
+      id: "write-button"
+    timeout: 15000
+- tapOn:
+    id: "write-button"
+
+# 어제는 쓴 날이 아니므로 덮어쓰기 확인은 없다. 재료 확인이 뜨면 쓴다(사진이 있어 보통 안 뜬다).
+- runFlow:
+    when:
+      visible:
+        id: "material-confirm"
+    commands:
+      - tapOn:
+          id: "material-confirm-yes"
+
+# 쓰는 중이 된다
+- extendedWaitUntil:
+    visible:
+      id: "stop-button"
+    timeout: 30000
+- assertVisible: "쓰는 중"
+
+# 끝날 때까지 기다린다 — 실패하면 쓰기 전 홈으로 돌아와 쓴 날 지면이 안 서므로 아래에서 실패한다
+- extendedWaitUntil:
+    notVisible:
+      id: "stop-button"
+    timeout: 300000
+
+# 쓴 날 홈
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: "rewrite-bar"
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: "write-button"
+    text: "다시 쓰기"

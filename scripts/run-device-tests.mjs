@@ -51,6 +51,7 @@ const FLOWS = [
   // **덮어쓰기 확인이 뜨는가**를 본다(049가 정오 제한을 없앴다).
   // ⚠️ **오늘을 실제로 생성하는 것(049 D8)은 여기 없다** — 캐릭터·모델이 필요하다.
   // quickstart를 손으로 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
+  // 073 — 홈에서 「일기」 글자가 사라진 것(055)만 고쳤다(홈이 떴는가는 `day-strip`이 정한다). 온보딩이 끝난 기준 상태가 전제라 층 1로 돈다(`NEEDS_LAYER1_BASELINE`).
   ".maestro/today-diary.yml",
   // 015 — 쓰는 중 독백. **단계별·사진 장별로 서로 다른 문구가 보이는가**를 본다.
   // ⚠️ **정밀 시나리오(A3 실패 유도, A4 그만두기 타이밍)는 여기 없다** — 비행기
@@ -151,10 +152,11 @@ const FLOWS = [
   // ⚠️ 펼침 움직임·다시 예약·바깥 누름·뒤로·「켬」의 권한 창·두 번째 열기의 읽는 중 없음·토글 꺼짐 손잡이·큰 글꼴은 여기
   // 없다 — 056 quickstart Q1·Q3·Q4·Q6~Q9를 사람이 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/settings-time-place.yml",
-  // 059 — 개발자 화면 → 진단(개발 환경 전용). **환경·추론 위치·모듈 상태(loaded)·저장 점검이 보이는가**를 본다. 설정 → 「개발자」 행 → 「진단」 행이 닿는 길이다.
+  // 059 → 073 — 개발자 화면 → 진단(개발 환경 전용). **환경·추론 위치(기기 · CPU)·저장 점검(N편 · 정상)이 보이는가**를 본다. 설정 → 「개발자」 행 → 「진단」 행이 닿는 길이다.
+  // 073 — 060이 진단을 일곱 묶음으로 바꿔 옛 줄(「모듈 상태」·「loaded」·「on-device」)이 사라져 고쳤다. 네이티브 추론 모듈의 실제 적재는 층 2(실제 모델로 쓰기)가 본다.
   // ⚠️ 배포 환경(7번 탭으로 켜기·진단 그룹 없음)·모듈 다시 받기·온보딩부터 다시는 여기 없다 — 059 quickstart를 사람이 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/skeleton.yml",
-  // 022 → 059 — 진단의 입력 프롬프트 미리보기. 프리셋 둘·근사 크기 라벨이 보이는가. 진입은 skeleton과 같다.
+  // 022 → 059 → 073 — 진단의 입력 프롬프트 미리보기. 프리셋 둘이 눌러 바뀌고 본문 상자·근사 크기 라벨이 보이는가(프롬프트 문안 글자는 단언하지 않는다 — 문안은 prompt.ts에서 바뀌고 바이트 동일성은 기기 없는 테스트가 잠근다). 진입은 skeleton과 같다.
   ".maestro/prompt-preview.yml",
   // 017 → 051 → 059 — 쓴 날 본문과 장소 이름 대화상자. 설정의 「장소 이름으로 보기」 행이 새 자리다.
   ".maestro/diary-body-screen.yml",
@@ -172,6 +174,11 @@ const FLOWS = [
   ".maestro/settings-developer-sweep.yml",
   // 070 — 30일치 표본(MediaStore 사진)을 전제한다. `--layer1`의 「표본 보장」 단계가 심고 대표 날 값을 `-e`로 넘긴다 — 일반 실행(`pm clear`)에서는 표본도 값도 없어 실패한다.
   ".maestro/sample-days.yml",
+  // 073 — 층 2(실제 모델로 쓰는 스모크) 넷. `--layer2`가 흐름마다 기준 상태를 만들고 따로 부른다 — 일반 실행(`pm clear` 뒤)에서는 돌지 않는다(`LAYER2_FLOWS`). 근거와 단언은 각 파일 머리, 기능별 대응은 docs/e2e/feature-flow-map.md.
+  ".maestro/layer2-write-and-read.yml",
+  ".maestro/layer2-open-app-writes.yml",
+  ".maestro/layer2-diagnostics-try-write.yml",
+  ".maestro/layer2-first-run-auto-diary.yml",
 ];
 
 /**
@@ -189,6 +196,10 @@ const LAYER1_FLOWS = [
   ".maestro/diary-home-1d.yml",
   ".maestro/week-strip-swipe.yml",
   ".maestro/diary-body-screen.yml",
+  // 073 — 낡은 흐름 셋을 현재 화면에 맞게 고쳤고(생성 없음) 기준 상태에서 통과했다 — 위반 주입으로 실패도 확인(2026-10-10)
+  ".maestro/skeleton.yml",
+  ".maestro/prompt-preview.yml",
+  ".maestro/today-diary.yml",
   // 상태 흉내를 켰다 끄므로 마지막에 둔다 — 중간에 실패해도 다음 실행의 기준 상태 복원이 흉내 기록을 지운다
   ".maestro/state-simulation.yml",
   // 070 — 표본 위에서 날마다 다른 상황의 사진·장소 칸을 본다(대표 날 값은 실행기가 만든다)
@@ -203,8 +214,24 @@ const NEEDS_LAYER1_BASELINE = [
   ".maestro/restart-persistence.yml",
   ".maestro/single-photo-swipe.yml",
   ".maestro/settings-developer-sweep.yml",
+  // 073 — 온보딩이 끝난 기준 상태가 전제다(`pm clear` 뒤에는 첫 실행 화면이 홈을 가린다)
+  ".maestro/skeleton.yml",
+  ".maestro/prompt-preview.yml",
+  ".maestro/today-diary.yml",
   // 070 — 기준 상태에 더해 30일치 표본과 실행기가 넘기는 `-e` 값이 필요하다
   ".maestro/sample-days.yml",
+];
+
+/**
+ * 073 — 층 2: 실제 모델로 일기를 쓰는 스모크 흐름. `--layer2`로만 돈다(흐름마다 기준 상태를 다시 만들고 따로 부른다 — `scripts/layer2/runner.ts`).
+ * **여기 있는 흐름은 모두 위 `FLOWS`에도 있어야 한다**(등록하지 않은 흐름은 초록불인데 아무것도 검증하지 않는다) 그리고 `scripts/layer2/flows.ts`의 표와 같아야 한다 —
+ * 일반 실행(`pm clear` 뒤라 쓴 날 픽스처·표본이 없다)에서는 돌리지 않는다. 기능 → 흐름 대응은 docs/e2e/feature-flow-map.md.
+ */
+const LAYER2_FLOWS = [
+  ".maestro/layer2-write-and-read.yml",
+  ".maestro/layer2-open-app-writes.yml",
+  ".maestro/layer2-diagnostics-try-write.yml",
+  ".maestro/layer2-first-run-auto-diary.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */
@@ -248,6 +275,33 @@ function report(status, reason) {
     console.log("  기능이 끝났다고 말하려면 최소 한 번은 실기기에서 돌아야 한다.");
   }
   console.log("");
+}
+
+async function runLayer2Mode() {
+  const { adbDevice } = await import("./layer1/device.ts");
+  const { runLayer2WithSample } = await import("./layer2/with-sample.ts");
+  const { LAYER2_FLOWS: table } = await import("./layer2/flows.ts");
+  const { realSampleStep } = await import("./e2e-sample/layer1-step.ts");
+  const requested = process.argv.slice(2).filter((arg) => arg !== "--layer2");
+  const flows = requested.length > 0 ? table.filter((f) => requested.includes(f.file)) : table;
+  const log = (line) => console.log(line);
+  const result = await runLayer2WithSample({ device: adbDevice(), flows, log }, realSampleStep(log));
+  const collected = result.perFlow.filter((f) => f.collected !== undefined);
+  if (collected.length > 0) {
+    console.log("");
+    console.log("사람이 읽을 일기 (자동 채점은 없다):");
+    for (const f of collected) console.log("  " + f.collected);
+  }
+  if (result.status === PASSED) {
+    report(PASSED);
+    process.exit(0);
+  }
+  if (result.status === SKIPPED) {
+    report(SKIPPED, result.reason);
+    process.exit(0);
+  }
+  report(result.status === ABORTED ? ABORTED : FAILED, result.reason);
+  process.exit(1);
 }
 
 async function runLayer1Mode() {
@@ -342,10 +396,10 @@ function main() {
   //
   // 인자로 흐름 파일을 주면 그것만 돈다: `node scripts/run-device-tests.mjs .maestro/a.yml`
   const requested = process.argv.slice(2);
-  const skippedForBaseline = FLOWS.filter((f) => NEEDS_LAYER1_BASELINE.includes(f));
+  const skippedForBaseline = FLOWS.filter((f) => NEEDS_LAYER1_BASELINE.includes(f) || LAYER2_FLOWS.includes(f));
   const flows = requested.length > 0 ? requested : FLOWS.filter((f) => !skippedForBaseline.includes(f));
   if (requested.length === 0 && skippedForBaseline.length > 0) {
-    console.log(`  (층 1 기준 상태가 필요한 흐름 ${skippedForBaseline.length}개는 여기서 돌지 않는다 — npm run test:layer1)`);
+    console.log(`  (층 1 기준 상태나 층 2가 필요한 흐름 ${skippedForBaseline.length}개는 여기서 돌지 않는다 — npm run test:layer1 / npm run test:layer2)`);
   }
   const junit = join(mkdtempSync(join(tmpdir(), "pocketlog-maestro-")), "report.xml");
 
@@ -384,7 +438,9 @@ function failedFlows(path) {
   return names.length > 0 ? names.join(", ") : null;
 }
 
-if (process.argv.includes("--layer1")) {
+if (process.argv.includes("--layer2")) {
+  await runLayer2Mode();
+} else if (process.argv.includes("--layer1")) {
   await runLayer1Mode();
 } else {
   main();

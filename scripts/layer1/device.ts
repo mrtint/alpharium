@@ -13,9 +13,9 @@
  */
 
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import { failedFlowNames } from "./junit.ts";
 
@@ -44,6 +44,12 @@ export interface Layer1Device {
     flows: readonly string[],
     env?: Readonly<Record<string, string>>,
   ): { status: number | null; failed: string[] | null };
+}
+
+/** 073 — 층 2는 흐름이 쓴 일기를 개발 기계로 가져온다(사람이 읽는 출력). 읽기만 한다. */
+export interface Layer2Device extends Layer1Device {
+  /** `files/<relative>`를 개발 기계의 `localPath`로 저장한다 */
+  pullFile(serial: string, relative: string, localPath: string): Outcome;
 }
 
 const DEVICE_TMP = "/data/local/tmp/layer1";
@@ -76,7 +82,7 @@ function failedFlows(path: string): string[] | null {
   return names.length > 0 ? names : null;
 }
 
-export function adbDevice(): Layer1Device {
+export function adbDevice(): Layer2Device {
   const needPath = (relative: string): { ok: false; detail: string } | null =>
     safeRelative(relative) ? null : { ok: false, detail: `안전하지 않은 경로: ${relative}` };
 
@@ -145,6 +151,22 @@ export function adbDevice(): Layer1Device {
       if (!pushed.ok) return { ok: false, detail: pushed.detail };
       const copied = runAs(serial, "cp", `${DEVICE_TMP}/${name}`, `files/${relative}`);
       return copied.ok ? { ok: true, value: undefined } : { ok: false, detail: copied.detail };
+    },
+
+    pullFile(serial, relative, localPath) {
+      const bad = needPath(relative);
+      if (bad !== null) return bad;
+      mkdirSync(dirname(localPath), { recursive: true });
+      const result = spawnSync("adb", ["-s", serial, "exec-out", "run-as", PACKAGE, "cat", `files/${relative}`], {
+        encoding: "buffer",
+        shell: true,
+      });
+      if (result.error) return { ok: false, detail: `adb를 부르지 못했다: ${result.error.message}` };
+      if (result.status !== 0 || result.stdout.length === 0) {
+        return { ok: false, detail: `${relative}를 읽지 못했다 (${result.status}): ${result.stderr.toString().trim()}` };
+      }
+      writeFileSync(localPath, result.stdout);
+      return { ok: true, value: undefined };
     },
 
     removeFile(serial, relative) {

@@ -1,0 +1,33 @@
+# 073 — 층 2: 실제 모델로 쓴다. 「자동 쓰기가 켜진 채 앱을 열면 쓰는 중 → 쓴 날」(057).
+#
+# 전제(실행기가 만든다): 자동 쓰기 켜짐(목표 시각 = 지금 시 — 시도 창 안), 오늘 일기 있음·어제 일기 없음, 070 표본의 어제(사진 5장)가 있다.
+# 오늘 일기가 있어야 `pickRetryDay`(가장 최근 미작성일)가 어제를 고르고, 어제는 재료가 있어 `write`로 판정된다.
+# `-e YESTERDAY`는 실행기가 넘긴다. 단언은 상태 전이까지다 — 본문은 사람이 읽는다(원칙 IV). 완료 대기 한도 300초.
+appId: com.a810labs.pocketlog
+env:
+  YESTERDAY: ${YESTERDAY || ""}
+---
+- assertTrue: ${YESTERDAY != ""}
+
+# 쓰기 버튼을 누르지 않는다 — 앱을 여는 것만으로 쓰기가 시작돼야 한다
+- launchApp
+
+- extendedWaitUntil:
+    visible:
+      id: "stop-button"
+    timeout: 90000
+- assertVisible: "쓰는 중"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "stop-button"
+    timeout: 300000
+
+# 어제가 골라진 쓴 날 홈
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 15000
+- assertVisible:
+    id: "day-${YESTERDAY}"
+    selected: true

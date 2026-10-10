@@ -7,7 +7,7 @@
 #
 # 검증 항목:
 #   FR-001 앱이 실기기에서 뜬다
-#   FR-006 추론 모듈 적재 상태를 확인할 수 있다
+#   FR-006 추론 모듈 적재 — 060 이후 진단에 적재 줄이 없다. 실제 적재는 층 2 흐름(실제 모델로 쓰기)이 본다
 #   FR-012 실기기에서 추론 위치가 온디바이스다
 #   FR-017 현재 환경과 추론 위치가 보인다
 #
@@ -40,21 +40,35 @@ appId: com.a810labs.pocketlog
 - tapOn:
     id: "developer-diagnostics"
 
-# FR-001 — 앱이 죽지 않고 뜨고, 진단 화면이 보인다
+# 073 — 진단 화면이 060에서 보드 6h의 일곱 묶음으로 바뀌어 옛 줄(「모듈 상태」·「loaded」·「on-device」·「ok — 저장·조회…」)이 사라졌다.
+# 지금 보이는 것으로 같은 뜻을 본다.
+#
+# FR-001 — 앱이 죽지 않고 뜨고, 진단 화면과 「환경」 묶음이 보인다
+- extendedWaitUntil:
+    visible:
+      id: "diagnostics-screen"
+    timeout: 10000
+- assertVisible:
+    id: "diagnostics-group-env"
 - assertVisible: "환경"
 - assertVisible: "추론 위치"
-- assertVisible: "모듈 상태"
 
-# FR-006 — 온디바이스 추론 모듈이 적재됐다
-# 이 줄이 이 기능의 진짜 검증이다. loaded가 아니면 온디바이스가 붙지 않은 것이다.
-- assertVisible: "loaded"
-
-# FR-012 — 실기기에서는 추론이 기기에서 돈다
-- assertVisible: "on-device"
+# FR-012·017 — 추론 위치가 기기다(로컬 서버가 아니다). 이 줄은 llama-port의 GPU_LAYERS=0 고정에 근거한 표시이고,
+# 060 계약 테스트가 그 상수가 바뀌면 문구도 같이 고치게 한다. 네이티브 모듈이 실제로 적재되는지는 층 2(실제로 일기를 쓴다)가 본다.
+- assertVisible: "기기 · CPU"
 
 # 002 — 파일 저장이 실기기에서 실제로 돈다
-# "저장 점검" 줄이 ok로 시작해야 한다. unavailable이면 어댑터가 붙지 않은 것이고,
-# failed면 왕복 어딘가가 깨진 것이다 — 둘 다 통과가 아니다.
+# 060이 옛 왕복 점검을 일기를 다시 읽어 세는 점검으로 바꿨다: 「N편 · 정상」이어야 하고 「읽기 실패」가 붙으면 깨진 일기가 있다.
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-storage"
+    direction: DOWN
+    timeout: 20000
 - assertVisible: "저장 점검"
+# 저장 점검 행은 눌러야 값이 펼쳐진다(›)
+- tapOn:
+    id: "diagnostics-storage"
 - assertVisible:
-    text: "ok — 저장·조회·덮어쓰기·unknown 보존 확인"
+    text: ".*편 · 정상"
+- assertNotVisible:
+    text: ".*읽기 실패.*"
