@@ -45,6 +45,11 @@ npm run lint
 
 - **브랜치 보호(FR-013)**: 2026-10-10 `gh api repos/mrtint/alpharium/branches/main/protection`이 404 "Branch not protected", `rulesets`는 빈 배열이다. 필수 체크가 하나도 없으므로 이 잡은 필수가 아니다. 나중에 보호를 켜면 이 잡을 필수 체크에 넣지 않는다(경로 필터로 건너뛴 필수 체크는 「대기 중」에 머문다).
 
+## 4a. `main` push 경로 필터 확인 (T036, 2026-10-10)
+
+- **양성**: #131 머지(워크플로 파일을 바꾼 머지) 직후 `main` push 실행이 시작됐다 — run 38054427754.
+- **음성**: 이 기록을 담은 문서 전용 PR이 열리고 머지될 때 네이티브 빌드 확인이 시작되지 않는지는 머지 뒤 아래에 적는다.
+
 ## 5. 실측 기록 (2026-10-10, GitHub 호스티드 러너)
 
 러너 사양: ubuntu-latest 4코어·15,989MB, macos-latest 3코어·7,168MB(macOS 26.6.2, Xcode 26.6). 모두 별도 설정 없이 통과했고 NDK·CMake·Xcode 버전 문제는 없었다.
