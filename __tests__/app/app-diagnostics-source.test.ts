@@ -115,8 +115,10 @@ describe("WF7 — 쓰기 실패 기록 지점 셋", () => {
   const task = read("src/schedule/task.ts");
   const wiring = read("src/app/wiring.ts");
 
-  it("홈 generate: 그만두기(cancelled)를 거른 뒤에 recordFailure를 부른다 — 홈은 기록 통로를 모른다", () => {
-    const cancelled = home.indexOf("if (cancelled.current) return;");
+  it("홈 generate: 그만두기(시도별 isCancelled)를 거른 뒤에 recordFailure를 부른다 — 홈은 기록 통로를 모른다", () => {
+    // 071 — 그만두었는가는 시도별 번호로 가린다(불리언 `cancelled` 하나가 아니다 — 새 시도가 되돌려 거짓 실패가 기록됐다, SE-2).
+    // 마지막 `isCancelled()` 거름(파이프라인이 끝난 뒤의 것)이 기록보다 앞서야 한다 — 앞쪽 것은 앞 시도를 기다린 뒤의 거름이다.
+    const cancelled = home.lastIndexOf("if (isCancelled()) return;");
     const record = home.indexOf("recordFailure?.(result)");
     expect(cancelled).toBeGreaterThan(-1);
     expect(record).toBeGreaterThan(cancelled);

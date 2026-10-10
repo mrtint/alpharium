@@ -103,6 +103,17 @@ export type PipelineInput = {
    * 않게 한다("두 개의 진실" 금지). 없으면 키 자체를 만들지 않는다.
    */
   authorName?: string;
+  /**
+   * 사용자가 이 쓰기를 그만두었는가 (071, SE-3).
+   *
+   * **저장을 시작하기 직전에 한 번 본다.** 참이면 저장하지 않는다 — 어댑터의 중단 확인은 모델 적재 직후와 제목 질문 직후 두
+   * 곳뿐이라, 생성이 끝나는 순간 온 그만두기는 그 뒤 저장까지 아무도 보지 않았다(실기기: 26.2초에 그만두기 → 일기 저장됨).
+   * **저장이 시작된 뒤의 취소는 일기를 남긴다** — 저장은 대상을 지우고 옮기는 것이라 되돌리면 다시 쓰기에서 옛 일기까지
+   * 잃는다(002 FR-023b). 그래서 저장 뒤에 지우는 경로는 없다.
+   *
+   * 옵셔널이다 — 백그라운드 자동 쓰기는 그만둘 화면이 없어 주지 않는다(동작 그대로). 판정은 화면이 쓰기 시도마다 정한다.
+   */
+  isCancelled?: () => boolean;
 };
 
 /**
@@ -245,6 +256,22 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
 }
 
 /**
+ * 저장되지 않는 일기의 사진 사본을 정리한다 — 저장 실패(017 P4)와 저장 전 취소(071)가 같은 규칙을 쓴다.
+ *
+ * **`ownsResizedPath`가 거짓인 것(원본과 같은 경로, 013 C1)은 절대 지우지 않는다** — 그 경로는 사용자의 원본 사진이다.
+ */
+async function discardPhotos(
+  deps: PipelineDeps,
+  usedPhotos: { resizedPath: string; ownsResizedPath: boolean }[] | undefined,
+): Promise<void> {
+  if (usedPhotos === undefined || deps.cleanupResizedPhoto === undefined) return;
+  const cleanup = deps.cleanupResizedPhoto;
+  await Promise.all(
+    usedPhotos.filter((p) => p.ownsResizedPath).map((p) => cleanup(p.resizedPath).catch(() => {})),
+  );
+}
+
+/**
  * 3~6단계.
  *
  * **앞 단계가 실패하면 뒤 단계를 시도하지 않는다.** 특히 5(생성)가 실패했는데 6(저장)이
@@ -329,6 +356,12 @@ async function runStages(
   // 014 — **`judge()`가 이미 통과시킨 전체 텍스트에서 제목을 사후 분리한다.**
   // `extractTitle()`은 판정을 다시 하지 않고, 실패해도 예외를 던지지 않는다
   // (title.ts 계약 P1·P2) — 떼지 못하면 title 없이 전체가 본문이 된다(FR-009).
+  // 071 — 저장을 시작하기 직전의 마지막 취소 확인. 사진 사본은 저장 실패와 같은 규칙으로 정리한다(아래 `discardPhotos`).
+  if (input.isCancelled?.() === true) {
+    await discardPhotos(deps, generated.usedPhotos);
+    return stop("generation", "interrupted: 저장 전에 그만두었다");
+  }
+
   const { title, body } = extractTitle(generated.text);
   const entry: DiaryEntry = {
     date: input.day,
@@ -355,14 +388,7 @@ async function runStages(
     //
     // **`ownsResizedPath`가 거짓인 것(원본과 같은 경로, 013 C1)은 절대 지우지
     // 않는다**(2026-10-10, FR-006) — 그 경로는 사용자의 원본 사진이다.
-    if (generated.usedPhotos !== undefined && deps.cleanupResizedPhoto !== undefined) {
-      const cleanup = deps.cleanupResizedPhoto;
-      await Promise.all(
-        generated.usedPhotos
-          .filter((p) => p.ownsResizedPath)
-          .map((p) => cleanup(p.resizedPath).catch(() => {})),
-      );
-    }
+    await discardPhotos(deps, generated.usedPhotos);
     // **만든 글을 버리지 않는다**(006 FR-012a). 30초를 들인 글이고 다시 생성해도
     // 같은 글이 나오지 않는다. 실패는 실패로 두되 읽을 기회를 빼앗지 않는다.
     return { ok: false, stage: "storage", reason: saved.reason, entry };
