@@ -32,7 +32,7 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
    5. 사용자가 "반영하지 않는다"고 정한 지적은 그 결정을 spec이나 plan에 한 줄로 남긴다. 이후 회차에 남은 지적이 **전부 사용자가 이미 반영하지 않기로 정한 것**이면 루프를 끝낸다. 하나라도 새 지적이 있으면 3으로 간다.
 
    루프가 끝나면 산출물, **analyze 회차별 지적 수**(예: 5 → 2 → 0), 사용자가 반영하지 않기로 정한 지적을 짧게 보고한다.
-7. **구현 구간 (한 흐름으로)**: speckit-implement → **speckit-converge(필수, 정확히 1회)** → converge가 tasks.md에 추가한 태스크를 구현한다. **converge 재실행 금지** — 그 뒤에도 남는 지적사항은 구현하지 않고 최종 보고에만 적는다. 구간 중간에는 사용자 승인을 기다리지 않는다(상호작용 지점은 brainstorming·clarify로 충분). 구현 구간의 종료 보고는 최종 보고로 갈음한다.
+7. **구현 구간 (한 흐름으로)**: speckit-implement → **speckit-converge(필수, 1회 수행 후 보고)** → converge가 tasks.md에 추가한 태스크를 구현한다. **단일 호출 내 자동 반복 루프 금지**(1회 요청 시 1번 실행하고 결과를 보고한다. 전체 개발 루틴에서 추가 converge가 금지되는 것이 아니며, 사용자 요청이나 추가 검증 라운드 시 다시 실행 가능). 구간 중간에는 사용자 승인을 기다리지 않는다(상호작용 지점은 brainstorming·clarify로 충분). 구현 구간의 종료 보고는 최종 보고로 갈음한다.
 8. **완료 처리**: `npm test`·`npm run lint`를 실제로 실행해 통과를 확인하고, dev 빌드로 실기기에서 최소 1회 확인한다(헌법 원칙 V — 건너뛴 실기기 테스트는 통과가 아니다. 결과 안 보고 "완료" 주장 금지). 그 뒤 로드맵의 「진행 예정 과제」에서 해당 과제를 빼고 「완료 이력」 표에 스펙 번호와 한 줄로 옮긴다. 커밋 메시지에 스펙 번호를 남긴다(예: `docs: 로드맵에서 049 완료 과제를 이력으로 옮김`).
 
 ## 커밋 시점 (한 커밋 = 한 논리적 변경)
@@ -58,10 +58,10 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
 | "좁은 기능이라 clarify/analyze는 건질 게 없다" | 건질 게 없으면 싸게 끝난다. 건너뛸지 판단하는 비용이 실행 비용보다 크다. |
 | "analyze 필수 1회는 이미 채웠다, 반영했으니 끝" | analyze는 횟수가 아니라 지적 0건이 종료 조건이다. 반영했으면 다시 analyze. |
 | "LOW/MEDIUM만 남았고 analyze도 proceed해도 된다고 한다" | 그것은 speckit의 기본값이다. 이 파이프라인은 심각도와 무관하게 0건까지 간다. |
-| "converge가 1회 상한이니 analyze도 같은 취지로 멈추자" | 상한 1회는 converge에만 있다. analyze에 유추해 적용하지 않는다. |
+| "converge가 1회 상한이니 analyze도 같은 취지로 멈추자" | 1회 수행 후 보고는 converge 호출 단위의 규칙이다. analyze는 지적 0건까지 반복하는 루프이므로 유추해 적용하지 않는다. |
 | "반영한 부분만 내가 훑어보면 analyze를 또 돌릴 필요 없다" | 대체 절차 금지. 다시 speckit-analyze를 호출하는 것이 단계다. |
-| "converge 대신 인수조건 수동 대조" | 대체 절차 금지. speckit-converge 1회 호출. |
-| "converge가 또 태스크를 찾았으니 한 번 더 돌리자" | 상한은 1회다. 잔여분은 보고만 한다. |
+| "converge 대신 인수조건 수동 대조" | 대체 절차 금지. speckit-converge 호출. |
+| "converge가 또 태스크를 찾았으니 한 번 더 돌리자" | 단일 호출 내에서 임의로 자동 연쇄 재실행하지 않는다. 1회 수행 후 결과를 보고하고, 추가 converge는 보고 후 필요에 따라(또는 사용자 요청 시) 진행한다. |
 
 ## Red Flags — 이 생각이 들면 멈추고 파이프라인으로 복귀
 
