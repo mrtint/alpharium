@@ -50,14 +50,14 @@
 ## Phase 6: Polish & 검증
 
 - [x] T020 `npm test`·`npm run lint`(prettier 포함 — 워크플로 YAML도 포맷 검사 대상인지 확인)를 실행해 통과를 확인한다. `git diff --stat main...HEAD -- src .github/workflows/ci.yml`이 비어 있음을 확인한다 (원칙 IV·FR-011·SC-005)
-- [ ] T021 사용자 확인을 받고 현재 구현을 피처 브랜치에 커밋한 뒤 push하고 **초안 PR**을 연다(워크플로 파일이 경로 필터에 들어 있어 첫 실행이 돈다). 러너에서만 드러나는 문제(NDK/CMake 버전, Xcode 버전, 캐시 키)는 고쳐서 같은 커밋에 합치고(`--amend` + `--force-with-lease`, 자기 브랜치, 매번 확인) plan의 「실측 전이라 확정하지 않는 것」 표에 따라 research.md에 기록한다 (.github/workflows/native-build.yml, specs/072-ci-native-build-check/research.md)
-- [ ] T022 `gh run rerun`으로 같은 ref에서 **둘째 실행**을 해 캐시 적중 시간을 얻는다. 러너 수정 push가 진행 중이던 앞선 실행을 취소하는지(FR-001a)는 관찰되면 기록한다(계약 테스트가 설정을 잠근다) (러너)
-- [ ] T023 위반 주입(SC-001): 피처 브랜치에서 `072-inject`를 따 `app.json`의 `plugins`에 없는 이름(`"./plugins/does-not-exist"`)을 넣고 **피처 브랜치를 base로** 초안 PR을 연다 → 두 잡이 빨갛게 되는 것을 본다. 되돌려 push해 초록을 본다 (app.json)
-- [ ] T028 경로 필터 음성 확인(FR-003): 피처 브랜치에서 `072-docs-only`를 따 문서 파일 하나만 바꾸고 피처 브랜치를 base로 PR을 연다 → 이 확인이 시작되지 않고 `ci.yml`만 도는 것을 본다 (docs)
-- [ ] T024 첫·둘째 실행의 값으로 quickstart §5 표를 채우고, `timeout-minutes`를 실측에 맞게 확정한다. 안드로이드가 지나치게 길면 ccache를 후속 과제로 로드맵에 한 줄 남긴다 (specs/072-ci-native-build-check/quickstart.md, .github/workflows/native-build.yml, docs/roadmap/README.md)
-- [ ] T025 FR-013 확인 사항(브랜치 보호의 필수 체크에 이 잡이 없다)을 소유자에게 확인해 quickstart에 결과를 적는다 (specs/072-ci-native-build-check/quickstart.md)
+- [x] T021 사용자 확인을 받고 현재 구현을 피처 브랜치에 커밋한 뒤 push하고 **초안 PR**을 연다(워크플로 파일이 경로 필터에 들어 있어 첫 실행이 돈다). 러너에서만 드러나는 문제(NDK/CMake 버전, Xcode 버전, 캐시 키)는 고쳐서 같은 커밋에 합치고(`--amend` + `--force-with-lease`, 자기 브랜치, 매번 확인) plan의 「실측 전이라 확정하지 않는 것」 표에 따라 research.md에 기록한다 (.github/workflows/native-build.yml, specs/072-ci-native-build-check/research.md)
+- [x] T022 `gh run rerun`으로 같은 ref에서 **둘째 실행**을 해 캐시 적중 시간을 얻는다. 러너 수정 push가 진행 중이던 앞선 실행을 취소하는지(FR-001a)는 관찰되면 기록한다(계약 테스트가 설정을 잠근다) (러너)
+- [x] T023 위반 주입(SC-001): 피처 브랜치에서 `072-inject`를 따 `app.json`의 `plugins`에 없는 이름(`"./plugins/does-not-exist"`)을 넣고 **피처 브랜치를 base로** 초안 PR을 연다 → 두 잡이 빨갛게 되는 것을 본다. 되돌려 push해 초록을 본다 (app.json)
+- [x] T028 경로 필터 음성 확인(FR-003): 피처 브랜치에서 `072-docs-only`를 따 문서 파일 하나만 바꾸고 피처 브랜치를 base로 PR을 연다 → 이 확인이 시작되지 않고 `ci.yml`만 도는 것을 본다 (docs)
+- [x] T024 첫·둘째 실행의 값으로 quickstart §5 표를 채우고, `timeout-minutes`를 실측에 맞게 확정한다. 안드로이드가 지나치게 길면 ccache를 후속 과제로 로드맵에 한 줄 남긴다 (specs/072-ci-native-build-check/quickstart.md, .github/workflows/native-build.yml, docs/roadmap/README.md)
+- [x] T025 FR-013 확인 사항(브랜치 보호의 필수 체크에 이 잡이 없다)을 소유자에게 확인해 quickstart에 결과를 적는다 (specs/072-ci-native-build-check/quickstart.md)
 - [x] T026 `docs/roadmap/README.md`를 갱신한다: 이 과제의 할 일 1번을 「네이티브 입력(`package.json`·`package-lock.json`·`app.json`·`plugins/**`)이 바뀐 PR과 `main` push·수동 실행에서만, 필수 체크는 아님」으로 고치고, 「안드로이드 release 빌드·서명·보관을 CI로」와 「무료 빌드 머신으로 iOS 빌드·업로드」에 「Tier 3(서명·업로드)는 태그·수동 트리거로, release 빌드 종류는 여기서 정한다」를 한 줄씩 더한다 (docs/roadmap/README.md)
-- [ ] T027 T023·T028 뒤 두 PR을 닫고 `072-inject`·`072-docs-only`를 로컬·원격에서 지운다(`git branch -D`, `git push origin --delete`) — 사용자 확인 후 (git)
+- [x] T027 T023·T028 뒤 두 PR을 닫고 `072-inject`·`072-docs-only`를 로컬·원격에서 지운다(`git branch -D`, `git push origin --delete`) — 사용자 확인 후 (git)
 
 ## Dependencies & 실행 순서
 
@@ -75,10 +75,10 @@
 
 ## Phase 7: Convergence
 
-- [ ] T029 러너 사양·단계별 시간·안드로이드 최대 메모리를 실행 요약뿐 아니라 잡 로그(표준 출력)에도 출력해 `gh run view --log`로 읽을 수 있게 한다 (.github/workflows/native-build.yml) per SC-003 (missing)
-- [ ] T030 `gh workflow run native-build.yml`로 수동 실행이 되는지 확인하고, `main` push 실행(머지 직후)의 결과를 기록한다 per FR-001·FR-002 (missing)
-- [ ] T031 T029 반영 push로 도는 실행에서 캐시 적중 시간을 얻고, 첫 실행(안드로이드 9분 51초·iOS 8분 52초)과 함께 quickstart §5 표를 채운다. `timeout-minutes`를 실측에 맞게 확정한다 per SC-003 (missing)
-- [ ] T032 `main`에서 따는 `072-inject` 브랜치로 `app.json`에 없는 plugin 이름을 넣은 PR을 열어 두 잡이 빨갛게 되는지, 되돌리면 초록이 되는지 확인한다 per SC-001 (missing)
-- [ ] T033 `main`에서 따는 `072-docs-only` 브랜치로 문서 파일 하나만 바꾼 PR을 열어 네이티브 빌드 확인이 시작되지 않고 `ci.yml`만 도는지 확인한다 per FR-003 (missing)
-- [ ] T034 `gh api`로 `main`의 브랜치 보호(필수 체크)를 조회해 이 잡이 필수가 아님을 확인하고 quickstart §4에 결과를 적는다 per FR-013 (missing)
-- [ ] T035 T032·T033의 PR을 닫고 `072-inject`·`072-docs-only` 브랜치를 로컬·원격에서 지운다 per plan: 일회용 PR 정리 (missing)
+- [x] T029 러너 사양·단계별 시간·안드로이드 최대 메모리를 실행 요약뿐 아니라 잡 로그(표준 출력)에도 출력해 `gh run view --log`로 읽을 수 있게 한다 (.github/workflows/native-build.yml) per SC-003 (missing)
+- [x] T030 `gh workflow run native-build.yml`로 수동 실행이 되는지 확인하고, `main` push 실행(머지 직후)의 결과를 기록한다 per FR-001·FR-002 (missing)
+- [x] T031 T029 반영 push로 도는 실행에서 캐시 적중 시간을 얻고, 첫 실행(안드로이드 9분 51초·iOS 8분 52초)과 함께 quickstart §5 표를 채운다. `timeout-minutes`를 실측에 맞게 확정한다 per SC-003 (missing)
+- [x] T032 `main`에서 따는 `072-inject` 브랜치로 `app.json`에 없는 plugin 이름을 넣은 PR을 열어 두 잡이 빨갛게 되는지, 되돌리면 초록이 되는지 확인한다 per SC-001 (missing)
+- [x] T033 `main`에서 따는 `072-docs-only` 브랜치로 문서 파일 하나만 바꾼 PR을 열어 네이티브 빌드 확인이 시작되지 않고 `ci.yml`만 도는지 확인한다 per FR-003 (missing)
+- [x] T034 `gh api`로 `main`의 브랜치 보호(필수 체크)를 조회해 이 잡이 필수가 아님을 확인하고 quickstart §4에 결과를 적는다 per FR-013 (missing)
+- [x] T035 T032·T033의 PR을 닫고 `072-inject`·`072-docs-only` 브랜치를 로컬·원격에서 지운다 per plan: 일회용 PR 정리 (missing)
