@@ -15,9 +15,9 @@
 1. **트리거는 세 가지다**(2026-10-10 재결정 — 실무의 3티어 CI 구성에 맞춤. 앞서 정한 "PR에서는 돌리지 않는다"를 대체한다).
    - `pull_request`: 네이티브 입력이 바뀐 PR에서만 — 경로 필터 `package.json`·`package-lock.json`·`app.json`·`plugins/**`·`.github/workflows/native-build.yml`(자기 자신).
      의존성·config plugin 변경이 네이티브를 깨뜨리는 주범이고 그런 PR은 드물어 10~20분대 빌드의 비용이 작다. `pull_request`는 PR 브랜치의 워크플로 파일을 쓰므로 새 파일도 PR에서 곧바로 돈다.
-   - `push`: `main`, 경로 필터 없음. `workflow_dispatch`: 수동 실행(파일이 `main`에 있어야 한다).
+   - `push`: `main`, **같은 경로 필터**(재결정 — 문서 오탈자 머지에 빌드를 돌리지 않는다). `workflow_dispatch`: 수동 실행(파일이 `main`에 있어야 한다).
    - 티어: Tier 1 모든 PR = `ci.yml`, **Tier 2 = 이 워크플로**, Tier 3 서명·업로드 = 후속 두 과제(태그·수동 트리거).
-2. **`main` push에서는 경로와 무관하게 항상 돈다**(경로 필터가 놓친 변경·upstream 변화도 한 번 걸러진다).
+2. **`main` push도 같은 경로에서만 돈다.** 처음에는 항상 돌리기로 했으나(경로 필터가 놓친 변경·upstream 변화를 걸러내려고), PR에 경로 필터를 건 3티어 구성에서는 중복이고 문서 머지마다 10~13분을 쓴다. upstream 변화로 깨지는 것은 수동 실행으로 본다.
 3. **안드로이드는 `assembleDebug`, arm64 하나다.** `plugins/with-release-signing.js`가 release에 키스토어를 요구해 서명 없는 release는 돌지 않는다.
    release 최적화 컴파일(로컬에서 네 ABI는 clang OOM이었다)과 서명은 「안드로이드 release 빌드·서명·보관을 CI로」 과제에서 정한다.
 4. **iOS는 macOS 러너의 서명 없는 시뮬레이터 빌드다**(`prebuild` → `pod install` → `xcodebuild -sdk iphonesimulator CODE_SIGNING_ALLOWED=NO`).
