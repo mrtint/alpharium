@@ -12,7 +12,8 @@
 | `deleteFiles` | string[] | 기준 상태 뒤 추가로 지우는 `preferences/` 파일(예: `character-names.json`) |
 | `absentDays` | `("today"\|"yesterday"\|"day-before")[]` | 일기 픽스처에서 뺄 날 |
 | `writtenDay` | `"today"\|"yesterday"` | 흐름이 쓰는 날 — 끝나고 가져올 일기 |
-| `env` | `(ctx) => Record<string,string>` | `-e`로 넘길 값(예: `YESTERDAY`) |
+
+`-e` 값은 흐름마다 다르지 않다 — 실행기가 `TODAY`·`YESTERDAY`를 모든 흐름에 넘긴다(날짜 리터럴이 흐름에 없게).
 
 **규칙**: 표는 흐름 파일마다 정확히 하나. 표의 `file`이 파일시스템·`FLOWS`·`LAYER2_FLOWS`(`run-device-tests.mjs`)와 일치한다(계약 테스트).
 

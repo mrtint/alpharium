@@ -8,6 +8,6 @@
 | `layer2-write-and-read` | 어제 일기 없음, 어제 표본 사진 있음 | `day-${YESTERDAY}` 선택 → `write-button` → (덮어쓰기 없음) → `stop-button`·`home-day-state`「쓰는 중」 → `stop-button` 소멸 → `write-button` 대신 쓴 날 홈: `diary-title` 존재, 「다시 쓰기」 존재 |
 | `layer2-open-app-writes` | 자동 쓰기 켜짐(목표 = 지금 시), 오늘 일기 있음·어제 없음 | `launchApp` → `stop-button` 나타남(쓰는 중) → 소멸 → 어제가 선택된 쓴 날 홈 |
 | `layer2-diagnostics-try-write` | 오늘 일기 없음 | 홈 → 설정 → 개발자 → 진단 → 「한 번 써 보기」 → 홈이 쓰는 중 → 소멸 → 오늘 쓴 날 홈 |
-| `layer2-first-run-auto-diary` | `onboarding` 되돌림, 작명 파일 삭제, 오늘 일기 없음, 모델 있음 | 로고 → (권한 자동) → 작명 입력·확정 → liveness 통과 → 쓰는 중 → 소멸 → 오늘 쓴 날 홈 |
+| `layer2-first-run-auto-diary` | `onboarding` 되돌림, 작명 파일 삭제, 오늘 일기 없음, 모델 있음 | 로고 → (권한 자동) → 작명 입력·확정 → liveness 통과 → 홈(`home-settings`) → **`written-paper`**(오늘 쓴 날 지면). **`stop-button`을 기다리지 않는다** — 040 자동 첫 일기는 홈의 제자리 쓰기가 아니라 파이프라인 직접 호출이라 쓰는 중 표식이 서지 않는다(2026-10-10 실기기에서 확인) |
 
 각 흐름의 정확한 testID는 구현 때 기존 흐름(`in-place-writing`·`written-day-reading`·`settings-developer-sweep`·`first-run-flow`)에서 가져온다. 새 testID가 필요하면 앱에 가장 작은 추가만 하고 사유를 기록한다(FR-024).

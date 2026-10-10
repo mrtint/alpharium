@@ -26,7 +26,11 @@ appId: com.a810labs.pocketlog
 ---
 - launchApp
 
-- assertVisible: "일기"
+# 073 — 홈에서 「일기」 글자(048 kicker)가 사라졌다(055: 월 라벨 줄 + 점 셋). 홈이 떴는가는 스트립이 정한다.
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 30000
 
 # ★ M1 — **고르는 자리가 있고, 오늘이 골라져 있다.** 049 — 일~토 주간 스트립(`day-strip`),
 # 오늘 칸은 숫자 밑줄(`day-today-*`)로만 구분된다(헤더에 「오늘」 글자가 없다).

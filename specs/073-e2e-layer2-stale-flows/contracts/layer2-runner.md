@@ -8,7 +8,7 @@
 - **L2-3**: 프로브(`run-as`)·모델 존재 점검 실패 → `aborted`. 모델은 읽기만(I-1).
 - **L2-4 (흐름마다 반복)**: 앱 종료 → 기준 상태(`prepareBaseline`, 층 1과 같은 `BASELINE`) → 흐름의 `preferenceOverrides`·`deleteFiles` 적용 → 일기 픽스처에서 `absentDays` 제거한 것 심기 → `maestro test <흐름 1개> -e …` 실행 → 흐름의 `writtenDay` 일기 가져오기.
 - **L2-5**: 한 흐름이 실패해도 다음 흐름으로 간다. 끝에 흐름별 상태를 표로 출력한다.
-- **L2-6**: `DeviceServerDiedException` 등 Maestro 기기 서버가 죽은 실패는 같은 흐름을 한 번만 다시 돌린다(AGENTS 「Maestro」). 그 밖의 실패는 다시 돌리지 않는다.
+- **L2-6**: **보고서에 실패한 흐름 이름이 없는데 종료 코드가 0이 아니면**(= `DeviceServerDiedException` 등 Maestro 기기 서버가 죽은 실패) 같은 흐름을 기준 상태부터 한 번만 다시 돌린다(AGENTS 「Maestro」). 보고서에 실패 이름이 있으면 진짜 실패라 다시 돌리지 않는다.
 - **L2-7**: 마지막 흐름 뒤 기준 상태를 한 번 더 만든다(FR-016) — 설정을 바꾼 채 끝나지 않게.
 - **L2-8**: 가져오기 실패는 경고만 출력하고 판정에 영향이 없다(출력일 뿐이다). 일기를 채점·비교하지 않는다(IV).
 - **금지(소스 계약)**: `pm clear`·`install`·`uninstall`, `judge`·`score`·`similar` 등 채점 어휘, 일기 `text` 필드를 읽는 코드.
