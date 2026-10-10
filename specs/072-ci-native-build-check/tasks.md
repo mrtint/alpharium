@@ -19,7 +19,7 @@
 **Goal**: 네이티브 입력이 바뀐 PR·`main` push·수동 실행에서만 시작하고, 네이티브와 무관한 PR에서는 시작하지 않으며, 실패가 가려지지 않는다.
 **Independent Test**: 트리거·동시성·`continue-on-error` 부재를 소스로 단언하는 테스트가 통과한다.
 
-- [x] T005 [US2] 트리거 계약 테스트를 쓴다: `pull_request.paths`가 정확히 `package.json`·`package-lock.json`·`app.json`·`plugins/**`·`.github/workflows/native-build.yml` 다섯, `pull_request_target`·`schedule` 없음, `push.branches`가 `main`뿐이고 push에 `paths` 없음, `workflow_dispatch` 있음 (__tests__/ci/native-build-workflow.test.ts)
+- [x] T005 [US2] 트리거 계약 테스트를 쓴다: `pull_request.paths`가 정확히 `package.json`·`package-lock.json`·`app.json`·`plugins/**`·`.github/workflows/native-build.yml` 다섯, `pull_request_target`·`schedule` 없음, `push.branches`가 `main`뿐이고 push의 `paths`도 같은 다섯 항목, `workflow_dispatch` 있음 (__tests__/ci/native-build-workflow.test.ts)
 - [x] T006 [US2] 동시성·실패 처리 계약 테스트를 쓴다: `concurrency.group`에 `github.ref` 포함·`cancel-in-progress: true`, `continue-on-error` 어디에도 없음 (__tests__/ci/native-build-workflow.test.ts)
 - [x] T007 [US2] 테스트가 실패하는 것을 확인한 뒤, 워크플로 뼈대(`name: Pocketlog Native Build`, `on`, `concurrency`)를 쓴다. 잡은 아직 없다 — T005·T006이 통과해야 한다 (.github/workflows/native-build.yml)
 

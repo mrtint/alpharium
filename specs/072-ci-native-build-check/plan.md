@@ -78,7 +78,7 @@ docs/roadmap/README.md             # 별도 과제 추가분(커밋 안 된 수�
 
 ## 설계 결정
 
-1. **트리거**: `on: pull_request: paths: [package.json, package-lock.json, app.json, "plugins/**", .github/workflows/native-build.yml]` + `push: branches: [main]`(경로 필터 없음) + `workflow_dispatch`(FR-001·001b·002·003). 필수 체크로 올리지 않는다(경로 필터로 건너뛴 필수 체크는 「대기 중」에 머문다).
+1. **트리거**: `on: pull_request: paths: [package.json, package-lock.json, app.json, "plugins/**", .github/workflows/native-build.yml]` + `push: branches: [main]`(같은 경로 필터) + `workflow_dispatch`(FR-001·001b·002·003). 필수 체크로 올리지 않는다(경로 필터로 건너뛴 필수 체크는 「대기 중」에 머문다).
 2. **동시성**: `concurrency: { group: native-build-${{ github.ref }}, cancel-in-progress: true }`(FR-001a). 같은 ref(PR이면 PR ref)의 새 실행이 앞선 실행을 취소한다 — PR에서 특히 자연스럽다.
 3. **안드로이드 잡**: JDK 17 → `npm ci` → `npx expo prebuild --platform android --clean` → 메모리 기록 시작 → `cd android && ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a` → 기록 종료·요약.
 4. **iOS 잡**: `npm ci` → `npx expo prebuild --platform ios --clean --no-install` → `cd ios && pod install` → `xcodebuild -workspace ios/Pocketlog.xcworkspace -scheme Pocketlog -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath $RUNNER_TEMP/dd CODE_SIGNING_ALLOWED=NO build`.
@@ -87,7 +87,7 @@ docs/roadmap/README.md             # 별도 과제 추가분(커밋 안 된 수�
 6. **시간·메모리 기록**: 단계별로 `date +%s`로 시작·끝을 재서 요약에 쓴다. 안드로이드 메모리는 빌드 직전 백그라운드에서 5초마다 `/proc/meminfo`(`MemTotal - MemAvailable`)를 파일에 적고, 빌드 뒤 최대값을 요약에 쓴다. 두 기록 단계는 `if: always()`라 실패·타임아웃에도 남는다.
 7. **타임아웃**: 실측 전에는 `timeout-minutes: 60`(러너 기본 360분보다 낮은 안전망)으로 두고 실측 뒤 확정한다.
 8. **취소 표시**: 취소된 실행은 GitHub가 「취소됨」으로 표시한다(실패 아님, FR-001a).
-9. **테스트가 잠그는 것**(FR-012, SC-004): (a) `pull_request`에 `paths`가 정확히 위 다섯 항목, `pull_request_target`·`schedule` 없음, `push.branches`가 `main`뿐이고 push에는 `paths` 없음, `workflow_dispatch` 있음 (b) `continue-on-error` 없음 (c) 안드로이드 명령에 `-PreactNativeArchitectures=arm64-v8a`가 있고 다른 ABI 문자열이 없음 (d) `secrets.`·`upload-artifact`·`signing`·`.jks` 없음 (e) 두 잡에 `needs:` 없음 (f) `concurrency`에 `cancel-in-progress: true` (g) 안드로이드는 `assembleDebug`, iOS는 `CODE_SIGNING_ALLOWED=NO`. 소스를 읽을 때 주석을 먼저 걷어낸다.
+9. **테스트가 잠그는 것**(FR-012, SC-004): (a) `pull_request`에 `paths`가 정확히 위 다섯 항목, `pull_request_target`·`schedule` 없음, `push.branches`가 `main`뿐이고 push의 `paths`도 같은 다섯 항목, `workflow_dispatch` 있음 (b) `continue-on-error` 없음 (c) 안드로이드 명령에 `-PreactNativeArchitectures=arm64-v8a`가 있고 다른 ABI 문자열이 없음 (d) `secrets.`·`upload-artifact`·`signing`·`.jks` 없음 (e) 두 잡에 `needs:` 없음 (f) `concurrency`에 `cancel-in-progress: true` (g) 안드로이드는 `assembleDebug`, iOS는 `CODE_SIGNING_ALLOWED=NO`. 소스를 읽을 때 주석을 먼저 걷어낸다.
 
 ## Complexity Tracking
 

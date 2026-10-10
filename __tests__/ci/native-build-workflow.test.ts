@@ -64,10 +64,10 @@ describe("072 native-build 워크플로", () => {
       expect(listItems(section(pr, "paths", 4)).sort()).toEqual([...NATIVE_INPUTS].sort());
     });
 
-    it("main push는 경로 필터 없이 돈다", () => {
+    it("main push도 PR과 같은 네이티브 입력 경로에서만 돈다", () => {
       const push = section(section(read(), "on", 0), "push", 2);
       expect(push).toMatch(/branches:\s*\[\s*main\s*\]/);
-      expect(push).not.toMatch(/paths/);
+      expect(listItems(section(push, "paths", 4)).sort()).toEqual([...NATIVE_INPUTS].sort());
     });
 
     it("수동 실행이 있다", () => {
