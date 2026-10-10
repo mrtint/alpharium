@@ -82,3 +82,7 @@
 - [x] T033 `main`에서 따는 `072-docs-only` 브랜치로 문서 파일 하나만 바꾼 PR을 열어 네이티브 빌드 확인이 시작되지 않고 `ci.yml`만 도는지 확인한다 per FR-003 (missing)
 - [x] T034 `gh api`로 `main`의 브랜치 보호(필수 체크)를 조회해 이 잡이 필수가 아님을 확인하고 quickstart §4에 결과를 적는다 per FR-013 (missing)
 - [x] T035 T032·T033의 PR을 닫고 `072-inject`·`072-docs-only` 브랜치를 로컬·원격에서 지운다 per plan: 일회용 PR 정리 (missing)
+
+## Phase 8: Convergence
+
+- [ ] T036 #131 머지 뒤 실제 `main` push로 `main` push 경로 필터를 러너에서 확인한다: 문서만 바꾼 머지에서는 네이티브 빌드 확인이 시작되지 않고, 네이티브 입력(예: `package.json`)이 바뀐 머지에서는 시작되는지 `gh run list`로 본다. 이 확인은 머지 뒤에야 가능하다 per FR-001 (missing)
