@@ -1,10 +1,24 @@
 name: Pocketlog CI
 
+# 문서만 바뀐 PR·커밋(docs/**, specs/**, .specify/**, *.md)에서는 돌지 않는다.
+# lint·jest·안드로이드 번들 모두 문서만 바뀐 경우는 검증 대상이 없다.
 on:
   push:
     branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - 'specs/**'
+      - '.specify/**'
+      - '**/*.md'
+      - '*.md'
   pull_request:
     branches: [main, develop]
+    paths-ignore:
+      - 'docs/**'
+      - 'specs/**'
+      - '.specify/**'
+      - '**/*.md'
+      - '*.md'
 
 jobs:
   # 1단계: 검사와 기기 불필요 테스트
