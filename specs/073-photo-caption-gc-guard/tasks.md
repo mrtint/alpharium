@@ -7,7 +7,7 @@
 
 **Purpose**: Test execution setup and verification baseline
 
-- [ ] T001 Verify test runner and baseline contract tests pass via package.json
+- [x] T001 Verify test runner and baseline contract tests pass via package.json
 
 ---
 
@@ -15,7 +15,7 @@
 
 **Purpose**: Core contract definitions that block user stories
 
-- [ ] T002 Verify VLM guard contract and Asset scope rules in specs/073-photo-caption-gc-guard/contracts/vlm-guard-contract.md
+- [x] T002 Verify VLM guard contract and Asset scope rules in specs/073-photo-caption-gc-guard/contracts/vlm-guard-contract.md
 
 ---
 
@@ -25,8 +25,8 @@
 
 **Independent Test**: `src/signals/expo-port.ts`의 `filePathOf`, `folderNamesFor`, `locationOf`가 비동기 실행 도중 임시 객체 해제 없이 유효한 경로 및 메타데이터를 반환하는지 단위 테스트로 확인
 
-- [ ] T003 [P] [US1] Add unit tests for Asset reference preservation across async operations in __tests__/signals/expo-port.test.ts
-- [ ] T004 [US1] Implement Asset reference retention in filePathOf, folderNamesFor, and locationOf in src/signals/expo-port.ts
+- [x] T003 [P] [US1] Add unit tests for Asset reference preservation across async operations in __tests__/signals/expo-port.test.ts
+- [x] T004 [US1] Implement Asset reference retention in filePathOf, folderNamesFor, and locationOf in src/signals/expo-port.ts
 
 **Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
 
@@ -38,8 +38,8 @@
 
 **Independent Test**: `captionAll`이 0장 캡션을 반환할 때 `readPhotos`가 `{ kind: "failed" }`를 반환하고 `generate()`가 `{ kind: "vision-failed", reason: "failed" }`로 거부하는지 확인
 
-- [ ] T005 [P] [US2] Add unit tests verifying zero-caption fail-fast guard in __tests__/inference/on-device.test.ts
-- [ ] T006 [US2] Implement zero-caption fail-fast guard in readPhotos in src/inference/on-device.ts
+- [x] T005 [P] [US2] Add unit tests verifying zero-caption fail-fast guard in __tests__/inference/on-device.test.ts
+- [x] T006 [US2] Implement zero-caption fail-fast guard in readPhotos in src/inference/on-device.ts
 
 **Checkpoint**: At this point, User Stories 1 and 2 should both work and prevent silent false diary creation
 
@@ -51,7 +51,7 @@
 
 **Independent Test**: 정적 소스 계약 테스트가 실행되어 검사 대상 파일 >= 1개 및 위반 0건으로 통과하는지 확인
 
-- [ ] T007 [P] [US3] Create static source contract test in __tests__/signals/expo-asset-scope.test.ts
+- [x] T007 [P] [US3] Create static source contract test in __tests__/signals/expo-asset-scope.test.ts
 
 **Checkpoint**: All user stories should now be independently testable and protected against regression
 
@@ -61,8 +61,8 @@
 
 **Purpose**: Whole-feature validation and compliance verification
 
-- [ ] T008 Execute quickstart validation scenarios defined in specs/073-photo-caption-gc-guard/quickstart.md
-- [ ] T009 Run full static checks and constitution verification via npm run lint
+- [x] T008 Execute quickstart validation scenarios defined in specs/073-photo-caption-gc-guard/quickstart.md
+- [x] T009 Run full static checks and constitution verification via npm run lint
 
 ---
 
