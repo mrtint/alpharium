@@ -66,12 +66,12 @@ jobs:
             echo
             echo "| 단계 | 걸린 시간 |"
             echo "| --- | --- |"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - run: npm ci
       - name: expo prebuild
         run: |
           start=$(date +%s)
-          trap 'echo "| prebuild | $(( $(date +%s) - start ))초 |" >> "$GITHUB_STEP_SUMMARY"' EXIT
+          trap 'echo "| prebuild | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           npx expo prebuild --platform android --clean
       # 캐시가 없어도 결과는 같다 — 느릴 뿐이다. android/는 prebuild --clean이 지우는 생성물이라
       # 그 안은 캐시하지 않는다.
@@ -91,14 +91,14 @@ jobs:
           start=$(date +%s)
           ( while true; do awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{print int((t-a)/1024)}' /proc/meminfo >> "$RUNNER_TEMP/mem.log"; sleep 5; done ) &
           sampler=$!
-          trap 'kill $sampler 2>/dev/null; echo "| gradle assembleDebug | $(( $(date +%s) - start ))초 |" >> "$GITHUB_STEP_SUMMARY"' EXIT
+          trap 'kill $sampler 2>/dev/null; echo "| gradle assembleDebug | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           ./gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a
       - name: 최대 메모리 사용량
         if: always()
         run: |
           peak=$(sort -n "$RUNNER_TEMP/mem.log" 2>/dev/null | tail -1)
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "최대 메모리 사용: ${peak:-기록 없음} MB (5초 간격 샘플)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "최대 메모리 사용: ${peak:-기록 없음} MB (5초 간격 샘플)" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # iOS: macOS 러너에서 네이티브 프로젝트를 새로 만들고 서명 없이 시뮬레이터용으로 빌드한다.
   #
@@ -123,12 +123,12 @@ jobs:
             echo
             echo "| 단계 | 걸린 시간 |"
             echo "| --- | --- |"
-          } >> "$GITHUB_STEP_SUMMARY"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - run: npm ci
       - name: expo prebuild
         run: |
           start=$(date +%s)
-          trap 'echo "| prebuild | $(( $(date +%s) - start ))초 |" >> "$GITHUB_STEP_SUMMARY"' EXIT
+          trap 'echo "| prebuild | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           npx expo prebuild --platform ios --clean --no-install
       - uses: actions/cache@v4
         with:
@@ -140,7 +140,7 @@ jobs:
         working-directory: ios
         run: |
           start=$(date +%s)
-          trap 'echo "| pod install | $(( $(date +%s) - start ))초 |" >> "$GITHUB_STEP_SUMMARY"' EXIT
+          trap 'echo "| pod install | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           pod install
       - uses: actions/cache@v4
         with:
@@ -151,5 +151,5 @@ jobs:
       - name: xcodebuild (시뮬레이터, 서명 없음)
         run: |
           start=$(date +%s)
-          trap 'echo "| xcodebuild | $(( $(date +%s) - start ))초 |" >> "$GITHUB_STEP_SUMMARY"' EXIT
+          trap 'echo "| xcodebuild | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           xcodebuild -workspace ios/Pocketlog.xcworkspace -scheme Pocketlog -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/dd" -quiet CODE_SIGNING_ALLOWED=NO build

@@ -72,3 +72,13 @@
 - **MVP**: Phase 2~4(뼈대 + 두 잡). 측정(Phase 5)은 그 위의 추가다.
 - 3티어 모델: 이 워크플로가 Tier 2이고 Tier 1은 `ci.yml`, Tier 3(서명·업로드)는 후속 과제다.
 - 러너에서 처음 돌리면 예상 못 한 환경 문제가 나올 수 있다(NDK·Xcode 버전). T021에서 고치고 기록하되 새 도구를 임의로 들이지 않는다.
+
+## Phase 7: Convergence
+
+- [ ] T029 러너 사양·단계별 시간·안드로이드 최대 메모리를 실행 요약뿐 아니라 잡 로그(표준 출력)에도 출력해 `gh run view --log`로 읽을 수 있게 한다 (.github/workflows/native-build.yml) per SC-003 (missing)
+- [ ] T030 `gh workflow run native-build.yml`로 수동 실행이 되는지 확인하고, `main` push 실행(머지 직후)의 결과를 기록한다 per FR-001·FR-002 (missing)
+- [ ] T031 T029 반영 push로 도는 실행에서 캐시 적중 시간을 얻고, 첫 실행(안드로이드 9분 51초·iOS 8분 52초)과 함께 quickstart §5 표를 채운다. `timeout-minutes`를 실측에 맞게 확정한다 per SC-003 (missing)
+- [ ] T032 `main`에서 따는 `072-inject` 브랜치로 `app.json`에 없는 plugin 이름을 넣은 PR을 열어 두 잡이 빨갛게 되는지, 되돌리면 초록이 되는지 확인한다 per SC-001 (missing)
+- [ ] T033 `main`에서 따는 `072-docs-only` 브랜치로 문서 파일 하나만 바꾼 PR을 열어 네이티브 빌드 확인이 시작되지 않고 `ci.yml`만 도는지 확인한다 per FR-003 (missing)
+- [ ] T034 `gh api`로 `main`의 브랜치 보호(필수 체크)를 조회해 이 잡이 필수가 아님을 확인하고 quickstart §4에 결과를 적는다 per FR-013 (missing)
+- [ ] T035 T032·T033의 PR을 닫고 `072-inject`·`072-docs-only` 브랜치를 로컬·원격에서 지운다 per plan: 일회용 PR 정리 (missing)
