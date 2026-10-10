@@ -143,27 +143,6 @@ TestFlight에서 실제 iPhone에 설치된다. 같은 경로로 안드로이드
 
 **위험**: 퍼블릭 저장소에서 비밀이 새지 않게 업로드 잡은 `main`의 수동 실행으로만 돌린다(포크 PR에는 비밀이 안 넘어간다). 러너 실측(스펙 072, `specs/072-ci-native-build-check/quickstart.md` §5): ubuntu-latest(4코어·16GB)에서 arm64 debug는 gradle 5~10분·최대 메모리 약 12GB/16GB로 OOM이 없었다 — release 최적화 컴파일은 이 값으로 추정하지 말고 다시 잰다. `ubuntu-latest`가 2026-10-19부터 Ubuntu 26으로 바뀐다.
 
-### 사진 있는 날의 VLM 캡션 전량 스킵(SharedObject GC 레이스) 방어 (073)
-
-상세 분석 문서: [`docs/superpowers/specs/2026-10-10-photo-caption-silent-failure.md`](../superpowers/specs/2026-10-10-photo-caption-silent-failure.md)
-
-**배경**: 2026-10-10 테스트 디바이스(SM-G986N)에서 사진이 각각 6장·12장 있는 날임에도 `visionMs`가 1초 미만으로 끝나며 일기 본문이 `"나는 오늘 아무것도 보지 못했다. 사진은 쌓였지만, 그 속을 끝까지 들여다보지 못해 심심했다..."`로 저장되고 사진 캐러셀이 나오지 않는 현상이 관측됐다. 같은 날 화면에서 「다시 쓰기」(포그라운드)를 돌리면 정상적으로 6장(24초)·8장(38초) 캡션과 캐러셀이 복구됐다.
-
-**관측한 것과 원인**:
-- `filePathOf`(`src/signals/expo-port.ts`)의 `await new lib.Asset(id).getUri()`가 임시 객체로 생성되어 비동기 쿼리 중 JS 스택에서 사라진다.
-- 대형 모델(VLM·kanana) 로드 직전/직후의 네이티브 힙 메모리 압박(`NativeAlloc`)으로 강제 GC가 발생하면, Hermes가 임시 `Asset` 객체를 먼저 회수하여 JSI 브릿지에서 `Cannot use shared object that was already released` 예외가 발생한다(2026-10-09 `expo-file-system`의 `File` 객체 결함과 동일 계열).
-- `filePathOf`의 `catch`가 조용히 `null`을 반환하고 `captionAll`이 `continue`로 스킵하여 사진 N장이 1초 미만에 전량 건너뛰어진다.
-- 프롬프트 엔진(`prompt.ts`)은 이를 보고 `unread` 갈래로 분류해 `"나는 오늘 아무것도 보지 못했다"` 일기를 오류 없는 정상 일기로 데이터베이스에 영구 저장한다.
-- 백그라운드 자동 일기 생성(Doze·WorkManager)이나 RAM이 타이트한 실사용 기기에서 발생 확률이 매우 높다.
-
-**할 일**:
-1. **`Asset` 객체의 JS GC 조기 회수 방지**: `filePathOf`·`folderNamesFor`·`locationOf`(`src/signals/expo-port.ts`)에서 `new lib.Asset(id)`를 로컬 변수에 할당하고 `await` 이후까지 참조를 유지하여 비동기 I/O 도중 Hermes GC가 SharedObject를 회수하지 못하게 스코프를 보장한다.
-2. **VLM 전량 실패 방어**: 사진이 관측되었는데 캡션 결과가 0장인 경우, 침묵 저장 대신 1회 재시도하거나 `vision-failed`로 방어하여 거짓 일기가 정상 일기로 저장되는 것을 차단한다.
-3. **소스 계약 테스트 추가**: `__tests__/diary/expo-file-sync.test.ts`와 유사하게 `Asset`의 임시 객체 즉시 비동기 호출을 정적으로 차단하는 계약 테스트를 추가한다.
-
-**완료 조건**: 메모리 압박/연속 생성 상태에서도 캡션이 전량 스킵되는 현상이 재현되지 않고, 사진이 있는 날에는 항상 사진 캡션과 캐러셀이 정상적으로 포함된 일기가 저장된다.
-
-**위험**: `Asset` 외에도 `expo-media-library`나 다른 네이티브 모듈의 비동기 SharedObject 메서드가 유사한 패턴으로 노출되어 있을 수 있다. 소스 계약 테스트로 범위를 통제한다.
 
 ### 첫 실행 모델 내려받기 — Wi-Fi가 아니면 알리고 고르게 하기
 
@@ -243,6 +222,7 @@ TestFlight에서 실제 iPhone에 설치된다. 같은 경로로 안드로이드
 |    —    |    070    | e2e 표본 — 1~30일 전 30일치 가상의 하루(사진 129장)를 MediaStore에 심고 층 1을 시작한다: Wikimedia Commons CC0·PD 사진 210장 목록(`scripts/e2e-sample/photos.json`)·직접 쓰는 EXIF·「표본 보장」(기기 표식 + 되읽기)·새 흐름 `sample-days`, 심기 7.5초/건너뜀 3.3초 (iOS 갈래는 아래 e2e 과제에 남음) |
 |    —    |    071    | 쓰기·그만두기 빠른 반복 부작용 — 실기기에서 간격을 달리해 되풀이해 결함 둘을 고쳤다: 그만둔 쓰기가 실패로 기록되던 것(시도별 취소 번호)·그만둔 직후 다시 쓰기가 거절되던 것(앞 시도가 풀리기를 기다림)·저장 직전 취소 확인 (저장이 시작된 뒤의 취소는 일기를 남기는 것으로 소유자 확정, 반복 시나리오는 e2e로 옮기지 않기로 소유자 결정) |
 |    —    |    072    | CI 네이티브 빌드 확인 — 네이티브 입력(`package.json`·`app.json`·`plugins/**` 등) 변경 PR·`main` push와 수동에서 안드로이드 arm64 debug와 iOS 시뮬레이터 빌드(러너 실측·위반 주입 확인, 필수 체크 아님) |
+|    —    |    073    | 사진 있는 날의 VLM 캡션 전량 스킵(SharedObject GC 레이스) 방어 — Asset 스코프 보장 및 0장 캡션 실패 가드 |
 
 ## 참고 — 디자인 리뷰 보드
 
