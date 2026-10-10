@@ -48,6 +48,14 @@ appId: com.a810labs.pocketlog
           commands:
             - tapOn:
                 id: "download-consent-confirm"
+      # 074 — 시뮬레이터가 연결을 모바일로 읽는 경우의 방어(호스트 네트워크는 대개 표준 동의가 뜬다)
+      - runFlow:
+          when:
+            visible:
+              id: "download-consent-cellular-confirm"
+          commands:
+            - tapOn:
+                id: "download-consent-cellular-confirm"
       - waitForAnimationToEnd:
           timeout: 3000
 

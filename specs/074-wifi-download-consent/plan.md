@@ -66,12 +66,14 @@ src/
 │   ├── consent-gate.ts          # 신규 순수: withTimeout(), consentVariantOf(connection), gate 상태 전이(reducer)
 │   └── use-consent-gate.ts      # 신규 훅: 연결·받을 양 읽기(통로 주입), AppState active 재판정, 「다시 확인하기」
 ├── ui/
-│   ├── DownloadConsentDialog.tsx     # 수정: variant "standard" | "cellular", sizeLabel, onDefer (standard는 지금 모양 그대로)
+│   ├── DownloadConsentDialog.tsx     # 무변경 — 표준 동의(045). 소스 어휘까지 잠근 계약 테스트가 있어 선택지를 더하지 않는다
+│   ├── CellularConsentDialog.tsx     # 신규: 모바일 동의 (구현 중 정함 — 표준 동의에 variant를 더하는 대신 따로 둔다)
+│   ├── DownloadConsentGate.tsx       # 신규: 훅 + 세 화면 조립 (App.tsx에서 떼어 jest에서 실제로 그린다; 통로는 props)
 │   └── DownloadDeferredScreen.tsx    # 신규: 대기 화면 (문자열·핸들러만 받는다)
 └── i18n/catalogs/ko/
     ├── consent-gate.ts               # 신규: consentGate 영역 (cellular·deferred 문구). 기존 download.ts는 무변경
     └── index.ts                      # 수정: consentGate 등록
-App.tsx                               # 수정: download-consent 분기를 같은 파일의 DownloadConsentGate 컴포넌트(훅 사용)로 조립
+App.tsx                               # 수정: download-consent 분기가 <DownloadConsentGate>를 그리고 readConnection·readConsentSizeLabel을 주입
 __tests__/i18n/ko-golden.test.ts      # 수정: ADDED_AFTER_GOLDEN에 새 리터럴 추가 (골든 json은 다시 쓰지 않는다)
 __tests__/
 ├── app/consent-gate.test.ts

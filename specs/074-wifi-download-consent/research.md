@@ -14,7 +14,7 @@
 - **주의**: 한도가 지난 뒤 늦게 오는 결과가 상태를 덮지 않게 한다(요청 번호표로 무시).
 
 ## R3 — 훅이 읽기·세션 상태를 맡고 App.tsx는 조립만
-- **Decision**: `useConsentGate({ readConnection, readRemainingBytes })` → `{ view: "reading" | "standard" | "cellular" | "deferred", sizeLabel, defer(), recheck() }`. 단계에 들어갈 때(마운트)와 `AppState` `active`에서 재판정, `defer()`는 `deferred`로, `recheck()`는 `reading`을 거쳐 다시 판정한다.
+- **Decision**: `useConsentGate({ readConnection, readSizeLabel })` → `{ view: "reading" | "standard" | "cellular" | "deferred", sizeLabel, defer(), recheck() }`. 단계에 들어갈 때(마운트)와 `AppState` `active`에서 재판정, `defer()`는 `deferred`로, `recheck()`는 `reading`을 거쳐 다시 판정한다.
 - **Rationale**: App.tsx는 이미 수천 줄이고 이 분기는 `firstRunStage === "download-consent"` 렌더 가지 안이다. 단계에 들어갈 때만 마운트되는 컴포넌트에 훅을 두면 단계에 안 들어가는 사용자(모델 준비됨·이미 동의)는 연결을 읽지 않는다(FR-009). 훅은 별도 `DownloadConsentGate` 컴포넌트(App.tsx 안 또는 `src/ui` 밖)에서 부른다.
 - **Alternatives**: `FirstRunStage`에 단계 추가 — 소유자 결정으로 기각(progress 테스트 불변).
 

@@ -40,12 +40,12 @@ describe("040/045 — App.tsx가 resolveFirstRunStage를 호출한다", () => {
 });
 
 describe('045 C2 — "download-consent"/"downloading" 단계면 각 화면을 그린다', () => {
-  it('firstRunStage === "download-consent" 분기가 DownloadConsentDialog를 렌더한다', () => {
+  it('firstRunStage === "download-consent" 분기가 DownloadConsentGate를 렌더한다 (074 — 표준 동의 DownloadConsentDialog는 그 안에서 그려진다)', () => {
     const region = APP_SOURCE.slice(
       APP_SOURCE.indexOf('firstRunStage === "download-consent"'),
       APP_SOURCE.indexOf('firstRunStage === "download-consent"') + 500,
     );
-    expect(region).toMatch(/<DownloadConsentDialog/);
+    expect(region).toMatch(/<DownloadConsentGate/);
   });
 
   it('firstRunStage === "downloading" 분기가 DownloadProgressScreen을 렌더한다', () => {
@@ -251,5 +251,36 @@ describe("046 D8 — 다운로드 실패 자동 재시도는 App.tsx가 스스�
     );
     expect(region).not.toMatch(/onRetry=/);
     expect(region).toMatch(/downloadFraction=\{downloadFraction\}/);
+  });
+});
+
+describe("074 — 동의 단계의 조립 (CG15·CG16·CG17, 소스 배선)", () => {
+  const consentBranch = () => {
+    const at = APP_SOURCE.indexOf('firstRunStage === "download-consent"');
+    return APP_SOURCE.slice(at, at + 700);
+  };
+
+  it("CG16 — 게이트의 onConfirm은 045의 onConfirmDownloadConsent(동의 저장 → 다운로드 시작) 그대로다", () => {
+    expect(consentBranch()).toMatch(/onConfirm={onConfirmDownloadConsent}/);
+  });
+
+  it("연결·받을 양 통로는 059의 readConnection과 모듈 최상단의 readConsentSizeLabel을 주입한다", () => {
+    expect(consentBranch()).toMatch(/readConnection={readConnection}/);
+    expect(consentBranch()).toMatch(/readSizeLabel={readConsentSizeLabel}/);
+    expect(APP_SOURCE).toMatch(/^async function readConsentSizeLabel\(/m);
+  });
+
+  it("CG15 — DownloadConsentGate는 download-consent 분기 한 곳에서만 그려진다(다른 사용자는 연결을 읽지 않는다)", () => {
+    const uses = [...APP_SOURCE.matchAll(/<DownloadConsentGate[\s/>]/g)];
+    expect(uses).toHaveLength(1);
+  });
+
+  it("CG17 — 「나중에 받기」는 App.tsx에 저장·시작 배선이 없다(게이트 안의 세션 상태뿐)", () => {
+    expect(APP_SOURCE).not.toMatch(/downloadDeferred|onDefer/);
+  });
+
+  it("onConfirmDownloadConsent는 한 곳 — 표준·모바일 동의가 같은 콜백을 쓴다", () => {
+    const decl = [...APP_SOURCE.matchAll(/const onConfirmDownloadConsent = /g)];
+    expect(decl).toHaveLength(1);
   });
 });

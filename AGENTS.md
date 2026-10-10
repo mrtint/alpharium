@@ -20,7 +20,7 @@
 - **온디바이스 일기 생성** — 프롬프트 조립 → `llama.rn` 추론 → 4갈래 판정
   (`empty`/`echo`/`language`/`unfinished`) → 저장. 사진은 VLM이 먼저 읽는다.
 - **백그라운드 자동 생성과 알림**, **통합 첫 실행 흐름**(로고 → 권한 → 다운로드 동의·
-  진행 → 작명 → 자동 첫 일기), **캐릭터 페르소나**(로스터는 검증된 하나, 037).
+  진행 → 작명 → 자동 첫 일기; 모바일 데이터면 받기 전에 알리고 고른다, 074), **캐릭터 페르소나**(로스터는 검증된 하나, 037).
 - **홈 UI/UX 개편(Modernist)이 조각 단위로 진행 중이다**(049~054): 주간 스트립·날짜
   달력·쓴 날 읽기·읽기 스크롤·쓸 재료·제자리 쓰기.
 - **설정·개발자 화면 개편**(055~060·064): 홈 위에 쌓이는 설정 틀, 매일 쓰는 시각·장소 이름 대화상자, 자동 쓰기 규칙
@@ -500,7 +500,7 @@
 - **순서는 `권한 → 동의 Dialog → 진행 슬라이드 → 작명 → liveness → 자동 첫 일기`다**(040의 작명∥다운로드 병렬을 뒤집었다).
   `resolveFirstRunStage()`에 `"download-consent"`·`"downloading"`이 있고 `"waiting-for-download"`(`WaitingForDownloadScreen`)는 삭제했다.
 - 동의 Dialog(`DownloadConsentDialog`)는 VLM·LLM을 고르게 하지 않는다(`ESSENTIAL_ASSET_KEYS`는 셋 다) — 무엇을 왜 받는지 알리고
-  [받을게요] 하나뿐이다(거부 조작 없음). `OnboardingFlag.downloadConsented`가 넷째 필드다. **`downloadProceedConfirmed`**(세션 로컬)가
+  [받을게요] 하나뿐이다(거부 조작 없음 — Wi-Fi이거나 연결 종류를 모를 때. **모바일 데이터로 확인되면 074의 모바일 동의가 대신 선다**, 아래). `OnboardingFlag.downloadConsented`가 넷째 필드다. **`downloadProceedConfirmed`**(세션 로컬)가
   「완료 화면 버튼을 눌렀는가」를 따로 추적한다 — 없으면 `downloadReady`가 되는 즉시 완료 화면이 사라진다(FR-007).
 - **040의 헌법 검사 G8(경과 시간 어휘 전면 금지)을 제거했다** — 4초 장식 슬라이드 전환의 `elapsedMs`와 충돌했다. 원칙 IV가 금지하는 것은
   진행 중 화면에 정밀한 시간·바이트·퍼센트를 노출하는 것이지 경과 시간 개념이 아니다(`tokens_*`·`timings`는 `llama-port.ts`가 따로 막는다).
@@ -966,6 +966,24 @@
 - **Maestro는 이 Windows 기계에 없었다** — GitHub 릴리스 `maestro.zip`을 `~/.maestro-install/maestro/bin`에 풀고 PATH에 얹어 썼다(2.11.0). `maestro --version`이 JVM(17)을 기동하는 데 수십 초 걸린다.
 - **실측(2026-10-10, SM-G986N, dev)**: 흐름 넷이 각각 1m49s(쓰기)·1m31s(앱 열기)·약 1분(진단)·57s(첫 실행)에 통과했다. 위반 주입(완료 표식을 틀리게) 실패·모델 파일 이름을 바꾸면 `ABORTED` 확인.
   낡은 흐름 셋도 위반 주입(단언을 틀리게)으로 실패를 확인했다. **미확인**: release 빌드·iOS·다른 기기.
+
+### 074 — 첫 실행 다운로드: 모바일 데이터면 알리고 고르게 하기
+
+- **판정은 `cellular`로 확인될 때만이다**(`src/app/consent-gate.ts`의 `consentViewOf`, 059 `readConnection()` 그대로). Wi-Fi·이더넷·VPN·읽지 못함·연결 없음·한도 초과는 모두 045의 표준 동의 [받을게요]다(원칙 V — 모르는 것을 모바일로
+  단정하지 않는다). 연결 없음은 별도 안내가 없고 046의 내려받기 실패 처리에 맡긴다. **알려진 한계**: `expo-network`는 핫스팟에 붙은 Wi-Fi를 `WIFI`로 보고하므로 그 경우 모달이 뜨지 않는다(과금 여부 `NOT_METERED`는 새 네이티브
+  조회가 필요해 범위 밖). 받는 도중 Wi-Fi→모바일 전환도 다루지 않는다 — 시작 시점의 판정뿐이다(모델은 이어받기).
+- **구조**: `download-consent` 단계는 그대로고(`resolveFirstRunStage` 입력·우선순위 불변) 그 분기가 `DownloadConsentGate`(`src/ui/`)를 그린다. 게이트는 `useConsentGate`(`src/app/`)의 상태 — `reading` →
+  `standard`/`cellular` → `deferred` — 로 표준 동의(`DownloadConsentDialog`, **무변경**)·모바일 동의(`CellularConsentDialog`: 「모바일 데이터로 받기」 / 「나중에 받기」 + 받을 양)·대기 화면(`DownloadDeferredScreen`)을 가른다.
+  표준 동의 컴포넌트에 선택지를 더하지 않고 모바일 동의를 따로 둔 이유는 045의 「[받을게요] 하나뿐」 계약 테스트가 소스 어휘까지 잠그고 있어서다. 통로(`readConnection`·`readSizeLabel`)는 `App.tsx`가 주입한다.
+- **「나중에 받기」는 저장하지 않는 세션 상태다** — 동의도 내려받기 시작도 하지 않고(게이트는 `onConfirm`만 안다), 앱을 다시 열면 처음부터 읽는다. 새 저장 필드·권한·네이티브 의존성 0. 대기 화면은 「다시 확인하기」와 **대기 화면일 때의**
+  전경 복귀(`AppState` `change → active`)에서만 다시 읽는다 — 눈앞에 떠 있는 대화상자는 전경 복귀에 바뀌지 않는다. Wi-Fi가 되어도 자동으로 받지 않는다([받을게요]를 사용자가 누른다). 로드맵의 「앱 닫기」(iOS에는 공식 방법이 없다)는
+  소유자 결정으로 「나중에 받기」가 되었다. 연결 읽기·받을 양 읽기는 각각 3초 한도(`READ_LIMIT_MS` 한 곳)이고 넘으면 「모름」/「양 없음」이다 — 응답 없는 조회가 첫 실행을 빈 화면에 세워 두지 않게.
+- **받을 양은 모바일 동의 본문에만 나온다**(「약 2.0GB」, 059 `readEssentialRemainingBytes`+`formatModuleBytes` 1000 기준). 표준 동의에는 용량을 노출하지 않는다(045 FR-003). 못 읽으면 양 없이 같은 안내다. 새 문구는 기존 `download` 영역이 아니라
+  `consentGate` 영역에 있고 062 골든의 `ADDED_AFTER_GOLDEN`에 올렸다(골든 json은 다시 쓰지 않았다).
+- **`AppFrame.firstrun.test.tsx`는 소스 배선 테스트다**(App.tsx를 렌더하지 않는다) — 게이트의 실제 동작은 `__tests__/ui/download-consent-gate.test.tsx`가 그린다. 이 기능이 바꾼 기존 단언은 「동의 분기가 `DownloadConsentGate`를 그린다」 한 곳뿐이다.
+- 헌법 v2.0.1에는 「앱이 사용자를 막지 않는다」 원칙이 없다(원칙 I은 온디바이스) — 이 문서의 옛 표기(「원칙 I」로 온보딩을 건너뛴다 등)는 2.0.0 개정 전 번호다. 045의 「거부 조작 없음」은 헌법이 아니라 045의 설계 결정이었다.
+- **미확인**: 실기기(SM-G986N)에서 모바일 동의의 두 갈래와 Wi-Fi 갈래 — 시험은 모델 없는 상태가 전제라 `pm clear`가 필요하다. 상태별 `getNetworkStateAsync()` 값(Wi-Fi·모바일·비행기 모드·핫스팟·VPN)은
+  `specs/074-wifi-download-consent/quickstart.md`의 실측 표에 적는다.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

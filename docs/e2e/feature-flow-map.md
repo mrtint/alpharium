@@ -71,7 +71,7 @@
 | `.maestro/writing-monologue.yml` | ○ | — | 쓰는 중 독백 | 일기를 생성한다 | — |
 | `.maestro/writing-monologue-expansion.yml` | ○ | — | 쓰는 중 독백(모델 적재 구간) | 일기를 생성한다 | — |
 | `.maestro/first-run-flow.yml` | ○ | — | 첫 실행 | `clearState`를 쓴다 — 새 설치 상태가 전제다 | — |
-| `.maestro/download-consent-flow.yml` | ○ | — | 다운로드 동의·진행 | 앱 데이터가 비어 있어야 한다(모델 내려받기 전) | — |
+| `.maestro/download-consent-flow.yml` | ○ | — | 다운로드 동의·진행 | 앱 데이터가 비어 있어야 한다(모델 내려받기 전). 기기 연결이 모바일 데이터가 아니어야 한다(Wi-Fi) — 모바일 데이터면 표준 동의 대신 모바일 동의가 뜬다(074). 모바일 갈래는 자동화하지 않고 `specs/074-wifi-download-consent/quickstart.md`를 사람이 본다 | — |
 | `.maestro/unified-permission-onboarding.yml` | ○ | — | 권한 온보딩 | `clearState`를 여러 번 쓴다 — 온보딩부터 시작한다 | — |
 | `.maestro/ios/settings-sweep.yml` | — | — | iOS 설정 훑기 | iOS 시뮬레이터 갈래는 범위 밖(로드맵에 남음) — 훑기 도구라 `FLOWS`에 없다 | — |
 | `.maestro/ios/developer-diagnostics-sweep.yml` | — | — | iOS 개발자·진단 훑기 | iOS 시뮬레이터 갈래는 범위 밖(로드맵에 남음) | — |
