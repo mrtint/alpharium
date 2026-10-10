@@ -437,8 +437,15 @@ export function DiaryHomeScreen({
   /** 지금 도는 생성이 있는가. `AppState` 구독이 본다 */
   const running = useRef(false);
 
-  /** 사용자가 그만두었는가 (007 FR-014a). */
-  const cancelled = useRef(false);
+  /**
+   * 쓰기 시도 번호와 「여기까지 그만두었다」 번호 (007 FR-014a, 071).
+   *
+   * **그만두었는가를 불리언 하나로 들지 않는다** — 그만두고 곧바로 다시 쓰면 새 시도가 그 불리언을 되돌려, 앞 시도가 뒤늦게 풀릴 때
+   * 자기가 그만둔 것인지 모르고 중단 결과를 실패로 기록했다(SE-2, 실기기 4/4). 시도마다 번호를 붙이고(`attempt`) 그만두기는
+   * 그때까지의 번호를 닫는다(`cancelledThrough`) — 새 시도는 번호가 커서 닫히지 않고, 앞 시도는 닫힌 채 남는다.
+   */
+  const attempt = useRef(0);
+  const cancelledThrough = useRef(0);
 
   /** 058 — 지금 도는 생성 전체(`generate` 본문). 지우기 요청은 이것이 끝나기를 기다린다(research R1) */
   const inFlight = useRef<Promise<void> | null>(null);
@@ -759,6 +766,13 @@ export function DiaryHomeScreen({
     async (params: ResolvedParams, items: DiaryListItem[], options: { auto?: boolean } = {}) => {
       if (pipeline === undefined) return;
 
+      // 071 — 이 시도의 번호. 그만두기·늦은 결과 처리·정리가 모두 이 번호로 가려진다(위 `attempt` 주석).
+      const mine = ++attempt.current;
+      const isCancelled = () => cancelledThrough.current >= mine;
+      // 071 — 앞 시도가 아직 풀리는 중이면(그만두면 화면은 곧바로 홈이지만 모델 적재는 못 끊어 5~12초 더 잠금을 쥔다, SE-1) 그것이
+      // 끝나기를 기다린 뒤 시작한다 — 곧바로 부르면 잠금에 막혀 `already-running`으로 거절되고 토스트만 뜬다.
+      const previous = inFlight.current;
+
       // 058 — 이 생성이 끝나는 순간을 밖에서 기다릴 수 있게 둔다(지우기 요청, research R1). `finally`에서 푼다.
       let settle: () => void = () => {};
       inFlight.current = new Promise<void>((resolve) => {
@@ -771,9 +785,14 @@ export function DiaryHomeScreen({
       setScreen({ kind: "writing" });
       lockBar();
       running.current = true;
-      cancelled.current = false;
 
       try {
+        if (previous !== null) {
+          await previous;
+          // 기다리는 동안 그만두었으면 시작하지 않는다 — 화면은 `cancel()`이 이미 홈으로 돌려놓았다.
+          if (isCancelled()) return;
+        }
+
         const at = now();
 
         let seen: VisionOutcome | undefined;
@@ -794,6 +813,8 @@ export function DiaryHomeScreen({
             // ("두 개의 진실" 금지). 없으면 코드 안 기본 이름이 쓰인다.
             ...(characterNames !== undefined ? { customNames: characterNames } : {}),
             authorName: nameOf(params.character, characterNames),
+            // 071 — 저장을 시작하기 직전의 마지막 취소 확인(SE-3). 시도별 판정이다.
+            isCancelled,
           },
           (stage, branch) => {
             if (stage === "load" && branch === undefined) return;
@@ -808,7 +829,7 @@ export function DiaryHomeScreen({
           },
         );
 
-        if (cancelled.current) return;
+        if (isCancelled()) return;
 
         // 060 — 쓰기 실패를 기록한다(그만두기는 위에서 걸렀다 — 실패가 아니다). 기록은 던지지 않는다.
         if (!result.ok) recordFailure?.(result);
@@ -828,8 +849,11 @@ export function DiaryHomeScreen({
           setToast({ id: ++toastId.current, kind: next.toast });
         }
       } finally {
-        running.current = false;
-        inFlight.current = null;
+        // 071 — 더 새 시도가 이미 섰으면 그쪽의 「쓰는 중」·`inFlight`를 끄지 않는다(앞 시도가 뒤늦게 풀릴 때).
+        if (attempt.current === mine) {
+          running.current = false;
+          inFlight.current = null;
+        }
         settle();
       }
     },
@@ -1035,7 +1059,7 @@ export function DiaryHomeScreen({
   }, [writingStage, writingBranch]);
 
   const cancel = useCallback(async () => {
-    cancelled.current = true;
+    cancelledThrough.current = attempt.current;
     lockBar();
     await stop?.().catch(() => {});
     setScreen(toList(await refresh()));
@@ -1057,7 +1081,7 @@ export function DiaryHomeScreen({
     const token = wipeRequest;
     void (async () => {
       if (running.current) {
-        cancelled.current = true;
+        cancelledThrough.current = attempt.current;
         await stop?.().catch(() => {});
         await inFlight.current;
       }
