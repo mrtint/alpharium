@@ -56,7 +56,6 @@
       }
     },
     "plugins": [
-      "./plugins/does-not-exist",
       [
         "llama.rn",
         {
