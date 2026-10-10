@@ -85,4 +85,4 @@
 
 ## Phase 8: Convergence
 
-- [ ] T036 #131 머지 뒤 실제 `main` push로 `main` push 경로 필터를 러너에서 확인한다: 문서만 바꾼 머지에서는 네이티브 빌드 확인이 시작되지 않고, 네이티브 입력(예: `package.json`)이 바뀐 머지에서는 시작되는지 `gh run list`로 본다. 이 확인은 머지 뒤에야 가능하다 per FR-001 (missing)
+- [x] T036 #131 머지 뒤 실제 `main` push로 `main` push 경로 필터를 러너에서 확인한다: 문서만 바꾼 머지에서는 네이티브 빌드 확인이 시작되지 않고, 네이티브 입력(예: `package.json`)이 바뀐 머지에서는 시작되는지 `gh run list`로 본다. 이 확인은 머지 뒤에야 가능하다 per FR-001 (missing)
