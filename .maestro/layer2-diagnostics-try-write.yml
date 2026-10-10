@@ -1,0 +1,67 @@
+# 073 — 층 2: 실제 모델로 쓴다. 「진단 한 번 써 보기」(060) → 홈이 쓰는 중 → 오늘 쓴 날.
+#
+# 전제(실행기가 만든다): 오늘 일기가 없다. 개발 환경(dev)이어야 진단 행이 있다 — 진입은 점 셋 → 설정 → 개발자 → 진단.
+# 진단에서 일기를 쓰는 길은 홈의 제자리 쓰기 하나다(060) — 덮어쓰기·재료 확인 없이 시작한다. 오늘은 표본 사진이 없어 사진 읽기는 돌지 않는다.
+# 단언은 상태 전이까지다 — 본문은 사람이 읽는다(원칙 IV). 완료 대기 한도 300초.
+appId: com.a810labs.pocketlog
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 30000
+
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "settings-developer"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "settings-developer"
+- extendedWaitUntil:
+    visible:
+      id: "developer-screen"
+    timeout: 5000
+- scrollUntilVisible:
+    element:
+      id: "developer-diagnostics"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "developer-diagnostics"
+- extendedWaitUntil:
+    visible:
+      id: "diagnostics-screen"
+    timeout: 10000
+
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-try-once"
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: "diagnostics-try-once"
+
+# 홈이 쓰는 중이 된다
+- extendedWaitUntil:
+    visible:
+      id: "stop-button"
+    timeout: 30000
+- assertVisible: "쓰는 중"
+
+- extendedWaitUntil:
+    notVisible:
+      id: "stop-button"
+    timeout: 300000
+
+# 오늘의 쓴 날 홈
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 15000

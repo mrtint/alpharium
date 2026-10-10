@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { LAYER2_FLOWS } from "../../scripts/layer2/flows";
 import {
   checkFlowMap,
   parseTables,
@@ -59,6 +60,8 @@ function realInput(doc = DOC): FlowMapInput {
     exists: (path) => existsSync(join(ROOT, path)),
     flows: stringArray(RUNNER, "FLOWS"),
     layer1: stringArray(RUNNER, "LAYER1_FLOWS"),
+    layer2: stringArray(RUNNER, "LAYER2_FLOWS"),
+    layer2Table: LAYER2_FLOWS.map((f) => f.file),
     newFlows: NEW_FLOWS,
     newFlowSources: Object.fromEntries(
       NEW_FLOWS.map((f) => [f, strip(readFileSync(join(ROOT, f), "utf8"))]),
@@ -149,6 +152,37 @@ describe("기능→흐름 대응표 (069)", () => {
       const line = DOC.split("\n").find((l) => l.startsWith("| 쓴 날 읽기(홈이 곧 상세)")) ?? "";
       const problems = mutate(line, "| 쓴 날 읽기(홈이 곧 상세) | — | — | 범위 밖(069) | — |");
       expect(problems.some((p) => p.startsWith("M-6"))).toBe(true);
+    });
+
+    it("V7 — 인벤토리의 층 2 ○를 —로 바꾸면 M-3", () => {
+      const line =
+        DOC.split("\n").find((l) => l.startsWith("| `.maestro/layer2-write-and-read.yml`")) ?? "";
+      expect(line).toMatch(/\| ○ \|\s*$/);
+      const problems = mutate(line, line.replace(/\| ○ \|\s*$/, "| — |"));
+      expect(problems.some((p) => p.startsWith("M-3"))).toBe(true);
+    });
+
+    it("V8 — LAYER2_FLOWS에서 한 흐름이 빠지면(= 표와 어긋나면) M-11", () => {
+      const input = realInput();
+      const problems = checkFlowMap({ ...input, layer2: input.layer2.slice(1) });
+      expect(problems.some((p) => p.startsWith("M-11"))).toBe(true);
+    });
+
+    it("V9 — 층 2 흐름이 FLOWS에 없으면 M-11", () => {
+      const input = realInput();
+      const problems = checkFlowMap({
+        ...input,
+        flows: input.flows.filter((f) => f !== input.layer2[0]),
+      });
+      expect(problems.some((p) => p.startsWith("M-11"))).toBe(true);
+    });
+
+    it("V10 — 기능 표의 층 2 칸이 LAYER2_FLOWS에 없는 흐름을 가리키면 M-12", () => {
+      const problems = mutate(
+        "`.maestro/layer2-open-app-writes.yml`",
+        "`.maestro/restart-persistence.yml`",
+      );
+      expect(problems.some((p) => p.startsWith("M-12"))).toBe(true);
     });
 
     it("V6 — 새 흐름이 픽스처 본문을 단언하면 M-10", () => {

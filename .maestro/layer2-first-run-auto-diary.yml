@@ -1,0 +1,55 @@
+# 073 — 층 2: 실제 모델로 쓴다. 「첫 실행 자동 첫 일기」(040) — 모델은 이미 받아져 있다.
+#
+# 전제(실행기가 만든다): 모델 있음, `onboarding.json`을 `completed:false`·`welcomeShown:false`로 되돌림(`downloadConsented:true`라 동의 화면은 건너뜀),
+# 지난 실행의 이름(`character-names.json`) 삭제, 오늘 일기 없음. 권한은 이미 부여된 기기라 권한 단계는 저절로 지나간다(OS 상태가 정한다).
+# **`clearState`를 쓰지 않는다** — 앱 데이터를 지우면 모델이 사라진다. 모델 내려받기·동의는 이 흐름의 대상이 아니다.
+#
+# 흐름: 로고 → (권한 자동) → 작명 → 정상 동작 확인(liveness) → 홈 → 자동 첫 일기가 저장되어 오늘 쓴 날 지면.
+# 단언은 상태 전이까지다 — 본문은 사람이 읽는다(원칙 IV). 모델 적재와 정상 동작 확인을 포함하므로 완료 대기 한도 600초.
+# 이름은 ASCII로 넣는다(adb 입력 경유 한글이 기기에 따라 깨진다).
+appId: com.a810labs.pocketlog
+---
+- launchApp
+
+# 권한 단계가 떠 있으면 건너뛴다 (이미 부여된 기기에서는 안 뜬다)
+- repeat:
+    times: 6
+    while:
+      visible:
+        id: "onboarding-skip"
+    commands:
+      - tapOn:
+          id: "onboarding-skip"
+
+# 배터리 단계가 남아 있으면 건너뛴다 (카드 + 설정 열기/건너뛰기)
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-battery-exception"
+    commands:
+      - tapOn:
+          id: "onboarding-skip"
+
+- extendedWaitUntil:
+    visible:
+      id: "welcome-name-input"
+    timeout: 60000
+- tapOn:
+    id: "welcome-name-input"
+- inputText: "Dori"
+- tapOn:
+    id: "welcome-name-submit"
+
+# 정상 동작 확인 → 자동 첫 일기. **홈의 「쓰는 중」(stop-button)이 서지 않는다** — 자동 첫 일기는 홈의 제자리 쓰기가 아니라
+# `triggerFirstRunAutoDiary()`가 파이프라인을 직접 부른다(040, 2026-10-10 실기기에서 stop-button 대기가 실패해 확인). 그래서 상태 전이를 쓴 날 지면
+# 하나로 본다: 홈에 닿은 뒤 일기가 저장되고 홈이 목록을 다시 읽으면 `written-paper`가 선다. 정상 동작 확인이 실패하면(「그냥 시작하기」 화면)
+# 자동 첫 일기가 안 돌아 지면이 서지 않고 이 대기가 한도에서 실패한다.
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 180000
+
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 600000

@@ -17,6 +17,10 @@ export type FlowMapInput = {
   /** `run-device-tests.mjs`의 배열들 */
   flows: readonly string[];
   layer1: readonly string[];
+  /** 073 — `run-device-tests.mjs`의 `LAYER2_FLOWS` */
+  layer2: readonly string[];
+  /** 073 — `scripts/layer2/flows.ts` 표의 `file`들 */
+  layer2Table: readonly string[];
   /** 새 흐름 셋 */
   newFlows: readonly string[];
   /** 새 흐름 파일 전문(주석을 걷은 것) — 본문 단언 금지(M-10) 검사용 */
@@ -88,8 +92,8 @@ export function checkFlowMap(input: FlowMapInput): string[] {
     if (!input.flowFiles.includes(file)) problems.push(`M-2: 인벤토리의 파일이 저장소에 없다: ${file}`);
   }
 
-  const column = (name: "flows" | "layer1") => {
-    const index = name === "flows" ? 1 : 2;
+  const column = (name: "flows" | "layer1" | "layer2") => {
+    const index = name === "flows" ? 1 : name === "layer1" ? 2 : 5;
     return inventory
       .filter((row) => row[index] === "○")
       .map((row) => pathsIn(row[0])[0] ?? row[0])
@@ -104,6 +108,17 @@ export function checkFlowMap(input: FlowMapInput): string[] {
   if (!sameSet(column("layer1"), input.layer1)) {
     problems.push("M-3: 인벤토리의 층 1 ○ 집합이 run-device-tests.mjs의 LAYER1_FLOWS와 다르다");
   }
+  if (!sameSet(column("layer2"), input.layer2)) {
+    problems.push("M-3: 인벤토리의 층 2 ○ 집합이 run-device-tests.mjs의 LAYER2_FLOWS와 다르다");
+  }
+  // M-11 (073) — LAYER2_FLOWS == scripts/layer2/flows.ts 표, LAYER2_FLOWS ⊆ FLOWS, 층 1과 겹치지 않는다
+  if (!sameSet(input.layer2, input.layer2Table)) {
+    problems.push("M-11: LAYER2_FLOWS가 scripts/layer2/flows.ts의 표와 다르다");
+  }
+  for (const file of input.layer2) {
+    if (!input.flows.includes(file)) problems.push(`M-11: LAYER2_FLOWS의 흐름이 FLOWS에 없다: ${file}`);
+    if (input.layer1.includes(file)) problems.push(`M-11: 층 2 흐름이 LAYER1_FLOWS에도 있다: ${file}`);
+  }
   // M-4 — LAYER1_FLOWS ⊆ FLOWS
   for (const file of input.layer1) {
     if (!input.flows.includes(file)) problems.push(`M-4: LAYER1_FLOWS의 흐름이 FLOWS에 없다: ${file}`);
@@ -114,9 +129,10 @@ export function checkFlowMap(input: FlowMapInput): string[] {
       problems.push(`M-5: 층 1이 아닌 이유가 없다: ${row[0]}`);
     }
   }
-  // M-6 — 기능 표의 각 행에 층 1 / 계약 / 사람이 봄 중 하나
+  // M-6 — 기능 표의 각 행에 층 1 / 계약 / 층 2 / 사람이 봄 중 하나 (073 — 층 2 칸의 「범위 밖」은 내용이 아니다)
+  const hasLayer2 = (cell: string | undefined) => hasContent(cell) && !cell!.startsWith("범위 밖");
   for (const row of features) {
-    if (!hasContent(row[1]) && !hasContent(row[2]) && !hasContent(row[4])) {
+    if (!hasContent(row[1]) && !hasContent(row[2]) && !hasLayer2(row[3]) && !hasContent(row[4])) {
       problems.push(`M-6: 지키는 곳도 사람이 보는 이유도 없는 기능: ${row[0]}`);
     }
   }
@@ -125,6 +141,12 @@ export function checkFlowMap(input: FlowMapInput): string[] {
   for (const row of features) for (const cell of row) for (const p of pathsIn(cell)) cited.add(p);
   for (const p of cited) {
     if (!input.exists(p)) problems.push(`M-7: 표에 적힌 파일이 없다: ${p}`);
+  }
+  // M-12 (073) — 기능 표 「층 2」 칸에 적힌 흐름은 LAYER2_FLOWS에 있다
+  for (const row of features) {
+    for (const p of pathsIn(row[3] ?? "")) {
+      if (!input.layer2.includes(p)) problems.push(`M-12: 기능 표의 층 2 칸이 LAYER2_FLOWS에 없는 흐름을 가리킨다: ${p}`);
+    }
   }
   // M-8 — 새 흐름은 FLOWS와 LAYER1_FLOWS 양쪽에 있다
   for (const file of input.newFlows) {

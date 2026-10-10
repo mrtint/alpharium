@@ -24,6 +24,8 @@ import {
 export type Layer1Status = "passed" | "failed" | "skipped" | "aborted";
 export type Layer1Result = { status: Layer1Status; reason?: string };
 
+export type Fixtures = { diaries: FixtureFile[]; photos: { name: string; localPath: string }[] };
+
 export type Layer1Options = {
   device: Layer1Device;
   /** 돌릴 흐름 파일들 */
@@ -31,7 +33,7 @@ export type Layer1Options = {
   now?: Date;
   log?: (line: string) => void;
   /** 테스트가 틀·사진을 갈아 끼운다. 기본은 저장소의 픽스처 */
-  fixtures?: { diaries: FixtureFile[]; photos: { name: string; localPath: string }[] };
+  fixtures?: Fixtures;
   /** 070 — 흐름에 넘길 `-e` 값(표본 대표 날). 없으면 넘기지 않는다 */
   env?: Readonly<Record<string, string>>;
 };
@@ -56,6 +58,80 @@ function must(step: string, outcome: Outcome<unknown>): string | null {
   return outcome.ok ? null : `${step}: ${outcome.detail}`;
 }
 
+/**
+ * 기준 상태를 만든다 (L2~L6) — 층 1과 층 2(073)가 함께 쓴다. 문제가 있으면 aborted 결과를, 없으면 null을 돌려준다.
+ * 앱 데이터를 통째로 지우지 않고 모델은 읽기만 한다(I-1).
+ */
+export function prepareBaseline(
+  device: Layer1Device,
+  serial: string,
+  fixtures: Fixtures,
+  log: (line: string) => void,
+): Layer1Result | null {
+  // L2 — debug 앱 데이터에 닿는가
+  const probe = device.probe(serial);
+  if (!probe.ok) {
+    return stop(
+      "aborted",
+      `[${serial}] 앱 데이터에 닿지 못했다(release 빌드이거나 재부팅 뒤 첫 잠금 해제 전일 수 있다): ${probe.detail}`,
+    );
+  }
+
+  // L3 — 모델이 있는가 (읽기만)
+  const models = device.listDir(serial, "models");
+  if (!models.ok) return stop("aborted", `[${serial}] 모델 폴더를 읽지 못했다: ${models.detail}`);
+  const missing = REQUIRED_MODEL_FILES.filter((name) => !models.value.includes(name));
+  if (missing.length > 0) {
+    return stop("aborted", `[${serial}] 모델이 없다: ${missing.join(", ")} — 층 1·2는 모델을 받지 않는다`);
+  }
+
+  // L4 — 앱을 끈다(파일을 바꾸는 동안 앱이 쓰지 않게; I-7)
+  const stopped = must(`[${serial}] 앱 종료`, device.forceStop(serial));
+  if (stopped !== null) return stop("aborted", stopped);
+
+  const dirs = must(`[${serial}] 폴더 준비`, device.ensureDirs(serial));
+  if (dirs !== null) return stop("aborted", dirs);
+
+  // L5 — 설정 기준값
+  for (const entry of BASELINE) {
+    const path = `preferences/${entry.file}`;
+    if (entry.action === "write") {
+      const failed = must(`[${serial}] ${entry.file} 쓰기`, device.writeFile(serial, path, entry.content ?? ""));
+      if (failed !== null) return stop("aborted", failed);
+    } else if (entry.action === "delete") {
+      const failed = must(`[${serial}] ${entry.file} 삭제`, device.removeFile(serial, path));
+      if (failed !== null) return stop("aborted", failed);
+    }
+  }
+
+  // L6 — 일기 폴더(일기 파일만)와 사진 사본을 픽스처로
+  const diaryNames = device.listDir(serial, "diary");
+  if (!diaryNames.ok) return stop("aborted", `[${serial}] 일기 폴더를 읽지 못했다: ${diaryNames.detail}`);
+  for (const name of diaryNames.value.filter((n) => DIARY_FILE.test(n))) {
+    const failed = must(`[${serial}] 일기 ${name} 삭제`, device.removeFile(serial, `diary/${name}`));
+    if (failed !== null) return stop("aborted", failed);
+  }
+  const cacheNames = device.listDir(serial, "vision-cache");
+  if (!cacheNames.ok) return stop("aborted", `[${serial}] 사진 사본 폴더를 읽지 못했다: ${cacheNames.detail}`);
+  for (const name of cacheNames.value.filter((n) => SAFE_NAME.test(n))) {
+    const failed = must(`[${serial}] 사진 사본 ${name} 삭제`, device.removeFile(serial, `vision-cache/${name}`));
+    if (failed !== null) return stop("aborted", failed);
+  }
+  for (const photo of fixtures.photos) {
+    const failed = must(
+      `[${serial}] 사진 사본 ${photo.name} 심기`,
+      device.copyFile(serial, `vision-cache/${photo.name}`, photo.localPath),
+    );
+    if (failed !== null) return stop("aborted", failed);
+  }
+  for (const diary of fixtures.diaries) {
+    const failed = must(`[${serial}] 일기 ${diary.name} 심기`, device.writeFile(serial, `diary/${diary.name}`, diary.content));
+    if (failed !== null) return stop("aborted", failed);
+  }
+  log(`  [${serial}] 기준 상태: 설정 ${BASELINE.length}개 정리, 일기 ${fixtures.diaries.length}편·사진 사본 ${fixtures.photos.length}개`);
+  return null;
+}
+
 export function runLayer1(options: Layer1Options): Layer1Result {
   const { device, flows } = options;
   const log = options.log ?? (() => {});
@@ -78,67 +154,8 @@ export function runLayer1(options: Layer1Options): Layer1Result {
   };
 
   for (const serial of serials) {
-    // L2 — debug 앱 데이터에 닿는가
-    const probe = device.probe(serial);
-    if (!probe.ok) {
-      return stop(
-        "aborted",
-        `[${serial}] 앱 데이터에 닿지 못했다(release 빌드이거나 재부팅 뒤 첫 잠금 해제 전일 수 있다): ${probe.detail}`,
-      );
-    }
-
-    // L3 — 모델이 있는가 (읽기만)
-    const models = device.listDir(serial, "models");
-    if (!models.ok) return stop("aborted", `[${serial}] 모델 폴더를 읽지 못했다: ${models.detail}`);
-    const missing = REQUIRED_MODEL_FILES.filter((name) => !models.value.includes(name));
-    if (missing.length > 0) {
-      return stop("aborted", `[${serial}] 모델이 없다: ${missing.join(", ")} — 층 1은 모델을 받지 않는다`);
-    }
-
-    // L4 — 앱을 끈다(파일을 바꾸는 동안 앱이 쓰지 않게; I-7)
-    const stopped = must(`[${serial}] 앱 종료`, device.forceStop(serial));
-    if (stopped !== null) return stop("aborted", stopped);
-
-    const dirs = must(`[${serial}] 폴더 준비`, device.ensureDirs(serial));
-    if (dirs !== null) return stop("aborted", dirs);
-
-    // L5 — 설정 기준값
-    for (const entry of BASELINE) {
-      const path = `preferences/${entry.file}`;
-      if (entry.action === "write") {
-        const failed = must(`[${serial}] ${entry.file} 쓰기`, device.writeFile(serial, path, entry.content ?? ""));
-        if (failed !== null) return stop("aborted", failed);
-      } else if (entry.action === "delete") {
-        const failed = must(`[${serial}] ${entry.file} 삭제`, device.removeFile(serial, path));
-        if (failed !== null) return stop("aborted", failed);
-      }
-    }
-
-    // L6 — 일기 폴더(일기 파일만)와 사진 사본을 픽스처로
-    const diaryNames = device.listDir(serial, "diary");
-    if (!diaryNames.ok) return stop("aborted", `[${serial}] 일기 폴더를 읽지 못했다: ${diaryNames.detail}`);
-    for (const name of diaryNames.value.filter((n) => DIARY_FILE.test(n))) {
-      const failed = must(`[${serial}] 일기 ${name} 삭제`, device.removeFile(serial, `diary/${name}`));
-      if (failed !== null) return stop("aborted", failed);
-    }
-    const cacheNames = device.listDir(serial, "vision-cache");
-    if (!cacheNames.ok) return stop("aborted", `[${serial}] 사진 사본 폴더를 읽지 못했다: ${cacheNames.detail}`);
-    for (const name of cacheNames.value.filter((n) => SAFE_NAME.test(n))) {
-      const failed = must(`[${serial}] 사진 사본 ${name} 삭제`, device.removeFile(serial, `vision-cache/${name}`));
-      if (failed !== null) return stop("aborted", failed);
-    }
-    for (const photo of fixtures.photos) {
-      const failed = must(
-        `[${serial}] 사진 사본 ${photo.name} 심기`,
-        device.copyFile(serial, `vision-cache/${photo.name}`, photo.localPath),
-      );
-      if (failed !== null) return stop("aborted", failed);
-    }
-    for (const diary of fixtures.diaries) {
-      const failed = must(`[${serial}] 일기 ${diary.name} 심기`, device.writeFile(serial, `diary/${diary.name}`, diary.content));
-      if (failed !== null) return stop("aborted", failed);
-    }
-    log(`  [${serial}] 기준 상태: 설정 ${BASELINE.length}개 정리, 일기 ${fixtures.diaries.length}편·사진 사본 ${fixtures.photos.length}개`);
+    const aborted = prepareBaseline(device, serial, fixtures, log);
+    if (aborted !== null) return aborted;
   }
 
   // L7 — 흐름을 한 번의 maestro 실행으로

@@ -28,6 +28,15 @@ const TEMPLATES = [
 
 export type FixtureFile = { name: string; content: string };
 
+export type FixtureDayKey = "today" | "yesterday" | "day-before";
+
+/** 픽스처의 날 하나 (073 — 층 2가 어느 날의 일기를 뺄지 이름으로 고른다) */
+export function fixtureDay(now: Date, key: FixtureDayKey): DayDate {
+  const offset = TEMPLATES.find((t) => t.template === key)?.offset;
+  if (offset === undefined) throw new Error(`알 수 없는 픽스처 날: ${key}`);
+  return dayBefore(now, offset);
+}
+
 /** 오늘로부터 `offset`일 전의 날. 기기 로컬 정오를 기준으로 건너 일광절약 경계에 흔들리지 않는다. */
 function dayBefore(now: Date, offset: number): DayDate {
   return dayOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset, 12));
