@@ -205,6 +205,7 @@ const NEEDS_LAYER1_BASELINE = [
 const PASSED = "passed";
 const FAILED = "failed";
 const SKIPPED = "skipped";
+const ABORTED = "aborted";
 
 function has(command, args) {
   const result = spawnSync(command, args, { encoding: "utf8", shell: true });
@@ -228,6 +229,7 @@ function report(status, reason) {
     [PASSED]: "PASSED  — 실기기 테스트가 돌아서 통과했다",
     [FAILED]: "FAILED  — 실기기 테스트가 돌아서 실패했다",
     [SKIPPED]: "SKIPPED — 실기기 테스트가 돌지 못했다 (통과가 아니다)",
+    [ABORTED]: "ABORTED — 기준 상태를 만들지 못해 흐름을 돌리지 않았다 (통과가 아니다)",
   }[status];
 
   console.log("");
@@ -256,8 +258,8 @@ async function runLayer1Mode() {
     report(SKIPPED, result.reason);
     process.exit(0);
   }
-  // aborted(기준 상태를 못 만듦)·failed 모두 통과가 아니다
-  report(FAILED, result.reason);
+  // aborted(기준 상태를 못 만듦)·failed 모두 통과가 아니다 — 앞의 것은 흐름을 돌리지 않았으므로 문구가 다르다
+  report(result.status === ABORTED ? ABORTED : FAILED, result.reason);
   process.exit(1);
 }
 

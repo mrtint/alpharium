@@ -927,7 +927,7 @@
   `restart-persistence`가 실패한다. **`CI=1`로 띄운 Metro는 파일 감시가 없어** 소스를 바꿔도 번들이 안 바뀐다 — 주입·되돌림마다 Metro를 다시 띄우고 `curl`한 번들에서 치환된 줄을 grep으로 확인한다.
 - **`run-device-tests.mjs`의 JUnit 실패 흐름 집계에 버그가 있었다**: 자기 닫힘 `<testcase/>`를 건너뛰지 않아 통과한 흐름을 실패로 보고했다(`scripts/layer1/junit.ts`와 같은 규칙으로 고쳤다).
 - **실측(2026-10-10, SM-G986N, dev, Metro CI=1)**: 층 1 8개 흐름이 7분 37초에 통과(새 3 + 기존 `dialog-foundation`·`diary-home-1d`·`week-strip-swipe`·`diary-body-screen`·`state-simulation`).
-  위반 주입 둘이 실패로 뒤집혔다. **미확인**: 위치·알림·배터리 권한 행의 OS 설정 왕복(층 1은 사진 행 하나만 누른다), release 빌드, iOS, 층 2(실제 생성 스모크).
+  위반 주입 둘이 실패로 뒤집혔다. 권한 행 넷(사진·위치·알림·배터리)의 OS 설정 왕복과 모델 없음 중단(`ABORTED`)도 같은 기기에서 확인했다. **미확인**: release 빌드·재부팅 직후 잠금 해제 전의 `run-as` 실패(실제 상황), iOS, 층 2(실제 생성 스모크).
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
