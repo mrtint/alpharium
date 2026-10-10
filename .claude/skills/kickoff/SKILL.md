@@ -5,13 +5,13 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
 
 # Kickoff
 
-<!-- 원본: github.com/mrtint/bluehall .claude/skills/kickoff — 이 저장소에 맞춰 경로·완료 조건을 옮기고, analyze → 수정을 지적 0건까지 반복하도록 바꿨다. -->
+<!-- 원본: github.com/mrtint/bluehall .claude/skills/kickoff — 이 저장소에 맞춰 경로·완료 조건을 옮기고, analyze 및 converge를 지적 0건까지 반복하며, 구현 완료 후 독립 코드 리뷰를 거치도록 바꿨다. -->
 
 ## Overview
 
-로드맵 과제 하나를 구현 완료까지 끌고 가는 파이프라인. speckit이 "선택"이라 부르는 clarify·analyze·converge는 **이 프로젝트에서는 필수**다.
+로드맵 과제 하나를 구현 완료까지 끌고 가는 파이프라인. speckit이 "선택"이라 부르는 clarify·analyze·converge와 구현 후 **코드 리뷰**는 **이 프로젝트에서는 필수**다.
 
-**규칙의 문자를 어기는 것이 곧 정신을 어기는 것이다.** 필수 단계를 "같은 효과의 다른 방법"(가정 명시로 clarify 대체, 수동 대조로 analyze/converge 대체 등)으로 갈음하는 것도 생략이며, 금지다. 스킬을 호출하는 것 자체가 단계다.
+**규칙의 문자를 어기는 것이 곧 정신을 어기는 것이다.** 필수 단계를 "같은 효과의 다른 방법"(가정 명시로 clarify 대체, 수동 대조로 analyze/converge 대체, 자체 검토로 코드 리뷰 대체 등)으로 갈음하는 것도 생략이며, 금지다. 스킬을 호출하는 것 자체가 단계다.
 
 ## 적용 범위
 
@@ -32,19 +32,31 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
    5. 사용자가 "반영하지 않는다"고 정한 지적은 그 결정을 spec이나 plan에 한 줄로 남긴다. 이후 회차에 남은 지적이 **전부 사용자가 이미 반영하지 않기로 정한 것**이면 루프를 끝낸다. 하나라도 새 지적이 있으면 3으로 간다.
 
    루프가 끝나면 산출물, **analyze 회차별 지적 수**(예: 5 → 2 → 0), 사용자가 반영하지 않기로 정한 지적을 짧게 보고한다.
-7. **구현 구간 (한 흐름으로)**: speckit-implement → **speckit-converge(필수, 1회 수행 후 보고)** → converge가 tasks.md에 추가한 태스크를 구현한다. **단일 호출 내 자동 반복 루프 금지**(1회 요청 시 1번 실행하고 결과를 보고한다. 전체 개발 루틴에서 추가 converge가 금지되는 것이 아니며, 사용자 요청이나 추가 검증 라운드 시 다시 실행 가능). 구간 중간에는 사용자 승인을 기다리지 않는다(상호작용 지점은 brainstorming·clarify로 충분). 구현 구간의 종료 보고는 최종 보고로 갈음한다.
+7. **구현 구간 (한 흐름으로)**: speckit-implement → **converge 루프** → **코드 리뷰**:
+   1. **speckit-implement** 실행하여 tasks.md의 초기 태스크들을 구현 및 단위/계약 테스트 작성.
+   2. **speckit-converge 루프**:
+      1. **speckit-converge** 호출.
+      2. 누락된 요구사항이나 미구현 사항이 없어 추가 태스크가 0건(`converged`)이면 루프 종료.
+      3. 새 태스크가 `tasks.md`에 추가되면 해당 태스크를 구현하고 테스트를 검증한 뒤 **다시 speckit-converge를 호출한다.**
+      4. 사용자의 의도적 결정으로 구현하지 않기로 한 항목은 `tasks.md`에 사유와 함께 기록하고 converge를 마무리한다.
+   3. **코드 리뷰 (requesting-code-review 호출)**:
+      - converge가 완료되어 스펙/계획과 코드가 완전히 일치한 상태(`converged`)에서만 코드 리뷰를 호출한다(미구현 사항에 대한 불필요한 리뷰 지적으로 토큰/시간 낭비 방지).
+      - 리뷰어가 제시한 지적 중 **Critical(Must Fix)** 및 **Important(Should Fix)** 항목은 즉시 수정하고 테스트를 다시 돌린다.
+      - 수정 후 전체 테스트 및 린트 통과를 확인하고, 최종 리뷰 결과가 머지 가능(Ready to merge: Yes) 상태임을 확인한다.
+   구간 중간에는 사용자 승인을 기다리지 않는다(상호작용 지점은 brainstorming·clarify로 충분). 구현 구간의 종료 보고는 최종 보고로 갈음한다.
 8. **완료 처리**: `npm test`·`npm run lint`를 실제로 실행해 통과를 확인하고, dev 빌드로 실기기에서 최소 1회 확인한다(헌법 원칙 V — 건너뛴 실기기 테스트는 통과가 아니다. 결과 안 보고 "완료" 주장 금지). 그 뒤 로드맵의 「진행 예정 과제」에서 해당 과제를 빼고 「완료 이력」 표에 스펙 번호와 한 줄로 옮긴다. 커밋 메시지에 스펙 번호를 남긴다(예: `docs: 로드맵에서 049 완료 과제를 이력으로 옮김`).
 
 ## 커밋 시점 (한 커밋 = 한 논리적 변경)
 
 정확히 3회, 각각 실행 전 사용자 확인을 받는다. 커밋 메시지는 한국어:
 1. 설계 구간 종료 후 — 스펙 산출물(`specs/NNN-*/`, `docs/superpowers/specs/`)
-2. 구현 구간 종료 후 — 구현 코드
+2. 구현 구간 종료 후 — 구현 코드 (converge 수렴 및 코드 리뷰 반영 완료 후)
 3. 완료 처리 — 로드맵 갱신 (구현 커밋과 분리)
 
 ## 최종 보고에 반드시 포함
 
-- converge 이후 남은 지적사항(구현 안 한 것) 목록
+- converge 이후 남은 지적사항(구현 안 한 것) 목록 및 converge 회차별 추가 태스크 수
+- 코드 리뷰 결과 요약(지적 사항 및 수정 내용)
 - clarify에서 확정된 주요 결정
 - 남은 리스크(실기기 미확인 잔여 포함)
 
@@ -58,10 +70,12 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
 | "좁은 기능이라 clarify/analyze는 건질 게 없다" | 건질 게 없으면 싸게 끝난다. 건너뛸지 판단하는 비용이 실행 비용보다 크다. |
 | "analyze 필수 1회는 이미 채웠다, 반영했으니 끝" | analyze는 횟수가 아니라 지적 0건이 종료 조건이다. 반영했으면 다시 analyze. |
 | "LOW/MEDIUM만 남았고 analyze도 proceed해도 된다고 한다" | 그것은 speckit의 기본값이다. 이 파이프라인은 심각도와 무관하게 0건까지 간다. |
-| "converge가 1회 상한이니 analyze도 같은 취지로 멈추자" | 1회 수행 후 보고는 converge 호출 단위의 규칙이다. analyze는 지적 0건까지 반복하는 루프이므로 유추해 적용하지 않는다. |
 | "반영한 부분만 내가 훑어보면 analyze를 또 돌릴 필요 없다" | 대체 절차 금지. 다시 speckit-analyze를 호출하는 것이 단계다. |
 | "converge 대신 인수조건 수동 대조" | 대체 절차 금지. speckit-converge 호출. |
-| "converge가 또 태스크를 찾았으니 한 번 더 돌리자" | 단일 호출 내에서 임의로 자동 연쇄 재실행하지 않는다. 1회 수행 후 결과를 보고하고, 추가 converge는 보고 후 필요에 따라(또는 사용자 요청 시) 진행한다. |
+| "converge 1회 돌렸으니 추가 태스크 구현 후 바로 끝내자" | 구현 후 다시 converge를 호출해 추가 태스크 0건(`converged`)을 확인해야 루프가 끝난다. |
+| "converge 다 안 끝났지만 코드 리뷰 먼저 받자" | converge가 끝나기 전에 리뷰를 받으면 미구현 지적에 토큰과 시간을 낭비한다. 스펙 수렴 완료 후에 코드 리뷰를 진행한다. |
+| "코드 리뷰 지적 중 Important는 머지 후 나중에 고치자" | Critical과 Important는 머지 전 수정 필수다. 수정한 뒤 전체 테스트 통과를 확인한다. |
+| "자체 검토로 코드 리뷰를 대신하자" | 대체 절차 금지. requesting-code-review를 호출해 독립적 리뷰를 받는 것이 단계다. |
 
 ## Red Flags — 이 생각이 들면 멈추고 파이프라인으로 복귀
 
@@ -69,4 +83,7 @@ description: Use when starting implementation of a roadmap task — e.g. "이 �
 - "같은 효과를 더 빨리 낼 수 있다"
 - "speckit 문서에는 선택이라고 되어 있다"
 - analyze 보고서에 지적이 남아 있는데 설계 구간 종료 보고를 쓰고 있다
+- converge에서 추가 태스크가 나왔는데 재converge 없이 구현 구간을 끝내려 하고 있다
+- converge 수렴 전에 코드 리뷰를 호출하거나, 코드 리뷰 없이 2차 커밋을 하려 하고 있다
 - 필수 단계를 스킬 호출 없이 수동 절차로 대신하려는 계획을 세우고 있다
+

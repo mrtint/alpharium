@@ -1242,3 +1242,87 @@ describe("066 — mmproj GPU는 iOS에서만 끈다", () => {
     expect(code).toMatch(/function isIOS\(\)[\s\S]*?require\("react-native"\)[\s\S]*?catch/);
   });
 });
+
+/**
+ * 073 — 사진이 있는 날 VLM 캡션 전량 누락 시 vision-failed로 즉시 거부 (거짓 일기 방어).
+ */
+describe("073 — VLM 캡션 전량 실패 시 vision-failed 거부 가드", () => {
+  const photo = (id: string, hour: number): Photo => ({
+    id,
+    takenAt: new Date(2026, 7, 20, hour, 0, 0),
+  });
+
+  function signalsWithPhotos(photos: Photo[]): DaySignals {
+    return {
+      date: "2026-08-20",
+      photos: { kind: "known", value: { photos, complete: true } },
+      places: { kind: "none" },
+      steps: { kind: "unknown", reason: "no-channel" },
+      battery: { kind: "unknown", reason: "no-channel" },
+      connectivity: { kind: "unknown", reason: "no-channel" },
+    };
+  }
+
+  function requestWith(signals: DaySignals): DiaryRequest {
+    return { signals, character: "quiet", vision: "quick", dayStillOpen: false };
+  }
+
+  it("사진이 1장 이상 주어졌으나 캡션이 전량 누락(0장)되면 vision-failed로 거부한다", async () => {
+    // 모든 사진 캡션이 빈 문자열(실패)로 반환되는 대역
+    const cleaned: string[] = [];
+    const engine: VisionEngine = {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(): Promise<VisionRunResult> {
+        return { text: "" };
+      },
+      async stop() {},
+      async unload() {},
+    };
+
+    const support: VisionSupport = {
+      engine,
+      resolvePath: async (p) => `/photo/${p.id}.jpg`,
+      resize: async (sourcePath) => ({
+        ok: true,
+        path: sourcePath.replace("/photo/", "/resized/"),
+      }),
+      cleanupResized: async (path) => {
+        cleaned.push(path);
+      },
+    };
+
+    let llmRan = false;
+    const llmEngine: GenerationEngine = {
+      ask: async () => ({ text: "", ending: { kind: "length" as const } }),
+      async load() {
+        return { ok: true, warm: true };
+      },
+      async prewarm() {},
+      async run() {
+        llmRan = true;
+        return { text: "나는 오늘 아무것도 보지 못했다.", ending: { kind: "eos" } };
+      },
+      async stop() {},
+      async unload() {},
+    };
+
+    const backend = createOnDeviceBackend(async () => [], llmEngine, 60_000, support);
+    const result = await backend.generate(
+      requestWith(signalsWithPhotos([photo("a", 10), photo("b", 14)])),
+    );
+
+    // LLM 실행 없이 즉시 vision-failed로 거절되어야 함
+    expect(llmRan).toBe(false);
+    expect(result).toEqual({ kind: "vision-failed", reason: "failed" });
+  });
+
+  it("readPhotos 구현부에 073 캡션 0장 방어 가드가 있다", () => {
+    const code = readFileSync(join(__dirname, "../../src/inference/on-device.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+
+    expect(code).toMatch(/selected\.length\s*>\s*0\s*&&\s*result\.captions\.length\s*===\s*0/);
+  });
+});

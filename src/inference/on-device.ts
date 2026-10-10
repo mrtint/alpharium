@@ -320,7 +320,15 @@ async function readPhotos(
     );
 
     // `null`은 그만둔 것이다 — 거기까지 읽은 것을 버린다(FR-009).
-    return result === null ? { kind: "cancelled" } : { kind: "seen", vision: result };
+    if (result === null) return { kind: "cancelled" };
+
+    // 073 — 사진이 후보로 주어졌으나 캡션 결과가 0장이면 정상 시각 완료로 다루지 않고
+    // 실패로 반환한다. 「사진은 쌓였는데 못 봤다」는 unread 거짓 일기가 저장되는 것을 막는다(원칙 II·V).
+    if (selected.length > 0 && result.captions.length === 0) {
+      return { kind: "failed", reason: "전량 캡션 실패 (0장 생성)" };
+    }
+
+    return { kind: "seen", vision: result };
   } catch (error) {
     return { kind: "failed", reason: error instanceof Error ? error.message : String(error) };
   } finally {
