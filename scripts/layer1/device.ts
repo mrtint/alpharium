@@ -39,7 +39,11 @@ export interface Layer1Device {
   writeFile(serial: string, relative: string, content: string): Outcome;
   copyFile(serial: string, relative: string, localPath: string): Outcome;
   removeFile(serial: string, relative: string): Outcome;
-  runMaestro(flows: readonly string[]): { status: number | null; failed: string[] | null };
+  /** `env`는 070 — 흐름에 `-e KEY=VALUE`로 넘긴다(표본 대표 날 값). 값은 영문·숫자·`_`·`-`만 허용한다 */
+  runMaestro(
+    flows: readonly string[],
+    env?: Readonly<Record<string, string>>,
+  ): { status: number | null; failed: string[] | null };
 }
 
 const DEVICE_TMP = "/data/local/tmp/layer1";
@@ -150,12 +154,21 @@ export function adbDevice(): Layer1Device {
       return result.ok ? { ok: true, value: undefined } : { ok: false, detail: result.detail };
     },
 
-    runMaestro(flows) {
+    runMaestro(flows, env) {
+      const envArgs: string[] = [];
+      for (const [key, value] of Object.entries(env ?? {})) {
+        // 셸을 거치는 인자라 공백·따옴표가 든 값은 보내지 않는다(070 contracts/sample-days-flow.md FL-3)
+        if (!/^[A-Z][A-Z0-9_]*$/.test(key) || !/^[A-Za-z0-9_-]+$/.test(value)) {
+          console.error(`maestro -e 값이 안전하지 않다: ${key}`);
+          return { status: 2, failed: null };
+        }
+        envArgs.push("-e", `${key}=${value}`);
+      }
       // 한국어 Windows의 CP949 때문에 흐름의 한글이 뭉개진다 — UTF-8을 준다(run-device-tests.mjs와 같은 이유).
       const junit = join(mkdtempSync(join(tmpdir(), "pocketlog-maestro-")), "report.xml");
       const run = spawnSync(
         "maestro",
-        ["test", "--no-reinstall-driver", "--format", "junit", "--output", junit, ...flows],
+        ["test", "--no-reinstall-driver", "--format", "junit", "--output", junit, ...envArgs, ...flows],
         {
           stdio: "inherit",
           shell: true,

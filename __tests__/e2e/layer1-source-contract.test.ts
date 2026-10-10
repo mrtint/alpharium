@@ -39,7 +39,8 @@ describe("층 1 소스 계약 (069)", () => {
     const code = read("scripts", "run-device-tests.mjs");
     expect(code).toMatch(/--layer1/);
     expect(code).toMatch(/"pm",\s*"clear"/);
-    expect(code).toMatch(/layer1\/runner\.ts/);
+    // 070: 층 1 실행은 표본 보장을 앞에 끼우는 래퍼(with-sample.ts)를 거쳐 runner.ts를 부른다
+    expect(code).toMatch(/layer1\/(runner|with-sample)\.ts/);
   });
 
   it("I-5 — 층 1 목록 배열 LAYER1_FLOWS가 있다", () => {

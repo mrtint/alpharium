@@ -67,7 +67,9 @@
     "check:constitution": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/check-constitution.mts",
     "seed:day": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-day.mts",
     "seed:list": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-list.mts",
-    "seed:clear": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-clear.mts"
+    "seed:clear": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-clear.mts",
+    "sample:fetch": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/sample-fetch.mts",
+    "sample:seed": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/sample-seed.mts"
   },
   "jest": {
     "projects": [
