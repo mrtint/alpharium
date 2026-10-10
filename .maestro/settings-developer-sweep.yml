@@ -1,0 +1,224 @@
+# 층 1 — 설정·개발자·진단의 행을 차례로 열고 닫아도 앱이 살아 있다 (069, 068 iOS 훑기의 안드로이드 판 — 단언이 있다)
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# 무엇을 지키나: TestFlight 빌드 2에서 설정의 권한 행을 누르는 즉시 앱이 종료됐다(066 `await import("react-native")`).
+#   기능 흐름 e2e가 설정 행을 눌러 봤다면 잡혔을 결함이다. 설정·개발자·진단은 흐름이 거의 비어 있어 여기서 한 번 훑는다.
+#
+# 누르는 것: 열고 닫을 수 있는 행(이름·시각·장소·권한·이 휴대폰·지우기 확인 대화상자 취소·개발자·진단).
+# **누르지 않고 보이는지만 보는 행**(069 FR-021a — 층 1은 일기를 생성하지 않고 기준 상태를 바꾸지 않는다):
+#   「한 번 써 보기」(diagnostics-try-once), 「자동 쓰기 지금 실행」(diagnostics-run-auto), 「모듈 다시 받기」(developer-redownload),
+#   「온보딩부터 다시」(developer-replay-onboarding), 「끄기」(developer-off). 상태 흉내 토글·날짜도 state-simulation.yml 몫이다.
+#   눌렀을 때의 동작은 대응표(docs/e2e/feature-flow-map.md)에 「층 2 / 사람이 봄」으로 적혀 있다.
+#
+# 자동으로 쓰기 토글은 켜서 시각·장소 행을 열었다가 **끝에서 다시 끈다**(FR-021b). 기준 상태는 꺼짐이다.
+# 끝나면 홈의 쓴 날(픽스처)이 그대로다 — 지우기 대화상자는 취소로 끝난다.
+#
+# 선행: `node scripts/run-device-tests.mjs --layer1`이 만든 기준 상태(개발 환경 — 개발자 행이 처음부터 있다).
+# ─────────────────────────────────────────────────────────────────────────────
+appId: com.a810labs.pocketlog
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 20000
+
+# ── 설정 ──
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+
+# 이름 바꾸기 → 뒤로
+- tapOn:
+    id: "settings-name"
+- extendedWaitUntil:
+    visible:
+      id: "rename-save"
+    timeout: 5000
+- tapOn:
+    id: "rename-back"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 5000
+
+# 자동으로 쓰기(기준 상태는 꺼짐) → 켜면 시각 행이 펼쳐진다 → 시각·장소 대화상자를 열고 취소 → 다시 끈다
+- tapOn:
+    id: "auto-diary-toggle"
+- extendedWaitUntil:
+    visible:
+      id: "settings-target-hour"
+    timeout: 5000
+- tapOn:
+    id: "settings-target-hour"
+- extendedWaitUntil:
+    visible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- tapOn:
+    id: "target-hour-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "target-hour-dialog"
+    timeout: 5000
+- tapOn:
+    id: "settings-place-names"
+- extendedWaitUntil:
+    visible:
+      id: "place-name-dialog"
+    timeout: 5000
+- tapOn:
+    id: "place-name-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "place-name-dialog"
+    timeout: 5000
+- tapOn:
+    id: "auto-diary-toggle"
+- extendedWaitUntil:
+    notVisible:
+      id: "settings-target-hour"
+    timeout: 5000
+
+# 권한 행 — OS 설정 앱으로 나갔다가 뒤로 가기로 돌아온다
+- scrollUntilVisible:
+    element:
+      id: "settings-perm-photos"
+- tapOn:
+    id: "settings-perm-photos"
+- waitForAnimationToEnd:
+    timeout: 3000
+- back
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+
+# 이 휴대폰 — 모듈 용량 행, 일기 모두 지우기는 확인 대화상자까지만(취소)
+- scrollUntilVisible:
+    element:
+      id: "settings-device-modules"
+- assertVisible:
+    id: "settings-device-modules"
+- scrollUntilVisible:
+    element:
+      id: "settings-wipe"
+- tapOn:
+    id: "settings-wipe"
+- extendedWaitUntil:
+    visible:
+      id: "wipe-dialog"
+    timeout: 5000
+- tapOn:
+    id: "wipe-cancel"
+- extendedWaitUntil:
+    notVisible:
+      id: "wipe-dialog"
+    timeout: 5000
+
+# 버전
+- scrollUntilVisible:
+    element:
+      id: "settings-version"
+- assertVisible:
+    id: "settings-version"
+
+# ── 개발자 ──
+- scrollUntilVisible:
+    element:
+      id: "settings-developer"
+- tapOn:
+    id: "settings-developer"
+- extendedWaitUntil:
+    visible:
+      id: "developer-screen"
+    timeout: 5000
+# 누르지 않는 행: 보이기만
+- assertVisible:
+    id: "developer-redownload"
+- scrollUntilVisible:
+    element:
+      id: "developer-group-sim"
+- assertVisible:
+    id: "developer-group-sim"
+- scrollUntilVisible:
+    element:
+      id: "developer-replay-onboarding"
+- assertVisible:
+    id: "developer-replay-onboarding"
+- scrollUntilVisible:
+    element:
+      id: "developer-off"
+- assertVisible:
+    id: "developer-off"
+
+# ── 진단 ──
+- scrollUntilVisible:
+    element:
+      id: "developer-diagnostics"
+- tapOn:
+    id: "developer-diagnostics"
+- extendedWaitUntil:
+    visible:
+      id: "diagnostics-screen"
+    timeout: 5000
+- assertVisible:
+    id: "diagnostics-group-env"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-storage"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-photo"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-probe"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-prompt"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-gen"
+# 누르지 않는 행: 보이기만 (생성하는 두 버튼)
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-try-once"
+- assertVisible:
+    id: "diagnostics-try-once"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-run-auto"
+- assertVisible:
+    id: "diagnostics-run-auto"
+- scrollUntilVisible:
+    element:
+      id: "diagnostics-group-failures"
+
+# ── 닫기 — 진단 → 개발자 → 설정 → 홈 ──
+- tapOn:
+    id: "back-to-developer"
+- extendedWaitUntil:
+    visible:
+      id: "developer-screen"
+    timeout: 5000
+- tapOn:
+    id: "back-to-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 5000
+- tapOn:
+    id: "back-to-home"
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 5000
+
+# 쓴 날(픽스처)이 그대로다 — 지우기가 취소로 끝났다
+- assertVisible:
+    id: "written-paper"
+- assertVisible:
+    id: "written-body"

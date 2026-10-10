@@ -58,7 +58,7 @@
 
 ## R6. 위반 주입 설계 (FR-025, SC-005·006)
 
-- 재시작: `src/diary/store.ts` `expoFileSystemPort().read`의 `file.textSync()`를 `await file.text()`로 되돌린 상태에서 `restart-persistence`를 돌려 실패가 나는지 본다. 확률적이라 한 번에 안 날 수 있다(12회 중 5회) — 실패가 안 나면 원인(주입 미적용/확률)을 기록하고 횟수를 늘려 다시 한다. 주입 전 치환이 실제로 적용됐는지 단언한다.
+- 재시작: `src/diary/store.ts` `expoFileSystemPort().read`의 `file.textSync()`를 **원래 결함의 꼴 그대로 `file.text()`(await 없음)**로 되돌린 상태에서(`await file.text()`로 되돌리면 `file`이 async 프레임에 살아 있어 재현되지 않는다 — 실측 30/30 통과) `restart-persistence`를 돌려 실패가 나는지 본다. 확률적이라 한 번에 안 날 수 있다(12회 중 5회) — 실패가 안 나면 원인(주입 미적용/확률)을 기록하고 횟수를 늘려 다시 한다. 주입 전 치환이 실제로 적용됐는지 단언한다.
 - 쓸기: 확대 화면을 여는 누름 판정 `isTap`(`src/app/photo-viewer.ts`)을 항상 참으로 바꿔 쓸기 뒤에도 확대 화면이 열리는지 본다.
 - 둘 다 되돌려 `git diff`가 비는 것을 확인하고 커밋하지 않는다.
 

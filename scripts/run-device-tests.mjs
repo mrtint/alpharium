@@ -165,6 +165,40 @@ const FLOWS = [
   // 흉내를 끈 채로 끝낸다. ⚠️ 날짜 흉내·실패 토스트·권한 없음 칸·진단 두 버튼·헤드리스 자동 쓰기·재시작 유지·메뉴 끄기는 여기 없다 —
   // 064 quickstart를 사람이 본다. **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/state-simulation.yml",
+  // 069 — 층 1(생성 없는 화면 흐름) 새 흐름 셋. `--layer1`이 만드는 기준 상태(오늘부터 사흘 쓴 날, 자동 쓰기 꺼짐)를 전제한다 — 일반 실행(`pm clear`)에서는
+  // 쓴 날이 없어 실패한다. 근거와 단언은 각 파일 머리, 기능별 대응은 docs/e2e/feature-flow-map.md.
+  ".maestro/restart-persistence.yml",
+  ".maestro/single-photo-swipe.yml",
+  ".maestro/settings-developer-sweep.yml",
+];
+
+/**
+ * 069 — 층 1: 일기를 쓰지 않고 끝나는 화면 흐름. `--layer1`로만 돈다(`pm clear` 없이 `scripts/layer1/runner.ts`가 기준 상태를 만든다).
+ * **여기 있는 흐름은 모두 위 `FLOWS`에도 있어야 한다** — 등록하지 않은 흐름은 초록불인데 아무것도 검증하지 않는다.
+ * 기능 → 흐름 대응표(어느 흐름이 무엇을 지키는가, 왜 층 1이 아닌가)의 정본은 `docs/e2e/feature-flow-map.md`다 — 표를 여기 복제하지 않는다.
+ */
+const LAYER1_FLOWS = [
+  // 069 새 흐름 — 기준 상태(쓴 날 픽스처)를 전제한다
+  ".maestro/restart-persistence.yml",
+  ".maestro/single-photo-swipe.yml",
+  ".maestro/settings-developer-sweep.yml",
+  // 기존 흐름 중 생성 없이, 수정 없이 기준 상태에서 통과한 것(2026-10-10 실기기). 못 넣은 흐름과 이유는 대응표에 있다.
+  ".maestro/dialog-foundation.yml",
+  ".maestro/diary-home-1d.yml",
+  ".maestro/week-strip-swipe.yml",
+  ".maestro/diary-body-screen.yml",
+  // 상태 흉내를 켰다 끄므로 마지막에 둔다 — 중간에 실패해도 다음 실행의 기준 상태 복원이 흉내 기록을 지운다
+  ".maestro/state-simulation.yml",
+];
+
+/**
+ * 069 — 층 1 기준 상태(쓴 날 픽스처)를 전제하는 흐름. **일반 실행(`pm clear` 뒤라 쓴 날이 없다)에서는 돌리지 않는다** — 돌리면 전제가 없어 실패한다.
+ * 위 `FLOWS`에는 등록돼 있다(등록이 없으면 아무것도 검증하지 않는 초록불이다). `--layer1`로 돈다.
+ */
+const NEEDS_LAYER1_BASELINE = [
+  ".maestro/restart-persistence.yml",
+  ".maestro/single-photo-swipe.yml",
+  ".maestro/settings-developer-sweep.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */
@@ -206,6 +240,25 @@ function report(status, reason) {
     console.log("  기능이 끝났다고 말하려면 최소 한 번은 실기기에서 돌아야 한다.");
   }
   console.log("");
+}
+
+async function runLayer1Mode() {
+  const { adbDevice } = await import("./layer1/device.ts");
+  const { runLayer1 } = await import("./layer1/runner.ts");
+  const requested = process.argv.slice(2).filter((arg) => arg !== "--layer1");
+  const flows = requested.length > 0 ? requested : LAYER1_FLOWS;
+  const result = runLayer1({ device: adbDevice(), flows, log: (line) => console.log(line) });
+  if (result.status === PASSED) {
+    report(PASSED);
+    process.exit(0);
+  }
+  if (result.status === SKIPPED) {
+    report(SKIPPED, result.reason);
+    process.exit(0);
+  }
+  // aborted(기준 상태를 못 만듦)·failed 모두 통과가 아니다
+  report(FAILED, result.reason);
+  process.exit(1);
 }
 
 function main() {
@@ -278,7 +331,11 @@ function main() {
   //
   // 인자로 흐름 파일을 주면 그것만 돈다: `node scripts/run-device-tests.mjs .maestro/a.yml`
   const requested = process.argv.slice(2);
-  const flows = requested.length > 0 ? requested : FLOWS;
+  const skippedForBaseline = FLOWS.filter((f) => NEEDS_LAYER1_BASELINE.includes(f));
+  const flows = requested.length > 0 ? requested : FLOWS.filter((f) => !skippedForBaseline.includes(f));
+  if (requested.length === 0 && skippedForBaseline.length > 0) {
+    console.log(`  (층 1 기준 상태가 필요한 흐름 ${skippedForBaseline.length}개는 여기서 돌지 않는다 — npm run test:layer1)`);
+  }
   const junit = join(mkdtempSync(join(tmpdir(), "pocketlog-maestro-")), "report.xml");
 
   console.log(`▶ 흐름 ${flows.length}개를 한 번에 실행`);
@@ -305,10 +362,19 @@ function main() {
 function failedFlows(path) {
   if (!existsSync(path)) return null;
   const xml = readFileSync(path, "utf8");
-  const names = [
-    ...xml.matchAll(/<testcase\b[^>]*\bname="([^"]*)"[^>]*>(?:(?!<\/testcase>)[\s\S])*<failure/g),
-  ].map((m) => m[1]);
+  // 069 — 자기 닫힘 `<testcase .../>`를 건너뛴다. 옛 정규식은 통과한 흐름의 태그에서 시작해 다음 흐름의 `<failure`까지 먹어 통과한 흐름을 실패로 보고했다.
+  // 같은 규칙이 scripts/layer1/junit.ts(테스트 있음)에 있다 — 이 파일은 `.ts`를 정적으로 불러오지 않는다(경고).
+  const names = [];
+  for (const match of xml.matchAll(/<testcase\b([^>]*?)(?:\/>|>([\s\S]*?)<\/testcase>)/g)) {
+    if (match[2] === undefined || !/<failure\b/.test(match[2])) continue;
+    const name = /\bname="([^"]*)"/.exec(match[1]);
+    if (name !== null) names.push(name[1]);
+  }
   return names.length > 0 ? names.join(", ") : null;
 }
 
-main();
+if (process.argv.includes("--layer1")) {
+  await runLayer1Mode();
+} else {
+  main();
+}

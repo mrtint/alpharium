@@ -11,6 +11,8 @@
 순수 함수와 정합성(흐름 파일 ↔ 대응표 ↔ `FLOWS`, 픽스처 ↔ 실제 `deserializeEntry`, 설정 파일 ↔ 앱이 읽는 `preferences/*.json`)은 기기 없는 jest 계약 테스트가 지킨다.
 기기에서만 보이는 것(재시작 반복, 쓸기, 행 훑기)은 Maestro 흐름이 지킨다.
 
+- **구현 중 정한 것 둘**: (a) 층 1 기준 상태(쓴 날 픽스처)를 전제하는 새 흐름은 `FLOWS`에 등록하되 일반 실행(`pm clear` 뒤라 쓴 날이 없다)에서는 `NEEDS_LAYER1_BASELINE`으로 제외한다 — contracts/layer1-runner.md I-4. (b) `run-device-tests.mjs`의 JUnit 실패 집계가 통과한 흐름을 실패로 보고하던 버그를 `scripts/layer1/junit.ts`(테스트 있음)와 같은 규칙으로 고쳤다 — 스펙 밖이지만 층 1 결과를 믿으려면 필요했다.
+
 ## Technical Context
 
 **Language/Version**: TypeScript(`scripts/*.ts`, node 24 타입 제거로 직접 실행 — 기존 `scripts/seed-day.mts` 관례: 확장자를 적은 import), 실행기 `scripts/run-device-tests.mjs`(ESM), Maestro YAML
