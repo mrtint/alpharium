@@ -93,11 +93,11 @@ description: "074 모바일 데이터 동의 — 태스크"
 
 ## Phase 7: 실기기 확인 (⚠️ 시작 전 소유자 확인)
 
-- [ ] T030 소유자에게 확인한다 — 기기(`R3CN60JVNCE` / 무선 `192.168.219.112:46409` 중 무엇), 안티그랩 사용 여부, **모델 백업 없이 `pm clear`로 2GB를 지워도 되는지**(Wi-Fi로 다시 받는 것으로 갈음할지). 답 전에는 `adb install`·`pm clear`·Maestro를 실행하지 않는다(읽기 조회 `adb devices`는 가능).
-- [ ] T031 확인이 나면 dev APK를 설치하고(`adb -s <시리얼> install -r android/app/build/outputs/apk/debug/app-debug.apk`; 필요하면 먼저 빌드), Metro를 dev로 띄워 번들에 `.env.development.local`이 들어갔는지 `curl`로 확인, `adb reverse tcp:8081 tcp:8081`.
-- [ ] T032 quickstart 시험 순서 1~5를 따라 본다 — Wi-Fi(모달 없음) / 모바일 데이터(모바일 동의, 받을 양 표시) → 「나중에 받기」(파일 없음·`downloadConsented` false 확인 `run-as`) → Wi-Fi 켜고 「다시 확인하기」 → 표준 / 모바일 → 「모바일 데이터로 받기」로 진행 시작만 확인하고 끊기 / 비행기 모드. 각 상태의 `getNetworkStateAsync()` 값을 quickstart 실측 표에 적는다. 못 본 것은 「미확인」. `uiautomator dump`가 이 기기에서 `Killed`이므로 고정 좌표 + `screencap`을 쓴다.
-- [ ] T033 글꼴 2.0배에서 모바일 동의 버튼 둘이 잘리지 않는지(056 DLG8 교훈) 한 번 본다. 못 보면 「미확인」.
-- [ ] T034 시험 뒤 기기 상태를 되돌린다(Wi-Fi 켜기, 비행기 모드 끄기) 하고 결과를 소유자에게 보고한다.
+- [X] T030 소유자에게 확인한다 — 기기(`R3CN60JVNCE` / 무선 `192.168.219.112:46409` 중 무엇), 안티그랩 사용 여부, **모델 백업 없이 `pm clear`로 2GB를 지워도 되는지**(Wi-Fi로 다시 받는 것으로 갈음할지). 답 전에는 `adb install`·`pm clear`·Maestro를 실행하지 않는다(읽기 조회 `adb devices`는 가능).
+- [X] T031 확인이 나면 dev APK를 설치하고(`adb -s <시리얼> install -r android/app/build/outputs/apk/debug/app-debug.apk`; 필요하면 먼저 빌드), Metro를 dev로 띄워 번들에 `.env.development.local`이 들어갔는지 `curl`로 확인, `adb reverse tcp:8081 tcp:8081`.
+- [X] T032 (실측: quickstart 「실측」 절 — 실제 모바일 데이터는 SIM 무서비스로 미확인, 모바일 갈래는 연결 값을 덮어써 화면·흐름 확인) quickstart 시험 순서 1~5를 따라 본다 — Wi-Fi(모달 없음) / 모바일 데이터(모바일 동의, 받을 양 표시) → 「나중에 받기」(파일 없음·`downloadConsented` false 확인 `run-as`) → Wi-Fi 켜고 「다시 확인하기」 → 표준 / 모바일 → 「모바일 데이터로 받기」로 진행 시작만 확인하고 끊기 / 비행기 모드. 각 상태의 `getNetworkStateAsync()` 값을 quickstart 실측 표에 적는다. 못 본 것은 「미확인」. `uiautomator dump`가 이 기기에서 `Killed`이므로 고정 좌표 + `screencap`을 쓴다.
+- [X] T033 글꼴 2.0배에서 모바일 동의 버튼 둘이 잘리지 않는지(056 DLG8 교훈) 한 번 본다. 못 보면 「미확인」.
+- [X] T034 시험 뒤 기기 상태를 되돌린다(Wi-Fi 켜기, 비행기 모드 끄기) 하고 결과를 소유자에게 보고한다.
 
 ## 구현 구간 밖 — 완료 처리 메모 (체크박스 아님, `/speckit-implement`가 실행하지 않는다)
 
@@ -130,4 +130,4 @@ description: "074 모바일 데이터 동의 — 태스크"
 - [X] T037 [P] `docs/e2e/feature-flow-map.md`의 `download-consent-flow` 행 전제와 `.maestro/download-consent-flow.yml` 머리 주석에 「Wi-Fi(또는 모바일 데이터가 아닌) 연결이 전제 — 모바일 갈래는 quickstart 074를 사람이 본다」를 적는다. 표와 흐름 파일이 어긋나면 `flow-map.test.ts`가 실패하므로 `npm run test:logic`으로 확인 per SC-005 (partial)
 - [X] T038 [P] `.maestro/ios/first-run-to-home.yml` 47행 근처 `when: visible: download-consent-confirm` 블록 옆에 `download-consent-cellular-confirm`을 누르는 같은 모양의 블록을 더한다(시뮬레이터가 모바일로 읽는 경우의 방어 — 호스트 네트워크는 대개 `other`/`wifi`라 평소엔 안 돈다) per FR-005 (partial)
 - [X] T039 [P] 설계 문서의 이름 표류를 바로잡는다: `contracts/consent-gate.md` CG5·CG6의 `readRemainingBytes`를 `readSizeLabel`(문자열 통로)로, `data-model.md`·`research.md` R3의 훅 시그니처(`readRemainingBytes`·`formatBytes`)를 구현(`useConsentGate({ readConnection, readSizeLabel })`)에 맞춘다. `spec.md`·`plan.md`는 건드리지 않는다 per plan: Structure Decision (partial)
-- [ ] T040 T030~T034(실기기 확인)가 여전히 남아 있다 — 소유자 확인 뒤 quickstart 실측 표를 채워야 SC-005가 닫힌다. 못 본 갈래는 「미확인」으로 남긴다 per SC-005 (missing)
+- [X] T040 T030~T034(실기기 확인)가 여전히 남아 있다 — 소유자 확인 뒤 quickstart 실측 표를 채워야 SC-005가 닫힌다. 못 본 갈래는 「미확인」으로 남긴다 per SC-005 (missing)

@@ -982,8 +982,9 @@
   `consentGate` 영역에 있고 062 골든의 `ADDED_AFTER_GOLDEN`에 올렸다(골든 json은 다시 쓰지 않았다).
 - **`AppFrame.firstrun.test.tsx`는 소스 배선 테스트다**(App.tsx를 렌더하지 않는다) — 게이트의 실제 동작은 `__tests__/ui/download-consent-gate.test.tsx`가 그린다. 이 기능이 바꾼 기존 단언은 「동의 분기가 `DownloadConsentGate`를 그린다」 한 곳뿐이다.
 - 헌법 v2.0.1에는 「앱이 사용자를 막지 않는다」 원칙이 없다(원칙 I은 온디바이스) — 이 문서의 옛 표기(「원칙 I」로 온보딩을 건너뛴다 등)는 2.0.0 개정 전 번호다. 045의 「거부 조작 없음」은 헌법이 아니라 045의 설계 결정이었다.
-- **미확인**: 실기기(SM-G986N)에서 모바일 동의의 두 갈래와 Wi-Fi 갈래 — 시험은 모델 없는 상태가 전제라 `pm clear`가 필요하다. 상태별 `getNetworkStateAsync()` 값(Wi-Fi·모바일·비행기 모드·핫스팟·VPN)은
-  `specs/074-wifi-download-consent/quickstart.md`의 실측 표에 적는다.
+- **실기기(SM-G986N, 2026-10-11)**: `getNetworkStateAsync()`는 Wi-Fi에서 `{"isConnected":true,"type":"WIFI",…}`, Wi-Fi를 끄면 `{"isConnected":false,"type":"NONE",…}`였다(둘 다 표준 동의, 모달 없음). **이 기기의 SIM은 무서비스(`OUT_OF_SERVICE`·등록 거부)라
+  실제 모바일 데이터가 안 잡혀 `CELLULAR` 값은 못 봤다** — 모바일 갈래는 연결 값을 임시로 덮어쓴 채 화면·흐름(모달·용량·나중에 받기·다시 확인하기·전경 복귀·받기 시작·글꼴 2.0배)만 봤다. **미확인**: 실제 `CELLULAR` 값과 그 갈래,
+  핫스팟·VPN 값. 시험은 `pm clear` 없이 `run-as`로 `files/models`를 옮겨 두고 `onboarding.json`의 `downloadConsented`만 false로 만들어 모델 2GB를 보존했다(끝에 되돌림). 상세는 `specs/074-wifi-download-consent/quickstart.md` 「실측」.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
