@@ -4,7 +4,7 @@
 
 ## 단계 이름 (테스트가 이름으로 단계를 찾는다 — 바꾸면 계약도 바꾼다)
 
-`사전 점검` · `러너 사양` · `키스토어 복원` · `gradle bundleRelease` · `서명 확인` · `Play 업로드` · `최대 메모리 사용량` · `정리`. 그 밖의 단계(checkout·setup-node·setup-java·`npm ci`·`expo prebuild`)는 이름을 정하지 않는다.
+`사전 점검` · `설정 점검` · `러너 사양` · `키스토어 복원` · `gradle bundleRelease` · `서명 확인` · `Play 업로드` · `최대 메모리 사용량` · `정리`. 그 밖의 단계(checkout·setup-node·setup-java·`npm ci`·`expo prebuild`)는 이름을 정하지 않는다.
 
 ## 잠그는 규칙
 
@@ -14,21 +14,22 @@
 | W2 | `on:` 아래 키가 `workflow_dispatch` **하나뿐**이다 (`pull_request`·`pull_request_target`·`push`·`schedule`·`workflow_run` 없음) | FR-002 |
 | W3 | 정확히 한 잡이 있고 `environment: android-release`, `runs-on: ubuntu-latest` | FR-001·003 |
 | W4 | 최상위 `permissions:`가 `contents: read` **하나뿐**이고 잡 수준 `permissions`가 없다 | FR-003 |
-| W5 | `secrets.X` 참조의 집합이 허용 넷(`ANDROID_KEYSTORE_BASE64`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_PASSWORD`·`PLAY_SERVICE_ACCOUNT_JSON`)의 부분집합이고 모든 참조 줄이 `NAME: ${{ secrets.NAME }}` 꼴이다(`run:` 본문 보간·`toJSON(secrets)`·`secrets['X']` 불가). `${{ … secrets … }}` 식은 전부 그 꼴이다 | FR-004·005 |
+| W5 | `secrets.X` 참조의 집합이 허용 넷(`ANDROID_KEYSTORE_BASE64`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_PASSWORD`·`PLAY_SERVICE_ACCOUNT_JSON`)의 부분집합이고 모든 참조 줄이 `KEY: ${{ secrets.NAME }}` 꼴이다 — KEY는 NAME과 같거나, 두 비밀번호만 gradle 환경변수 별칭(`ANDROID_KEYSTORE_PASSWORD` → `ORG_GRADLE_PROJECT_POCKETLOG_STORE_PASSWORD`, `ANDROID_KEY_PASSWORD` → `ORG_GRADLE_PROJECT_POCKETLOG_KEY_PASSWORD`)다(`run:` 본문 보간·`toJSON(secrets)`·`secrets['X']` 불가). `${{ … secrets … }}` 식은 전부 그 꼴이다 | FR-004·005 |
 | W5a | 비밀 참조는 **단계 `env` 깊이**에만 있다(잡 수준 `env`·`with:` 금지) | FR-005 |
 | W5b | 각 비밀은 정해진 단계에서만 나온다: 키스토어 → `키스토어 복원`, 두 비밀번호 → `gradle bundleRelease` 단계(키 `ORG_GRADLE_PROJECT_POCKETLOG_STORE_PASSWORD`·`ORG_GRADLE_PROJECT_POCKETLOG_KEY_PASSWORD`), 서비스 계정 → `Play 업로드` 단계, 사전 점검은 넷 모두 | FR-005 |
-| W6 | `actions/upload-artifact`·`actions/cache`가 없다 | FR-008 |
+| W6 | `actions/upload-artifact`·`actions/cache`가 없고, `cache:` 키가 없으며 `setup-node`에 `package-manager-cache: false`가 있다(v5는 `packageManager` 필드가 있으면 캐시를 자동으로 켠다) | FR-008 |
 | W7 | `set -x`·`set -o xtrace`·비밀 변수를 `echo`·`cat`·`printenv` 인자로 쓰는 줄이 없다 | FR-005 |
 | W8 | 정리 단계가 있고 `if: always()`이며 마지막 단계이고 키스토어 파일·AAB 삭제를 포함한다 | FR-005·SC-006 |
 | W9 | `concurrency:`가 있고 `cancel-in-progress: false`이다 | FR-010 |
 | W10 | `continue-on-error`가 없다 | — |
 | W11 | 외부 Action은 `actions/*`뿐이다(`uses:`의 소유자) | FR-012 |
 | W12 | 빌드 인자: `./gradlew bundleRelease`·`-PreactNativeArchitectures=arm64-v8a`가 있고, `NODE_ENV: production`이 `gradle bundleRelease` 단계의 `env`에 있으며, `assembleRelease`·`apk`는 없다 | FR-001·006 |
-| W13 | 단계 순서: 사전 점검 < `expo prebuild` < 키스토어 복원 < `bundleRelease` < 서명 확인 < Play 업로드 < 정리 | FR-007·009 |
+| W13 | 단계 순서: 사전 점검 < 설정 점검 < `expo prebuild` < 키스토어 복원 < `bundleRelease` < 서명 확인 < Play 업로드 < 정리 | FR-007·009 |
 | W14 | `timeout-minutes`가 있다 | — |
 | W15 | `GITHUB_STEP_SUMMARY`에 러너 사양(CPU·메모리·Java)을 적고, `expo prebuild`·`gradle bundleRelease`·`Play 업로드` 세 단계가 `trap`으로 걸린 시간을, `최대 메모리 사용량` 단계가 최대 메모리를 적는다. `서명 확인` 단계는 AAB 크기·소유자·지문을 적는다 | FR-011 |
 | W16 | 서명 확인 단계가 `scripts/android-release/verify-signature.mts`를 부르고, Play 업로드 단계가 `scripts/android-release/play-upload.mts`를 부른다 | FR-007·012 |
-| W17 | 사전 점검이 `upload-key.sha256`의 존재를 본다(스크립트 위임) | FR-009 |
+| W17 | `사전 점검`은 비밀 넷이 비었는지만 보고 이름만 밝히며(`::error::`, 값 출력 없음), 비밀이 env에 있으므로 저장소 코드(`node`·`npm`·`npx`·`./gradlew`)를 부르지 않는다. `npm ci`보다 앞이다 | FR-009 |
+| W17a | `설정 점검`은 `android.versionCode`와 `upload-key.sha256`(`--check-expected-only`)을 보고 `env`·`secrets.`가 없다. `npm ci`보다 앞이다 | FR-009 |
 | W18 | `actions/checkout`에 `persist-credentials: false`가 있다 | FR-005 |
 | W19 | `android/`를 직접 고치는 줄이 없다(`sed -i`·`>>` 등으로 `build.gradle`·`gradle.properties`를 쓰지 않는다) | FR-006 |
 
@@ -55,6 +56,11 @@
 | `assembleRelease` 추가 | W12 실패 |
 | 서명 확인 단계를 Play 업로드 뒤로 이동 | W13 실패 |
 | 사전 점검 단계 이름 변경(빌드 뒤로) | W13 실패 |
+| `setup-node`의 `package-manager-cache: false` 제거, `cache: npm` 추가 | W6 실패 |
+| 줄 끝 주석 뒤에 비밀 `echo` 숨기기(`echo "x # ${{ secrets.… }}"`) | W5·W7 실패 |
+| `사전 점검`에 `node` 호출 추가 | W17 실패 |
+| `설정 점검`에 비밀 env 추가 | W17a 실패 |
+| `설정 점검`을 `npm ci` 뒤로 | W17a 실패 |
 | `timeout-minutes` 제거 | W14 실패 |
 | `persist-credentials: false` 제거 | W18 실패 |
 | `sed -i … android/app/build.gradle` 추가 | W19 실패 |

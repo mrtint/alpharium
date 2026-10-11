@@ -20,7 +20,7 @@ NEEDS CLARIFICATION은 없다. 아래는 결정과 **첫 실행에서 재야 하
 - **Decision**: AAB는 jarsigner 서명이므로 `keytool -printcert -jarfile app-release.aab`로 첫 서명자의 `Owner:`와 `SHA256:`를 읽는다. `Owner`가 비었거나 `CN=Android Debug`를 포함하거나 `SHA256`이 저장소의 `upload-key.sha256`과 다르면 실패한다. 판정은 순수 함수로 두고 keytool 실행은 진입점이 한다.
 - **Rationale**: AGENTS가 이미 이 명령을 서명 확인의 표준으로 둔다. 기대 지문 비교는 clarify에서 확정(소유자 2026-10-11).
 - **Alternatives**: `apksigner`(APK용, AAB 직접 불가), `jarsigner -verify`(무결성 검증이지 신원 비교가 아님).
-- **미실측**: 러너의 `keytool` 출력 형식(언어 로캘에 따라 `소유자:`일 수 있음) — 진입점이 `LC_ALL=C`로 부르고, 파싱은 영어 키만 본다.
+- **실측(2026-10-11, 로컬 JDK 17, 한국어 Windows)**: `keytool` 출력은 로캘을 따라 한국어(`소유자:`)로 나오고 `LC_ALL=C`로는 안 바뀐다. `-J-Duser.language=en -J-Duser.country=US`를 주면 `Owner:`·`SHA256:`가 영어로 나온다. 줄 끝이 섞여 있다(`Signer #1:`·`Certificate #1:`·`Version: 3` 줄은 CRLF, 나머지는 LF) — 파싱이 ``을 걷는다. `SHA256:` 줄은 로캘과 무관하게 같았다. 러너(리눅스)에서의 출력은 **미실측** — 같은 `-J` 옵션을 쓰므로 영어여야 하며 첫 실행이 증명한다.
 
 ### D4 — Play 업로드: 직접 쓴 Node 스크립트(Play Developer API v3 edits)
 - **Decision**: 서비스 계정 JSON → JWT(RS256, `crypto.createSign`) → `POST https://oauth2.googleapis.com/token`(jwt-bearer) → `POST …/applications/{pkg}/edits` → `POST …/upload/…/edits/{id}/bundles?uploadType=media`(옥텟 스트림) → `PUT …/edits/{id}/tracks/internal`(`releases: [{ versionCodes, status: "completed" }]`) → `POST …/edits/{id}:commit`. 어느 단계든 실패하면 `DELETE …/edits/{id}`.
@@ -33,7 +33,7 @@ NEEDS CLARIFICATION은 없다. 아래는 결정과 **첫 실행에서 재야 하
 - **Rationale**: 포크 PR은 보호 환경 비밀에 닿지 못한다. 아티팩트는 퍼블릭 저장소에서 누구나 받는다.
 
 ### D6 — 캐시 없음
-- **Decision**: gradle 캐시(072)를 쓰지 않는다. **Rationale**: 서명 키가 열린 빌드에서 캐시 복원은 캐시 오염 경로다(075 규칙). 대가는 시간이며 첫 실행에서 잰다. `setup-node`의 `cache: npm`은 075와 같게 둔다(의존성 내려받기 캐시이고 `actions/cache` 직접 사용이 아니다).
+- **Decision**: gradle 캐시(072)를 쓰지 않는다. **Rationale**: 서명 키가 열린 빌드에서 캐시 복원은 캐시 오염 경로다(075 규칙). 대가는 시간이며 첫 실행에서 잰다. `setup-node`의 `cache: npm`도 캐시 복원이므로 쓰지 않는다(075 iOS는 두었지만 스펙 FR-008이 「캐시도 쓰지 않는다」이고, 계약 테스트가 `cache:` 키를 막는다). `npm ci`가 조금 느려질 뿐이다.
 
 ### D7 — 사전 점검의 범위
 - **Decision**: 비밀 이름이 비었는지, `android.versionCode`가 정수인지, 기대 지문 파일이 있고 형식이 맞는지만 본다(전부 빌드 전). 같은 `versionCode`의 중복은 Play가 거부하므로 점검하지 않는다.

@@ -12,7 +12,7 @@ verifySigner(cert: ReturnType<typeof parseCertificate>, expected: string | undef
 
 | ID | 규칙 |
 | --- | --- |
-| V1 | `parseCertificate`는 `keytool -printcert` 출력에서 첫 서명자의 `Owner:`와 `SHA256:` 줄을 읽는다. 둘 중 하나라도 없으면 `undefined` |
+| V1 | `parseCertificate`는 `keytool -printcert` 출력에서 첫 서명자의 `Owner:`와 `SHA256:` 줄을 읽는다(줄 끝 `` 허용 — 실측 출력은 CRLF와 LF가 섞여 있다). 둘 중 하나라도 없으면 `undefined` |
 | V2 | `parseExpectedFingerprint`는 `#` 줄·빈 줄을 건너뛴 첫 줄이 `AA:BB:…`(대문자 16진수 32바이트, 콜론 구분)이면 그것을, 아니면 `undefined`. 소문자 입력은 대문자로 정규화 |
 | V3 | `verifySigner`는 `cert`가 `undefined`이면 `{ok:false}`(서명 없음/읽기 실패) |
 | V4 | `owner`가 `CN=Android Debug`를 포함하면 `{ok:false}` |
@@ -20,7 +20,7 @@ verifySigner(cert: ReturnType<typeof parseCertificate>, expected: string | undef
 | V6 | `sha256 !== expected`이면 `{ok:false}`이고 `reason`에 두 지문을 모두 담는다(공개 값) |
 | V7 | 그 밖은 `{ok:true}` |
 
-진입점 `verify-signature.mts <aab> [<expected 파일>]`: `LC_ALL=C keytool -printcert -jarfile <aab>`를 실행해 위 함수로 판정한다. 통과하면 `owner`·`sha256`을 표준 출력에 한 줄씩 쓰고 종료 코드 0, 실패하면 `reason`을 표준 오류에 쓰고 1. 비밀을 다루지 않는다.
+진입점 `verify-signature.mts <aab> [<expected 파일>]`: `keytool -J-Duser.language=en -J-Duser.country=US -printcert -jarfile <aab>`(실측: `LC_ALL=C`는 로캘을 못 바꾼다)를 실행해 위 함수로 판정한다. 통과하면 `owner`·`sha256`을 표준 출력에 한 줄씩 쓰고 종료 코드 0, 실패하면 `reason`을 표준 오류에 쓰고 1. 비밀을 다루지 않는다.
 `--check-expected-only`(사전 점검용): 기대 지문 파일만 읽어 V2를 판정한다.
 
 ## 2. `play-upload.ts` (fetch·시계 주입)
