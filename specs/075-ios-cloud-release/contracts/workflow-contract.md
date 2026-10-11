@@ -40,6 +40,10 @@
 | `cancel-in-progress: true` | W9 실패 |
 | 업로드를 `--username/--password`로 | W11 실패 |
 
+## 한계
+
+이 표는 휴리스틱이다. W7은 같은 줄의 `echo|cat|printenv`와 `set -x`만 보고(`bash -x`·인자 없는 `env`·`printenv`는 못 잡는다), W11은 `--username/--password`만 막는다. 그래서 워크플로를 고칠 때는 이 표를 통과하는 것에 만족하지 않고 비밀이 어디로 흐르는지 읽는다. W5는 `${{ … secrets … }}` 식이 전부 `NAME: ${{ secrets.NAME }}` 꼴이고 단계 `env` 깊이(10칸)에만 있도록 잠근다(`toJSON(secrets)`·잡 수준 env 차단).
+
 ## 비계약 (코드가 강제하지 못하는 것 — quickstart의 눈으로 확인 단계)
 
 Environment 보호 규칙(필수 리뷰어·배포 브랜치 `main`)은 저장소 설정이라 파일에 없다. 소유자가 설정 화면에서 직접 확인한다.

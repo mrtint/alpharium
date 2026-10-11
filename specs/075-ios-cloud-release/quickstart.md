@@ -16,6 +16,9 @@ npm test && npm run lint
 1. GitHub > Settings > Environments > New environment **`ios-release`**.
 2. Required reviewers = 소유자. Deployment branches = Selected branches → `main`만.
 3. Environment secrets에 [data-model.md](data-model.md)의 여섯을 넣는다. p12는 `~/.pocketlog-signing/ios/`의 키·인증서로 `openssl pkcs12 -export` 후 `base64`한다.
+   **Homebrew OpenSSL 3의 기본 암호화(AES-256)는 macOS `security import`가 못 읽는다**(오류가 「MAC verification failed」·비밀번호 틀림처럼 보인다) — 시스템 `/usr/bin/openssl`(LibreSSL)을 쓰거나 `-legacy`(또는 `-certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1`)를 준다.
+   새로 받은 인증서가 WWDR G3가 아닌 다른 세대 중간 인증서에 매이면 워크플로의 G3 폴백이 소용없다 — 「유효한 Apple Distribution 서명 신원이 없다」로 실패하면 인증서의 발급 기관부터 본다.
+   **이 설정이 서명 키를 지키는 유일한 방어다**: 워크플로가 도는 동안 `npm ci`·CocoaPods 의존성의 스크립트와 `xcodebuild`가 열린 키체인 옆에서 실행된다. 배포 브랜치를 `main`으로 제한하고 필수 리뷰어를 소유자로 두는 것을 빠뜨리지 않는다.
 4. App Store Connect > Users and Access > Integrations에서 API 키(권한 App Manager 이상)를 만들어 `.p8`·Key ID·Issuer ID를 얻는다.
 5. 설정 화면을 눈으로 확인한다(저장소 설정은 코드로 강제할 수 없다): 필수 리뷰어, 배포 브랜치.
 
@@ -41,3 +44,11 @@ npm test && npm run lint
 ## 실측 기록
 
 (첫 실행 뒤 채운다 — 단계별 시간, 최대 메모리, WWDR 유무, altool 플래그 확인, 필요했다면 낮춘 `-jobs` 값과 근거.)
+
+## 위반 주입 결과 (T006, 2026-10-11)
+
+`npx jest __tests__/ci/ios-release-workflow.test.ts`(20개 통과)에서 워크플로를 24가지로 바꿔 각각 해당 규칙이 실패로 뒤집히는 것을 확인했다(치환이 적용되지 않으면 실패로 처리, 끝나면 `finally`로 복원).
+W2(pull_request·push·schedule 추가), W3(environment 제거), W4(id-token 추가), W5(허용 밖 비밀·run 본문 직접 보간·`toJSON(secrets)`·잡 수준 env 비밀), W6(upload-artifact·cache 추가), W7(`set -x`·비밀 변수 echo),
+W8(정리의 `if: always()` 제거), 정리 뒤 이름 없는 `- run:` 단계, W9(cancel-in-progress true), W10(continue-on-error), W11(앱 암호 업로드), W12(팀 ID 변경), W13(사전 점검 단계 이름 변경),
+W14(timeout 제거), checkout `persist-credentials` 제거, Xcode 검사 약화, 프로파일 UUID 검사 제거.
+코드 리뷰(1회차)의 Important 6건을 반영하며 추가한 주입이 뒤 여섯 가지다.
