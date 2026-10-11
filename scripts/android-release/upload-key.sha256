@@ -1,0 +1,5 @@
+# 업로드 키(pocketlog.jks, 별칭 pocketlog)의 인증서 SHA-256 지문 — 공개 값이다 (076).
+# android-release 워크플로의 서명 확인 단계가 AAB의 서명 지문과 이 값을 비교하고, 다르면 Play에 올리기 전에 실패한다.
+# 이 값을 바꾸는 것은 서명 키를 바꾸는 결정이다. 키를 교체할 때만 사람이 고친다.
+# 뽑는 법: keytool -list -v -keystore ~/.pocketlog-signing/pocketlog.jks -alias pocketlog | grep "SHA256:"
+92:CC:E6:44:ED:B4:5B:E0:24:C9:1C:58:1B:CB:E6:06:85:E2:F7:9B:53:04:D7:40:FE:E8:16:96:70:55:04:FC
