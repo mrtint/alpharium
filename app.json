@@ -10,7 +10,7 @@
       "supportsTablet": true,
       "appleTeamId": "PGNGG84B39",
       "bundleIdentifier": "com.a810labs.pocketlog",
-      "buildNumber": "3",
+      "buildNumber": "4",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
