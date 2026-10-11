@@ -29,7 +29,7 @@
   `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`의 조각 일곱이 모두 들어갔다.
 - **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
 - **쓴 날의 사진을 누르면 확대 화면**(067): 핀치·두 번 탭·이동, 배율 1에서 가로 넘김·아래로 끌어 닫기.
-- **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. 절차는 아래 「release 빌드·서명·Google Play」.
+- **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 구현됨 — 첫 실행의 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
 - **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
   절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공 — 처리 통과·iPhone 설치는 미확인; 아래 「iOS 빌드·서명·TestFlight」).
 
@@ -1056,7 +1056,7 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 
 ## release 빌드·서명·Google Play — 요청받았을 때만 탄다
 
-**배포물을 만드는 절차다**(006, Google Play는 065). 손으로 설치할 APK와 Play에 올릴 AAB가 같은 서명·같은 빌드 설정에서 나온다.
+**배포물을 만드는 절차다**(006, Google Play는 065, CI는 076). **기본 경로는 GitHub Actions다** — Play에 올릴 서명 AAB를 개발 기계 없이 만든다. 개발 기계에서 손으로 하는 절차는 CI를 못 쓸 때와 **손으로 설치할 APK**를 위한 대안이다. 둘은 같은 서명 설정(`plugins/with-release-signing.js`)을 쓴다.
 
 > **⚠️ 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug)로만 하며(아래 「테스트」), 이 절차는 저장소 소유자가 그 세션에서 명시적으로 요청했을 때만 탄다. **release를 설치하려면 debug 앱을
 > 지워야 하고 그때 모델 파일·일기·설정이 함께 사라진다** — 시작 전에 모델 백업(`~/.pocketlog-signing/model-backup/`)을 확인한다.
@@ -1067,7 +1067,25 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
   저장소 이름(GitHub `alpharium`)만 옛 이름이다.
 - 옛 패키지 `com.anonymous.alpharium`과는 **다른 앱**이다 — 옛 앱의 일기·모델은 넘어오지 않는다. 옛 서명 키(`alpharium.jks`)는 옛 패키지의 덮어 설치에만 쓰므로 `~/.pocketlog-signing/legacy/`에 보관한다.
 
-### 서명 키 (최초 1회)
+### 기본 경로 — GitHub Actions로 올린다 (076)
+
+`.github/workflows/android-release.yml`(Actions → 「Pocketlog Android Release」 → Run workflow, `main`)이 사전 점검 → prebuild → 키스토어 복원 → `bundleRelease`(arm64) → 서명 확인 → Play 내부 테스트 업로드 → 정리를 한 잡으로 한다.
+iOS 짝은 `ios-release.yml`(075)이고 보안 틀이 같다. **AAB는 아티팩트로 남기지 않고 Play로만 간다**(저장소가 퍼블릭이라 아티팩트는 누구나 받는다). 손으로 설치할 APK는 CI가 만들지 않는다(아래 대안).
+
+- **비밀은 보호 환경 `android-release`의 secrets 넷뿐이다**: `ANDROID_KEYSTORE_BASE64`(`pocketlog.jks` 한 줄 base64)·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_PASSWORD`·`PLAY_SERVICE_ACCOUNT_JSON`. 보호 환경은 필수 리뷰어 = 소유자, 배포 브랜치 = `main`으로
+  설정한다(저장소 설정이라 파일이 강제하지 못한다 — quickstart §2에서 눈으로 확인). 키를 GitHub에 올리는 것은 소유자 결정이다(2026-10-11). 등록 명령·서비스 계정 만드는 법은 `specs/076-android-release-ci/quickstart.md`.
+- **서명 확인이 업로드를 막는다**: AAB의 서명자가 `CN=Android Debug`이거나 저장소의 기대 지문(`scripts/android-release/upload-key.sha256`, 공개 값)과 다르면 Play에 닿기 전에 실패한다. 지문은 소유자가
+  로컬 키에서 뽑아 PR로 올린다 — 파일이 없으면 사전 점검에서 실패한다. 키를 바꾸는 결정은 이 파일의 diff로 보인다.
+- **업로드는 직접 쓴 Node 스크립트다**(`scripts/android-release/play-upload.mts`, Play Developer API edits — 새 의존성·서드파티 Action 없음). 내부 테스트 트랙에 테스터가 바로 받을 수 있는 완료 상태로 올리고, 실패하면 열린 편집을 버린다.
+  비밀번호는 `ORG_GRADLE_PROJECT_POCKETLOG_*` 환경변수로 gradle에 전달한다(`~/.gradle/gradle.properties`를 만들지 않는다).
+- **퍼블릭 저장소라 비밀이 새는 길을 계약 테스트가 잠근다**(`__tests__/ci/android-release-workflow.test.ts`, 스크립트는 `__tests__/scripts/`): 시작은 수동 하나, 허용 밖 비밀·직접 보간·잡 수준 env 금지, 아티팩트·캐시·명령 추적 없음, 정리 단계는
+  `if: always()`이고 마지막. 워크플로를 고칠 때 이 테스트가 실패하면 테스트가 아니라 워크플로를 의심한다. 072의 `native-build.yml`은 `secrets.`를 금지하므로 합치지 않는다.
+- **`android.versionCode` 올림은 사람이 커밋한다.** 사전 점검이 비밀이 빈 것·번호가 정수가 아닌 것·기대 지문 파일만 잡고, 같은 번호의 중복은 Play가 거부한다(숨기지 않는다). 업로드가 성공해도 **Play에서 받은 앱**(Play가 다시 서명한 것)을
+  전용 기기에서 한 번 열어 본다 — 업로드 성공 ≠ 정상 동작.
+- 첫 실행은 실패할 수 있다고 가정한다(075는 `PlistBuddy`에서 첫 실행이 실패했다). release 컴파일의 시간·메모리, 환경변수로 준 비밀번호가 서명에 닿는지, 서비스 계정 권한은 **첫 실행 전에는 미실측**이다.
+- 업로드 키 유출이 의심되면 Play Console에서 업로드 키를 재설정하고(며칠) `ANDROID_KEYSTORE_*`와 `upload-key.sha256`을 함께 바꾼다. 서비스 계정 키는 Google Cloud에서 폐기하고 다시 발급한다.
+
+### 서명 키 (최초 1회) — CI 비밀의 원본이자 손으로 빌드할 때의 키
 
 **Play 앱 서명을 쓴다** — 사용자 기기에 깔리는 APK는 Google이 보관한 **앱 서명 키**로 서명되고, 우리 키(`pocketlog.jks`)는 Play에 올릴 때만 쓰는 **업로드 키**다. 업로드 키를 잃으면
 Play Console에서 재설정을 요청할 수 있지만(며칠 걸린다) 손으로 설치한 release APK는 그 키로 덮어 설치하므로 **저장소 밖에 백업한다.**
@@ -1091,7 +1109,7 @@ POCKETLOG_KEY_PASSWORD=<비밀번호>
 
 **서명 설정은 `plugins/with-release-signing.js`가 선언으로 넣는다**(`assembleRelease`·`bundleRelease` 모두). `android/app/build.gradle`은 gitignore된 생성물이라 직접 고치지 않는다.
 
-### 빌드
+### 빌드 (개발 기계에서 손으로 — 대안, 손으로 설치할 APK는 이쪽뿐)
 
 ```
 npx expo prebuild --platform android --clean

@@ -55,6 +55,8 @@
 
 ### 안드로이드 release 빌드·서명·보관을 CI로 — 로컬 19분 빌드 없이
 
+**스펙 076** (`specs/076-android-release-ci/`, 설계 `docs/superpowers/specs/2026-10-11-android-release-ci-design.md`) — 진행 중.
+
 **Tier 3(서명·업로드)** — 태그·수동 트리거로 돌린다. release 빌드 종류(최적화·서명)는 여기서 정한다.
 
 **배경**: 지금 안드로이드 release(AAB·APK) 빌드와 서명은 소유자의 개발 기계에서만 된다(AGENTS 「release 빌드·서명·Google Play」). 빌드가 약 14~19분이고 서명 키(`~/.pocketlog-signing/pocketlog.jks`)가 그 기계에만 있다.
