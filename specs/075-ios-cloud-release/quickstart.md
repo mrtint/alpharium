@@ -45,6 +45,11 @@ npm test && npm run lint
 
 (첫 실행 뒤 채운다 — 단계별 시간, 최대 메모리, WWDR 유무, altool 플래그 확인, 필요했다면 낮춘 `-jobs` 값과 근거.)
 
+### 1회차 실행 (2026-10-11 09:26, run 38128376831) — 실패: 프로파일 설치
+- 사전 점검·`npm ci`·`expo prebuild`(2초)·`pod install`(55초)·서명 키체인 준비(1초)는 통과 — 비밀 여섯 개와 p12·비밀번호는 정상, Xcode 26 점검 통과. 정리 단계도 실패 뒤 성공(키체인·키 파일 정리 확인).
+- `프로파일 설치`에서 실패: `security cms -D -i … | PlistBuddy … /dev/stdin`이 `Cannot parse a NULL or zero-length data`로 UUID를 못 읽었다(PlistBuddy는 파이프를 못 읽는다). 읽기 실패 문구가 UUID 변수에 들어가 `-z` 검사를 통과했고 `cp`가 이상한 경로로 죽었다.
+- 수정(075 후속 PR): 프로파일을 파일로 해독해 읽고, UUID는 8-4-4-4-12 형식 검사로 거른다. 계약 테스트·위반 주입 추가. 이 수정 뒤 재실행 결과는 아래에 이어 적는다.
+
 ## 위반 주입 결과 (T006, 2026-10-11)
 
 `npx jest __tests__/ci/ios-release-workflow.test.ts`(20개 통과)에서 워크플로를 24가지로 바꿔 각각 해당 규칙이 실패로 뒤집히는 것을 확인했다(치환이 적용되지 않으면 실패로 처리, 끝나면 `finally`로 복원).
