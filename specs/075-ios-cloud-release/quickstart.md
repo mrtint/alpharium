@@ -48,7 +48,27 @@ npm test && npm run lint
 ### 1회차 실행 (2026-10-11 09:26, run 38128376831) — 실패: 프로파일 설치
 - 사전 점검·`npm ci`·`expo prebuild`(2초)·`pod install`(55초)·서명 키체인 준비(1초)는 통과 — 비밀 여섯 개와 p12·비밀번호는 정상, Xcode 26 점검 통과. 정리 단계도 실패 뒤 성공(키체인·키 파일 정리 확인).
 - `프로파일 설치`에서 실패: `security cms -D -i … | PlistBuddy … /dev/stdin`이 `Cannot parse a NULL or zero-length data`로 UUID를 못 읽었다(PlistBuddy는 파이프를 못 읽는다). 읽기 실패 문구가 UUID 변수에 들어가 `-z` 검사를 통과했고 `cp`가 이상한 경로로 죽었다.
-- 수정(075 후속 PR): 프로파일을 파일로 해독해 읽고, UUID는 8-4-4-4-12 형식 검사로 거른다. 계약 테스트·위반 주입 추가. 이 수정 뒤 재실행 결과는 아래에 이어 적는다.
+- 수정(PR #148): 프로파일을 파일로 해독해 읽고, UUID는 8-4-4-4-12 형식 검사로 거른다. 계약 테스트·위반 주입 추가.
+
+### 2회차 실행 (2026-10-11 09:35, run 38128889721) — 업로드 성공
+러너: macOS 26.6.2, Xcode 26.6, 3코어, 7,168MB. 빌드 1.0.0 (4).
+
+| 단계 | 걸린 시간 |
+| --- | --- |
+| expo prebuild | 2초 |
+| pod install | 45초 |
+| 서명 키체인 준비 + 프로파일 설치 | 각 1초 |
+| xcodebuild archive (Release, 기본 병렬도) | 281초 (시스템 여유 메모리 최소 67%) |
+| exportArchive | 9초 |
+| altool 업로드 | 100초 |
+| 잡 전체 | 약 8분 |
+
+- `** ARCHIVE SUCCEEDED **`, `** EXPORT SUCCEEDED **`, `UPLOAD SUCCEEDED with no errors`, Delivery UUID `82e7ab48-74ce-4eef-a732-e3aa9cf6ad0a`.
+- **메모리**: 시스템 여유 최소 67%(5초 간격 샘플이라 짧은 스파이크는 놓친다) → 7GB 러너에서 `-jobs` 낮춤이 필요 없었다(FR-015는 발동하지 않았다).
+- **altool API 키**: `--apiKey`·`--apiIssuer`와 `~/.appstoreconnect/private_keys/AuthKey_<ID>.p8` 탐색이 Xcode 26.6에서 그대로 동작했다.
+- **WWDR G3**: 「받아 넣는다」 메시지가 로그에 없었다 → 러너에 이미 있었던 것으로 본다(로그 부재로 본 추정, 요약 파일의 줄은 확인하지 않았다).
+- 정리 단계 로그: 「정리 완료: 키체인·프로파일·API 키 파일 삭제」.
+- **미확인**: App Store Connect 처리 통과(ITMS 메일 부재, TestFlight 목록), 실제 iPhone 설치, 같은 번호 재업로드의 거부 표시, 비밀 하나를 비운 사전 점검 실패, `main` 외 브랜치 거부.
 
 ## 위반 주입 결과 (T006, 2026-10-11)
 

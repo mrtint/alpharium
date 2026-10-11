@@ -31,7 +31,7 @@
 - **쓴 날의 사진을 누르면 확대 화면**(067): 핀치·두 번 탭·이동, 배율 1에서 가로 넘김·아래로 끌어 닫기.
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. 절차는 아래 「release 빌드·서명·Google Play」.
 - **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
-  절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 구현만 — 첫 실행 전; 아래 「iOS 빌드·서명·TestFlight」).
+  절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공 — 처리 통과·iPhone 설치는 미확인; 아래 「iOS 빌드·서명·TestFlight」).
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -1158,8 +1158,7 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 ### 기본 경로 — GitHub Actions로 올린다 (075)
 
 회사 맥 없이 `.github/workflows/ios-release.yml`(Actions → 「Pocketlog iOS Release」 → Run workflow, `main`)이 prebuild → pod install → 임시 키체인 서명 → 아카이브 → 내보내기 → `altool`(API 키)
-업로드까지 한다. 아래 「빌드」·「다른 맥에서 올리려면」은 CI를 못 쓸 때의 **대안**이다. **이 경로는 아직 한 번도 돌려 보지 않았다**(구현·계약 테스트까지, 실제 실행은 구현 PR이 `main`에 머지된 뒤 —
-`specs/075-ios-cloud-release/quickstart.md`의 「실측 기록」이 채워지면 이 줄을 고친다).
+업로드까지 한다. 아래 「빌드」·「다른 맥에서 올리려면」은 CI를 못 쓸 때의 **대안**이다. **2026-10-11 두 번째 실행에서 `altool` 업로드가 오류 없이 끝났다**(run 38128889721, 빌드 1.0.0 (4), 총 약 8분: prebuild 2초·pod install 45초·아카이브 281초·내보내기 9초·업로드 100초; 시스템 여유 메모리 최소 67%로 `-jobs` 조정 불필요; 러너 macOS 26.6.2·Xcode 26.6·3코어 7GB). **업로드 성공 ≠ 처리 통과 — ITMS 메일 부재, TestFlight 목록, 실제 iPhone 설치는 아직 확인하지 못했다**(확인되면 이 줄을 고친다). 첫 실행은 `PlistBuddy`가 파이프를 못 읽어 프로파일 설치에서 실패했다(수정됨) — 상세·실측은 `specs/075-ios-cloud-release/quickstart.md`의 「실측 기록」.
 
 - **비밀은 보호 환경 `ios-release`의 secrets 여섯뿐이다**: `IOS_DIST_P12_BASE64`·`IOS_DIST_P12_PASSWORD`·`IOS_PROFILE_BASE64`·`ASC_API_KEY_P8`·`ASC_KEY_ID`·`ASC_ISSUER_ID`. 보호 환경은 필수 리뷰어 = 소유자,
   배포 브랜치 = `main`으로 설정한다(저장소 설정이라 파일이 강제하지 못한다 — 눈으로 확인). 서명 키를 GitHub에 올리는 것은 소유주(Hyunmin Lee) 동의가 전제다. 만드는 법·등록 순서는 quickstart §2.
