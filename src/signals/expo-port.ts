@@ -173,7 +173,11 @@ export function expoPhotoPort(): PhotoPort {
       const entries = await Promise.all(
         photoIds.map(async (id): Promise<[string, string | undefined]> => {
           try {
-            return [id, folderNameOf(await new lib.Asset(id).getUri())];
+            const asset = new lib.Asset(id);
+            const uri = await asset.getUri();
+            // 073 — await 완료 시점까지 JS 참조를 유지해 Hermes GC 조기 수거 방지
+            if (asset.id === "") return [id, undefined];
+            return [id, folderNameOf(uri)];
           } catch {
             return [id, undefined];
           }
@@ -196,7 +200,10 @@ export function expoPhotoPort(): PhotoPort {
     async locationOf(photoId: string): Promise<LocationOutcome> {
       try {
         const lib = await import("expo-media-library");
-        const location = await new lib.Asset(photoId).getLocation();
+        const asset = new lib.Asset(photoId);
+        const location = await asset.getLocation();
+        // 073 — await 완료 시점까지 JS 참조를 유지해 Hermes GC 조기 수거 방지
+        if (asset.id === "") return { kind: "absent" };
 
         if (location === null) return { kind: "absent" };
         if (!isUsableCoordinate(location.latitude, location.longitude)) return { kind: "absent" };
@@ -223,7 +230,10 @@ export function expoPhotoPort(): PhotoPort {
     async filePathOf(photoId: string): Promise<string | null> {
       try {
         const lib = await import("expo-media-library");
-        const uri = await new lib.Asset(photoId).getUri();
+        const asset = new lib.Asset(photoId);
+        const uri = await asset.getUri();
+        // 073 — await 완료 시점까지 JS 참조를 유지해 Hermes GC 조기 수거 방지
+        if (asset.id === "") return null;
 
         if (typeof uri !== "string" || uri === "") return null;
         return uri.startsWith("file://") ? uri.slice("file://".length) : uri;

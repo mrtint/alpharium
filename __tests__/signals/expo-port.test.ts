@@ -57,3 +57,34 @@ describe("photosBetween이 폴더 이름을 미리 채우지 않는다 (023 T041
     expect(CODE).toMatch(/async folderNamesFor\(/);
   });
 });
+
+/**
+ * 073 — expo-media-library의 Asset 인스턴스 JS GC 조기 회수 방지.
+ *
+ * await 직전 임시 객체 생성을 금지하고, 로컬 변수 바인딩 및 await 완료 후 참조 유지를 검증한다.
+ */
+describe("Asset 참조 수명 보장 (073 SharedObject GC 레이스 방어)", () => {
+  const SOURCE = readFileSync(join(__dirname, "../../src/signals/expo-port.ts"), "utf8");
+  const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+  it("filePathOf가 new lib.Asset을 로컬 변수에 할당하고 참조를 유지한다", () => {
+    const fn = CODE.match(/async filePathOf\([^)]*\)[^{]*\{([\s\S]*?)\n {4}\}/)?.[1] ?? "";
+    expect(fn).toMatch(/const\s+asset\s*=\s*new\s+lib\.Asset/);
+    expect(fn).not.toMatch(/await\s+new\s+lib\.Asset/);
+    expect(fn).toMatch(/asset\.id/);
+  });
+
+  it("folderNamesFor가 new lib.Asset을 로컬 변수에 할당하고 참조를 유지한다", () => {
+    const fn = CODE.match(/async folderNamesFor\([^)]*\)[^{]*\{([\s\S]*?)\n {4}\}/)?.[1] ?? "";
+    expect(fn).toMatch(/const\s+asset\s*=\s*new\s+lib\.Asset/);
+    expect(fn).not.toMatch(/await\s+new\s+lib\.Asset/);
+    expect(fn).toMatch(/asset\.id/);
+  });
+
+  it("locationOf가 new lib.Asset을 로컬 변수에 할당하고 참조를 유지한다", () => {
+    const fn = CODE.match(/async locationOf\([^)]*\)[^{]*\{([\s\S]*?)\n {4}\}/)?.[1] ?? "";
+    expect(fn).toMatch(/const\s+asset\s*=\s*new\s+lib\.Asset/);
+    expect(fn).not.toMatch(/await\s+new\s+lib\.Asset/);
+    expect(fn).toMatch(/asset\.id/);
+  });
+});
