@@ -1,0 +1,43 @@
+# Quickstart: iOS 클라우드 릴리스 검증 가이드
+
+이 문서는 검증 절차다. 구현 코드는 `tasks.md`와 구현 단계에 있다. 계약은 [contracts/workflow-contract.md](contracts/workflow-contract.md), 비밀 목록은 [data-model.md](data-model.md).
+
+## 1. 기기 없이 (항상 돈다)
+
+```bash
+npx jest __tests__/ci/ios-release-workflow.test.ts   # 계약 W1~W16
+npm test && npm run lint
+```
+
+통과 기준: 전부 초록. 위반 주입 표(계약 문서)의 각 주입이 해당 규칙을 실패로 뒤집는다.
+
+## 2. 소유자가 한 번 준비한다 (에이전트는 키를 다루지 않는다)
+
+1. GitHub > Settings > Environments > New environment **`ios-release`**.
+2. Required reviewers = 소유자. Deployment branches = Selected branches → `main`만.
+3. Environment secrets에 [data-model.md](data-model.md)의 여섯을 넣는다. p12는 `~/.pocketlog-signing/ios/`의 키·인증서로 `openssl pkcs12 -export` 후 `base64`한다.
+4. App Store Connect > Users and Access > Integrations에서 API 키(권한 App Manager 이상)를 만들어 `.p8`·Key ID·Issuer ID를 얻는다.
+5. 설정 화면을 눈으로 확인한다(저장소 설정은 코드로 강제할 수 없다): 필수 리뷰어, 배포 브랜치.
+
+## 3. 실제 실행 (원칙 V — 건너뛰면 통과가 아니다)
+
+0. **구현 PR(`ios-release.yml` 포함)이 먼저 `main`에 머지되어 있어야 한다** — 워크플로 파일이 기본 브랜치에 있어야 Run workflow가 보이고 보호 환경이 `main`만 허용한다.
+1. `app.json`의 `ios.buildNumber`를 올려 커밋하고 `main`에 머지한다.
+2. Actions > 「Pocketlog iOS Release」 > Run workflow (`main`) → 소유자가 승인한다.
+3. 실행 요약에서 단계별 시간·Xcode 버전·최대 메모리(재면)를 읽어 이 문서 아래 「실측 기록」에 옮긴다.
+4. **처리 통과 확인**: ITMS 거부 메일이 없고 App Store Connect > TestFlight 목록에 빌드가 나타난다(업로드 성공 ≠ 처리 통과).
+5. TestFlight에서 실제 iPhone에 설치하고 첫 화면까지 열어 본다(소유자).
+
+## 4. 위반 주입 (실행)
+
+- 비밀 하나를 비우고 시작 → 사전 점검에서 그 이름을 밝히며 빌드 전에 실패(1분 안).
+- `main`이 아닌 브랜치에서 시작 → 보호 환경이 거부.
+- 실패한 실행의 로그에서 정리 단계가 키체인·프로파일·`.p8`을 지웠음을 본다(SC-005).
+
+## 5. 인증서 갱신 (만료 2027-10-08)
+
+만료 전에 CSR을 새로 만들어 소유주에게 새 배포 인증서를 받고 p12·프로파일 비밀을 갱신한다. 절차 원본은 AGENTS.md 「iOS 빌드·서명·TestFlight」.
+
+## 실측 기록
+
+(첫 실행 뒤 채운다 — 단계별 시간, 최대 메모리, WWDR 유무, altool 플래그 확인, 필요했다면 낮춘 `-jobs` 값과 근거.)
