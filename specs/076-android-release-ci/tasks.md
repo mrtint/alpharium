@@ -82,13 +82,13 @@ description: "076 안드로이드 클라우드 릴리스 — 구현 태스크"
 
 ## Phase 9: 실제 실행 (kickoff 8단계 — 구현 PR이 `main`에 머지된 뒤)
 
-- [ ] T022 [US1] **구현 PR을 `main`에 머지한다(소유자)** — 워크플로가 기본 브랜치에 있어야 Run workflow가 보이고 보호 환경의 배포 브랜치도 `main`뿐이다. 아래는 이 머지 뒤에만 가능하다.
-- [ ] T023 [US1] **소유자 준비**(에이전트는 키를 열지 않는다): quickstart.md §2 — 환경 `android-release` 생성, 필수 리뷰어·배포 브랜치 `main`을 설정 화면에서 눈으로 확인, Play 서비스 계정 권한(내부 테스트 릴리스만), 로컬 키에서 SHA-256을 뽑아 `scripts/android-release/upload-key.sha256`을 PR로 머지(`main` 직접 커밋은 훅이 막는다), 비밀 넷 등록(`gh secret set … --env android-release`).
-- [ ] T024 [US1] **실제 실행**: `app.json`의 `android.versionCode`를 올려 커밋·머지 → Actions 「Pocketlog Android Release」 Run workflow(`main`) → 승인 → 끝까지 → 요약에서 단계별 시간·최대 메모리·AAB 크기·업로드 시간·서명 소유자·지문 읽기, 그리고 환경변수 `ORG_GRADLE_PROJECT_POCKETLOG_*`가 서명에 닿았는지(research D2의 미실측)를 quickstart.md 「실측 기록」에 적는다(안 잰 것은 「미확인」). **첫 실행은 실패할 수 있다고 가정한다** — 실패하면 원인을 읽어 워크플로·스크립트·계약 테스트를 고치고(테스트 먼저) 다시 돈다. 진행은 3분마다 `gh run`을 폴링해 보고한다. 결과를 직접 보기 전에 성공이라고 말하지 않는다. OOM이면 gradle 병렬도를 낮춰 재시도하고 값·근거를 기록한다(FR-015).
-- [ ] T025 [US1] Play Console 내부 테스트 트랙에 새 `versionCode`가 올라왔는지 소유자가 확인한다. 서비스 계정 권한·`completed` 수락 여부를 기록한다(거부되면 사유와 함께 소유자가 초안으로 바꿀지 결정).
-- [ ] T026 [US1] **전용 기기 확인**(모델·일기가 사라져도 되는 기기): 내부 테스트로 받은 앱을 설치해 Metro 없이 홈이 뜨는지, 모델 내려받기와 일기 쓰기까지 한 번 본다(원칙 V — 건너뛰면 통과가 아니다). 결과를 quickstart에 기록한다.
-- [ ] T027 [US4] quickstart.md §4의 실행 위반 주입: 비밀 하나를 비운 채 시작해 사전 점검에서 이름을 밝히며 실패하는지, `main`이 아닌 브랜치에서 거부되는지, 실패 실행의 정리 단계가 키스토어를 지웠는지(SC-006)를 로그로 확인하고 기록한다.
-- [ ] T028 `docs/roadmap/README.md`: 완료 처리는 kickoff 8단계(구현 커밋과 분리)에서 한다 — 이 태스크는 「진행 예정 과제」에서 빼고 「완료 이력」에 076을 옮겼는지 확인한다. 실측 문구가 정해지면 T019의 AGENTS.md 서술을 확정한다.
+- [x] T022 [US1] **구현 PR을 `main`에 머지한다(소유자)** — 워크플로가 기본 브랜치에 있어야 Run workflow가 보이고 보호 환경의 배포 브랜치도 `main`뿐이다. 아래는 이 머지 뒤에만 가능하다.
+- [x] T023 [US1] **소유자 준비**(에이전트는 키를 열지 않는다): quickstart.md §2 — 환경 `android-release` 생성, 필수 리뷰어·배포 브랜치 `main`을 설정 화면에서 눈으로 확인, Play 서비스 계정 권한(내부 테스트 릴리스만), 로컬 키에서 SHA-256을 뽑아 `scripts/android-release/upload-key.sha256`을 PR로 머지(`main` 직접 커밋은 훅이 막는다), 비밀 넷 등록(`gh secret set … --env android-release`).
+- [x] T024 [US1] **실제 실행**: `app.json`의 `android.versionCode`를 올려 커밋·머지 → Actions 「Pocketlog Android Release」 Run workflow(`main`) → 승인 → 끝까지 → 요약에서 단계별 시간·최대 메모리·AAB 크기·업로드 시간·서명 소유자·지문 읽기, 그리고 환경변수 `ORG_GRADLE_PROJECT_POCKETLOG_*`가 서명에 닿았는지(research D2의 미실측)를 quickstart.md 「실측 기록」에 적는다(안 잰 것은 「미확인」). **첫 실행은 실패할 수 있다고 가정한다** — 실패하면 원인을 읽어 워크플로·스크립트·계약 테스트를 고치고(테스트 먼저) 다시 돈다. 진행은 3분마다 `gh run`을 폴링해 보고한다. 결과를 직접 보기 전에 성공이라고 말하지 않는다. OOM이면 gradle 병렬도를 낮춰 재시도하고 값·근거를 기록한다(FR-015).
+- [x] T025 [US1] Play Console 내부 테스트 트랙에 새 `versionCode`가 올라왔는지 소유자가 확인한다. 서비스 계정 권한·`completed` 수락 여부를 기록한다(거부되면 사유와 함께 소유자가 초안으로 바꿀지 결정).
+- [x] T026 [US1] **전용 기기 확인**(모델·일기가 사라져도 되는 기기): 내부 테스트로 받은 앱을 설치해 Metro 없이 홈이 뜨는지, 모델 내려받기와 일기 쓰기까지 한 번 본다(원칙 V — 건너뛰면 통과가 아니다). 결과를 quickstart에 기록한다.
+- [ ] T027 [US4] **(미실시 — 소유자 몫으로 남김, 075와 같음. quickstart 「미확인」에 기록)** quickstart.md §4의 실행 위반 주입: 비밀 하나를 비운 채 시작해 사전 점검에서 이름을 밝히며 실패하는지, `main`이 아닌 브랜치에서 거부되는지, 실패 실행의 정리 단계가 키스토어를 지웠는지(SC-006)를 로그로 확인하고 기록한다.
+- [x] T028 `docs/roadmap/README.md`: 완료 처리는 kickoff 8단계(구현 커밋과 분리)에서 한다 — 이 태스크는 「진행 예정 과제」에서 빼고 「완료 이력」에 076을 옮겼는지 확인한다. 실측 문구가 정해지면 T019의 AGENTS.md 서술을 확정한다.
 
 ## Dependencies & Execution Order
 

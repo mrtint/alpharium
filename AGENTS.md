@@ -29,7 +29,7 @@
   `docs/superpowers/specs/2026-10-01-settings-developer-decomposition-design.md`의 조각 일곱이 모두 들어갔다.
 - **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
 - **쓴 날의 사진을 누르면 확대 화면**(067): 핀치·두 번 탭·이동, 배율 1에서 가로 넘김·아래로 끌어 닫기.
-- **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 구현됨 — 첫 실행의 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
+- **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 2026-10-11 첫 실행 성공 — 약 13분 30초, Play 내부 테스트 versionCode 10 반영; 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
 - **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
   절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공 — 처리 통과·iPhone 설치는 미확인; 아래 「iOS 빌드·서명·TestFlight」).
 
@@ -1082,7 +1082,9 @@ iOS 짝은 `ios-release.yml`(075)이고 보안 틀이 같다. **AAB는 아티팩
   `if: always()`이고 마지막. 워크플로를 고칠 때 이 테스트가 실패하면 테스트가 아니라 워크플로를 의심한다. 072의 `native-build.yml`은 `secrets.`를 금지하므로 합치지 않는다.
 - **`android.versionCode` 올림은 사람이 커밋한다.** 사전 점검이 비밀이 빈 것·번호가 정수가 아닌 것·기대 지문 파일만 잡고, 같은 번호의 중복은 Play가 거부한다(숨기지 않는다). 업로드가 성공해도 **Play에서 받은 앱**(Play가 다시 서명한 것)을
   전용 기기에서 한 번 열어 본다 — 업로드 성공 ≠ 정상 동작.
-- 첫 실행은 실패할 수 있다고 가정한다(075는 `PlistBuddy`에서 첫 실행이 실패했다). release 컴파일의 시간·메모리, 환경변수로 준 비밀번호가 서명에 닿는지, 서비스 계정 권한은 **첫 실행 전에는 미실측**이다.
+- **실측(2026-10-11 첫 실행, run 38138524204 — 첫 시도에 성공)**: ubuntu-latest(4코어·16GB)에서 `bundleRelease` 684초(Gradle 11m 23s)·최대 메모리 9,529MB(OOM 없음)·AAB 55MB·Play 업로드 57초, 전체 약 13분 30초. 서명 지문이 기대 값과 같았고(환경변수 비밀번호가 서명에 닿음) 서비스 계정 권한과 `completed` 릴리스가 받아들여졌다. 소유자가 Play 내부 테스트 반영과 전용 기기 설치를 확인했다.
+  **미확인**: 위반 주입 실행(비밀 비움 → 1분 안 실패, `main` 외 브랜치 거부, 같은 `versionCode` 재업로드의 거부 표시, 실패 실행의 정리) — 소유자 몫으로 남겼다(075와 같다). 상세는 `specs/076-android-release-ci/quickstart.md` 「실측 기록」.
+- **`versionCode`는 사람이 올린다**(iOS `buildNumber`와 같다). 자동으로 올리려면 CI가 `main`에 쓰거나(쓰기 권한 — 비밀을 쥔 워크플로에 주지 않기로 했다) 빌드 때만 Play 마지막 번호 + 1로 덮어써야 하는데, 후자는 저장소 번호와 Play 번호가 어긋나 로컬 빌드와 충돌할 수 있어 하지 않았다.
 - 업로드 키 유출이 의심되면 Play Console에서 업로드 키를 재설정하고(며칠) `ANDROID_KEYSTORE_*`와 `upload-key.sha256`을 함께 바꾼다. 서비스 계정 키는 Google Cloud에서 폐기하고 다시 발급한다.
 
 ### 서명 키 (최초 1회) — CI 비밀의 원본이자 손으로 빌드할 때의 키
