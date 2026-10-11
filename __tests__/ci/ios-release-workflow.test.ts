@@ -199,7 +199,10 @@ describe("075 ios-release 워크플로", () => {
 
     it("프로파일을 해독하지 못하면 조용히 넘어가지 않는다", () => {
       const install = step(read(), "프로파일 설치");
-      expect(install).toMatch(/if \[ -z "\$uuid" \]/);
+      // PlistBuddy는 파이프를 못 읽는다(첫 실행에서 드러남) — 파일로 해독하고 UUID 형식을 검사한다.
+      // 읽기 실패 문구가 UUID 자리에 들어와도 비어 있지 않다는 이유로 통과하면 안 된다
+      expect(install).not.toMatch(/\|\s*\/usr\/libexec\/PlistBuddy/);
+      expect(install).toMatch(/grep -Eq '\^\[0-9A-Fa-f\]\{8\}/);
       expect(install).toMatch(/exit 1/);
     });
   });

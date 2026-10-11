@@ -133,8 +133,13 @@ jobs:
         run: |
           profile="$RUNNER_TEMP/profile.mobileprovision"
           base64 --decode <<< "$IOS_PROFILE_BASE64" > "$profile"
-          uuid=$(security cms -D -i "$profile" | /usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin) || true
-          if [ -z "$uuid" ]; then
+          # PlistBuddy는 파이프(/dev/stdin)를 못 읽는다("Cannot parse a NULL or zero-length data") — 파일로 해독해 읽는다.
+          # 읽기 실패 문구가 UUID 자리에 들어오지 못하게 형식을 검사한다.
+          plist="$RUNNER_TEMP/profile.plist"
+          security cms -D -i "$profile" > "$plist" || true
+          uuid=$(/usr/libexec/PlistBuddy -c "Print :UUID" "$plist" 2>/dev/null) || true
+          rm -f "$plist"
+          if ! printf '%s' "$uuid" | grep -Eq '^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$'; then
             echo "::error::프로파일을 해독하지 못했다 (IOS_PROFILE_BASE64 확인)"
             exit 1
           fi
@@ -179,6 +184,6 @@ jobs:
           if [ -n "${KEYCHAIN:-}" ]; then security delete-keychain "$KEYCHAIN" || true; fi
           rm -f "${PROFILE_PATH:-/nonexistent}"
           rm -f "$HOME"/.appstoreconnect/private_keys/AuthKey_*.p8
-          rm -f "$RUNNER_TEMP/distribution.p12" "$RUNNER_TEMP/profile.mobileprovision"
+          rm -f "$RUNNER_TEMP/distribution.p12" "$RUNNER_TEMP/profile.mobileprovision" "$RUNNER_TEMP/profile.plist"
           rm -rf "$RUNNER_TEMP/Pocketlog.xcarchive" "$RUNNER_TEMP/export"
           echo "정리 완료: 키체인·프로파일·API 키 파일 삭제"
