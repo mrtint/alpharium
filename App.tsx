@@ -64,7 +64,7 @@ import { resolveFirstRunStage } from "./src/firstrun/progress";
 import { shouldAutoGenerate } from "./src/firstrun/auto-diary";
 import { LogoScreen } from "./src/ui/LogoScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
-import { DownloadConsentDialog } from "./src/ui/DownloadConsentDialog";
+import { DownloadConsentGate } from "./src/ui/DownloadConsentGate";
 import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
 import { WelcomeScreen, type WelcomePhase } from "./src/ui/WelcomeScreen";
 import { SettingsFrame } from "./src/ui/SettingsFrame";
@@ -214,6 +214,14 @@ const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;
  * 실기기에서 바와 겹치지 않는지 본다(quickstart 5).
  */
 const HOME_TOAST_BOTTOM = 88;
+
+/**
+ * 074 — 모바일 데이터 동의에 보일 받을 양(`DownloadConsentGate`가 `cellular`로 확인된 뒤에만 부른다). 059 `planRedownload`와 같은 통로·같은 표기(1000 기준)다.
+ * 못 읽으면 거부한다 — 게이트가 한도·거부를 「양 없음」으로 다룬다(양을 지어내지 않는다). 모듈 최상단 함수라 렌더마다 새로 만들어지지 않는다.
+ */
+async function readConsentSizeLabel(): Promise<string | null> {
+  return formatModuleBytes(await readEssentialRemainingBytes());
+}
 
 function AppFrame() {
   /*
@@ -1450,7 +1458,11 @@ function AppFrame() {
   if (firstRunStage === "download-consent") {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
-        <DownloadConsentDialog onConfirm={onConfirmDownloadConsent} visible={true} />
+        <DownloadConsentGate
+          onConfirm={onConfirmDownloadConsent}
+          readConnection={readConnection}
+          readSizeLabel={readConsentSizeLabel}
+        />
         <StatusBar style="auto" />
       </SafeAreaView>
     );
