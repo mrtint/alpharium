@@ -1,0 +1,184 @@
+name: Pocketlog iOS Release
+
+# iOS 릴리스 빌드를 서명해 TestFlight(App Store Connect)로 올린다 (075).
+# 회사 맥 없이 소유자가 GitHub에서 손으로 시작한다 — 066의 수동 서명 절차를 러너로 옮긴 것이다.
+#
+# 서명 키가 퍼블릭 저장소의 러너에서 쓰이므로 비밀이 새는 길을 잠근다. 계약은
+# specs/075-ios-cloud-release/contracts/workflow-contract.md, 잠금은 __tests__/ci/ios-release-workflow.test.ts:
+#   - 시작 방법은 수동 하나뿐이다. PR·push·예약이 없으니 포크 PR이 비밀에 닿을 길이 없다.
+#   - 비밀은 보호 환경 ios-release에만 있다(필수 리뷰어 = 소유자, 배포 브랜치 = main — 저장소 설정이라
+#     이 파일이 강제하지 못한다. quickstart §2에서 소유자가 눈으로 확인한다).
+#   - 비밀은 단계의 env로만 받고 run 본문에 보간하지 않는다. 명령 추적을 켜지 않고 값을 출력하지 않는다.
+#   - IPA·로그 묶음을 아티팩트로 남기지 않는다. 퍼블릭 저장소라 누구나 내려받는다.
+#   - 캐시를 쓰지 않는다. 072에서 Pods·DerivedData 캐시는 효과가 없었다.
+#   - 마지막 정리 단계는 성공·실패와 무관하게 키체인·프로파일·API 키 파일을 지운다.
+#
+# ios.buildNumber 올림은 사람이 커밋한다(CI는 올리지 않는다). 같은 버전·번호는 Apple이 거부하며
+# 그 실패를 숨기지 않는다. 업로드가 성공해도 App Store Connect의 처리 단계 통과는 따로 확인한다
+# (ITMS 메일, TestFlight 목록 — 066의 ITMS-90683).
+on:
+  workflow_dispatch:
+
+# 동시에 하나만 돈다. 진행 중인 실행은 취소하지 않는다 — 업로드 도중 취소로 반쪽 상태가 되지 않게.
+concurrency:
+  group: ios-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: macos-latest
+    environment: ios-release
+    timeout-minutes: 90
+    steps:
+      # 토큰을 .git/config에 남기지 않는다 — 이 워크플로는 push하지 않고, npm·Pod 스크립트가 서명 키가 열린 빌드 중에 돈다.
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      # 값이 틀리면 비싼 아카이브 전에 이름만 밝히고 끝낸다. 값은 찍지 않는다.
+      # 같은 버전·번호의 중복 업로드는 로컬에서 알 수 없어 점검하지 않는다(Apple이 거부한다).
+      - name: 사전 점검
+        env:
+          IOS_DIST_P12_BASE64: ${{ secrets.IOS_DIST_P12_BASE64 }}
+          IOS_DIST_P12_PASSWORD: ${{ secrets.IOS_DIST_P12_PASSWORD }}
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          failed=0
+          for name in IOS_DIST_P12_BASE64 IOS_DIST_P12_PASSWORD IOS_PROFILE_BASE64 ASC_API_KEY_P8 ASC_KEY_ID ASC_ISSUER_ID; do
+            if [ -z "${!name}" ]; then
+              echo "::error::비밀 $name 이(가) 비어 있다 (보호 환경 ios-release의 secrets)"
+              failed=1
+            fi
+          done
+          build=$(node -p "require('./app.json').expo.ios.buildNumber")
+          case "$build" in
+            ''|*[!0-9]*)
+              echo "::error::app.json의 expo.ios.buildNumber 가 정수가 아니다"
+              failed=1
+              ;;
+          esac
+          # macos-latest 이미지는 흘러간다. App Store는 최신 SDK로 만든 빌드만 받으므로(Xcode 26 이상) 비싼 아카이브 전에 확인한다.
+          xcode_major=$(xcodebuild -version | awk '/^Xcode/{split($2, v, "."); print v[1]}')
+          if [ -z "$xcode_major" ] || [ "$xcode_major" -lt 26 ]; then
+            echo "::error::러너의 Xcode 가 26 미만이다 ($(xcodebuild -version | head -1))"
+            failed=1
+          fi
+          exit "$failed"
+      - name: 러너 사양
+        run: |
+          {
+            echo "### iOS 릴리스 (macos-latest)"
+            echo "- CPU: $(sysctl -n hw.ncpu)코어"
+            echo "- 메모리: $(( $(sysctl -n hw.memsize) / 1048576 )) MB"
+            echo "- $(sw_vers -productName) $(sw_vers -productVersion), $(xcodebuild -version | head -1)"
+            echo "- 버전 $(node -p "require('./app.json').expo.version") (빌드 $(node -p "require('./app.json').expo.ios.buildNumber"))"
+            echo
+            echo "| 단계 | 걸린 시간 |"
+            echo "| --- | --- |"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+      - run: npm ci
+      - name: expo prebuild
+        run: |
+          start=$(date +%s)
+          trap 'echo "| prebuild | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
+          npx expo prebuild --platform ios --clean --no-install
+      - name: pod install
+        working-directory: ios
+        run: |
+          start=$(date +%s)
+          trap 'echo "| pod install | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
+          pod install
+      # 잡 동안만 있는 임시 키체인. 경로는 정리 단계가 지우도록 GITHUB_ENV로 넘긴다(비밀이 아니다).
+      # WWDR 중간 인증서가 러너에 없으면 유효한 서명 신원이 0개로 보인다 — 그때만 066의 URL에서 받아 넣는다.
+      - name: 서명 키체인 준비
+        env:
+          IOS_DIST_P12_BASE64: ${{ secrets.IOS_DIST_P12_BASE64 }}
+          IOS_DIST_P12_PASSWORD: ${{ secrets.IOS_DIST_P12_PASSWORD }}
+        run: |
+          keychain="$RUNNER_TEMP/pocketlog-signing.keychain-db"
+          keychain_password="$(uuidgen)"
+          echo "::add-mask::$keychain_password"
+          printf 'KEYCHAIN=%s\n' "$keychain" >> "$GITHUB_ENV"
+          base64 --decode <<< "$IOS_DIST_P12_BASE64" > "$RUNNER_TEMP/distribution.p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$RUNNER_TEMP/distribution.p12" -k "$keychain" -P "$IOS_DIST_P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          if ! security find-identity -v -p codesigning "$keychain" | grep -q "Apple Distribution"; then
+            echo "러너에 WWDR 중간 인증서가 없어 받아 넣는다"
+            curl -fsSL -o "$RUNNER_TEMP/AppleWWDRCAG3.cer" https://www.apple.com/certificateauthority/AppleWWDRCAG3.cer
+            security import "$RUNNER_TEMP/AppleWWDRCAG3.cer" -k "$keychain" -T /usr/bin/codesign
+            echo "- WWDR G3: 러너에 없어 받아 넣음" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "- WWDR G3: 러너에 이미 있음" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          security find-identity -v -p codesigning "$keychain" | grep -q "Apple Distribution" || {
+            echo "::error::유효한 Apple Distribution 서명 신원이 없다 (p12·비밀번호 또는 WWDR 중간 인증서를 확인)"
+            exit 1
+          }
+      - name: 프로파일 설치
+        env:
+          IOS_PROFILE_BASE64: ${{ secrets.IOS_PROFILE_BASE64 }}
+        run: |
+          profile="$RUNNER_TEMP/profile.mobileprovision"
+          base64 --decode <<< "$IOS_PROFILE_BASE64" > "$profile"
+          uuid=$(security cms -D -i "$profile" | /usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin) || true
+          if [ -z "$uuid" ]; then
+            echo "::error::프로파일을 해독하지 못했다 (IOS_PROFILE_BASE64 확인)"
+            exit 1
+          fi
+          dir="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+          mkdir -p "$dir"
+          cp "$profile" "$dir/$uuid.mobileprovision"
+          printf 'PROFILE_PATH=%s\n' "$dir/$uuid.mobileprovision" >> "$GITHUB_ENV"
+          rm -f "$profile"
+      # 메모리는 5초마다 시스템 전체의 여유 비율을 적는다. 짧은 스파이크는 놓친다 — 경향을 본다.
+      # 부족해 죽으면 xcodebuild에 -jobs <낮춘 값>을 더해 다시 돌리고 값과 근거를 quickstart에 남긴다(FR-015).
+      - name: xcodebuild archive
+        run: |
+          start=$(date +%s)
+          ( while true; do memory_pressure | awk '/free percentage/{gsub("%","",$NF); print $NF}' >> "$RUNNER_TEMP/mem.log"; sleep 5; done ) &
+          sampler=$!
+          trap 'kill $sampler 2>/dev/null; echo "| xcodebuild archive | $(( $(date +%s) - start ))초 (시스템 여유 메모리 최소 $(sort -n "$RUNNER_TEMP/mem.log" 2>/dev/null | head -1 | grep . || echo 측정 못 함)%) |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
+          xcodebuild -workspace ios/Pocketlog.xcworkspace -scheme Pocketlog -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/Pocketlog.xcarchive" archive \
+            CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=PGNGG84B39 PROVISIONING_PROFILE_SPECIFIER="Pocketlog App Store" CODE_SIGN_IDENTITY="Apple Distribution"
+      - name: xcodebuild exportArchive
+        run: |
+          start=$(date +%s)
+          trap 'echo "| exportArchive | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/Pocketlog.xcarchive" -exportOptionsPlist scripts/ios/ExportOptions.plist -exportPath "$RUNNER_TEMP/export"
+      # altool은 ~/.appstoreconnect/private_keys/AuthKey_<키 ID>.p8 에서 API 키를 찾는다.
+      - name: TestFlight 업로드
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          start=$(date +%s)
+          trap 'echo "| altool 업로드 | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
+          umask 077
+          mkdir -p "$HOME/.appstoreconnect/private_keys"
+          printf '%s' "$ASC_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
+          xcrun altool --upload-app -f "$RUNNER_TEMP/export/Pocketlog.ipa" -t ios --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+      # 성공·실패와 무관하게 돈다. 이 단계 뒤에 다른 단계를 두지 않는다.
+      - name: 정리
+        if: always()
+        run: |
+          if [ -n "${KEYCHAIN:-}" ]; then security delete-keychain "$KEYCHAIN" || true; fi
+          rm -f "${PROFILE_PATH:-/nonexistent}"
+          rm -f "$HOME"/.appstoreconnect/private_keys/AuthKey_*.p8
+          rm -f "$RUNNER_TEMP/distribution.p12" "$RUNNER_TEMP/profile.mobileprovision"
+          rm -rf "$RUNNER_TEMP/Pocketlog.xcarchive" "$RUNNER_TEMP/export"
+          echo "정리 완료: 키체인·프로파일·API 키 파일 삭제"

@@ -31,7 +31,7 @@
 - **쓴 날의 사진을 누르면 확대 화면**(067): 핀치·두 번 탭·이동, 배율 1에서 가로 넘김·아래로 끌어 닫기.
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. 절차는 아래 「release 빌드·서명·Google Play」.
 - **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
-  절차와 함정은 아래 「iOS 시뮬레이터」.
+  절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 구현만 — 첫 실행 전; 아래 「iOS 빌드·서명·TestFlight」).
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -1155,7 +1155,21 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
   llama.rn의 `enableEntitlements`는 `extended-virtual-addressing`까지 둘을 넣으므로 꺼 두고 `ios.entitlements`에 `increased-memory-limit`만 직접 선언한다(`__tests__/config/ios-permissions.test.ts`).
 - **App Store Connect 앱 레코드**(`com.a810labs.pocketlog`)는 Admin이 App Store Connect > 나의 앱 > ＋에서 만들거나, Xcode Organizer 첫 업로드가 만든다(Xcode 13+).
 
-### 빌드
+### 기본 경로 — GitHub Actions로 올린다 (075)
+
+회사 맥 없이 `.github/workflows/ios-release.yml`(Actions → 「Pocketlog iOS Release」 → Run workflow, `main`)이 prebuild → pod install → 임시 키체인 서명 → 아카이브 → 내보내기 → `altool`(API 키)
+업로드까지 한다. 아래 「빌드」·「다른 맥에서 올리려면」은 CI를 못 쓸 때의 **대안**이다. **이 경로는 아직 한 번도 돌려 보지 않았다**(구현·계약 테스트까지, 실제 실행은 구현 PR이 `main`에 머지된 뒤 —
+`specs/075-ios-cloud-release/quickstart.md`의 「실측 기록」이 채워지면 이 줄을 고친다).
+
+- **비밀은 보호 환경 `ios-release`의 secrets 여섯뿐이다**: `IOS_DIST_P12_BASE64`·`IOS_DIST_P12_PASSWORD`·`IOS_PROFILE_BASE64`·`ASC_API_KEY_P8`·`ASC_KEY_ID`·`ASC_ISSUER_ID`. 보호 환경은 필수 리뷰어 = 소유자,
+  배포 브랜치 = `main`으로 설정한다(저장소 설정이라 파일이 강제하지 못한다 — 눈으로 확인). 서명 키를 GitHub에 올리는 것은 소유주(Hyunmin Lee) 동의가 전제다. 만드는 법·등록 순서는 quickstart §2.
+- **퍼블릭 저장소라 비밀이 새는 길을 계약 테스트가 잠근다**(`__tests__/ci/ios-release-workflow.test.ts`): 시작은 수동 하나, 비밀은 `env` 값 자리에서만, 아티팩트·캐시·명령 추적 없음, 정리 단계는 `if: always()`.
+  이 워크플로를 고칠 때 이 테스트가 실패하면 테스트가 아니라 워크플로를 의심한다. 072의 `native-build.yml`은 `secrets.`를 금지하므로 합치지 않는다.
+- **`ios.buildNumber` 올림은 사람이 커밋한다.** 사전 점검이 비밀이 빈 것과 번호가 정수가 아닌 것만 잡고, 같은 번호의 중복은 Apple이 거부한다. **업로드 성공 ≠ 처리 통과** — ITMS 메일과 TestFlight 목록을 본다.
+- 인증서 만료 2027-10-08 — 그전에 새 인증서를 받아 `IOS_DIST_P12_*`·`IOS_PROFILE_BASE64`를 갱신한다.
+- 메모리가 모자라 아카이브가 죽으면 `xcodebuild`에 `-jobs`를 낮춰 다시 돌린다(FR-015) — 값과 근거는 quickstart에 실측으로 남긴다.
+
+### 빌드 (맥에서 손으로 — 대안)
 
 ```
 npx expo prebuild --platform ios --clean          # ~/.netrc가 644면 NETRC=<빈 디렉터리>를 앞에 준다
@@ -1177,7 +1191,7 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 - **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널) — **처리 단계에서 ITMS-90683(모션 문구 없음)으로 거부**됐다. 같은 날 빌드 2에 문구를 넣어 다시 올렸다.
   **업로드 성공 ≠ 처리 통과** — 「has one or more issues」 메일을 기다려 본다. 다음 업로드는 `ios.buildNumber`를 먼저 올린다.
 
-### 다른 맥에서 올리려면
+### 다른 맥에서 올리려면 (대안)
 
 1. `~/.pocketlog-signing/ios/` 통째로 옮긴다(`distribution.key`·`.cer`·`.mobileprovision`). 옮기기 쉽게 한 파일로 묶으려면 `openssl pkcs12 -export -inkey distribution.key -in distribution.pem
    -out distribution.p12`(비밀번호는 그때 정한다; `.cer`는 DER라 바로 못 넣는다 — `distribution.pem`이 PEM 변환본) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
