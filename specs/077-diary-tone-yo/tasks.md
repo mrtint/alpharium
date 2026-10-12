@@ -61,7 +61,7 @@
 - [X] T025 위반 주입 넷을 돌려 각각 실패함을 확인하고 되돌린다(quickstart §1): 틀 한 글자 변경 / `complete()`의 `grammar` 제거 / 사진 `unknown` 문장을 `${ph.reason}`으로 되돌림 / `instructionLines()`의 본 장면 꼬리 제거 — 치환 적용을 먼저 단언한다
 - [X] T026 my-ollama 바이트 대조(quickstart §2)를 돌려 결과를 `specs/077-diary-tone-yo/quickstart.md` 「실측」에 적는다 — 틀 자리 제외 10케이스 `prompt`·`followUp` 일치, `instructionLines` 집합 일치(본 장면 있는 날 꼬리 줄은 틀 자리 제외)
 - [X] T027 AGENTS.md에 077 절(결론·남은 위험)을 더하고 061 절의 「문안의 원본은 my-ollama `variants.ts`」를 hand-prompt v5 기준으로 고친다(이력처럼 덧대지 않고 고친다). `docs/superpowers/specs/2026-10-12-diary-tone-yo-design.md`와 어긋나는 서술이 없게 한다
-- [ ] T028 dev 실기기 확인 D1~D5(quickstart §3)를 하고 결과(로마자 0, 첫 문장 틀 변화, `~요` 유지, 권한 없는 날, **헤드리스 시간**)를 quickstart 「실측」에 적는다 — 헤드리스가 한도를 넘으면 소유자에게 보고하고 완료로 처리하지 않는다(SC-005)
+- [ ] T028 (부분 — D1~D4 완료, D5 헤드리스 미측정: 소유자가 측정 없이 머지·릴리스하기로 정함 2026-10-12, quickstart 「실측」) dev 실기기 확인 D1~D5(quickstart §3)를 하고 결과(로마자 0, 첫 문장 틀 변화, `~요` 유지, 권한 없는 날, **헤드리스 시간**)를 quickstart 「실측」에 적는다 — 헤드리스가 한도를 넘으면 소유자에게 보고하고 완료로 처리하지 않는다(SC-005)
 
 ## Dependencies & Execution Order
 
