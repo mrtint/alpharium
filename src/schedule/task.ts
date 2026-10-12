@@ -28,7 +28,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import type { DayDate } from "../config/day-boundary";
+import { dayOf, type DayDate } from "../config/day-boundary";
 import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { effectiveSimulation, simulationBlocksWriting } from "../app/simulation";
@@ -58,6 +58,13 @@ import { displayNameOf } from "../diary/character-name";
 import type { Character, CustomNames } from "../diary/types";
 import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
 import { resolveAutoWrite } from "./auto-write";
+import {
+  expoCatchUpStorePort,
+  loadCatchUpDay,
+  saveCatchUpDay,
+  type CatchUpStorePort,
+} from "./catch-up-store";
+import { isInTargetWindow } from "./decision";
 import { manualSettings } from "./manual";
 import { decideNotify } from "./notify";
 import {
@@ -110,6 +117,8 @@ export type AutoDiaryTaskDeps = {
   simulationPort?: SimulationStorePort;
   /** 078 — 자동 쓰기 시도 기록 통로. 주지 않으면 `preferences/auto-write-attempts.json` */
   attemptPort?: AutoWriteAttemptPort;
+  /** 078 — 창 밖 따라잡기 기록 통로. 주지 않으면 `preferences/auto-write-catch-up.json` */
+  catchUpPort?: CatchUpStorePort;
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
@@ -178,6 +187,17 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
     // B2-3 — 지금 돌려야 하는가. 057 — 020 판정을 통과한 날도 재료가 없거나 사진 권한이 없으면 쓰지 않는다
     // (FR-007~FR-009). 앱을 열 때의 자동 쓰기와 **같은 판정**이다(`resolveAutoWrite`, R1·R2). 건너뛰면 파이프라인을
     // 부르지 않으므로 사진 모델도 쓰는 모델도 열리지 않고 알림도 없다. 사진 권한 건너뜀은 그 안에서 기록된다.
+    // ★ 078 — 창 밖의 따라잡기는 하루에 한 번만 판정한다. 시도 창은 재시도의 유일한 상한이었는데(하루 3시간), 지난 날을 창
+    // 밖에서도 쓰게 하면서 그 상한이 사라졌다 — 계속 실패하는 지난 날을 15분마다 온종일 다시 돌리지 않게 한다(헤드리스 한 번이
+    // 18분 걸리는 기기도 있다). 오늘 몫을 이미 썼으면 신호도 읽지 않는다. 창 안은 종전대로이고, 수동 실행은 목표 시각이 지금이라
+    // 늘 창 안이다. 못 읽으면 「쓴 적 없음」이다(막지 않는 쪽).
+    const catchingUp = settings.enabled && !isInTargetWindow(settings, now);
+    const catchUpPort = deps.catchUpPort ?? expoCatchUpStorePort();
+    const today = dayOf(now);
+    if (catchingUp && (await loadCatchUpDay(catchUpPort)) === today) {
+      return skipped("catch-up-spent");
+    }
+
     const decision = await resolveAutoWrite({
       settings,
       now,
@@ -185,6 +205,10 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
       previewDay: app.previewDay,
       skipPort: deps.skipPort ?? expoSkipStorePort(),
     });
+    // 쓰거나 건너뛴 판정(그 날을 실제로 들여다봤다)만 오늘 몫을 쓴다 — 돌 일이 없었던 판정은 쓰지 않는다.
+    if (catchingUp && decision.kind !== "idle") {
+      await saveCatchUpDay(catchUpPort, today).catch(() => {});
+    }
     if (decision.kind !== "write") {
       return skipped(attemptOutcomeOf(decision));
     }

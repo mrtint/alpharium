@@ -8,11 +8,12 @@
  * **두 경로가 이 판정 하나를 쓴다** — 백그라운드 자동 쓰기(`task.ts`)와 앱을 열 때의 자동 쓰기(`App.tsx`). 둘이
  * 따로 판정하면 「백그라운드는 안 쓴 날을 앱 열기는 쓴다」가 생긴다.
  *
- * **020 판정(`decideSchedule`)은 그대로다.** 그것이 「언제·어느 날」(켜짐·시도 창·사흘 중 안 쓴 날)을 정하고, 이
+ * **「언제·어느 날」은 020 판정(`decideSchedule`)이 정한다**(켜짐·시도 창·사흘 중 안 쓴 날 — 078부터 차례가 지난 날은 창 밖에서도). 이
  * 판정은 그 날의 신호를 보고 「쓸 재료가 있는가」만 더한다. 날이 정해져야 그 날의 신호를 읽을 수 있으므로 두 축이다.
  *
  * **판정 순서가 계약이다**(FR-003):
- *  1. 020이 돌 일 없음 → `idle`. 신호를 읽지 않는다(매 15분 콜백이 사진을 훑지 않게).
+ *  1. 020이 돌 일 없음 → `idle`. 신호를 읽지 않는다. (078부터 놓친 날은 창 밖에서도 후보라 재료 없는 날·사진 권한 없는 날에
+ *     콜백마다 신호를 읽게 된다 — 백그라운드는 `task.ts`의 「창 밖 따라잡기 하루 한 번」이 그것을 막는다.)
  *  2. 사진 권한이 없음(`denied`·`blocked` — 053이 「아직 묻지 않음」도 `denied`로 옮긴다) → 「사진 권한 없음」 건너뜀.
  *     이것만 기록된다(설정의 사진 행에 보인다, 보드 `6g`).
  *  3. 053 재료 판정이 「바로 쓴다」(사진이나 장소가 하나라도 있음) → 쓴다. 위치 권한만 없고 사진이 있으면 쓴다.
@@ -26,7 +27,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { dayOf, selectableDays, type DayDate } from "../config/day-boundary";
+import { dayOf, includesTodayAtHour, selectableDays, type DayDate } from "../config/day-boundary";
 import { decideMaterial, fromCountHint } from "../app/material";
 import type { DayPreview } from "../app/state";
 import { decideSchedule, type ScheduleDecision } from "./decision";
@@ -72,6 +73,7 @@ export async function resolveAutoWrite(deps: {
     settings: deps.settings,
     now: deps.now,
     today: dayOf(deps.now),
+    targetDay: includesTodayAtHour(deps.settings.targetHour) ? "today" : "yesterday",
     selectableDays: selectableDays(deps.now),
     existingDiaryDays: await deps.listDiaryDays(),
   });

@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { decideSchedule } from "../../src/schedule/decision";
+import { includesTodayAtHour } from "../../src/config/day-boundary";
+import { decideSchedule, isInTargetWindow } from "../../src/schedule/decision";
 import type { AutoDiarySettings } from "../../src/schedule/settings";
 
 /**
@@ -21,6 +22,23 @@ function at(hour: number): Date {
   return new Date(2026, 7, 28, hour, 30, 0, 0);
 }
 
+/**
+ * `today`와 「창이 겨냥하는 날」을 채워 부른다. 겨냥하는 날은 제품과 같은 규칙으로 구한다 — 목표 시(hour)에 사흘에 오늘이 드는가
+ * (`includesTodayAtHour`, 049 구성 규칙). 오후 목표는 오늘, 오전 목표는 어제를 겨냥한다(056 미리보기 문장과 같다).
+ */
+function decide(input: {
+  settings: AutoDiarySettings;
+  now: Date;
+  selectableDays: readonly string[];
+  existingDiaryDays: readonly string[];
+}) {
+  return decideSchedule({
+    ...input,
+    today: TODAY,
+    targetDay: includesTodayAtHour(input.settings.targetHour) ? "today" : "yesterday",
+  });
+}
+
 /** 정오 전의 사흘(오늘 없음) — `selectableDays()`의 구성 규칙(049) */
 const PAST_ONLY = ["2026-08-27", "2026-08-26", "2026-08-25"] as const;
 /** 정오 후의 사흘(오늘 포함) */
@@ -29,10 +47,9 @@ const PAST_WRITTEN = ["2026-08-27", "2026-08-26", "2026-08-25"] as const;
 
 describe("D2-1 — 꺼져 있으면 안 한다", () => {
   it("enabled: false면 { act: false, reason: 'disabled' } — 지난 날이 비어 있어도", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: { ...ENABLED, enabled: false },
       now: at(7),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
@@ -44,10 +61,9 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
   const PM: AutoDiarySettings = { enabled: true, targetHour: 14 };
 
   it("창 안(14시)이고 오늘이 비어 있으면 오늘", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: PM,
       now: at(14),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -55,10 +71,9 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
   });
 
   it("창의 마지막 시(16시)도 창 안", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: PM,
       now: at(16),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -66,10 +81,9 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
   });
 
   it("창의 끝(17시)이면 오늘은 안 쓴다 — 오늘만 비어 있으면 not-near-target", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: PM,
       now: at(17),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -77,10 +91,9 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
   });
 
   it("창 직전(13시)도 오늘은 안 쓴다", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: PM,
       now: at(13),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -88,10 +101,9 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
   });
 
   it("창 안이고 오늘도 어제도 비어 있으면 가장 최근인 오늘", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: PM,
       now: at(15),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: [],
     });
@@ -100,11 +112,10 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
 });
 
 describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
-  it("창 밖(6시, 목표 7시)이어도 어제가 비어 있으면 어제", () => {
-    const r = decideSchedule({
+  it("창이 지난 뒤(10시, 목표 7시)에는 어제가 비어 있으면 어제", () => {
+    const r = decide({
       settings: ENABLED,
-      now: at(6),
-      today: TODAY,
+      now: at(10),
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
@@ -112,10 +123,9 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
   });
 
   it("창 밖(17시)이고 오늘·어제가 비어 있으면 오늘을 건너 어제", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: { enabled: true, targetHour: 14 },
       now: at(17),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: [],
     });
@@ -123,10 +133,9 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
   });
 
   it("창 밖이고 어제는 써 있고 그제가 비어 있으면 그제", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: ENABLED,
       now: at(3),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: ["2026-08-27"],
     });
@@ -134,10 +143,9 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
   });
 
   it("창 밖(6시)이고 지난 날이 다 써 있으면(오늘은 정오 전이라 후보 아님) all-written", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: ENABLED,
       now: at(6),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -145,14 +153,90 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
   });
 });
 
+describe("D2-2 — 오전 목표의 어제는 오늘 목표 시각에 차례가 온다 (078 리뷰 I1)", () => {
+  // 목표 7시 = 「매일 오전 7시쯤 어제 일기를 써요」. 어제의 창은 오늘 7시에 열린다 — 그 전(자정 직후 등)에 쓰면 고른 시각이 무의미해진다.
+  it.each([0, 3, 6])("%i시(목표 7시 전)에는 어제를 건너 그제를 쓴다 — 어제만 기다린다", (hour) => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(hour),
+      selectableDays: PAST_ONLY,
+      existingDiaryDays: [],
+    });
+    // 그제·그끄제는 이미 차례가 지났으므로 쓴다 — 어제만 기다린다
+    expect(r).toEqual({ act: true, day: "2026-08-26" });
+  });
+
+  it("목표 7시 전이고 어제만 비어 있으면 not-near-target (all-written이 아니다 — 어제가 기다리는 중이다)", () => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(3),
+      selectableDays: PAST_ONLY,
+      existingDiaryDays: ["2026-08-26", "2026-08-25"],
+    });
+    expect(r).toEqual({ act: false, reason: "not-near-target" });
+  });
+
+  it("창 안(7시)에는 종전대로 어제", () => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(7),
+      selectableDays: PAST_ONLY,
+      existingDiaryDays: ["2026-08-26", "2026-08-25"],
+    });
+    expect(r).toEqual({ act: true, day: "2026-08-27" });
+  });
+
+  it.each([10, 15, 23])("창이 지난 %i시에는 어제를 쓴다 (놓친 날)", (hour) => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(hour),
+      selectableDays: hour >= 12 ? WITH_TODAY : PAST_ONLY,
+      existingDiaryDays: hour >= 12 ? [TODAY, "2026-08-26"] : ["2026-08-26", "2026-08-25"],
+    });
+    expect(r).toEqual({ act: true, day: "2026-08-27" });
+  });
+
+  it("오후 목표(22시)는 새벽 3시에도 어제를 쓴다 — 어제의 창은 어제 22시에 이미 열렸다 (iOS가 밤에 깨우는 경우)", () => {
+    const r = decide({
+      settings: { enabled: true, targetHour: 22 },
+      now: at(3),
+      selectableDays: PAST_ONLY,
+      existingDiaryDays: [],
+    });
+    expect(r).toEqual({ act: true, day: "2026-08-27" });
+  });
+});
+
+describe("창 안인가 (078 리뷰 I2 — 따라잡기 상한이 묻는다)", () => {
+  it("목표 7시: 7·8·9시는 창 안, 6·10시는 창 밖", () => {
+    expect([6, 7, 8, 9, 10].map((h) => isInTargetWindow(ENABLED, at(h)))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+    ]);
+  });
+
+  it("목표 23시: 23·0·1시는 창 안(자정 wrap), 22·2시는 창 밖", () => {
+    const late = { enabled: true, targetHour: 23 };
+    expect([22, 23, 0, 1, 2].map((h) => isInTargetWindow(late, at(h)))).toEqual([
+      false,
+      true,
+      true,
+      true,
+      false,
+    ]);
+  });
+});
+
 describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () => {
   const LATE: AutoDiarySettings = { ...ENABLED, targetHour: 23 };
 
   it("23시면 창 안 — 오늘(정오 후)을 쓴다", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: LATE,
       now: at(23),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -160,10 +244,9 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
   });
 
   it("자정 넘어 0시면 창 안 — 새 날은 정오 전이라 후보에 없고 어제(그날)를 쓴다", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: LATE,
       now: at(0),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
@@ -171,10 +254,9 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
   });
 
   it("1시도 창 안 — 어제", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: LATE,
       now: at(1),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
@@ -182,10 +264,9 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
   });
 
   it("22시(창 시작 직전)면 오늘은 안 쓴다 — 오늘만 비어 있으면 not-near-target", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: LATE,
       now: at(22),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -193,10 +274,9 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
   });
 
   it("22시여도 어제가 비어 있으면 어제", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: LATE,
       now: at(22),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: [TODAY, "2026-08-26"],
     });
@@ -206,10 +286,9 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
 
 describe("D2-3 — 대상 하루 선정 (retry.ts 재사용)", () => {
   it("창 안이고 전부 써졌으면 { act: false, reason: 'all-written' }", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: ENABLED,
       now: at(7),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: PAST_WRITTEN,
     });
@@ -217,10 +296,9 @@ describe("D2-3 — 대상 하루 선정 (retry.ts 재사용)", () => {
   });
 
   it("창 밖이고 오늘 포함 전부 써졌으면 all-written (not-near-target이 아니다)", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: ENABLED,
       now: at(17),
-      today: TODAY,
       selectableDays: WITH_TODAY,
       existingDiaryDays: [TODAY, "2026-08-27", "2026-08-26"],
     });
@@ -228,10 +306,9 @@ describe("D2-3 — 대상 하루 선정 (retry.ts 재사용)", () => {
   });
 
   it("가장 최근이 써졌으면 그다음을 대상으로", () => {
-    const r = decideSchedule({
+    const r = decide({
       settings: ENABLED,
       now: at(8),
-      today: TODAY,
       selectableDays: PAST_ONLY,
       existingDiaryDays: ["2026-08-27"],
     });

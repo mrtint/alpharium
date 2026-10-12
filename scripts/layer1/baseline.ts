@@ -54,6 +54,11 @@ export const BASELINE: readonly BaselineEntry[] = [
     reason: "자동 쓰기 시도 기록(078) — 진단이 비어 시작",
   },
   {
+    file: "auto-write-catch-up.json",
+    action: "delete",
+    reason: "창 밖 따라잡기 기록(078) — 지난 실행의 「오늘 이미 시도함」이 남지 않게",
+  },
+  {
     file: "character-names.json",
     action: "delete",
     reason: "이름 바꾸기 훑기가 만든 값이 다음 실행으로 새지 않게",

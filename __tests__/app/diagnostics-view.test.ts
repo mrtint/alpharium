@@ -261,12 +261,13 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
     for (const line of lines) expect(Object.keys(line).sort()).toEqual(["headText", "outcomeText"]);
   });
 
-  it("열두 갈래 문구가 모두 있고 서로 다르다", () => {
+  it("열세 갈래 문구가 모두 있고 서로 다르다", () => {
     const outcomes = [
       "started",
       "simulation",
       "disabled",
       "not-near-target",
+      "catch-up-spent",
       "all-written",
       "no-photo-access",
       "no-material",
@@ -285,6 +286,7 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
       "상태 흉내가 막음",
       "자동 쓰기 꺼짐",
       "쓰는 시각이 아님",
+      "오늘 창 밖에서 이미 한 번 시도함",
       "모두 써 있음",
       "사진 권한 없음",
       "재료 없음",

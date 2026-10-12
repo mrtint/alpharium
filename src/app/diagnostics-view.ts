@@ -216,6 +216,7 @@ function attemptOutcomeText(outcome: AttemptOutcome): string {
     simulation: A.simulation,
     disabled: A.disabled,
     "not-near-target": A.notNearTarget,
+    "catch-up-spent": A.catchUpSpent,
     "all-written": A.allWritten,
     "no-photo-access": A.noPhotoAccess,
     "no-material": A.noMaterial,

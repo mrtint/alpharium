@@ -13,11 +13,13 @@ export const attempts = {
   pathManual: "지금 실행",
   /** 머리 줄 — 「백그라운드 · 10월 13일 22:05」 */
   line: (path: string, time: string): string => `${path} · ${time}`,
-  /** 결과 열둘 — `AttemptOutcome` 순서 */
+  /** 결과 열셋 — `AttemptOutcome` 순서 */
   started: "시작한 뒤 끝나지 않음",
   simulation: "상태 흉내가 막음",
   disabled: "자동 쓰기 꺼짐",
   notNearTarget: "쓰는 시각이 아님",
+  /** 창 밖 따라잡기는 백그라운드에서 하루에 한 번이다 — 오늘 몫을 이미 썼다 */
+  catchUpSpent: "오늘 창 밖에서 이미 한 번 시도함",
   allWritten: "모두 써 있음",
   noPhotoAccess: "사진 권한 없음",
   noMaterial: "재료 없음",

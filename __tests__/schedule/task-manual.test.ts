@@ -54,6 +54,7 @@ function make(over: {
   };
   const deps = {
     manual: over.manual,
+    catchUpPort: { read: async () => null, write: async () => {} },
     attemptPort: attempts,
     failurePort: failures,
     skipPort: { read: async () => null, write: async () => {}, remove: async () => {} },

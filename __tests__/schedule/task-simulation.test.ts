@@ -49,6 +49,7 @@ function make(environment: "dev" | "prod", simulation: SimulationStorePort) {
     },
   };
   const deps = {
+    catchUpPort: { read: async () => null, write: async () => {} },
     attemptPort: attempts,
     simulationPort: simulation,
     failurePort,

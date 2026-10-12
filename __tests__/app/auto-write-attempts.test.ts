@@ -35,13 +35,14 @@ const AT = new Date("2026-10-13T13:12:03.456Z");
 const LATER = new Date("2026-10-13T14:00:00.000Z");
 
 describe("AT1 — 갈래는 사람이 못 박은 상수다", () => {
-  it("경로 셋, 결과 열둘 — 순서까지", () => {
+  it("경로 셋, 결과 열셋 — 순서까지", () => {
     expect(ATTEMPT_PATHS).toEqual(["background", "app-open", "manual"]);
     expect(ATTEMPT_OUTCOMES).toEqual([
       "started",
       "simulation",
       "disabled",
       "not-near-target",
+      "catch-up-spent",
       "all-written",
       "no-photo-access",
       "no-material",

@@ -18,6 +18,7 @@ import { join } from "node:path";
 import {
   dayBounds,
   dayOf,
+  includesTodayAtHour,
   isDayClosed,
   isDayWritable,
   latestClosedDay,
@@ -235,5 +236,25 @@ describe("현재 시각을 스스로 읽지 않는다", () => {
   it("소스에 new Date() (인자 없는 호출)가 없다", () => {
     expect(SOURCE).not.toMatch(/new Date\(\s*\)/);
     expect(SOURCE).not.toContain("Date.now(");
+  });
+});
+
+/**
+ * 078 — 그 시(hour)에 「사흘」에 오늘이 드는가. `selectableDays()`의 구성 규칙을 시(hour)로 묻는 것이다 — 자동 쓰기 판정이
+ * 「목표 시각의 창이 오늘을 겨냥하는가, 어제를 겨냥하는가」를 정오 상수 없이 알게 한다.
+ */
+describe("078 includesTodayAtHour — selectableDays와 같은 규칙", () => {
+  it("0–11시는 거짓, 12–23시는 참", () => {
+    const hours = Array.from({ length: 24 }, (_, h) => h);
+    expect(hours.filter((h) => includesTodayAtHour(h))).toEqual([
+      12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+    ]);
+  });
+
+  it("★ 모든 시에서 selectableDays의 실제 구성과 일치한다 (규칙이 두 곳으로 갈라지지 않는다)", () => {
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = new Date(2026, 7, 28, hour, 30, 0, 0);
+      expect(includesTodayAtHour(hour)).toBe(selectableDays(now).includes(dayOf(now)));
+    }
   });
 });

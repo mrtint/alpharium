@@ -127,6 +127,8 @@ describe("B6 — 저장된 데이터에 화면 문구가 없다 (research R13)",
       "auto-diary.json",
       // 078 — 자동 쓰기 시도 기록(시각·경로·결과 갈래, 화면 문구 없음)
       "auto-write-attempts.json",
+      // 078 — 창 밖 따라잡기를 판정한 날(날짜 하나, 화면 문구 없음)
+      "auto-write-catch-up.json",
       "auto-write-skipped.json",
       "character-names.json",
       "developer-menu.json",

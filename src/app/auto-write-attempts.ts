@@ -26,6 +26,7 @@ export type AttemptOutcome =
   | "simulation"
   | "disabled"
   | "not-near-target"
+  | "catch-up-spent"
   | "all-written"
   | "no-photo-access"
   | "no-material"
@@ -39,6 +40,7 @@ export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = [
   "simulation",
   "disabled",
   "not-near-target",
+  "catch-up-spent",
   "all-written",
   "no-photo-access",
   "no-material",
