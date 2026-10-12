@@ -113,10 +113,19 @@ describe("B2 — 판정 순서", () => {
     expect(pipelineRun).not.toHaveBeenCalled();
   });
 
-  it("목표 시각 근방이 아니면 'skipped'", async () => {
-    const { deps, pipelineRun } = baseDeps({ now: at(3) });
+  it("창 밖이고 오늘만 비어 있으면 'skipped' (오늘은 창 안에서만)", async () => {
+    const { deps, pipelineRun } = baseDeps({
+      now: at(15),
+      listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"],
+    });
     expect(await runAutoDiaryTask(deps)).toBe("skipped");
     expect(pipelineRun).not.toHaveBeenCalled();
+  });
+
+  it("078 — 창 밖이어도 지난 날이 비어 있으면 그 날을 쓴다", async () => {
+    const { deps, pipelineRun } = baseDeps({ now: at(3) });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(pipelineRun).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
   });
 
   it("모든 하루가 써졌으면 'skipped'", async () => {

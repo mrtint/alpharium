@@ -126,10 +126,19 @@ describe("AR4 — manual이 아니면 기존 그대로", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it("켜져 있어도 창 밖이면 skipped", async () => {
-    const { deps, run } = make({ enabled: true });
+  it("켜져 있고 창 밖이며 오늘만 비어 있으면 skipped", async () => {
+    const { deps, run } = make({
+      enabled: true,
+      listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"],
+    });
     expect(await runAutoDiaryTask(deps)).toBe("skipped");
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("078 — 켜져 있고 창 밖이어도 어제가 비어 있으면 어제를 쓴다", async () => {
+    const { deps, run } = make({ enabled: true });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
   });
 });
 
