@@ -70,7 +70,8 @@
     "seed:list": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-list.mts",
     "seed:clear": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-clear.mts",
     "sample:fetch": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/sample-fetch.mts",
-    "sample:seed": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/sample-seed.mts"
+    "sample:seed": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/sample-seed.mts",
+    "version:bump": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/release/bump-version.mts"
   },
   "jest": {
     "projects": [

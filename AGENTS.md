@@ -1097,11 +1097,11 @@ iOS 짝은 `ios-release.yml`(075)이고 보안 틀이 같다. **AAB는 아티팩
   비밀번호는 `ORG_GRADLE_PROJECT_POCKETLOG_*` 환경변수로 gradle에 전달한다(`~/.gradle/gradle.properties`를 만들지 않는다).
 - **퍼블릭 저장소라 비밀이 새는 길을 계약 테스트가 잠근다**(`__tests__/ci/android-release-workflow.test.ts`, 스크립트는 `__tests__/scripts/`): 시작은 수동 하나, 허용 밖 비밀·직접 보간·잡 수준 env 금지, 아티팩트·캐시·명령 추적 없음, 정리 단계는
   `if: always()`이고 마지막. 워크플로를 고칠 때 이 테스트가 실패하면 테스트가 아니라 워크플로를 의심한다. 072의 `native-build.yml`은 `secrets.`를 금지하므로 합치지 않는다.
-- **`android.versionCode` 올림은 사람이 커밋한다.** 사전 점검이 비밀이 빈 것·번호가 정수가 아닌 것·기대 지문 파일만 잡고, 같은 번호의 중복은 Play가 거부한다(숨기지 않는다). 업로드가 성공해도 **Play에서 받은 앱**(Play가 다시 서명한 것)을
+- **번호 올림은 `npm run version:bump -- <patch|minor>`로 하고 사람이 커밋한다** — `expo.version`·`android.versionCode`·`ios.buildNumber` 셋을 함께 올린다(`scripts/release/bump-version.ts`). 2026-10-12에 versionCode만 11로 올려 내보냈더니 버전이 1.0.0 그대로라 기기 설정의 「버전」으로 새 빌드가 깔렸는지 가를 수 없었다 — **versionCode만 손으로 올리지 않는다.** 핫픽스는 `patch`, 기능은 `minor`. 사전 점검이 비밀이 빈 것·번호가 정수가 아닌 것·기대 지문 파일만 잡고, 같은 번호의 중복은 Play가 거부한다(숨기지 않는다). 업로드가 성공해도 **Play에서 받은 앱**(Play가 다시 서명한 것)을
   전용 기기에서 한 번 열어 본다 — 업로드 성공 ≠ 정상 동작.
 - **실측(2026-10-11 첫 실행, run 38138524204 — 첫 시도에 성공)**: ubuntu-latest(4코어·16GB)에서 `bundleRelease` 684초(Gradle 11m 23s)·최대 메모리 9,529MB(OOM 없음)·AAB 55MB·Play 업로드 57초, 전체 약 13분 30초. 서명 지문이 기대 값과 같았고(환경변수 비밀번호가 서명에 닿음) 서비스 계정 권한과 `completed` 릴리스가 받아들여졌다. 소유자가 Play 내부 테스트 반영과 전용 기기 설치를 확인했다.
   **미확인**: 위반 주입 실행(비밀 비움 → 1분 안 실패, `main` 외 브랜치 거부, 같은 `versionCode` 재업로드의 거부 표시, 실패 실행의 정리) — 소유자 몫으로 남겼다(075와 같다). 상세는 `specs/076-android-release-ci/quickstart.md` 「실측 기록」.
-- **`versionCode`는 사람이 올린다**(iOS `buildNumber`와 같다). 자동으로 올리려면 CI가 `main`에 쓰거나(쓰기 권한 — 비밀을 쥔 워크플로에 주지 않기로 했다) 빌드 때만 Play 마지막 번호 + 1로 덮어써야 하는데, 후자는 저장소 번호와 Play 번호가 어긋나 로컬 빌드와 충돌할 수 있어 하지 않았다.
+- **번호를 CI가 올리지 않는 이유**: 자동으로 올리려면 CI가 `main`에 쓰거나(쓰기 권한 — 비밀을 쥔 워크플로에 주지 않기로 했다) 빌드 때만 Play 마지막 번호 + 1로 덮어써야 하는데, 후자는 저장소 번호와 Play 번호가 어긋나 로컬 빌드와 충돌할 수 있어 하지 않았다.
 - 업로드 키 유출이 의심되면 Play Console에서 업로드 키를 재설정하고(며칠) `ANDROID_KEYSTORE_*`와 `upload-key.sha256`을 함께 바꾼다. 서비스 계정 키는 Google Cloud에서 폐기하고 다시 발급한다.
 
 ### 서명 키 (최초 1회) — CI 비밀의 원본이자 손으로 빌드할 때의 키
@@ -1143,7 +1143,7 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 - **★ `-PreactNativeArchitectures=arm64-v8a`를 빼지 않는다**(065 실측). 네 ABI를 다 빌드하면 `llama.rn`의 CPU 갈래 10여 벌을 release 최적화로 동시에 컴파일하다
   clang이 `LLVM ERROR: out of memory`로 죽었다(34분 뒤 실패). arm64 하나면 13분 39초에 끝난다. 2GB 모델을 기기에서 돌리는 앱이라 출시 대상도 arm64뿐이다 —
   32비트·x86 기기에는 Play에서 앱이 보이지 않는다. 첫 release 빌드는 `react-android-*-release.aar`(약 168MB)를 받다 연결 시간 초과가 난 적이 있다(다시 돌리면 된다).
-- **Play에 올릴 때마다 `app.json`의 `android.versionCode`를 1 올린다** — 같은 번호는 Play가 거부한다. 사람이 보는 버전은 `expo.version`(versionName)이다. 올린 번호는 커밋에 남긴다.
+- **Play에 올릴 때마다 `npm run version:bump -- <patch|minor>`로 버전과 번호를 함께 올린다** — 같은 versionCode는 Play가 거부하고, 사람이 보는 버전(`expo.version`, versionName)이 그대로면 기기에서 빌드를 가를 수 없다. 올린 번호는 커밋에 남긴다.
 - 실측(065): `targetSdk`는 36(RN 0.86 기본), 모든 arm64 네이티브 라이브러리(`llama.rn` 포함)의 LOAD 정렬이 16KB다 — Play의 16KB 페이지 요구를 충족한다. `llama.rn`을 올리면 다시 본다
   (`.so`의 ELF 프로그램 헤더 `p_align`; 개발 기계에 `readelf`가 없어 node로 읽었다).
 
@@ -1201,7 +1201,7 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
   배포 브랜치 = `main`으로 설정한다(저장소 설정이라 파일이 강제하지 못한다 — 눈으로 확인). 서명 키를 GitHub에 올리는 것은 소유주(Hyunmin Lee) 동의가 전제다. 만드는 법·등록 순서는 quickstart §2.
 - **퍼블릭 저장소라 비밀이 새는 길을 계약 테스트가 잠근다**(`__tests__/ci/ios-release-workflow.test.ts`): 시작은 수동 하나, 비밀은 `env` 값 자리에서만, 아티팩트·캐시·명령 추적 없음, 정리 단계는 `if: always()`.
   이 워크플로를 고칠 때 이 테스트가 실패하면 테스트가 아니라 워크플로를 의심한다. 072의 `native-build.yml`은 `secrets.`를 금지하므로 합치지 않는다.
-- **`ios.buildNumber` 올림은 사람이 커밋한다.** 사전 점검이 비밀이 빈 것과 번호가 정수가 아닌 것만 잡고, 같은 번호의 중복은 Apple이 거부한다. **업로드 성공 ≠ 처리 통과** — ITMS 메일과 TestFlight 목록을 본다.
+- **`ios.buildNumber` 올림은 `npm run version:bump`로 하고 사람이 커밋한다**(안드로이드와 같은 명령 — 셋을 함께 올린다). 사전 점검이 비밀이 빈 것과 번호가 정수가 아닌 것만 잡고, 같은 번호의 중복은 Apple이 거부한다. **업로드 성공 ≠ 처리 통과** — ITMS 메일과 TestFlight 목록을 본다.
 - 인증서 만료 2027-10-08 — 그전에 새 인증서를 받아 `IOS_DIST_P12_*`·`IOS_PROFILE_BASE64`를 갱신한다.
 - 메모리가 모자라 아카이브가 죽으면 `xcodebuild`에 `-jobs`를 낮춰 다시 돌린다(FR-015) — 값과 근거는 quickstart에 실측으로 남긴다.
 
@@ -1225,7 +1225,7 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
   `Failed to find item AC_PASSWORD … in keychain`으로 떨어진다. 앱 암호 저장은 Xcode 26 altool이 도움말과 달리 `--item`을 요구한다:
   `xcrun altool --store-password-in-keychain-item --item AC_PASSWORD -u <Apple ID> -p <앱 암호>`(앱 암호는 appleid.apple.com이 발급하는 값, 임의로 못 정한다).
 - **2026-10-08 빌드 1(1.0.0)을 이 절차로 올렸다**(검증 → 업로드, 저장소 소유자 터미널) — **처리 단계에서 ITMS-90683(모션 문구 없음)으로 거부**됐다. 같은 날 빌드 2에 문구를 넣어 다시 올렸다.
-  **업로드 성공 ≠ 처리 통과** — 「has one or more issues」 메일을 기다려 본다. 다음 업로드는 `ios.buildNumber`를 먼저 올린다.
+  **업로드 성공 ≠ 처리 통과** — 「has one or more issues」 메일을 기다려 본다. 다음 업로드는 `npm run version:bump`로 번호를 먼저 올린다.
 
 ### 다른 맥에서 올리려면 (대안)
 
@@ -1234,7 +1234,7 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 2. 받는 맥 키체인에 **WWDR G3**를 넣고(위), 프로파일을 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`에 둔다. `security find-identity -v -p codesigning`에 valid 1개.
 3. Xcode(26 기준 실측)·CocoaPods(`brew install cocoapods`)·Node 20+. `~/.netrc`가 644면 `NETRC=<빈 디렉터리>`.
 4. 앱 암호를 그 맥 키체인에 다시 저장한다(위 `--item` 명령; 암호 자체는 Apple ID에 묶여 어디서나 같다).
-5. `app.json`의 `ios.buildNumber`를 올리고 커밋 → 위 「빌드」 세 줄 → 사람의 터미널에서 `--validate-app` → `--upload-app`.
+5. `npm run version:bump -- <patch|minor>`로 번호를 올리고 커밋 → 위 「빌드」 세 줄 → 사람의 터미널에서 `--validate-app` → `--upload-app`.
 
 ### 확인 — 빌드 성공을 믿지 않는다
 
