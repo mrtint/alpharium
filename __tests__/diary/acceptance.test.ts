@@ -20,8 +20,10 @@ import { join } from "node:path";
  */
 
 import { judge, REJECT_REASONS, type Verdict } from "../../src/diary/acceptance";
+import { buildPrompt, instructionLines } from "../../src/diary/prompt";
 import type { Ending } from "../../src/inference/engine-port";
-import { CHARACTERS, type Character } from "../../src/diary/types";
+import { CHARACTERS, type Character, type DiaryRequest } from "../../src/diary/types";
+import type { DaySignals } from "../../src/signals/types";
 
 const EOS: Ending = { kind: "eos" };
 
@@ -148,6 +150,139 @@ describe("A-2c 꼬리의 지시 절을 옮기면 거부된다 (061 EC2~EC4)", ()
   it("지시 어미가 아닌 절은 비교하지 않는다 — 사실 문장은 일기에 나와도 된다", () => {
     // 「나는 오늘 사진을 한 장도 보지 못해서 본 것이 없다」는 베껴도 일기 문장으로 읽히는 1인칭 사실이다.
     expect(withTail("나는 오늘 사진을 한 장도 보지 못해서 본 것이 없다. 심심했다.").ok).toBe(true);
+  });
+});
+
+/**
+ * 077 — 본 장면 있는 날의 꼬리(첫 문장 틀이 든 줄)가 지시문 줄에 들어간다(contracts/prompt.md TN5b).
+ * 실제 `instructionLines()`로 판정한다 — 틀은 작은따옴표 안이라 비교에서 빠지므로 틀대로 시작한
+ * 본문은 통과하고, 꼬리의 지시 절이나 줄 전체를 옮긴 본문은 `echo`다.
+ */
+describe("A-2d 본 장면 있는 날의 꼬리 (077 TN5b)", () => {
+  const DAY = "2026-01-15";
+  const signals: DaySignals = {
+    date: DAY,
+    photos: {
+      kind: "known",
+      value: { photos: [{ id: "p1", takenAt: new Date(`${DAY}T13:00:00`) }], complete: true },
+    },
+    places: { kind: "none" },
+    steps: { kind: "unknown", reason: "걸음 수를 되짚는 통로가 없다" },
+    battery: { kind: "unknown", reason: "배터리 기록을 되짚지 못했다" },
+    connectivity: { kind: "unknown", reason: "연결 기록을 되짚지 못했다" },
+  };
+  const vision = {
+    captions: [{ photoId: "p1", takenAt: new Date(`${DAY}T13:00:00`), text: "A desk." }],
+    considered: 1,
+    available: 1,
+  };
+  const request: DiaryRequest = {
+    signals,
+    character: "quiet",
+    vision: "quick",
+    dayStillOpen: false,
+  };
+  const lines = instructionLines(request, vision);
+  const tail = buildPrompt(request, vision).split("\n").at(-1) ?? "";
+  const frame = /첫 문장은 '([^']*)'처럼/.exec(tail)?.[1] ?? "";
+  const verdictOf = (text: string) => judge(text, EOS, "quiet", lines);
+
+  it("꼬리가 지시문 줄에 있다", () => {
+    expect(frame).not.toBe("");
+    expect(lines).toContain(tail);
+  });
+
+  it("틀대로 시작한 `~요` 본문은 통과한다", () => {
+    const opening = frame.replace("~", "책상 위의 노트북");
+    expect(
+      verdictOf(`${opening}. 오후의 빛이 화면에 내려앉아 있었어요. 주인도 조금 지쳤을 것 같아요.`)
+        .ok,
+    ).toBe(true);
+  });
+
+  it.each([
+    ["꼬리 줄 전체", () => tail],
+    ["꼬리의 지시 절", () => "이 기록으로 그 하루의 일기를 써라. 오늘은 책상을 보았어요."],
+  ])("%s를 옮긴 본문은 echo다", (_label, body) => {
+    const verdict = verdictOf(body());
+    expect(verdict.ok).toBe(false);
+    if (!verdict.ok) expect(verdict.why).toBe("echo");
+  });
+});
+
+/**
+ * 077 — 본 장면 없는 날의 새 꼬리 셋(「너는/네」, `~요` 보기 문장)도 실제 `instructionLines()`로
+ * 되뱉기를 잠근다. A-2c는 판정 규칙을 고정 문자열로 보고, 이것은 지금 프롬프트의 꼬리가 그
+ * 규칙에 실제로 걸리는가를 본다 — 꼬리의 지시 어미가 바뀌면 조용히 무력해지는 자리다.
+ */
+describe("A-2e 본 장면 없는 날의 꼬리 (077)", () => {
+  const DAY = "2026-01-15";
+  const HIDDEN = {
+    steps: { kind: "unknown", reason: "걸음 수를 되짚는 통로가 없다" },
+    battery: { kind: "unknown", reason: "배터리 기록을 되짚지 못했다" },
+    connectivity: { kind: "unknown", reason: "연결 기록을 되짚지 못했다" },
+  } as const;
+  const days: [string, DaySignals][] = [
+    ["zero", { date: DAY, photos: { kind: "none" }, places: { kind: "none" }, ...HIDDEN }],
+    [
+      "unread",
+      {
+        date: DAY,
+        photos: {
+          kind: "known",
+          value: { photos: [{ id: "p1", takenAt: new Date(`${DAY}T13:00:00`) }], complete: true },
+        },
+        places: { kind: "none" },
+        ...HIDDEN,
+      },
+    ],
+    [
+      "unseen",
+      {
+        date: DAY,
+        photos: { kind: "unknown", reason: "x" },
+        places: { kind: "unknown", reason: "x" },
+        ...HIDDEN,
+      },
+    ],
+  ];
+
+  describe.each(days)("%s", (_kind, signals) => {
+    const request: DiaryRequest = {
+      signals,
+      character: "quiet",
+      vision: "quick",
+      dayStillOpen: false,
+    };
+    const lines = instructionLines(request);
+    const tail = buildPrompt(request).split("\n").at(-1) ?? "";
+    const verdictOf = (text: string) => judge(text, EOS, "quiet", lines);
+
+    it("꼬리가 지시문 줄에 있다", () => {
+      expect(tail).toContain("네 하루를 쓴다");
+      expect(lines).toContain(tail);
+    });
+
+    it.each([
+      ["꼬리 줄 전체", () => tail],
+      [
+        "「네 하루를 쓴다」 절",
+        () =>
+          "나는 오늘 아무것도 보지 못했어요. 그래서 오늘 일기는 주인의 하루가 아니라 네 하루를 쓴다.",
+      ],
+    ])("%s를 옮긴 본문은 echo다", (_label, body) => {
+      const verdict = verdictOf(body());
+      expect(verdict.ok).toBe(false);
+      if (!verdict.ok) expect(verdict.why).toBe("echo");
+    });
+
+    it("쓰라고 준 말로 쓴 정상 본문은 통과한다", () => {
+      expect(
+        verdictOf(
+          "나는 오늘 아무것도 보지 못했어요. 가방 속은 깜깜했고 심심했어요. 하품만 했어요. 내일은 무엇이든 보여 줬으면 좋겠어요.",
+        ).ok,
+      ).toBe(true);
+    });
   });
 });
 

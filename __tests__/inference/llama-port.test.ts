@@ -19,7 +19,7 @@ import { buildPrompt, promptPrefix } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
 import { CHARACTERS, type Character } from "../../src/diary/types";
 import { judgeServerOutput, serverRequestFor } from "../../src/inference/desktop-server";
-import { SAMPLING } from "../../src/inference/sampling";
+import { ROMAN_LETTER_BLOCK_GRAMMAR, SAMPLING } from "../../src/inference/sampling";
 import { richDay } from "../../src/signals/fake";
 import { createLlamaEngine, endingOf } from "../../src/inference/llama-port";
 import { FUTURE_CHARACTER } from "../future-character";
@@ -682,6 +682,8 @@ describe("061 — ask() (specs/061-diary-prompt-swap/contracts/title-ask.md TA1)
       top_p: SAMPLING.top_p,
       top_k: SAMPLING.top_k,
       n_predict: SAMPLING.n_predict,
+      // 077 — 제목도 로마자 차단 문법을 받는다(GR2)
+      grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
     });
   });
 
@@ -726,5 +728,73 @@ describe("061 — ask() (specs/061-diary-prompt-swap/contracts/title-ask.md TA1)
     await engine.load(QUIET);
     await engine.ask("p", "b", "q", { timeoutMs: 1000 });
     expect(seen[0]).toHaveLength(1);
+  });
+});
+
+/* ═══════════════════ 077 — 로마자 차단 문법 (contracts/grammar.md) ═══════════════════ */
+
+describe("077 — 로마자 차단 문법 (GR1~GR5)", () => {
+  const GRAMMAR = "root ::= [^A-Za-z]*";
+
+  function recording() {
+    const calls: Record<string, unknown>[] = [];
+    const loader = async () => ({
+      async completion(params: Record<string, unknown>) {
+        calls.push(params);
+        return { content: "글", stopped_eos: true, timings: { predicted_ms: 1 } };
+      },
+      async stopCompletion() {},
+      async release() {},
+    });
+    return { calls, engine: createLlamaEngine(loader, pathFor) };
+  }
+
+  it("GR1 — sampling.ts가 원본 문법 문자열을 내보낸다(줄바꿈 없음)", () => {
+    expect(ROMAN_LETTER_BLOCK_GRAMMAR).toBe(GRAMMAR);
+  });
+
+  it("GR2 — 본문(run)과 제목(ask) 호출이 같은 문법을 넘긴다", async () => {
+    const { calls, engine } = recording();
+    await engine.load(QUIET);
+    await engine.run("프롬프트", { timeoutMs: 1000 });
+    await engine.ask("프롬프트", "본문", "제목을 적어라.", { timeoutMs: 1000 });
+    expect(calls).toHaveLength(2);
+    expect(calls[0].grammar).toBe(GRAMMAR);
+    expect(calls[1].grammar).toBe(GRAMMAR);
+  });
+
+  it("GR3 — 프리웜은 문법을 넘기지 않는다(생성하지 않는다)", async () => {
+    const { calls, engine } = recording();
+    await engine.load(QUIET);
+    await engine.prewarm(QUIET, promptPrefix(QUIET));
+    expect(calls).toHaveLength(1);
+    expect("grammar" in calls[0]).toBe(false);
+  });
+
+  it("GR4 — 데스크톱 요청이 온디바이스와 같은 문법을 싣는다", async () => {
+    const { calls, engine } = recording();
+    const r = buildRequest(richDay("2026-01-15"), "quiet", "quick");
+    if (!r.ok) throw new Error("테스트 준비 실패");
+    await engine.load(QUIET);
+    await engine.run(buildPrompt(r.request), { timeoutMs: 1000 });
+    expect(calls[0].grammar).toBe(GRAMMAR);
+    expect(serverRequestFor(r.request).grammar).toBe(calls[0].grammar);
+  });
+
+  it("GR1 — 문법 문자열 리터럴이 src/ 안에서 sampling.ts 한 곳에만 있다", () => {
+    const files = ["inference/llama-port.ts", "inference/desktop-server.ts", "diary/prompt.ts"];
+    for (const f of files) {
+      expect(readFileSync(join(__dirname, "../../src", f), "utf8")).not.toContain("[^A-Za-z]");
+    }
+    expect(readFileSync(join(__dirname, "../../src/inference/sampling.ts"), "utf8")).toContain(
+      `"${GRAMMAR}"`,
+    );
+  });
+
+  it("GR5 — 결과는 여전히 { text, ending } 둘뿐이다(원칙 IV)", async () => {
+    const { engine } = recording();
+    await engine.load(QUIET);
+    const result = await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(Object.keys(result).sort()).toEqual(["ending", "text"]);
   });
 });

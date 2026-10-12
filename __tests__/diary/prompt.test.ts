@@ -121,17 +121,18 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
     expect(PROMPT_SOURCE).toMatch(/본 것만|기록에 있는 것만/);
   });
 
-  it("한국어: 본 것만 있다는 것과 주인의 일은 짐작으로 쓰라는 지시가 담긴다 (061)", () => {
+  it("한국어: 본 장면만 보고 쓴다는 것과 주인의 마음은 한 번만 짐작하라는 지시가 담긴다 (077)", () => {
+    // 077 — 「주인이 무엇을 했는지 짐작」이 행적 추리(탐정 말투)를 만들었다(hand-prompt v5).
     const prompt = buildPrompt(requestFor(unknownDay(DAY)));
-    expect(prompt).toContain("사진에 담긴 장면 말고는 본 것이 없다");
-    expect(prompt).toContain("주인이 무엇을 했는지는 '~했을 것 같다'");
+    expect(prompt).toContain("사진에 담긴 장면만 보고 이야기한다");
+    expect(prompt).toContain("주인의 마음은 '주인도 ~했을 것 같아요'처럼 한 번만 짐작한다");
   });
 
-  it("★ 061: 본 장면 없는 날은 주인의 하루를 짐작하지 않고 내 하루를 쓴다", () => {
+  it("★ 061: 본 장면 없는 날은 주인의 하루를 짐작하지 않고 휴대폰의 하루를 쓴다 (077 「네 하루」)", () => {
     // 「상상으로 쓴다」가 지어내기의 직접 원인이었다(my-ollama REPORT §8.2).
     for (const day of [emptyDay(DAY), unknownDay(DAY)]) {
       const prompt = buildPrompt(requestFor(day));
-      expect(prompt).toContain("주인의 하루가 아니라 내 하루를 쓴다");
+      expect(prompt).toContain("주인의 하루가 아니라 네 하루를 쓴다");
       expect(prompt).toContain("주인이 무엇을 했는지는 짐작하지 않는다");
       expect(prompt).not.toContain("상상");
     }
@@ -139,10 +140,10 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
 
   it("기록이 적으면 짧게 쓰라는 지시가 담긴다", () => {
     // **길이를 채우려는 압력이 지어내기의 원인이다.** 짧아도 된다고 말해 준다.
-    // 061 한국어는 "짧게 쓴다. 본문은 서너 문장이면 된다", 현행은 "짧게".
+    // 077 한국어의 본 장면 없는 날은 꼬리가 "본문은 네댓 문장이면 되고", 현행은 "짧게".
     for (const character of CHARACTERS) {
       const prompt = buildPrompt(requestFor(unknownDay(DAY), character));
-      expect(prompt).toMatch(/짧(게|아도)|서너 문장/);
+      expect(prompt).toMatch(/짧(게|아도)|네댓 문장/);
     }
   });
 
@@ -168,8 +169,8 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
     // 갈리지만(036) 규칙 자체는 다섯 캐릭터가 같다.
     for (const c of CHARACTERS) {
       const prompt = buildPrompt(requestFor(unknownDay(DAY), c));
-      expect(prompt).toMatch(/본 것만|기록에 있는 것만|장면 말고는 본 것이 없다/);
-      expect(prompt).toMatch(/짧(게|아도)|서너 문장/);
+      expect(prompt).toMatch(/본 것만|기록에 있는 것만|장면만 보고 이야기한다/);
+      expect(prompt).toMatch(/짧(게|아도)|네댓 문장/);
     }
   });
 
@@ -181,7 +182,7 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
    */
   it("확실하지 않은 것은 짐작의 말투로 쓰라는 지시가 담긴다(FR-012)", () => {
     const prompt = buildPrompt(requestFor(unknownDay(DAY)));
-    expect(prompt).toMatch(/것 같다|일지도 모른다|~것 같/);
+    expect(prompt).toMatch(/것 같다|것 같아요|일지도 모른다|~것 같/);
   });
 
   it("짐작 어미 지시가 모든 캐릭터에 공통이다(캐릭터 차이와는 별개의 공통 규칙)", () => {
@@ -195,13 +196,13 @@ describe("★ P-1a 기록이 없으면 지어내지 않도록 이끈다 (006 FR-
         .join("\n");
     });
     for (const prompt of withoutNamesAndLanguage) {
-      expect(prompt).toMatch(/것 같다|일지도 모른다|~것 같/);
+      expect(prompt).toMatch(/것 같다|것 같아요|일지도 모른다|~것 같/);
     }
   });
 
   it("짐작 어미 지시가 instructionLines()에도 담긴다(되뱉기 판정 대상)", () => {
     const lines = instructionLines(requestFor(unknownDay(DAY)));
-    expect(lines.some((line) => /것 같다|일지도 모른다|~것 같/.test(line))).toBe(true);
+    expect(lines.some((line) => /것 같다|것 같아요|일지도 모른다|~것 같/.test(line))).toBe(true);
   });
 });
 
@@ -271,14 +272,14 @@ describe("P-3 신호의 세 갈래가 서로 다른 말이 된다 (FR-012a·b)",
 
   it("unknown은 「모른다」로 전달된다", () => {
     const prompt = buildPrompt(requestFor(unknownDay(DAY)));
-    expect(prompt).toMatch(/모른다|알 수 없/);
+    expect(prompt).toMatch(/모른다|몰라요|알 수 없/);
   });
 
-  it("unknown의 이유가 함께 전달된다", () => {
-    // 004가 「왜 모르는지」를 담아 두었다. 그것이 프롬프트까지 와야 휴대폰이
-    // "권한이 없어 보지 못했다"와 "안드로이드가 알려주지 않는다"를 구분해 쓸 수 있다.
+  it("unknown은 왜 모르는지를 고정 문장으로 전달한다 (077 — 신호의 까닭 문자열은 싣지 않는다)", () => {
+    // 004가 담아 둔 까닭은 평어·오류 메시지라 `~요` 글에 섞인다(077 FR-007). 한국어 경로는
+    // 신호 갈래로 고른 고정 문장을 싣는다 — 「볼 길이 막혔다」는 사실은 그대로 간다.
     const prompt = buildPrompt(requestFor(unknownDay(DAY)));
-    expect(prompt).toContain("권한");
+    expect(prompt).toContain("사진을 볼 수 있는 길이 막혀 있어요");
   });
 
   it("none은 「없었다」로 전달되며 unknown과 다른 문장이다", () => {
@@ -294,20 +295,20 @@ describe("P-3 신호의 세 갈래가 서로 다른 말이 된다 (FR-012a·b)",
     // 뒤집힌 실수도 막는다. 사진 0장을 "모른다"로 적으면 쓸 수 있는 사실을 버리는 것이다.
     const prompt = buildPrompt(requestFor(emptyDay(DAY)));
     const photoSection = prompt.split("\n").filter((l) => l.includes("사진"));
-    expect(photoSection.join("\n")).not.toMatch(/모른다|알 수 없/);
+    expect(photoSection.join("\n")).not.toMatch(/모른다|몰라요|알 수 없/);
   });
 
   it("known은 관측된 사실로 적힌다", () => {
-    // 036 — 한국어 캐릭터는 문장형("사진은 세 장이 남았다"), 현행은 라벨형("사진: 3장").
-    expect(buildPrompt(requestFor(richDay(DAY)))).toMatch(/사진은 세 장이 남았다/);
+    // 036 — 한국어 캐릭터는 문장형("사진은 세 장이 남았어요", 077 `~요`), 현행은 라벨형("사진: 3장").
+    expect(buildPrompt(requestFor(richDay(DAY)))).toMatch(/사진은 세 장이 남았어요/);
     expect(buildPrompt(requestFor(richDay(DAY)))).toMatch(/세 장|3/); // 사진 세 장
   });
 
   it("한 하루 안에서 세 갈래가 섞여도 각각 옳게 나온다", () => {
     // 실제로 가장 흔한 모양이다 — 사진은 봤고, 위치는 모르고, 연결은 없었다.
     const prompt = buildPrompt(requestFor(partiallyUnknownDay(DAY)));
-    expect(prompt).toMatch(/모른다|알 수 없/);
-    expect(prompt).toMatch(/없었다|없다/);
+    expect(prompt).toMatch(/모른다|몰라요|알 수 없/);
+    expect(prompt).toMatch(/없었다|없었어요|없다/);
   });
 });
 
@@ -334,9 +335,9 @@ describe("P-4 관측의 한계가 함께 간다 (FR-012c·d)", () => {
 
   it("잘린 하루에는 사진 수를 단언하지 말라는 지시가 붙는다", () => {
     // 잘린 목록의 길이는 그날 찍은 수가 아니라 우리가 본 수다.
-    // 036 — 한국어 캐릭터는 "이것이 그날 사진의 전부는 아니다. 더 있을 수 있다.",
+    // 077 — 한국어 캐릭터는 "이것이 그날 사진의 전부는 아니에요. 더 있을 수 있어요.",
     // 현행(chinese)은 "사진의 정확한 수를 단언하지 마라".
-    expect(buildPrompt(requestFor(truncatedDay()))).toMatch(/전부는 아니다.*더 있을 수 있다/s);
+    expect(buildPrompt(requestFor(truncatedDay()))).toMatch(/전부는 아니에요.*더 있을 수 있어요/s);
     expect(PROMPT_SOURCE).toMatch(/정확한 수|수를 단언/);
   });
 

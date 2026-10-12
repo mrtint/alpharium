@@ -67,3 +67,18 @@ export const SAMPLING: SamplingSettings = {
  * 그 값을 결과에 담거나 저장하는 것이 금지다.
  */
 export const GENERATION_TIMEOUT_MS = 180_000;
+
+/**
+ * 로마자 차단 문법 (077, my-ollama `results/hand-prompt/v5/grammar.gbnf`).
+ *
+ * 캡션이 영어라 「Desk에 집중된 시선」처럼 영어 낱말이 본문에 남는 글이 있었다(v2 60런 중 2편).
+ * 프롬프트가 아니라 **생성 단계에서** 막는다 — 본문(`run`)과 제목(`ask`) 둘 다에 걸고,
+ * 데스크톱 서버에도 같은 값을 보낸다(원칙 I — 같은 GGUF·프롬프트·샘플링). llama-server 기준
+ * v3~v5 180런과 탐색 751런에서 로마자 0건·끝맺음 정상, 속도 차이 없음(16런).
+ * **llama.rn·실기기에서는 재지 않았다**(077 quickstart D1).
+ *
+ * 문장 끝을 `요`로 강제하는 문법·낱말 끝 「다」를 막는 문법은 시험했으나 쓰지 않는다(끝맺지
+ * 못하거나 「~다네」로 빠졌다). **로스터에 한국어가 아닌 캐릭터가 들어오면 이 문법이 그 글을
+ * 막는다** — 그때 다시 판단한다(지금은 한국어 하나, 037).
+ */
+export const ROMAN_LETTER_BLOCK_GRAMMAR = "root ::= [^A-Za-z]*";

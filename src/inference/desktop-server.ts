@@ -36,7 +36,7 @@ import { judge } from "../diary/acceptance";
 import { buildPrompt, instructionLines } from "../diary/prompt";
 import type { DiaryRequest } from "../diary/types";
 import type { Ending } from "./engine-port";
-import { SAMPLING } from "./sampling";
+import { ROMAN_LETTER_BLOCK_GRAMMAR, SAMPLING } from "./sampling";
 import type { GenerationResult, InferenceBackend, ModuleStatus } from "./types";
 
 /**
@@ -52,6 +52,8 @@ export type ServerRequest = {
   top_p: number;
   top_k: number;
   n_predict: number;
+  /** 077 — 로마자 차단 문법. 온디바이스 `complete()`와 같은 값이다 */
+  grammar: string;
 };
 
 /**
@@ -69,6 +71,7 @@ export function serverRequestFor(request: DiaryRequest): ServerRequest {
     top_p: SAMPLING.top_p,
     top_k: SAMPLING.top_k,
     n_predict: SAMPLING.n_predict,
+    grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
   };
 }
 
