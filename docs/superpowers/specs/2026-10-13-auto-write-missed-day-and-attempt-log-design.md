@@ -32,6 +32,13 @@ iPhone(TestFlight)에서 자동 일기 쓰기가 동작하지 않는다. 조사 
 
 **영향 범위**: `src/schedule/decision.ts`, `src/schedule/auto-write.ts`(입력 전달), `specs/020-scheduled-diary-notification/contracts/schedule-decision.md` D1·D2 개정, `__tests__/schedule/decision.test.ts`(창 밖 지난 날 케이스 추가, 기존 「창 끝 10시면 근방 아님」류는 「오늘은 안 쓴다, 지난 날은 쓴다」로 다시 쓴다), `auto-write.test.ts`.
 
+### 리뷰 뒤 고친 것 (2026-10-13, 브랜치 전체 리뷰)
+
+위 규칙을 그대로 두면 안드로이드에서 두 가지가 달라진다는 것이 리뷰에서 드러나 같은 브랜치에서 고쳤다. 위 「바뀌지 않는 것」의 「056 미리보기 문장은 여전히 사실」은 아래 첫 줄을 넣은 뒤에야 참이다.
+
+- **오전 목표의 어제는 오늘 목표 시각에 차례가 온다.** 오전 목표(0–11시)의 창은 어제를 겨냥한다 — 「지난 날은 언제든」을 그대로 적용하면 자정 직후 첫 콜백이 어제를 써서 고른 시각이 무의미해진다. 창 밖 후보는 **차례가 이미 지난 날**로 좁힌다: 오늘은 빼고, 창이 어제를 겨냥하는데 오늘 목표 시각이 아직 안 왔으면 어제도 뺀다. 입력에 `targetDay: "today" | "yesterday"`를 더한다(`day-boundary.ts`의 `includesTodayAtHour(목표 시)` — 정오 상수는 밖으로 나가지 않는다). 오후 목표의 어제는 새벽에도 쓴다.
+- **창 밖 따라잡기는 백그라운드에서 하루에 한 번만 판정한다.** 시도 창은 재시도의 유일한 상한이었다 — 창 밖 쓰기를 허용하면 계속 실패하는 지난 날을 15분마다 온종일 다시 돌린다. `task.ts`가 `preferences/auto-write-catch-up.json`(`{"on"}` 날짜 하나)을 보고, 오늘 몫을 썼으면 신호도 읽지 않고 `catch-up-spent`로 끝낸다. 창 안·수동 실행·앱 열기 경로는 이 상한을 타지 않는다. 결과 갈래가 열셋이 된다.
+
 ## 조각 2 — 자동 쓰기 시도 기록
 
 **무엇을**: 자동 쓰기가 **판정에 들어갈 때마다** 한 줄. 060 쓰기 실패 기록(`src/app/write-failures.ts`)과 같은 꼴·같은 통로 패턴이다.
@@ -42,6 +49,7 @@ type AttemptOutcome =
   | "started"            // 시작만 기록되고 끝이 없다 = 프로세스가 도중에 정지됐다(iOS 만료·메모리, 안드로이드 kill)
   | "simulation"         // 064 상태 흉내가 막음
   | "disabled" | "not-near-target" | "all-written"      // 020 판정
+  | "catch-up-spent"     // 창 밖 따라잡기의 오늘 몫을 이미 썼다(리뷰 뒤 더함)
   | "no-photo-access" | "no-material"                   // 057 판정
   | "no-character"       // 고른 캐릭터 없음
   | "write"              // app-open 전용: 쓸 날을 홈에 넘겼다(결과는 홈이 쓰고 실패는 060 기록이 받는다)
@@ -59,7 +67,7 @@ type Attempt = { at: Date; path: AttemptPath; outcome: AttemptOutcome };
 - **보이는 자리 둘** (구현 중 고침, 2026-10-13): 처음에는 진단 화면만 적었는데 **진단 화면은 개발 환경 전용**이라(060) TestFlight(배포) 빌드의 테스터가 볼 수 없다. 그래서 같은 묶음(공용 부품 `AttemptsGroup`)을 **개발자 화면 맨 아래**(「끄기」 아래, 배포 빌드에서도 설정 → 「버전」을 1초 안에 7번 탭 → 「개발자」 맨 아래로 열림 — 보드 `6e`·`6j` 밖, 소유자 확인 대상)에도 둔다. `AppFrame`이 개발자 겹이 열릴 때 읽는다.
 - **진단 화면**: 「최근 실패」 묶음 아래 「최근 자동 쓰기 시도」 묶음. 줄마다 라벨 「{경로} · M월 d일 HH:mm」, 값 「{결과}」. 경로 문구 셋(백그라운드·앱 열기·지금 실행)과 결과 문구 열둘은 카탈로그(`src/i18n/catalogs/ko/`)의 **새 영역**에 둔다(062 — 옛 골든 영역에 키를 더하지 않는다). 줄 조립은 `src/app/diagnostics-view.ts`의 순수 함수 `attemptLines()`(`failureLines`와 같은 모양, 시각 형식도 같은 `failureTime`). 읽기는 `DiagnosticsLayer`가 실패 기록과 같은 시점(마운트·「자동 쓰기 지금 실행」 뒤)에 한다. 빈 목록은 「아직 시도가 없어요」.
 - **지우지 않는다**: 058 일기 모두 지우기·059 개발자 끄기·온보딩 다시는 이 파일을 건드리지 않는다(060 실패 기록과 같다).
-- **iOS에서 읽는 법**: 테스터가 개발자 화면(설정 → 「버전」을 1초 안에 7번 탭 → 「개발자」 맨 아래) 스크린샷을 보낸다. 줄이 없으면 OS가 깨우지 않았다(스와이프 종료·앱 새로 고침·저전력을 묻는다). `background · not-near-target`만 있으면 조각 1 이전 동작이다. `background · started`가 남아 있으면 완주하다 끊겼다(4번 원인). 앱을 백그라운드로 다시 띄운 실행에서는 `App.tsx`도 그려지므로 `app-open` 줄이 같이 남을 수 있다 — 정상이다.
+- **iOS에서 읽는 법**: 테스터가 개발자 화면(설정 → 「버전」을 1초 안에 7번 탭 → 「개발자」 맨 아래) 스크린샷을 보낸다. **`background` 줄이 없으면** OS가 깨우지 않았다(스와이프 종료·앱 새로 고침·저전력을 묻는다 — 앱을 여는 순간 `app-open` 줄은 늘 생기므로 「줄이 아예 없다」는 일어나지 않는다). `background · started`가 남아 있으면 도는 중이거나 프로세스가 죽었다. iOS는 예산이 끝나면 죽이지 않고 멈추므로, 앱을 열 때 이어져 끝난 `background · failed`(밤 시각)도 같은 원인일 수 있다. 정본은 AGENTS 078의 읽는 법이다. 앱을 백그라운드로 다시 띄운 실행에서는 `App.tsx`도 그려지므로 `app-open` 줄이 같이 남을 수 있다 — 정상이다.
 
 **영향 범위**: 새 `src/app/auto-write-attempts.ts`(순수 + 기기 통로), `src/schedule/task.ts`, `App.tsx`(`DiarySection` 한 곳 + `DiagnosticsLayer` 읽기·전달), `src/app/diagnostics-view.ts`, `src/ui/DiagnosticsScreen.tsx`(묶음 하나), `src/i18n/catalogs/ko/`(새 영역 + `index.ts` 등록), `scripts/constitution-rules.ts`(새 파일이 `src/app/`이라 `checkScheduleFile`에 걸리지 않는다 — `task.ts`가 `app/write-failures`를 이미 import하는 것과 같은 방향; 검사가 걸리면 그 자리에 이유를 적는다).
 
