@@ -16,7 +16,9 @@
 import { View } from "react-native";
 
 import { AppText } from "./components/Text";
+import type { AttemptLine } from "../app/diagnostics-view";
 import type { SimulationState } from "../app/simulation";
+import { AttemptsGroup } from "./AttemptsGroup";
 import { DEVELOPER_TEXT, SIMULATION_TEXT } from "./developer-text";
 import { Chevron, Group, Row, Toggle, Value } from "./SettingsScreen";
 import { COLORS, SETTINGS } from "./theme/tokens";
@@ -30,6 +32,11 @@ export type DeveloperScreenProps = {
   onReplayOnboarding?: () => void;
   onDisable?: () => void;
   onOpenDiagnostics?: () => void;
+  /**
+   * 078 — 최근 자동 쓰기 시도(최신이 위). **배포 빌드에서도 그린다** — 진단 화면은 개발 환경 전용이라, 실제 iPhone(TestFlight)에서
+   * 「자동 쓰기가 왜 안 돌았는가」를 읽을 자리는 이 화면뿐이다. 보드 `6e`·`6j`에 없는 묶음이다(소유자 확인 대상).
+   */
+  attempts: readonly AttemptLine[];
   /**
    * 064 — 「상태 흉내」 묶음(보드 `6e` ③). **개발 환경일 때만 조립부가 넘긴다**(S7) — 없으면 묶음 자체가 없다. 화면은 상태를 그리고 누름을
    * 알릴 뿐이다(저장·효력은 `use-simulation.ts`).
@@ -51,6 +58,7 @@ export function DeveloperScreen({
   onReplayOnboarding,
   onDisable,
   onOpenDiagnostics,
+  attempts,
   simulation,
 }: DeveloperScreenProps) {
   return (
@@ -141,6 +149,9 @@ export function DeveloperScreen({
           testID="developer-off"
         />
       </View>
+
+      {/* 078 — 「끄기」 아래에 둔다: 위 행들의 자리가 바뀌지 않는다(보드의 행 순서·실기기 흐름의 스크롤 거리를 건드리지 않는다) */}
+      <AttemptsGroup attempts={attempts} idPrefix="developer" />
     </View>
   );
 }

@@ -17,7 +17,7 @@
 
 import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 
-import { ATTEMPT_TEXT as A, DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
+import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type {
   AttemptLine,
   EnvironmentLines,
@@ -26,6 +26,7 @@ import type {
   ProbeCell,
 } from "../app/diagnostics-view";
 import type { PromptPreview } from "../diagnostics/types";
+import { AttemptsGroup } from "./AttemptsGroup";
 import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
 import { AppText } from "./components/Text";
 import { SIMULATION_TEXT } from "./developer-text";
@@ -272,22 +273,8 @@ export function DiagnosticsScreen({
         )}
       </Group>
 
-      {/* 078 — 자동 쓰기가 판정에 들어간 기록. 줄이 없으면 OS가 깨우지 않은 것이고, 「시작한 뒤 끝나지 않음」은 도중에 정지된 것이다 */}
-      <Group label={A.group} testID="diagnostics-group-attempts">
-        {attempts.length === 0 ? (
-          <Row label={A.empty} labelTone="muted" testID="diagnostics-attempts-empty" />
-        ) : (
-          attempts.map((line, index) => (
-            // 위치가 키다 — 같은 경로·같은 결과가 이어질 수 있다(035)
-            <Row
-              key={index}
-              label={line.headText}
-              testID={`diagnostics-attempt-${index}`}
-              trailing={<Value text={line.outcomeText} />}
-            />
-          ))
-        )}
-      </Group>
+      {/* 078 — 자동 쓰기가 판정에 들어간 기록. 개발자 화면과 같은 부품이다(배포 빌드는 그쪽에서 본다) */}
+      <AttemptsGroup attempts={attempts} idPrefix="diagnostics" />
     </View>
   );
 }

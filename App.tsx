@@ -675,8 +675,23 @@ function AppFrame() {
    * 알리는 신호일 뿐 판정 입력이 아니다. 앱을 연 채 자동 쓰기가 건너뛰면 `onSkipped`가 이 값을 바로 바꾼다.
    */
   const skipPort = useMemo(() => expoSkipStorePort(), []);
-  // 078 — 자동 쓰기 시도 기록 통로(진단 「최근 자동 쓰기 시도」). 앱 열기 판정이 한 줄씩 남긴다.
+  // 078 — 자동 쓰기 시도 기록 통로. 앱 열기 판정이 한 줄씩 남긴다.
   const attemptPort = useMemo(() => expoAutoWriteAttemptPort(), []);
+  /**
+   * 078 — 개발자 화면의 「최근 자동 쓰기 시도」. 겹이 열릴 때 읽는다(059 모듈 줄과 같은 방식). **배포 빌드에서 이 기록을 보는 유일한
+   * 자리다** — 진단 화면은 개발 환경에서만 열린다.
+   */
+  const [developerAttempts, setDeveloperAttempts] = useState<AttemptLine[]>([]);
+  useEffect(() => {
+    if (route !== "developer") return;
+    let alive = true;
+    void loadAutoWriteAttempts(attemptPort).then((items) => {
+      if (alive) setDeveloperAttempts(attemptLines(items));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [route, attemptPort]);
   const [skippedDay, setSkippedDay] = useState<DayDate | null>(null);
   useEffect(() => {
     let alive = true;
@@ -1633,6 +1648,7 @@ function AppFrame() {
             titleAside={buildLabelFor({ devEnvironment: showsDiagnostics, versionText })}
           >
             <DeveloperScreen
+              attempts={developerAttempts}
               modules={moduleLines}
               onDisable={onDisableDeveloper}
               onOpenDiagnostics={showsDiagnostics ? openDiagnostics : undefined}

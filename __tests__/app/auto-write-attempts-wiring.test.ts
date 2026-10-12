@@ -45,3 +45,17 @@ describe("진단 화면", () => {
     expect(layer).toMatch(/attempts=\{attempts\}/);
   });
 });
+
+describe("개발자 화면 (배포 빌드에서 보는 자리)", () => {
+  it("AppFrame이 개발자 겹이 열릴 때 읽어 DeveloperScreen에 attempts로 넘긴다", () => {
+    const frame = functionBody("AppFrame");
+    expect(frame).toMatch(/loadAutoWriteAttempts\(attemptPort\)/);
+    expect(frame).toMatch(/setDeveloperAttempts\(attemptLines\(/);
+    expect(frame).toMatch(/attempts=\{developerAttempts\}/);
+  });
+
+  it("진단과 달리 showsDiagnostics에 묶이지 않는다 — 배포 빌드의 유일한 통로다", () => {
+    const frame = functionBody("AppFrame");
+    expect(frame).not.toMatch(/attempts=\{showsDiagnostics/);
+  });
+});
