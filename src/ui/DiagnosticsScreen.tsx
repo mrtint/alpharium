@@ -17,8 +17,9 @@
 
 import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 
-import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
+import { ATTEMPT_TEXT as A, DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type {
+  AttemptLine,
   EnvironmentLines,
   FailureLine,
   PhotoPermissionLines,
@@ -59,6 +60,8 @@ export type DiagnosticsScreenProps = {
   autoResult: AutoRunResult | null;
   /** 최신이 위 */
   failures: readonly FailureLine[];
+  /** 078 — 최근 자동 쓰기 시도, 최신이 위 */
+  attempts: readonly AttemptLine[];
   /**
    * 064 — 상태 흉내가 켜져 있다(S8). 참이면 두 쓰기 버튼에 콜백을 넘기지 않고(058 — 누를 수 없는 것은 `onPress`도 없다) 흐리게 그리며 아래에
    * 차단 문구를 보인다. 홈·백그라운드도 각각 막는다 — 이 화면은 첫 방어다.
@@ -110,6 +113,7 @@ export function DiagnosticsScreen({
   autoRunning,
   autoResult,
   failures,
+  attempts,
   writeBlocked = false,
 }: DiagnosticsScreenProps) {
   const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : autoText(autoResult);
@@ -263,6 +267,23 @@ export function DiagnosticsScreen({
               label={line.reasonText}
               testID={`diagnostics-failure-${index}`}
               trailing={<Value text={line.timeText} />}
+            />
+          ))
+        )}
+      </Group>
+
+      {/* 078 — 자동 쓰기가 판정에 들어간 기록. 줄이 없으면 OS가 깨우지 않은 것이고, 「시작한 뒤 끝나지 않음」은 도중에 정지된 것이다 */}
+      <Group label={A.group} testID="diagnostics-group-attempts">
+        {attempts.length === 0 ? (
+          <Row label={A.empty} labelTone="muted" testID="diagnostics-attempts-empty" />
+        ) : (
+          attempts.map((line, index) => (
+            // 위치가 키다 — 같은 경로·같은 결과가 이어질 수 있다(035)
+            <Row
+              key={index}
+              label={line.headText}
+              testID={`diagnostics-attempt-${index}`}
+              trailing={<Value text={line.outcomeText} />}
             />
           ))
         )}

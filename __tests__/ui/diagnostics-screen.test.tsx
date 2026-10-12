@@ -46,6 +46,7 @@ function props(over: Partial<DiagnosticsScreenProps> = {}): DiagnosticsScreenPro
     autoRunning: false,
     autoResult: null,
     failures: [],
+    attempts: [],
     ...over,
   };
 }
@@ -58,10 +59,12 @@ const GROUP_IDS = [
   "diagnostics-group-prompt",
   "diagnostics-group-gen",
   "diagnostics-group-failures",
+  // 078 — 보드 `6h` 밖: 일곱 묶음 뒤에 자동 쓰기 시도 묶음
+  "diagnostics-group-attempts",
 ];
 
-describe("DS1 — 일곱 묶음이 보드 순서로 있다", () => {
-  it("환경 → 저장 점검 → 사진 권한 → 신호 프로브 · 오늘 → 입력 프롬프트 미리보기 → 생성 → 최근 실패", async () => {
+describe("DS1 — 일곱 묶음이 보드 순서로 있고 그 뒤에 078 시도 묶음이 있다", () => {
+  it("환경 → 저장 점검 → 사진 권한 → 신호 프로브 · 오늘 → 입력 프롬프트 미리보기 → 생성 → 최근 실패 → 최근 자동 쓰기 시도", async () => {
     await render(<DiagnosticsScreen {...props()} />);
     const tree = JSON.stringify(screen.toJSON());
     const order = GROUP_IDS.map((id) => tree.indexOf(`"testID":"${id}"`));
@@ -75,6 +78,7 @@ describe("DS1 — 일곱 묶음이 보드 순서로 있다", () => {
       "입력 프롬프트 미리보기",
       "생성",
       "최근 실패",
+      "최근 자동 쓰기 시도",
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
@@ -361,6 +365,8 @@ describe("DS8 — 화면은 기기·파이프라인·신호·모델에 닿지 �
       /from\s+["'][^"']*(?:schedule\/|diary\/pipeline|diary\/prompt|signals\/|models\/|vision\/)/,
     );
     expect(src).not.toMatch(/createAppPipeline|runAutoDiaryTask/);
+    // 078 — 화면은 시도 기록 모듈을 import하지 않는다(줄만 받는다)
+    expect(src).not.toMatch(/auto-write-attempts/);
     // 모델 이름 문자열이 없다(원칙 III)
     expect(src).not.toMatch(/gguf|exaone|kanana|qwen|llama/i);
   });
@@ -379,10 +385,39 @@ describe("DS10 — 측정 어휘가 없다 (FR-021, 원칙 IV)", () => {
     "src/app/diagnostics-view.ts",
     "src/app/diary-inspect.ts",
     "src/app/write-failures.ts",
+    "src/app/auto-write-attempts.ts",
   ])("%s", (file) => {
     // import 경로(`theme/tokens` — 디자인 토큰)는 대상이 아니다 — 코드의 낱말만 본다.
     const body = code(file).replace(/from\s+["'][^"']*["']/g, "");
     expect(body).not.toMatch(/duration|elapsed|timing|\btokens?\b/i);
+  });
+});
+
+/* ═══════════════════ 078 — 최근 자동 쓰기 시도 ═══════════════════ */
+
+describe("078 — 최근 자동 쓰기 시도 묶음", () => {
+  it("비어 있으면 「아직 시도가 없어요」 한 줄", async () => {
+    await render(<DiagnosticsScreen {...props()} />);
+    expect(screen.getByTestId("diagnostics-attempts-empty")).toBeTruthy();
+    expect(screen.getByText("아직 시도가 없어요")).toBeTruthy();
+  });
+
+  it("줄마다 머리(경로 · 시각)와 결과를 그 순서로 그린다", async () => {
+    await render(
+      <DiagnosticsScreen
+        {...props({
+          attempts: [
+            { headText: "백그라운드 · 10월 13일 22:05", outcomeText: "시작한 뒤 끝나지 않음" },
+            { headText: "앱 열기 · 10월 14일 08:00", outcomeText: "홈에 넘김" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("diagnostics-attempts-empty")).toBeNull();
+    const first = screen.getByTestId("diagnostics-attempt-0");
+    expect(within(first).getByText("백그라운드 · 10월 13일 22:05")).toBeTruthy();
+    expect(within(first).getByText("시작한 뒤 끝나지 않음")).toBeTruthy();
+    expect(within(screen.getByTestId("diagnostics-attempt-1")).getByText("홈에 넘김")).toBeTruthy();
   });
 });
 

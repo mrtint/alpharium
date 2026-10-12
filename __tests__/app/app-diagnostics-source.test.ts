@@ -94,7 +94,14 @@ describe("TO3 — 진단은 파이프라인을 만들지 않는다", () => {
     const layer = functionBody("DiagnosticsLayer");
     // cleanup이 alive를 내리고, 비동기 결과로 상태를 바꾸는 자리마다 alive 검사가 앞선다
     expect(layer).toMatch(/alive\.current = false/);
-    for (const setter of ["setReport", "setPhoto", "setProbe", "setInspection", "setFailures"]) {
+    for (const setter of [
+      "setReport",
+      "setPhoto",
+      "setProbe",
+      "setInspection",
+      "setFailures",
+      "setAttempts",
+    ]) {
       const calls = [...layer.matchAll(new RegExp(setter + "\\(", "g"))];
       expect(calls.length).toBeGreaterThan(0);
       for (const call of calls) {

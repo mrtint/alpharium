@@ -126,8 +126,16 @@ import { showsOnScreen } from "./src/diagnostics/sink";
 import { collectReport } from "./src/diagnostics/report";
 import type { DiagnosticReport } from "./src/diagnostics/types";
 import { languageResolution, text } from "./src/i18n/current";
+import {
+  attemptOutcomeOf,
+  expoAutoWriteAttemptPort,
+  loadAutoWriteAttempts,
+  recordAttemptEnd,
+  type AutoWriteAttemptPort,
+} from "./src/app/auto-write-attempts";
 import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
 import {
+  attemptLines,
   canRequestPhoto,
   environmentLines,
   languageLine,
@@ -135,6 +143,7 @@ import {
   photoPermissionLines,
   probeCells,
   storageValue,
+  type AttemptLine,
   type FailureLine,
   type PhotoPermissionLines,
   type ProbeCell,
@@ -666,6 +675,8 @@ function AppFrame() {
    * 알리는 신호일 뿐 판정 입력이 아니다. 앱을 연 채 자동 쓰기가 건너뛰면 `onSkipped`가 이 값을 바로 바꾼다.
    */
   const skipPort = useMemo(() => expoSkipStorePort(), []);
+  // 078 — 자동 쓰기 시도 기록 통로(진단 「최근 자동 쓰기 시도」). 앱 열기 판정이 한 줄씩 남긴다.
+  const attemptPort = useMemo(() => expoAutoWriteAttemptPort(), []);
   const [skippedDay, setSkippedDay] = useState<DayDate | null>(null);
   useEffect(() => {
     let alive = true;
@@ -1547,6 +1558,7 @@ function AppFrame() {
           claimAutoWrite={claimAutoWrite}
           onSkipped={onSkipped}
           skipPort={skipPort}
+          attemptPort={attemptPort}
           // 058 — 일기 모두 지우기 요청. 홈이 멈춘 뒤 응답한다.
           wipeRequest={wipeRequest}
           onWipeReady={onWipeReady}
@@ -1722,6 +1734,7 @@ function DiagnosticsLayer({
   const photoPort = useMemo(() => expoPhotoPort(), []);
   const diaryStore = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
   const failurePort = useMemo(() => expoWriteFailurePort(), []);
+  const attemptPort = useMemo(() => expoAutoWriteAttemptPort(), []);
   const alive = useRef(true);
   useEffect(() => {
     alive.current = true;
@@ -1772,10 +1785,17 @@ function DiagnosticsLayer({
   }, [diaryStore]);
 
   const [failures, setFailures] = useState<FailureLine[]>([]);
+  // 078 — 자동 쓰기 시도 기록. 실패 기록과 같은 시점(열 때·「자동 쓰기 지금 실행」 뒤)에 읽는다.
+  const [attempts, setAttempts] = useState<AttemptLine[]>([]);
   const readFailures = useCallback(async () => {
-    const items = await loadWriteFailures(failurePort);
+    const [items, tries] = await Promise.all([
+      loadWriteFailures(failurePort),
+      loadAutoWriteAttempts(attemptPort),
+    ]);
+    // DS11 — 상태를 바꾸는 자리마다 alive 검사가 바로 앞선다(소스 계약이 setter마다 본다)
     if (alive.current) setFailures(failureLines(items));
-  }, [failurePort]);
+    if (alive.current) setAttempts(attemptLines(tries));
+  }, [failurePort, attemptPort]);
   useEffect(() => {
     void readFailures();
   }, [readFailures]);
@@ -1821,6 +1841,7 @@ function DiagnosticsLayer({
       }
       language={languageLine(languageResolution())}
       failures={failures}
+      attempts={attempts}
       onInspectStorage={onInspectStorage}
       onRefreshProbe={() => void readProbe()}
       onRequestPhoto={onRequestPhoto}
@@ -1857,6 +1878,7 @@ function DiarySection({
   claimAutoWrite,
   onSkipped,
   skipPort,
+  attemptPort,
   wipeRequest,
   onWipeReady,
   writeRequest,
@@ -1891,6 +1913,8 @@ function DiarySection({
   onSkipped?: (day: DayDate) => void;
   /** 057 — 사진 권한 건너뜀 기록 통로 */
   skipPort?: SkipStorePort;
+  /** 078 — 자동 쓰기 시도 기록 통로. 앱 열기 판정 결과를 한 줄로 남긴다 */
+  attemptPort?: AutoWriteAttemptPort;
   /** 048 — 고른 하루. `AppFrame`이 들고 있다(Q4) */
   chosenDay?: DayDate | null;
   onChooseDay?: (day: DayDate) => void;
@@ -2110,15 +2134,19 @@ function DiarySection({
   useEffect(() => {
     if (autoDiarySettings == null || previewForAuto === undefined || skipPort === undefined) return;
     let alive = true;
-    const check = () =>
+    const check = () => {
+      const now = new Date();
       void resolveAutoWrite({
         settings: autoDiarySettings,
-        now: new Date(),
+        now,
         listDiaryDays: () => store.listDays(),
         previewDay: previewForAuto,
         skipPort,
       })
         .then((decision) => {
+          // 078 — 판정에 들어갔다는 사실을 남긴다. 화면이 닫힌 뒤여도 판정은 일어났으므로 `alive`와 무관하게 쓴다.
+          if (attemptPort)
+            void recordAttemptEnd(attemptPort, "app-open", now, attemptOutcomeOf(decision));
           if (!alive) return;
           if (decision.kind === "write") setAutoWriteDay(decision.day);
           else if (decision.kind === "skip" && decision.because === "no-photo-access") {
@@ -2126,6 +2154,7 @@ function DiarySection({
           }
         })
         .catch(() => {});
+    };
     check();
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active") check();
@@ -2134,7 +2163,7 @@ function DiarySection({
       alive = false;
       sub.remove();
     };
-  }, [autoDiarySettings, previewForAuto, skipPort, store, onSkipped]);
+  }, [autoDiarySettings, previewForAuto, skipPort, store, onSkipped, attemptPort]);
 
   /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
   const onGenerated = useCallback(
