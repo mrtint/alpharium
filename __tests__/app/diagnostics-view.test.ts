@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  attemptLines,
   canRequestPhoto,
   environmentLines,
   failureLines,
@@ -242,5 +243,57 @@ describe("소스 계약 — DV7·DV8", () => {
 
   it("사용자 화면의 축 제외 상수를 보지 않는다 (DIAGNOSTICS_HIDES_AXES)", () => {
     expect(code("src/app/diagnostics-view.ts")).not.toContain("USER_VISIBLE_SIGNAL_AXES");
+  });
+});
+
+describe("DV9 — 078 자동 쓰기 시도 줄", () => {
+  it("경로 · 시각이 머리, 결과가 값", () => {
+    const lines = attemptLines([
+      { path: "background", outcome: "started", at: new Date(2026, 9, 13, 22, 5) },
+      { path: "app-open", outcome: "write", at: new Date(2026, 9, 14, 8, 0) },
+      { path: "manual", outcome: "ran", at: new Date(2026, 9, 14, 9, 30) },
+    ]);
+    expect(lines).toEqual([
+      { headText: "백그라운드 · 10월 13일 22:05", outcomeText: "시작한 뒤 끝나지 않음" },
+      { headText: "앱 열기 · 10월 14일 08:00", outcomeText: "홈에 넘김" },
+      { headText: "지금 실행 · 10월 14일 09:30", outcomeText: "썼음" },
+    ]);
+    for (const line of lines) expect(Object.keys(line).sort()).toEqual(["headText", "outcomeText"]);
+  });
+
+  it("열두 갈래 문구가 모두 있고 서로 다르다", () => {
+    const outcomes = [
+      "started",
+      "simulation",
+      "disabled",
+      "not-near-target",
+      "all-written",
+      "no-photo-access",
+      "no-material",
+      "no-character",
+      "write",
+      "already-running",
+      "ran",
+      "failed",
+    ] as const;
+    const texts = outcomes.map(
+      (outcome) =>
+        attemptLines([{ path: "background", outcome, at: new Date(2026, 0, 1) }])[0]?.outcomeText,
+    );
+    expect(texts).toEqual([
+      "시작한 뒤 끝나지 않음",
+      "상태 흉내가 막음",
+      "자동 쓰기 꺼짐",
+      "쓰는 시각이 아님",
+      "모두 써 있음",
+      "사진 권한 없음",
+      "재료 없음",
+      "캐릭터 없음",
+      "홈에 넘김",
+      "다른 쓰기가 진행 중",
+      "썼음",
+      "실패",
+    ]);
+    expect(new Set(texts).size).toBe(outcomes.length);
   });
 });
