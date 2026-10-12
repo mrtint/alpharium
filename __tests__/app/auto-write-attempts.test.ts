@@ -187,6 +187,37 @@ describe("AT7 — 기록 실패는 삼킨다", () => {
   });
 });
 
+describe("AT10 — 같은 프로세스의 겹친 기록은 줄을 잃지 않는다", () => {
+  /** 읽기·쓰기가 한 박자씩 걸리는 통로 — 기기 통로는 `await import` 뒤에 파일을 만지므로 두 기록의 읽기·쓰기가 엇갈릴 수 있다 */
+  function slowPort(): AutoWriteAttemptPort {
+    let content: string | null = null;
+    const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 5));
+    return {
+      async read() {
+        await tick();
+        return content;
+      },
+      async write(serialized) {
+        await tick();
+        content = serialized;
+      },
+    };
+  }
+
+  it("백그라운드 시작과 앱 열기 판정이 동시에 기록해도 두 줄이 다 남는다 (iOS는 백그라운드 재실행에서 둘이 함께 돈다)", async () => {
+    const port = slowPort();
+    await Promise.all([
+      recordAttemptStart(port, "background", AT),
+      recordAttemptEnd(port, "app-open", LATER, "all-written"),
+    ]);
+    const items = await loadAutoWriteAttempts(port);
+    expect(items.map((i) => [i.path, i.outcome]).sort()).toEqual([
+      ["app-open", "all-written"],
+      ["background", "started"],
+    ]);
+  });
+});
+
 describe("AT8 — 판정 → 갈래", () => {
   it("idle은 reason, skip은 because, write는 write", () => {
     expect(attemptOutcomeOf({ kind: "idle", reason: "disabled" })).toBe("disabled");

@@ -110,50 +110,67 @@ async function save(port: AutoWriteAttemptPort, items: readonly AutoWriteAttempt
   );
 }
 
+/**
+ * ★ 같은 프로세스 안의 기록을 한 줄로 세운다. 기록은 「읽고 → 고쳐 → 쓴다」인데 통로가 비동기라, 백그라운드의 시작 기록과 앱 열기
+ * 판정의 기록이 겹치면 뒤에 쓴 쪽이 앞의 줄을 덮었다 — iOS는 백그라운드 재실행에서도 `App.tsx`를 그려 둘이 함께 돈다. 잃는 쪽이
+ * `started`면 「깼지만 끝나지 않았다」의 증거가 사라진다. 일은 던지지 않으므로(아래 try/catch) 줄이 끊기지 않는다.
+ */
+let queue: Promise<void> = Promise.resolve();
+function inOrder(work: () => Promise<void>): Promise<void> {
+  queue = queue.then(work);
+  return queue;
+}
+
 /** 시작 — `started` 줄을 맨 앞에. 실패는 삼킨다. */
-export async function recordAttemptStart(
+export function recordAttemptStart(
   port: AutoWriteAttemptPort,
   path: AttemptPath,
   at: Date,
 ): Promise<void> {
-  try {
-    const previous = await loadAutoWriteAttempts(port);
-    await save(port, [{ at, path, outcome: "started" }, ...previous]);
-  } catch {
-    // 기록이 자동 쓰기를 막지 않는다.
-  }
+  return inOrder(async () => {
+    try {
+      const previous = await loadAutoWriteAttempts(port);
+      await save(port, [{ at, path, outcome: "started" }, ...previous]);
+    } catch {
+      // 기록이 자동 쓰기를 막지 않는다.
+    }
+  });
 }
 
 /**
  * 끝 — 같은 `at`(ms까지)·`path`의 줄을 결과로 바꾼다. 짝이 없으면: 바로 앞 줄과 경로·결과가 같으면 그 줄의 시각만 갱신하고,
  * 아니면 맨 앞에 넣는다. 실패는 삼킨다.
  */
-export async function recordAttemptEnd(
+export function recordAttemptEnd(
   port: AutoWriteAttemptPort,
   path: AttemptPath,
   at: Date,
   outcome: AttemptOutcome,
 ): Promise<void> {
-  try {
-    const previous = await loadAutoWriteAttempts(port);
-    const key = at.toISOString();
-    const index = previous.findIndex((item) => item.path === path && item.at.toISOString() === key);
-    if (index >= 0) {
-      await save(
-        port,
-        previous.map((item, n) => (n === index ? { ...item, outcome } : item)),
+  return inOrder(async () => {
+    try {
+      const previous = await loadAutoWriteAttempts(port);
+      const key = at.toISOString();
+      const index = previous.findIndex(
+        (item) => item.path === path && item.at.toISOString() === key,
       );
-      return;
+      if (index >= 0) {
+        await save(
+          port,
+          previous.map((item, n) => (n === index ? { ...item, outcome } : item)),
+        );
+        return;
+      }
+      const head = previous[0];
+      if (head !== undefined && head.path === path && head.outcome === outcome) {
+        await save(port, [{ ...head, at }, ...previous.slice(1)]);
+        return;
+      }
+      await save(port, [{ at, path, outcome }, ...previous]);
+    } catch {
+      // 기록이 자동 쓰기를 막지 않는다.
     }
-    const head = previous[0];
-    if (head !== undefined && head.path === path && head.outcome === outcome) {
-      await save(port, [{ ...head, at }, ...previous.slice(1)]);
-      return;
-    }
-    await save(port, [{ at, path, outcome }, ...previous]);
-  } catch {
-    // 기록이 자동 쓰기를 막지 않는다.
-  }
+  });
 }
 
 /* ────────────────────────── 기기 통로 ────────────────────────── */
