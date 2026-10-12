@@ -25,7 +25,7 @@ import type { Character } from "../diary/types";
 import { assetFor } from "../models/roster";
 import { modelFilePath } from "../models/expo-port";
 import type { Ending, GenerationEngine, LoadResult, RunLimits, RunResult } from "./engine-port";
-import { SAMPLING } from "./sampling";
+import { ROMAN_LETTER_BLOCK_GRAMMAR, SAMPLING } from "./sampling";
 
 /**
  * 모델을 여는 값.
@@ -276,6 +276,9 @@ async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<Ru
     top_p: SAMPLING.top_p,
     top_k: SAMPLING.top_k,
     n_predict: SAMPLING.n_predict,
+    // 077 — 본문·제목 모두 로마자를 내지 못한다. jinja 서식 결과가 문법을 줄 때만(도구·
+    // `response_format`) llama.rn이 이 값을 덮어쓴다 — 우리 호출은 둘 다 안 쓴다.
+    grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
   });
 
   // ★ **여기가 원칙 IV의 경계다.** `text`와 `ending`만 꺼내고 나머지를 버린다.

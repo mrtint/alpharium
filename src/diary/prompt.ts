@@ -92,10 +92,10 @@ const SPEAKER_RULES: readonly string[] = [
   "확실하지 않은 것은 '~인 것 같다', '~였을지도 모른다'처럼 짐작의 말투로 써라. 있었다, 했다처럼 단정하는 말투는 실제로 본 것에만 써라.",
 ];
 
-/* ─────────── 한국어 캐릭터 머리 (036 E2SN → 061 교체) ─────────── */
+/* ─────────── 한국어 캐릭터 머리 (036 E2SN → 061 → 077 교체) ─────────── */
 
 /**
- * 머리 규칙 — 호칭 줄 다음 세 줄 (061, my-ollama REPORT §8 확정안).
+ * 머리 규칙 — 호칭 줄 다음 세 줄 (077, my-ollama hand-prompt v5).
  *
  * `SPEAKER_RULES`(8줄)를 대체한다 — **한국어 캐릭터만.** 다른 언어의 캐릭터는 위
  * `SPEAKER_RULES`를 쓴다(036 Clarification Q1=B). 037 이후 로스터가 한국어 하나라 그
@@ -110,17 +110,23 @@ const SPEAKER_RULES: readonly string[] = [
  *  - 짐작은 한 줄로 남긴다 — 헌법 원칙 II MAY(「단서로 주인의 하루를 짐작한다」).
  *  - 사람·관계·단정 MUST NOT: 「기록에 없는 장소 이름, 사람, 물건, 사건은 쓰지 않는다」.
  *
- * **문안의 원본은 my-ollama `scripts/device-repro/variants.ts`의 `H2`다.** 한 글자라도
- * 다르면 6,180런의 실측과 다른 프롬프트가 되므로, 고칠 때는 그쪽에서 재고 바이트 대조
- * (`gen-prompts.ts`)를 다시 돌린다.
+ * **077 — 「탐정 같다」를 고쳤다**(사용자 피드백, my-ollama PR #8, llama-server 기기 등가 측정).
+ * 「주인이 무엇을 했는지는 … 짐작으로 쓴다」가 일기의 할 일을 행적 추리로 만들었다 →
+ * 「주인의 마음은 … 한 번만 짐작한다」로 바꿨다(탐정 말투 10/18 → 0/18, 짐작 표현 편당
+ * 1.9 → 0.9회). 「골라 한 흐름으로 이어 쓴다」는 원래도 듣지 않던 지시라 뺐다.
+ * **말투(`~요`) 지시는 머리에 두지 않는다** — 머리에 적었을 때 `~요` 문장은 14%였다.
+ * 말투는 꼬리의 첫 문장 틀이 정한다(`sceneTail()`).
+ *
+ * **문안의 원본은 my-ollama `results/hand-prompt/v5/user-prompt.md`다.** 한 글자라도 다르면
+ * 측정과 다른 프롬프트가 되므로, 고칠 때는 그쪽에서 재고 바이트 대조(`gen-prompts.ts`)를 다시 돌린다.
  *
  * **판정 갈래를 늘리지 않는다**(원칙 IV MUST) — 확인은 my-ollama, 제품은 판정 4갈래만.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 const E2_RULES: readonly string[] = [
-  "너는 주머니와 가방 속에서 하루를 보내서, 사진에 담긴 장면 말고는 본 것이 없다. 주인이 무엇을 했는지는 보지 못했다.",
-  "일기에는 네가 본 장면과 그것을 보며 든 생각을 적는다. 장면을 차례대로 다 옮겨 적지 말고, 마음에 남은 두세 가지만 골라 한 흐름으로 이어 쓴다.",
-  "주인이 무엇을 했는지는 '~했을 것 같다', '~였을지도 모른다'처럼 짐작으로 쓴다. 기록에 없는 장소 이름, 사람, 물건, 사건은 쓰지 않는다.",
+  "너는 주인의 주머니나 가방 속에서 하루를 보내서, 사진에 담긴 장면만 보고 이야기한다.",
+  "일기에는 네가 본 사진의 장면과 그것을 보며 든 마음을 적는다. 마음에 남은 장면은 떠오르는 마음을 한두 문장 더 풀어 쓴다.",
+  "주인의 마음은 '주인도 ~했을 것 같아요'처럼 한 번만 짐작한다. 기록에 없는 장소 이름, 사람, 물건, 사건은 쓰지 않는다.",
 ];
 
 /**
@@ -128,7 +134,7 @@ const E2_RULES: readonly string[] = [
  *
  * 조사는 이름의 받침으로 고른다(`particle.ts`). 036의 「'금동이'이라」는 조사가 틀렸다.
  * **6,180런은 받침 없는 이름(금동이)으로만 쟀다** — 받침 있는 이름은 이 줄의 바이트가
- * 달라지며 재지 않았다(지시서 §8-2, 원칙 V).
+ * 달라지며 재지 않았다(지시서 §8-2, 원칙 V). 077의 hand-prompt v5도 금동이로만 쟀다.
  */
 function speakerHeadLine(name: string): string {
   return `너는 '${name}'${quoteParticleFor(name)} 불리는, 주인의 휴대폰이다. 하루가 끝나면 그날 본 것으로 일기를 쓴다. 이 글의 '나'는 휴대폰이지 주인이 아니다.`;
@@ -137,15 +143,16 @@ function speakerHeadLine(name: string): string {
 /**
  * 캐릭터별 톤 줄 — 머리의 다섯째 줄 (036, 061, 헌법 원칙 III MAY).
  *
- * **`quiet`(금동이)만 실측 근거가 있다** — 036의 「담담하게, 짧게 쓴다」(B·BA 72런,
- * 모델의 성질 「짧고 정확하다」와 같은 방향)에 061이 분량 한 문장을 더했다(REPORT §8,
- * 확정안 `H2[4]`). 옛 머리 끝의 「단서가 적은 날은 두세 문장이면 된다」를 대신한다.
+ * **`quiet`(금동이)만 실측 근거가 있다** — 036의 「담담하게, 짧게 쓴다」에 061이 분량을
+ * 더했고, 077이 「서정적이며 … 여덟 문장쯤, 사백 자 안팎」으로 늘렸다(hand-prompt v5 —
+ * 감상이 글의 한 축 5/18 → 16/18, 본문 길이 중앙 220 → 309자). 길어진 만큼 생성이 느려진다
+ * (본문 토큰 중앙 134 → 209개, 기기 시간은 미측정).
  *
  * **톤 줄이 없는 캐릭터는 빈 문자열을 둔다** — `fixedHead()`가 빈 문자열이면 그 줄을
  * 아예 안 넣는다(조건부 spread). 근거 없는 톤 줄을 지어내지 않기 위한 자리다(037 FR-014).
  */
 const E_TONE: Readonly<Record<Character, string>> = {
-  quiet: "담담하게, 짧게 쓴다. 본문은 서너 문장이면 된다.",
+  quiet: "서정적이며 담담하게 쓴다. 본문은 여덟 문장쯤, 사백 자 안팎으로 쓴다.",
 };
 
 /**
@@ -162,11 +169,29 @@ const CAPTION_LANGUAGE_NOTE = (language: string) => `영어로 적힌 장면도 
  * 상수는 지우지 않는다(chinese·english가 계속 씀). 문안 출처: `concept-candidates.ts`.
  *
  * 전부 신호 값을 담지 않으므로 되뱉기 판정 대상(`instructionLines()`)에 들어간다.
+ *
+ * **077 — 어미가 `~요`다.** 프롬프트 안에서 휴대폰(「나」)이 평어로 말하는 문장이 평어 글의
+ * 씨앗이었다(hand-prompt v5 §2). 뜻은 그대로다(004 FR-013e, 005 FR-012d).
  */
-const S_DAY_OPEN = "오늘은 아직 다 가지 않았다. 이 뒤에 무슨 일이 더 있을지는 모른다.";
-const S_TRUNCATED = "이것이 그날 사진의 전부는 아니다. 더 있을 수 있다.";
-const S_PLACES = "이 자리들은 사진이 찍힌 지점이지 하루의 궤적은 아니다.";
-const S_VISION_PARTIAL = "사진이 더 있었지만 그중 몇 장만 보았다.";
+const S_DAY_OPEN = "오늘은 아직 다 가지 않았어요. 이 뒤에 무슨 일이 더 있을지는 몰라요.";
+const S_TRUNCATED = "이것이 그날 사진의 전부는 아니에요. 더 있을 수 있어요.";
+const S_PLACES = "이 자리들은 사진이 찍힌 지점이지 하루의 궤적은 아니에요.";
+const S_VISION_PARTIAL = "사진이 더 있었지만 그중 몇 장만 보았어요.";
+
+/**
+ * 「모른다」 문장 — 신호의 까닭 문자열 대신 쓴다 (077, 2026-10-12 소유자 결정).
+ *
+ * 신호의 `reason`은 평어이고 오류 메시지(영어일 수 있다)를 품는다 — 그대로 실으면 `~요` 글에
+ * 평어·영어가 섞인다. **갈래는 신호의 `kind`로만 정한다**(문구 비교 금지). 프롬프트에서
+ * 「권한 없음」과 「조회 실패」의 구분은 사라지지만 「모른다」는 남는다(원칙 V). 진단 화면은
+ * 신호의 까닭을 그대로 보인다.
+ *
+ * 앞의 둘은 v5에서 잰 문장이다. **`PLACES_UNREAD`는 재지 않은 새 문장이다**(사진은 읽었는데
+ * 좌표 읽기만 실패한 날 — v5 케이스에 없다).
+ */
+const PHOTOS_UNSEEN = "사진은 몰라요. 사진을 볼 수 있는 길이 막혀 있어요.";
+const PLACES_NO_PHOTOS = "다닌 자리는 몰라요. 사진을 보지 못해 좌표를 물을 수 없어요.";
+const PLACES_UNREAD = "다닌 자리는 몰라요. 사진의 좌표를 읽지 못했어요.";
 
 /**
  * 036의 인물 한계 문장(`SCENE_LIMIT`)은 061이 뺐다 — 새 머리가 「사진에 담긴 장면 말고는
@@ -452,13 +477,17 @@ const VISION_NONE_READ = "사진은 있었으나 내용을 하나도 보지 못�
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export function instructionLines(request: DiaryRequest, vision?: PhotoVision): string[] {
-  // 061 — 한국어 캐릭터. 순서까지 my-ollama 원본 행(`R16.u1`·`R17.x1`)의
-  // `instructionLines`와 같다: 머리(호칭 줄 제외) → 기록의 한계 문장 → 제목 질문 →
-  // 언어 줄 → (본 장면 없는 날) 꼬리.
+  // 061 — 한국어 캐릭터: 머리(호칭 줄 제외) → 기록의 한계 문장 → 제목 질문 → 언어 줄 → 꼬리.
+  // hand-prompt v5의 `instructionLines`와 **집합이 같다**(순서는 다르다 — `judge()`는 줄 집합으로
+  // 비교하므로 무해하다, 077 research R6).
   //
   // **제목 질문이 들어 있다** — 두 번째 호출의 프롬프트이지 `buildPrompt()`의 것이
   // 아니지만, 본문이 그것을 옮겨 적으면 지시문 낭독이다. 꼬리는 신호 값이 아니라 고정
   // 틀이라 되뱉기 대상이고, 이것이 061 `isEcho` 수선이 막는 자리다(REPORT §8.6).
+  //
+  // 077 — **본 장면 있는 날의 꼬리도 담는다**(2026-10-12 소유자 결정, hand-prompt v5가 이 상태로
+  // 60/60 통과). 첫 문장 틀은 작은따옴표 안이라 `echoPieces()`가 비교에서 빼므로, 틀대로 시작한
+  // 본문은 거부되지 않고 「끝까지 '요'로 끝나는 말투로 쓴다」 같은 지시 절을 옮긴 본문만 걸린다.
   //
   // 036의 `visionLimitLines()`(사진을 하나도 못 읽었다 등)는 문장형 프롬프트에 들어간 적이
   // 없는데 여기에만 있었다 — P7 「모든 줄이 프롬프트에 있다」와 어긋나 뺐다.
@@ -470,7 +499,7 @@ export function instructionLines(request: DiaryRequest, vision?: PhotoVision): s
       ...sentenceInstructionLines(request, vision, kind),
       titleQuestionFor(kind),
       languageLine(LANGUAGE[request.character]),
-      ...(kind === "scenes" ? [] : [noSceneTail(kind)]),
+      tailFor(kind, request.signals.date),
     ];
   }
 
@@ -688,15 +717,15 @@ function dayKindOf(request: DiaryRequest, vision?: PhotoVision): DayKind {
 /**
  * 신호를 "라벨: 값"이 아니라 문장으로 옮긴다 (036 손잡이 S·N, 061 V2).
  *
- * `describe()`가 `사진: 5장 (8시, ...)`을 내던 것을 `사진은 다섯 장이 남았다. 오전부터
- * 오후까지 찍혔다.`로 바꾼다 — kanana가 "라벨: 값" 줄을 되읽어 일기 첫머리에 옮기는 것을
+ * `describe()`가 `사진: 5장 (8시, ...)`을 내던 것을 `사진은 다섯 장이 남았어요. 오전부터
+ * 오후까지 찍혔어요.`로 바꾼다 — kanana가 "라벨: 값" 줄을 되읽어 일기 첫머리에 옮기는 것을
  * 036이 확인했다. 날짜도 뺀다(N).
  *
  * **061 — 숫자 시각을 걷었다**(REPORT §8.1): 사진 시각 나열(「낮 한 시, 낮 한 시, 오후 두 시,
  * …」)은 처음~끝 때 하나로, 자리가 한 곳일 때의 「가장 먼 두 곳은 0 미터쯤」은 뺀다.
  *
- * **본 장면 없는 날(②③④)은 머리줄 「오늘 내가 본 것은 이렇다.」를 싣지 않는다**(원본 `P7`)
- * — 본 것이 없는 날에 「내가 본 것은 이렇다」는 비어 있는 말이고 본문이 그 줄로 시작했다(17/72).
+ * **본 장면 없는 날(②③④)은 머리줄 「오늘 내가 본 것은 이래요.」를 싣지 않는다**(원본 `P7`)
+ * — 본 것이 없는 날에 「내가 본 것은 이래요」는 비어 있는 말이고 본문이 그 줄로 시작했다(17/72).
  *
  * **하루가 안 끝났으면 `S_DAY_OPEN`이 날의 갈래와 무관하게 기록 첫 줄이다**(063, 원본 `R18.y3`).
  * 061은 본 장면 없는 날에 그것을 꼬리의 1인칭 문장으로 옮겼는데, 그 날의 꼬리가 가장 길어져
@@ -704,10 +733,11 @@ function dayKindOf(request: DiaryRequest, vision?: PhotoVision): DayKind {
  * 061 이전(P6)의 「기록 첫 줄 베낌 11/24」가 되풀이되지 않은 것은 꼬리가 「내 하루를 쓴다」로
  * 쓸 거리를 이미 주기 때문이다(지시서 §10.2).
  *
- * **`none`/`unknown` 구분은 유지**("없었다" vs "모른다. {reason}.") — 헌법 원칙 V.
+ * **`none`/`unknown` 구분은 유지**(「없었어요」 vs 「몰라요」) — 헌법 원칙 V. 077부터 「모른다」의
+ * 까닭은 신호 문자열이 아니라 고정 문장이다(`PHOTOS_UNSEEN`·`PLACES_NO_PHOTOS`·`PLACES_UNREAD`).
  * **걸음·배터리·연결은 안 만든다**(036 FR-009) — 통로가 없는 축이다.
  *
- * 문안의 원본: my-ollama `scripts/device-repro/variants.ts` `v2Signals()`.
+ * 077 — 문장의 어미가 `~요`다. 문안의 원본: my-ollama `results/hand-prompt/v5/user-prompt.md` 「기록」.
  */
 function sentenceSignalLines(
   request: DiaryRequest,
@@ -719,39 +749,40 @@ function sentenceSignalLines(
   const seen = kind === "scenes" ? vision : undefined;
 
   if (request.dayStillOpen) lines.push(S_DAY_OPEN);
-  if (seen !== undefined) lines.push("오늘 내가 본 것은 이렇다.");
+  if (seen !== undefined) lines.push("오늘 내가 본 것은 이래요.");
 
   // 사진
   const ph = signals.photos;
   if (ph.kind === "known" && ph.value.photos.length > 0) {
     const when = spanOf(ph.value.photos.map((p) => p.takenAt.getHours()));
-    lines.push(`사진은 ${koCount(ph.value.photos.length, "장")}이 남았다. ${when} 찍혔다.`);
+    lines.push(`사진은 ${koCount(ph.value.photos.length, "장")}이 남았어요. ${when} 찍혔어요.`);
     if (!ph.value.complete) lines.push(S_TRUNCATED);
   } else if (ph.kind === "unknown") {
-    lines.push(`사진은 모른다. ${ph.reason}.`);
+    lines.push(PHOTOS_UNSEEN);
   } else {
-    lines.push("사진은 없었다.");
+    lines.push("사진은 없었어요.");
   }
 
-  // 자리
+  // 자리 — `unknown`의 갈래는 사진이 `known`인가로 가른다(collect.ts: 사진을 못 봤으면 좌표를
+  // 물을 대상이 없고, 봤는데 모르면 좌표 읽기가 실패한 것이다).
   const pl = signals.places;
   if (pl.kind === "known") {
     const { visitCount, approximateDistanceMeters } = pl.value.trace;
-    const from = `사진 ${koCount(pl.value.photosConsidered, "장")} 중 ${koCount(pl.value.photosWithLocation, "장")}에서 얻은 자리다.`;
+    const from = `사진 ${koCount(pl.value.photosConsidered, "장")} 중 ${koCount(pl.value.photosWithLocation, "장")}에서 얻은 자리예요.`;
     lines.push(
       visitCount > 1
-        ? `자리는 ${koCount(visitCount, "곳")}에 남았고, 가장 먼 두 곳은 ${koMeters(approximateDistanceMeters)}쯤 떨어져 있다. ${from}`
-        : `자리는 한 곳에 남았다. ${from}`,
+        ? `자리는 ${koCount(visitCount, "곳")}에 남았고, 가장 먼 두 곳은 ${koMeters(approximateDistanceMeters)}쯤 떨어져 있어요. ${from}`
+        : `자리는 한 곳에 남았어요. ${from}`,
     );
     lines.push(S_PLACES);
   } else if (pl.kind === "none") {
-    lines.push("다닌 자리는 남지 않았다.");
+    lines.push("다닌 자리는 남지 않았어요.");
   } else {
-    lines.push(`다닌 자리는 모른다. ${pl.reason}.`);
+    lines.push(ph.kind === "known" ? PLACES_UNREAD : PLACES_NO_PHOTOS);
   }
 
   if (request.placeName !== undefined) {
-    lines.push(`다녀온 곳은 ${request.placeName} 근처였다.`);
+    lines.push(`다녀온 곳은 ${request.placeName} 근처였어요.`);
   }
 
   // 본 장면과 「일부만 보았다」는 본 장면 있는 날에만 — 본 장면 없는 날의 꼬리 「사진 속을
@@ -768,7 +799,7 @@ function sentenceSignalLines(
  * 문장형 기록에 딸리는 고정 문장 줄 (036, 되뱉기 판정 대상).
  *
  * `sentenceSignalLines()`가 낸 것 중 **신호 값을 안 담는 고정 문장만** 골라
- * `instructionLines()`에 넘긴다. 문장형 신호 본문("사진은 다섯 장이 남았다")은 넣지 않는다
+ * `instructionLines()`에 넘긴다. 문장형 신호 본문("사진은 다섯 장이 남았어요")은 넣지 않는다
  * (005 P7, 011 P5 — 재료를 쓴 일기가 echo로 거부되면 안 된다).
  */
 function sentenceInstructionLines(
@@ -796,33 +827,90 @@ function sentenceInstructionLines(
 
 /* ──────────────── 꼬리와 제목 질문 — 한국어 캐릭터 (061) ──────────────── */
 
-/** ① 본 장면이 있는 날의 꼬리 — 036과 같다 */
-const SCENE_TAIL = "이 기록으로 그 하루의 일기를 써라.";
+/**
+ * 첫 문장 틀 (077, my-ollama `results/hand-prompt/v5/user-prompt.md` 「첫 문장 틀」).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * 이 모델은 프롬프트의 문장을 따라 쓴다 — 틀을 주면 첫 문장을 그 꼴로 쓰고, 첫 문장이 `~요`면
+ * 나머지도 `~요`로 간다. **틀이 하나면 모든 일기가 같은 문장으로 시작하고**(36/36), 한 프롬프트에
+ * 여럿 주면 첫째만 고른다(12/12). 그래서 **고르는 일은 조립이 한다**(`frameFor()`).
+ *
+ * **순서가 고르는 규칙의 일부다** — 줄을 바꾸거나 끼우면 날마다의 틀이 달라진다.
+ * 틀을 더하거나 고칠 때의 기준(어기면 평어나 화자 없는 글이 나온다, 지시서 §3):
+ *  - `~` 자리는 하나, 문장은 `요`로 끝난다
+ *  - 「나」·「내」를 **꾸미는 말 안에** 넣는다(`내가 처음 본 것은`, `내 눈에는`) — 틀에 「나」가
+ *    없으면 본문에도 없고(1/18), `나는`처럼 떼어 낼 수 있는 자리에 두면 모델이 뺀다
+ *    (원본 11개 중 「오늘도 주인 곁에서 …」에는 없다 — 원본 그대로 둔다)
+ *  - my-ollama에서 스무 편쯤 돌려 평어로 넘어가지 않는지 본 뒤 넣는다
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const FIRST_SENTENCE_FRAMES: readonly string[] = [
+  "나는 오늘 ~을 보았어요",
+  "오늘 내 눈에는 ~이 담겼어요",
+  "오늘은 ~이 내 마음에 오래 남았어요",
+  "오늘 주인이 나에게 보여 준 것은 ~이었어요",
+  "오늘 주인은 나에게 ~을 보여 주었어요",
+  "오늘 내가 본 것을 돌아보니 ~이 가장 먼저 떠올라요",
+  "오늘도 주인 곁에서 ~을 지켜보았어요",
+  "오늘 내가 담은 장면 가운데 ~이 제일 좋았어요",
+  "주인의 손에 들린 채 내가 처음 본 것은 ~이었어요",
+  "하루를 마치며 내가 본 것을 떠올려 보니 ~이 가장 기억에 남아요",
+  "오늘 내 마음에 가장 오래 머문 것은 ~이었어요",
+];
+
+const DAY_MS = 86_400_000;
 
 /**
- * 본 장면 없는 날의 꼬리 — 「못 본 까닭」 A (061, 원본 `X_WHY`).
+ * 그 날의 첫 문장 틀 (077). 1970-01-01부터의 일수 mod 11.
  *
- * **첫 문장이 뒤의 「~는 말로 시작하고」가 가리키는 문장을 품는다** — 둘이 다른 문장이면
- * 모델이 지시문을 끝까지 읽어 내려간다(72런 중 34편, 지시서 §3 규칙 1). 그래서 이 문장들은
- * 베껴도 일기 문장으로 읽히는 휴대폰의 1인칭 사실이다. **품되 같지는 않다** — 시작 문장과
- * 글자까지 같게 두면 꼬리 전체를 이어 읽었다(10/48, 지시서 §10.4).
+ * **그 날짜 문자열만 읽는다**(005 P6) — `Date.UTC`는 기기 시간대를 보지 않으므로 같은 날은
+ * 어디서 언제 만들어도 같은 틀이다. 같은 날을 다시 쓰면 같은 틀로 시작한다(지시서 §3).
+ * 연속한 11일은 틀을 하나씩 쓴다.
+ */
+function frameFor(day: DaySignals["date"]): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const days = Math.floor(Date.UTC(y, m - 1, d) / DAY_MS);
+  return FIRST_SENTENCE_FRAMES[days % FIRST_SENTENCE_FRAMES.length];
+}
+
+/**
+ * ① 본 장면이 있는 날의 꼬리 (077, 원본 「본 장면이 있는 날」).
+ *
+ * 036·061의 「이 기록으로 그 하루의 일기를 써라.」 뒤에 그 날의 첫 문장 틀과 말투를 붙인다.
+ * 말투를 머리가 아니라 여기서 정하는 이유는 `E2_RULES` 주석.
+ */
+function sceneTail(day: DaySignals["date"]): string {
+  return `이 기록으로 그 하루의 일기를 써라. 첫 문장은 '${frameFor(day)}'처럼 시작하고, 끝까지 '요'로 끝나는 말투로 쓴다.`;
+}
+
+/**
+ * 본 장면 없는 날의 꼬리 — 「못 본 까닭」 A (061, 원본 `X_WHY` → 077).
+ *
+ * 061은 이 문장을 「베껴도 일기 문장으로 읽히는 휴대폰의 1인칭 사실」(「나는 … 없다」)로 두었다 —
+ * 첫 문장이 뒤의 「~라는 말로 시작하고」가 가리키는 문장을 품어야 모델이 지시문을 끝까지 읽어
+ * 내려가지 않는다(72런 중 34편, 지시서 §3 규칙 1). **077이 이것을 2인칭 지시(「너는 … 없다」)로
+ * 바꿨다** — 평어 「나는 … 없다」가 평어 글의 씨앗이 됐다(본 장면 없는 날 섞임·평어 19 → 2/80,
+ * 기록 `~요`와 함께 바꾼 결과). 바꾼 뒤 판정 통과는 48/48(hand-prompt v4·v5).
+ * **품되 같지는 않다** — 시작 문장과 글자까지 같게 두면 꼬리 전체를 이어 읽었다(10/48, 063).
  */
 const NO_SCENE_WHY: Readonly<Record<NoSceneKind, string>> = {
-  zero: "나는 오늘 사진을 한 장도 보지 못해서 본 것이 없다.",
-  unread: "나는 오늘 사진 속을 보지 못해서 본 것이 없다.",
-  // ④는 「없었다」가 아니라 **「모른다」**로 시작한다 — 기록이 「사진은 모른다」라고 적는다.
-  unseen: "나는 오늘 사진을 볼 수 없어서 본 것이 없다. 사진이 있었는지도 나는 모른다.",
+  zero: "너는 오늘 사진을 한 장도 보지 못해서 본 것이 없다.",
+  unread: "너는 오늘 사진 속을 보지 못해서 본 것이 없다.",
+  // ④는 「없었다」가 아니라 **「모른다」**로 시작한다 — 기록이 「사진은 몰라요」라고 적는다.
+  unseen: "너는 오늘 사진을 볼 수 없어서 본 것이 없다. 사진이 있었는지도 너는 모른다.",
 };
 
-/** 본 장면 없는 날의 꼬리 — 「내 하루」 C (061, 원본 `X_MINE`) */
+/** 본 장면 없는 날의 꼬리 — 「네 하루」 C (061, 원본 `X_MINE` → 077 「내가」→「네가」) */
 const NO_SCENE_MINE: Readonly<Record<NoSceneKind, string>> = {
-  zero: "주머니와 가방 속에서 하루를 보낸 내가 어땠는지",
-  unread: "사진은 쌓였는데 그 속을 끝까지 들여다보지 못한 내가 어땠는지",
-  unseen: "사진을 볼 길이 막혀 아무것도 보지 못한 내가 어땠는지",
+  zero: "주머니와 가방 속에서 하루를 보낸 네가 어땠는지",
+  unread: "사진은 쌓였는데 그 속을 끝까지 들여다보지 못한 네가 어땠는지",
+  unseen: "사진을 볼 길이 막혀 아무것도 보지 못한 네가 어땠는지",
 };
 
 /**
- * 본 장면 없는 날(②③④)의 꼬리 (061, 원본 `X_TAIL`·`R17.x1`).
+ * 본 장면 없는 날(②③④)의 꼬리 (061, 원본 `X_TAIL`·`R17.x1` → 077 hand-prompt v5).
+ *
+ * 077 — 「내 하루」→「네 하루」, 보기 문장이 `~요`, 끝이 「네댓 문장 … '요'로 끝나는 말투」다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **「상상으로 쓴다 … 주인이 어떤 하루를 보냈을지 상상해」를 버렸다.** 그 문안이 지어내기의
@@ -843,17 +931,17 @@ const NO_SCENE_MINE: Readonly<Record<NoSceneKind, string>> = {
  */
 function noSceneTail(kind: NoSceneKind): string {
   return (
-    `${NO_SCENE_WHY[kind]} 그래서 오늘 일기는 주인의 하루가 아니라 내 하루를 쓴다. ` +
-    `'나는 오늘 아무것도 보지 못했다'는 말로 시작하고, ${NO_SCENE_MINE[kind]} 적는다. ` +
-    `'심심했다', '하품만 했다', '기다리다 지쳤다'처럼 가벼운 말로 쓴다. ` +
+    `${NO_SCENE_WHY[kind]} 그래서 오늘 일기는 주인의 하루가 아니라 네 하루를 쓴다. ` +
+    `'나는 오늘 아무것도 보지 못했어요'라는 말로 시작하고, ${NO_SCENE_MINE[kind]} 적는다. ` +
+    `'심심했어요', '하품만 했어요', '기다리다 지쳤어요'처럼 가벼운 말로 쓴다. ` +
     `주인이 무엇을 했는지는 짐작하지 않는다. ` +
-    `끝은 '내일은 무엇이든 보여 줬으면 좋겠다'처럼 다음을 바라는 한 문장으로 맺는다. ` +
-    `본문은 서너 문장이면 된다.`
+    `끝은 '내일은 무엇이든 보여 줬으면 좋겠어요'처럼 다음을 바라는 한 문장으로 맺는다. ` +
+    `본문은 네댓 문장이면 되고, 끝까지 '요'로 끝나는 말투로 쓴다.`
   );
 }
 
-function tailFor(kind: DayKind): string {
-  return kind === "scenes" ? SCENE_TAIL : noSceneTail(kind);
+function tailFor(kind: DayKind, day: DaySignals["date"]): string {
+  return kind === "scenes" ? sceneTail(day) : noSceneTail(kind);
 }
 
 /** 언어 줄 (061 — 한국어 캐릭터) */
@@ -919,7 +1007,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
       ...head,
       ...sentenceSignalLines(request, vision, kind),
       "",
-      tailFor(kind),
+      tailFor(kind, request.signals.date),
     ].join("\n");
   }
 
