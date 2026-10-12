@@ -50,15 +50,16 @@ type Attempt = { at: Date; path: AttemptPath; outcome: AttemptOutcome };
 ```
 
 - **갈래는 사람이 못 박은 상수**이고 코드가 늘리지 않는다. 시간·바이트·토큰·단계별 소요는 기록하지 않는다(원칙 IV). 판정 이유 문자열(`reason`)도 싣지 않는다 — 갈래만.
-- **저장**: `preferences/auto-write-attempts.json` `{ items: [{ at, path, outcome }] }`, 최신이 앞, **최근 20건**(`MAX_AUTO_WRITE_ATTEMPTS`). 못 읽거나 깨졌으면 빈 목록. 깨진 항목은 건너뛴다(060과 같다). 쓰기 실패는 삼킨다 — 기록이 자동 쓰기를 막지 않는다.
+- **저장**: `preferences/auto-write-attempts.json` `{ items: [{ at, path, outcome }] }`, 최신이 앞, **최근 20건**(`MAX_AUTO_WRITE_ATTEMPTS`). 같은 프로세스의 기록은 한 줄로 세워 쓴다(겹치면 뒤에 쓴 쪽이 앞 줄을 덮는다 — 구현 중 더함). 못 읽거나 깨졌으면 빈 목록. 깨진 항목은 건너뛴다(060과 같다). 쓰기 실패는 삼킨다 — 기록이 자동 쓰기를 막지 않는다.
 - **시작과 끝을 따로 쓴다**: `recordAttemptStart(port, path, at)`가 `outcome: "started"` 줄을 맨 앞에 넣고, `recordAttemptEnd(port, path, at, outcome)`가 **같은 `at`·`path`의 줄을 찾아** 결과로 바꾼다(없으면 맨 앞에 넣는다 — 잃지 않는다). 끝이 영영 안 오면 `started`가 남는다 — 그것이 「끊겼다」의 증거다.
 - **어디서 부르는가**:
   - `runAutoDiaryTask`(백그라운드·`manual`): 들어가자마자 `start`(`path`는 `deps.manual`이면 `manual`), 모든 반환·예외 경로에서 `end`. 결과 대응: 흉내 → `simulation`, `!app.ok` → `failed`, `resolveAutoWrite` `idle` → 그 `reason`, `skip` → 그 `because`, 캐릭터 없음 → `no-character`, 파이프라인 `ok` → `ran`, `already-running` → `already-running`, 그 밖 실패·예외 → `failed`. 통로는 `deps.attemptPort?`로 주입(기본 `expoAutoWriteAttemptPort()`), 테스트는 대역.
-  - 앱 열기(`App.tsx` `DiarySection`의 `resolveAutoWrite` 호출): 판정 결과를 한 줄로 **바로 끝까지** 쓴다(`start` 없이 `end` 한 번 — 판정 자체는 끊길 일이 없다). `write`면 `write`. 홈의 실제 쓰기 결과는 기록하지 않는다 — 화면이 보이고 실패는 060이 받는다. 전경 복귀마다 판정하므로 줄이 쌓인다 — 20건 상한이 막는다.
+  - 앱 열기(`App.tsx` `DiarySection`의 `resolveAutoWrite` 호출): 판정 결과를 한 줄로 **바로 끝까지** 쓴다(`start` 없이 `end` 한 번 — 판정 자체는 끊길 일이 없다). `write`면 `write`. 홈의 실제 쓰기 결과는 기록하지 않는다 — 화면이 보이고 실패는 060이 받는다. 전경 복귀마다 판정하므로 줄이 쌓인다 — 바로 앞 줄과 경로·결과가 같으면 새 줄 대신 시각만 갱신해 백그라운드 줄이 상한 밖으로 밀리지 않게 한다.
   - 040 첫 실행 자동 첫 일기·홈의 수동 쓰기·진단 「한 번 써 보기」는 자동 쓰기가 아니다 — 기록하지 않는다.
+- **보이는 자리 둘** (구현 중 고침, 2026-10-13): 처음에는 진단 화면만 적었는데 **진단 화면은 개발 환경 전용**이라(060) TestFlight(배포) 빌드의 테스터가 볼 수 없다. 그래서 같은 묶음(공용 부품 `AttemptsGroup`)을 **개발자 화면 맨 아래**(「끄기」 아래, 배포 빌드에서도 설정 → 「버전」을 1초 안에 7번 탭 → 「개발자」 맨 아래로 열림 — 보드 `6e`·`6j` 밖, 소유자 확인 대상)에도 둔다. `AppFrame`이 개발자 겹이 열릴 때 읽는다.
 - **진단 화면**: 「최근 실패」 묶음 아래 「최근 자동 쓰기 시도」 묶음. 줄마다 라벨 「{경로} · M월 d일 HH:mm」, 값 「{결과}」. 경로 문구 셋(백그라운드·앱 열기·지금 실행)과 결과 문구 열둘은 카탈로그(`src/i18n/catalogs/ko/`)의 **새 영역**에 둔다(062 — 옛 골든 영역에 키를 더하지 않는다). 줄 조립은 `src/app/diagnostics-view.ts`의 순수 함수 `attemptLines()`(`failureLines`와 같은 모양, 시각 형식도 같은 `failureTime`). 읽기는 `DiagnosticsLayer`가 실패 기록과 같은 시점(마운트·「자동 쓰기 지금 실행」 뒤)에 한다. 빈 목록은 「아직 시도가 없어요」.
 - **지우지 않는다**: 058 일기 모두 지우기·059 개발자 끄기·온보딩 다시는 이 파일을 건드리지 않는다(060 실패 기록과 같다).
-- **iOS에서 읽는 법**: 테스터가 진단 화면 스크린샷을 보낸다. 줄이 없으면 OS가 깨우지 않았다(스와이프 종료·앱 새로 고침·저전력을 묻는다). `background · not-near-target`만 있으면 조각 1 이전 동작이다. `background · started`가 남아 있으면 완주하다 끊겼다(4번 원인). 앱을 백그라운드로 다시 띄운 실행에서는 `App.tsx`도 그려지므로 `app-open` 줄이 같이 남을 수 있다 — 정상이다.
+- **iOS에서 읽는 법**: 테스터가 개발자 화면(설정 → 「버전」을 1초 안에 7번 탭 → 「개발자」 맨 아래) 스크린샷을 보낸다. 줄이 없으면 OS가 깨우지 않았다(스와이프 종료·앱 새로 고침·저전력을 묻는다). `background · not-near-target`만 있으면 조각 1 이전 동작이다. `background · started`가 남아 있으면 완주하다 끊겼다(4번 원인). 앱을 백그라운드로 다시 띄운 실행에서는 `App.tsx`도 그려지므로 `app-open` 줄이 같이 남을 수 있다 — 정상이다.
 
 **영향 범위**: 새 `src/app/auto-write-attempts.ts`(순수 + 기기 통로), `src/schedule/task.ts`, `App.tsx`(`DiarySection` 한 곳 + `DiagnosticsLayer` 읽기·전달), `src/app/diagnostics-view.ts`, `src/ui/DiagnosticsScreen.tsx`(묶음 하나), `src/i18n/catalogs/ko/`(새 영역 + `index.ts` 등록), `scripts/constitution-rules.ts`(새 파일이 `src/app/`이라 `checkScheduleFile`에 걸리지 않는다 — `task.ts`가 `app/write-failures`를 이미 import하는 것과 같은 방향; 검사가 걸리면 그 자리에 이유를 적는다).
 
