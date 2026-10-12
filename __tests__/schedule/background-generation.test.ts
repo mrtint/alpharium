@@ -43,14 +43,25 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
   const dismiss = jest.fn().mockResolvedValue(undefined);
   const notifiedWrite = jest.fn().mockResolvedValue(undefined);
   const skipWrite = jest.fn().mockResolvedValue(undefined);
+  const attempts = {
+    content: null as string | null,
+    async read() {
+      return attempts.content;
+    },
+    async write(serialized: string) {
+      attempts.content = serialized;
+    },
+  };
 
   return {
+    attempts,
     pipelineRun,
     present,
     dismiss,
     notifiedWrite,
     skipWrite,
     deps: {
+      attemptPort: attempts,
       skipPort: { read: async () => null, write: skipWrite, remove: async () => {} },
       now: at(7),
       resolution: { ok: true, environment: "dev" } as never,
@@ -89,6 +100,24 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
       ...overrides,
     },
   };
+}
+
+/** 미리보기·실행을 바꾼 파이프라인 조립 대역 */
+function pipelineWith(previewDay: ReturnType<typeof previewOf>, run?: jest.Mock) {
+  return (() => ({
+    ok: true,
+    pipeline: {
+      run: run ?? jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false }),
+    },
+    location: "on-device",
+    previewDay,
+    store: {
+      listDays: async () => [],
+      load: async () => null,
+      has: async () => false,
+      save: async () => ({ ok: true, overwrote: false }),
+    },
+  })) as never;
 }
 
 describe("B2 — 판정 순서", () => {
@@ -402,5 +431,96 @@ describe("B1a — defineTask는 모듈 부수 효과다 (024, 헤드리스 배�
       /(^|\n)import\s+.*expo-task-manager/.test(code) ||
       /require\(\s*["']expo-task-manager["']\s*\)/.test(code);
     expect(loadsTaskManagerAtModuleScope).toBe(true);
+  });
+});
+
+describe("078 AT — 자동 쓰기 시도 기록", () => {
+  const lines = (port: { content: string | null }) =>
+    (
+      JSON.parse(port.content ?? '{"items":[]}') as {
+        items: { path: string; outcome: string; at: string }[];
+      }
+    ).items;
+
+  it("쓰면 background · ran 한 줄 — 시작과 끝이 같은 줄이다(at이 now와 같다)", async () => {
+    const { deps, attempts } = baseDeps();
+    await runAutoDiaryTask(deps);
+    expect(lines(attempts)).toEqual([
+      { path: "background", outcome: "ran", at: at(7).toISOString() },
+    ]);
+  });
+
+  it.each([
+    [
+      "disabled",
+      {
+        settingsPort: {
+          read: async () => JSON.stringify({ ...ENABLED, enabled: false }),
+          write: async () => {},
+        },
+      },
+    ],
+    [
+      "not-near-target",
+      { now: at(15), listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"] },
+    ],
+    ["all-written", { listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"] }],
+    ["no-character", { loadCharacter: async () => null }],
+  ] as const)("%s", async (outcome, over) => {
+    const { deps, attempts } = baseDeps({ ...over });
+    await runAutoDiaryTask(deps);
+    expect(lines(attempts).map((l) => l.outcome)).toEqual([outcome]);
+  });
+
+  it("사진 0장이면 no-material, 사진 권한 없음이면 no-photo-access", async () => {
+    const a = baseDeps({ makePipeline: pipelineWith(previewOf({ kind: "known", count: 0 })) });
+    await runAutoDiaryTask(a.deps);
+    expect(lines(a.attempts).map((l) => l.outcome)).toEqual(["no-material"]);
+    const b = baseDeps({ makePipeline: pipelineWith(previewOf({ kind: "unknown" }, "denied")) });
+    await runAutoDiaryTask(b.deps);
+    expect(lines(b.attempts).map((l) => l.outcome)).toEqual(["no-photo-access"]);
+  });
+
+  it("already-running·실패·예외·조립 실패는 각각 already-running·failed·failed·failed", async () => {
+    const cases: [string, Record<string, unknown>][] = [
+      [
+        "already-running",
+        {
+          makePipeline: pipelineWith(
+            WITH_PHOTOS,
+            jest.fn().mockResolvedValue({ ok: false, stage: "already-running", reason: "x" }),
+          ),
+        },
+      ],
+      [
+        "failed",
+        {
+          makePipeline: pipelineWith(
+            WITH_PHOTOS,
+            jest.fn().mockResolvedValue({ ok: false, stage: "storage", reason: "x" }),
+          ),
+        },
+      ],
+      [
+        "failed",
+        { makePipeline: pipelineWith(WITH_PHOTOS, jest.fn().mockRejectedValue(new Error("boom"))) },
+      ],
+      ["failed", { makePipeline: () => ({ ok: false, reason: "no-engine" }) }],
+    ];
+    for (const [outcome, over] of cases) {
+      const { deps, attempts } = baseDeps(over);
+      await runAutoDiaryTask(deps);
+      expect(lines(attempts).map((l) => l.outcome)).toEqual([outcome]);
+    }
+  });
+
+  it("기록 통로가 던져도 결과와 파이프라인 호출은 그대로다", async () => {
+    const broken = {
+      read: () => Promise.reject(new Error("io")),
+      write: () => Promise.reject(new Error("io")),
+    };
+    const { deps, pipelineRun } = baseDeps({ attemptPort: broken });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(pipelineRun).toHaveBeenCalledTimes(1);
   });
 });

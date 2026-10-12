@@ -43,8 +43,18 @@ function make(over: {
 }) {
   const run = over.run ?? jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false });
   const failures = failurePort();
+  const attempts = {
+    content: null as string | null,
+    async read() {
+      return attempts.content;
+    },
+    async write(serialized: string) {
+      attempts.content = serialized;
+    },
+  };
   const deps = {
     manual: over.manual,
+    attemptPort: attempts,
     failurePort: failures,
     skipPort: { read: async () => null, write: async () => {}, remove: async () => {} },
     now: over.now ?? OUT_OF_WINDOW,
@@ -74,7 +84,7 @@ function make(over: {
       store: { listDays: async () => [] },
     })) as never,
   };
-  return { deps, run, failures };
+  return { deps, run, failures, attempts };
 }
 
 describe("AR1 — manual은 시도 창과 토글을 무시한다", () => {
@@ -206,5 +216,16 @@ describe("AR5 — 쓰기 실패 기록", () => {
       write: () => Promise.reject(new Error("io")),
     };
     expect(await runAutoDiaryTask({ ...deps, failurePort: broken })).toBe("failed");
+  });
+});
+
+describe("078 AT — manual은 경로가 manual이다", () => {
+  it("쓰면 manual · ran", async () => {
+    const { deps, attempts } = make({ manual: true });
+    await runAutoDiaryTask(deps);
+    const items = (
+      JSON.parse(attempts.content ?? "") as { items: { path: string; outcome: string }[] }
+    ).items;
+    expect(items).toEqual([{ path: "manual", outcome: "ran", at: expect.any(String) }]);
   });
 });

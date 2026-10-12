@@ -37,6 +37,15 @@ import {
   loadSimulation,
   type SimulationStorePort,
 } from "../app/simulation-store";
+import {
+  attemptOutcomeOf,
+  expoAutoWriteAttemptPort,
+  recordAttemptEnd,
+  recordAttemptStart,
+  type AttemptOutcome,
+  type AttemptPath,
+  type AutoWriteAttemptPort,
+} from "../app/auto-write-attempts";
 import { createAppPipeline } from "../app/wiring";
 import { showsOnScreen } from "../diagnostics/sink";
 import {
@@ -99,7 +108,14 @@ export type AutoDiaryTaskDeps = {
   failurePort?: WriteFailurePort;
   /** 064 — 상태 흉내 기록 통로. 주지 않으면 `preferences/simulation.json` */
   simulationPort?: SimulationStorePort;
+  /** 078 — 자동 쓰기 시도 기록 통로. 주지 않으면 `preferences/auto-write-attempts.json` */
+  attemptPort?: AutoWriteAttemptPort;
 };
+
+/** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
+type BodyOutcome = { result: AutoDiaryTaskResult; outcome: AttemptOutcome };
+const skipped = (outcome: AttemptOutcome): BodyOutcome => ({ result: "skipped", outcome });
+const FAILED: BodyOutcome = { result: "failed", outcome: "failed" };
 
 /**
  * 백그라운드 트리거의 실제 본체.
@@ -112,9 +128,21 @@ export type AutoDiaryTaskDeps = {
  */
 export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<AutoDiaryTaskResult> {
   // B7 — now를 한 번만 만든다. 콜백이 도는 도중 시각이 넘어가 판정과 생성이
-  // 다른 하루를 보는 것을 막는다.
+  // 다른 하루를 보는 것을 막는다. 078 — 시도 기록의 시작·끝도 이 값으로 짝을 맞춘다.
   const now = deps.now ?? new Date();
+  const attemptPort = deps.attemptPort ?? expoAutoWriteAttemptPort();
+  const path: AttemptPath = deps.manual === true ? "manual" : "background";
 
+  // ★ 078 — 시작을 먼저 쓴다. 끝이 영영 안 오면(iOS 시간 예산 만료·메모리, 안드로이드 kill) `started`가 남고 그것이
+  // 「깼지만 완주하지 못했다」의 유일한 증거다. 기록 실패는 안에서 삼킨다 — 기록이 자동 쓰기를 막지 않는다.
+  await recordAttemptStart(attemptPort, path, now);
+  const { result, outcome } = await runBody(deps, now);
+  await recordAttemptEnd(attemptPort, path, now, outcome);
+  return result;
+}
+
+/** 본체. 결과와 기록 갈래를 함께 돌려준다 — 기록은 `runAutoDiaryTask`가 한다. */
+async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome> {
   try {
     const settingsPort = deps.settingsPort ?? expoAutoDiarySettingsPort();
     const loaded = await loadAutoDiarySettings(settingsPort);
@@ -130,7 +158,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       showsOnScreen(resolution),
     );
     if (simulationBlocksWriting(simulation)) {
-      return "skipped";
+      return skipped("simulation");
     }
     const makePipeline = deps.makePipeline ?? createAppPipeline;
     // 020 L5 — 백그라운드 owner로 조립한다. wiring.ts가 owner-bound
@@ -138,7 +166,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
     // 취득 실패로 인한 already-running 결과는 아래에서 "skipped"로 매핑한다.
     const app = makePipeline(resolution, { lockOwner: "background" });
     if (!app.ok) {
-      return "failed";
+      return FAILED;
     }
 
     // 저장된 일기 날짜. 주입이 없으면 pipeline이 쓰는 store에서 읽는다
@@ -158,7 +186,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       skipPort: deps.skipPort ?? expoSkipStorePort(),
     });
     if (decision.kind !== "write") {
-      return "skipped";
+      return skipped(attemptOutcomeOf(decision));
     }
 
     // 007이 저장한 캐릭터를 읽기만 한다(제품 상태를 쓰지 않는다).
@@ -167,7 +195,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       : await loadSelection(expoSelectionPort());
     if (!character) {
       // 고른 캐릭터 없이 자동 생성하지 않는다.
-      return "skipped";
+      return skipped("no-character");
     }
 
     // ★ 042 — **백그라운드도 사진을 본다.**
@@ -193,7 +221,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
 
     if (result.ok) {
       await sendCompletionNotification(decision.day, character, deps);
-      return "ran";
+      return { result: "ran", outcome: "ran" };
     }
 
     // 060 — 쓰기 실패를 기록한다(진단 「최근 실패」). `already-running`은 기록하지 않는다(다른 쪽이 쓰는 중이다) —
@@ -202,9 +230,9 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
 
     // B2-9 — 잠금 외 사유로 실패했으면 알림을 보내지 않는다(FR-005, SC-006).
     if (result.stage === "already-running") {
-      return "skipped";
+      return skipped("already-running");
     }
-    return "failed";
+    return FAILED;
   } catch {
     // 060 — 예상 못 한 예외도 쓰기 실패다(`unwritten`). 던지지 않는다.
     await recordWriteFailure(
@@ -212,7 +240,7 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
       { ok: false, stage: "unexpected", reason: "" },
       now,
     );
-    return "failed";
+    return FAILED;
   }
 }
 
