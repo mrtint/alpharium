@@ -414,6 +414,11 @@ describe("T — 첫 문장 틀은 날짜로 하나 (077)", () => {
     expect(new Set(used)).toEqual(new Set(FRAMES));
   });
 
+  it("1970년 이전 날짜도 틀 하나를 고른다 (음수 나머지 없음)", () => {
+    const f = frameIn(buildPrompt(req(sceneDay("1969-12-31"), "quiet"), twoCaptions()));
+    expect(FRAMES).toContain(f);
+  });
+
   it("고르는 규칙 — 1970-01-01부터의 일수 mod 11번째 줄", () => {
     for (const day of ["2026-01-01", "2026-10-12", "2027-03-01", "2024-02-29"]) {
       expect(frameIn(buildPrompt(req(sceneDay(day), "quiet"), twoCaptions()))).toBe(frameOf(day));

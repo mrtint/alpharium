@@ -778,6 +778,8 @@ function sentenceSignalLines(
   } else if (pl.kind === "none") {
     lines.push("다닌 자리는 남지 않았어요.");
   } else {
+    // collect.ts는 사진이 `none`이면 자리도 `none`을 낸다 — 「사진은 없었어요」 뒤에
+    // `PLACES_NO_PHOTOS`가 붙는 조합은 그 전제 밖이다(대역에서만 생긴다).
     lines.push(ph.kind === "known" ? PLACES_UNREAD : PLACES_NO_PHOTOS);
   }
 
@@ -865,12 +867,14 @@ const DAY_MS = 86_400_000;
  *
  * **그 날짜 문자열만 읽는다**(005 P6) — `Date.UTC`는 기기 시간대를 보지 않으므로 같은 날은
  * 어디서 언제 만들어도 같은 틀이다. 같은 날을 다시 쓰면 같은 틀로 시작한다(지시서 §3).
- * 연속한 11일은 틀을 하나씩 쓴다.
+ * 연속한 11일은 틀을 하나씩 쓴다. 날짜는 `day-boundary`의 `dayOf`가 만든 `YYYY-MM-DD`라고
+ * 전제한다(형식이 틀리면 `NaN`). 1970년 이전 날짜도 음수 나머지가 나지 않게 양수로 접는다.
  */
 function frameFor(day: DaySignals["date"]): string {
   const [y, m, d] = day.split("-").map(Number);
   const days = Math.floor(Date.UTC(y, m - 1, d) / DAY_MS);
-  return FIRST_SENTENCE_FRAMES[days % FIRST_SENTENCE_FRAMES.length];
+  const n = FIRST_SENTENCE_FRAMES.length;
+  return FIRST_SENTENCE_FRAMES[((days % n) + n) % n];
 }
 
 /**
@@ -999,7 +1003,8 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
 
   // 036·061 — 한국어 캐릭터는 문장형 기록 + 날의 갈래 넷에 따른 꼬리. 날짜 머리줄·별도
   // dayStillOpen/placeName/vision 조각이 전부 sentenceSignalLines()·tailFor() 안으로
-  // 들어간다. `signals.date` 필드 자체는 안 지운다 — 본문에서만 안 쓴다(036 FR-007).
+  // 들어간다. `signals.date` 필드 자체는 안 지운다 — 날짜 문자열은 싣지 않고(036 FR-007),
+  // 077부터 첫 문장 틀을 고르는 데만 쓴다(`frameFor`).
   if (usesE2SN(request.character)) {
     const kind = dayKindOf(request, vision);
     return [
