@@ -33,7 +33,8 @@ export type ScheduleDecision =
  *
  * 근사치(FR-002)이므로 넉넉히. SC-002(24시간 내 1회)와 SC-003(예외 시
  * 1시간 내 1회)은 이 "창"이 아니라 **시도 하한**을 재는 기준이다 — 이 창은
- * "매 15분 콜백 중 어느 구간에서 생성을 시도할 자격이 있는가"를 정한다.
+ * "어느 구간에서 **오늘**을 쓰기 시작할 자격이 있는가"를 정한다(078 — 지난 날 중
+ * 안 쓴 날은 이 창과 무관하게 쓴다).
  *
  * **export하지 않는다**(D3) — 부르는 쪽이 이 값을 알면 값이 두 곳에 생긴다
  * (009의 `SELECTABLE_DAY_COUNT`가 밖으로 안 나가는 것과 같은 방식). 테스트도
@@ -51,34 +52,39 @@ function isNearTarget(hour: number, targetHour: number): boolean {
 
 /**
  * 지금 자동 생성을 돌려야 하는가.
- *
- * 판정 순서(고정, D2):
+ * 판정 순서(고정, D2 — 078 개정):
  *  1. `settings.enabled === false` → `{ act: false, reason: "disabled" }`.
- *  2. `now`의 현지 시(hour)가 목표 시각 근방이 아니면
- *     → `{ act: false, reason: "not-near-target" }`.
- *  3. `pickRetryDay`가 `null`이면 → `{ act: false, reason: "all-written" }`.
- *  4. 그 외 → `{ act: true, day }`.
+ *  2. `near` = `now`의 현지 시(hour)가 목표 시각 근방인가. 후보는 `near`면
+ *     `selectableDays` 전부, 아니면 거기서 `today`를 뺀 것 — **오늘은 창 안에서만,
+ *     지난 날은 언제든**(078: iOS `BGTaskScheduler`는 창 안에 깨운다는 보장이 없다).
+ *  3. `pickRetryDay(후보, existingDiaryDays)`가 날을 주면 → `{ act: true, day }`.
+ *  4. `null`이면: 창 밖이고 오늘이 `selectableDays`에 있으며 안 쓴 날이면
+ *     `not-near-target`, 그 밖은 `all-written`.
+ *
+ * `today`는 주입이다(`dayOf(now)`) — 이 파일은 하루 경계를 계산하지 않는다(FR-021a).
  */
 export function decideSchedule(input: {
   settings: AutoDiarySettings;
   now: Date;
+  today: DayDate;
   selectableDays: readonly DayDate[];
   existingDiaryDays: readonly DayDate[];
 }): ScheduleDecision {
-  const { settings, now, selectableDays, existingDiaryDays } = input;
+  const { settings, now, today, selectableDays, existingDiaryDays } = input;
 
   if (!settings.enabled) {
     return { act: false, reason: "disabled" };
   }
 
-  if (!isNearTarget(now.getHours(), settings.targetHour)) {
-    return { act: false, reason: "not-near-target" };
+  const near = isNearTarget(now.getHours(), settings.targetHour);
+  const candidates = near ? selectableDays : selectableDays.filter((day) => day !== today);
+
+  const day = pickRetryDay(candidates, existingDiaryDays);
+  if (day !== null) {
+    return { act: true, day };
   }
 
-  const day = pickRetryDay(selectableDays, existingDiaryDays);
-  if (day === null) {
-    return { act: false, reason: "all-written" };
-  }
-
-  return { act: true, day };
+  const todayPending =
+    !near && selectableDays.includes(today) && !existingDiaryDays.includes(today);
+  return { act: false, reason: todayPending ? "not-near-target" : "all-written" };
 }

@@ -10,6 +10,7 @@ Clarifications(재시도 대상, 목표 시각 변경).
 export function decideSchedule(input: {
   settings: AutoDiarySettings;
   now: Date;
+  today: DayDate;              // dayOf(now) — 주입 (078)
   selectableDays: readonly DayDate[];   // 009의 selectableDays(now)
   existingDiaryDays: readonly DayDate[]; // store.listDays()
 }): ScheduleDecision;
@@ -19,16 +20,21 @@ export type ScheduleDecision =
   | { act: true; day: DayDate };
 ```
 
-## D2 — 판정 순서 (고정)
+## D2 — 판정 순서 (고정, 078 개정)
 
 1. `settings.enabled === false` → `{ act: false, reason: "disabled" }`.
-2. `now`의 **현지 시(hour)** 가 `[targetHour, targetHour + WINDOW_HOURS)`
-   구간에 없으면 → `{ act: false, reason: "not-near-target" }`.
-   - `targetHour + WINDOW_HOURS > 24`이면 자정을 넘겨 wrap한다
-     (예: `targetHour=23, WINDOW_HOURS=3` → 23·0·1시가 근방).
-3. `pickRetryDay(selectableDays, existingDiaryDays)`가 `null`이면 →
-   `{ act: false, reason: "all-written" }`.
-4. 그 외 → `{ act: true, day: <그 값> }`.
+2. `near` = `now`의 **현지 시(hour)** 가 `[targetHour, targetHour + WINDOW_HOURS)`
+   구간에 있는가. `targetHour + WINDOW_HOURS > 24`이면 자정을 넘겨 wrap한다
+   (예: `targetHour=23, WINDOW_HOURS=3` → 23·0·1시가 근방).
+   후보 = `near`면 `selectableDays` 전부, 아니면 `selectableDays`에서 `today`를 뺀 것.
+   **오늘은 창 안에서만, 지난 날은 언제든 쓴다** — iOS `BGTaskScheduler`는 창 안에
+   깨운다는 보장이 없고(078), 앱 열기 경로(057)도 같은 판정이다.
+3. `pickRetryDay(후보, existingDiaryDays)`가 날을 주면 → `{ act: true, day }`.
+4. `null`이면: `near`가 아니고 `today`가 `selectableDays`에 있으며 안 쓴 날이면
+   `{ act: false, reason: "not-near-target" }`, 그 밖은 `{ act: false, reason: "all-written" }`.
+
+`today`는 `dayOf(now)`를 부르는 쪽(`resolveAutoWrite`)이 넘긴다 — `decision.ts`는
+하루 경계를 계산하지 않는다(FR-021a).
 
 ## D3 — `WINDOW_HOURS` 상수
 
@@ -69,7 +75,7 @@ export function pickRetryDay(
 | 주입 | 기대 |
 |---|---|
 | `pickRetryDay`가 `selectableDays` 밖 날짜를 돌려준다 | 계약 위반 — 결과는 항상 입력 배열의 원소이거나 `null` |
-| `decideSchedule`가 `settings.targetHour`를 무시하고 항상 `act: true` | D2-2 위반 — 목표 시각 근방이 아니면 `not-near-target` |
+| `decideSchedule`가 `settings.targetHour`를 무시하고 오늘을 언제든 쓴다 | D2-2 위반 — 창 밖이면 오늘을 쓰지 않는다(`not-near-target`) |
 | `WINDOW_HOURS`를 export한다 | 소스 검사 위반 (D3, 009 `SELECTABLE_DAY_COUNT` 패턴) |
 | `decideSchedule`가 `new Date()`를 안에서 부른다 | D4 위반 — 소스 문자열에 `new Date()` 없음(주석 제외) |
 | `settings.enabled === false`인데 `act: true` | D2-1 위반 |

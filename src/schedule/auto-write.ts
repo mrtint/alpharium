@@ -26,7 +26,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { selectableDays, type DayDate } from "../config/day-boundary";
+import { dayOf, selectableDays, type DayDate } from "../config/day-boundary";
 import { decideMaterial, fromCountHint } from "../app/material";
 import type { DayPreview } from "../app/state";
 import { decideSchedule, type ScheduleDecision } from "./decision";
@@ -71,6 +71,7 @@ export async function resolveAutoWrite(deps: {
   const schedule = decideSchedule({
     settings: deps.settings,
     now: deps.now,
+    today: dayOf(deps.now),
     selectableDays: selectableDays(deps.now),
     existingDiaryDays: await deps.listDiaryDays(),
   });
