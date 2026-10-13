@@ -43,6 +43,7 @@ import {
   LIVENESS_TIMEOUT_MS,
   type LivenessOutcome,
 } from "../welcome/liveness";
+import { type AssemblyOwner, generationTimeoutFor, inferenceThreadsFor } from "./assembly";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
@@ -146,8 +147,12 @@ async function runWithTimeout(
 
   const timeout = new Promise<{ timedOut: true }>((resolve) => {
     timer = setTimeout(() => {
-      // 결과를 기다리지 않는다 — stop()이 듣지 않을 수도 있고(research §2), 그때도
-      // 사용자를 붙잡아 두지 않는 것이 낫다.
+      // 여기서는 멈춤의 결과를 기다리지 않고 한도 판정을 낸다.
+      //
+      // **그러나 부른 쪽은 생성이 실제로 멈출 때까지 돌아가지 않는다**(079, assembly.md U8) —
+      // `generate()`·`checkLiveness()`의 `finally`가 `engine.unload()`를 기다리고, `unload()`는
+      // 도는 생성이 끝난 뒤에만 컨텍스트를 놓는다. 계산 중인 컨텍스트를 놓으면 앱이 죽는다
+      // (2026-10-13 iOS 시뮬레이터 SIGSEGV). 「사용자를 붙잡지 않으려고」 그 기다림을 빼지 않는다.
       void engine.stop().catch(() => {});
       resolve({ timedOut: true });
     }, timeoutMs);
@@ -787,7 +792,17 @@ export function onDeviceBackend(
    * 이름으로 프리필하며, 그때도 틀리지 않고 느려질 뿐이다(018 E10).
    */
   loadCustomNames?: () => Promise<CustomNames>,
+  /**
+   * 이 어댑터를 조립하는 쪽 (079, contracts/assembly.md A6). 주지 않으면 화면이다.
+   *
+   * 백그라운드 자동 쓰기가 조립하면 안드로이드에서 두 모델을 스레드 2로 열고, 생성 시간
+   * 한도가 600초가 된다 — 값과 근거는 `assembly.ts`. `wiring.ts`가 잠금 주체와 같은 값을 넘긴다.
+   */
+  owner: AssemblyOwner = "screen",
 ): StoppableBackend {
+  // 본문 모델과 사진 모델이 같은 값을 쓴다. 화면 조립·iOS는 undefined다(키를 싣지 않는다).
+  const threads = inferenceThreadsFor(owner, isIOS() ? "ios" : "android");
+
   return createOnDeviceBackend(
     async () => {
       const llama = await import("llama.rn");
@@ -795,12 +810,12 @@ export function onDeviceBackend(
     },
     // 005가 더한 것. `llamaEngine()` 자체는 지연 import를 안에서 하므로 여기서
     // 만들어도 시뮬레이터에서 모듈 해석이 터지지 않는다.
-    llamaEngine(),
-    GENERATION_TIMEOUT_MS,
+    llamaEngine(threads),
+    generationTimeoutFor(owner),
     // ★ 011 — 사진을 읽는 수단. **이것을 넘기지 않으면 `quick`/`detailed`가 영영
     // `not-implemented`로 거부된다** — 006의 `GenerationProbe`, 007의 끊긴 `stop`
     // 배선과 같은 종류의 조용한 실패가 나는 자리다.
-    visionSupport(),
+    visionSupport(threads),
     loadSignals,
     loadCustomNames,
   );
@@ -827,16 +842,12 @@ function isIOS(): boolean {
  * `llamaEngine()`과 같은 방식으로 지연 import 한다 — 시뮬레이터·웹에서 네이티브 모듈
  * 해석이 터지지 않게 하기 위해서다.
  */
-function visionSupport(): VisionSupport {
+function visionSupport(threads?: number): VisionSupport {
   return {
     engine: createVisionEngine(
       async (path: string) => {
         const llama = await import("llama.rn");
-        return (await llama.initLlama({
-          model: path,
-          n_ctx: VISION_CONTEXT_SIZE,
-          n_gpu_layers: 0,
-        })) as never;
+        return (await llama.initLlama(visionContextParams(path, threads))) as never;
       },
       undefined,
       // 066 — iOS만 mmproj를 CPU에 둔다. 안드로이드는 라이브러리 기본값 그대로다(`VisionEngineOptions`).
@@ -991,3 +1002,18 @@ const cleanupResizedPhoto: ResizedPhotoCleaner = async (path) => {
  * 들어가므로 요구가 다르다. **짐작이며 실측이 아니다**(원칙 V, quickstart D1).
  */
 const VISION_CONTEXT_SIZE = 4096;
+
+/**
+ * 사진 모델의 `initLlama`에 넘길 값 (079, contracts/assembly.md A4·A5).
+ *
+ * 본문 모델의 `contextParams()`와 같은 규칙이다 — `threads`가 없으면 **`n_threads` 키를 만들지
+ * 않는다**. 화면 조립의 인자는 079 이전과 같다.
+ */
+export function visionContextParams(modelPath: string, threads?: number) {
+  return {
+    model: modelPath,
+    n_ctx: VISION_CONTEXT_SIZE,
+    n_gpu_layers: 0,
+    ...(threads === undefined ? {} : { n_threads: threads }),
+  };
+}

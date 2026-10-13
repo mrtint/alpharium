@@ -21,7 +21,7 @@ import { CHARACTERS, type Character } from "../../src/diary/types";
 import { judgeServerOutput, serverRequestFor } from "../../src/inference/desktop-server";
 import { ROMAN_LETTER_BLOCK_GRAMMAR, SAMPLING } from "../../src/inference/sampling";
 import { richDay } from "../../src/signals/fake";
-import { createLlamaEngine, endingOf } from "../../src/inference/llama-port";
+import { contextParams, createLlamaEngine, endingOf } from "../../src/inference/llama-port";
 import { FUTURE_CHARACTER } from "../future-character";
 
 /** 로스터에 있는 캐릭터. 한 캐릭터만 필요한 자리에 쓴다. */
@@ -796,5 +796,291 @@ describe("077 — 로마자 차단 문법 (GR1~GR5)", () => {
     await engine.load(QUIET);
     const result = await engine.run("프롬프트", { timeoutMs: 1000 });
     expect(Object.keys(result).sort()).toEqual(["ending", "text"]);
+  });
+});
+
+/**
+ * 079 — 모델을 여는 값 (specs/079-bg-auto-write-threads/contracts/assembly.md A4·A5).
+ *
+ * 백그라운드 조립만 스레드 수를 싣는다. **화면 조립의 인자에는 키 자체가 없다** — 값이
+ * `undefined`인 키도 네이티브로 넘어가면 「주지 않음」과 같다는 보장이 없다.
+ */
+describe("079 — 모델을 여는 값 (assembly.md A4·A5)", () => {
+  const code = readFileSync(join(__dirname, "../../src/inference/llama-port.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
+  it("A5 — 스레드 수를 주면 n_threads를 싣고 나머지 값은 그대로다", () => {
+    expect(contextParams("/m.bin", 2)).toEqual({
+      model: "/m.bin",
+      n_ctx: 2048,
+      n_gpu_layers: 0,
+      n_threads: 2,
+    });
+  });
+
+  it("A4 — 스레드 수를 주지 않으면 이 기능 이전의 값과 같다", () => {
+    expect(contextParams("/m.bin")).toEqual({ model: "/m.bin", n_ctx: 2048, n_gpu_layers: 0 });
+  });
+
+  it("A4 — 주지 않으면 n_threads 키 자체가 없다 (undefined 값의 키도 안 된다)", () => {
+    expect(Object.keys(contextParams("/m.bin"))).toEqual(["model", "n_ctx", "n_gpu_layers"]);
+    expect(Object.keys(contextParams("/m.bin", undefined))).not.toContain("n_threads");
+  });
+
+  it("llamaEngine이 받은 스레드 수를 contextParams로 initLlama에 넘긴다", () => {
+    expect(code).toMatch(/export function llamaEngine\(threads\?: number\)/);
+    expect(code).toMatch(/initLlama\(contextParams\(modelPath, threads\)\)/);
+  });
+});
+
+/**
+ * 079 — 도는 생성이 끝나기 전에 컨텍스트를 놓지 않는다
+ * (specs/079-bg-auto-write-threads/contracts/assembly.md U1~U7).
+ *
+ * 2026-10-13 iOS 시뮬레이터에서 앱이 죽었다(SIGSEGV). 시간 한도에 걸린 생성은 멈춤 신호만 받고
+ * 아직 `llama_decode` 중이었는데, 부른 쪽의 `finally`가 `unload()`로 컨텍스트를 놓았다.
+ * `stopCompletion()`은 플래그만 세운다 — 생성이 실제로 끝났는지는 `completion()`의 Promise만 안다.
+ */
+describe("079 — 도는 생성이 끝나기 전에 놓지 않는다 (assembly.md U1~U7)", () => {
+  /** 테스트가 끝내 줄 때까지 `completion()`이 끝나지 않는 대역. 불린 순서를 적는다 */
+  function controllable(options: { stopThrows?: boolean; releaseThrows?: boolean } = {}) {
+    const order: string[] = [];
+    const state = { opened: 0 };
+    let settle: { finish: () => void; fail: () => void } | null = null;
+
+    const loader = async () => {
+      state.opened += 1;
+      return {
+        completion() {
+          order.push("completion");
+          return new Promise<{ content: string; stopped_eos: boolean }>((resolve, reject) => {
+            settle = {
+              finish: () => resolve({ content: "글", stopped_eos: true }),
+              fail: () => reject(new Error("네이티브 생성이 실패했다")),
+            };
+          });
+        },
+        async stopCompletion() {
+          order.push("stopCompletion");
+          if (options.stopThrows) throw new Error("멈추지 못했다");
+        },
+        async release() {
+          order.push("release");
+          if (options.releaseThrows) throw new Error("놓지 못했다");
+        },
+      };
+    };
+
+    return {
+      order,
+      state,
+      engine: createLlamaEngine(loader, pathFor),
+      finish: () => settle?.finish(),
+      fail: () => settle?.fail(),
+    };
+  }
+
+  /** 마이크로태스크를 넉넉히 비운다 — 「기다리지 않고 놓았다」면 이 사이에 release가 찍힌다 */
+  async function flush() {
+    for (let i = 0; i < 20; i += 1) await Promise.resolve();
+  }
+
+  it("U2·U3 — 본문 생성 도중 unload()는 멈춤을 보내고, 생성이 끝나기 전에는 놓지 않는다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const running = fake.engine.run("프롬프트", { timeoutMs: 1000 });
+    await flush();
+
+    const unloading = fake.engine.unload();
+    await flush();
+    expect(fake.order).toEqual(["completion", "stopCompletion"]);
+
+    fake.finish();
+    await unloading;
+    expect(fake.order).toEqual(["completion", "stopCompletion", "release"]);
+    await expect(running).resolves.toEqual({ text: "글", ending: { kind: "eos" } });
+  });
+
+  it("U1 — 제목 질문(ask) 도중의 unload()도 끝나기를 기다린다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const asking = fake.engine.ask("프롬프트", "본문", "제목을 적어라.", { timeoutMs: 1000 });
+    await flush();
+
+    const unloading = fake.engine.unload();
+    await flush();
+    expect(fake.order).not.toContain("release");
+
+    fake.finish();
+    await unloading;
+    await asking;
+    expect(fake.order).toEqual(["completion", "stopCompletion", "release"]);
+  });
+
+  it("U1 — 미리 준비(prewarm) 도중의 unload()도 끝나기를 기다린다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const warming = fake.engine.prewarm(QUIET, "접두사");
+    await flush();
+
+    const unloading = fake.engine.unload();
+    await flush();
+    expect(fake.order).not.toContain("release");
+
+    fake.finish();
+    await unloading;
+    await warming;
+    expect(fake.order).toEqual(["completion", "stopCompletion", "release"]);
+  });
+
+  it("U1·U4 — 생성이 끝난 뒤의 unload()는 멈춤 없이 바로 놓는다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const running = fake.engine.run("프롬프트", { timeoutMs: 1000 });
+    await flush();
+    fake.finish();
+    await running;
+
+    await fake.engine.unload();
+    expect(fake.order).toEqual(["completion", "release"]);
+  });
+
+  it("U4 — 도는 생성이 없으면 멈춤 없이 바로 놓는다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+
+    await fake.engine.unload();
+    expect(fake.order).toEqual(["release"]);
+  });
+
+  it("U5 — 생성이 거부로 끝나도 놓는다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const running = fake.engine.run("프롬프트", { timeoutMs: 1000 }).catch(() => "거부");
+    await flush();
+
+    const unloading = fake.engine.unload();
+    await flush();
+    expect(fake.order).not.toContain("release");
+
+    fake.fail();
+    await unloading;
+    await running;
+    expect(fake.order).toEqual(["completion", "stopCompletion", "release"]);
+  });
+
+  it("U5 — 멈춤이 던져도 생성이 끝나기를 기다린 뒤 놓는다", async () => {
+    const fake = controllable({ stopThrows: true });
+    await fake.engine.load(QUIET);
+    const running = fake.engine.run("프롬프트", { timeoutMs: 1000 });
+    await flush();
+
+    const unloading = fake.engine.unload();
+    await flush();
+    expect(fake.order).toEqual(["completion", "stopCompletion"]);
+
+    fake.finish();
+    await unloading;
+    await running;
+    expect(fake.order).toEqual(["completion", "stopCompletion", "release"]);
+  });
+
+  it("U6 — 기다리는 동안 온 run()은 「열린 것이 없다」로 답한다", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const running = fake.engine.run("프롬프트", { timeoutMs: 1000 });
+    await flush();
+    const unloading = fake.engine.unload();
+    await flush();
+
+    await expect(fake.engine.run("다른 프롬프트", { timeoutMs: 1000 })).resolves.toEqual({
+      text: "",
+      ending: { kind: "length" },
+    });
+    expect(fake.order).not.toContain("release");
+
+    fake.finish();
+    await unloading;
+    await running;
+  });
+
+  it("U6 — 기다리는 동안 온 load()는 앞 컨텍스트가 놓인 뒤에 새로 연다 (E1 — 둘이 함께 열리지 않는다)", async () => {
+    const fake = controllable();
+    await fake.engine.load(QUIET);
+    const running = fake.engine.run("프롬프트", { timeoutMs: 1000 });
+    await flush();
+    const unloading = fake.engine.unload();
+    await flush();
+
+    const loading = fake.engine.load(QUIET);
+    await flush();
+    // 앞 컨텍스트는 아직 계산 중이다 — GB 단위 모델 둘이 함께 열리면 기기가 죽는다.
+    expect(fake.state.opened).toBe(1);
+    expect(fake.order).not.toContain("release");
+
+    fake.finish();
+    await unloading;
+    await running;
+    await expect(loading).resolves.toEqual({ ok: true, warm: false });
+    expect(fake.state.opened).toBe(2);
+    expect(fake.order.filter((call) => call === "release")).toHaveLength(1);
+  });
+
+  /**
+   * 리뷰에서 잡힌 구멍: 「도는 생성」을 한 칸에만 들면, 미리 준비가 도는 중에 온 본문 호출이
+   * 네이티브의 「Context is busy」로 곧바로 거부될 때 그 칸이 비워진다. 홈은 `prepare()`를
+   * 기다리지 않고 부르므로(018) 「쓰기」를 누르면 실제로 이 순서가 된다.
+   */
+  it("U1 — 겹친 호출이 먼저 끝나도, 아직 도는 호출이 끝나기 전에는 놓지 않는다", async () => {
+    const order: string[] = [];
+    let finishFirst: (() => void) | null = null;
+    let calls = 0;
+    const engine = createLlamaEngine(
+      async () => ({
+        completion() {
+          calls += 1;
+          order.push(`completion#${calls}`);
+          // 첫 호출(미리 준비)은 테스트가 끝내 줄 때까지 돈다. 그 사이의 호출은 네이티브처럼 곧바로 거부된다.
+          if (calls === 1) {
+            return new Promise<{ content: string; stopped_eos: boolean }>((resolve) => {
+              finishFirst = () => resolve({ content: "", stopped_eos: true });
+            });
+          }
+          return Promise.reject(new Error("Context is busy"));
+        },
+        async stopCompletion() {
+          order.push("stopCompletion");
+        },
+        async release() {
+          order.push("release");
+        },
+      }),
+      pathFor,
+    );
+
+    await engine.load(QUIET);
+    const warming = engine.prewarm(QUIET, "접두사");
+    await flush();
+    await engine.run("프롬프트", { timeoutMs: 1000 }).catch(() => "거부");
+    await flush();
+
+    const unloading = engine.unload();
+    await flush();
+    expect(order).toEqual(["completion#1", "completion#2", "stopCompletion"]);
+
+    (finishFirst as (() => void) | null)?.();
+    await unloading;
+    await warming;
+    expect(order).toEqual(["completion#1", "completion#2", "stopCompletion", "release"]);
+  });
+
+  it("U7 — 놓기가 실패해도 unload()는 던지지 않고, 다음 load()가 새로 연다", async () => {
+    const fake = controllable({ releaseThrows: true });
+    await fake.engine.load(QUIET);
+
+    await expect(fake.engine.unload()).resolves.toBeUndefined();
+    await expect(fake.engine.load(QUIET)).resolves.toEqual({ ok: true, warm: false });
+    expect(fake.state.opened).toBe(2);
   });
 });

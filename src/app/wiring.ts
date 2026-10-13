@@ -153,6 +153,9 @@ export type WiringDeps = {
    * `"screen"`이면 화면 수동 생성, `"background"`면 자동 생성 태스크.
    * 이 값으로 owner-bound `acquireLock` 클로저를 만든다. 주지 않으면
    * `"screen"`(기존 유일 호출자).
+   *
+   * 079 — 같은 값이 백엔드 선택에도 간다. `"background"`면 안드로이드에서 모델을 스레드 2로
+   * 열고 생성 시간 한도가 600초다(`inference/assembly.ts`).
    */
   lockOwner?: "screen" | "background";
   /**
@@ -198,6 +201,13 @@ export function createAppPipeline(
   // 신호 미리보기(previewDay)가 같은 함수를 쓴다 — 미리보기가 새 수집 경로가 되지 않는다(PV4).
   const loadSignals = deps.loadSignals ?? deviceSignals;
 
+  // 020 L5 — 이 파이프라인을 조립하는 쪽. owner를 여기서 한 번 정한다 — `PipelineInput`은
+  // 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다.
+  // ★ 079 — **잠금과 추론 조립이 같은 값을 본다.** 백그라운드가 조립한 쓰기만 안드로이드에서
+  // 스레드 2로 모델을 열고 600초 한도를 탄다(`inference/assembly.ts`). 「백그라운드인가」를
+  // 잠금과 따로 정하면 둘이 어긋날 수 있다 — 식은 여기 하나다(FR-006).
+  const owner = deps.lockOwner ?? "screen";
+
   // **여기서 규칙을 다시 판단하지 않는다.** select.ts가 policy.ts에 물어 정한다.
   // 018 2단계 — captionDay()가 신호를 읽을 수 있도록 같은 loadSignals를 넘긴다.
   const selection = selectBackend(
@@ -206,6 +216,7 @@ export function createAppPipeline(
     desktopInferenceUrl(),
     loadSignals,
     deps.loadCustomNames ?? deviceCustomNames,
+    owner,
   );
   if (!selection.ok) {
     return { ok: false, reason: selection.reason, detail: selection.detail };
@@ -220,12 +231,10 @@ export function createAppPipeline(
 
   const store = deps.store ?? deviceStore();
 
-  // 020 — 경합 잠금. owner를 여기서 bind한다(L5) — `PipelineInput`은
-  // 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다. `Date.now()`를
+  // 020 — 경합 잠금. 위에서 정한 owner를 bind한다(L5). `Date.now()`를
   // 여기서 부르는 것은 허용된다(L5) — 잠금 취득 시각은 테스트가 경계값을
   // 볼 필요 없는 벽시계 사실이다. 순수 `decideAcquire`는 `nowMs`를 인자로
   // 받으므로 그쪽이 테스트 대상이다.
-  const owner = deps.lockOwner ?? "screen";
   const lockPort = deps.lockPort ?? expoLockPort();
   const acquireLock = async (): Promise<LockHandle | null> => {
     const record = await acquireLockRecord(lockPort, owner, Date.now());

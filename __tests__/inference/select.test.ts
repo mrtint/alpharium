@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { resolveEnvironment } from "../../src/config/environment";
 import { selectBackend, selectLocation } from "../../src/inference/select";
 
@@ -176,5 +179,29 @@ describe("selectBackend — 끊을 수 있는 어댑터를 좁히지 않는다 (
     const result = selectBackend(resolved("local"), "desktop-server", serverUrl);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.backend.stop).toBeUndefined();
+  });
+});
+
+/**
+ * 079 — 조립 주체를 온디바이스 어댑터로 흘린다
+ * (specs/079-bg-auto-write-threads/contracts/assembly.md A7).
+ */
+describe("079 — selectBackend가 조립 주체를 온디바이스 어댑터에 넘긴다 (assembly.md A7)", () => {
+  const code = readFileSync(join(__dirname, "../../src/inference/select.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
+  it("마지막 인자로 주체를 받는다", () => {
+    expect(code).toMatch(/owner\?:\s*AssemblyOwner,?\s*\):\s*BackendSelection/);
+  });
+
+  it("받은 주체를 onDeviceBackend에 그대로 넘긴다", () => {
+    expect(code).toMatch(/onDeviceBackend\(loadSignals,\s*loadCustomNames,\s*owner\)/);
+  });
+
+  it("데스크톱 어댑터에는 넘기지 않는다", () => {
+    const call = code.match(/createDesktopServerBackend\([^)]*\)/)?.[0] ?? "";
+    expect(call).not.toBe("");
+    expect(call).not.toContain("owner");
   });
 });

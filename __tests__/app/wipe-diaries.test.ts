@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { wipeDiaries, type WipeDeps } from "../../src/app/wipe-diaries";
-import type { LockRecord } from "../../src/schedule/lock";
+import { STALE_LOCK_MS, type LockRecord } from "../../src/schedule/lock";
 
 const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 
@@ -143,8 +143,8 @@ describe("WP4·WP5 — 실패", () => {
 });
 
 describe("WP6 — 잠금 규칙은 020 그대로", () => {
-  it("owner는 screen이고, 6분이 지난 잠금은 얻는다", async () => {
-    const h = harness({ lock: { owner: "background", acquiredAtMs: NOW - 7 * 60 * 1000 } });
+  it("owner는 screen이고, 낡은 잠금(STALE_LOCK_MS 초과)은 얻는다", async () => {
+    const h = harness({ lock: { owner: "background", acquiredAtMs: NOW - STALE_LOCK_MS - 1 } });
     expect(await wipeDiaries(h.deps)).toEqual({ kind: "wiped" });
     expect(h.calls.slice(0, 2)).toEqual(["lock.read", "lock.write"]);
   });
@@ -168,7 +168,7 @@ describe("WP6·WP7·WP8 — 소스 계약", () => {
     .replace(/\/\/.*$/gm, "");
 
   it("WP6 — 잠금 판정을 다시 두지 않는다(숫자 없음, schedule/lock에서 가져온다)", () => {
-    expect(source).not.toMatch(/STALE_LOCK_MS|360000|360_000|6 \* 60/);
+    expect(source).not.toMatch(/STALE_LOCK_MS|360000|360_000|6 \* 60|600000|600_000|10 \* 60/);
     expect(source).toMatch(
       /import \{[^}]*acquireLock[^}]*releaseLock[^}]*\} from "\.\.\/schedule\/lock"/,
     );
