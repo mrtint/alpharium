@@ -69,6 +69,24 @@ export const SAMPLING: SamplingSettings = {
 export const GENERATION_TIMEOUT_MS = 180_000;
 
 /**
+ * 백그라운드가 조립한 쓰기의 생성 시간 한도 (079, contracts/assembly.md A3).
+ *
+ * 화면이 조립한 쓰기는 위 180초 그대로다. 어느 조립이 어느 값을 받는지는 `assembly.ts`의
+ * `generationTimeoutFor()`가 정한다.
+ *
+ * **사람이 정한 값이다.** 2026-10-13 SM-S901N의 `dumpsys jobscheduler`가 보인 잡 실행 최소
+ * 보장(`runtime_min_guarantee_ms=600000`)에서 왔다 — 그 뒤로는 OS가 언제든 잡을 끊을 수 있다.
+ * 한 기기의 값이다. iOS의 백그라운드 시간 예산은 모른다 — iOS 백그라운드 조립에도 같은 값을
+ * 쓰는 것은 소유자 결정이다(한도는 속도를 바꾸지 않는 안전장치다).
+ *
+ * **왜 180초가 아닌가**: 백그라운드 본문은 스레드 2에서 151.0초·174.2초가 걸려 180초에 가깝다
+ * (스레드 3 실험은 98.2초·136.1초).
+ * 백그라운드에서는 JS 타이머가 억제돼 걸리지 않지만, 그 사이 사용자가 앱을 열면 타이머가 살아나
+ * 180초가 지난 실행을 끊는다.
+ */
+export const BACKGROUND_GENERATION_TIMEOUT_MS = 600_000;
+
+/**
  * 로마자 차단 문법 (077, my-ollama `results/hand-prompt/v5/grammar.gbnf`).
  *
  * 캡션이 영어라 「Desk에 집중된 시선」처럼 영어 낱말이 본문에 남는 글이 있었다(v2 60런 중 2편).

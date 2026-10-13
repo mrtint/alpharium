@@ -17,6 +17,8 @@
 import { buildPrompt } from "../../src/diary/prompt";
 import { buildRequest } from "../../src/diary/request";
 import type { Character, DiaryRequest } from "../../src/diary/types";
+import { generationTimeoutFor } from "../../src/inference/assembly";
+import { createLlamaEngine } from "../../src/inference/llama-port";
 import { createOnDeviceBackend } from "../../src/inference/on-device";
 import type {
   Ending,
@@ -255,6 +257,138 @@ describe("E-3 시간 한도 (FR-021)", () => {
     const result = await backendWith(fake.engine, 30).generate(requestFor());
 
     expect(JSON.stringify(result)).not.toContain("text");
+  });
+});
+
+/**
+ * 079 — 생성 시간 한도는 조립 주체로 정해진다 (specs/079-bg-auto-write-threads/contracts/assembly.md A3).
+ *
+ * 백그라운드 본문은 스레드 2에서 151.0초·174.2초, 스레드 3에서 98.2초·136.1초가 걸렸다(2026-10-13 SM-S901N). 180초 한도 그대로면
+ * 사용자가 앱을 여는 순간 타이머가 살아나 끝나 가는 실행을 끊는다 — 백그라운드 조립은 600초다.
+ */
+describe("E-3 시간 한도 — 079 주체별 값 (assembly.md A3)", () => {
+  const FIVE_MINUTES = 300_000;
+  const TITLE = "조용한 하루";
+
+  const after = <T>(ms: number, value: T) =>
+    new Promise<T>((resolve) => setTimeout(() => resolve(value), ms));
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** 사진·적재는 마이크로태스크로 지나간다 — 타이머가 걸린 뒤에 시간을 민다 */
+  async function settle<T>(pending: Promise<T>): Promise<T> {
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(FIVE_MINUTES);
+    return pending;
+  }
+
+  /** 본문이 5분 걸리는 엔진 */
+  const slowBody = () =>
+    fakeEngine({ run: () => after(FIVE_MINUTES, { text: GOOD_KO, ending: { kind: "eos" } }) });
+
+  /** 본문은 바로 끝나고 제목 질문이 5분 걸리는 엔진 */
+  function slowTitle() {
+    const fake = fakeEngine();
+    fake.engine.ask = () => after(FIVE_MINUTES, { text: TITLE, ending: { kind: "eos" } });
+    return fake;
+  }
+
+  it("백그라운드 조립은 5분짜리 본문을 끊지 않는다", async () => {
+    const fake = slowBody();
+    const backend = backendWith(fake.engine, generationTimeoutFor("background"));
+    const result = await settle(backend.generate(requestFor()));
+
+    expect(isGenerationFailure(result)).toBe(false);
+    expect(fake.calls).not.toContain("stop");
+  });
+
+  it("화면 조립은 같은 본문을 180초에 끊는다", async () => {
+    const fake = slowBody();
+    const backend = backendWith(fake.engine, generationTimeoutFor("screen"));
+    const result = await settle(backend.generate(requestFor()));
+
+    expect(isGenerationFailure(result)).toBe(true);
+    if (isGenerationFailure(result)) expect(result.kind).toBe("timed-out");
+  });
+
+  it("백그라운드 조립은 5분짜리 제목 질문도 기다린다 — 같은 값을 한 번 더 쓴다 (061)", async () => {
+    const fake = slowTitle();
+    const backend = backendWith(fake.engine, generationTimeoutFor("background"));
+    const result = await settle(backend.generate(requestFor()));
+
+    expect(isGenerationFailure(result)).toBe(false);
+    if (!isGenerationFailure(result)) expect(result.text).toBe(`${TITLE}\n\n${GOOD_KO}`);
+  });
+
+  it("화면 조립은 제목 질문을 180초에 끊고 본문만 낸다 — 제목 때문에 일기를 버리지 않는다", async () => {
+    const fake = slowTitle();
+    const backend = backendWith(fake.engine, generationTimeoutFor("screen"));
+    const result = await settle(backend.generate(requestFor()));
+
+    expect(isGenerationFailure(result)).toBe(false);
+    if (!isGenerationFailure(result)) expect(result.text).toBe(GOOD_KO);
+  });
+});
+
+/**
+ * 079 — 한도에 걸린 뒤의 정리 (specs/079-bg-auto-write-threads/contracts/assembly.md U8).
+ *
+ * 위 E-3은 대역 엔진으로 「한도를 넘으면 stop·unload가 불린다」를 본다. 여기서는 **진짜 엔진**
+ * (`createLlamaEngine`)을 어댑터에 이어 붙여, 그 unload가 생성이 실제로 멈출 때까지 기다리는 것과
+ * 그래서 `generate()`가 그 뒤에야 돌아오는 것을 본다. 반쪽씩 대역으로 보면 이음매가 빠진다.
+ */
+describe("E-3 시간 한도 — 079 한도에 걸린 생성이 멈춘 뒤에 놓고 돌아온다 (assembly.md U8)", () => {
+  it("멈춤을 보내고, 생성이 끝난 뒤에야 컨텍스트를 놓고 timed-out으로 돌아온다", async () => {
+    const order: string[] = [];
+    let finish: (() => void) | null = null;
+    const engine = createLlamaEngine(
+      async () => ({
+        completion() {
+          order.push("completion");
+          return new Promise<{ content: string; interrupted: boolean }>((resolve) => {
+            finish = () => {
+              order.push("completion-end");
+              resolve({ content: "", interrupted: true });
+            };
+          });
+        },
+        async stopCompletion() {
+          order.push("stopCompletion");
+        },
+        async release() {
+          order.push("release");
+        },
+      }),
+      async () => "/models/quiet.bin",
+    );
+
+    let settled = false;
+    const pending = backendWith(engine, 30)
+      .generate(requestFor())
+      .then((result) => {
+        settled = true;
+        return result;
+      });
+
+    // 한도(30ms)는 지났고 멈춤도 갔다. 그러나 네이티브 생성은 아직 끝나지 않았다.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(order).toContain("stopCompletion");
+    expect(order).not.toContain("release");
+    expect(settled).toBe(false);
+
+    (finish as (() => void) | null)?.();
+    const result = await pending;
+
+    expect(isGenerationFailure(result)).toBe(true);
+    if (isGenerationFailure(result)) expect(result.kind).toBe("timed-out");
+    expect(order.indexOf("completion-end")).toBeLessThan(order.indexOf("release"));
+    expect(order[order.length - 1]).toBe("release");
   });
 });
 

@@ -32,7 +32,7 @@
 
 **Constraints**: 측정 코드를 제품에 넣지 않는다(원칙 IV) · 전경의 `initLlama` 인자는 바이트가 같아야 한다 · 계약(005 `engine.md`)을 먼저 고친다 · release 빌드는 만들지 않는다
 
-**Scale/Scope**: 소스 5개 파일 수정 + 새 파일 1개, 계약 문서 1개 개정 + 새 계약 1개, 테스트 7개 파일(새 파일 2개)
+**Scale/Scope**: 소스 5개 파일 수정 + 새 파일 1개, 계약 문서 1개 개정 + 새 계약 1개, 테스트 7개 파일(새 파일 2개). 코드 리뷰 뒤 `src/schedule/lock.ts`(잠금 낡음 시간 10분)·`src/welcome/liveness.ts`(주석)와 그 테스트 둘이 더해졌다
 
 ## Constitution Check
 
@@ -101,6 +101,7 @@ __tests__/
 - **해제 순서**: `createLlamaEngine()`이 `inFlight`(지금 도는 호출의 Promise)를 든다. `run`·`ask`·`prewarm`이 그것을 세우고 끝나면 비운다(자기 것일 때만). `unload()`는 ① `context`·`openFor` 비움 → ② `inFlight`가 있으면 `stopCompletion()` 뒤 그 Promise의 종료를 기다림(거부도 종료다) → ③ `release()`.
 - **`runWithTimeout()`·`askWithTimeout()`은 모양을 바꾸지 않는다.** 받는 `timeoutMs` 값만 주체에 따라 달라진다.
 - **사진 엔진은 바꾸지 않는다**: `vision-port.ts`에는 한도 타이머가 없고 `caption()`을 하나씩 기다린 뒤 `unload()`한다(research R6).
+- **코드 리뷰 뒤 바뀐 것**(2026-10-13): `inFlight`는 한 칸이 아니라 집합이다(겹친 호출) · 정리가 끝나기 전의 `load()`는 그 정리를 기다린다(005 E1) · `STALE_LOCK_MS`를 10분으로 올린다(백그라운드 본문 한도 600초보다 짧지 않게 — 소유자 결정, contracts L1·L2).
 
 ## Complexity Tracking
 

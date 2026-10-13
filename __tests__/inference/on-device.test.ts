@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   createOnDeviceBackend,
   type VisionSupport,
+  visionContextParams,
   withTitle,
 } from "../../src/inference/on-device";
 import type { GenerationEngine, LoadResult, RunResult } from "../../src/inference/engine-port";
@@ -1324,5 +1325,85 @@ describe("073 — VLM 캡션 전량 실패 시 vision-failed 거부 가드", () 
       .replace(/\/\/.*$/gm, "");
 
     expect(code).toMatch(/selected\.length\s*>\s*0\s*&&\s*result\.captions\.length\s*===\s*0/);
+  });
+});
+
+/**
+ * 079 — 조립 주체가 스레드 수와 시간 한도를 정한다
+ * (specs/079-bg-auto-write-threads/contracts/assembly.md A4~A6).
+ *
+ * 실제 `llama.rn`은 jest에 없으므로 인자를 만드는 순수 함수와 전달 사슬의 소스를 따로 잠근다
+ * (066 `projectorOnGpu`와 같은 방식).
+ */
+describe("079 — 조립 주체가 스레드 수와 시간 한도를 정한다 (assembly.md A4~A6)", () => {
+  const code = readFileSync(join(__dirname, "../../src/inference/on-device.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+  const assembly = code.slice(code.indexOf("export function onDeviceBackend("));
+  const onDeviceBackendBody = assembly.slice(0, assembly.indexOf("\n}\n"));
+
+  it("A5 — 사진 모델도 스레드 수를 주면 n_threads를 싣는다", () => {
+    expect(visionContextParams("/v.bin", 2)).toEqual({
+      model: "/v.bin",
+      n_ctx: 4096,
+      n_gpu_layers: 0,
+      n_threads: 2,
+    });
+    expect(code).toMatch(/const VISION_CONTEXT_SIZE = 4096;/);
+  });
+
+  it("A4 — 주지 않으면 이 기능 이전의 값과 같고 n_threads 키가 없다", () => {
+    expect(visionContextParams("/v.bin")).toEqual({
+      model: "/v.bin",
+      n_ctx: 4096,
+      n_gpu_layers: 0,
+    });
+    expect(Object.keys(visionContextParams("/v.bin"))).toEqual(["model", "n_ctx", "n_gpu_layers"]);
+    expect(Object.keys(visionContextParams("/v.bin", undefined))).not.toContain("n_threads");
+  });
+
+  it("A6 — onDeviceBackend가 주체를 받고, 주지 않으면 화면이다", () => {
+    expect(onDeviceBackendBody).toMatch(/owner:\s*AssemblyOwner\s*=\s*"screen"/);
+  });
+
+  it("A6 — 주체와 플랫폼으로 스레드 수를 한 번 정한다", () => {
+    expect(onDeviceBackendBody).toMatch(
+      /const threads = inferenceThreadsFor\(owner,\s*isIOS\(\) \? "ios" : "android"\);/,
+    );
+    expect(code.split("inferenceThreadsFor(").length - 1).toBe(1);
+  });
+
+  it("A6 — 같은 스레드 수를 본문 엔진과 사진 엔진 둘 다에 넘긴다", () => {
+    expect(onDeviceBackendBody).toMatch(/llamaEngine\(threads\)/);
+    expect(onDeviceBackendBody).toMatch(/visionSupport\(threads\)/);
+    expect(code).toMatch(/initLlama\(visionContextParams\(path, threads\)\)/);
+  });
+
+  it("A6 — 시간 한도를 주체로 정해 넘긴다 (화면 값을 직접 넘기지 않는다)", () => {
+    expect(onDeviceBackendBody).toMatch(/generationTimeoutFor\(owner\)/);
+    expect(onDeviceBackendBody).not.toContain("GENERATION_TIMEOUT_MS");
+  });
+
+  it("주체를 주지 않고 만든 어댑터의 한도 기본값은 여전히 180초 상수다", () => {
+    expect(code).toMatch(/timeoutMs:\s*number\s*=\s*GENERATION_TIMEOUT_MS/);
+  });
+
+  it("주체를 글자로 박아 넘기는 호출부가 없다 — 주체는 wiring.ts의 변수에서만 온다", () => {
+    const root = join(__dirname, "../../src");
+    const files = (readdirSync(root, { recursive: true }) as string[]).filter((file) =>
+      /\.tsx?$/.test(file),
+    );
+    expect(files.length).toBeGreaterThan(50);
+
+    const offenders = files.filter((file) => {
+      const source = readFileSync(join(root, file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      // 선언(`function onDeviceBackend(… owner = "screen")`)은 호출부가 아니다 — 기본값은 거기 한 곳이다.
+      return /(?<!function )(?:onDeviceBackend|selectBackend)\([^;]*"(?:background|screen)"[^;]*\)/.test(
+        source,
+      );
+    });
+    expect(offenders).toEqual([]);
   });
 });

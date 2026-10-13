@@ -32,6 +32,7 @@
 - **Rationale**: 경합의 양쪽(`completion`과 `release`)이 모두 이 파일에서만 불린다 — 호출부(`runWithTimeout`의 `void engine.stop()`, `generate()`의 `finally`, `load()`의 「다른 캐릭터면 먼저 닫는다」, 화면의 `release()`)가 어떤 순서로 부르든 한 곳에서 막힌다. 한도를 두면 한도가 찬 순간 계산 중인 컨텍스트를 놓는다 — 크래시 보고서의 모양 그대로다(`llama_decode` 중인 스레드와 `lm_ggml_backend_blas_free` 중인 스레드).
 - **Alternatives considered**: `runWithTimeout()`이 `stop()` 뒤 `run`의 종료를 기다리게 하기(호출부 하나만 막는다 — `askWithTimeout`·`load()`·`release()` 경로가 남는다) · 타이머가 멈춘 시간을 세지 않게 하기(경합 자체는 남는다, 범위 밖).
 - **확인한 것**: `llama.rn`의 `stopCompletion()`은 플래그를 세울 뿐 생성 종료를 기다리지 않는다(AGENTS 「`stopCompletion()`은 거부시키지 않는다」— `interrupted: true`로 정상 resolve). 그래서 「기다림」은 우리가 들고 있는 `completion()`의 Promise로 한다.
+- **코드 리뷰에서 더 읽은 것**: 네이티브 해제는 이미 그 컨텍스트의 작업을 기다리지만 **5초까지만**이다(`cpp/jsi/JSITaskManager.cpp` `TASK_WAIT_TIMEOUT`) — 「한도를 두면 그 순간 놓는다」는 가정이 아니라 지금 라이브러리가 하는 일이고, 시뮬레이터의 「복귀 5초 만에 종료」가 그 값이다. 또 한 컨텍스트에 호출이 겹치면 네이티브가 뒤의 것을 「Context is busy」로 곧바로 거부한다(`RNLlamaJSI.cpp` `throwIfContextBusy`) — 홈이 `prepare()`를 기다리지 않으므로 「도는 생성」은 한 칸이 아니라 집합으로 든다.
 
 ## R6 — 사진 엔진에도 같은 경합이 있는가
 

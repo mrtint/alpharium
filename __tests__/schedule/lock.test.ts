@@ -1,6 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { BACKGROUND_GENERATION_TIMEOUT_MS } from "../../src/inference/sampling";
+
 import {
   acquireLock,
   clearStaleLocksOnStart,
@@ -291,5 +293,29 @@ describe("SL4 — STALE_LOCK_MS 값 규칙 (024, stale-lock-basis.md)", () => {
     // 규칙: 새값 = ceil(M × 2 / 60000) × 60000. narrative M >= quiet M이므로
     // 새값 >= 현재 5분. 상향은 가능하되 하향은 규칙상 불가.
     expect(STALE_LOCK_MS).toBeGreaterThanOrEqual(5 * 60 * 1000);
+  });
+});
+
+/**
+ * 079 — 잠금이 낡았다고 보는 시간은 백그라운드 쓰기가 합법적으로 도는 시간보다 짧지 않다
+ * (specs/079-bg-auto-write-threads/contracts/assembly.md L1·L2).
+ *
+ * 079부터 백그라운드가 조립한 쓰기의 본문은 600초까지 돈다. 잠금은 쓰기 시작 때 한 번 잡고
+ * 갱신하지 않으므로, 낡음 시간이 그보다 짧으면 아직 도는 실행의 잠금을 앱을 열 때 쓰는 경로가
+ * 「낡았다」고 보고 두 번째 쓰기를 시작한다 — 모델이 둘 열리고 같은 날을 두 번 쓴다.
+ */
+describe("079 L1·L2 — STALE_LOCK_MS와 백그라운드 생성 한도", () => {
+  it("L1 — 값은 10분이다", () => {
+    expect(STALE_LOCK_MS).toBe(10 * 60 * 1000);
+  });
+
+  it("L2 — 백그라운드 조립의 생성 시간 한도보다 짧지 않다", () => {
+    expect(STALE_LOCK_MS).toBeGreaterThanOrEqual(BACKGROUND_GENERATION_TIMEOUT_MS);
+  });
+
+  it("L1 — 024의 값 규칙(가장 느린 백그라운드 완주 × 2 이상)을 여전히 만족한다", () => {
+    // 079 실측(2026-10-13 SM-S901N, 화면 꺼짐·스레드 2·사진 4장): 잡 시작부터 저장까지 247초.
+    const slowestObservedMs = 247_000;
+    expect(STALE_LOCK_MS).toBeGreaterThanOrEqual(slowestObservedMs * 2);
   });
 });

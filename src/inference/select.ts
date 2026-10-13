@@ -16,6 +16,7 @@ import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import type { DaySignals } from "../signals/types";
 import type { VisionOutcome } from "../vision/types";
 import type { LivenessOutcome } from "../welcome/liveness";
+import type { AssemblyOwner } from "./assembly";
 import { createDesktopServerBackend, httpProbe } from "./desktop-server";
 import { onDeviceBackend } from "./on-device";
 import type { InferenceBackend, InferenceLocation, SelectionFailure } from "./types";
@@ -125,6 +126,11 @@ export function selectBackend(
   loadSignals?: (day: DayDate) => Promise<DaySignals | null>,
   /** 035 — `prepare()`가 프리필할 접두사에 사용자 지정 이름을 싣는다(N14) */
   loadCustomNames?: () => Promise<CustomNames>,
+  /**
+   * 079 — 이 파이프라인을 조립하는 쪽. 온디바이스 어댑터가 모델을 여는 스레드 수와 생성 시간
+   * 한도를 이것으로 정한다(`assembly.ts`). 데스크톱 경로는 쓰지 않는다. 주지 않으면 화면이다.
+   */
+  owner?: AssemblyOwner,
 ): BackendSelection {
   const selection = selectLocation(resolution, requested);
 
@@ -139,7 +145,7 @@ export function selectBackend(
 
   const backend =
     selection.location === "on-device"
-      ? onDeviceBackend(loadSignals, loadCustomNames)
+      ? onDeviceBackend(loadSignals, loadCustomNames, owner)
       : createDesktopServerBackend(serverBaseUrl, httpProbe);
 
   return { ok: true, backend };

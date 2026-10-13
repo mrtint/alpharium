@@ -39,7 +39,10 @@ import { ROMAN_LETTER_BLOCK_GRAMMAR, SAMPLING } from "./sampling";
  * - `n_gpu_layers` 0 — 안드로이드 GPU 오프로드는 기기마다 다르고 실패가 조용하다.
  *   0이 가장 안전한 시작점이라는 짐작
  *
- * `n_threads`를 주지 않는다 — 정하면 그것이 성능 튜닝이고 원칙 IV의 언저리다.
+ * **`n_threads`는 화면이 조립한 쓰기에는 주지 않는다**(라이브러리 기본값). 백그라운드가 조립한
+ * 쓰기에만 `assembly.ts`가 정한 값을 싣는다(079) — 기본 4스레드가 백그라운드 cpuset의 코어
+ * 3개를 나눠 써 한 편에 26분이 걸렸다(2026-10-13 SM-S901N 실측, 값과 근거는 `assembly.ts`).
+ * 주지 않을 때는 키 자체를 싣지 않는다.
  *
  * **실기기에서 재면 근거가 실측으로 바뀐다**(quickstart D1·D4). 004의
  * `DEFAULT_PHOTO_LIMIT`(200)와 같은 성격의 값이다.
@@ -47,6 +50,20 @@ import { ROMAN_LETTER_BLOCK_GRAMMAR, SAMPLING } from "./sampling";
  */
 const CONTEXT_SIZE = 2048;
 const GPU_LAYERS = 0;
+
+/**
+ * `initLlama`에 넘길 값 (079, contracts/assembly.md A4·A5).
+ *
+ * `threads`가 없으면 **`n_threads` 키를 만들지 않는다** — 화면 조립의 인자는 079 이전과 같다.
+ */
+export function contextParams(modelPath: string, threads?: number) {
+  return {
+    model: modelPath,
+    n_ctx: CONTEXT_SIZE,
+    n_gpu_layers: GPU_LAYERS,
+    ...(threads === undefined ? {} : { n_threads: threads }),
+  };
+}
 
 /** `llama.rn`의 `LlamaContext`에서 우리가 쓰는 부분만. 전체를 들고 다니지 않는다 */
 type LlamaLike = {
@@ -114,6 +131,44 @@ export function createLlamaEngine(
   let context: LlamaLike | null = null;
   let openFor: Character | null = null;
 
+  /**
+   * 지금 네이티브에서 도는 호출들 (079, contracts/assembly.md U1). 비어 있으면 도는 것이 없다.
+   *
+   * `unload()`가 이것들이 모두 끝나기를 기다린다 — **계산 중인 컨텍스트를 놓으면 앱이 죽는다.**
+   * 2026-10-13 iOS 시뮬레이터 SIGSEGV: 시간 한도에 걸린 생성은 멈춤 신호만 받고 아직
+   * `llama_decode` 중이었는데 부른 쪽의 `finally`가 컨텍스트를 놓았다(한 스레드는 행렬 곱,
+   * 다른 스레드는 같은 백엔드를 해제하는 중이었다). `stopCompletion()`은 플래그만 세우므로
+   * 생성이 실제로 끝났는지는 이 Promise들만 안다.
+   *
+   * 네이티브 해제도 도는 작업을 기다리지만 **5초까지만**이다(`llama.rn` 0.12
+   * `cpp/jsi/JSITaskManager.cpp`의 `TASK_WAIT_TIMEOUT`) — 그 뒤에는 그대로 지운다. 시뮬레이터에서
+   * 「돌아온 지 5초 만에」 죽은 것이 그것이다. 라이브러리를 올릴 때 이 값이 바뀌는지 본다.
+   *
+   * **한 칸이 아니라 집합이다.** 홈은 미리 준비(`prewarm`)를 기다리지 않고 부르므로(018) 그것이
+   * 도는 중에 본문 호출이 올 수 있다. 네이티브는 그 호출을 「Context is busy」로 곧바로 거부한다 —
+   * 한 칸만 들면 거부된 호출이 칸을 비워 아직 도는 미리 준비를 잊는다.
+   */
+  const inFlight = new Set<Promise<void>>();
+
+  /** 호출 하나를 「도는 생성」으로 든다. 끝나면(성공·거부) 뺀다 */
+  function tracked<T>(call: Promise<T>): Promise<T> {
+    const settled = call.then(
+      () => undefined,
+      () => undefined,
+    );
+    inFlight.add(settled);
+    void settled.then(() => inFlight.delete(settled));
+    return call;
+  }
+
+  /**
+   * 아직 끝나지 않은 정리 (079, U6). 없으면 null.
+   *
+   * 정리는 도는 생성을 기다리느라 오래 걸릴 수 있다. 그 사이의 `load()`가 새 컨텍스트를 열면
+   * 앞 것과 **함께 열린다**(E1 위반 — GB 단위 모델 둘) — `load()`가 이것을 먼저 기다린다.
+   */
+  let releasing: Promise<void> | null = null;
+
   return {
     async load(character: Character): Promise<LoadResult> {
       // 같은 캐릭터가 이미 열려 있으면 재사용한다. 닫았다 여는 것은 느리고, 같은 것이
@@ -127,6 +182,9 @@ export function createLlamaEngine(
       // **다른 것이 열려 있으면 먼저 닫는다**(E1). 두 모델이 동시에 열리면 GB 둘이
       // 되어 기기가 죽는다.
       if (context !== null) await this.unload();
+      // 079 — 다른 호출이 시작한 정리가 아직 도는 생성을 기다리는 중이면 그것도 기다린다(U6).
+      // 앞 컨텍스트가 놓이기 전에 새로 열지 않는다.
+      if (releasing !== null) await releasing;
 
       let path: string;
       try {
@@ -172,14 +230,16 @@ export function createLlamaEngine(
       if (context === null || openFor !== character) return;
 
       try {
-        await context.completion({
-          messages: [{ role: "user", content: prefix }],
-          jinja: true,
-          temperature: SAMPLING.temperature,
-          top_p: SAMPLING.top_p,
-          top_k: SAMPLING.top_k,
-          n_predict: 1,
-        });
+        await tracked(
+          context.completion({
+            messages: [{ role: "user", content: prefix }],
+            jinja: true,
+            temperature: SAMPLING.temperature,
+            top_p: SAMPLING.top_p,
+            top_k: SAMPLING.top_k,
+            n_predict: 1,
+          }),
+        );
       } catch {
         // 프리워밍 실패는 알릴 것이 없다(E10) — 다음 run()이 그냥 느릴
         // 뿐 틀리지 않는다(FR-007).
@@ -211,7 +271,7 @@ export function createLlamaEngine(
       // 같은 문자열을 보낸다. 모델마다 템플릿이 다르지만 **우리가 넣는 것은 하나**이며,
       // 그 동일성이 테스트로 검증된다.
       // ─────────────────────────────────────────────────────────────────────
-      return complete(context, [{ role: "user", content: prompt }]);
+      return tracked(complete(context, [{ role: "user", content: prompt }]));
     },
 
     /**
@@ -228,11 +288,13 @@ export function createLlamaEngine(
       _limits: RunLimits,
     ): Promise<RunResult> {
       if (context === null) return { text: "", ending: { kind: "length" } };
-      return complete(context, [
-        { role: "user", content: prompt },
-        { role: "assistant", content: body },
-        { role: "user", content: question },
-      ]);
+      return tracked(
+        complete(context, [
+          { role: "user", content: prompt },
+          { role: "assistant", content: body },
+          { role: "user", content: question },
+        ]),
+      );
     },
 
     async stop(): Promise<void> {
@@ -247,15 +309,45 @@ export function createLlamaEngine(
 
     async unload(): Promise<void> {
       const open = context;
+      // 지금 도는 호출들. 이 뒤로는 `context`가 비어 새 호출이 이 컨텍스트에 닿지 않는다.
+      const running = [...inFlight];
       // 먼저 지운다 — release()가 실패해도 다음 load()가 새로 열 수 있어야 한다.
       context = null;
       openFor = null;
-
-      try {
-        await open?.release();
-      } catch {
-        /* 무시한다 */
+      if (open === null) {
+        // 열린 것이 없다. 다만 다른 호출이 시작한 정리가 아직 돌고 있으면 그것이 끝나야 「정리됐다」.
+        if (releasing !== null) await releasing;
+        return;
       }
+
+      // ★ 079 — **도는 생성이 끝난 뒤에만 놓는다**(contracts/assembly.md U2·U3). 멈춤을 보내고
+      // 그 호출들이 실제로 끝나기를 기다린다. **기다림에 한도를 두지 않는다** — 한도가 찬 순간
+      // 계산 중인 컨텍스트를 놓게 되고, 그것이 고치려는 결함이다.
+      //
+      // **그래서 `unload()`를 기다리는 쪽도 함께 기다린다** — 시간 한도에 걸린 `generate()`·
+      // `checkLiveness()`는 생성이 실제로 멈춘 뒤에야 돌아온다(U8). 멈춤은 보통 다음 토큰에서
+      // 듣지만 보장은 아니다: 호출이 막 시작하는 구간에 보낸 멈춤은 네이티브가 지울 수 있고, 그때는
+      // 생성이 제 길이(`n_predict`)까지 간 뒤에 끝난다.
+      const done = (async () => {
+        if (running.length > 0) {
+          try {
+            await open.stopCompletion();
+          } catch {
+            /* 멈춤이 실패해도 기다림은 이어진다(U5) */
+          }
+          await Promise.all(running);
+        }
+
+        try {
+          await open.release();
+        } catch {
+          /* 무시한다 */
+        }
+      })();
+
+      releasing = done;
+      await done;
+      if (releasing === done) releasing = null;
     },
   };
 }
@@ -315,15 +407,13 @@ async function defaultPathFor(character: Character): Promise<string> {
  *
  * 모듈 해석 자체가 실패할 수 있으므로(시뮬레이터·웹) 지연 import 한다 — 001의
  * `onDeviceBackend()`가 이미 쓰는 방식이다.
+ *
+ * `threads`는 조립 주체가 정한 스레드 수다(079 — `assembly.ts`). 화면 조립은 주지 않는다.
  */
-export function llamaEngine(): GenerationEngine {
+export function llamaEngine(threads?: number): GenerationEngine {
   return createLlamaEngine(async (modelPath) => {
     const llama = await import("llama.rn");
-    const context = await llama.initLlama({
-      model: modelPath,
-      n_ctx: CONTEXT_SIZE,
-      n_gpu_layers: GPU_LAYERS,
-    });
+    const context = await llama.initLlama(contextParams(modelPath, threads));
 
     // **`LlamaContext`를 그대로 돌려주지 않는다**(원칙 III). `model`·`systemInfo`·
     // `devices`가 딸려 오며, 그것이 밖으로 나가면 캐릭터 뒤의 모델이 드러난다.

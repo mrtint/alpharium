@@ -66,7 +66,7 @@
 
 **주체를 아는 자리**: `wiring.ts`의 `createAppPipeline()`이 이미 받는 `lockOwner`다(`runAutoDiaryTask`가 `"background"`로 조립한다 — 020 L5). 새 플래그를 만들지 않는다: 잠금 주체와 추론 조립 주체가 따로 놀면 둘이 어긋날 수 있다. 그래서 `task.ts`는 바뀌지 않고, `manual` 실행도 같은 함수를 타므로 결정 4가 저절로 성립한다.
 
-**전달 경로**: `createAppPipeline()` → `selectBackend(…, owner)` → `onDeviceBackend(…, owner)`. `onDeviceBackend()`가 플랫폼을 읽어(066의 `isIOS()` — `appPlatform()`으로 옮겨 넘긴다) `inferenceThreadsFor()`를 한 번 부르고, 그 값을 `llamaEngine(threads)`와 `visionSupport(threads)`에 넘긴다. 두 자리의 `initLlama` 인자에 `...(threads !== undefined ? { n_threads: threads } : {})`를 더한다. 데스크톱 경로는 주체를 받아도 쓰지 않는다.
+**전달 경로**: `createAppPipeline()` → `selectBackend(…, owner)` → `onDeviceBackend(…, owner)`. `onDeviceBackend()`가 플랫폼을 읽어(066의 `isIOS()`를 `"ios" | "android"`로 옮겨 넘긴다 — `inference/`가 `app/platform.ts`를 import하지 않는다) `inferenceThreadsFor()`를 한 번 부르고, 그 값을 `llamaEngine(threads)`와 `visionSupport(threads)`에 넘긴다. 두 자리의 `initLlama` 인자에 `...(threads !== undefined ? { n_threads: threads } : {})`를 더한다. 데스크톱 경로는 주체를 받아도 쓰지 않는다.
 
 **바뀌지 않는 것**: 화면이 조립하는 파이프라인(홈 쓰기·앱 열 때 쓰기·첫 실행 자동 첫 일기·진단 「한 번 써 보기」)의 스레드, iOS 전부, 샘플링·프롬프트·판정, 077의 문법.
 
@@ -84,6 +84,8 @@
 
 **기다림에 한도를 두지 않는다.** 한도를 두면 한도가 찬 순간 다시 계산 중인 컨텍스트를 놓게 된다 — 고치려는 결함 그대로다. 사용자가 기다리는 것은 달라지지 않는다: 전경에서 멈춤은 토큰 하나 안에 듣고, `timed-out` 판정 자체는 `runWithTimeout()`의 경합(race)이 지금처럼 바로 낸다. 달라지는 것은 그 뒤의 정리가 생성 종료를 기다린다는 것뿐이다.
 
+**코드 리뷰 뒤 고친 것(2026-10-13)**: (1) 「도는 생성」은 한 칸이 아니라 집합이다 — 홈이 `prepare()`를 기다리지 않아 미리 준비 도중에 본문 호출이 올 수 있고, 네이티브가 그것을 곧바로 거부하면 한 칸은 비워져 버린다. (2) 정리가 끝나기 전의 `load()`는 그 정리를 기다린다(005 E1). (3) 위 문단의 「사용자가 기다리는 것은 달라지지 않는다」는 정확하지 않다 — 한도 판정은 바로 나지만 `generate()`·`checkLiveness()`는 `finally`의 `unload()`를 기다리므로 **생성이 실제로 멈춘 뒤에야 돌아온다**. 멈춤이 듣지 않으면 그만큼 화면이 「쓰는 중」에 머문다. 크래시와 맞바꾼 것이다. (4) 네이티브 해제는 이미 5초까지 기다린 뒤 지운다(`TASK_WAIT_TIMEOUT`) — 시뮬레이터의 「5초 만에 종료」가 그 값이다.
+
 **손대지 않는 것**: `runWithTimeout()`·`askWithTimeout()`의 모양. 한도 타이머가 멈춰 있던 시간까지 세는 것도 그대로다 — 한도보다 오래 멈췄다 돌아온 실행은 복귀 순간 `timed-out`(시도 기록 `실패`)으로 끝나고 다음 기회에 다시 쓴다. 이 조각은 죽지 않게만 한다.
 
 **사진 모델**: `vision-port.ts`에는 한도 타이머가 없고 캡션 루프가 각 호출을 기다린 뒤에 닫는다. 같은 경합이 없으므로 바꾸지 않는다(계획 단계에서 소스로 한 번 더 확인한다).
@@ -92,7 +94,7 @@
 
 **규칙**: 생성 시간 한도는 조립 주체로 정한다 — 화면 180초(`GENERATION_TIMEOUT_MS`, 그대로), 백그라운드 600초. 플랫폼으로 가르지 않는다. 한도를 재는 구간(본문 생성, 제목 질문은 같은 값을 한 번 더)은 그대로다.
 
-**왜**: 스레드 2의 백그라운드 본문은 98~151초가 걸려 180초에 가깝다. 백그라운드에서는 JS 타이머가 억제돼 걸리지 않지만(R1은 1,264초 동안 걸리지 않았다), 그 사이 사용자가 앱을 열면 타이머가 살아나 180초가 지난 실행을 끊는다. 600은 이 기기 OS의 잡 실행 최소 보장(10분)에서 온 사람이 정한 상수다 — 그 뒤로는 OS가 언제든 끊을 수 있다.
+**왜**: 백그라운드 본문은 스레드 2에서 151.0초(구현 뒤 확인에서는 174.2초), 스레드 3에서 98.2초·136.1초가 걸려 180초에 가깝다. 백그라운드에서는 JS 타이머가 억제돼 걸리지 않지만(R1은 1,264초 동안 걸리지 않았다), 그 사이 사용자가 앱을 열면 타이머가 살아나 180초가 지난 실행을 끊는다. 600은 이 기기 OS의 잡 실행 최소 보장(10분)에서 온 사람이 정한 상수다 — 그 뒤로는 OS가 언제든 끊을 수 있다.
 
 **자리**: `BACKGROUND_GENERATION_TIMEOUT_MS = 600_000`을 `GENERATION_TIMEOUT_MS` 옆(`sampling.ts`)에 둔다. `createOnDeviceBackend()`는 이미 `timeoutMs`를 인자로 받는다 — `onDeviceBackend()`가 주체를 보고 고른 값을 넘긴다. 스레드 수와 같은 전달 경로다.
 

@@ -253,3 +253,33 @@ describe("048 createAppPipeline — previewDay", () => {
     expect(code.match(/deps\.loadSignals\s*\?\?\s*deviceSignals/g)).toHaveLength(1);
   });
 });
+
+/**
+ * 079 — 잠금 주체와 추론 조립 주체는 한 값이다
+ * (specs/079-bg-auto-write-threads/contracts/assembly.md A8, FR-006).
+ *
+ * 백그라운드가 조립한 쓰기만 스레드 2·600초 한도를 탄다. 「백그라운드인가」를 잠금과 따로 정하면
+ * 둘이 어긋날 수 있다 — 주체를 정하는 식은 하나이고 그 변수가 두 자리에 간다.
+ */
+describe("079 createAppPipeline — 잠금 주체를 백엔드 선택에도 넘긴다 (assembly.md A8)", () => {
+  const code = readFileSync(join(__dirname, "../../src/app/wiring.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
+  it("주체를 정하는 식이 하나뿐이다", () => {
+    expect(code.match(/deps\.lockOwner\s*\?\?\s*"screen"/g)).toHaveLength(1);
+    expect(code).toMatch(/const owner = deps\.lockOwner \?\? "screen";/);
+  });
+
+  it("그 변수가 selectBackend의 마지막 인자다", () => {
+    expect(code).toMatch(/selectBackend\([^;]*,\s*owner,?\s*\);/);
+  });
+
+  it("같은 변수가 잠금 취득에 쓰인다", () => {
+    expect(code).toMatch(/acquireLockRecord\(lockPort,\s*owner,/);
+  });
+
+  it("주체가 백엔드 선택보다 먼저 정해진다", () => {
+    expect(code.indexOf("const owner = ")).toBeLessThan(code.indexOf("selectBackend("));
+  });
+});
