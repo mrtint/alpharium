@@ -33,7 +33,8 @@ export type ScheduleDecision =
  *
  * 근사치(FR-002)이므로 넉넉히. SC-002(24시간 내 1회)와 SC-003(예외 시
  * 1시간 내 1회)은 이 "창"이 아니라 **시도 하한**을 재는 기준이다 — 이 창은
- * "매 15분 콜백 중 어느 구간에서 생성을 시도할 자격이 있는가"를 정한다.
+ * "어느 구간에서 **오늘**을 쓰기 시작할 자격이 있는가"를 정한다(078 — 지난 날 중
+ * 안 쓴 날은 이 창과 무관하게 쓴다).
  *
  * **export하지 않는다**(D3) — 부르는 쪽이 이 값을 알면 값이 두 곳에 생긴다
  * (009의 `SELECTABLE_DAY_COUNT`가 밖으로 안 나가는 것과 같은 방식). 테스트도
@@ -50,18 +51,33 @@ function isNearTarget(hour: number, targetHour: number): boolean {
 }
 
 /**
+ * 지금이 시도 창 안인가 (078). 창의 크기는 여전히 이 파일만 안다(D3) — 부르는 쪽은 참·거짓만 받는다.
+ * 백그라운드의 「창 밖 따라잡기는 하루 한 번」 상한(`task.ts`)이 묻는다.
+ */
+export function isInTargetWindow(settings: AutoDiarySettings, now: Date): boolean {
+  return isNearTarget(now.getHours(), settings.targetHour);
+}
+
+/**
  * 지금 자동 생성을 돌려야 하는가.
- *
- * 판정 순서(고정, D2):
+ * 판정 순서(고정, D2 — 078 개정):
  *  1. `settings.enabled === false` → `{ act: false, reason: "disabled" }`.
- *  2. `now`의 현지 시(hour)가 목표 시각 근방이 아니면
- *     → `{ act: false, reason: "not-near-target" }`.
- *  3. `pickRetryDay`가 `null`이면 → `{ act: false, reason: "all-written" }`.
- *  4. 그 외 → `{ act: true, day }`.
+ *  2. `near` = `now`의 현지 시(hour)가 목표 시각 근방인가. 후보는 `near`면 `selectableDays` 전부.
+ *     창 밖이면 **차례가 이미 지난 날**만이다 — 오늘은 뺀다(오늘은 창 안에서만), 그리고 창이 어제를
+ *     겨냥하는데(`targetDay === "yesterday"`, 오전 목표) 오늘의 목표 시각이 아직 안 왔으면 어제도 뺀다
+ *     (어제의 차례는 오늘 목표 시각에 온다 — 자정 직후에 쓰면 고른 시각이 무의미해진다).
+ *     078: iOS `BGTaskScheduler`는 창 안에 깨운다는 보장이 없어, 놓친 날을 다음 기회에 쓴다.
+ *  3. `pickRetryDay(후보, existingDiaryDays)`가 날을 주면 → `{ act: true, day }`.
+ *  4. `null`이면: 사흘 중 안 쓴 날이 남아 있으면(차례를 기다리는 중) `not-near-target`, 없으면 `all-written`.
+ *
+ * `today`·`targetDay`는 주입이다 — 이 파일은 하루 경계도 정오도 계산하지 않는다(FR-021a).
  */
 export function decideSchedule(input: {
   settings: AutoDiarySettings;
   now: Date;
+  today: DayDate;
+  /** 목표 시각의 창이 겨냥하는 날 — 목표 시(hour)에 사흘에 오늘이 드는가로 정한다(`includesTodayAtHour`) */
+  targetDay: "today" | "yesterday";
   selectableDays: readonly DayDate[];
   existingDiaryDays: readonly DayDate[];
 }): ScheduleDecision {
@@ -71,14 +87,33 @@ export function decideSchedule(input: {
     return { act: false, reason: "disabled" };
   }
 
-  if (!isNearTarget(now.getHours(), settings.targetHour)) {
-    return { act: false, reason: "not-near-target" };
+  const near = isNearTarget(now.getHours(), settings.targetHour);
+  const day = pickRetryDay(near ? selectableDays : dueOutsideWindow(input), existingDiaryDays);
+  if (day !== null) {
+    return { act: true, day };
   }
 
-  const day = pickRetryDay(selectableDays, existingDiaryDays);
-  if (day === null) {
-    return { act: false, reason: "all-written" };
-  }
+  const waiting = !near && pickRetryDay(selectableDays, existingDiaryDays) !== null;
+  return { act: false, reason: waiting ? "not-near-target" : "all-written" };
+}
 
-  return { act: true, day };
+/** 창 밖에서 쓸 수 있는 날 — 차례가 이미 지난 날만. */
+function dueOutsideWindow(input: {
+  settings: AutoDiarySettings;
+  now: Date;
+  today: DayDate;
+  targetDay: "today" | "yesterday";
+  selectableDays: readonly DayDate[];
+}): readonly DayDate[] {
+  const past = input.selectableDays.filter((day) => day !== input.today);
+  const yesterdayStillAhead =
+    input.targetDay === "yesterday" && input.now.getHours() < input.settings.targetHour;
+  if (!yesterdayStillAhead) return past;
+
+  // 지난 날 중 가장 최근이 어제다(`YYYY-MM-DD`는 사전순이 시간순) — 날짜를 계산하지 않고 고른다.
+  const yesterday = past.reduce<DayDate | null>(
+    (latest, day) => (latest === null || day > latest ? day : latest),
+    null,
+  );
+  return past.filter((day) => day !== yesterday);
 }

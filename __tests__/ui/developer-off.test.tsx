@@ -54,6 +54,7 @@ function Harness({
   const [route, setRoute] = useState<"settings" | "developer">("settings");
   return route === "developer" && developer.enabled ? (
     <DeveloperScreen
+      attempts={[]}
       modules={{ reading: null, writing: null }}
       onDisable={() => {
         developer.disable();

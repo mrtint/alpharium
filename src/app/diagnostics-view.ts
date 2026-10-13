@@ -15,11 +15,12 @@
 
 import type { PermissionState } from "../signals/port";
 import type { DaySignals, SignalValue } from "../signals/types";
-import { DIAGNOSTICS_TEXT as T } from "./diagnostics-text";
+import { ATTEMPT_TEXT as A, DIAGNOSTICS_TEXT as T } from "./diagnostics-text";
 import { text } from "../i18n/current";
 import type { Language } from "../i18n/languages";
 import type { LanguageResolution } from "../i18n/resolve";
 import type { PhotoLocationReading } from "./permission-tags";
+import type { AttemptOutcome, AttemptPath, AutoWriteAttempt } from "./auto-write-attempts";
 import type { WriteFailure, WriteFailureReason } from "./write-failures";
 
 /* ─────────────────────────────── 환경 ─────────────────────────────── */
@@ -192,6 +193,50 @@ export function failureLines(items: readonly WriteFailure[]): FailureLine[] {
       item.at.getDate(),
       item.at.toTimeString().slice(0, 5),
     ),
+  }));
+}
+
+/* ─────────────────────── 최근 자동 쓰기 시도 (078) ─────────────────────── */
+
+export type AttemptLine = { headText: string; outcomeText: string };
+
+/** 062 C4 — 문구 표는 함수 안에서 만든다. `Record<AttemptPath, …>`라 갈래가 늘면 tsc가 짚는다 */
+function attemptPathText(path: AttemptPath): string {
+  const byPath: Readonly<Record<AttemptPath, string>> = {
+    background: A.pathBackground,
+    "app-open": A.pathAppOpen,
+    manual: A.pathManual,
+  };
+  return byPath[path];
+}
+
+function attemptOutcomeText(outcome: AttemptOutcome): string {
+  const byOutcome: Readonly<Record<AttemptOutcome, string>> = {
+    started: A.started,
+    simulation: A.simulation,
+    disabled: A.disabled,
+    "not-near-target": A.notNearTarget,
+    "catch-up-spent": A.catchUpSpent,
+    "all-written": A.allWritten,
+    "no-photo-access": A.noPhotoAccess,
+    "no-material": A.noMaterial,
+    "no-character": A.noCharacter,
+    write: A.write,
+    "already-running": A.alreadyRunning,
+    ran: A.ran,
+    failed: A.failed,
+  };
+  return byOutcome[outcome];
+}
+
+/** 기록 순서 그대로(최신이 위). 머리는 「경로 · M월 d일 HH:mm」(시각 형식은 실패 줄과 같다), 값은 결과 문구다. */
+export function attemptLines(items: readonly AutoWriteAttempt[]): AttemptLine[] {
+  return items.map((item) => ({
+    headText: A.line(
+      attemptPathText(item.path),
+      T.failureTime(item.at.getMonth() + 1, item.at.getDate(), item.at.toTimeString().slice(0, 5)),
+    ),
+    outcomeText: attemptOutcomeText(item.outcome),
   }));
 }
 

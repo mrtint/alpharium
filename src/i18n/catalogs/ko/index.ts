@@ -12,6 +12,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { attempts } from "./attempts";
 import { calendar } from "./calendar";
 import { consentGate } from "./consent-gate";
 import { developer } from "./developer";
@@ -38,6 +39,7 @@ export const ko = {
   developer,
   diagnostics,
   diagnosticsLanguage,
+  attempts,
   simulation,
   welcome,
   download,

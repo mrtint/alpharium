@@ -39,7 +39,18 @@ function make(environment: "dev" | "prod", simulation: SimulationStorePort) {
   const present = jest.fn(async () => "n");
   const failureWrites = jest.fn(async () => {});
   const failurePort: WriteFailurePort = { read: async () => null, write: failureWrites };
+  const attempts = {
+    content: null as string | null,
+    async read() {
+      return attempts.content;
+    },
+    async write(serialized: string) {
+      attempts.content = serialized;
+    },
+  };
   const deps = {
+    catchUpPort: { read: async () => null, write: async () => {} },
+    attemptPort: attempts,
     simulationPort: simulation,
     failurePort,
     skipPort: { read: async () => null, write: async () => {}, remove: async () => {} },
@@ -64,7 +75,7 @@ function make(environment: "dev" | "prod", simulation: SimulationStorePort) {
     loadNames: async () => ({}),
     makePipeline: makePipeline as never,
   };
-  return { deps, run, makePipeline, present, failureWrites };
+  return { deps, run, makePipeline, present, failureWrites, attempts };
 }
 
 describe("BG1 — 개발 환경 + 흉내 켬 → 건너뜀", () => {
@@ -77,6 +88,13 @@ describe("BG1 — 개발 환경 + 흉내 켬 → 건너뜀", () => {
       expect(m.run).not.toHaveBeenCalled();
       expect(m.present).not.toHaveBeenCalled();
       expect(m.failureWrites).not.toHaveBeenCalled();
+      // 078 — 흉내가 막은 것도 시도다(백그라운드 · simulation 한 줄)
+      const items = (
+        JSON.parse(m.attempts.content ?? '{"items":[]}') as {
+          items: { path: string; outcome: string }[];
+        }
+      ).items;
+      expect(items.map((l) => [l.path, l.outcome])).toEqual([["background", "simulation"]]);
     },
   );
 

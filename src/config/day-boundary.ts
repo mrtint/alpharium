@@ -131,7 +131,7 @@ export function latestClosedDay(now: Date): DayDate {
  */
 export function selectableDays(now: Date): readonly DayDate[] {
   const today = dayOf(now);
-  const includesToday = now.getHours() >= WRITABLE_FROM_HOUR;
+  const includesToday = includesTodayAtHour(now.getHours());
   const first = includesToday ? 0 : 1;
 
   const days: DayDate[] = [];
@@ -139,6 +139,16 @@ export function selectableDays(now: Date): readonly DayDate[] {
     days.push(addDays(today, -back));
   }
   return days;
+}
+
+/**
+ * 그 시(hour)에 「사흘」에 오늘이 드는가 (078) — **`selectableDays()`의 구성 규칙 그 자체다**(위 함수가 이것을 부른다).
+ *
+ * 자동 쓰기 판정이 「목표 시각의 창이 오늘을 겨냥하는가, 어제를 겨냥하는가」를 알아야 한다(오전 목표는 어제, 오후 목표는 오늘 —
+ * 056 미리보기 문장과 같다). 정오 상수를 밖으로 내보내면 값이 두 곳에 생기므로 규칙을 함수로 묻게 한다. **화면은 부르지 않는다.**
+ */
+export function includesTodayAtHour(hour: number): boolean {
+  return hour >= WRITABLE_FROM_HOUR;
 }
 
 /**

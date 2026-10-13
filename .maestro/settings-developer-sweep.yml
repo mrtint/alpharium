@@ -191,11 +191,20 @@ appId: com.a810labs.pocketlog
       id: "developer-off"
 - assertVisible:
     id: "developer-off"
+# 078 — 「끄기」 아래의 「최근 자동 쓰기 시도」 묶음. 배포 빌드에서 자동 쓰기 기록을 보는 유일한 자리다.
+- scrollUntilVisible:
+    element:
+      id: "developer-group-attempts"
+- assertVisible:
+    id: "developer-group-attempts"
 
 # ── 진단 ──
+# ★ 078부터 「끄기」 아래에 묶음이 있어 화면이 더 내려간다 — 위에 있는 「진단」 행은 **올라가며** 찾는다.
+#   방향을 안 주면(기본 DOWN) 실기기(SM-S901N)에서 20초 동안 못 찾고 실패했다(2026-10-13).
 - scrollUntilVisible:
     element:
       id: "developer-diagnostics"
+    direction: UP
 - tapOn:
     id: "developer-diagnostics"
 - extendedWaitUntil:

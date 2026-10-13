@@ -43,14 +43,37 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
   const dismiss = jest.fn().mockResolvedValue(undefined);
   const notifiedWrite = jest.fn().mockResolvedValue(undefined);
   const skipWrite = jest.fn().mockResolvedValue(undefined);
+  const attempts = {
+    content: null as string | null,
+    async read() {
+      return attempts.content;
+    },
+    async write(serialized: string) {
+      attempts.content = serialized;
+    },
+  };
+
+  const catchUp = {
+    content: null as string | null,
+    async read() {
+      return catchUp.content;
+    },
+    async write(serialized: string) {
+      catchUp.content = serialized;
+    },
+  };
 
   return {
+    attempts,
+    catchUp,
     pipelineRun,
     present,
     dismiss,
     notifiedWrite,
     skipWrite,
     deps: {
+      attemptPort: attempts,
+      catchUpPort: catchUp,
       skipPort: { read: async () => null, write: skipWrite, remove: async () => {} },
       now: at(7),
       resolution: { ok: true, environment: "dev" } as never,
@@ -91,6 +114,24 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/** 미리보기·실행을 바꾼 파이프라인 조립 대역 */
+function pipelineWith(previewDay: ReturnType<typeof previewOf>, run?: jest.Mock) {
+  return (() => ({
+    ok: true,
+    pipeline: {
+      run: run ?? jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false }),
+    },
+    location: "on-device",
+    previewDay,
+    store: {
+      listDays: async () => [],
+      load: async () => null,
+      has: async () => false,
+      save: async () => ({ ok: true, overwrote: false }),
+    },
+  })) as never;
+}
+
 describe("B2 — 판정 순서", () => {
   it("조건이 맞으면 pipeline.run()을 부르고 'ran'을 반환한다", async () => {
     const { deps, pipelineRun } = baseDeps();
@@ -113,8 +154,26 @@ describe("B2 — 판정 순서", () => {
     expect(pipelineRun).not.toHaveBeenCalled();
   });
 
-  it("목표 시각 근방이 아니면 'skipped'", async () => {
-    const { deps, pipelineRun } = baseDeps({ now: at(3) });
+  it("창 밖이고 오늘만 비어 있으면 'skipped' (오늘은 창 안에서만)", async () => {
+    const { deps, pipelineRun } = baseDeps({
+      now: at(15),
+      listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"],
+    });
+    expect(await runAutoDiaryTask(deps)).toBe("skipped");
+    expect(pipelineRun).not.toHaveBeenCalled();
+  });
+
+  it("078 — 창이 지난 뒤(15시, 목표 7시)에도 어제가 비어 있으면 어제를 쓴다", async () => {
+    const { deps, pipelineRun } = baseDeps({ now: at(15) });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(pipelineRun).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
+  });
+
+  it("078 — 오전 목표(7시)의 어제는 목표 시각 전(3시)에 쓰지 않는다", async () => {
+    const { deps, pipelineRun } = baseDeps({
+      now: at(3),
+      listDiaryDays: async () => ["2026-08-26", "2026-08-25"],
+    });
     expect(await runAutoDiaryTask(deps)).toBe("skipped");
     expect(pipelineRun).not.toHaveBeenCalled();
   });
@@ -393,5 +452,231 @@ describe("B1a — defineTask는 모듈 부수 효과다 (024, 헤드리스 배�
       /(^|\n)import\s+.*expo-task-manager/.test(code) ||
       /require\(\s*["']expo-task-manager["']\s*\)/.test(code);
     expect(loadsTaskManagerAtModuleScope).toBe(true);
+  });
+});
+
+describe("078 AT — 자동 쓰기 시도 기록", () => {
+  const lines = (port: { content: string | null }) =>
+    (
+      JSON.parse(port.content ?? '{"items":[]}') as {
+        items: { path: string; outcome: string; at: string }[];
+      }
+    ).items;
+
+  it("쓰면 background · ran 한 줄 — 시작과 끝이 같은 줄이다(at이 now와 같다)", async () => {
+    const { deps, attempts } = baseDeps();
+    await runAutoDiaryTask(deps);
+    expect(lines(attempts)).toEqual([
+      { path: "background", outcome: "ran", at: at(7).toISOString() },
+    ]);
+  });
+
+  it.each([
+    [
+      "disabled",
+      {
+        settingsPort: {
+          read: async () => JSON.stringify({ ...ENABLED, enabled: false }),
+          write: async () => {},
+        },
+      },
+    ],
+    [
+      "not-near-target",
+      { now: at(15), listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"] },
+    ],
+    ["all-written", { listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"] }],
+    ["no-character", { loadCharacter: async () => null }],
+  ] as const)("%s", async (outcome, over) => {
+    const { deps, attempts } = baseDeps({ ...over });
+    await runAutoDiaryTask(deps);
+    expect(lines(attempts).map((l) => l.outcome)).toEqual([outcome]);
+  });
+
+  it("사진 0장이면 no-material, 사진 권한 없음이면 no-photo-access", async () => {
+    const a = baseDeps({ makePipeline: pipelineWith(previewOf({ kind: "known", count: 0 })) });
+    await runAutoDiaryTask(a.deps);
+    expect(lines(a.attempts).map((l) => l.outcome)).toEqual(["no-material"]);
+    const b = baseDeps({ makePipeline: pipelineWith(previewOf({ kind: "unknown" }, "denied")) });
+    await runAutoDiaryTask(b.deps);
+    expect(lines(b.attempts).map((l) => l.outcome)).toEqual(["no-photo-access"]);
+  });
+
+  it("already-running·실패·예외·조립 실패는 각각 already-running·failed·failed·failed", async () => {
+    const cases: [string, Record<string, unknown>][] = [
+      [
+        "already-running",
+        {
+          makePipeline: pipelineWith(
+            WITH_PHOTOS,
+            jest.fn().mockResolvedValue({ ok: false, stage: "already-running", reason: "x" }),
+          ),
+        },
+      ],
+      [
+        "failed",
+        {
+          makePipeline: pipelineWith(
+            WITH_PHOTOS,
+            jest.fn().mockResolvedValue({ ok: false, stage: "storage", reason: "x" }),
+          ),
+        },
+      ],
+      [
+        "failed",
+        { makePipeline: pipelineWith(WITH_PHOTOS, jest.fn().mockRejectedValue(new Error("boom"))) },
+      ],
+      ["failed", { makePipeline: () => ({ ok: false, reason: "no-engine" }) }],
+    ];
+    for (const [outcome, over] of cases) {
+      const { deps, attempts } = baseDeps(over);
+      await runAutoDiaryTask(deps);
+      expect(lines(attempts).map((l) => l.outcome)).toEqual([outcome]);
+    }
+  });
+
+  // 078 리뷰 I3 — 이 기록의 핵심은 「끝나기 전에 started가 디스크에 있다」이다. 끝 기록은 짝이 없으면 스스로 줄을 넣으므로
+  // 시작 기록을 지워도 위 테스트는 모두 통과한다 — 도는 도중의 디스크를 직접 본다.
+  it("★ 파이프라인이 도는 동안 디스크에는 started 한 줄이 이미 있다", async () => {
+    const made = baseDeps();
+    const seenMidRun: unknown[] = [];
+    const run = jest.fn(async () => {
+      seenMidRun.push(JSON.parse(made.attempts.content ?? "null"));
+      return { ok: true, entry: {}, overwrote: false };
+    });
+    await runAutoDiaryTask({ ...made.deps, makePipeline: pipelineWith(WITH_PHOTOS, run as never) });
+    expect(seenMidRun).toEqual([
+      { items: [{ at: at(7).toISOString(), path: "background", outcome: "started" }] },
+    ]);
+  });
+
+  it("★ 끝나지 않는 실행은 started로 남는다 (프로세스가 도중에 정지된 경우의 모양)", async () => {
+    const never = jest.fn(() => new Promise<never>(() => {}));
+    const made = baseDeps();
+    void runAutoDiaryTask({
+      ...made.deps,
+      makePipeline: pipelineWith(WITH_PHOTOS, never as never),
+    });
+    for (let n = 0; n < 50 && never.mock.calls.length === 0; n += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2));
+    }
+    expect(never).toHaveBeenCalledTimes(1);
+    expect(lines(made.attempts)).toEqual([
+      { path: "background", outcome: "started", at: at(7).toISOString() },
+    ]);
+  });
+
+  it("기록 통로가 던져도 결과와 파이프라인 호출은 그대로다", async () => {
+    const broken = {
+      read: () => Promise.reject(new Error("io")),
+      write: () => Promise.reject(new Error("io")),
+    };
+    const { deps, pipelineRun } = baseDeps({ attemptPort: broken });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(pipelineRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 078 리뷰 I2 — 시도 창은 재시도의 유일한 상한이었다(하루 3시간). 지난 날을 창 밖에서도 쓰게 하면서 그 상한이 사라져, 계속 실패하는
+ * 지난 날을 백그라운드가 15분마다 온종일 다시 돌릴 수 있었다(헤드리스 한 번이 18분 걸리는 기기도 있다). **창 밖의 따라잡기는 하루에
+ * 한 번만 판정한다.** 창 안은 종전대로다. 앱을 열 때의 경로는 이 상한을 타지 않는다(한 실행에 한 번이고 화면이 보인다).
+ */
+describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한 번", () => {
+  const FAIL = () => jest.fn().mockResolvedValue({ ok: false, stage: "storage", reason: "x" });
+  const lastOutcome = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: { outcome: string }[] }).items[0]
+      ?.outcome;
+
+  it("같은 날 창 밖에서 두 번째는 파이프라인을 부르지 않고 catch-up-spent로 남는다", async () => {
+    const run = FAIL();
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(WITH_PHOTOS, run) });
+    expect(await runAutoDiaryTask(made.deps)).toBe("failed");
+    expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
+
+    expect(await runAutoDiaryTask({ ...made.deps, now: at(16) })).toBe("skipped");
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(lastOutcome(made.attempts)).toBe("catch-up-spent");
+  });
+
+  it("두 번째는 신호도 읽지 않는다 (재료 없는 날·사진 권한 없는 날을 15분마다 훑지 않는다)", async () => {
+    const preview = jest.fn(previewOf({ kind: "known", count: 0 }));
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(preview as never) });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(lastOutcome(made.attempts)).toBe("no-material");
+    expect(preview).toHaveBeenCalledTimes(1);
+
+    expect(await runAutoDiaryTask({ ...made.deps, now: at(16) })).toBe("skipped");
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(lastOutcome(made.attempts)).toBe("catch-up-spent");
+  });
+
+  it("다음 날에는 다시 한 번 시도한다", async () => {
+    const run = FAIL();
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(WITH_PHOTOS, run) });
+    await runAutoDiaryTask(made.deps);
+    const nextDay = new Date(2026, 7, 29, 15, 30, 0, 0);
+    expect(await runAutoDiaryTask({ ...made.deps, now: nextDay })).toBe("failed");
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-29" });
+  });
+
+  it("창 안의 재시도는 종전대로 막지 않는다 — 기록도 남기지 않는다", async () => {
+    const run = FAIL();
+    const made = baseDeps({ now: at(7), makePipeline: pipelineWith(WITH_PHOTOS, run) });
+    await runAutoDiaryTask(made.deps);
+    await runAutoDiaryTask({ ...made.deps, now: at(8) });
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(made.catchUp.content).toBeNull();
+  });
+
+  it("창 밖에서 따라잡기를 쓴 날에도 창 안에서는 쓴다", async () => {
+    // 목표 16시: 15시(창 밖)에 어제를 시도해 실패 → 16시(창 안)에는 다시 시도한다
+    const run = FAIL();
+    const settingsPort = {
+      read: async () => JSON.stringify({ enabled: true, targetHour: 16 }),
+      write: async () => {},
+    };
+    const made = baseDeps({
+      now: at(15),
+      settingsPort,
+      makePipeline: pipelineWith(WITH_PHOTOS, run),
+    });
+    await runAutoDiaryTask(made.deps);
+    await runAutoDiaryTask({ ...made.deps, now: at(16) });
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it("돌 일이 없는 판정(모두 써 있음)은 오늘의 한 번을 쓰지 않는다", async () => {
+    const made = baseDeps({
+      now: at(15),
+      listDiaryDays: async () => ["2026-08-28", "2026-08-27", "2026-08-26"],
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(lastOutcome(made.attempts)).toBe("all-written");
+    expect(made.catchUp.content).toBeNull();
+  });
+
+  it("기록 통로가 던지면 막지 않는다 (못 읽으면 쓴 적 없음)", async () => {
+    const run = FAIL();
+    const broken = {
+      read: () => Promise.reject(new Error("io")),
+      write: () => Promise.reject(new Error("io")),
+    };
+    const made = baseDeps({
+      now: at(15),
+      catchUpPort: broken,
+      makePipeline: pipelineWith(WITH_PHOTOS, run),
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("failed");
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
+  it("진단의 수동 실행은 상한을 타지 않는다", async () => {
+    const run = FAIL();
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(WITH_PHOTOS, run) });
+    await runAutoDiaryTask(made.deps);
+    expect(await runAutoDiaryTask({ ...made.deps, now: at(16), manual: true })).toBe("failed");
+    expect(run).toHaveBeenCalledTimes(2);
   });
 });

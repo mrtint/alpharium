@@ -43,8 +43,19 @@ function make(over: {
 }) {
   const run = over.run ?? jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false });
   const failures = failurePort();
+  const attempts = {
+    content: null as string | null,
+    async read() {
+      return attempts.content;
+    },
+    async write(serialized: string) {
+      attempts.content = serialized;
+    },
+  };
   const deps = {
     manual: over.manual,
+    catchUpPort: { read: async () => null, write: async () => {} },
+    attemptPort: attempts,
     failurePort: failures,
     skipPort: { read: async () => null, write: async () => {}, remove: async () => {} },
     now: over.now ?? OUT_OF_WINDOW,
@@ -74,7 +85,7 @@ function make(over: {
       store: { listDays: async () => [] },
     })) as never,
   };
-  return { deps, run, failures };
+  return { deps, run, failures, attempts };
 }
 
 describe("AR1 — manual은 시도 창과 토글을 무시한다", () => {
@@ -126,10 +137,19 @@ describe("AR4 — manual이 아니면 기존 그대로", () => {
     expect(run).not.toHaveBeenCalled();
   });
 
-  it("켜져 있어도 창 밖이면 skipped", async () => {
-    const { deps, run } = make({ enabled: true });
+  it("켜져 있고 창 밖이며 오늘만 비어 있으면 skipped", async () => {
+    const { deps, run } = make({
+      enabled: true,
+      listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"],
+    });
     expect(await runAutoDiaryTask(deps)).toBe("skipped");
     expect(run).not.toHaveBeenCalled();
+  });
+
+  it("078 — 켜져 있고 창 밖이어도 어제가 비어 있으면 어제를 쓴다", async () => {
+    const { deps, run } = make({ enabled: true });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
   });
 });
 
@@ -197,5 +217,16 @@ describe("AR5 — 쓰기 실패 기록", () => {
       write: () => Promise.reject(new Error("io")),
     };
     expect(await runAutoDiaryTask({ ...deps, failurePort: broken })).toBe("failed");
+  });
+});
+
+describe("078 AT — manual은 경로가 manual이다", () => {
+  it("쓰면 manual · ran", async () => {
+    const { deps, attempts } = make({ manual: true });
+    await runAutoDiaryTask(deps);
+    const items = (
+      JSON.parse(attempts.content ?? "") as { items: { path: string; outcome: string }[] }
+    ).items;
+    expect(items).toEqual([{ path: "manual", outcome: "ran", at: expect.any(String) }]);
   });
 });

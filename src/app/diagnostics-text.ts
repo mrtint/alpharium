@@ -16,3 +16,6 @@ import { lazyText } from "../i18n/current";
 
 /** 062 — 문구는 한국어 카탈로그 `src/i18n/catalogs/ko/diagnostics.ts`로 옮겼다. 이름은 그대로 두고 읽는 순간 카탈로그에서 꺼낸다 */
 export const DIAGNOSTICS_TEXT = lazyText((c) => c.diagnostics);
+
+/** 078 — 진단 「최근 자동 쓰기 시도」 묶음의 문구. 읽는 순간 카탈로그에서 꺼낸다(C4) */
+export const ATTEMPT_TEXT = lazyText((c) => c.attempts);

@@ -19,12 +19,14 @@ import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 
 import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type {
+  AttemptLine,
   EnvironmentLines,
   FailureLine,
   PhotoPermissionLines,
   ProbeCell,
 } from "../app/diagnostics-view";
 import type { PromptPreview } from "../diagnostics/types";
+import { AttemptsGroup } from "./AttemptsGroup";
 import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
 import { AppText } from "./components/Text";
 import { SIMULATION_TEXT } from "./developer-text";
@@ -59,6 +61,8 @@ export type DiagnosticsScreenProps = {
   autoResult: AutoRunResult | null;
   /** 최신이 위 */
   failures: readonly FailureLine[];
+  /** 078 — 최근 자동 쓰기 시도, 최신이 위 */
+  attempts: readonly AttemptLine[];
   /**
    * 064 — 상태 흉내가 켜져 있다(S8). 참이면 두 쓰기 버튼에 콜백을 넘기지 않고(058 — 누를 수 없는 것은 `onPress`도 없다) 흐리게 그리며 아래에
    * 차단 문구를 보인다. 홈·백그라운드도 각각 막는다 — 이 화면은 첫 방어다.
@@ -110,6 +114,7 @@ export function DiagnosticsScreen({
   autoRunning,
   autoResult,
   failures,
+  attempts,
   writeBlocked = false,
 }: DiagnosticsScreenProps) {
   const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : autoText(autoResult);
@@ -267,6 +272,9 @@ export function DiagnosticsScreen({
           ))
         )}
       </Group>
+
+      {/* 078 — 자동 쓰기가 판정에 들어간 기록. 개발자 화면과 같은 부품이다(배포 빌드는 그쪽에서 본다) */}
+      <AttemptsGroup attempts={attempts} idPrefix="diagnostics" />
     </View>
   );
 }
