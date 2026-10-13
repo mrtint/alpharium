@@ -262,7 +262,7 @@ describe("B2-9 / N7 — 실패엔 알림이 없다 (FR-005, SC-006)", () => {
     expect(present).not.toHaveBeenCalled();
   });
 
-  it("already-running(잠금 취득 실패)이면 'skipped', 알림 없음", async () => {
+  it("already-running(다른 쓰기가 살아 있어 칸을 못 차지함)이면 'skipped', 알림 없음", async () => {
     const { deps, present } = baseDeps();
     deps.makePipeline = (() => ({
       ok: true,
@@ -276,6 +276,89 @@ describe("B2-9 / N7 — 실패엔 알림이 없다 (FR-005, SC-006)", () => {
 
     expect(await runAutoDiaryTask(deps)).toBe("skipped");
     expect(present).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 080 — 사용자가 그만둔 쓰기 (specs/080-live-write-registry/contracts/live-write.md T2).
+ *
+ * 합류한 홈의 「그만두기」나 「일기 모두 지우기」가 백그라운드의 쓰기를 끊으면 태스크에는 실패 모양으로 돌아온다 — 그러나
+ * 실패가 아니다. 문구(`interrupted: …`)가 아니라 결과의 `cancelled`로 가른다.
+ */
+describe("080 T2 — 사용자가 그만둔 쓰기는 실패도 완주도 아니다", () => {
+  const CANCELLED = {
+    ok: false,
+    stage: "generation",
+    reason: "interrupted: 저장 전에 그만두었다",
+    cancelled: true,
+  };
+
+  const lines = (port: { content: string | null }) =>
+    (
+      JSON.parse(port.content ?? '{"items":[]}') as {
+        items: { path: string; outcome: string; at: string }[];
+      }
+    ).items;
+
+  function failures() {
+    const port = {
+      content: null as string | null,
+      async read() {
+        return port.content;
+      },
+      async write(serialized: string) {
+        port.content = serialized;
+      },
+    };
+    return port;
+  }
+
+  it("★ 건너뜀으로 끝나고 알림도 쓰기 실패 기록도 없으며 시도 기록은 「그만둠」이다", async () => {
+    const failurePort = failures();
+    const { deps, present, attempts } = baseDeps({
+      failurePort,
+      makePipeline: pipelineWith(WITH_PHOTOS, jest.fn().mockResolvedValue(CANCELLED)),
+    });
+
+    expect(await runAutoDiaryTask(deps)).toBe("skipped");
+
+    expect(present).not.toHaveBeenCalled();
+    expect(failurePort.content).toBeNull();
+    // 시작(`started`)과 같은 시각으로 짝이 맞아 한 줄이다 — 「시작한 뒤 끝나지 않음」으로 남지 않는다.
+    expect(lines(attempts)).toEqual([
+      { at: at(7).toISOString(), path: "background", outcome: "cancelled" },
+    ]);
+  });
+
+  it("수동 실행(진단의 「자동 쓰기 지금 실행」)에서도 같다", async () => {
+    const failurePort = failures();
+    const { deps, present, attempts } = baseDeps({
+      manual: true,
+      failurePort,
+      makePipeline: pipelineWith(WITH_PHOTOS, jest.fn().mockResolvedValue(CANCELLED)),
+    });
+
+    expect(await runAutoDiaryTask(deps)).toBe("skipped");
+
+    expect(present).not.toHaveBeenCalled();
+    expect(failurePort.content).toBeNull();
+    expect(lines(attempts).map((l) => [l.path, l.outcome])).toEqual([["manual", "cancelled"]]);
+  });
+
+  it("대조 — 그만둠이 없는 같은 실패는 종전대로 실패이고 기록된다", async () => {
+    const failurePort = failures();
+    const { deps, attempts } = baseDeps({
+      failurePort,
+      makePipeline: pipelineWith(
+        WITH_PHOTOS,
+        jest.fn().mockResolvedValue({ ...CANCELLED, cancelled: undefined }),
+      ),
+    });
+
+    expect(await runAutoDiaryTask(deps)).toBe("failed");
+
+    expect(failurePort.content).not.toBeNull();
+    expect(lines(attempts).map((l) => l.outcome)).toEqual(["failed"]);
   });
 });
 

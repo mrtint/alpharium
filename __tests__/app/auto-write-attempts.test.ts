@@ -35,7 +35,7 @@ const AT = new Date("2026-10-13T13:12:03.456Z");
 const LATER = new Date("2026-10-13T14:00:00.000Z");
 
 describe("AT1 — 갈래는 사람이 못 박은 상수다", () => {
-  it("경로 셋, 결과 열셋 — 순서까지", () => {
+  it("경로 셋, 결과 열넷 — 순서까지 (080: 사용자가 그만둠)", () => {
     expect(ATTEMPT_PATHS).toEqual(["background", "app-open", "manual"]);
     expect(ATTEMPT_OUTCOMES).toEqual([
       "started",
@@ -49,9 +49,11 @@ describe("AT1 — 갈래는 사람이 못 박은 상수다", () => {
       "no-character",
       "write",
       "already-running",
+      "cancelled",
       "ran",
       "failed",
     ]);
+    expect(ATTEMPT_OUTCOMES).toHaveLength(14);
     expect(MAX_AUTO_WRITE_ATTEMPTS).toBe(20);
   });
 });
@@ -86,6 +88,16 @@ describe("AT3 — 끝은 같은 at·path의 줄을 결과로 바꾼다", () => {
     await recordAttemptEnd(port, "background", AT, "ran");
     expect(await loadAutoWriteAttempts(port)).toEqual([
       { at: AT, path: "background", outcome: "ran" },
+    ]);
+  });
+
+  it("080 — 사용자가 그만둔 쓰기는 「시작한 뒤 끝나지 않음」으로 남지 않고 그만둠으로 닫힌다", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT);
+    await recordAttemptEnd(port, "background", AT, "cancelled");
+    // 저장된 것을 다시 읽어도 그 갈래다 — 모르는 갈래로 버려지지 않는다.
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: AT, path: "background", outcome: "cancelled" },
     ]);
   });
 

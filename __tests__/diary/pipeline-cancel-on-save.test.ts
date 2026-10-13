@@ -36,7 +36,15 @@ const usedPhotos = [
   { photoId: "p2", takenAt: AFTER_CLOSE, resizedPath: "/orig/p2.jpg", ownsResizedPath: false },
 ];
 
-function make(options: { cleanup?: (path: string) => Promise<void> } = {}) {
+/**
+ * `afterGenerate`는 생성이 끝나는 순간에 불린다 — 「생성이 끝나는 순간에 온 그만두기」(SE-3)를 만드는 자리다.
+ *
+ * 080(코드 리뷰)부터 파이프라인은 **생성에 들어서기 전에도** 취소를 본다. 처음부터 참인 `isCancelled`는 그 앞 확인에 걸려
+ * 생성 자체가 돌지 않으므로, 「저장 직전」의 확인을 보려면 취소가 생성 도중에 와야 한다.
+ */
+function make(
+  options: { cleanup?: (path: string) => Promise<void>; afterGenerate?: () => void } = {},
+) {
   const store = memoryStore();
   const backend: InferenceBackend = {
     location: "on-device",
@@ -44,6 +52,7 @@ function make(options: { cleanup?: (path: string) => Promise<void> } = {}) {
       return { kind: "loaded" };
     },
     async generate() {
+      options.afterGenerate?.();
       return { text: "오늘의 일기다.", usedPhotos };
     },
   };
@@ -58,10 +67,11 @@ function make(options: { cleanup?: (path: string) => Promise<void> } = {}) {
 
 describe("C1 — 생성이 끝난 뒤 저장 직전에 취소를 본다", () => {
   it("★ 취소돼 있으면 저장하지 않는다 — 파일이 생기지 않고 실패 값이 돌아온다", async () => {
-    const { pipeline, store } = make();
+    let cancelled = false;
+    const { pipeline, store } = make({ afterGenerate: () => (cancelled = true) });
     const save = jest.spyOn(store, "save");
 
-    const result = await pipeline.run(input({ isCancelled: () => true }));
+    const result = await pipeline.run(input({ isCancelled: () => cancelled }));
 
     expect(save).not.toHaveBeenCalled();
     expect(await store.load(DAY)).toBeNull();
@@ -75,12 +85,19 @@ describe("C1 — 생성이 끝난 뒤 저장 직전에 취소를 본다", () => 
   });
 
   it("★ 이미 쓴 날의 다시 쓰기도 옛 일기를 건드리지 않는다", async () => {
-    const { pipeline, store } = make();
+    let armed = false;
+    let cancelled = false;
+    const { pipeline, store } = make({
+      afterGenerate: () => {
+        if (armed) cancelled = true;
+      },
+    });
     const first = await pipeline.run(input());
     expect(first.ok).toBe(true);
     const before = await store.load(DAY);
+    armed = true;
 
-    const result = await pipeline.run(input({ isCancelled: () => true }));
+    const result = await pipeline.run(input({ isCancelled: () => cancelled }));
 
     expect(result.ok).toBe(false);
     expect(await store.load(DAY)).toEqual(before);
@@ -88,9 +105,10 @@ describe("C1 — 생성이 끝난 뒤 저장 직전에 취소를 본다", () => 
 
   it("취소돼 저장을 건너뛰면 우리 사본만 정리한다 — 원본 경로는 지우지 않는다 (013 C1)", async () => {
     const cleanup = jest.fn(async () => {});
-    const { pipeline } = make({ cleanup });
+    let cancelled = false;
+    const { pipeline } = make({ cleanup, afterGenerate: () => (cancelled = true) });
 
-    await pipeline.run(input({ isCancelled: () => true }));
+    await pipeline.run(input({ isCancelled: () => cancelled }));
 
     expect(cleanup).toHaveBeenCalledTimes(1);
     expect(cleanup).toHaveBeenCalledWith("/cache/p1.jpg");

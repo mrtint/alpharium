@@ -796,7 +796,7 @@ export function onDeviceBackend(
    * 이 어댑터를 조립하는 쪽 (079, contracts/assembly.md A6). 주지 않으면 화면이다.
    *
    * 백그라운드 자동 쓰기가 조립하면 안드로이드에서 두 모델을 스레드 2로 열고, 생성 시간
-   * 한도가 600초가 된다 — 값과 근거는 `assembly.ts`. `wiring.ts`가 잠금 주체와 같은 값을 넘긴다.
+   * 한도가 600초가 된다 — 값과 근거는 `assembly.ts`. `wiring.ts`가 등록부의 칸에 싣는 주체와 같은 값을 넘긴다.
    */
   owner: AssemblyOwner = "screen",
 ): StoppableBackend {

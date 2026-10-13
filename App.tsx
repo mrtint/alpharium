@@ -24,8 +24,6 @@ import {
 import { expoBatteryExceptionPort } from "./src/schedule/battery-exception-port";
 import { expoNotificationPort } from "./src/schedule/notification-port";
 import { acknowledgeNotified, expoNotifiedStorePort } from "./src/schedule/notified-store";
-import { clearStaleLocksOnStart } from "./src/schedule/lock";
-import { expoLockPort } from "./src/schedule/lock-port";
 import {
   clearSkippedDay,
   expoSkipStorePort,
@@ -121,6 +119,7 @@ import {
 } from "./src/app/geocoding-setting-store";
 import { dayBounds, dayOf, isDayWritable, selectableDays } from "./src/config/day-boundary";
 import { createAppPipeline, triggerFirstRunAutoDiary } from "./src/app/wiring";
+import { liveWrites } from "./src/diary/live-write";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
 import { collectReport } from "./src/diagnostics/report";
@@ -467,13 +466,8 @@ function AppFrame() {
     // 전역 백그라운드 태스크를 등록한다(019 research §1 — 전역 스코프 요건).
     ensureAutoDiaryTaskDefined();
 
-    // 020 — 앱이 방금 시작했으므로 이전 프로세스가 남긴 죽은 잠금을 청소한다
-    // (generation-lock.md L7 보강). `force-stop`·크래시로 `pipeline.run()`의
-    // `finally { release() }`가 안 돌면 잠금 파일이 5분까지 살아 화면 생성이
-    // 전부 `already-running`으로 막힌다. `clearStaleLocksOnStart`가 "screen"은
-    // 무조건, "background"는 stale일 때만 지운다(진행 중인 백그라운드 생성을
-    // 방해하지 않기 위해).
-    void clearStaleLocksOnStart(expoLockPort(), Date.now()).catch(() => {});
+    // 080 — 시작할 때 치울 것이 없다. 살아 있는 쓰기는 메모리의 등록부가 안다(`diary/live-write.ts`) — 이전 프로세스가
+    // 죽었으면 그 쓰기도 함께 사라졌다. 020의 잠금 파일 청소는 걷었다.
 
     void notificationPort.ensureChannel().catch(() => {});
 
@@ -1168,8 +1162,9 @@ function AppFrame() {
    *
    * 1. 요청 토큰(`wipeRequest`)을 올려 홈에 알린다. 홈은 쓰는 중이면 054 그만두기처럼 멈추고 **그 생성이 끝난 뒤에**
    *    `onWipeReady(token)`을 부른다 — 홈을 다시 마운트하는 것만으로는 생성이 멈추지 않아 지운 뒤에 저장된다.
-   * 2. 응답이 오면 `wipeDiaries`가 쓰기 잠금을 쥔 채 일기·사진 사본·알림 확인 기록을 지운다. 잠금을 못 얻으면(백그라운드가 쓰는 중)
-   *    아무것도 지우지 않고 `busy` — 설정이 한 줄로 알린다(FR-016a).
+   * 2. 응답이 오면 `wipeDiaries`가 등록부의 칸을 쥔 채 일기·사진 사본·알림 확인 기록을 지운다. 080 — 그 전에 **남의 쓰기**
+   *    (백그라운드 자동 쓰기 등, 홈이 멈추지 못하는 것)가 살아 있으면 끊고 끝나기를 기다린다. 칸을 못 차지하면(다른 지우기,
+   *    또는 끊은 틈에 선 다른 쓰기) 아무것도 지우지 않고 `busy` — 설정이 한 줄로 알린다(FR-016a).
    * 3. `busy`가 아니면(지웠거나 일부 실패) 설정을 닫고, 고른 날을 오늘로 두고, 홈을 다시 마운트해 목록을 새로 읽힌다 — 일부
    *    실패여도 홈은 실제로 남은 일기를 보인다(FR-018).
    *
@@ -1188,7 +1183,7 @@ function AppFrame() {
   const wipeTokenRef = useRef(0);
   /**
    * 059 — 쓰는 중인 홈을 먼저 멈춘다(058에서 뽑았다). 지우기·모듈 다시 받기·온보딩부터 다시가 함께 쓴다 — 셋 모두 홈을 곧 언마운트하거나 그 밑의
-   * 파일을 건드리므로, 멈추지 않으면 생성이 뒤에서 이어져 저장되거나 잠금을 쥔 채 남는다. 쓰는 중이 아니면 곧바로 끝난다.
+   * 파일을 건드리므로, 멈추지 않으면 생성이 뒤에서 이어져 저장되거나 등록부의 칸을 쥔 채 남는다. 쓰는 중이 아니면 곧바로 끝난다.
    */
   const stopHome = useCallback(async (): Promise<void> => {
     const token = ++wipeTokenRef.current;
@@ -1206,8 +1201,7 @@ function AppFrame() {
       clearPhotoCopies,
       notifiedPort: expoNotifiedStorePort(),
       dismiss: (id) => notifications.dismiss(id),
-      lockPort: expoLockPort(),
-      nowMs: Date.now(),
+      liveWrites,
     }).catch((error: unknown): WipeOutcome => ({ kind: "failed", reason: String(error) }));
     if (outcome.kind !== "busy") {
       goHome();
@@ -2221,6 +2215,7 @@ function DiarySection({
       // 057 — 앱을 열 때의 자동 쓰기. 판정은 위에서 했고 홈은 그 날을 쓴다.
       autoWriteDay={autoWriteDay}
       claimAutoWrite={claimAutoWrite}
+      liveWrites={liveWrites}
       // 058 — 홈이 늘 그려진다(조립이 실패해도 `DiaryHomeScreen`이 실패 화면을 그린다) — 요청은 언제나 홈이 받는다.
       wipeRequest={wipeRequest}
       onWipeReady={onWipeReady}

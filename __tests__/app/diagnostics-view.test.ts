@@ -261,7 +261,7 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
     for (const line of lines) expect(Object.keys(line).sort()).toEqual(["headText", "outcomeText"]);
   });
 
-  it("열세 갈래 문구가 모두 있고 서로 다르다", () => {
+  it("열네 갈래 문구가 모두 있고 서로 다르다 (080: 사용자가 그만둠)", () => {
     const outcomes = [
       "started",
       "simulation",
@@ -274,6 +274,7 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
       "no-character",
       "write",
       "already-running",
+      "cancelled",
       "ran",
       "failed",
     ] as const;
@@ -293,6 +294,7 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
       "캐릭터 없음",
       "홈에 넘김",
       "다른 쓰기가 진행 중",
+      "사용자가 그만둠",
       "썼음",
       "실패",
     ]);

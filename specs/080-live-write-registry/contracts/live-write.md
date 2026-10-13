@@ -61,6 +61,7 @@ export const liveWrites: LiveWrites; // 앱이 쓰는 하나
 | P3 | 차지한 뒤에는 성공·실패·예외 어느 길로 끝나도 `finally`에서 `end()`를 부른다. `end()`는 `runStages`가 돌아온 뒤 — 곧 백엔드가 모델 정리까지 마친 뒤(079 U8)다 |
 | P4 | `run()`은 진행 신호를 손잡이의 `publish()`에도 싣는다. 호출자가 `onProgress`를 주지 않아도 싣는다 |
 | P5 | 저장 직전 확인(071)은 `input.isCancelled?.()` **또는** 손잡이의 `isCancelled()`다 |
+| P5a | 같은 확인을 **`backend.generate()` 직전에도** 한 번 한다(코드 리뷰). 어댑터가 `generate()`에 들어설 때 지난 그만두기 신호를 비우므로, 그 전에 온 끊기는 여기서 걸러야 한다 — 걸리면 생성을 부르지 않고 `generation` 단계의 `interrupted` 실패다. 칸의 `cancel()`은 「생성이 아직 시작되지 않았어도 그 쓰기는 생성 없이 끝난다」를 보장한다 |
 | P6 | 실패 결과에 그만둠이 실린다: 손잡이의 `isCancelled()`가 참이고 결과가 실패이면 `cancelled: true`가 붙는다. 성공 결과에는 붙지 않는다(저장이 시작된 뒤의 그만두기는 일기를 남긴다 — 071). `PipelineStage`는 늘지 않는다 |
 | P7 | `wiring.ts`의 `createAppPipeline()`은 `beginWrite`를 `(day) => registry.beginWrite({ day, owner, stop })`로 묶는다 — `owner`는 079 A8의 그 한 변수, `stop`은 그 파이프라인 백엔드의 `stop`(없으면 싣지 않는다), `registry`는 `deps.liveWrites ?? liveWrites`다 |
 | P8 | `pipeline.ts`·`wiring.ts`·`task.ts`·`wipe-diaries.ts`·`App.tsx`에 잠금 파일 통로·낡음 시간·시작 시 청소가 없다. `src/schedule/lock.ts`·`lock-port.ts`는 없다 |
@@ -89,6 +90,7 @@ export const liveWrites: LiveWrites; // 앱이 쓰는 하나
 | H6 | 합류한 쓰기가 실패로 끝나면(`ok`도 `cancelled`도 아님) 목록을 다시 읽어 목록 상태다. 토스트 없음, 쓰기 실패 기록을 홈이 남기지 않는다(시작한 쪽이 남긴다). 그 뒤 057 자동 시작 조건이 다시 판정된다 — `claimAutoWrite()`가 거짓이면(그 실행의 「한 번」이 이미 쓰였다) 아무 일도 없다 |
 | H7 | 홈이 그만두지 않았는데 `cancelled`로 끝나면(지우기가 끊었다) H6과 같되 057의 「한 번」을 소모한다 |
 | H8 | 남의 쓰기가 칸에 있는 동안 057 자동 시작은 `claimAutoWrite()`를 부르지 않고, 018 미리 준비·사진 미리 읽기는 `prepare`·`captionDay`를 부르지 않는다 |
+| H8a | 남의 쓰기가 칸에 있는 동안 온 060 쓰기 요청(진단 「지금 한 번 써 보기」)은 시작하지 않고 요청만 비운다 — 「이미 쓰는 중」과 같다(코드 리뷰). **H8의 미리 준비 확인은 방어다**: 지금 `App.tsx`는 `prepare`·`release`·`captionDay`를 홈에 넘기지 않는다 |
 | H9 | 홈이 시작한 쓰기가 `already-running`으로 돌아왔고 칸에 쓰기가 있으면 토스트를 띄우지 않는다 — 목록 상태로 돌아가 H1이 합류시킨다. 칸에 쓰기가 없으면(지우기 중·이미 끝남) 종전대로다 |
 | H10 | 홈이 언마운트된 뒤에 끝난 합류는 상태를 바꾸지 않는다. 단계·변화 구독은 언마운트·합류 종료 때 끊는다 |
 | H11 | `liveWrites`를 주지 않으면 합류·H8·H9·H12가 없다 — 기존 화면 테스트가 그대로 통과한다 |
@@ -122,10 +124,10 @@ export const liveWrites: LiveWrites; // 앱이 쓰는 하나
 | --- | --- |
 | R1~R8·R10 | `__tests__/diary/live-write.test.ts` (100회 무작위 순서 포함) |
 | R9·P8 | 같은 파일의 소스 계약 — 주석을 걷고 본다. `src/`·`App.tsx` 전체에서 `STALE_LOCK_MS`·`diary-generation.lock`·`clearStaleLocksOnStart`·`lock-port` 0건 |
-| P1~P6 | `__tests__/diary/pipeline.live-write.test.ts` (옛 `pipeline.lock.test.ts`를 대체) |
+| P1~P6·P5a | `__tests__/diary/pipeline.live-write.test.ts` (옛 `pipeline.lock.test.ts`를 대체), 저장 직전 확인은 `pipeline-cancel-on-save.test.ts`(071) |
 | P7 | `__tests__/app/wiring.test.ts` |
 | P9 | `__tests__/app/write-failures.test.ts` |
 | T1~T4 | `__tests__/schedule/background-generation.test.ts`·`__tests__/app/auto-write-attempts.test.ts`·`__tests__/app/diagnostics-view.test.ts` |
-| H1~H12 | `__tests__/ui/home-join.test.tsx` (새 파일, RNTL) |
+| H1~H12·H8a | `__tests__/ui/home-join.test.tsx` (새 파일, RNTL). 「FR-013」 묶음은 진짜 `createPipeline()`을 같은 등록부에 묶어 본다 — 가짜 파이프라인은 칸을 차지하지 않아 `running` 확인을 지워도 통과한다 |
 | W1~W4 | `__tests__/app/wipe-diaries.test.ts` |
 | 실기기 | [quickstart.md](../quickstart.md) |

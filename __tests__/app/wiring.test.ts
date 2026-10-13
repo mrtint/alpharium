@@ -19,6 +19,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { createAppPipeline } from "../../src/app/wiring";
+import { createLiveWrites } from "../../src/diary/live-write";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { DaySignals } from "../../src/signals/types";
 
@@ -261,7 +262,7 @@ describe("048 createAppPipeline — previewDay", () => {
  * 백그라운드가 조립한 쓰기만 스레드 2·600초 한도를 탄다. 「백그라운드인가」를 잠금과 따로 정하면
  * 둘이 어긋날 수 있다 — 주체를 정하는 식은 하나이고 그 변수가 두 자리에 간다.
  */
-describe("079 createAppPipeline — 잠금 주체를 백엔드 선택에도 넘긴다 (assembly.md A8)", () => {
+describe("079 createAppPipeline — 조립 주체를 백엔드 선택에도 넘긴다 (assembly.md A8)", () => {
   const code = readFileSync(join(__dirname, "../../src/app/wiring.ts"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, "");
@@ -275,11 +276,81 @@ describe("079 createAppPipeline — 잠금 주체를 백엔드 선택에도 넘�
     expect(code).toMatch(/selectBackend\([^;]*,\s*owner,?\s*\);/);
   });
 
-  it("같은 변수가 잠금 취득에 쓰인다", () => {
-    expect(code).toMatch(/acquireLockRecord\(lockPort,\s*owner,/);
+  it("같은 변수가 등록부의 칸을 차지할 때 쓰인다 (080 P7)", () => {
+    expect(code).toMatch(/registry\.beginWrite\(\{\s*day,\s*owner,/);
   });
 
   it("주체가 백엔드 선택보다 먼저 정해진다", () => {
     expect(code.indexOf("const owner = ")).toBeLessThan(code.indexOf("selectBackend("));
+  });
+});
+
+/**
+ * 080 — 파이프라인은 등록부의 칸을 차지한다
+ * (specs/080-live-write-registry/contracts/live-write.md P7·P8).
+ *
+ * 020의 잠금 파일 통로(`lockPort`)와 벽시계(`Date.now()`)가 조립에서 사라졌다 — 살아 있는 쓰기는 메모리의 등록부 하나가
+ * 안다. 화면이 조립한 파이프라인과 백그라운드가 조립한 파이프라인이 **같은 등록부**를 나눠 써야 서로를 본다.
+ */
+describe("080 createAppPipeline — 등록부 (live-write.md P7)", () => {
+  const code = readFileSync(join(__dirname, "../../src/app/wiring.ts"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+
+  it("주지 않으면 앱의 등록부 하나를 쓴다", () => {
+    expect(code).toMatch(/const registry = deps\.liveWrites \?\? liveWrites;/);
+  });
+
+  it("칸을 차지할 때 그 파이프라인 백엔드의 멈춤을 묶는다", () => {
+    expect(code).toMatch(/selection\.backend\.stop\?\.bind\(selection\.backend\)/);
+    expect(code.match(/selection\.backend\.stop\?\.bind/g)).toHaveLength(1);
+    expect(code).toMatch(/registry\.beginWrite\(\{[^}]*stop/);
+  });
+
+  it("잠금 파일 통로도 벽시계도 없다", () => {
+    expect(code).not.toMatch(/lockPort|expoLockPort|acquireLock|Date\.now\(\)/);
+  });
+
+  it("주체가 다른 두 파이프라인이 같은 등록부를 나눠 쓴다", async () => {
+    const registry = createLiveWrites();
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const signals = async (day: string): Promise<DaySignals | null> => {
+      await gate;
+      void day;
+      return null;
+    };
+    const background = createAppPipeline(resolved("dev"), {
+      liveWrites: registry,
+      lockOwner: "background",
+      loadSignals: signals,
+    });
+    const screen = createAppPipeline(resolved("dev"), {
+      liveWrites: registry,
+      loadSignals: signals,
+    });
+    if (!background.ok || !screen.ok) throw new Error("조립 실패");
+    const input = {
+      day: "2026-10-12",
+      now: new Date("2026-10-13T09:00:00"),
+      character: "quiet" as const,
+      vision: "quick" as const,
+    };
+
+    const first = background.pipeline.run(input);
+    const slot = registry.current();
+    expect(slot?.kind === "write" && slot.owner).toBe("background");
+    expect(slot?.kind === "write" && slot.day).toBe("2026-10-12");
+
+    await expect(screen.pipeline.run(input)).resolves.toMatchObject({
+      ok: false,
+      stage: "already-running",
+    });
+
+    release();
+    await first;
+    expect(registry.current()).toBeNull();
   });
 });

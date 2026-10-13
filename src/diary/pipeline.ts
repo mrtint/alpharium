@@ -17,6 +17,7 @@ import {
 } from "../inference/types";
 import type { DaySignals } from "../signals/types";
 import type { PhotoVision } from "../vision/types";
+import type { WriteHandle } from "./live-write";
 import { buildRequest } from "./request";
 import type { DiaryStore } from "./store";
 import { extractTitle } from "./title";
@@ -69,8 +70,14 @@ export type PipelineResult =
    * 비용이 커서 사라진 일기를 되돌릴 수 없다.
    */
   | { ok: true; entry: DiaryEntry; overwrote: boolean }
-  | { ok: false; stage: PipelineStage; reason: string; entry?: undefined }
-  | { ok: false; stage: "storage"; reason: string; entry: DiaryEntry };
+  /**
+   * `cancelled` — **사용자가 이 쓰기를 그만두었다**(080, contracts/live-write.md P6). 등록부의 칸에 그만둠이 선 채 실패로
+   * 끝났을 때만 붙는다. 문구(`interrupted: …`)를 비교하지 않고 이 값으로 가른다 — 시작한 쪽이 그것을 실패로 기록하지도,
+   * 완성 알림을 보내지도 않게. 단계(`PipelineStage`)를 늘리지 않는다(071 — 화면의 실패 갈래 표가 단계를 센다).
+   * 성공 갈래에는 없다: 저장이 시작된 뒤의 그만두기는 일기를 남긴다.
+   */
+  | { ok: false; stage: PipelineStage; reason: string; entry?: undefined; cancelled?: true }
+  | { ok: false; stage: "storage"; reason: string; entry: DiaryEntry; cancelled?: true };
 
 export type PipelineInput = {
   day: DayDate;
@@ -165,29 +172,24 @@ export type PipelineDeps = {
   /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
   geocodingEnabled?: boolean;
   /**
-   * 프로세스 경계 경합 잠금 (020, contracts/generation-lock.md L5).
+   * 살아 있는 쓰기 등록부의 칸을 차지한다 (080, contracts/live-write.md P1~P6 — 020의 `acquireLock?`을 대체한다).
    *
    * ─────────────────────────────────────────────────────────────────────────
-   * **`running: Set<DayDate>`는 인스턴스 로컬이다.** 화면과 백그라운드
-   * 태스크는 각자 `createAppPipeline()`을 불러 다른 파이프라인 인스턴스를
-   * 만들므로, 둘이 동시에 살면 `running` 방어가 서로를 못 본다(L1). 이
-   * 통로가 주어지면 `run()`이 `day-writable` 판정 다음, instance-local
-   * `running` 판정과 함께 파일 잠금 취득을 시도한다. 취득 실패 시
-   * `{ ok: false, stage: "already-running" }`로 즉시 반환한다.
+   * **`running: Set<DayDate>`는 인스턴스 로컬이다.** 화면과 백그라운드 태스크는 각자 `createAppPipeline()`을 불러 다른
+   * 파이프라인 인스턴스를 만들므로, 둘이 동시에 살면 `running` 방어가 서로를 못 본다. 이 통로가 주어지면 `run()`이
+   * `day-writable` 판정과 인스턴스 `running` 판정 다음에 칸을 차지한다. 못 차지하면(`null` — 다른 쓰기나 지우기가 살아 있다)
+   * `{ ok: false, stage: "already-running" }`로 즉시 돌아온다.
    *
-   * **옵셔널 확장이다**(003의 `isModelReady?`, 017의 `geocoding?`과 같은
-   * 방식) — 주지 않으면 002~019 동작을 그대로 유지한다(회귀 없음).
+   * **동기다.** 확인과 차지 사이에 다른 쓰기가 끼어들 틈이 없다 — 020의 파일 잠금은 「읽고 → 쓴다」 사이가 비어 있었다.
    *
-   * `owner`는 `run()` 호출자가 정하지 않는다 — `wiring.ts`가 화면/태스크
-   * 경로별로 owner-bound 클로저를 만들어 주입한다(`PipelineInput`은
-   * 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다).
+   * **옵셔널 확장이다**(003의 `isModelReady?`, 017의 `geocoding?`과 같은 방식) — 주지 않으면 등록부를 쓰지 않는다.
+   *
+   * 누가 조립했는가(주체)와 멈춤 함수는 여기 오지 않는다 — `wiring.ts`가 묶어서 준다(`PipelineInput`은 화면·태스크가
+   * 공유하는 데이터라 주체 개념이 안 어울린다).
    * ─────────────────────────────────────────────────────────────────────────
    */
-  acquireLock?: () => Promise<LockHandle | null>;
+  beginWrite?: (day: DayDate) => WriteHandle | null;
 };
-
-/** 취득한 잠금을 놓는 통로. `run()`이 `finally`에서 부른다. */
-export type LockHandle = { release: () => Promise<void> };
 
 export interface Pipeline {
   run(
@@ -231,25 +233,49 @@ export function createPipeline(deps: PipelineDeps): Pipeline {
         return stop("already-running", `${input.day}는 이미 생성 중이다`);
       }
 
-      // 3. 프로세스 경계 잠금 (020, L5). 주어졌을 때만 시도한다 — 주지
-      //    않으면 002~019 동작 그대로(회귀 없음). 다른 파이프라인
-      //    인스턴스(화면 ↔ 백그라운드 태스크)가 이미 잡고 있으면 null.
-      let handle: LockHandle | null = null;
-      if (deps.acquireLock !== undefined) {
-        handle = await deps.acquireLock();
+      // 3. 등록부의 칸 (080, P2). 주어졌을 때만 차지한다 — 주지 않으면 002~019 동작 그대로(회귀 없음).
+      //    다른 파이프라인 인스턴스(화면 ↔ 백그라운드 태스크)의 쓰기나 지우기가 살아 있으면 null.
+      let handle: WriteHandle | null = null;
+      if (deps.beginWrite !== undefined) {
+        handle = deps.beginWrite(input.day);
         if (handle === null) {
           return stop("already-running", `${input.day}는 다른 곳에서 생성 중이다`);
         }
       }
+      const held = handle;
 
       running.add(input.day);
+      let ok = false;
       try {
-        return await runStages(deps, input, onProgress);
+        const result = await runStages(
+          deps,
+          // P5 — 저장 직전 확인은 호출자의 판정 또는 칸의 그만둠이다(합류한 홈·지우기가 끊은 쓰기).
+          held === null
+            ? input
+            : {
+                ...input,
+                isCancelled: () => input.isCancelled?.() === true || held.isCancelled(),
+              },
+          // P4 — 진행 신호를 칸에도 싣는다. 자기 `onProgress`가 없는 백그라운드 쓰기의 단계를 합류한 홈이 본다.
+          held === null
+            ? onProgress
+            : (stage, branch) => {
+                held.publish(stage, branch);
+                onProgress?.(stage, branch);
+              },
+        );
+        ok = result.ok;
+        // P6 — 칸에 그만둠이 선 채 실패했으면 값으로 싣는다. 호출자가 스스로 가린 취소(홈의 시도 번호, 071)에는 붙지 않는다.
+        if (!result.ok && held !== null && held.isCancelled()) {
+          return { ...result, cancelled: true };
+        }
+        return result;
       } finally {
         // 성공·실패와 무관하게 빠진다. 빠지지 않으면 실패한 하루를 영영 다시 시도할 수 없다.
         running.delete(input.day);
-        // 잠금도 반드시 놓는다 — 안 놓으면 다음 실행이 stale 타임아웃(5분)까지 막힌다.
-        await handle?.release().catch(() => {});
+        // 칸도 반드시 비운다(P3) — 안 비우면 이 프로세스가 사는 동안 어떤 쓰기도 시작하지 못한다. 여기 닿는 것은 백엔드가
+        // 모델 정리까지 마친 뒤다(079 U8) — 끝남을 들은 쪽이 곧바로 모델을 열어도 겹치지 않는다.
+        held?.end({ ok });
       }
     },
   };
@@ -335,6 +361,15 @@ async function runStages(
     if (geocoded.kind === "known") {
       request.request = { ...request.request, placeName: geocoded.value };
     }
+  }
+
+  // ★ 080 (코드 리뷰) — **생성에 들어서기 전에 끊겼으면 시작하지 않는다.** 어댑터는 `generate()`에 들어설 때 지난 그만두기
+  // 신호를 비운다(새 요청이므로) — 신호 읽기·지오코딩 도중에 온 끊기는 거기서 사라지고, 사진 읽기·모델 적재·본문·제목이 끝까지
+  // 돈 뒤 저장 직전 확인에서야 버려졌다. 080부터 합류한 홈의 「그만두기」와 「일기 모두 지우기」가 그 끝을 기다리므로, 놓치면
+  // 그 시간만큼 「쓰는 중」·설정에 묶인다. 이 쓰기가 만든 사진 사본은 아직 없다(만드는 것은 생성 단계다) — 화면이 미리 읽어
+  // 넘긴 것(`input.seen`)의 사본은 화면의 것이라 여기서 지우지 않는다.
+  if (input.isCancelled?.() === true) {
+    return stop("generation", "interrupted: 시작 전에 그만두었다");
   }
 
   // 5. 생성한다. 이 기능에서는 항상 여기서 멈춘다.

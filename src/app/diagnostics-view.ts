@@ -223,6 +223,7 @@ function attemptOutcomeText(outcome: AttemptOutcome): string {
     "no-character": A.noCharacter,
     write: A.write,
     "already-running": A.alreadyRunning,
+    cancelled: A.cancelled,
     ran: A.ran,
     failed: A.failed,
   };

@@ -42,6 +42,30 @@ describe("AF1 — 요청 → 홈의 응답을 기다린 뒤에만 지운다", ()
   });
 });
 
+/**
+ * 080 — 지우기와 홈은 앱의 등록부 하나를 쓴다 (specs/080-live-write-registry/contracts/live-write.md W1·H).
+ *
+ * 020의 잠금 파일 통로(`lockPort`)와 벽시계(`nowMs`)가 지우기에서 사라졌다. 홈이 시작한 쓰기는 종전대로 `stopHome()`이
+ * 먼저 멈추고, 그 뒤 칸에 남은 쓰기(남의 쓰기)는 `wipeDiaries`가 끊는다 — 순서가 뒤집히면 홈의 쓰기를 「남의 쓰기」로 끊어
+ * 홈의 그만두기 처리(071의 시도 번호)를 건너뛴다.
+ */
+describe("080 — 지우기와 홈이 같은 등록부를 받는다", () => {
+  it("requestWipe는 등록부를 넘기고 잠금 통로·시각을 넘기지 않는다", () => {
+    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
+    const call = fn.slice(fn.indexOf("wipeDiaries("));
+
+    expect(call).toMatch(/\bliveWrites\b/);
+    expect(call).not.toMatch(/lockPort|nowMs|Date\.now/);
+    expect(fn.indexOf("await stopHome()")).toBeLessThan(fn.indexOf("wipeDiaries("));
+  });
+
+  it("홈에도 같은 등록부를 넘긴다 — 모듈의 그 하나다", () => {
+    expect(APP).toMatch(/import \{ liveWrites \} from "\.\/src\/diary\/live-write";/);
+    expect(APP).toMatch(/liveWrites=\{liveWrites\}/);
+    expect(APP).not.toMatch(/createLiveWrites/);
+  });
+});
+
 describe("AF2 — busy가 아니면 설정을 닫고 오늘로, 홈을 다시 마운트한다", () => {
   it("세 동작이 busy 조건 안에만 있다", () => {
     const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
@@ -76,7 +100,7 @@ describe("AF3 — 설정 조립부의 편수·용량", () => {
     expect(section()).toMatch(/wipeEnabled=\{diaryCount !== null && diaryCount > 0 && !wiping\}/);
   });
 
-  it("잠금에 막히면(busy) 막힘 줄을 켠다", () => {
+  it("다른 쓰기·지우기에 막히면(busy) 막힘 줄을 켠다", () => {
     expect(section()).toMatch(/if \(outcome\.kind === "busy"\) setWipeBlocked\(true\);/);
   });
 });
