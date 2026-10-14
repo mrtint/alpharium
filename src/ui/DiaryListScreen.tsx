@@ -50,14 +50,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  View,
-  type TextStyle,
-  type ViewStyle,
-} from "react-native";
+import { Pressable, ScrollView, View, type TextStyle, type ViewStyle } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -1089,13 +1082,12 @@ const BAR_LINE: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 1
 /** 064 — 월 라벨과 DEV 꼬리표(보드 `6i` ① gap 8) */
 const MONTH_LABEL: ViewStyle = { flexDirection: "row", alignItems: "center", gap: 8 };
 
-/** 064 — DEV 꼬리표(보드 `6i`: `font:700 10px/1 mono; padding:3px 5px; border:1px`) */
+/** 064 — DEV 꼬리표(보드 `6i`: `font:700 10px/1 mono; padding:3px 5px; border:1px`). 083 — mono 대신 Pretendard(FR-009) */
 const DEV_BADGE: ViewStyle = { borderWidth: 1, paddingVertical: 3, paddingHorizontal: 5 };
 const DEV_BADGE_TEXT: TextStyle = {
   fontSize: 10,
   lineHeight: 10,
   fontWeight: "700",
-  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
 };
 
 /** 쓴 날의 바 자리 — 지면 위에 겹쳐 화면 바닥에 붙는다 */

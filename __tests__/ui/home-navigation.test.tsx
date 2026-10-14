@@ -81,9 +81,9 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
     );
   });
 
-  it("055·059 — 설정·개발자는 홈 위의 StackLayer 겹이다 (설정은 닫으면 홈, 개발자는 설정, 그 위에 이름 바꾸기·진단)", () => {
+  it("055·059 — 설정·개발자는 홈 위의 StackLayer 겹이다 (설정은 닫으면 홈, 개발자는 설정, 그 위에 이름 바꾸기·서체 라이선스(083)·진단)", () => {
     const frame = functionBody("AppFrame");
-    expect(frame.match(/<StackLayer[\s>]/g)?.length).toBe(4);
+    expect(frame.match(/<StackLayer[\s>]/g)?.length).toBe(5);
     expect(frame.match(/onClose=\{goHome\}/g)?.length).toBe(1);
     expect(frame.match(/onClose=\{backToSettings\}/g)?.length).toBe(1);
   });

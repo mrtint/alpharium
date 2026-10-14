@@ -9,6 +9,8 @@
  * - 웹 갈래(`animate-in`·`sm:`)를 뺐다. 경로 별칭 `@/`를 상대 경로로.
  * - `Action`·`Cancel` 래퍼를 뺐다 — 보드의 버튼 모양은 `components/Dialog.tsx`가 준다.
  * - 덮개·면의 `testID`·`style`을 받게 했다(jest에는 NativeWind 변환이 없어 인라인 값이 필요하다).
+ * - 083 — `Title`·`Description`이 공통 글자 스타일(`TEXT_FONT`, Pretendard)을 맨 앞에 둔다. 프리미티브는 `asChild` 없이
+ *   RN `Text`를 직접 그려 그대로 두면 대화상자 제목·설명만 시스템 서체였다(083 코드 리뷰).
  *
  * **덮개가 누름을 받지 않는다** — 프리미티브의 `Overlay`는 `onPress`를 넘기지 않는다(설치본
  * `dist/alert-dialog.mjs`). 그래서 배경을 눌러도 닫히지 않는다(보드 `2d`). 뒤로 가기는 `Content`가
@@ -18,6 +20,8 @@ import * as AlertDialogPrimitive from "@rn-primitives/alert-dialog";
 import type { ComponentProps } from "react";
 import type { StyleProp, ViewStyle } from "react-native";
 import { FadeIn, FadeOut, ReduceMotion } from "react-native-reanimated";
+
+import { TEXT_FONT } from "../theme/tokens";
 
 import { NativeOnlyAnimatedView } from "./native-only-animated-view";
 import { cn } from "./utils";
@@ -57,7 +61,15 @@ function AlertDialogContent({
   );
 }
 
-const AlertDialogTitle = AlertDialogPrimitive.Title;
-const AlertDialogDescription = AlertDialogPrimitive.Description;
+function AlertDialogTitle({ style, ...props }: ComponentProps<typeof AlertDialogPrimitive.Title>) {
+  return <AlertDialogPrimitive.Title style={[TEXT_FONT, style]} {...props} />;
+}
+
+function AlertDialogDescription({
+  style,
+  ...props
+}: ComponentProps<typeof AlertDialogPrimitive.Description>) {
+  return <AlertDialogPrimitive.Description style={[TEXT_FONT, style]} {...props} />;
+}
 
 export { AlertDialog, AlertDialogContent, AlertDialogDescription, AlertDialogTitle };

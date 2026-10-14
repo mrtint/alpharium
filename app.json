@@ -90,6 +90,49 @@
           "motionUsagePermission": "앱은 움직임 정보를 쓰지 않습니다. 위치 기능이 포함한 라이브러리 때문에 표시되는 항목입니다."
         }
       ],
+      [
+        "expo-font",
+        {
+          "android": {
+            "fonts": [
+              {
+                "fontFamily": "Pretendard",
+                "fontDefinitions": [
+                  {
+                    "path": "./assets/fonts/pretendard/Pretendard-Regular.otf",
+                    "weight": 400
+                  },
+                  {
+                    "path": "./assets/fonts/pretendard/Pretendard-Medium.otf",
+                    "weight": 500
+                  },
+                  {
+                    "path": "./assets/fonts/pretendard/Pretendard-SemiBold.otf",
+                    "weight": 600
+                  },
+                  {
+                    "path": "./assets/fonts/pretendard/Pretendard-Bold.otf",
+                    "weight": 700
+                  },
+                  {
+                    "path": "./assets/fonts/pretendard/Pretendard-ExtraBold.otf",
+                    "weight": 800
+                  }
+                ]
+              }
+            ]
+          },
+          "ios": {
+            "fonts": [
+              "./assets/fonts/pretendard/Pretendard-Regular.otf",
+              "./assets/fonts/pretendard/Pretendard-Medium.otf",
+              "./assets/fonts/pretendard/Pretendard-SemiBold.otf",
+              "./assets/fonts/pretendard/Pretendard-Bold.otf",
+              "./assets/fonts/pretendard/Pretendard-ExtraBold.otf"
+            ]
+          }
+        }
+      ],
       "./plugins/with-no-push-entitlement"
     ]
   }

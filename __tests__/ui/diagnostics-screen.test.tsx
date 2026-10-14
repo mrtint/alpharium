@@ -15,7 +15,7 @@ import { StyleSheet } from "react-native";
 import { DiagnosticsScreen, type DiagnosticsScreenProps } from "../../src/ui/DiagnosticsScreen";
 import { collectPromptPreviews, SIGNAL_PRESETS } from "../../src/diagnostics/prompt-preview";
 import type { ProbeCell } from "../../src/app/diagnostics-view";
-import { COLORS, SETTINGS } from "../../src/ui/theme/tokens";
+import { COLORS, FONT, SETTINGS } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
 
@@ -213,7 +213,9 @@ describe("DS4 — 신호 프로브 다섯 칸", () => {
     const knownValue = flat(screen.getByTestId("diagnostics-probe-photos-value"));
     expect(knownValue.fontSize).toBe(15);
     expect(knownValue.fontWeight).toBe("700");
-    expect(String(knownValue.fontFamily ?? "")).toMatch(/mono|Menlo/i);
+    // 083 FR-009 — 보드의 고정폭 대신 Pretendard + 고정폭 숫자
+    expect(knownValue.fontFamily).toBe(FONT.family);
+    expect(knownValue.fontVariant).toContain("tabular-nums");
     const unknownValue = flat(screen.getByTestId("diagnostics-probe-steps-value"));
     expect(unknownValue.fontSize).toBe(14);
     expect(unknownValue.fontWeight).toBe("600");

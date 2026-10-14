@@ -17,12 +17,14 @@ import { join } from "node:path";
 
 import {
   COLORS,
+  FONT,
   RADIUS,
   RNR_COLOR_ALIASES,
   TYPE,
   contrastRatio,
   SETTINGS,
   SIMULATION,
+  TEXT_FONT,
   WRITTEN_DAY,
 } from "../src/ui/theme/tokens";
 
@@ -91,12 +93,21 @@ describe("DT2 — 간격·반경·타이포 상수", () => {
     }
   });
 
-  it("★ 커스텀 폰트 이름을 참조하지 않는다 — 시스템 서체다 (FR-019a)", () => {
-    // fontFamily 키가 없거나, 있어도 커스텀 이름이 아니다.
-    expect(TOKENS_SRC).not.toMatch(/fontFamily\s*:\s*["'](?!System)/);
-    for (const font of ["Pretendard", "Noto", "Roboto", "SUIT", "Spoqa"]) {
+  /*
+   * 083 — 032 FR-019a(「시스템 서체다」)를 뒤집었다: 두 플랫폼 모두 앱에 넣은 Pretendard를 쓰고, 서체는 이 토큰 한 곳에서 정한다
+   * (083 FR-007). 굵기 다섯은 `app.json`의 expo-font 설정·`assets/fonts/pretendard/source.json`과 짝이다(F4가 대조한다).
+   */
+  it("★ 서체는 Pretendard 하나다 — 이름·굵기 다섯·공통 글자 스타일 (083 FR-007)", () => {
+    expect(FONT.family).toBe("Pretendard");
+    expect([...FONT.weights]).toEqual(["400", "500", "600", "700", "800"]);
+    expect(TEXT_FONT.fontFamily).toBe(FONT.family);
+    for (const font of ["Noto", "Roboto", "SUIT", "Spoqa", "Menlo", "monospace"]) {
       expect(TOKENS_SRC).not.toContain(font);
     }
+  });
+
+  it("tokens.ts는 react-native를 import하지 않는다 — tailwind.config.js가 require한다 (083)", () => {
+    expect(TOKENS_SRC).not.toMatch(/from\s+["']react-native["']/);
   });
 });
 

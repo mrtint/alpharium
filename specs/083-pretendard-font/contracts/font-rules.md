@@ -15,13 +15,15 @@
 - `react-native`에서 `Text`(별칭 포함) 또는 `TextInput`을 import하는 대상 소스 = 정확히 `src/ui/components/Text.tsx`·`src/ui/rnr/text.tsx`·`src/ui/components/NameField.tsx`. 여러 줄 import도 센다.
 - 셋 모두 `TEXT_FONT`를 import하고 스타일에 쓴다(`TEXT_FONT` 식별자가 import 밖에서 한 번 이상).
 - `Animated.Text`·`Animated.createAnimatedComponent(Text…)`가 대상 소스에 0회(reanimated·RN 모두 — 글자 부품을 우회하는 길).
-- 위반 주입: 화면 하나에 `import { Text } from "react-native"`를 더하면 실패. `AppText`에서 `TEXT_FONT`를 빼면 실패.
+- `import X, { Text } from "react-native"`(기본 가져오기 뒤의 중괄호)도 센다. `react-native`를 이름공간째(`import * as RN`) 가져오는 파일이 없다.
+- **라이브러리 프리미티브도 글자를 그린다**(083 코드 리뷰): `@rn-primitives`의 `*Primitive.Title`·`*Primitive.Description`은 `asChild` 없이 RN `Text`를 직접 그린다. 대상 소스의 그 이름은 `typeof` 자리이거나 `<XPrimitive.Title style={[TEXT_FONT, style]}` 꼴로만 나온다(`rnr/alert-dialog.tsx`·`rnr/dialog.tsx`). 화면 테스트 `__tests__/ui/dialog-font.test.tsx`가 `ConfirmDialog`·`DismissibleDialog`의 제목·설명이 실제로 `FONT.family`로 그려지는지 본다.
+- 위반 주입: 화면 하나에 `import { Text } from "react-native"`를 더하면 실패. `import X, { Text }` 꼴도 실패. `AppText`에서 `TEXT_FONT`를 빼면 실패. `rnr/dialog.tsx`를 `const DialogTitle = DialogPrimitive.Title;`로 되돌리면 실패.
 
 ## F3. 소스가 쓰는 굵기는 넣은 다섯 안에 있다 (FR-002·FR-006)
 
-- 대상 소스와 `tailwind.config.js`에서 `fontWeight: "<값>"`·`fontWeight: '<값>'` 리터럴의 값을 모두 모으고, className의 `font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)`을 숫자로 옮긴다(normal 400 … black 900). 그 집합 ⊆ `FONT.weights`.
+- 대상 소스와 `tailwind.config.js`에서 굵기를 담는 키(`fontWeight`·`titleWeight`·`labelWeight`·`weight` … — `\w*[wW]eight:`)의 값 식 안 따옴표 값(삼항 `a ? "800" : "600"`의 둘 다)을 모두 모으고, className의 `font-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)`을 숫자로 옮긴다(normal 400 … black 900). 그 집합 ⊆ `FONT.weights`.
 - `fontWeight: "bold"`·`"normal"` 같은 이름 값도 숫자로 옮겨 센다(bold 700, normal 400).
-- 위반 주입: 한 곳의 `"800"`을 `"900"`으로 바꾸면 실패.
+- 위반 주입: 한 곳의 `"800"`을 `"900"`으로 바꾸면 실패 — 리터럴(`LogoScreen`)·삼항(`PlaceNameDialog`)·토큰 키(`titleWeight`) 모두.
 
 ## F4. 빌드 설정의 서체 파일은 배포처 그대로다 (FR-004·FR-005·FR-016)
 
@@ -35,5 +37,5 @@
 ## F5. 라이선스 전문은 배포처 파일과 같다 (FR-013·SC-005)
 
 - `src/ui/pretendard-license.ts`의 `PRETENDARD_LICENSE_TEXT` === `assets/fonts/pretendard/LICENSE.txt`의 내용(UTF-8, 바이트 동일 — 줄바꿈 포함).
-- 전문 첫 줄에 `Kil Hyung-jin`과 `Reserved Font Name Pretendard`가 있고 `SIL OPEN FONT LICENSE Version 1.1`이 있다(엉뚱한 파일과 짝지어지는 것을 막는다).
+- 전문 첫 줄에 `Kil Hyung-jin`이 있고, 전문에 `Reserved Font Name Pretendard`(둘째 줄)와 `SIL OPEN FONT LICENSE Version 1.1`이 있다(엉뚱한 파일과 짝지어지는 것을 막는다).
 - 위반 주입: 전문의 한 글자를 바꾸면 실패.

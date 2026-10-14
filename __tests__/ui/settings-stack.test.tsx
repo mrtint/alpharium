@@ -259,9 +259,9 @@ describe("★ 055 F6·D3 — 설정에서 걷은 것과 「모듈 다시 받기�
     expect(frame).toMatch(/onRedownload=\{onRedownload\}/);
   });
 
-  it("이름 바꾸기 겹이 열린 동안 설정 겹은 뒤로 가기를 등록하지 않는다(active), 저장은 035 검증을 거친다", () => {
+  it("이름 바꾸기·서체 라이선스(083) 겹이 열린 동안 설정 겹은 뒤로 가기를 등록하지 않는다(active), 저장은 035 검증을 거친다", () => {
     const frame = functionBody("AppFrame");
-    expect(frame).toMatch(/active=\{!renaming && route !== "developer"\}/);
+    expect(frame).toMatch(/active=\{!renaming && !fontLicenseOpen && route !== "developer"\}/);
     expect(frame).toMatch(/<StackLayer onClose=\{closeRename\} open=\{renaming\}>/);
     expect(frame).toMatch(/onRenameCharacter\(ONBOARDING_DEFAULT_CHARACTER, raw\)/);
   });

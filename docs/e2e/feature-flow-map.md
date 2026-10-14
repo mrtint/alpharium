@@ -26,6 +26,7 @@
 | 설정 — 자동으로 쓰기·매일 쓰는 시각·장소 이름 | `.maestro/settings-developer-sweep.yml`(켜서 대화상자를 열고 취소, 다시 끔) | `__tests__/ui/target-hour-dialog.test.tsx`, `__tests__/ui/place-name-dialog.test.tsx`, `__tests__/app/target-hour.test.ts` | — | 시각 적용 뒤 값이 바뀌는 흐름은 기존 `settings-time-place`가 본다(토글을 켠 채 끝나 층 1 아님) |
 | 설정 — 권한 행 | `.maestro/settings-developer-sweep.yml`(사진·위치·알림·배터리 행을 눌러 OS 설정에서 뒤로 가기 — 실기기에서 왕복 확인) | `__tests__/app/permission-tags.test.ts`(꼬리표 판정), `__tests__/onboarding/no-react-native-dynamic-import.test.ts`(066 튕김 원인 재발 방지) | — | 권한 창에서 실제로 허용·거부했을 때의 화면 변화, 큰 글꼴 |
 | 설정 — 이 휴대폰(모듈 용량·일기 모두 지우기) | `.maestro/settings-developer-sweep.yml`(행 보임, 지우기는 확인 대화상자 취소) | `__tests__/ui/settings-this-phone.test.tsx`, `__tests__/app/wipe-diaries.test.ts`(지우는 순서·잠금), `__tests__/ui/home-wipe.test.tsx` | — | 실제로 지우는 동작 — 층 1은 확인 대화상자에서 취소로 끝나 일기가 남는다(058 quickstart를 사람이 본다) |
+| 설정 — 서체 라이선스(083, OFL 1.1 고지) | `.maestro/settings-developer-sweep.yml`(열어 전문 보임 → 「‹ 설정」으로 돌아옴) | `__tests__/ui/font-license.test.tsx`(행·순서·겹 배선 소스 계약·전문 통째), `__tests__/config/font-rules.test.ts`(F5 전문이 `LICENSE.txt`와 바이트 동일, F1~F4 서체 규칙) | — | 글꼴 2.0배·전문 끝까지 내리기·두 플랫폼이 같은 서체로 보이는가(083 quickstart) |
 | 설정 — 버전 | `.maestro/settings-developer-sweep.yml`(행 보임) | `__tests__/ui/settings-screen.test.tsx`, `__tests__/app/version.test.ts` | — | 개발자 메뉴를 여는 7번 탭은 배포 환경 전용 — 개발 환경 흐름에 없다 |
 | 개발자 메뉴 | `.maestro/settings-developer-sweep.yml`(열기·행 보임, 맨 아래 「최근 자동 쓰기 시도」·「최근 실패」 묶음) | `__tests__/ui/developer-screen.test.tsx`, `__tests__/ui/failures-group.test.tsx`, `__tests__/app/app-developer-source.test.ts` | — | 「모듈 다시 받기」·「온보딩부터 다시」·「끄기」를 눌렀을 때의 동작 — 층 1이 생성·상태 변경을 하지 않으려고 누르지 않는다(스펙 069 FR-021a). 기존 `skeleton`이 환경·추론 위치·저장 점검을 본다 |
 | 진단 | `.maestro/settings-developer-sweep.yml`(일곱 묶음 보임) | `__tests__/ui/diagnostics-screen.test.tsx`, `__tests__/app/diagnostics-view.test.ts` | `.maestro/layer2-diagnostics-try-write.yml`(「한 번 써 보기」 → 쓰는 중 → 쓴 날; 「자동 쓰기 지금 실행」은 사람이 봄) | 「한 번 써 보기」·「자동 쓰기 지금 실행」 — 생성하므로 누르지 않는다. 기존 `prompt-preview`가 프롬프트 미리보기 구조를 본다 |
@@ -43,7 +44,7 @@
 | --- | --- | --- | --- | --- | --- |
 | `.maestro/restart-persistence.yml` | ○ | ○ | 강제 종료 후 재시작해도 읽힘, 쓴 날 읽기 | — | — |
 | `.maestro/single-photo-swipe.yml` | ○ | ○ | 사진 확대 화면 | — | — |
-| `.maestro/settings-developer-sweep.yml` | ○ | ○ | 설정 각 행, 개발자 메뉴, 진단 | — | — |
+| `.maestro/settings-developer-sweep.yml` | ○ | ○ | 설정 각 행(서체 라이선스 포함), 개발자 메뉴, 진단 | — | — |
 | `.maestro/dialog-foundation.yml` | ○ | ○ | 날짜로 이동(달력), 덮어쓰기 확인 | — (실측 통과) | — |
 | `.maestro/diary-home-1d.yml` | ○ | ○ | 날 고르기, 설정 진입 | — (실측 통과) | — |
 | `.maestro/week-strip-swipe.yml` | ○ | ○ | 날 고르기 | — (실측 통과) | — |

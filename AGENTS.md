@@ -32,6 +32,7 @@
 - **화면 문구는 언어별 카탈로그에서 온다**(062): `src/i18n/` — 지원 언어는 한국어 하나, 기기 언어를 읽어 고르고 없으면 한국어.
 - **쓴 날의 사진을 누르면 확대 화면**(067): 핀치·두 번 탭·이동, 배율 1에서 가로 넘김·아래로 끌어 닫기.
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 2026-10-11 첫 실행 성공 — 약 13분 30초, Play 내부 테스트 versionCode 10 반영; 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
+- **화면 글자는 두 플랫폼 모두 앱에 넣은 Pretendard다**(083) — v1.3.9 정적 OTF 다섯(400~800)을 배포처 그대로 `assets/fonts/pretendard/`에 두고 expo-font config plugin이 빌드에 넣는다. 서체는 `tokens.ts`의 `FONT`·`TEXT_FONT` 한 곳에서 정하고, 설정 「정보」 → 「서체 라이선스」에 OFL 1.1 전문이 있다. 아래 「083」.
 - **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
   절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공 — 처리 통과·iPhone 설치는 미확인; 아래 「iOS 빌드·서명·TestFlight」).
 
@@ -1155,6 +1156,20 @@
 - **실기기(같은 날, 고친 번들)**: 켰다 끄고 닫으면 21초 뒤에도 일기·모델 적재가 없고 시도 기록은 `꺼짐` → `홈에 넘김` → `꺼짐`. 켠 채 닫으면 약 66초 뒤 어제가 저장된다. 지운 직후와 내렸다 올린 뒤에도 쓰지 않고(시도 기록 맨 위는 `홈에 넘김` — 「넘김 ≠ 시작」), `force-stop` 뒤 새로 열면 어제를 쓴다. 상세는 `specs/082-auto-write-claim-handoff/quickstart.md` 「실측」.
 - **남은 것**: 자동 쓰기가 켜져 있으면 **백그라운드 잡이 다음에 깰 때 지운 날을 다시 쓸 수 있다** — 082는 지운 직후 눈앞에서 다시 쓰는 것만 막는다(소유자가 고른 범위; 지운 날을 기억하려면 판정 입력과 새 기록이 필요하다). 지운 실행에서는 합류한 남의 쓰기가 실패해도 홈이 이어 쓰지 않는다. 지우기가 예외로 끝나 아무것도 못 지운 경우에도(`busy`가 아닌 실패) 「한 번」은 소모된다. 프로세스가 오래 사는 경우(iOS) 지운 뒤 그 프로세스가 죽을 때까지 앱 열기 자동 쓰기가 없다.
 - **미확인**: iOS 전부, release 빌드, 지우기가 살아 있는 남의 쓰기를 끊은 뒤의 홈(테스트와 소스 계약으로만 — 080의 실기기 확인을 다시 하지 않았다).
+
+### 083 — 두 플랫폼 모두 Pretendard
+
+- **서체는 `src/ui/theme/tokens.ts`의 `FONT`(이름 `"Pretendard"`·굵기 다섯)와 `TEXT_FONT` 한 곳에서 정한다**(032 FR-019a의 「시스템 기본」을 뒤집었다). RN `Text`·`TextInput`을 직접 쓰는 자리는 셋뿐이고(`AppText`·`rnr/text.tsx`·`NameField`) 셋 모두 스타일 맨 앞에 `TEXT_FONT`를 둔다. **넷째 통로는 라이브러리 프리미티브다** — `@rn-primitives`의 대화상자 `Title`·`Description`은 `asChild` 없이 안에서 RN `Text`를 그린다. `rnr/alert-dialog.tsx`·`rnr/dialog.tsx`가 `style={[TEXT_FONT, style]}`로 감싼다(처음 구현이 이것을 놓쳐 대화상자 제목·설명만 시스템 서체였다 — 코드 리뷰가 고치기 전·후 캡처의 같은 자리를 잘라 바이트가 같은 것으로 찾았다). 새 라이브러리 부품이 글자를 그리면 같은 꼴로 감싸고, 화면 테스트로 그려진 `fontFamily`를 본다(`__tests__/ui/dialog-font.test.tsx`). 다른 파일에 `fontFamily`·`Menlo`·`monospace`를 쓰면, RN `Text`를 직접 가져오면, 넣지 않은 굵기를 쓰면 `__tests__/config/font-rules.test.ts`(F1~F5)가 실패한다. **고정폭 서체는 없다** — 개발자·진단의 숫자 값은 `fontVariant: ["tabular-nums"]`(소유자 결정, 보드 `6e`·`6h`·`6i`의 고정폭을 따르지 않는다).
+- **굵기를 하나 더 쓰려면 셋을 함께 고친다**: 배포처의 그 굵기 파일을 `assets/fonts/pretendard/`에 바이트 그대로 더하고 `source.json`에 해시를, `app.json`의 expo-font 설정(android `fontDefinitions`·ios `fonts`)에 경로를, `FONT.weights`에 값을 더한다. **파일을 직접 자르거나 변환하지 않는다** — OFL에서 서브셋은 수정이고 수정판은 예약 서체명(Pretendard)을 못 쓴다. 앱에 쓸 수 있는 공식 한글 서브셋판은 없다(「Std」는 라틴용).
+- **서체는 config plugin으로 빌드에 들어간다** — 안드로이드는 `res/font/xml_pretendard.xml`(굵기별 `<font>`) + `MainApplication`의 `ReactFontManager.addCustomFont(this, "Pretendard", R.font.xml_pretendard)`, iOS는 `UIAppFonts`(파일 안 family 이름 `Pretendard`). 두 플랫폼 모두 `fontFamily: "Pretendard"` + `fontWeight`로 굵기를 고른다(안드로이드 XML 묶음에서 굵기가 골라지는 것을 SM-S901N에서 처음 봤다). **서체 파일·설정을 바꾸면 네이티브 재빌드(`prebuild --clean`)가 필요하다** — Metro로는 안 올라간다. `expo-font`는 `expo`의 의존성으로 이미 깔려 있어 `package.json`에 올리지 않았다.
+- **런타임 `Font.loadAsync`는 쓰지 않는다** — iOS 시뮬레이터 dev에서 등록한 이름·별칭 어느 것도 적용되지 않았다(시스템 서체와 픽셀 동일, 원인은 캐지 않았다). 가변 서체(파일 하나)는 iOS에서 `fontWeight`로 골라지는 것을 확인했지만 안드로이드의 굵기 축 값이 API 26+에서만 들어(minSdk 24) 정적 다섯을 골랐다.
+- **안드로이드 `includeFontPadding`은 건드리지 않는다** — 끈 벌과 켠 벌이 이 기기·RN 0.86에서 픽셀 단위로 같았다(083 quickstart). 두 플랫폼에 남은 차이는 **큰 날짜 숫자가 안드로이드에서 약 5.7dp 아래**(`lineHeight`가 글자 크기와 같아 서체의 자연 높이보다 작다 — 고치기 전에도 같았다, 서체로는 닫히지 않는다).
+- **서체 라이선스**: 설정 「정보」의 「버전」 다음 「서체 라이선스」 행 → 설정 위 겹(이름 바꾸기와 같은 방식 — 열린 동안 설정 겹 `active`가 거짓). 전문은 `src/ui/pretendard-license.ts`의 문자열 상수이고 `assets/fonts/pretendard/LICENSE.txt`(v1.3.9 릴리스 그대로, 저작권 줄 하나)와 바이트 대조된다 — **손으로 고치지 않는다**. 서체를 새 버전으로 올리면 그 버전의 `LICENSE.txt`로 바꾼다(`main`의 LICENSE는 저작권 줄이 넷으로 늘었다 — 우리가 넣은 v1.3.9 파일과 짝이 아니다).
+- **iOS 시스템 서체와 Pretendard는 원래 닮았다** — 고치기 전후 iOS 글자 폭이 0.3~1단위만 다르다. 「서체가 바뀌었는가」를 iOS 화면만 보고 판정하지 않는다(083은 안드로이드와 폭이 같아진 것·스파이크의 시스템 서체 대비로 봤다). 글자 폭·여백을 재는 도구는 `specs/083-pretendard-font/captures/tools/`(제품 밖).
+- **다른 기계에서 서명된 debug APK가 깔린 기기는 재설치가 필요하다** — `files/` 전체를 `run-as tar`로 맥에 백업(2GB, 약 2분) → uninstall → install → 되돌림 → `pm grant`(사진·위치·알림)로 했고 모델 md5가 같았다. **재설치 뒤 Smart Lock 신뢰가 풀려 PIN 잠금이 걸린다** — 사람이 푼다. 절차는 083 quickstart §2a.
+- **표본 사진 내려받기(070)가 깨져 있다**(2026-10-15, 맥) — `commons-indoor-13.jpg`의 sha256이 목록과 달라 `npm run sample:fetch`가 멈추고, 그래서 `npm run test:layer1`이 앞단에서 중단된다. 083은 기준 상태를 손으로 깔고 표본이 필요 없는 층 1 흐름 열하나를 `maestro test`로 돌렸다(11/11). 목록을 고칠지는 소유자가 정한다.
+- **iOS에서 「글꼴 2.0배」는 `xcrun simctl ui booted content_size accessibility-large`다**(본문 33pt/17pt ≈ 1.94배 — `accessibility-extra-large`는 약 2.35배라 넘친다). 그 단계에서 겹침·넘침은 없었다. extra-large에서는 큰 제목 「서체 라이선스」가 「라이선 / 스」로 낱말 가운데서 갈리고 스트립 숫자가 붙는다 — iOS는 큰 제목도 선형으로 키운다(소유자 확인 대상).
+- **미확인**: iOS 실기기·release(서체가 든 TestFlight·Play 빌드), Android 7.x의 굵기, `sample-days` 흐름, 다른 안드로이드 기기.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

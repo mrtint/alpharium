@@ -1,0 +1,17 @@
+appId: com.a810labs.pocketlog
+---
+# 083 코드 리뷰 — 대화상자 제목이 Pretendard인지(「날짜로 이동」). 어떤 날 상태에서도 큰 날짜 숫자로 달력이 열린다.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 30000
+- tapOn:
+    id: "home-day-number"
+- extendedWaitUntil:
+    visible:
+      id: "calendar-dialog"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: shot-02-calendar

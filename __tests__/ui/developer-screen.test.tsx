@@ -14,6 +14,7 @@ import { StyleSheet } from "react-native";
 
 import { DeveloperScreen, type DeveloperScreenProps } from "../../src/ui/DeveloperScreen";
 import { DEVELOPER_TEXT } from "../../src/ui/developer-text";
+import { FONT } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
 
@@ -127,13 +128,15 @@ describe("DV7 — 핸들러 연결", () => {
   });
 });
 
-describe("DV9 — 모듈 줄 값은 고정폭 글꼴이다", () => {
-  it("값 글자의 fontFamily 가 monospace 계열이다", async () => {
+/* 083 — 고정폭 서체를 걷었다(소유자 결정): 값은 Pretendard(공통 글자 스타일)이고 숫자 폭만 고정폭 숫자로 맞춘다. */
+describe("DV9 — 모듈 줄 값은 Pretendard + 고정폭 숫자다 (083 FR-009)", () => {
+  it("값 글자의 fontFamily 가 FONT.family 이고 fontVariant 에 tabular-nums 가 있다", async () => {
     await render(<DeveloperScreen {...props()} />);
     const value = within(screen.getByTestId("developer-module-reading")).getByText(
       "loaded · 482MB",
     );
-    expect(String(flat(value).fontFamily)).toMatch(/mono|Menlo|Courier/i);
+    expect(flat(value).fontFamily).toBe(FONT.family);
+    expect(flat(value).fontVariant).toContain("tabular-nums");
   });
 });
 
