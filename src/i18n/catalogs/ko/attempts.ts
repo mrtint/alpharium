@@ -13,7 +13,7 @@ export const attempts = {
   pathManual: "지금 실행",
   /** 머리 줄 — 「백그라운드 · 10월 13일 22:05」 */
   line: (path: string, time: string): string => `${path} · ${time}`,
-  /** 결과 열셋 — `AttemptOutcome` 순서 */
+  /** 결과 열넷 — `AttemptOutcome` 순서 */
   started: "시작한 뒤 끝나지 않음",
   simulation: "상태 흉내가 막음",
   disabled: "자동 쓰기 꺼짐",
@@ -26,6 +26,8 @@ export const attempts = {
   noCharacter: "캐릭터 없음",
   write: "홈에 넘김",
   alreadyRunning: "다른 쓰기가 진행 중",
+  /** 080 — 합류한 홈에서 그만두었거나 「일기 모두 지우기」가 그 쓰기를 멈췄다 */
+  cancelled: "사용자가 그만둠",
   ran: "썼음",
   failed: "실패",
 };

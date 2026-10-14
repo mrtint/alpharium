@@ -37,6 +37,8 @@
 
 ## L. 잠금이 낡았다고 보는 시간
 
+> **080으로 대체됨** (2026-10-13) — `specs/080-live-write-registry/contracts/live-write.md`. 낡음 시간 자체가 없어졌다(L1·L2는 더 지키지 않는다). 아래 「닫히지 않는 틈」을 080이 닫았다. 이 절은 이력이다 — A·U절은 그대로 유효하다.
+
 자리: `src/schedule/lock.ts`의 `STALE_LOCK_MS`(020·024 — 값은 여전히 그 한 곳).
 
 | ID | 규칙 |

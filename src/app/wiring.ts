@@ -26,14 +26,13 @@
 import type { DayDate } from "../config/day-boundary";
 import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
-import { createPipeline, type LockHandle, type Pipeline } from "../diary/pipeline";
+import { liveWrites, type LiveWrites } from "../diary/live-write";
+import { createPipeline, type Pipeline } from "../diary/pipeline";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
 import { expoWriteFailurePort, recordWriteFailure, type WriteFailurePort } from "./write-failures";
 import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
-import { acquireLock as acquireLockRecord, releaseLock, type LockPort } from "../schedule/lock";
-import { expoLockPort } from "../schedule/lock-port";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
 import type { PermissionState } from "../signals/port";
@@ -148,21 +147,21 @@ export type WiringDeps = {
    */
   loadCustomNames?: () => Promise<CustomNames>;
   /**
-   * 이 파이프라인을 누가 조립하는가 (020, contracts/generation-lock.md L5).
+   * 이 파이프라인을 누가 조립하는가 (020 L5 → 080 contracts/live-write.md P7).
    *
-   * `"screen"`이면 화면 수동 생성, `"background"`면 자동 생성 태스크.
-   * 이 값으로 owner-bound `acquireLock` 클로저를 만든다. 주지 않으면
-   * `"screen"`(기존 유일 호출자).
+   * `"screen"`이면 화면이 조립한 쓰기, `"background"`면 자동 쓰기 태스크. 이 값이 등록부의 칸에 실린다(합류한 홈이 「누가
+   * 시작했는가」를 묻지는 않지만, 기기에서 볼 때 가린다). 주지 않으면 `"screen"`. 이름은 020에서 온 것이다 — 잠금 파일은
+   * 080이 걷었다.
    *
    * 079 — 같은 값이 백엔드 선택에도 간다. `"background"`면 안드로이드에서 모델을 스레드 2로
    * 열고 생성 시간 한도가 600초다(`inference/assembly.ts`).
    */
   lockOwner?: "screen" | "background";
   /**
-   * 경합 잠금 파일 통로 (020). 테스트가 기기 없이 갈아끼운다. 주지 않으면
-   * `expoLockPort()`.
+   * 살아 있는 쓰기 등록부 (080). 테스트가 새 등록부로 갈아끼운다. 주지 않으면 앱의 하나(`liveWrites`) —
+   * 화면이 조립한 파이프라인과 백그라운드가 조립한 파이프라인이 그 하나를 나눠 써야 서로를 본다.
    */
-  lockPort?: LockPort;
+  liveWrites?: LiveWrites;
 };
 
 /**
@@ -203,9 +202,9 @@ export function createAppPipeline(
 
   // 020 L5 — 이 파이프라인을 조립하는 쪽. owner를 여기서 한 번 정한다 — `PipelineInput`은
   // 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다.
-  // ★ 079 — **잠금과 추론 조립이 같은 값을 본다.** 백그라운드가 조립한 쓰기만 안드로이드에서
+  // ★ 079 — **등록부의 칸과 추론 조립이 같은 값을 본다.** 백그라운드가 조립한 쓰기만 안드로이드에서
   // 스레드 2로 모델을 열고 600초 한도를 탄다(`inference/assembly.ts`). 「백그라운드인가」를
-  // 잠금과 따로 정하면 둘이 어긋날 수 있다 — 식은 여기 하나다(FR-006).
+  // 두 자리에서 따로 정하면 둘이 어긋날 수 있다 — 식은 여기 하나다(FR-006).
   const owner = deps.lockOwner ?? "screen";
 
   // **여기서 규칙을 다시 판단하지 않는다.** select.ts가 policy.ts에 물어 정한다.
@@ -231,16 +230,16 @@ export function createAppPipeline(
 
   const store = deps.store ?? deviceStore();
 
-  // 020 — 경합 잠금. 위에서 정한 owner를 bind한다(L5). `Date.now()`를
-  // 여기서 부르는 것은 허용된다(L5) — 잠금 취득 시각은 테스트가 경계값을
-  // 볼 필요 없는 벽시계 사실이다. 순수 `decideAcquire`는 `nowMs`를 인자로
-  // 받으므로 그쪽이 테스트 대상이다.
-  const lockPort = deps.lockPort ?? expoLockPort();
-  const acquireLock = async (): Promise<LockHandle | null> => {
-    const record = await acquireLockRecord(lockPort, owner, Date.now());
-    if (record === null) return null;
-    return { release: () => releaseLock(lockPort, record) };
-  };
+  // **backend를 버리지 않는다**(007 §3). 006까지 여기서 버려서 화면이 끊을 길이 없었다.
+  // 데스크톱에는 `stop`이 없으므로 그대로 undefined가 실린다 — 넓히지 않는다(005 FR-025).
+  const stop = selection.backend.stop?.bind(selection.backend);
+
+  // 080 P7 — 살아 있는 쓰기 등록부. 위에서 정한 owner와 이 파이프라인 백엔드의 멈춤을 묶는다 — 합류한 홈의
+  // 「그만두기」와 지우기는 칸에서 받은 쓰기의 `cancel()`로 **그 쓰기를 조립한 쪽의 엔진**을 멈춘다. 시각을 읽지 않는다:
+  // 살았는지는 나이가 아니라 「칸에 있는가」다.
+  const registry = deps.liveWrites ?? liveWrites;
+  const beginWrite = (day: DayDate) =>
+    registry.beginWrite({ day, owner, ...(stop !== undefined ? { stop } : {}) });
 
   const pipeline = createPipeline({
     backend: selection.backend,
@@ -252,13 +251,10 @@ export function createAppPipeline(
     // `expoModelPorts()`와 같은 판단).
     geocoding: expoGeocodingPort(),
     geocodingEnabled: deps.geocodingEnabled,
-    acquireLock,
+    beginWrite,
   });
 
-  // **backend를 버리지 않는다**(007 §3). 006까지 여기서 버려서 화면이 끊을 길이 없었다.
-  // 데스크톱에는 `stop`이 없으므로 그대로 undefined가 실린다 — 넓히지 않는다(005 FR-025).
-  const stop = selection.backend.stop?.bind(selection.backend);
-  // 018 — 같은 방식으로 prepare/release/captionDay를 넘긴다. 데스크톱에는
+  // 018 — `stop`과 같은 방식으로 prepare/release/captionDay를 넘긴다. 데스크톱에는
   // 없으므로 undefined.
   const prepare = selection.backend.prepare?.bind(selection.backend);
   const release = selection.backend.release?.bind(selection.backend);

@@ -63,6 +63,42 @@ describe("WF2 — 기록하지 않는 것", () => {
     await recordWriteFailure(port, { ok: true }, AT);
     expect(port.content).toBeNull();
   });
+
+  // 080 P9 — 사용자가 그만둔 쓰기(합류한 홈의 그만두기·지우기)는 실패가 아니다. 결과의 값으로 가른다.
+  it("사용자가 그만둔 쓰기는 기록하지 않는다", async () => {
+    const port = memoryPort();
+    await recordWriteFailure(
+      port,
+      {
+        ok: false,
+        stage: "generation",
+        reason: "interrupted: 저장 전에 그만두었다",
+        cancelled: true,
+      },
+      AT,
+    );
+    expect(port.content).toBeNull();
+  });
+
+  it("같은 실패라도 그만둠이 없으면 기록한다", async () => {
+    const port = memoryPort();
+    await recordWriteFailure(
+      port,
+      { ok: false, stage: "generation", reason: "interrupted: 저장 전에 그만두었다" },
+      AT,
+    );
+    expect(await loadWriteFailures(port)).toEqual([{ reason: "unwritten", at: AT }]);
+  });
+
+  // FR-016 — 첫 실행 자동 첫 일기에는 시도 기록도 알림도 없다. 그만둔 그 쓰기가 실패로 남지 않는 길은 이 한 곳이다.
+  it("첫 실행 자동 첫 일기는 결과를 그대로 이 함수에 넘긴다", () => {
+    const code = readFileSync(join(__dirname, "../../src/app/wiring.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const trigger = code.slice(code.indexOf("export async function triggerFirstRunAutoDiary"));
+
+    expect(trigger).toMatch(/\.then\(\(result\) =>\s*recordWriteFailure\([^,]+,\s*result,/);
+  });
 });
 
 describe("WF4 — 더하기와 상한", () => {

@@ -170,9 +170,9 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
       return skipped("simulation");
     }
     const makePipeline = deps.makePipeline ?? createAppPipeline;
-    // 020 L5 — 백그라운드 owner로 조립한다. wiring.ts가 owner-bound
-    // acquireLock을 만들어 pipeline.run()이 프로세스 경계 잠금을 취득한다.
-    // 취득 실패로 인한 already-running 결과는 아래에서 "skipped"로 매핑한다.
+    // 020 L5 — 백그라운드 owner로 조립한다. wiring.ts가 그 주체를 묶어 pipeline.run()이
+    // 살아 있는 쓰기 등록부의 칸을 차지한다(080). 다른 쓰기가 살아 있어 못 차지한
+    // already-running 결과는 아래에서 "skipped"로 매핑한다.
     const app = makePipeline(resolution, { lockOwner: "background" });
     if (!app.ok) {
       return FAILED;
@@ -233,8 +233,8 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
     // 헌법 v1.7.0: 「사진 접근이 허용되어 있으면 그 하루의 사진은 반드시 본다(MUST).」
     // 화면 경로와 **같은 판정**이어야 하므로 분기 자체가 없다.
 
-    // B2-7 — 잠금은 pipeline.run() 안에서 취득한다(wiring.ts가 "background"
-    // owner로 배선). 취득 실패로 인한 already-running 결과는 "skipped"로
+    // B2-7 — 등록부의 칸은 pipeline.run() 안에서 차지한다(wiring.ts가 "background"
+    // owner로 배선). 못 차지한 already-running 결과는 "skipped"로
     // 매핑한다(다음 콜백 재시도, FR-013 경로와 합류).
     const result = await app.pipeline.run({
       day: decision.day,
@@ -248,11 +248,19 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
       return { result: "ran", outcome: "ran" };
     }
 
+    // ★ 080 T2 — **사용자가 그만둔 쓰기는 실패가 아니다.** 앱을 연 홈이 이 쓰기에 합류해 「그만두기」를 눌렀거나 「일기 모두
+    // 지우기」가 멈췄다(등록부의 칸에 그만둠이 선 채 끝났다). 쓰기 실패 기록도 완성 알림도 남기지 않고, 시도 기록에는 그
+    // 사실을 적는다 — 갈래가 없으면 그 줄이 「시작한 뒤 끝나지 않음」으로 남아 「프로세스가 죽었다」로 읽힌다. 문구가 아니라
+    // 값으로 가른다.
+    if (result.cancelled === true) {
+      return skipped("cancelled");
+    }
+
     // 060 — 쓰기 실패를 기록한다(진단 「최근 실패」). `already-running`은 기록하지 않는다(다른 쪽이 쓰는 중이다) —
     // 그 판정은 `recordWriteFailure` 안에 있고, 기록 실패는 삼킨다. 아래 매핑보다 **앞에서** 부른다.
     await recordWriteFailure(deps.failurePort ?? expoWriteFailurePort(), result, now);
 
-    // B2-9 — 잠금 외 사유로 실패했으면 알림을 보내지 않는다(FR-005, SC-006).
+    // B2-9 — 그 밖의 사유로 실패했으면 알림을 보내지 않는다(FR-005, SC-006).
     if (result.stage === "already-running") {
       return skipped("already-running");
     }

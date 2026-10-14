@@ -329,8 +329,9 @@ describe("소스 검사 — D3·D4·D7", () => {
     expect(CODE).toMatch(/\bWINDOW_HOURS\b/);
   });
 
-  it("D7 — 파이프라인·알림·잠금을 부르지 않는다 (순수 판정)", () => {
-    expect(CODE).not.toMatch(/pipeline|\.run\(|notification|acquireLock|present\(/i);
+  it("D7 — 파이프라인·알림·등록부를 부르지 않는다 (순수 판정)", () => {
+    // 080 — 잠금(`acquireLock`)은 등록부의 칸(`beginWrite`·`liveWrites`)이 됐다. 판정은 쓰기를 시작하지 않는다.
+    expect(CODE).not.toMatch(/pipeline|\.run\(|notification|beginWrite|liveWrites|present\(/i);
   });
 
   it("D5 — pickRetryDay를 재사용한다 (대상 선정을 다시 구현하지 않음)", () => {

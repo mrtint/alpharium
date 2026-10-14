@@ -33,8 +33,12 @@ export interface WriteFailurePort {
   write(serialized: string): Promise<void>;
 }
 
-/** 파이프라인 결과에서 이 모듈이 보는 모양 — 파이프라인 타입에 닿지 않는다 */
-export type WriteResult = { ok: boolean; stage?: string; reason?: string };
+/**
+ * 파이프라인 결과에서 이 모듈이 보는 모양 — 파이프라인 타입에 닿지 않는다.
+ *
+ * `cancelled` — 사용자가 그 쓰기를 그만두었다(080, 등록부의 칸에 그만둠이 선 채 끝났다).
+ */
+export type WriteResult = { ok: boolean; stage?: string; reason?: string; cancelled?: boolean };
 
 function split(reason: string | undefined): { kind: string; detail: string } {
   const [kind, ...rest] = (reason ?? "").split(":");
@@ -67,9 +71,15 @@ export function writeFailureReasonFor(result: {
   }
 }
 
-/** 기록할 만한 실패인가 — 성공과 `already-running`(다른 쪽이 쓰는 중)은 아니다 */
+/**
+ * 기록할 만한 실패인가 — 성공과 `already-running`(다른 쪽이 쓰는 중)은 아니다.
+ *
+ * 080 — **사용자가 그만둔 쓰기도 아니다.** 합류한 홈의 「그만두기」나 「일기 모두 지우기」가 끊은 쓰기는 시작한 쪽
+ * (백그라운드 태스크·첫 실행 자동 첫 일기)에 실패 모양으로 돌아오지만 실패가 아니다. 문구가 아니라 값으로 가른다.
+ * 홈이 스스로 시작한 쓰기의 그만두기는 홈이 먼저 거른다(071의 시도 번호) — 여기 오지 않는다.
+ */
 function isRecordable(result: WriteResult): boolean {
-  return !result.ok && result.stage !== "already-running";
+  return !result.ok && result.stage !== "already-running" && result.cancelled !== true;
 }
 
 function isReason(value: unknown): value is WriteFailureReason {

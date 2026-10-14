@@ -62,6 +62,7 @@ import { TOAST_TEXT, type PipelineFailure, type ToastKind } from "../app/failure
 import { paperFor, type LoadedEntry } from "../app/written-day";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
+import type { LiveWrite, LiveWrites } from "../diary/live-write";
 import { pickMonologue } from "../diary/monologue";
 import { PERSONA_NAMES } from "../diary/persona";
 import type { Pipeline } from "../diary/pipeline";
@@ -69,6 +70,7 @@ import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
 import type { Character, VisionSetting } from "../diary/types";
 import { text } from "../i18n/current";
+import type { MonologueBranch, ProgressStage } from "../inference/types";
 import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DateJumpDialog } from "./DateJumpDialog";
@@ -214,6 +216,15 @@ export type DiaryHomeScreenProps = {
    */
   claimAutoWrite?: () => boolean;
   /**
+   * 080 — 살아 있는 쓰기 등록부 (specs/080-live-write-registry/contracts/live-write.md H1~H12).
+   *
+   * 홈이 스스로 시작하지 않은 쓰기(백그라운드 자동 쓰기·진단의 수동 실행·첫 실행 자동 첫 일기)가 살아 있으면 홈은 그 날의
+   * 「쓰는 중」으로 **합류한다** — 두 번째 쓰기를 시작하지 않고, 모델을 미리 열지도 않는다. 합류는 관찰이다: 앞을 벗어나도
+   * 끊지 않고 「그만두기」만 그 쓰기를 끊는다. **조립부가 앱의 그 하나를 넘긴다** — 화면은 등록부를 만들지도 값으로
+   * import하지도 않는다. 주지 않으면 합류가 없다(옛 호출자·테스트 무변경).
+   */
+  liveWrites?: Pick<LiveWrites, "current" | "onChange">;
+  /**
    * 058 — 설정의 「일기 모두 지우기」 요청 토큰(research R1). 값이 바뀌면 쓰는 중이면 054 그만두기처럼 멈추고, **도는 생성이
    * 끝난 뒤에** `onWipeReady(token)`을 부른다 — 멈춘 쓰기가 지운 뒤에 저장되지 않게(FR-014). 마운트 때의 값에는 응답하지 않는다
    * (지운 뒤 다시 마운트된다, HS4). 덮여 있어도 응답한다 — 요청은 설정이 열린 동안 온다(HS5).
@@ -302,6 +313,7 @@ export function DiaryHomeScreen({
   canPrepare,
   autoWriteDay,
   claimAutoWrite,
+  liveWrites,
   wipeRequest,
   onWipeReady,
   writeRequest,
@@ -434,8 +446,69 @@ export function DiaryHomeScreen({
    */
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  /** 지금 도는 생성이 있는가. `AppState` 구독이 본다 */
+  /**
+   * 지금 도는 **홈이 시작한** 생성이 있는가. `AppState` 구독이 본다.
+   *
+   * 080 — 합류한 동안에는 거짓이다(H3). 이 값이 「앞을 벗어나면 끊는다」(005 FR-014b)와 지우기 응답(058)이 가리는
+   * 「홈의 쓰기」이므로, 합류한 남의 쓰기는 앞을 벗어나도 끊기지 않는다.
+   */
   const running = useRef(false);
+
+  /** 080 — 등록부의 칸이 차거나 비었다는 신호. 값은 쓰지 않는다 — 합류·057·018 effect를 다시 돌릴 뿐이다 */
+  const [liveTick, setLiveTick] = useState(0);
+  /**
+   * 080 H12 — **목록이 낡았다**: 홈이 시작하지 않은 쓰기(또는 지우기)가 칸을 드나들었고 그 뒤로 목록을 다시 읽지 않았다.
+   *
+   * 서 있는 동안 057 자동 시작이 물러선다. 020에서는 남의 쓰기에 막힌 자동 쓰기가 `already-running`으로 돌아오며 「한 번」을
+   * 소모했으므로 다시 시작할 일이 없었다 — 이제 홈은 물러설 뿐 소모하지 않으므로(H8), 합류하지 못한 채(덮여 있었다) 그 쓰기가
+   * 끝나면 **방금 써진 날을 낡은 목록으로 다시 쓸 수 있다.** 칸이 빈 뒤에 시작한 읽기가 반영돼야 내린다.
+   */
+  const listStale = useRef(false);
+  useEffect(() => {
+    if (liveWrites === undefined) return undefined;
+    // 그려지기 전부터 살아 있던 남의 쓰기 — 변화 신호가 오기 전에 이미 낡을 것이 정해졌다.
+    if (liveWrites.current() !== null && !running.current) listStale.current = true;
+    return liveWrites.onChange(() => {
+      // 홈이 시작한 쓰기의 차지·비움은 낡게 하지 않는다 — 그 끝은 `generate()`가 목록을 다시 읽는다.
+      if (!running.current) listStale.current = true;
+      setLiveTick((t) => t + 1);
+    });
+  }, [liveWrites]);
+
+  /** 080 — 합류한 쓰기와 그 단계 구독을 끊는 길. 합류하지 않았으면 `null` */
+  const joined = useRef<LiveWrite | null>(null);
+  const leaveJoined = useRef<(() => void) | null>(null);
+  /**
+   * 080 — 지금의 `claimAutoWrite`. 합류의 끝 처리는 합류한 순간의 클로저에서 돈다 — 그 사이 조립부가 콜백을 바꿨으면(064
+   * 흉내 기록을 읽은 뒤) 옛 것을 부르게 된다(043의 stale closure). 렌더가 아니라 effect에서 갱신한다.
+   */
+  const claimRef = useRef(claimAutoWrite);
+  useEffect(() => {
+    claimRef.current = claimAutoWrite;
+  }, [claimAutoWrite]);
+
+  /** 080 — 이 홈이 아직 화면에 있는가. 사라진 뒤에 온 합류의 끝은 버린다(H10) */
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      leaveJoined.current?.();
+      leaveJoined.current = null;
+      joined.current = null;
+    };
+  }, []);
+
+  /**
+   * 080 — 남의 쓰기: 칸에 쓰기가 있고 홈이 시작한 쓰기가 도는 중이 아니다(H1). 지우기가 든 칸은 아니다.
+   *
+   * ref를 읽으므로 렌더가 아니라 effect·콜백 안에서만 부른다.
+   */
+  const foreignWrite = useCallback((): LiveWrite | null => {
+    const slot = liveWrites?.current() ?? null;
+    if (slot === null || slot.kind !== "write" || running.current) return null;
+    return slot;
+  }, [liveWrites]);
 
   /**
    * 쓰기 시도 번호와 「여기까지 그만두었다」 번호 (007 FR-014a, 071).
@@ -498,6 +571,7 @@ export function DiaryHomeScreen({
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
+        // 080 H3 — `running`은 **홈이 시작한 쓰기**만 가리킨다. 합류한 남의 쓰기는 여기서 끊기지 않는다 — 뒤에서 계속 돈다.
         if (running.current) {
           void stop?.().catch(() => {});
         } else {
@@ -529,6 +603,8 @@ export function DiaryHomeScreen({
   useEffect(() => {
     if (screen.kind !== "list") return;
     if (captionDay !== undefined) return; // 사진 있는 날 경로(아래)가 담당
+    // 080 H8 — 남의 쓰기가 살아 있는 동안에는 모델을 미리 열지 않는다. 열면 그 쓰기의 모델과 함께 둘이 열린다(E1).
+    if (foreignWrite() !== null) return;
 
     const { day } = writePromptFor(screen.items, now(), chosenDay);
     // ★ 049 R5 — 사진 유무를 미리 훑지 않은 날은 미리 준비하지 않는다(FR-020a).
@@ -550,7 +626,19 @@ export function DiaryHomeScreen({
 
     void prepare?.(outcome.params.character).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- screen.items는 매 렌더 새 배열이라 넣으면 무한 루프. day 판정 입력만 의존성으로.
-  }, [screen.kind, chosenDay, prepare, release, resolve, now, captionDay, canPrepare, tick]);
+  }, [
+    screen.kind,
+    chosenDay,
+    prepare,
+    release,
+    resolve,
+    now,
+    captionDay,
+    canPrepare,
+    tick,
+    foreignWrite,
+    liveTick,
+  ]);
 
   /**
    * 사진이 있는 날의 미리 읽기 (018 2단계, FR-006).
@@ -560,6 +648,8 @@ export function DiaryHomeScreen({
   useEffect(() => {
     if (screen.kind !== "list") return;
     if (captionDay === undefined) return;
+    // 080 H8 — 위와 같다. 사진 미리 읽기는 사진 모델을 연다.
+    if (foreignWrite() !== null) return;
 
     const { day } = writePromptFor(screen.items, now(), chosenDay);
     // ★ 049 R5 — 사흘 밖의 날은 미리 읽지 않는다(FR-020a). 준비해 둔 캐릭터 모델도 놓아준다 —
@@ -588,7 +678,19 @@ export function DiaryHomeScreen({
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 위와 같은 이유.
-  }, [screen.kind, chosenDay, captionDay, prepare, release, resolve, now, canPrepare, tick]);
+  }, [
+    screen.kind,
+    chosenDay,
+    captionDay,
+    prepare,
+    release,
+    resolve,
+    now,
+    canPrepare,
+    tick,
+    foreignWrite,
+    liveTick,
+  ]);
 
   /**
    * 자정 전환 (049 FR-019·HS2, 048의 정오 전환 타이머를 대체).
@@ -753,6 +855,24 @@ export function DiaryHomeScreen({
   }, [refresh]);
 
   /**
+   * 진행 단계를 쓰는 중 화면의 혼잣말로 옮긴다 (015·054). 홈이 시작한 쓰기와 합류한 쓰기(080 H2)가 같이 쓴다 —
+   * 단계에서 줄을 고르는 규칙이 두 곳에 생기지 않게.
+   */
+  const showProgress = useCallback(
+    (stage: ProgressStage, branch: MonologueBranch | undefined, name: string | undefined) => {
+      if (stage === "load" && branch === undefined) return;
+
+      setScreen((s) => {
+        if (s.kind !== "writing") return s;
+        const characterName = stage === "load" ? name : undefined;
+        const line = pickMonologue(stage, branch, s.line, characterName);
+        return { ...s, stage, branch, line };
+      });
+    },
+    [],
+  );
+
+  /**
    * 실제로 생성을 돌린다.
    *
    * **★ 저장 상태를 보지 않는다**(S1, 원칙 I). 목록에 그 하루가 이미 있어도 **언제나**
@@ -769,8 +889,8 @@ export function DiaryHomeScreen({
       // 071 — 이 시도의 번호. 그만두기·늦은 결과 처리·정리가 모두 이 번호로 가려진다(위 `attempt` 주석).
       const mine = ++attempt.current;
       const isCancelled = () => cancelledThrough.current >= mine;
-      // 071 — 앞 시도가 아직 풀리는 중이면(그만두면 화면은 곧바로 홈이지만 모델 적재는 못 끊어 5~12초 더 잠금을 쥔다, SE-1) 그것이
-      // 끝나기를 기다린 뒤 시작한다 — 곧바로 부르면 잠금에 막혀 `already-running`으로 거절되고 토스트만 뜬다.
+      // 071 — 앞 시도가 아직 풀리는 중이면(그만두면 화면은 곧바로 홈이지만 모델 적재는 못 끊어 5~12초 더 등록부의 칸을 쥔다, SE-1) 그것이
+      // 끝나기를 기다린 뒤 시작한다 — 곧바로 부르면 칸이 차 있어 `already-running`으로 거절되고 토스트만 뜬다.
       const previous = inFlight.current;
 
       // 058 — 이 생성이 끝나는 순간을 밖에서 기다릴 수 있게 둔다(지우기 요청, research R1). `finally`에서 푼다.
@@ -816,17 +936,7 @@ export function DiaryHomeScreen({
             // 071 — 저장을 시작하기 직전의 마지막 취소 확인(SE-3). 시도별 판정이다.
             isCancelled,
           },
-          (stage, branch) => {
-            if (stage === "load" && branch === undefined) return;
-
-            setScreen((s) => {
-              if (s.kind !== "writing") return s;
-              const characterName =
-                stage === "load" ? nameOf(params.character, characterNames) : undefined;
-              const line = pickMonologue(stage, branch, s.line, characterName);
-              return { ...s, stage, branch, line };
-            });
-          },
+          (stage, branch) => showProgress(stage, branch, nameOf(params.character, characterNames)),
         );
 
         if (isCancelled()) return;
@@ -842,9 +952,17 @@ export function DiaryHomeScreen({
         // 읽힌다). 054 — 실패도 결과 화면 없이 쓰기 전 상태의 홈이다(저장 실패도 — 글은 버려진다).
         const next = afterGeneration(result);
         setScreen(toList(await refresh()));
-        // 057 FR-019 — 앱 열기 자동 쓰기가 백그라운드의 잠금에 막힌 것은 실패가 아니다(그쪽이 쓰고 있다). 토스트를 띄우지 않는다.
+        // 057 FR-019 — 앱 열기 자동 쓰기가 다른 쓰기에 막힌 것은 실패가 아니다(그쪽이 쓰고 있다). 토스트를 띄우지 않는다.
+        // 080 H9 — 사용자가 누른 「쓰기」도 칸에 쓰기가 살아 있어 막혔으면 실패가 아니다: 목록 상태로 돌아가면 합류 effect가
+        // 그 쓰기를 보여 준다. 여기서 토스트를 올리면 합류가 덮기 전에 한두 프레임 올라왔다 사라진다. 칸에 쓰기가 없는데
+        // 막혔으면(지우는 중이었다·그 사이 끝났다) 종전대로 알린다.
+        const blockedByWrite =
+          !result.ok &&
+          result.stage === "already-running" &&
+          liveWrites?.current()?.kind === "write";
         const busyElsewhere =
-          options.auto === true && !result.ok && result.stage === "already-running";
+          (options.auto === true && !result.ok && result.stage === "already-running") ||
+          blockedByWrite;
         if (next.kind === "toast" && !busyElsewhere) {
           setToast({ id: ++toastId.current, kind: next.toast });
         }
@@ -859,7 +977,17 @@ export function DiaryHomeScreen({
     },
     // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
     // 생성·독백이 돈다(조용히 틀리는 결함).
-    [pipeline, now, onGenerated, characterNames, refresh, recordFailure, lockBar],
+    [
+      pipeline,
+      now,
+      onGenerated,
+      characterNames,
+      refresh,
+      recordFailure,
+      lockBar,
+      showProgress,
+      liveWrites,
+    ],
   );
 
   /**
@@ -962,6 +1090,11 @@ export function DiaryHomeScreen({
     if (autoWriteDay == null || claimAutoWrite === undefined) return;
     // 064 — 흉내 중에는 시작하지 않는다(HM2). 한 번의 소모는 조립부의 `claimAutoWrite`가 맡는다.
     if (writeBlocked) return;
+    // 080 H8 — 남의 쓰기가 살아 있으면 시작하지 않고 「한 번」도 소모하지 않는다. 아래 합류 effect가 그 쓰기를 보여 준다.
+    // 같은 렌더에서 두 effect가 함께 돌므로 순서에 기대지 않고 여기서 먼저 물러선다.
+    if (foreignWrite() !== null) return;
+    // 080 H12 — 남의 쓰기가 끝났어도 목록을 다시 읽어 반영하기 전에는 시작하지 않는다. 그 쓰기가 방금 이 날을 썼을 수 있다.
+    if (listStale.current) return;
     if (!listRead.current || screen.kind !== "list" || covered) return;
     if (materialConfirm !== null || calendarOpen || settingsPromptOpen || deciding.current) return;
     if (screen.items.some((item) => item.day === autoWriteDay)) return;
@@ -987,7 +1120,108 @@ export function DiaryHomeScreen({
     resolve,
     setChosenDay,
     generate,
+    foreignWrite,
+    liveTick,
   ]);
+
+  /**
+   * 080 — 남의 쓰기에 합류한다 (contracts/live-write.md H1·H2·H5·H10).
+   *
+   * 057 자동 시작과 **같은 조건**(목록을 읽었고, 목록 상태이고, 덮여 있지 않고, 대화상자·판정이 없다)에서 칸에 남의 쓰기가
+   * 있으면 그 날을 고르고 054 「쓰는 중」이 된다. 혼잣말은 그 쓰기가 지금 있는 단계에서 시작해 단계 구독을 따른다.
+   *
+   * **`running`을 세우지 않는다**(H3) — 합류는 관찰이다. 끝나면 목록을 다시 읽어 목록 상태로 돌아온다: 저장됐으면 그 날이
+   * 쓴 날로 보인다(H5). 상태 바꿈은 effect 본문이 아니라 다음 차례에 한다(react-hooks/set-state-in-effect).
+   */
+  useEffect(() => {
+    const live = foreignWrite();
+    if (live === null || joined.current === live) return;
+    if (!listRead.current || screen.kind !== "list" || covered) return;
+    if (materialConfirm !== null || calendarOpen || settingsPromptOpen || deciding.current) return;
+
+    joined.current = live;
+    const items = screen.items;
+    const outcome = resolve(live.day);
+    const name =
+      outcome.kind === "resolved" ? nameOf(outcome.params.character, characterNames) : undefined;
+
+    void Promise.resolve().then(() => {
+      if (!mounted.current || joined.current !== live) return;
+
+      setChosenDay(live.day);
+      setWritingItems(items);
+      setWritingName(name);
+      setScreen({ kind: "writing" });
+      lockBar();
+
+      const reached = live.progress();
+      if (reached !== null) showProgress(reached.stage, reached.branch, name);
+      leaveJoined.current = live.onProgress((progress) =>
+        showProgress(progress.stage, progress.branch, name),
+      );
+
+      void live.done.then(async (end) => {
+        if (joined.current !== live) return;
+        leaveJoined.current?.();
+        leaveJoined.current = null;
+        joined.current = null;
+        if (!mounted.current) return;
+
+        // H4·H7 — 끊긴 쓰기(홈의 「그만두기」든 지우기든) 뒤에는 이 실행에서 저절로 다시 쓰지 않는다: 057의 「한 번」을
+        // 소모한다. **목록 상태로 돌아가기 전에** 소모한다 — 뒤에 하면 057 effect가 먼저 시작한다. 실패로 끝난 쓰기(H6)는
+        // 소모하지 않는다 — 그 뒤는 057 판정이 이어서 쓴다.
+        if (end.cancelled) claimRef.current?.();
+
+        // 칸이 빈 뒤에 시작한 읽기다 — 반영하면 목록은 낡지 않았다(H12).
+        const next = await refresh();
+        if (!mounted.current) return;
+        listStale.current = false;
+        setScreen(toList(next));
+        // 그만둔 직후의 「일기 쓰기」가 곧바로 눌리지 않게 — 홈이 시작한 쓰기의 그만두기와 같다.
+        if (end.cancelled) lockBar();
+      });
+    });
+  }, [
+    foreignWrite,
+    liveTick,
+    screen,
+    covered,
+    materialConfirm,
+    calendarOpen,
+    settingsPromptOpen,
+    resolve,
+    characterNames,
+    setChosenDay,
+    lockBar,
+    showProgress,
+    refresh,
+  ]);
+
+  /**
+   * 080 H12 — 합류하지 못한 채 남의 쓰기가 끝났으면 목록을 다시 읽는다.
+   *
+   * 합류했으면 위 끝 처리가 읽는다. 여기는 덮여 있었거나 합류 직전에 끝난 경우다 — 칸이 비고(남의 쓰기 없음) 목록 상태일 때
+   * 한 번 읽어 반영한 뒤에야 낡음을 내린다. 반영이 화면 상태를 바꾸므로 057 effect가 새 목록으로 다시 판정한다.
+   * 읽는 사이 화면이 목록 상태를 벗어나면(쓰기를 눌렀다) 반영하지 않는다 — 돌아왔을 때 다시 읽는다.
+   *
+   * **의존성은 화면 상태 전체다**(갈래만이 아니다) — 그 쓰기가 첫 목록 읽기보다 먼저 끝나면, 첫 읽기가 반영되는 순간이 이
+   * effect가 다시 도는 유일한 계기다. 갈래(`list`)는 그때 바뀌지 않는다. 놓치면 낡음이 영영 서서 자동 쓰기가 조용히 막힌다.
+   */
+  useEffect(() => {
+    if (liveWrites === undefined || !listStale.current) return undefined;
+    if (foreignWrite() !== null || joined.current !== null) return undefined;
+    if (!listRead.current || screen.kind !== "list") return undefined;
+
+    let alive = true;
+    void refresh().then((items) => {
+      if (!alive || !mounted.current) return;
+      listStale.current = false;
+      setScreen((s) => (s.kind === "list" ? toList(items) : s));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [liveWrites, liveTick, screen, foreignWrite, refresh]);
 
   /**
    * 060 — 진단 「지금 한 번 써 보기」의 쓰기 요청 (contracts HR1~HR9, research R4).
@@ -1003,6 +1237,13 @@ export function DiaryHomeScreen({
     const id = writeRequest.id;
     // 064 — 흉내 중에는 시작하지 않고 요청만 비운다(HM2). 진단 행도 막히지만 홈이 마지막 방어다.
     if (writeBlocked || running.current || screen.kind === "writing") {
+      handledWriteRequest.current = id;
+      onWriteRequestHandled?.(id);
+      return;
+    }
+    // 080 (코드 리뷰) — 남의 쓰기가 살아 있으면 「이미 쓰는 중」과 같다: 시작하지 않고 요청만 비운다. 그대로 두면 합류한 직후
+    // 이 요청의 쓰기가 칸에 막혀 돌아오며 화면을 목록으로 되돌린다 — 합류는 이미 한 것으로 남아 다시 들어가지 않는다.
+    if (foreignWrite() !== null) {
       handledWriteRequest.current = id;
       onWriteRequestHandled?.(id);
       return;
@@ -1036,6 +1277,8 @@ export function DiaryHomeScreen({
     resolve,
     setChosenDay,
     generate,
+    foreignWrite,
+    liveTick,
   ]);
 
   /**
@@ -1059,11 +1302,21 @@ export function DiaryHomeScreen({
   }, [writingStage, writingBranch]);
 
   const cancel = useCallback(async () => {
+    // 080 H4 — 합류한 쓰기의 그만두기는 **그 쓰기를 조립한 쪽의 엔진**을 멈춘다(칸에서 받은 `cancel()`). 홈의 `stop`은 화면이
+    // 조립한 백엔드의 것이라 여기 쓰지 않는다. 화면을 되돌리는 것은 합류의 끝 처리다 — 그 쓰기가 실제로 멈추고 칸이 빈 뒤에야
+    // 쓰기 전 홈이 된다(생성이 멈춘 뒤에 모델을 내린다, 079).
+    const live = joined.current;
+    if (live !== null) {
+      lockBar();
+      live.cancel();
+      return;
+    }
+
     cancelledThrough.current = attempt.current;
     lockBar();
     await stop?.().catch(() => {});
     setScreen(toList(await refresh()));
-    // 멈추는 데 걸린 시간만큼 잠금이 먼저 풀리지 않게 — 쓰기 바가 돌아온 순간부터 다시 센다.
+    // 멈추는 데 걸린 시간만큼 바 잠금이 먼저 풀리지 않게 — 쓰기 바가 돌아온 순간부터 다시 센다.
     lockBar();
   }, [stop, refresh, lockBar]);
 

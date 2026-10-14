@@ -33,6 +33,8 @@ export type AttemptOutcome =
   | "no-character"
   | "write"
   | "already-running"
+  /** 080 — 사용자가 그 쓰기를 그만두었다(합류한 홈의 「그만두기」·「일기 모두 지우기」). 실패도 미완주도 아니다 */
+  | "cancelled"
   | "ran"
   | "failed";
 export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = [
@@ -47,6 +49,7 @@ export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = [
   "no-character",
   "write",
   "already-running",
+  "cancelled",
   "ran",
   "failed",
 ];

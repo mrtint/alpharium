@@ -4,8 +4,8 @@
  * 계약: specs/079-bg-auto-write-threads/contracts/assembly.md A1~A3
  *
  * 쓰기 파이프라인을 **누가 조립했는가**(화면 / 백그라운드 자동 쓰기)에 따라 모델을 여는 값 하나와
- * 생성 시간 한도가 갈린다. 주체는 `wiring.ts`가 잠금에 쓰는 값(`lockOwner`, 020 L5)과 같은 변수에서
- * 온다 — 잠금 주체와 추론 조립 주체가 따로 놀지 않는다.
+ * 생성 시간 한도가 갈린다. 주체는 `wiring.ts`가 등록부의 칸에 싣는 값(`lockOwner`, 020 L5 → 080)과 같은
+ * 변수에서 온다 — 칸의 주체와 추론 조립 주체가 따로 놀지 않는다.
  *
  * **이 파일은 기기를 읽지 않는다**(A2). 코어 수·앱 상태를 보고 값을 정하는 순간 그것이 재는
  * 코드가 된다(원칙 IV). 값은 사람이 실측을 읽고 정한 상수이고, 플랫폼은 부르는 쪽이 넘긴다.
@@ -16,9 +16,8 @@ import { BACKGROUND_GENERATION_TIMEOUT_MS, GENERATION_TIMEOUT_MS } from "./sampl
 /**
  * 쓰기 파이프라인을 조립한 쪽.
  *
- * `src/schedule/lock.ts`의 잠금 주체와 글자가 같다. 여기 따로 둔 것은 `inference/`가
- * `schedule/`을 import하지 않기 위해서다 — `wiring.ts`가 한 변수를 두 자리에 넘기므로 둘이
- * 어긋나면 `tsc`가 잡는다.
+ * 살아 있는 쓰기 등록부(`src/diary/live-write.ts`, 080)가 칸의 주체로 이 타입을 그대로 쓴다 —
+ * `wiring.ts`가 한 변수를 두 자리(등록부·백엔드 선택)에 넘긴다.
  */
 export type AssemblyOwner = "screen" | "background";
 

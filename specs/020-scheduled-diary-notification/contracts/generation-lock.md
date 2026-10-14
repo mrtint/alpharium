@@ -1,5 +1,7 @@
 # Contract: 프로세스 경계 경합 잠금 (`src/schedule/lock.ts`, `pipeline.ts` 옵셔널 확장)
 
+> **080으로 대체됨** (2026-10-13) — `specs/080-live-write-registry/contracts/live-write.md`. 잠금 파일·`STALE_LOCK_MS`·`clearStaleLocksOnStart`는 없어졌고, 살아 있는 쓰기는 앱 프로세스 안의 등록부 하나가 안다. 나이로는 「살아 있는가」를 가릴 수 없었다 — 오래 도는 쓰기는 죽어 보였고 죽은 쓰기는 살아 보였다. 아래는 이력이다.
+
 관련: FR-008, User Story 3, SC-005, 019 E1(한 번에 하나의 추론 엔진),
 019 research.md §5(경합을 막지 않고 관측만 한 미해결 과제).
 
