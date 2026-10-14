@@ -45,3 +45,20 @@ R1·R2는 실기기에서 본 것이고(2026-10-14, SM-S901N dev, `main` 17ebdc5
 - 훅 테스트는 RNTL 14 `renderHook`(Promise — `await`)과 `rerender`로 설정 참조를 바꾼다(`use-consent-gate.test.tsx`와 같다). `AppState` 재판정은 `jest.spyOn(AppState, "addEventListener")`로 받은 콜백을 직접 부른다(복원하지 않는다 — AGENTS).
 - 「쓰기가 시작되지 않았다」는 가짜 백엔드의 `generate` 호출 횟수와 등록부의 칸으로 단언한다(spec FR-014). 판정이 끝났음은 시도 기록 대역의 호출로 기다린다 — 시간을 기다리지 않는다.
 - 조립 테스트의 「지금」은 주입한다(`now` — 목표 22시·실제 오전이면 어제가 창 밖 따라잡기 대상이다, 재현 조건과 같다).
+
+## R8 — 기존 계약이 잠그는 자리 (T002, 2026-10-14 소스 읽기)
+
+| 파일 | 단언 | 옮긴 뒤 |
+| --- | --- | --- |
+| `__tests__/app/app-auto-write-source.test.ts` OP1 | `claimAutoWrite`의 본문 정규식(`simulationLoaded` → `autoGenerateTried`·`autoWriteClaimed` → 소모 → `!writeBlocked`) | `src/app/use-auto-write-claim.ts`를 읽는다(`autoGenerateTried` → `firstRunTried`, `autoWriteClaimed` → 훅 안의 ref 이름) |
+| 같은 파일 OP1 | `DiarySection`이 `resolveAutoWrite({`를 부르고 `App.tsx` 전체에서 한 번 | 훅 파일에서 한 번, `App.tsx`에서 0번, `DiarySection`이 `useAutoWriteHandoff(`를 부른다 |
+| 같은 파일 OP1·OP6 | `DiarySection`에 `runAutoDiaryTask`·알림 통로가 없다 | `App.tsx` 그대로 + 두 훅 파일에도 건다 |
+| `__tests__/app/simulation-wiring.test.ts` AF3 | claim 블록의 `simulationLoaded` 확인·소모·`if (writeBlocked) … = true` | 훅 파일을 읽는다 |
+| 같은 파일 AF4 | `previewForAuto = wiring.ok ? wiring.previewDay : undefined`, `resolveAutoWrite(` 블록에 `previewDay: previewForAuto`·`simulat` 없음 | `App.tsx`: 정의는 그대로 + 훅 호출에 `previewDay: previewForAuto`. 훅 파일: `simulat` 없음 |
+| 같은 파일 99행 | 홈의 057 effect가 `writeBlocked`를 본다 | 그대로(홈은 안 바뀐다) |
+| `__tests__/app/auto-write-attempts-wiring.test.ts` 「앱 열기 경로」 | `DiarySection`에 `const now = new Date();`·`resolveAutoWrite({ settings: autoDiarySettings, now,`·`recordAttemptEnd(attemptPort, "app-open", now, attemptOutcomeOf(decision))` | 훅 파일을 읽는다(같은 `now` 하나가 판정과 기록에 간다). 「`AppFrame`이 통로를 만들어 넘긴다」는 그대로 |
+| `__tests__/app/app-wipe-source.test.ts` AF2 | `requestWipe`의 `busy` 아닌 분기 본문 정규식(`goHome` → `setChosenDay` → `setDiaryKey`)과 의존성 `[goHome, stopHome]` | 분기 맨 앞에 `spendAutoWrite();`가 오고 의존성에 더해진다 — 정규식·끝 표식을 함께 고친다(Phase 4) |
+| `__tests__/ui/home-auto-write.test.tsx`·`home-simulation.test.tsx`·`home-join.test.tsx`·`home-wipe.test.tsx`·`diary-home-write-request.test.tsx` | 홈에 `autoWriteDay`·`claimAutoWrite`를 손으로 넘겨 057·064·080의 홈 쪽 계약을 본다 | 수정 없이 통과(홈의 props가 그대로다) |
+| `__tests__/config/day-boundary-source.test.ts` | `src/schedule/task.ts`가 `resolveAutoWrite(`를 부른다 | 그대로 |
+
+**R3의 「확인할 것」에 대한 답**: `App.tsx`의 `setSettingsValues`는 세 곳이다 — 처음 읽을 때(`{ autoDiary, geocoding }`), 자동 쓰기 변경(`{ ...v, autoDiary }`), 장소 이름 변경(`{ ...v, geocoding }`). 장소 이름을 바꿔도 `autoDiary`의 참조는 그대로다. 참조가 바뀌는 것은 자동 쓰기 설정(켜짐·시각)이 실제로 바뀔 때뿐이다 — 무관한 변경으로 넘겨 둔 날이 깜빡이지 않는다.

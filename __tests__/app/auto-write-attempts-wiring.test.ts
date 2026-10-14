@@ -18,14 +18,25 @@ function functionBody(name: string): string {
   return next < 0 ? rest : rest.slice(0, next);
 }
 
+// 082 — 앱 열기 판정은 `useAutoWriteHandoff`로 옮겨졌다. 기록의 배선은 그 파일에서 잠근다.
+const HANDOFF = readFileSync(join(__dirname, "../../src/app/use-auto-write-handoff.ts"), "utf8")
+  .replace(/\/\*[\s\S]*?\*\//g, "")
+  .replace(/^\s*\/\/.*$/gm, "");
+
 describe("앱 열기 경로", () => {
-  it("DiarySection이 판정 결과를 app-open 한 줄로 기록한다 — 판정의 now와 같은 시각, 갈래는 attemptOutcomeOf", () => {
-    const section = functionBody("DiarySection");
-    expect(section).toMatch(/const now = new Date\(\);/);
-    expect(section).toMatch(/resolveAutoWrite\(\{\s*settings: autoDiarySettings,\s*now,/);
-    expect(section).toMatch(
-      /recordAttemptEnd\(attemptPort, "app-open", now, attemptOutcomeOf\(decision\)\)/,
+  it("판정 결과를 app-open 한 줄로 기록한다 — 판정의 지금과 같은 시각, 갈래는 attemptOutcomeOf", () => {
+    expect(HANDOFF).toMatch(/const at = now\(\);/);
+    expect(HANDOFF).toMatch(/resolveAutoWrite\(\{\s*settings,\s*now: at,/);
+    expect(HANDOFF).toMatch(
+      /recordAttemptEnd\(attemptPort, "app-open", at, attemptOutcomeOf\(decision\)\)/,
     );
+    // 기본 「지금」은 기기의 시계다.
+    expect(HANDOFF).toMatch(/const systemNow = \(\) => new Date\(\);/);
+  });
+
+  it("DiarySection이 받은 통로를 훅에 넘긴다", () => {
+    const section = functionBody("DiarySection");
+    expect(section).toMatch(/useAutoWriteHandoff\(\{[^}]*\battemptPort,/);
   });
 
   it("AppFrame이 통로 하나를 만들어 DiarySection에 넘긴다", () => {

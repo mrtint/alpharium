@@ -67,6 +67,45 @@ D3의 마지막 단계가 이것이다 — 자동 쓰기 켜짐·어제 안 쓴 
 
 - iOS 전부(실제 기기 없음), release 빌드, OS가 깨운 백그라운드 잡이 지운 날을 다시 쓰는 것(범위 밖 — spec Assumptions).
 
-## 실측
+## 실측 (2026-10-14)
 
-(구현 뒤 채운다.)
+### 기기 없는 재현 — 고치기 전에 본 실패
+
+- **결함 A**(두 훅을 동작 그대로 옮긴 직후): 훅 단위 HO4 둘·HO5 둘·HO7 하나가 `Expected: "없음" / Received: "2026-09-27"`로, 조립 AS1·AS2·AS11이 `begun 1·generated 1`(기대 0)로 실패했다. AS3(켠 채 닫으면 쓴다)은 통과.
+- **결함 B**(`spendAutoWrite`가 없을 때): 훅 단위 CL5 셋, 소스 계약 WP1·WP3, 조립 AS4·AS5·AS6이 실패했다 — 지운 뒤 다시 마운트된 홈이 어제를 다시 써 일기 목록이 비지 않았다(AS8·AS9도 그 전제가 깨져 함께 실패).
+
+### 위반 주입 (주입 → 실패한 테스트; 되돌린 뒤 원래 문자열을 grep으로 확인했다)
+
+| 주입 | 실패한 것 |
+| --- | --- |
+| HO4 — `write`일 때만 반영 | 훅 HO4 둘, AS11 |
+| HO5 — 설정 비교를 뺀다 | 훅 HO5(끈 그 렌더부터), AS2 |
+| HO4 + HO5 (옛 동작) | 훅 HO4 둘·HO5 둘, AS1·AS2·AS11 |
+| HO6 — `alive` 확인을 뺀다 | 훅 HO6(늦게 끝난 옛 설정의 판정) |
+| HO7 — 번호 확인을 뺀다 | 훅 HO7 |
+| CL5 — `spendAutoWrite`가 아무것도 안 한다 | 훅 CL5 셋, AS4·AS5·AS6(·AS8·AS9) |
+| WP1 — `requestWipe`에서 소모를 뺀다 | 소스 WP1·WP3, `app-wipe-source` AF2 |
+| WP1 — 소모를 `setDiaryKey` 뒤로 옮긴다 | 소스 WP1, `app-wipe-source` AF2 |
+| CL4 — 흉내 소모 effect를 뺀다 | 훅 CL4, `simulation-wiring` AF3 |
+
+### 전체
+
+`npm test` 291 스위트·5,250 통과(7 skip — 이전부터), `npm run lint` 오류 0(경고 2 — 이전부터 있던 것), 헌법 검사 위반 0. 기존 홈 테스트(`home-auto-write`·`home-join`·`home-simulation`·`home-wipe`·`diary-home-write-request`)는 수정 없이 통과. `git diff main -- src/schedule src/ui/DiaryHomeScreen.tsx package.json src/i18n`은 비어 있다(X1~X3).
+
+### 실기기 (SM-S901N, dev — 기기의 debug APK + 맥의 Metro, 번들에 `spendAutoWrite`·`handed.settings === settings` 확인)
+
+10시 30분경, 목표 시각 22시(기본), 어제(10월 13일)에 사진 4장(`one-place`), 시작 상태는 자동 쓰기 꺼짐·일기 1편(10월 7일).
+
+| | 절차 | 본 것 |
+| --- | --- | --- |
+| D1 | 앱을 새로 연다 → 설정 → 켬 → 끔 → 뒤로 가기 | 21초 뒤에도 일기는 10월 7일 하나, 모델 적재 줄(`Attached ggml threadpool`) 0. `auto-diary.json` `enabled:false`. 시도 기록 `꺼짐` → `홈에 넘김` → `꺼짐`(판정은 종전대로 돈다). **수정 전: 약 50초 뒤 어제가 저장됐다** |
+| D2 | 이어서 설정 → 켬 → 뒤로 가기 | `stop-button`이 뜨고 약 66초 뒤 10월 13일 저장(적재 줄 `n_threads=4` 둘) |
+| D3 | `force-stop` 뒤 새로 연다(시작하지 않음 — 판정 `재료 없음`) → 설정 → 「일기 모두 지우기」 → 확인 | 일기 0편. 약 25초 뒤에도 `stop-button` 없음·적재 줄 0. 시도 기록 맨 위는 `홈에 넘김`(넘겼지만 시작하지 않았다). 홈 버튼으로 내렸다 올린 뒤 20초에도 같다. **수정 전: 지운 직후 `stop-button`이 떴다** |
+| D4 | `force-stop` 뒤 새로 연다 | 홈이 어제의 「쓰는 중」으로 시작해 약 78초 뒤 10월 13일 저장(057 회귀 없음, SC-004) |
+
+끝난 뒤 백업을 풀어 되돌렸다(일기·`onboarding.json`의 md5가 실험 전과 같다). 심은 사진 4장을 걷었다. 임시 로그는 넣지 않았다.
+
+### 성공 기준 대조
+
+- SC-001 ✓ D1 · SC-002 ✓ D3 · SC-003 ✓ D2·D4 · SC-004 ✓ D4 · SC-005 ✓ 위 「전체」·「위반 주입」.
+- **미확인**: iOS 전부(실제 기기 없음), release 빌드, OS가 깨운 백그라운드 잡이 지운 날을 다시 쓰는 것(범위 밖), 「켬 판정이 끝나기 전에 끄기」처럼 사람 손으로 만들기 어려운 타이밍(테스트로만), 지우기가 살아 있는 남의 쓰기를 끊은 뒤의 홈(080의 실기기 확인을 다시 하지 않았다 — 테스트와 소스 계약으로만).

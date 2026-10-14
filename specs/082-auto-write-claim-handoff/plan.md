@@ -46,7 +46,7 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 | V. 실측과 추측의 구분 | 통과 | 두 결함을 고치기 전에 실기기에서 재현했다(research R1·R2). 고친 뒤 같은 절차로 dev 실기기에서 본다. iOS·release·백그라운드가 지운 날을 다시 쓰는 것은 미확인으로 적는다 |
 | 개발 방식 | 통과 | 계약 먼저(`contracts/auto-write-open.md`) → 테스트 먼저 → 구현. 기능 브랜치·한국어 커밋 |
 
-**Post-design re-check (Phase 1 뒤)**: 위와 같다. 두 훅은 `src/app/`에 있고 `src/schedule/auto-write`(판정)·`src/app/auto-write-attempts`(기록)·타입만 import한다 — `src/app/` → `src/schedule/` 방향은 이미 있다(`wipe-diaries.ts`). `scripts/constitution-rules.ts`에 새 예외가 필요 없을 것으로 본다(구현 때 `npm run lint`로 확인 — 필요하면 그 사실을 여기 적는다).
+**Post-design re-check (Phase 1 뒤)**: 위와 같다. 두 훅은 `src/app/`에 있고 `src/schedule/auto-write`(판정)·`src/app/auto-write-attempts`(기록)·타입만 import한다 — `src/app/` → `src/schedule/` 방향은 이미 있다(`wipe-diaries.ts`). `scripts/constitution-rules.ts`에 새 예외가 필요 없었다(구현 뒤 `npm run lint` — 헌법 검사 위반 0, 가드 표 등록도 필요 없었다).
 
 ## Project Structure
 
