@@ -17,6 +17,9 @@ const code = (file: string) =>
 const APP = code("App.tsx");
 const HOME = code("src/ui/DiaryHomeScreen.tsx");
 const TASK = code("src/schedule/task.ts");
+// 082 — 앱 열기 자동 쓰기의 claim과 판정은 훅 둘로 옮겨졌다.
+const CLAIM = code("src/app/use-auto-write-claim.ts");
+const HANDOFF = code("src/app/use-auto-write-handoff.ts");
 
 /** `name = useCallback(...)` 또는 `function name(` 본문을 대략 잘라 낸다(다음 최상위 const까지) */
 function block(source: string, start: RegExp): string {
@@ -49,24 +52,31 @@ describe("AF2 — 개발자 메뉴를 끄면 흉내를 지운다", () => {
 });
 
 describe("AF3 — 앱 열기 자동 쓰기의 claim", () => {
-  const claim = () => block(APP, /const claimAutoWrite = useCallback/);
+  const claim = () => block(CLAIM, /const claimAutoWrite = useCallback/);
 
   it("흉내 기록을 읽기 전에는 판정하지 않는다", () => {
     expect(claim()).toMatch(/if \(!simulationLoaded\) return false;/);
   });
 
   it("막혀 있으면 한 번을 소모하고 거짓", () => {
-    expect(claim()).toMatch(/autoWriteClaimed\.current = true;\s*return !writeBlocked;/);
-    expect(APP).toMatch(/if \(writeBlocked\) autoWriteClaimed\.current = true;/);
+    expect(claim()).toMatch(/claimed\.current = true;\s*return !writeBlocked;/);
+    expect(CLAIM).toMatch(/if \(writeBlocked\) claimed\.current = true;/);
+    // 조립부가 흉내의 두 값을 그대로 넘긴다.
+    expect(APP).toMatch(
+      /useAutoWriteClaim\(\{\s*simulationLoaded: simulation\.loaded,\s*writeBlocked,/,
+    );
   });
 });
 
 describe("AF4 — 자동 쓰기 판정은 흉내 미리보기를 보지 않는다", () => {
   it("resolveAutoWrite에 넘기는 통로는 실제 wiring.previewDay다", () => {
     expect(APP).toMatch(/const previewForAuto = wiring\.ok \? wiring\.previewDay : undefined;/);
-    const auto = block(APP, /void resolveAutoWrite\(/);
+    const auto = block(APP, /const autoWriteDay = useAutoWriteHandoff\(/);
     expect(auto).toMatch(/previewDay: previewForAuto/);
     expect(auto).not.toMatch(/simulat/i);
+    // 훅은 받은 통로를 그대로 판정에 넘기고 흉내를 모른다(HO12).
+    expect(block(HANDOFF, /void resolveAutoWrite\(/)).toMatch(/\bpreviewDay,/);
+    expect(HANDOFF).not.toMatch(/simulat/i);
   });
 
   it("홈에만 흉내 미리보기를 넘긴다", () => {

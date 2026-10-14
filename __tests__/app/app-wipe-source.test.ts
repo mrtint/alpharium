@@ -30,7 +30,7 @@ describe("AF1 — 요청 → 홈의 응답을 기다린 뒤에만 지운다", ()
     expect(request).toBeGreaterThan(0);
     expect(wait).toBeGreaterThan(request);
 
-    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
+    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome, spendAutoWrite]);");
     const stopCall = fn.indexOf("await stopHome()");
     const wipe = fn.indexOf("wipeDiaries(");
     expect(stopCall).toBeGreaterThan(0);
@@ -51,7 +51,7 @@ describe("AF1 — 요청 → 홈의 응답을 기다린 뒤에만 지운다", ()
  */
 describe("080 — 지우기와 홈이 같은 등록부를 받는다", () => {
   it("requestWipe는 등록부를 넘기고 잠금 통로·시각을 넘기지 않는다", () => {
-    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
+    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome, spendAutoWrite]);");
     const call = fn.slice(fn.indexOf("wipeDiaries("));
 
     expect(call).toMatch(/\bliveWrites\b/);
@@ -68,9 +68,10 @@ describe("080 — 지우기와 홈이 같은 등록부를 받는다", () => {
 
 describe("AF2 — busy가 아니면 설정을 닫고 오늘로, 홈을 다시 마운트한다", () => {
   it("세 동작이 busy 조건 안에만 있다", () => {
-    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome]);");
+    const fn = body("const requestWipe = useCallback(", "}, [goHome, stopHome, spendAutoWrite]);");
     expect(fn).toMatch(
-      /if \(outcome\.kind !== "busy"\) \{\s*goHome\(\);\s*setChosenDay\(dayOf\(new Date\(\)\)\);\s*setDiaryKey\(\(k\) => k \+ 1\);\s*\}/,
+      // 082 — 맨 앞에서 앱 열기 자동 쓰기의 한 번을 소모한다(app-auto-write-source WP1)
+      /if \(outcome\.kind !== "busy"\) \{\s*spendAutoWrite\(\);\s*goHome\(\);\s*setChosenDay\(dayOf\(new Date\(\)\)\);\s*setDiaryKey\(\(k\) => k \+ 1\);\s*\}/,
     );
     expect(APP.match(/setDiaryKey\(/g)).toHaveLength(1);
   });
