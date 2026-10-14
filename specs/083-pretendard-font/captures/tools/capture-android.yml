@@ -1,0 +1,54 @@
+appId: com.a810labs.pocketlog
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: shot-01-home-written
+- tapOn:
+    id: "home-day-number"
+- extendedWaitUntil:
+    visible:
+      id: "calendar-dialog"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: shot-02-calendar
+- pressKey: back
+- runFlow:
+    when:
+      visible:
+        id: "calendar-dialog"
+    commands:
+      - tapOn:
+          point: "50%,5%"
+- extendedWaitUntil:
+    notVisible:
+      id: "calendar-dialog"
+    timeout: 5000
+- tapOn:
+    id: "day-2026-10-11"
+- extendedWaitUntil:
+    visible:
+      id: "write-button"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: shot-03-home-unwritten
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: shot-04-settings-top
+- scroll
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: shot-05-settings-bottom
+- tapOn:
+    id: "settings-developer"
+- waitForAnimationToEnd
+- takeScreenshot: shot-06-developer

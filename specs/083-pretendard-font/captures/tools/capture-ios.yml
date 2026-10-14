@@ -1,0 +1,43 @@
+appId: com.a810labs.pocketlog
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "오늘의 하루"
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: shot-01-home-written
+- tapOn:
+    point: "15%,16%"
+- extendedWaitUntil:
+    visible:
+      id: "calendar-dialog"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: shot-02-calendar
+- tapOn:
+    text: "취소"
+- extendedWaitUntil:
+    notVisible:
+      id: "calendar-dialog"
+    timeout: 5000
+- tapOn:
+    point: "11%,28%"
+- waitForAnimationToEnd
+- takeScreenshot: shot-03-home-unwritten
+- tapOn:
+    point: "92%,11%"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: shot-04-settings-top
+- scroll
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: shot-05-settings-bottom
+- tapOn:
+    point: "50%,89%"
+- waitForAnimationToEnd
+- takeScreenshot: shot-06-developer

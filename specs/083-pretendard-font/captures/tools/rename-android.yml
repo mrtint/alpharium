@@ -1,0 +1,18 @@
+appId: com.a810labs.pocketlog
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 30000
+- tapOn:
+    id: "home-settings"
+- tapOn:
+    id: "settings-name"
+- extendedWaitUntil:
+    visible:
+      id: "rename-save"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: shot-07-rename
