@@ -16,9 +16,10 @@
 import { View } from "react-native";
 
 import { AppText } from "./components/Text";
-import type { AttemptLine } from "../app/diagnostics-view";
+import type { AttemptLine, FailureLine } from "../app/diagnostics-view";
 import type { SimulationState } from "../app/simulation";
 import { AttemptsGroup } from "./AttemptsGroup";
+import { FailuresGroup } from "./FailuresGroup";
 import { DEVELOPER_TEXT, SIMULATION_TEXT } from "./developer-text";
 import { Chevron, Group, Row, Toggle, Value } from "./SettingsScreen";
 import { COLORS, SETTINGS } from "./theme/tokens";
@@ -37,6 +38,11 @@ export type DeveloperScreenProps = {
    * 「자동 쓰기가 왜 안 돌았는가」를 읽을 자리는 이 화면뿐이다. 보드 `6e`·`6j`에 없는 묶음이다(소유자 확인 대상).
    */
   attempts: readonly AttemptLine[];
+  /**
+   * 081 — 최근 쓰기 실패(최신이 위, 까닭의 갈래와 시각). **배포 빌드에서도 그린다** — 위 시도 묶음의 `백그라운드 · 실패`가 어떤
+   * 실패였는지를 같은 시각의 줄로 짝지어 읽는 자리다. 보드 `6e`·`6j`에 없는 묶음이다(소유자 승인 2026-10-14).
+   */
+  failures: readonly FailureLine[];
   /**
    * 064 — 「상태 흉내」 묶음(보드 `6e` ③). **개발 환경일 때만 조립부가 넘긴다**(S7) — 없으면 묶음 자체가 없다. 화면은 상태를 그리고 누름을
    * 알릴 뿐이다(저장·효력은 `use-simulation.ts`).
@@ -59,6 +65,7 @@ export function DeveloperScreen({
   onDisable,
   onOpenDiagnostics,
   attempts,
+  failures,
   simulation,
 }: DeveloperScreenProps) {
   return (
@@ -152,6 +159,9 @@ export function DeveloperScreen({
 
       {/* 078 — 「끄기」 아래에 둔다: 위 행들의 자리가 바뀌지 않는다(보드의 행 순서·실기기 흐름의 스크롤 거리를 건드리지 않는다) */}
       <AttemptsGroup attempts={attempts} idPrefix="developer" />
+
+      {/* 081 — 시도 묶음 바로 아래, 새 맨 아래다: 위 행들의 자리가 바뀌지 않고 스크린샷 한 장에 두 묶음이 함께 찍힌다 */}
+      <FailuresGroup failures={failures} idPrefix="developer" />
     </View>
   );
 }

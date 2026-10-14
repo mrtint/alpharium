@@ -377,7 +377,15 @@ async function runStages(
   // 이 값을 해석하지 않는다(data-model.md §5).
   const generated = await deps.backend.generate(request.request, onProgress, input.seen);
   if (isGenerationFailure(generated)) {
-    const detail = "reason" in generated ? `: ${generated.reason}` : "";
+    // 081 — 판정 거부는 `reason`이 아니라 `why`(닫힌 값 넷)를 든다. 그것도 detail로 싣는다 — 싣지 않으면 이유가
+    // `"rejected"` 한 낱말이라 쓰기 실패 기록이 거부의 갈래를 가를 수 없다(060의 `empty`가 081 전까지 닿지 않았다).
+    // 거부된 글은 여전히 어디에도 실리지 않는다(005 FR-017c).
+    const detail =
+      "reason" in generated
+        ? `: ${generated.reason}`
+        : "why" in generated
+          ? `: ${generated.why}`
+          : "";
 
     // 011 — **사진을 못 본 것은 생성 실패가 아니다.** 사용자가 할 일이 다르므로 단계를
     // 가른다(FR-021). 어댑터가 두 단계를 함께 돌지만(E1의 순서 때문이다), **어느

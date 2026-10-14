@@ -27,6 +27,7 @@ import type {
 } from "../app/diagnostics-view";
 import type { PromptPreview } from "../diagnostics/types";
 import { AttemptsGroup } from "./AttemptsGroup";
+import { FailuresGroup } from "./FailuresGroup";
 import { ProbeGrid, PromptPreviewBox } from "./DiagnosticsParts";
 import { AppText } from "./components/Text";
 import { SIMULATION_TEXT } from "./developer-text";
@@ -257,21 +258,8 @@ export function DiagnosticsScreen({
         </View>
       </Group>
 
-      <Group label={T.failures} testID="diagnostics-group-failures">
-        {failures.length === 0 ? (
-          <Row label={T.failuresEmpty} labelTone="muted" testID="diagnostics-failures-empty" />
-        ) : (
-          failures.map((line, index) => (
-            // 위치가 키다 — 같은 갈래·같은 시각이 이어질 수 있다(035)
-            <Row
-              key={index}
-              label={line.reasonText}
-              testID={`diagnostics-failure-${index}`}
-              trailing={<Value text={line.timeText} />}
-            />
-          ))
-        )}
-      </Group>
+      {/* 081 — 개발자 화면과 같은 부품이다(배포 빌드는 그쪽에서 본다). 자리는 060 그대로다 */}
+      <FailuresGroup failures={failures} idPrefix="diagnostics" />
 
       {/* 078 — 자동 쓰기가 판정에 들어간 기록. 개발자 화면과 같은 부품이다(배포 빌드는 그쪽에서 본다) */}
       <AttemptsGroup attempts={attempts} idPrefix="diagnostics" />

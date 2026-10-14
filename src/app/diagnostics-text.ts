@@ -19,3 +19,6 @@ export const DIAGNOSTICS_TEXT = lazyText((c) => c.diagnostics);
 
 /** 078 — 진단 「최근 자동 쓰기 시도」 묶음의 문구. 읽는 순간 카탈로그에서 꺼낸다(C4) */
 export const ATTEMPT_TEXT = lazyText((c) => c.attempts);
+
+/** 081 — 「최근 실패」 묶음의 새 갈래 여섯. 읽는 순간 카탈로그에서 꺼낸다(C4). 묶음 머리·빈 줄·옛 다섯은 `DIAGNOSTICS_TEXT`에 있다 */
+export const FAILURE_TEXT = lazyText((c) => c.failures);

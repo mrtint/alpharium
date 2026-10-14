@@ -69,4 +69,17 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17 maestro test .maestro/settings-developer-
 
 ## 실측
 
-(구현 뒤 여기에 적는다 — 날짜·기기·본 것·못 본 것)
+**2026-10-14, SM-S901N(Android 16), dev — 기기의 debug APK + 맥의 Metro(`CI=1`, 번들에 `.env.development.local` 모듈과 새 문구가 있는 것을 `curl`로 확인). 시작 전 기기 상태: 일기 1편(10월 7일), 설정은 `onboarding.json`뿐(자동 쓰기 꺼짐), 실패 기록 없음.**
+
+기기 없는 확인: `npm test` 288 스위트·5,190개 통과(7 skip은 기존), `npm run lint` 오류 0·헌법 검사 위반 0(eslint 경고 2건은 이 기능 밖의 기존 파일). 위반 주입 여덟(계약 표의 일곱 + 「토스트 소스에 새 문구가 샘」) 모두 적힌 테스트가 잡았고 되돌린 뒤 원본과 같았다.
+
+| 절차 | 본 것 |
+| --- | --- |
+| D1 | 오늘(사진 없음 — 재료 확인 대화상자에서 「쓰기」)을 쓰기 시작해 「쓰는 중」이 된 뒤 홈 버튼. 8초 뒤 `write-failures.json`이 `{"items":[{"reason":"interrupted","at":"2026-10-14T00:11:06.304Z"}]}`. 그 사이 `Attached ggml threadpool` 한 줄(본문 모델이 열린 뒤의 끊김). 일기는 생기지 않았다 |
+| D1·D2 | 설정 → 개발자 → 맨 아래: 「개발자 메뉴 끄기」 → 「최근 자동 쓰기 시도」(두 줄) → 「최근 실패」에 「도중에 끊김 · 10월 14일 09:11」. 위 행들의 순서 그대로 |
+| D3 | 기록 파일을 `interrupted`·`unwritten`·`photos`·`made-up`·`echo` 다섯 줄로 바꿔 넣음 → 개발자 화면과 진단 화면 모두 「도중에 끊김」·「일기를 쓰지 못함」·「사진을 읽지 못함」·「지시문을 되뱉음」 네 줄(모르는 줄만 빠짐, 다섯째 줄 없음) |
+| D2 | 글꼴 2.0배의 개발자 화면: 까닭과 시각이 두 줄로 나뉘어 겹치지 않는다(시도 묶음과 같은 모양) |
+| D4 | `settings-developer-sweep.yml`: 설정·개발자(`developer-group-failures` 포함)·진단 구간 통과, 닫기까지 통과. 마지막 `written-paper` 단언은 오늘 일기가 없어 실패(층 1 기준 상태가 아니다 — 078과 같다, 회귀 아님) |
+| 되돌리기 | 만든 설정 파일 셋(`write-failures.json`·`auto-write-attempts.json`·`auto-diary.json`)을 지우고 백업을 풀어 `diary/`·`preferences/`가 백업과 같음을 `diff -r`로 확인. 글꼴 1.0, `stayon` 끔, `adb reverse` 걷음 |
+
+**못 본 것**: 사진을 읽는 도중의 끊김(기기에 오늘 사진이 없었다 — 심지 않았다), 판정 거부 넷·시간 초과·생성 중 오류가 기기에서 남는 것, 끊긴 뒤 앱을 다시 열었을 때의 토스트(기록은 다시 열기 전에 이미 써져 있었다 — 토스트는 보지 않았다), iOS, 배포 빌드.

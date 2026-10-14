@@ -197,6 +197,12 @@ appId: com.a810labs.pocketlog
       id: "developer-group-attempts"
 - assertVisible:
     id: "developer-group-attempts"
+# 081 — 그 아래 「최근 실패」 묶음이 새 맨 아래다. 시도 묶음의 「실패」가 어떤 실패였는지를 배포 빌드에서 보는 유일한 자리다.
+- scrollUntilVisible:
+    element:
+      id: "developer-group-failures"
+- assertVisible:
+    id: "developer-group-failures"
 
 # ── 진단 ──
 # ★ 078부터 「끄기」 아래에 묶음이 있어 화면이 더 내려간다 — 위에 있는 「진단」 행은 **올라가며** 찾는다.

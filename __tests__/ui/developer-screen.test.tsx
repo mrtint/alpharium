@@ -29,6 +29,7 @@ function props(over: Partial<DeveloperScreenProps> = {}): DeveloperScreenProps {
     onDisable: jest.fn(),
     onOpenDiagnostics: jest.fn(),
     attempts: [],
+    failures: [],
     ...over,
   };
 }
@@ -92,6 +93,8 @@ describe("DV5 — 진단 그룹은 개발 환경에서만", () => {
       DEVELOPER_TEXT.groupReplay,
       // 078 — 보드 밖: 「끄기」 아래의 자동 쓰기 시도 묶음
       "최근 자동 쓰기 시도",
+      // 081 — 보드 밖: 그 아래의 실패 묶음(새 맨 아래)
+      "최근 실패",
     ]);
   });
 });
@@ -114,6 +117,7 @@ describe("DV7 — 핸들러 연결", () => {
     await render(
       <DeveloperScreen
         attempts={[]}
+        failures={[]}
         modules={{ reading: null, writing: null }}
         showsDiagnostics={false}
       />,
@@ -144,6 +148,8 @@ describe("DG2·BD1·BD2·BD4 — 소스 계약", () => {
     expect(code).not.toMatch(/process\.env|__DEV__/);
     // 078 — 시도 기록 모듈에 닿지 않는다(줄만 받는다)
     expect(code).not.toMatch(/auto-write-attempts/);
+    // 081 D4 — 실패 기록 모듈에도 닿지 않는다
+    expect(code).not.toMatch(/write-failures/);
   });
 
   it("한글 문자열 리터럴이 없다 — 문구는 DEVELOPER_TEXT 에서 온다", () => {
@@ -277,5 +283,48 @@ describe("078 — 최근 자동 쓰기 시도 묶음", () => {
     const at = (id: string) => tree.indexOf(`"testID":"${id}"`);
     expect(at("developer-group-off")).toBeGreaterThan(0);
     expect(at("developer-group-attempts")).toBeGreaterThan(at("developer-group-off"));
+  });
+});
+
+/* ═══════════════════ 081 — 최근 실패 (배포 빌드에서도 보인다) ═══════════════════ */
+
+describe("081 — 최근 실패 묶음", () => {
+  it("D3 — 배포 환경 props(진단 없음)에도 묶음이 있고, 비어 있으면 「아직 실패가 없어요」", async () => {
+    await render(<DeveloperScreen {...props({ showsDiagnostics: false })} />);
+    expect(screen.queryByTestId("developer-group-diag")).toBeNull();
+    expect(screen.getByTestId("developer-group-failures")).toBeTruthy();
+    expect(screen.getByText("최근 실패")).toBeTruthy();
+    expect(screen.getByTestId("developer-failures-empty")).toBeTruthy();
+  });
+
+  it("줄마다 까닭과 시각을 그린다", async () => {
+    await render(
+      <DeveloperScreen
+        {...props({
+          failures: [
+            { reasonText: "도중에 끊김", timeText: "10월 14일 09:05" },
+            { reasonText: "시간 초과", timeText: "10월 13일 22:15" },
+          ],
+        })}
+      />,
+    );
+    expect(screen.queryByTestId("developer-failures-empty")).toBeNull();
+    const first = screen.getByTestId("developer-failure-0");
+    expect(within(first).getByText("도중에 끊김")).toBeTruthy();
+    expect(within(first).getByText("10월 14일 09:05")).toBeTruthy();
+    expect(within(screen.getByTestId("developer-failure-1")).getByText("시간 초과")).toBeTruthy();
+  });
+
+  it("D2 — 새 맨 아래다: 끄기 → 시도 묶음 → 실패 묶음 순서라 위 행들의 자리가 바뀌지 않는다", async () => {
+    await render(<DeveloperScreen {...props({ showsDiagnostics: true })} />);
+    const tree = JSON.stringify(screen.toJSON());
+    const at = (id: string) => tree.indexOf(`"testID":"${id}"`);
+    expect(at("developer-group-off")).toBeGreaterThan(0);
+    expect(at("developer-group-attempts")).toBeGreaterThan(at("developer-group-off"));
+    expect(at("developer-group-failures")).toBeGreaterThan(at("developer-group-attempts"));
+    // 묶음 뒤에 다른 행이 없다
+    expect(tree.lastIndexOf('"testID":"developer-')).toBe(
+      tree.lastIndexOf('"testID":"developer-failures-empty"'),
+    );
   });
 });

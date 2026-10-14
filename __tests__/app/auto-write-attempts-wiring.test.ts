@@ -59,3 +59,42 @@ describe("개발자 화면 (배포 빌드에서 보는 자리)", () => {
     expect(frame).not.toMatch(/attempts=\{showsDiagnostics/);
   });
 });
+
+/* 081 — 개발자 화면의 「최근 실패」 (contracts/write-failure-reasons.md A1~A3) */
+describe("081 — 개발자 화면이 실패 기록을 함께 읽는다", () => {
+  it("A1 — AppFrame이 통로를 만들고 개발자 겹이 열릴 때 읽어 failures로 넘긴다", () => {
+    const frame = functionBody("AppFrame");
+    expect(frame).toMatch(/const failurePort = useMemo\(\(\) => expoWriteFailurePort\(\), \[\]\);/);
+    expect(frame).toMatch(/loadWriteFailures\(failurePort\)/);
+    expect(frame).toMatch(/setDeveloperFailures\(failureLines\(/);
+    expect(frame).toMatch(/failures=\{developerFailures\}/);
+  });
+
+  it("A1 — 시도 기록과 같은 effect에서 읽는다(개발자 겹이 열릴 때만)", () => {
+    const frame = functionBody("AppFrame");
+    // 개발자 겹에 묶인 effect는 여럿이다(059 모듈 줄도 같은 조건이다) — 시도 기록을 읽는 것을 고른다
+    const read = frame.indexOf("loadAutoWriteAttempts(attemptPort)");
+    const start = frame.lastIndexOf('if (route !== "developer") return;', read);
+    expect(start).toBeGreaterThan(-1);
+    const body = frame.slice(start, frame.indexOf("}, [route", start));
+    expect(body).toMatch(/loadAutoWriteAttempts\(attemptPort\)/);
+    expect(body).toMatch(/loadWriteFailures\(failurePort\)/);
+  });
+
+  it("A2 — 상태를 바꾸는 자리마다 살아 있는가 검사가 앞선다", () => {
+    const frame = functionBody("AppFrame");
+    expect(frame).toMatch(/if \(alive\) setDeveloperFailures\(/);
+    expect(frame).toMatch(/if \(alive\) setDeveloperAttempts\(/);
+  });
+
+  it("배포 빌드의 통로다 — showsDiagnostics에 묶이지 않는다", () => {
+    expect(functionBody("AppFrame")).not.toMatch(/failures=\{showsDiagnostics/);
+  });
+
+  it("A3 — 진단 겹의 읽기는 그대로다", () => {
+    const layer = functionBody("DiagnosticsLayer");
+    expect(layer).toMatch(/loadWriteFailures\(failurePort\)/);
+    expect(layer).toMatch(/setFailures\(failureLines\(/);
+    expect(layer).toMatch(/failures=\{failures\}/);
+  });
+});

@@ -15,7 +15,7 @@
 
 import type { PermissionState } from "../signals/port";
 import type { DaySignals, SignalValue } from "../signals/types";
-import { ATTEMPT_TEXT as A, DIAGNOSTICS_TEXT as T } from "./diagnostics-text";
+import { ATTEMPT_TEXT as A, DIAGNOSTICS_TEXT as T, FAILURE_TEXT as F } from "./diagnostics-text";
 import { text } from "../i18n/current";
 import type { Language } from "../i18n/languages";
 import type { LanguageResolution } from "../i18n/resolve";
@@ -178,6 +178,13 @@ function reasonText(reason: WriteFailureReason): string {
     photos: T.failPhotos,
     empty: T.failEmpty,
     save: T.failSave,
+    // 081 — 새 여섯은 새 영역에서 온다(옛 영역의 키 짝은 골든이 잠근다)
+    echo: F.echo,
+    language: F.language,
+    unfinished: F.unfinished,
+    "timed-out": F.timedOut,
+    interrupted: F.interrupted,
+    error: F.error,
     unwritten: T.failUnwritten,
   };
   return byReason[reason];
