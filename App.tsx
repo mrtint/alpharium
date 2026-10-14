@@ -676,16 +676,25 @@ function AppFrame() {
    * 자리다** — 진단 화면은 개발 환경에서만 열린다.
    */
   const [developerAttempts, setDeveloperAttempts] = useState<AttemptLine[]>([]);
+  /**
+   * 081 — 개발자 화면의 「최근 실패」. 시도 기록과 같은 때(겹이 열릴 때) 읽는다 — 시도 묶음의 `백그라운드 · 실패`를 같은 시각의
+   * 실패 줄과 짝지어 읽는 자리이고, 배포 빌드에서 쓰기 실패의 까닭을 보는 유일한 자리다. 읽기는 던지지 않는다(060 WF5).
+   */
+  const failurePort = useMemo(() => expoWriteFailurePort(), []);
+  const [developerFailures, setDeveloperFailures] = useState<FailureLine[]>([]);
   useEffect(() => {
     if (route !== "developer") return;
     let alive = true;
     void loadAutoWriteAttempts(attemptPort).then((items) => {
       if (alive) setDeveloperAttempts(attemptLines(items));
     });
+    void loadWriteFailures(failurePort).then((items) => {
+      if (alive) setDeveloperFailures(failureLines(items));
+    });
     return () => {
       alive = false;
     };
-  }, [route, attemptPort]);
+  }, [route, attemptPort, failurePort]);
   const [skippedDay, setSkippedDay] = useState<DayDate | null>(null);
   useEffect(() => {
     let alive = true;
@@ -1643,6 +1652,7 @@ function AppFrame() {
           >
             <DeveloperScreen
               attempts={developerAttempts}
+              failures={developerFailures}
               modules={moduleLines}
               onDisable={onDisableDeveloper}
               onOpenDiagnostics={showsDiagnostics ? openDiagnostics : undefined}

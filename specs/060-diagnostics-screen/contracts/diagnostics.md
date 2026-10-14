@@ -17,6 +17,8 @@
 
 ## WF — 쓰기 실패 기록 (`src/app/write-failures.ts`, `logic`)
 
+> **WF1은 081로 대체됨** — 갈래가 다섯에서 열하나가 됐다. 지금의 표는 `specs/081-write-failure-reasons/contracts/write-failure-reasons.md` F절과 `data-model.md` §2다. WF2~WF9는 그대로다(080이 WF2에 「사용자가 그만둔 쓰기」를 더했다).
+
 - **WF1** 갈래 판정(R3): `storage`→`save`; `request-build`·`model-not-ready`→`module`; `signals`→`photos`; `vision` + `vision-failed: not-ready`→`module`, 그 밖 `vision`→`photos`;
   `generation` + `model-load-failed`→`module`, `rejected: empty`→`empty`, `rejected: echo|language|unfinished`·`timed-out`·`interrupted`·`generation-failed`·`backend-unavailable`·`not-implemented`→`unwritten`;
   `day-not-closed`·모르는 단계·모르는 reason→`unwritten`. 판정은 reason의 앞 토큰과 `vision-failed`의 detail·`rejected`의 detail만 본다(문구 전체 비교 없음 — 소스 계약).

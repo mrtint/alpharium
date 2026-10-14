@@ -596,6 +596,34 @@ describe("005 — 실패하면 저장이 일어나지 않는다 (FR-020, SC-004b
     expect(JSON.stringify(result)).not.toContain('"text"');
   });
 
+  // 081 P1 — 판정 거부의 까닭이 이유 문자열까지 닿는다. 닿지 않으면 쓰기 실패 기록이 거부 넷을 가를 수 없다
+  // (060의 `empty` 갈래가 081 전까지 한 번도 서지 않은 까닭이다).
+  it.each(["empty", "echo", "language", "unfinished"] as const)(
+    "081 P1 — rejected의 why(%s)가 reason의 detail로 실린다",
+    async (why) => {
+      const { pipeline } = makePipeline({ backend: backendReturning({ kind: "rejected", why }) });
+
+      const result = await pipeline.run(inputFor());
+
+      expect(result).toEqual({ ok: false, stage: "generation", reason: `rejected: ${why}` });
+    },
+  );
+
+  // 081 P2·P3 — 나머지 실패의 문자열과 결과의 모양은 그대로다
+  it.each([
+    [{ kind: "timed-out" }, "timed-out"],
+    [{ kind: "interrupted" }, "interrupted"],
+    [{ kind: "not-implemented" }, "not-implemented"],
+    [{ kind: "model-load-failed", reason: "not-found" }, "model-load-failed: not-found"],
+    [{ kind: "generation-failed", reason: "a: b" }, "generation-failed: a: b"],
+  ] as [GenerationResult, string][])("081 P2 — %j → reason %s", async (failure, reason) => {
+    const { pipeline } = makePipeline({ backend: backendReturning(failure) });
+
+    const result = await pipeline.run(inputFor());
+
+    expect(result).toEqual({ ok: false, stage: "generation", reason });
+  });
+
   it("실패해도 기존 일기가 그대로 있다 (002 FR-023b)", async () => {
     const store = memoryStore();
     const first = makePipeline({ backend: generating("먼저 쓴 일기"), store });

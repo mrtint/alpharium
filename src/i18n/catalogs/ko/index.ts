@@ -18,6 +18,7 @@ import { consentGate } from "./consent-gate";
 import { developer } from "./developer";
 import { diagnostics, diagnosticsLanguage } from "./diagnostics";
 import { download } from "./download";
+import { failures } from "./failures";
 import { home } from "./home";
 import { monologue } from "./monologue";
 import { notification } from "./notification";
@@ -40,6 +41,7 @@ export const ko = {
   diagnostics,
   diagnosticsLanguage,
   attempts,
+  failures,
   simulation,
   welcome,
   download,

@@ -196,6 +196,40 @@ describe("DV6 — 실패 줄", () => {
     for (const line of lines) expect(Object.keys(line).sort()).toEqual(["reasonText", "timeText"]);
   });
 
+  // 081 T3 — 갈래 열하나가 모두 서로 다른 문구를 갖는다
+  it("열하나 갈래 문구가 모두 있고 서로 다르다", () => {
+    const reasons = [
+      "module",
+      "photos",
+      "empty",
+      "save",
+      "echo",
+      "language",
+      "unfinished",
+      "timed-out",
+      "interrupted",
+      "error",
+      "unwritten",
+    ] as const;
+    const texts = reasons.map(
+      (reason) => failureLines([{ reason, at: new Date(2026, 0, 1) }])[0]?.reasonText,
+    );
+    expect(texts).toEqual([
+      "모듈을 불러오지 못함",
+      "사진을 읽지 못함",
+      "글이 비어 있음",
+      "저장하지 못함",
+      "지시문을 되뱉음",
+      "다른 언어로 씀",
+      "글을 끝맺지 못함",
+      "시간 초과",
+      "도중에 끊김",
+      "생성 중 오류",
+      "일기를 쓰지 못함",
+    ]);
+    expect(new Set(texts).size).toBe(reasons.length);
+  });
+
   it("다섯 갈래 문구가 모두 있다", () => {
     const texts = (["module", "photos", "empty", "save", "unwritten"] as const).map(
       (reason) => failureLines([{ reason, at: new Date(2026, 0, 1) }])[0]?.reasonText,

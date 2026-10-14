@@ -1,7 +1,8 @@
 /**
  * 쓰기 실패의 영구 기록 (060, 보드 `6h` ⑦ 「최근 실패」).
  *
- * 계약: specs/060-diagnostics-screen/contracts/diagnostics.md WF1~WF9, data-model.md §1, research R2·R3
+ * 계약: specs/081-write-failure-reasons/contracts/write-failure-reasons.md F·S절(갈래 판정 — 060 WF1을 대체), 그 밖은
+ * specs/060-diagnostics-screen/contracts/diagnostics.md WF2~WF9, data-model.md §1, research R2·R3
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **이유 갈래와 시각뿐이다**(D3, 원칙 IV). 걸린 시간·토큰·모델·어느 하루였는지·오류 문구를 담으면 실행 이력 로그로 자란다 —
@@ -13,13 +14,39 @@
  *
  * 갈래 판정은 054 `failure-toast.ts`와 같은 규칙이다: `reason`의 앞 토큰(`` `${kind}: ${detail}` ``)과 `vision-failed`·`rejected`의 detail만
  * 본다. 문구 전체를 비교하면 문구를 고칠 때 조용히 깨진다(053의 교훈).
+ *
+ * **081 — 갈래는 열하나다**(specs/081-write-failure-reasons/contracts/write-failure-reasons.md F절, 표는 data-model.md §2).
+ * 060의 다섯은 판정 거부·시간 초과·끊김·예외를 `unwritten` 하나로 뭉쳐, 실패가 났을 때 「어느 문에서 멈췄는가」를 가를 수
+ * 없었다. 늘어난 것은 갈래의 수뿐이다 — 담는 것은 여전히 갈래와 시각이고, 점수·시간·오류 문구가 아니다. **판정의 갈래는
+ * 늘지 않는다**(원칙 IV): 거부 넷은 `acceptance.ts`가 이미 가른 것을 여기까지 옮긴 것이고, 이 모듈은 그 모듈에 기대지 않는다
+ * (테스트가 두 쪽의 집합을 대조한다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-/** 보드 `diag.fail.*` 넷 + 앞 넷에 안 맞는 모든 실패를 위한 다섯째(clarify Q1) */
-export type WriteFailureReason = "module" | "photos" | "empty" | "save" | "unwritten";
+/**
+ * 보드 `diag.fail.*` 넷 + 081이 더한 여섯 + 어디에도 안 맞는 실패와 옛 기록을 위한 `unwritten`.
+ *
+ * - `echo`·`language`·`unfinished` — 판정 거부(빈 글은 보드의 `empty`)
+ * - `timed-out` — 생성 시간 한도. **멈춰 있다 돌아와 한도가 지난 것도 이 갈래다**(079) — 가르려면 시간을 기록해야 해서 가르지 않는다
+ * - `interrupted` — 사용자가 그만둔 것이 아닌데 끊겼다(앱이 앞을 벗어남, OS 중단). 그만둔 쓰기는 기록되지 않는다
+ * - `error` — 생성 중 예외. 오류 문구는 읽지도 담지도 않는다
+ */
+const REASONS = [
+  "module",
+  "photos",
+  "empty",
+  "save",
+  "echo",
+  "language",
+  "unfinished",
+  "timed-out",
+  "interrupted",
+  "error",
+  "unwritten",
+] as const;
 
-const REASONS: readonly WriteFailureReason[] = ["module", "photos", "empty", "save", "unwritten"];
+/** 갈래의 이름은 위 목록에서 나온다 — 타입에만 더한 갈래가 기록된 뒤 읽을 때 조용히 버려지는 일이 없게 */
+export type WriteFailureReason = (typeof REASONS)[number];
 
 /** 기록 항목 하나 — 필드는 이 둘뿐이다 */
 export type WriteFailure = { reason: WriteFailureReason; at: Date };
@@ -45,6 +72,25 @@ function split(reason: string | undefined): { kind: string; detail: string } {
   return { kind: kind?.trim() ?? "", detail: rest.join(":").trim() };
 }
 
+/**
+ * 판정 거부의 까닭 값을 갈래로 옮긴다. 넷 밖이면(판정 갈래가 바뀌었거나 까닭이 실리지 않은 옛 모양) 다른 갈래로 새지 않고
+ * `unwritten`이다.
+ */
+function rejectedReasonFor(detail: string): WriteFailureReason {
+  switch (detail) {
+    case "empty":
+      return "empty";
+    case "echo":
+      return "echo";
+    case "language":
+      return "language";
+    case "unfinished":
+      return "unfinished";
+    default:
+      return "unwritten";
+  }
+}
+
 /** 실패 하나를 이유 갈래로 옮긴다. 던지지 않는다. 모르는 것은 `unwritten`이다. */
 export function writeFailureReasonFor(result: {
   stage?: string;
@@ -61,11 +107,25 @@ export function writeFailureReasonFor(result: {
     case "signals":
       return "photos";
     case "vision":
-      return detail === "not-ready" ? "module" : "photos";
+      if (detail === "not-ready") return "module";
+      // 사진을 못 읽은 것이 아니라 읽는 도중 끊긴 것이다 — 본문 도중의 끊김과 같은 갈래다(081 F3)
+      if (detail === "cancelled") return "interrupted";
+      return "photos";
     case "generation":
-      if (kind === "model-load-failed") return "module";
-      if (kind === "rejected" && detail === "empty") return "empty";
-      return "unwritten";
+      switch (kind) {
+        case "model-load-failed":
+          return "module";
+        case "rejected":
+          return rejectedReasonFor(detail);
+        case "timed-out":
+          return "timed-out";
+        case "interrupted":
+          return "interrupted";
+        case "generation-failed":
+          return "error";
+        default:
+          return "unwritten";
+      }
     default:
       return "unwritten";
   }

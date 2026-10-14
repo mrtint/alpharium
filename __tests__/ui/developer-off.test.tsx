@@ -55,6 +55,7 @@ function Harness({
   return route === "developer" && developer.enabled ? (
     <DeveloperScreen
       attempts={[]}
+      failures={[]}
       modules={{ reading: null, writing: null }}
       onDisable={() => {
         developer.disable();

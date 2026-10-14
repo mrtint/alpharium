@@ -1,5 +1,5 @@
 /**
- * 쓰기 실패 기록 계약 (060, WF1~WF6·WF8·WF9).
+ * 쓰기 실패 기록 계약 (060 WF2~WF6·WF8·WF9, 081 F1~F7·S1~S5 — 갈래 판정은 081이 WF1을 대체했다).
  */
 
 import { readFileSync } from "node:fs";
@@ -12,6 +12,8 @@ import {
   writeFailureReasonFor,
   type WriteFailurePort,
 } from "../../src/app/write-failures";
+import { failureLines } from "../../src/app/diagnostics-view";
+import { REJECT_REASONS } from "../../src/diary/acceptance";
 
 function memoryPort(initial: string | null = null): WriteFailurePort & { content: string | null } {
   const port = {
@@ -28,7 +30,33 @@ function memoryPort(initial: string | null = null): WriteFailurePort & { content
 
 const AT = new Date("2026-10-06T09:12:03.000Z");
 
-describe("WF1 — 갈래 판정", () => {
+/** 주석을 걷은 소스 — 이 저장소의 주석은 금지어를 설명 안에 정당하게 쓴다 */
+const code = (file: string) =>
+  readFileSync(join(__dirname, "..", "..", file), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
+const source = code("src/app/write-failures.ts");
+
+describe("081 F1~F4·F6 — 갈래 판정 (060 WF1을 대체)", () => {
+  it("F1 — 갈래는 정확히 열하나이고 타입은 그 목록에서 나온다", () => {
+    const list = /const REASONS = \[([^\]]*)\] as const;/.exec(source)?.[1] ?? "";
+    expect([...list.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual([
+      "module",
+      "photos",
+      "empty",
+      "save",
+      "echo",
+      "language",
+      "unfinished",
+      "timed-out",
+      "interrupted",
+      "error",
+      "unwritten",
+    ]);
+    // 타입에만 더한 갈래는 읽을 때 조용히 버려진다 — 타입을 목록에서 끌어낸다
+    expect(source).toMatch(/export type WriteFailureReason = \(typeof REASONS\)\[number\];/);
+  });
+
   it.each([
     ["storage", "디스크 가득", "save"],
     ["request-build", "캐릭터가 정해지지 않아 요청을 만들지 못했다", "module"],
@@ -36,23 +64,61 @@ describe("WF1 — 갈래 판정", () => {
     ["signals", "2026-10-05의 신호를 가져오지 못했다", "photos"],
     ["vision", "vision-failed: not-ready", "module"],
     ["vision", "vision-failed: failed", "photos"],
-    ["vision", "vision-failed: cancelled", "photos"],
+    // F3 — 사진을 못 읽은 것이 아니라 읽는 도중 끊긴 것이다(060은 photos였다)
+    ["vision", "vision-failed: cancelled", "interrupted"],
     ["generation", "model-load-failed: not-found", "module"],
     ["generation", "model-load-failed: load-failed", "module"],
     ["generation", "rejected: empty", "empty"],
-    ["generation", "rejected: echo", "unwritten"],
-    ["generation", "rejected: language", "unwritten"],
-    ["generation", "rejected: unfinished", "unwritten"],
-    ["generation", "timed-out", "unwritten"],
-    ["generation", "interrupted", "unwritten"],
-    ["generation", "generation-failed: oom", "unwritten"],
+    ["generation", "rejected: echo", "echo"],
+    ["generation", "rejected: language", "language"],
+    ["generation", "rejected: unfinished", "unfinished"],
+    // F4 — detail이 넷 밖이거나 없으면(옛 모양) 다른 갈래로 새지 않는다
+    ["generation", "rejected", "unwritten"],
+    ["generation", "rejected: too-short", "unwritten"],
+    ["generation", "timed-out", "timed-out"],
+    ["generation", "interrupted", "interrupted"],
+    ["generation", "interrupted: 시작 전에 그만두었다", "interrupted"],
+    ["generation", "generation-failed: oom", "error"],
+    // F6 — 오류 문구는 읽지 않는다
+    ["generation", "generation-failed: rejected: echo", "error"],
+    ["generation", "generation-failed: a: b: timed-out", "error"],
     ["generation", "backend-unavailable: x", "unwritten"],
     ["generation", "not-implemented", "unwritten"],
     ["day-not-closed", "미래 날", "unwritten"],
     ["어떤-새-단계", "뭔가", "unwritten"],
     ["generation", "처음 보는 reason", "unwritten"],
+    // 단계가 다르면 같은 낱말도 그 갈래가 아니다
+    ["signals", "timed-out", "photos"],
+    ["storage", "rejected: echo", "save"],
   ])("%s / %s → %s", (stage, reason, expected) => {
     expect(writeFailureReasonFor({ stage, reason })).toBe(expected);
+  });
+
+  it("단계도 이유도 없으면 unwritten이고 던지지 않는다", () => {
+    expect(writeFailureReasonFor({})).toBe("unwritten");
+  });
+
+  it("F5 — 거부 갈래 넷은 판정의 갈래 넷과 같은 집합이다", () => {
+    const fromRecord = REJECT_REASONS.map((why) =>
+      writeFailureReasonFor({ stage: "generation", reason: `rejected: ${why}` }),
+    );
+    // 판정 갈래마다 자기 이름의 기록 갈래가 선다 — 판정 갈래가 늘면 여기서 unwritten이 나와 실패한다
+    expect(fromRecord).toEqual([...REJECT_REASONS]);
+    expect(REJECT_REASONS).toHaveLength(4);
+  });
+
+  it("F5 — 이 모듈은 판정 모듈에 기대지 않는다", () => {
+    expect(source).not.toMatch(/acceptance/);
+  });
+
+  it("F7 — 판정 본문에 문구 비교가 없다", () => {
+    // 이유를 가르는 도우미(`split`·`rejectedReasonFor`)부터 판정 함수 끝까지 본다
+    const from = source.indexOf("function split(");
+    const body = source.slice(from, source.indexOf("function isRecordable"));
+    expect(from).toBeGreaterThan(-1);
+    expect(body.length).toBeGreaterThan(100);
+    expect(body).not.toMatch(/[가-힣]/);
+    expect(body).not.toMatch(/includes\(|startsWith\(|endsWith\(|\.match\(|\.test\(|RegExp/);
   });
 });
 
@@ -87,7 +153,8 @@ describe("WF2 — 기록하지 않는 것", () => {
       { ok: false, stage: "generation", reason: "interrupted: 저장 전에 그만두었다" },
       AT,
     );
-    expect(await loadWriteFailures(port)).toEqual([{ reason: "unwritten", at: AT }]);
+    // 081 — 그만둔 것이 아닌 끊김은 자기 갈래로 남는다(전에는 unwritten이었다)
+    expect(await loadWriteFailures(port)).toEqual([{ reason: "interrupted", at: AT }]);
   });
 
   // FR-016 — 첫 실행 자동 첫 일기에는 시도 기록도 알림도 없다. 그만둔 그 쓰기가 실패로 남지 않는 길은 이 한 곳이다.
@@ -176,13 +243,53 @@ describe("WF6 — 기록 실패는 삼킨다", () => {
   });
 });
 
-describe("소스 계약 — WF3·WF8·WF9", () => {
-  const code = (file: string) =>
-    readFileSync(join(__dirname, "..", "..", file), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
-  const source = code("src/app/write-failures.ts");
+describe("081 S2~S4 — 새 갈래의 저장과 옛 기록", () => {
+  it("S2 — 새 갈래 여섯이 기록·재독 왕복에서 보존된다", async () => {
+    const port = memoryPort();
+    const results = [
+      { stage: "generation", reason: "rejected: echo" },
+      { stage: "generation", reason: "rejected: language" },
+      { stage: "generation", reason: "rejected: unfinished" },
+      { stage: "generation", reason: "timed-out" },
+      { stage: "vision", reason: "vision-failed: cancelled" },
+      { stage: "generation", reason: "generation-failed: x" },
+    ];
+    for (const result of results) await recordWriteFailure(port, { ok: false, ...result }, AT);
 
+    expect((await loadWriteFailures(port)).map((i) => i.reason)).toEqual([
+      "error",
+      "interrupted",
+      "timed-out",
+      "unfinished",
+      "language",
+      "echo",
+    ]);
+    // S1 — 항목이 담는 것은 여전히 둘뿐이다
+    const stored = JSON.parse(port.content ?? "{}") as { items: object[] };
+    for (const item of stored.items) expect(Object.keys(item).sort()).toEqual(["at", "reason"]);
+  });
+
+  it("S3·S4 — 옛·새가 섞인 기록: 옛 줄은 그 갈래 그대로, 모르는 줄만 빠진다 (US3)", async () => {
+    const raw = JSON.stringify({
+      items: [
+        { reason: "interrupted", at: "2026-10-14T09:00:00.000Z" },
+        { reason: "unwritten", at: "2026-10-13T09:00:00.000Z" },
+        { reason: "photos", at: "2026-10-12T09:00:00.000Z" },
+        { reason: "made-up", at: "2026-10-11T09:00:00.000Z" },
+      ],
+    });
+    const items = await loadWriteFailures(memoryPort(raw));
+
+    expect(items.map((i) => i.reason)).toEqual(["interrupted", "unwritten", "photos"]);
+    expect(failureLines(items).map((line) => line.reasonText)).toEqual([
+      "도중에 끊김",
+      "일기를 쓰지 못함",
+      "사진을 읽지 못함",
+    ]);
+  });
+});
+
+describe("소스 계약 — WF3·WF8·WF9", () => {
   it("WF3 — 직렬화 객체의 키는 reason·at뿐이고 측정 어휘가 없다", () => {
     const serialize = source.slice(source.indexOf("JSON.stringify({"));
     const keys = [...serialize.slice(0, serialize.indexOf("}),") + 3).matchAll(/(\w+):/g)].map(
