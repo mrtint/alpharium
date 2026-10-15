@@ -12,12 +12,14 @@ import {
 import { PHOTO_TAGS } from "../../scripts/e2e-sample/manifest";
 
 /**
- * 070 — 사진 목록 검증 (contracts/sample-manifest.md C-1~C-6).
+ * 070 — 사진 목록 검증 (contracts/sample-manifest.md C-1~C-6). 084가 C-1을 대체했다(specs/084-sample-photo-identity/contracts/photo-identity.md I-1~I-3):
+ * 썸네일 해시는 받아들인 변형의 배열이고, 사진의 정체는 원본 sha1이다.
  *
  * 앞쪽은 가짜 목록으로 검증 규칙 자체를 본다. 마지막 묶음은 진짜 `photos.json`이다(T014 뒤에 통과한다).
  */
 
 const SHA = "a".repeat(64);
+const SHA1 = "b".repeat(40);
 
 function validList(): CatalogPhoto[] {
   const list: CatalogPhoto[] = [];
@@ -27,7 +29,8 @@ function validList(): CatalogPhoto[] {
       list.push({
         file: `commons-${tag}-${i}.jpg`,
         url: `https://upload.wikimedia.org/wikipedia/commons/thumb/x/${t}${i}/960px-f.jpg`,
-        sha256: SHA,
+        sha256: [SHA],
+        originalSha1: SHA1,
         license: "CC0",
         sourcePage: `https://commons.wikimedia.org/wiki/File:F${t}${i}.jpg`,
         checkedOn: "2026-10-10",
@@ -65,13 +68,53 @@ describe("validateCatalog (C-1~C-5)", () => {
     }
   });
 
-  it("C-1: sha256은 64 hex여야 하고 빈 값은 기록 모드에서만 허용된다", () => {
+  it("I-1: sha256은 64 hex의 배열이고 빈 배열은 기록 모드에서만 허용된다", () => {
     const list = validList();
-    list[0] = { ...list[0], sha256: "" };
+    list[0] = { ...list[0], sha256: [] };
     expect(validateCatalog(list).ok).toBe(false);
     expect(validateCatalog(list, { allowEmptyHashes: true }).ok).toBe(true);
-    list[1] = { ...list[1], sha256: "XYZ" };
+    list[1] = { ...list[1], sha256: ["XYZ"] };
     expect(validateCatalog(list, { allowEmptyHashes: true }).ok).toBe(false);
+  });
+
+  it("I-1: 여러 변형을 담을 수 있다", () => {
+    const list = validList();
+    list[0] = { ...list[0], sha256: [SHA, "c".repeat(64)] };
+    expect(validateCatalog(list).ok).toBe(true);
+  });
+
+  it("I-1: sha256이 문자열(070의 옛 모양)이면 실패한다", () => {
+    const list = validList() as unknown as Record<string, unknown>[];
+    list[0] = { ...list[0], sha256: SHA };
+    const result = validateCatalog(list);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.problems.join("\n")).toMatch(/sha256이 배열이 아니다/);
+  });
+
+  it("I-1: 배열 안에 같은 해시가 두 번 있으면 실패한다", () => {
+    const list = validList();
+    list[0] = { ...list[0], sha256: [SHA, SHA] };
+    const result = validateCatalog(list);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.problems.join("\n")).toMatch(/겹친다/);
+  });
+
+  it("I-2: originalSha1은 소문자 hex 40자이고 빈 값은 기록 모드에서만 허용된다", () => {
+    const list = validList();
+    list[0] = { ...list[0], originalSha1: "" };
+    const empty = validateCatalog(list);
+    expect(empty.ok).toBe(false);
+    // 빈 값은 기록 모드로 채우라고 알린다 (US4/AC1)
+    if (!empty.ok)
+      expect(empty.problems.join("\n")).toMatch(
+        /originalSha1이 비었다 — 처음 한 번 --record-hashes로 채운다/,
+      );
+    expect(validateCatalog(list, { allowEmptyHashes: true }).ok).toBe(true);
+    list[1] = { ...list[1], originalSha1: "B".repeat(40) };
+    expect(validateCatalog(list, { allowEmptyHashes: true }).ok).toBe(false);
+    const missing = validList() as unknown as Record<string, unknown>[];
+    delete missing[2].originalSha1;
+    expect(validateCatalog(missing, { allowEmptyHashes: true }).ok).toBe(false);
   });
 
   it("C-1: 필수 필드가 빠지면 이유와 함께 실패한다", () => {
@@ -110,7 +153,7 @@ describe("validateCatalog (C-1~C-5)", () => {
   });
 });
 
-describe("진짜 photos.json (C-1~C-6)", () => {
+describe("진짜 photos.json (C-1~C-6, I-3)", () => {
   it("파일이 있고 모든 항목이 규칙을 지킨다", () => {
     expect(existsSync(CATALOG_PATH())).toBe(true);
     const result = loadCatalog();

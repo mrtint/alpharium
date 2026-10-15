@@ -18,7 +18,8 @@ function fakeCatalog(shaSeed = "a"): CatalogPhoto[] {
       list.push({
         file: `commons-${tag}-${i}.jpg`,
         url: `https://upload.wikimedia.org/x/${tag}${i}.jpg`,
-        sha256: shaSeed.repeat(64),
+        sha256: [shaSeed.repeat(64)],
+        originalSha1: shaSeed.repeat(40),
         license: "CC0",
         sourcePage: `https://commons.wikimedia.org/wiki/File:${tag}${i}.jpg`,
         checkedOn: "2026-10-10",
@@ -115,7 +116,7 @@ describe("planSample (P-1~P-3)", () => {
   });
 });
 
-describe("fingerprint (P-4)", () => {
+describe("fingerprint (P-4, 084 P-4')", () => {
   const base = planSample(fakeCatalog(), NOW);
 
   it("16 hex이고 같은 입력이면 같다", () => {
@@ -131,10 +132,19 @@ describe("fingerprint (P-4)", () => {
     );
   });
 
-  it("사진 sha가 바뀌면 달라진다", () => {
-    expect(fingerprint(planSample(fakeCatalog("b"), NOW), fakeCatalog("b"))).not.toBe(
+  it("P-4'(084): 원본 sha1이 바뀌면 달라진다", () => {
+    const catalog = fakeCatalog();
+    catalog[0] = { ...catalog[0], originalSha1: "f".repeat(40) };
+    expect(fingerprint(planSample(catalog, NOW), catalog)).not.toBe(
       fingerprint(base, fakeCatalog()),
     );
+  });
+
+  it("P-4'(084): 썸네일 해시만 다르면 같다 — 데이터센터가 다른 두 기계가 기기를 다시 심지 않는다", () => {
+    const variants = fakeCatalog().map((p) => ({ ...p, sha256: [...p.sha256, "e".repeat(64)] }));
+    const other = fakeCatalog().map((p) => ({ ...p, sha256: ["d".repeat(64)] }));
+    expect(fingerprint(planSample(variants, NOW), variants)).toBe(fingerprint(base, fakeCatalog()));
+    expect(fingerprint(planSample(other, NOW), other)).toBe(fingerprint(base, fakeCatalog()));
   });
 
   it("항목이 하나 달라지면 달라진다", () => {

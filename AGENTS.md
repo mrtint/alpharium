@@ -940,8 +940,11 @@
 ### 070 — e2e 표본: 30일치 가상의 하루
 
 - **층 1 실행기 앞단이 「표본 보장」을 한다**(`scripts/layer1/with-sample.ts` → `scripts/e2e-sample/ensure.ts`): 기기의 `PocketlogSeed/` 아래 `s30-*.jpg` 129장(1~30일 전, **오늘은 심지 않는다**)이 표와 맞으면 건너뛰고(3.3초), 아니면 `s30-` 사진·표식만 지우고
-  다시 심는다(7.5초). `npm run sample:seed`는 같은 코드를 직접 돌린다. **사진은 실제 무료 사진 210장**(Wikimedia Commons CC0·퍼블릭 도메인, 소유자 결정 — 풀 200장 이상)이고 저장소에는 목록 `scripts/e2e-sample/photos.json`(URL·sha256·라이선스)과 스크립트만 있다.
-  받은 파일은 gitignore된 `.cache/`에 있다 — `npm run sample:fetch`(처음 한 번 `-- --record-hashes`), **외부 서비스를 부르므로 목록을 소유자가 본 뒤에만 돈다**.
+  다시 심는다(7.5초). `npm run sample:seed`는 같은 코드를 직접 돌린다. **사진은 실제 무료 사진 210장**(Wikimedia Commons CC0·퍼블릭 도메인, 소유자 결정 — 풀 200장 이상)이고 저장소에는 목록 `scripts/e2e-sample/photos.json`(URL·받아들인 썸네일 sha256들·원본 sha1·라이선스)과 스크립트만 있다.
+  받은 파일은 gitignore된 `.cache/`에 있다 — `npm run sample:fetch`(정체 필드가 빈 항목이 있으면 `-- --record-hashes`), **외부 서비스를 부르므로 목록을 소유자가 본 뒤에만 돈다**.
+- **★ 같은 썸네일 URL이 데이터센터마다 다른 바이트를 준다**(084, 2026-10-15 실측 — `curl --resolve`로 엣지를 바꿔 보니 codfw·ulsfo는 목록 작성 때의 바이트, eqiad·eqsin·esams 등은 다른 바이트; 210장 중 15장이 그랬다). 어느 쪽이 오는지는 개발 기계의 네트워크 위치가 정한다.
+  그래서 **사진의 정체는 Commons 원본 sha1(`originalSha1`)**이고 썸네일 해시는 받아들인 변형의 목록이다. 처음 보는 썸네일은 원본 sha1이 같고 바이트가 그 원본의 썸네일 모양(폭·원본 비율 ±1px)일 때만 받아들여 `photos.json`에 덧붙는다(성공한 실행만 목록을 쓴다 — diff를 보고 커밋한다).
+  원본이 다르거나 확인하지 못하면 지금처럼 멈춘다. 표식 지문도 원본 sha1을 쓴다(기계를 바꿔도 다시 심지 않는다). 해시만 한 기계 값으로 다시 기록하면 반대쪽 데이터센터에 붙는 기계가 깨진다.
 - **★ 직접 쓴 EXIF가 이 기기에서는 받아들여졌다**(010의 「손으로 만든 EXIF는 스캐너가 무시한다」와 다르다): 받은 사진의 EXIF를 걷고 IFD0(해상도·방향·`DateTime`)·ExifIFD(`ExifVersion`·`DateTimeOriginal/Digitized`·`OffsetTime*`·
   `ComponentsConfiguration`·화소 크기)·GPS(`GPSVersionID`·위경도·`GPSDateStamp`)를 새로 쓰면 좌표 있는 사진도 없는 사진도 `datetaken`이 정확했다(`scripts/e2e-sample/exif-write.ts`). **어느 태그가 결정적인지는 모른다**(짐작으로 넉넉히 넣었다).
   **색인은 `scan_volume` 한 번이 `scan_file` 장마다보다 빠르다**(20장 1.5초 vs 25.8초) — 010의 「`scan_file`만 동작한다」는 이 기기(Android 13)에서 맞지 않다. 볼륨 전체를 훑으므로 전용 기기 전제다.
@@ -1167,7 +1170,7 @@
 - **서체 라이선스**: 설정 「정보」의 「버전」 다음 「서체 라이선스」 행 → 설정 위 겹(이름 바꾸기와 같은 방식 — 열린 동안 설정 겹 `active`가 거짓). 전문은 `src/ui/pretendard-license.ts`의 문자열 상수이고 `assets/fonts/pretendard/LICENSE.txt`(v1.3.9 릴리스 그대로, 저작권 줄 하나)와 바이트 대조된다 — **손으로 고치지 않는다**. 서체를 새 버전으로 올리면 그 버전의 `LICENSE.txt`로 바꾼다(`main`의 LICENSE는 저작권 줄이 넷으로 늘었다 — 우리가 넣은 v1.3.9 파일과 짝이 아니다).
 - **iOS 시스템 서체와 Pretendard는 원래 닮았다** — 고치기 전후 iOS 글자 폭이 0.3~1단위만 다르다. 「서체가 바뀌었는가」를 iOS 화면만 보고 판정하지 않는다(083은 안드로이드와 폭이 같아진 것·스파이크의 시스템 서체 대비로 봤다). 글자 폭·여백을 재는 도구는 `specs/083-pretendard-font/captures/tools/`(제품 밖).
 - **다른 기계에서 서명된 debug APK가 깔린 기기는 재설치가 필요하다** — `files/` 전체를 `run-as tar`로 맥에 백업(2GB, 약 2분) → uninstall → install → 되돌림 → `pm grant`(사진·위치·알림)로 했고 모델 md5가 같았다. **재설치 뒤 Smart Lock 신뢰가 풀려 PIN 잠금이 걸린다** — 사람이 푼다. 절차는 083 quickstart §2a.
-- **표본 사진 내려받기(070)가 깨져 있다**(2026-10-15, 맥) — `commons-indoor-13.jpg`의 sha256이 목록과 달라 `npm run sample:fetch`가 멈추고, 그래서 `npm run test:layer1`이 앞단에서 중단된다. 083은 기준 상태를 손으로 깔고 표본이 필요 없는 층 1 흐름 열하나를 `maestro test`로 돌렸다(11/11). 목록을 고칠지는 소유자가 정한다.
+- 083 때 맥에서 표본 사진 내려받기가 멈춰(썸네일 바이트가 데이터센터마다 다름) 층 1을 손으로 돌렸다 — 084가 고쳤다(070 절).
 - **iOS에서 「글꼴 2.0배」는 `xcrun simctl ui booted content_size accessibility-large`다**(본문 33pt/17pt ≈ 1.94배 — `accessibility-extra-large`는 약 2.35배라 넘친다). 그 단계에서 겹침·넘침은 없었다. extra-large에서는 큰 제목 「서체 라이선스」가 「라이선 / 스」로 낱말 가운데서 갈리고 스트립 숫자가 붙는다 — iOS는 큰 제목도 선형으로 키운다(소유자 확인 대상).
 - **미확인**: iOS 실기기·release(서체가 든 TestFlight·Play 빌드), Android 7.x의 굵기, `sample-days` 흐름, 다른 안드로이드 기기.
 

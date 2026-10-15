@@ -5,6 +5,9 @@
  *
  * 저장소에는 사진 파일이 아니라 이 목록(출처·라이선스·URL·sha256)만 있다. 받은 파일은 gitignore된 캐시에 둔다.
  * 순수 검증 + 파일 읽기 한 줄만 있다 — 네트워크는 `fetch.ts`의 몫이다.
+ *
+ * 084: 사진의 **정체**는 Commons 원본 sha1(`originalSha1`)이다. 같은 썸네일 URL이 데이터센터마다 다른 바이트를 주므로(codfw·eqiad 실측)
+ * 썸네일 해시(`sha256`)는 받아들인 변형의 목록이다 — 계약 specs/084-sample-photo-identity/contracts/photo-identity.md I-1~I-3.
  */
 
 import { readFileSync } from "node:fs";
@@ -23,8 +26,10 @@ export type CatalogPhoto = {
   /** 캐시에 둘 파일 이름 (예: `commons-cafe-01.jpg`) */
   file: string;
   url: string;
-  /** 소문자 hex 64자. 비어 있으면 `--record-hashes`가 채울 자리(그 전에는 검증이 실패한다) */
-  sha256: string;
+  /** 받아들인 썸네일 변형의 sha256(소문자 hex 64자, 중복 없음). 비어 있으면 `--record-hashes`가 채울 자리(그 전에는 검증이 실패한다) */
+  sha256: string[];
+  /** Commons 원본 파일의 sha1(소문자 hex 40자) — 사진의 정체. 비어 있으면 `--record-hashes`가 채운다. 도구가 덮어쓰지 않는다 */
+  originalSha1: string;
   license: License;
   /** 라이선스를 확인한 Commons 파일 페이지 */
   sourcePage: string;
@@ -73,7 +78,7 @@ export function validateCatalog(raw: unknown, options: { allowEmptyHashes?: bool
     const file = str("file");
     const label = file === "" ? at : file;
     const url = str("url");
-    const sha256 = str("sha256");
+    const originalSha1 = str("originalSha1");
     const license = str("license");
     const sourcePage = str("sourcePage");
     const checkedOn = str("checkedOn");
@@ -87,8 +92,28 @@ export function validateCatalog(raw: unknown, options: { allowEmptyHashes?: bool
       problems.push(`${label}: 허용되지 않는 라이선스 「${license}」 (${ALLOWED_LICENSES.join("·")}만)`);
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(checkedOn)) problems.push(`${label}: checkedOn이 YYYY-MM-DD가 아니다`);
-    if (!/^[0-9a-f]{64}$/.test(sha256) && !(options.allowEmptyHashes === true && sha256 === "")) {
-      problems.push(`${label}: sha256이 소문자 hex 64자가 아니다`);
+    const sha256: string[] = [];
+    if (!Array.isArray(p.sha256)) {
+      problems.push(`${label}: sha256이 배열이 아니다`);
+    } else {
+      for (const h of p.sha256 as unknown[]) {
+        if (typeof h !== "string" || !/^[0-9a-f]{64}$/.test(h)) {
+          problems.push(`${label}: sha256의 원소가 소문자 hex 64자가 아니다`);
+        } else {
+          sha256.push(h);
+        }
+      }
+      if (new Set(sha256).size !== sha256.length) problems.push(`${label}: sha256 안의 해시가 겹친다`);
+      if (p.sha256.length === 0 && options.allowEmptyHashes !== true) {
+        problems.push(`${label}: sha256이 비었다 — 처음 한 번 --record-hashes로 채운다`);
+      }
+    }
+    if (originalSha1 === "") {
+      if (options.allowEmptyHashes !== true) {
+        problems.push(`${label}: originalSha1이 비었다 — 처음 한 번 --record-hashes로 채운다`);
+      }
+    } else if (!/^[0-9a-f]{40}$/.test(originalSha1)) {
+      problems.push(`${label}: originalSha1이 소문자 hex 40자가 아니다`);
     }
 
     const tags = Array.isArray(p.tags) ? (p.tags as unknown[]) : [];
@@ -105,6 +130,7 @@ export function validateCatalog(raw: unknown, options: { allowEmptyHashes?: bool
       file,
       url,
       sha256,
+      originalSha1,
       license: license as License,
       sourcePage,
       checkedOn,
