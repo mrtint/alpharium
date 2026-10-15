@@ -112,7 +112,7 @@ xcrun simctl install 887BFB8C-1D79-47B9-B1A2-08AA2B60234F <scratch>/dd/Build/Pro
 | | 잉크 아래 → 보조 줄 | 12.3 | 12.3 | 12.3 |
 | | **차이 절댓값 합** | **11.7** | **11.7** | — |
 
-- **두 벌이 픽셀 단위로 같았다**(7화면 모두 차이 0픽셀, Metro 번들에 `includeFontPadding: false`가 실린 것을 확인). 이 기기·RN 0.86(New Architecture)·이 화면들에서 `includeFontPadding`은 결과를 바꾸지 않는다 — **더 단순한 「서체만」을 남겼다**(`TEXT_FONT`는 `fontFamily` 하나). 소유자 확정 대기.
+- **두 벌이 픽셀 단위로 같았다**(7화면 모두 차이 0픽셀, Metro 번들에 `includeFontPadding: false`가 실린 것을 확인). 이 기기·RN 0.86(New Architecture)·이 화면들에서 `includeFontPadding`은 결과를 바꾸지 않는다 — **더 단순한 「서체만」을 남겼다**(`TEXT_FONT`는 `fontFamily` 하나). **소유자 확정(2026-10-15): 건드리지 않음.**
 - **남은 차이 하나 — 큰 날짜 숫자가 안드로이드에서 약 5.7dp 아래에 있다**(고치기 전에도 같았다: 18.3/25.7 vs 13.7/32.7). 숫자는 `fontSize 62 · lineHeight 62`로 줄높이가 서체의 자연 높이보다 작다 — 줄높이가 모자랄 때 두 플랫폼이 글자를 줄 상자 안에 다르게 놓는 것으로 본다(짐작 — 재지 않았다). 서체·여백으로는 닫히지 않는다.
 
 ### 굵기·깜빡임
@@ -147,6 +147,11 @@ xcrun simctl install 887BFB8C-1D79-47B9-B1A2-08AA2B60234F <scratch>/dd/Build/Pro
 - **`npm run test:layer1`은 돌지 못했다** — 앞단의 「표본 보장」이 표본 사진을 받다 `commons-indoor-13.jpg`의 sha256이 목록과 달라 멈췄다(Wikimedia 썸네일이 다시 만들어진 것으로 본다 — 070의 「다른 사진을 쓰지 않는다」 규칙이 막았다, 이 기능과 무관). 목록을 고치는 것은 소유자 확인 대상이라 손대지 않았다. 목록 전체를 다시 받아 대조하니 **210장 중 15장**이 어긋났다(모두 같은 URL에서 JPEG가 오지만 바이트가 다르다): indoor-13·18·26·28, street-06·12·29, people-12·14·18·19·26, night-01·08·22. **소유자 결정(2026-10-15): 083 밖 별도 과제로** — 로드맵에 올린다.
 - 대신 층 1 기준 상태(같은 `prepareBaseline` 규칙 — 설정 기준값 + 픽스처 일기 사흘·사진 사본)를 손으로 깔고 층 1 흐름 열둘 중 표본이 필요 없는 **열하나를 한 번의 `maestro test`로 돌려 11/11 통과**(10분 53초, 새 「서체 라이선스」 단계가 든 `settings-developer-sweep` 포함). `sample-days`는 돌리지 못했다.
 - 끝나고 두 기기의 일기·설정·사진 사본을 백업에서 되돌렸다.
+
+### 소유자 판정 (2026-10-15)
+
+- SC-001: 나란히 놓은 화면(`after/font-only/`·`after/review-dialog/`·`after/font-scale-2/`의 `side-by-side/`)이 **같다**.
+- FR-010: 안드로이드 글자 위아래 여백은 **건드리지 않음**으로 확정.
 
 ### 코드 리뷰 반영 (2026-10-15)
 
