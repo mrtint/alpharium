@@ -9,9 +9,10 @@
 | P3 | 최상위 `permissions`는 정확히 `contents: read`·`pages: write`·`id-token: write` | FR-008 |
 | P4 | `secrets.`가 없다 | FR-008 |
 | P5 | `uses:`는 `actions/checkout@v5`·`actions/configure-pages@v6`·`actions/upload-pages-artifact@v5`·`actions/deploy-pages@v5`뿐이다 | FR-010 |
-| P6 | 자리표시자 검사 단계가 있고, `upload-pages-artifact`보다 앞이며, 세 자리표시자 이름을 모두 담는다 | FR-009 |
+| P6 | 자리표시자 검사 단계가 있고, `upload-pages-artifact`보다 앞이며, 세 자리표시자 이름을 모두 담고, 「찾으면 실패」(`if grep …; then … exit 1`, 뒤집은 `if !` 없음) 꼴이다 | FR-009 |
 | P7 | 업로드 경로는 `site`다(저장소 전체를 올리지 않는다) | R1 |
 | P8 | `concurrency` 그룹이 있다(겹친 게시가 서로를 덮지 않게) | R1 |
+| P9 | checkout은 `persist-credentials: false`(Pages·OIDC 권한 토큰을 `.git`에 남기지 않는다, 코드 리뷰) | FR-008 |
 
 **자리표시자 검사 단계의 동작**: `site/` 아래에서 `{SUPPORT_EMAIL}`·`{OPERATOR}`·`{EFFECTIVE_DATE}`를 찾아 파일·줄을 출력하고, 하나라도 있으면 실패한다.
 

@@ -17,8 +17,8 @@
 
 | 규칙 | 내용 | 근거 |
 | --- | --- | --- |
-| A1 | 설정 조립부가 `openInBrowser(PRIVACY_URL)`·`openInBrowser(SUPPORT_URL)`를 넘기고, 결과가 `false`면 그 행의 실패 줄을 세우고 `true`면 비운다 | FR-013·014 |
-| A2 | 실패 줄 문구는 `linkOpenFailed(url)`(카탈로그)로 만든다 | FR-016 |
+| A1 | 설정 조립부가 두 행에 여는 함수 하나(`openLink(kind, url)` → `openInBrowser(url)`)를 `PRIVACY_URL`·`SUPPORT_URL`과 함께 넘기고, 결과가 `false`면 그 행의 실패 줄을 세우고 `true`면 비운다 | FR-013·014 |
+| A2 | 실패 줄 문구는 `POLICY_LINKS_TEXT.openFailed(url)`(카탈로그)로 만든다 | FR-016 |
 
 ## 통로 (B) — `src/app/browser-port.ts`
 
@@ -32,6 +32,6 @@
 
 | 규칙 | 내용 | 근거 |
 | --- | --- | --- |
-| T1 | 카탈로그 `settings.privacyPolicy` = 「개인정보처리방침」, `settings.support` = 「도움말·문의」, `settings.linkOpenFailed(url)` = 「브라우저를 열지 못했어요 · {url}」 | FR-016 |
+| T1 | 카탈로그 새 영역 `policyLinks`: `privacy` = 「개인정보처리방침」, `support` = 「도움말·문의」, `openFailed(url)` = 「브라우저를 열지 못했어요 · {url}」(062 — 옛 `settings` 영역에 키를 더하지 않는다) | FR-016 |
 | T2 | 새 고정 문구가 `ADDED_AFTER_GOLDEN`에 있고 골든 G1·G2가 통과한다 | FR-016 |
 | T3 | `app.json` iOS 위치 문구 = FR-018 문장 그대로, 사진 문구는 지금 그대로 | FR-018 |

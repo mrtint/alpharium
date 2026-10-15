@@ -34,6 +34,7 @@
 - **쓴 날의 사진을 누르면 확대 화면**(067): 핀치·두 번 탭·이동, 배율 1에서 가로 넘김·아래로 끌어 닫기.
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 2026-10-11 첫 실행 성공 — 약 13분 30초, Play 내부 테스트 versionCode 10 반영; 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
 - **화면 글자는 두 플랫폼 모두 앱에 넣은 Pretendard다**(083) — v1.3.9 정적 OTF 다섯(400~800)을 배포처 그대로 `assets/fonts/pretendard/`에 두고 expo-font config plugin이 빌드에 넣는다. 서체는 `tokens.ts`의 `FONT`·`TEXT_FONT` 한 곳에서 정하고, 설정 「정보」 → 「서체 라이선스」에 OFL 1.1 전문이 있다. 아래 「083」.
+- **개인정보처리방침·지원 페이지는 이 저장소의 `site/`이고 GitHub Pages로 올라간다**(086) — 설정 「정보」의 「개인정보처리방침」·「도움말·문의」가 기기 브라우저로 연다. 방침이 기대는 코드의 사실은 `__tests__/privacy/`가 잠근다. 아래 「086」.
 - **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
   절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공 — 처리 통과·iPhone 설치는 미확인; 아래 「iOS 빌드·서명·TestFlight」).
 
@@ -1188,6 +1189,20 @@
 - **★ 지난 시각의 예약을 「계획에 없음」으로 지우면 그날 알림이 사라진다**(F를 다시 보다가 찾음, RC8): 계획은 `at > now`인 발화만 담는데, 부정확 알람(최대 +1시간)·삼성 얼림 동안은 목표 시각이 지나도 예약이 아직 전달 전이다. 17:01:53 백그라운드 잡의 맞추기가 아직 안 뜬 17:00 예약을 취소했다(`dumpsys alarm`의 `App Alarm history`: `Reason=alarm_cancelled`). 켜져 있고 그 날을 안 썼고 사흘 안이면 지난 예약을 두게 고쳤다. **「이미 지났다」와 「이미 전달됐다」는 다르다** — 예약을 다시 계산해 맞추는 코드는 OS가 아직 쥐고 있는 지난 시각의 일을 지우지 않는다.
 - **관찰 함정**: `dumpsys notification | grep pkg=`는 지난 알림 기록(`mArchive`)까지 센다 — 트레이는 맨 앞 「Notification List」 구간이나 `notification_enqueue`·`notification_cancel` 이벤트 로그로 본다. **Maestro `launchApp`은 권한을 자동으로 허용한다** — 권한을 회수한 실험은 `adb shell am start`로 띄우고 흐름에서 `launchApp`을 뺀다. `pm revoke`는 앱 프로세스를 죽인다(024와 같다). 개발 빌드의 JS `console.log`는 logcat에도 Metro 출력에도 안 왔다 — 임시 계측은 기기 파일(`expo-file-system`, `create()` 뒤 `write`)로 남겼다.
 - **남은 위험**: **삼성에서 배터리 예외가 없으면 쓸 차례 알림은 캐시 프로세스가 정리될 때까지 늦는다**(얼어 있는 동안은 미뤄진다 — 소유자가 받아들인 한계로 머지(SC-001 개정), 얼림 대응은 로드맵 「백그라운드 자동 쓰기가 완주하지 못한다」) · 얼림으로 미뤄진 동안 재부팅·앱 업데이트가 끼면 expo가 지난 예약을 조용히 버려 그날 알림이 사라진다(`BOOT_COMPLETED`·`MY_PACKAGE_REPLACED` — expo 동작) · 사용자가 강제 중지하면 알람은 지워지는데 expo의 예약 저장은 남아 맞추기가 「같다」로 보고 다시 걸지 않는다(새로 더해지는 날만 걸려 최대 7일 동안 알림이 끊길 수 있다 — 코드 리뷰, 미대응) · 앱이 7일 동안 한 번도 돌지 않으면 알림이 멈춘다 · 시간대를 바꾸면 다음 맞추기까지 옛 시각 · 정확 알람 권한 없음(Play 정책) · 누르면 한 번 더(FR-023)는 기기 없는 조립 테스트로만(얼어 있는 동안은 알림이 뜨지 않아 같은 실행에서 누를 일이 드물다) · iOS·release·다른 기기 미확인.
+
+### 086 — 개인정보처리방침·지원 페이지와 데이터 선언
+
+- **장소 이름을 얻으려 좌표가 기기 밖으로 나간다**(M7) — [코드] `expo-location` 57의 `reverseGeocodeAsync`는 안드로이드 `android.location.Geocoder`, iOS `CLGeocoder`로 바로 간다. [문서] Apple 「network-based service」, Android 「may hit the network」. 받는 쪽은 iOS는 Apple, 안드로이드는 기기의 지오코더 제공자(대개 Google — [짐작], 패킷으로 재지 않았다). 앱은 일기 한 편에 대표 좌표 하나(`places[0]`)를 넘기고, 기기의 GPS는 읽지 않는다. **백그라운드 자동 쓰기는 지오코딩하지 않는다**(`task.ts`가 `geocodingEnabled`를 넘기지 않는다) — 방침은 「일기를 쓸 때」로 넓게 적었다(나중에 켜도 거짓이 되지 않게).
+- **★ iOS는 「켬」이면 위치 권한과 무관하게 좌표를 보낸다** — `expo-location` iOS의 `reverseGeocodeAsync`는 권한을 보지 않고(안드로이드는 `isMissingForegroundPermissions`로 먼저 거부한다), 설정 「켬」은 권한을 보지 않고 켠다(`resolve-generation.ts`). 그래서 방침의 끄는 법은 「끔」이고, 위치 권한 거부는 기본값 「자동」에서만 끄는 길이다(설계 때 「권한을 거부하면 안 나간다」로 썼다가 구현 중 소스로 고쳤다).
+- **나머지 외부 전송은 둘뿐이다** — 모듈 내려받기(Hugging Face가 IP 등을 받는다)와 운영체제 진단 보고(Apple·Google이 모은다, 앱이 보내지 않는다). 분석·크래시·광고 SDK 없음(D2, 소유자 2026-10-15), 푸시 토큰 호출 없음, 계정 없음.
+- **고칠 때의 순서는 방침 → 선언 초안 → 표다** — 방침 `site/privacy/index.html`(사실 문장마다 `<!-- 근거: … -->`), 선언 초안 `docs/store/privacy-declarations.md`(Play 데이터 보안·App Store 앱 개인정보 보호, 답마다 [문서]·[코드]·[미확인]), 표 `__tests__/privacy/outbound.ts`(외부 전송 목록·허용 호스트·금지 SDK). 방침의 `data-outbound` 절과 표의 식별자가 한 짝이고 테스트가 대조한다(S5). 주소는 `src/app/policy-links.ts` 한 곳(L5).
+- **사실 잠금은 소스에서 보이는 것만 본다**(`policy-facts.test.ts` F1~F7) — `dependencies`의 금지 SDK, 푸시 토큰 호출, `src/`·`App.tsx`의 리터럴 외부 주소(허용 호스트 `huggingface.co`·`mrtint.github.io`, 주석·OFL 원문 파일 제외 — 조립한 주소는 못 본다), `reverseGeocodeAsync` 호출 한 곳, 기기 위치 읽기·주소 지오코딩 0. 그래서 방침도 「포켓로그가 보내는 것은 셋」으로 주체를 앱으로 한정했다(코드 리뷰). 네이티브 라이브러리의 자체 통신·OS 백업·지오코더 뒤 서버는 못 본다 — 초록이 「방침이 참」이 아니다.
+- **게시는 `.github/workflows/pages.yml`**(`main`의 `site/**` 변경·수동, 권한 `contents: read`·`pages: write`·`id-token: write`, 비밀 0, 공식 Action 넷). 자리표시자(`{SUPPORT_EMAIL}`·`{OPERATOR}`·`{EFFECTIVE_DATE}`)가 하나라도 남으면 업로드 전에 실패한다 — jest는 자리표시자가 있어도 통과한다. Pages 소스(「GitHub Actions」)는 저장소 설정이라 테스트가 못 본다.
+- **CI(`ci.yml`)는 `docs/**`만 바뀐 커밋에서 돌지 않는다** — 선언 초안만 고쳤으면 `npm test`를 로컬에서 돌린다. `site/**`만 바뀐 커밋은 CI와 게시가 함께 돈다.
+- **화면 문구는 새 영역 `policyLinks`다** — 처음에는 `settings` 영역에 더했다가 062 골든 G2가 `SETTINGS_TEXT`를 `JSON.stringify`로 키 짝까지 잠가 실패했다(083 `fontLicense`와 같은 처방). 브라우저는 `src/app/browser-port.ts`가 호출 시점 `require`로 `Linking.openURL`만 부른다(`canOpenURL`은 안드로이드 11+ `<queries>` 없이는 거짓을 줄 수 있어 쓰지 않는다). 열지 못하면 그 행 아래 빨간 한 줄에 주소.
+- **iOS 위치 권한 문구**에 「이때 사진의 좌표를 Apple 지도 서비스에 보냅니다.」를 더했다(사진 문구는 그대로 — 사진 파일은 나가지 않는다). 다음 iOS 빌드부터 반영.
+- **Play 데이터 보안은 비공개 테스트 트랙에도 필수다**([문서] 내부 테스트 트랙만 예외) — 방침 URL이 Play 14일 시계 앞에 선다. Play 위치는 보수적으로 「정확한 위치 — 수집함」(OS API 경유를 Play 문서가 직접 다루지 않는다), App Store는 「Data Not Collected」(「Apple이 모으는 것은 선언할 책임이 없다」).
+- **미확인**: 패킷으로 본 지오코더 전송·안드로이드 제공자, OS 백업에 앱 데이터가 실리는지(방침은 「포함될 수 있습니다」), 지오코더의 전송 암호화. 상세·위반 주입·실기기는 `specs/086-privacy-policy/quickstart.md` 「실측」.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

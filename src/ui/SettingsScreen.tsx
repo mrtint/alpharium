@@ -30,7 +30,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 
 import type { PermissionTag, TaggedPermission } from "../app/permission-tags";
 import { AppText } from "./components/Text";
-import { FONT_LICENSE_TEXT, SETTINGS_TEXT } from "./settings-text";
+import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./settings-text";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
 const { group, paperPadding, row, tag, toggle } = SETTINGS;
@@ -79,6 +79,15 @@ export type SettingsScreenProps = {
   onOpenDeveloper?: () => void;
   /** 083 — 「정보」의 「서체 라이선스」 행 누름(설정 위에 겹이 쌓인다). 없으면 누를 수 없는 행이다 */
   onOpenFontLicense?: () => void;
+  /**
+   * 086 — 「정보」의 「개인정보처리방침」·「도움말·문의」 행 누름. 화면은 주소를 모른다 — 조립부가 기기 브라우저로 연다.
+   * 없으면 누를 수 없는 행이다
+   */
+  onOpenPrivacy?: () => void;
+  onOpenSupport?: () => void;
+  /** 086 — 브라우저를 열지 못했다는 그 행 아래 한 줄(주소 포함). 없으면 그리지 않는다 */
+  privacyFailedText?: string;
+  supportFailedText?: string;
 };
 
 export function SettingsScreen({
@@ -105,6 +114,10 @@ export function SettingsScreen({
   developerHighlight = false,
   onOpenDeveloper,
   onOpenFontLicense,
+  onOpenPrivacy,
+  onOpenSupport,
+  privacyFailedText,
+  supportFailedText,
 }: SettingsScreenProps) {
   return (
     <View testID="settings-screen">
@@ -196,6 +209,25 @@ export function SettingsScreen({
           {...(onPressVersion !== undefined ? { onPress: onPressVersion } : {})}
           testID="settings-version"
           trailing={<Value text={versionText ?? ""} />}
+        />
+        {/* 086 — App Store 5.1.1(i): 방침 링크를 앱 안에도 둔다. 개발자 메뉴와 무관하게 늘 있다 */}
+        <Row
+          label={POLICY_LINKS_TEXT.privacy}
+          {...(onOpenPrivacy !== undefined ? { onPress: onOpenPrivacy } : {})}
+          testID="settings-privacy"
+          trailing={<Chevron />}
+          {...(privacyFailedText !== undefined
+            ? { hint: privacyFailedText, hintTone: "danger" as const }
+            : {})}
+        />
+        <Row
+          label={POLICY_LINKS_TEXT.support}
+          {...(onOpenSupport !== undefined ? { onPress: onOpenSupport } : {})}
+          testID="settings-support"
+          trailing={<Chevron />}
+          {...(supportFailedText !== undefined
+            ? { hint: supportFailedText, hintTone: "danger" as const }
+            : {})}
         />
         {/* 083 — OFL 1.1 고지(FR-011). 개발자 메뉴와 무관하게 늘 있어 「개발자」 행 앞에 둔다 */}
         <Row

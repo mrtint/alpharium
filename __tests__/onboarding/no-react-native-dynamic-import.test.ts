@@ -52,6 +52,14 @@ describe("068 C3 — react-native 동적 import 금지", () => {
     );
   });
 
+  it('086 — browser-port.ts는 `require("react-native")`를 openInBrowser 안에서 호출한다', () => {
+    const code = read("src/app/browser-port.ts");
+    const at = code.indexOf("export async function openInBrowser");
+    expect(at).toBeGreaterThan(-1);
+    expect(code.slice(at)).toMatch(/require\(\s*["']react-native["']\s*\)/);
+    expect(code.slice(0, at)).not.toMatch(/require\(\s*["']react-native["']\s*\)/);
+  });
+
   it("battery-exception-port.ts의 앱 설정 대체 경로도 호출 시점 require다", () => {
     const code = read("src/schedule/battery-exception-port.ts");
     const fn = code.slice(code.indexOf("async function openAppSettingsFallback"));

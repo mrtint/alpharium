@@ -38,10 +38,10 @@
 - **Decision**: 실패한 행(`"privacy" | "support" | null`)은 `App.tsx`의 설정 조립부(`SettingsSection`)가 지역 state로 든다. 성공하면 비우고, 설정 겹이 닫히면 언마운트로 사라진다(055 — 설정 겹은 닫히면 언마운트).
 - **Rationale**: FR-014 「다시 눌러 성공하거나 설정을 다시 열면 지운다」를 저장 없이 만족한다.
 
-## R7. 문구 — 카탈로그 `settings` 영역
+## R7. 문구 — 카탈로그 새 영역 `policyLinks`
 
-- **Decision**: `catalogs/ko/settings.ts`에 `privacyPolicy`·`support`·`linkOpenFailed(url)`을 더하고 062 골든 `ADDED_AFTER_GOLDEN`에 고정 문구를 올린다.
-- **Rationale**: 083 「서체 라이선스」는 별도 영역(`fontLicense`)이었지만 그것은 화면 하나를 가진 기능이었다. 이번은 설정 행 둘뿐이라 `settings` 영역에 둔다.
+- **Decision**: `catalogs/ko/policy-links.ts`의 새 영역 `policyLinks`(`privacy`·`support`·`openFailed(url)`)에 두고 `src/ui/settings-text.ts`의 `POLICY_LINKS_TEXT`로 읽는다. 062 골든 `ADDED_AFTER_GOLDEN`에 고정 문구를 올린다.
+- **Rationale**: 처음에는 `settings` 영역에 더하려 했으나 구현에서 062 골든 G2가 `SETTINGS_TEXT`를 `JSON.stringify`로 키 짝까지 잠그는 것을 확인했다(AGENTS 062 「카탈로그 영역은 옛 상수와 같은 키만 갖는다」). 083 `fontLicense`와 같은 방식으로 새 영역을 둔다.
 
 ## R8. iOS 위치 문구
 

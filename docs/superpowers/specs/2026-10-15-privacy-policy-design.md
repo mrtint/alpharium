@@ -93,7 +93,7 @@
 2. 휴대폰 안에서만 다루는 것 — 그날 사진(읽기, 기기 안 모델이 설명을 만든다), 사진의 촬영 시각·좌표, 사진의 축소 사본, 일기, 이름·설정, 기록(쓰기 실패·자동 쓰기 시도 — 갈래와 시각뿐), 로컬 알림. 모두 앱 저장 공간에 있다.
 3. 휴대폰 밖으로 나가는 것
    - (가) 모듈 내려받기 — 처음 실행과 「모듈 다시 받기」 때 Hugging Face 서버에서 받는다. 이때 Hugging Face는 일반적인 웹 요청 정보(IP 주소 등)를 받는다. 사진·일기는 보내지 않는다.
-   - (나) 장소 이름 — 「장소 이름으로 보기」가 켜져 있으면 일기를 쓸 때 그날의 좌표 하나를 운영체제의 지도 서비스(iPhone은 Apple, 안드로이드는 기기의 위치 서비스 제공자 — 대개 Google)에 보내 이름을 받는다. 끄는 법: 설정 → 「장소 이름으로 보기」 → 「끔」, 또는 위치 권한을 허용하지 않음.
+   - (나) 장소 이름 — 「장소 이름으로 보기」가 켜져 있으면 일기를 쓸 때 그날의 좌표 하나를 운영체제의 지도 서비스(iPhone은 Apple, 안드로이드는 기기의 위치 서비스 제공자 — 대개 Google)에 보내 이름을 받는다. 끄는 법: 설정 → 「장소 이름으로 보기」 → 「끔」(위치 권한 거부는 기본값 「자동」에서만 끄는 길이다 — `expo-location` iOS의 `reverseGeocodeAsync`는 위치 권한을 보지 않아 「켬」이면 iPhone은 권한과 무관하게 보낸다, 구현 중 소스로 확인).
    - (다) 운영체제의 진단 보고 — 사용자가 기기 설정에서 진단 정보 공유를 켜 두면 Apple·Google이 앱 오류 보고를 모으고, 운영자는 스토어 개발자 화면에서 그 보고를 볼 수 있다. 앱이 직접 보내지 않는다.
 4. 제3자 제공·처리 위탁 — 없다.
 5. 보존과 삭제 — 앱 안 「일기 모두 지우기」, 앱을 지우면 일기·설정·모듈이 함께 지워진다. 기기 백업(iCloud·Google)에 포함될 수 있고 운영자는 그 백업에 접근할 수 없다. 백업에서 지우는 방법은 기기 설정을 따른다.
@@ -117,7 +117,7 @@
 - `src/app/policy-links.ts` — 두 URL 상수의 유일한 자리. 화면은 URL을 모른다 — 조립부(`App.tsx`)가 여는 함수를 넘긴다(설정은 `onOpenPrivacy`·`onOpenSupport` 콜백만 받는다).
 - 여는 통로: `react-native`의 `Linking.openURL`을 **호출 시점 `require`**로 읽는다(066 — `await import("react-native")`는 iOS를 죽인다; `os-settings-port.ts`와 같은 꼴). `canOpenURL`은 쓰지 않는다(안드로이드 11+ `<queries>` 없이는 거짓을 줄 수 있다).
 - 실패: `openURL`이 거부하면 그 행 아래 빨간 보조 줄(058 지우기 행의 `hint`/`hintTone: "danger"`와 같은 모양)에 「브라우저를 열지 못했어요 · {URL}」 — 사용자가 주소를 옮겨 적을 수 있게. 성공하거나 설정을 다시 열면 지운다.
-- 문구: `catalogs/ko/settings.ts`에 `privacyPolicy`·`support`·`linkOpenFailed`(함수). 062 골든 `ADDED_AFTER_GOLDEN`에 올린다.
+- 문구: 카탈로그 새 영역 `catalogs/ko/policy-links.ts`(`privacy`·`support`·`openFailed` 함수 — 옛 `settings` 영역은 062 골든 G2가 키 짝을 잠가 더하지 않는다, 083 `fontLicense`와 같다). 062 골든 `ADDED_AFTER_GOLDEN`에 올린다.
 - 배터리·권한 행, 다른 묶음은 건드리지 않는다.
 
 ### 3.4 iOS 위치 권한 문구 (`app.json` `expo-location.locationWhenInUsePermission`)

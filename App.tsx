@@ -10,6 +10,8 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
 import { resolveGenerationParams } from "./src/app/resolve-generation";
+import { openInBrowser } from "./src/app/browser-port";
+import { PRIVACY_URL, SUPPORT_URL } from "./src/app/policy-links";
 import { routeFromNotification } from "./src/app/notification-routing";
 import type { DayDate } from "./src/config/day-boundary";
 import {
@@ -106,7 +108,7 @@ import { formatModuleBytes, readModuleBytes } from "./src/app/module-size";
 import { wipeDiaries, type WipeOutcome } from "./src/app/wipe-diaries";
 import { clearPhotoCopies } from "./src/app/wipe-port";
 import { WipeConfirmDialog } from "./src/ui/WipeConfirmDialog";
-import { FONT_LICENSE_TEXT, SETTINGS_TEXT } from "./src/ui/settings-text";
+import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./src/ui/settings-text";
 import { StackLayer } from "./src/ui/StackLayer";
 import { AppText } from "./src/ui/components/Text";
 import { COLORS } from "./src/ui/theme/tokens";
@@ -2480,6 +2482,15 @@ function SettingsSection({
   const [wiping, setWiping] = useState(false);
   const [wipeBlocked, setWipeBlocked] = useState(false);
   const alive = useRef(true);
+
+  /* ── 086 — 정보: 개인정보처리방침·도움말·문의는 기기 브라우저로 연다 ─── */
+  // 열지 못한 행 하나. 다시 눌러 열리면 비우고, 설정 겹이 닫히면 이 조립과 함께 사라진다(StackLayer가 언마운트 — FR-014).
+  const [linkFailed, setLinkFailed] = useState<"privacy" | "support" | null>(null);
+  const openLink = (kind: "privacy" | "support", url: string) => {
+    void openInBrowser(url).then((opened) => {
+      if (alive.current) setLinkFailed(opened ? null : kind);
+    });
+  };
   useEffect(() => {
     alive.current = true;
     void readModuleBytes(expoModelPorts().files)
@@ -2550,6 +2561,14 @@ function SettingsSection({
         developerHighlight={developerHighlight}
         onOpenDeveloper={onOpenDeveloper}
         onOpenFontLicense={onOpenFontLicense}
+        onOpenPrivacy={() => openLink("privacy", PRIVACY_URL)}
+        onOpenSupport={() => openLink("support", SUPPORT_URL)}
+        {...(linkFailed === "privacy"
+          ? { privacyFailedText: POLICY_LINKS_TEXT.openFailed(PRIVACY_URL) }
+          : {})}
+        {...(linkFailed === "support"
+          ? { supportFailedText: POLICY_LINKS_TEXT.openFailed(SUPPORT_URL) }
+          : {})}
         // 057 SL3 — 기록이 있고 사진 꼬리표가 「허용 안 함」일 때만(읽지 못함·일부 허용·허용이면 그리지 않는다, FR-010).
         {...(skippedDay !== null && permissionTags.photos === "denied"
           ? { photoSkipText: skippedLineText(skippedDay, new Date()) }

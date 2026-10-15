@@ -13,6 +13,7 @@
 | F2 | `src/`·`App.tsx`에 `getExpoPushTokenAsync`·`getDevicePushTokenAsync`가 없다(주석 제외) | FR-022 |
 | F3 | `src/`·`App.tsx`의 `http(s)://` 주소(주석 제외, 빼는 파일 제외)의 호스트는 모두 허용 목록에 있다 | FR-022 |
 | F4 | `reverseGeocodeAsync` 호출은 `src/signals/geocoding-port.ts` 한 곳, 한 번뿐이다(주석 제외) | FR-022 |
+| F7 | `src/`·`App.tsx`에 기기 위치 읽기(`getCurrentPositionAsync`·`getLastKnownPositionAsync`·`watchPositionAsync`·`startLocationUpdatesAsync`·`watchHeadingAsync`·`startGeofencingAsync`)와 주소 문자열 지오코딩(`geocodeAsync`) 호출이 없다(방침 「현재 위치를 읽지 않습니다」, 코드 리뷰) | FR-022 |
 | F5 | 허용 목록의 모든 호스트가 실제로 소스에 한 번 이상 나온다(낡은 허용 0) | FR-022 |
 | F6 | 외부 전송 목록의 `evidence`가 코드 경로이면 그 파일이 있다 | FR-022a |
 
@@ -34,6 +35,7 @@
 | `src/` 아무 파일에 `fetch("https://example.com")` | F3 |
 | `src/` 아무 파일에 `Location.reverseGeocodeAsync(x)` 한 줄 | F4 |
 | 허용 목록에 `example.org` 추가 | F5 |
+| `src/`에 `Location.getCurrentPositionAsync()` 한 줄 | F7 |
 | 방침에서 `data-outbound="place-name"` 절 삭제 | S5 |
 | 방침에 `data-outbound="analytics"` 절 추가 | S5 |
 | `PRIVACY_URL` 끝 `/` 삭제 | L1·L3·L4 |

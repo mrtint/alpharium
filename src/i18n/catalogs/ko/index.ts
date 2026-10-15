@@ -25,6 +25,7 @@ import { monologue } from "./monologue";
 import { notification } from "./notification";
 import { onboarding } from "./onboarding";
 import { photoViewer } from "./photo-viewer";
+import { policyLinks } from "./policy-links";
 import { reminder } from "./reminder";
 import { frame, settings, skippedLine, targetHour } from "./settings";
 import { settingsPlatform } from "./settings-platform";
@@ -45,6 +46,7 @@ export const ko = {
   attempts,
   failures,
   fontLicense,
+  policyLinks,
   simulation,
   welcome,
   download,

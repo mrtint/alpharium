@@ -66,7 +66,7 @@ AllowedHost { host, reason }
 | --- | --- | --- | --- |
 | `linkFailed` | `App.tsx` 설정 조립부 | `"privacy" \| "support" \| null` | 설정 겹이 열려 있는 동안. 열기 성공 시 `null` |
 
-`SettingsScreen`이 받는 것: `onOpenPrivacy()`, `onOpenSupport()`, `privacyFailedText?`, `supportFailedText?`(조립부가 `linkOpenFailed(url)`로 만든다).
+`SettingsScreen`이 받는 것: `onOpenPrivacy()`, `onOpenSupport()`, `privacyFailedText?`, `supportFailedText?`(조립부가 `POLICY_LINKS_TEXT.openFailed(url)`로 만든다).
 
 ## 5. 선언 초안의 답 (`docs/store/privacy-declarations.md`)
 

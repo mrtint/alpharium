@@ -52,6 +52,20 @@ describe("066 — iOS 권한 문구", () => {
   it("모션 문구는 한국어로 둔다 — 빼면 App Store Connect 처리에서 ITMS-90683으로 거부된다", () => {
     expect(optionsOf("expo-location").motionUsagePermission).toMatch(HANGUL);
   });
+
+  // 086 T3 — 권한 창이 방침(site/privacy)과 같은 사실을 말한다. 장소 이름을 얻으려 사진의 좌표가 `CLGeocoder`로 Apple에
+  // 간다([문서] "network-based service"). 사진 파일은 나가지 않으므로 사진 문구는 그대로 둔다(FR-018).
+  it("086 — 위치 문구는 좌표가 Apple 지도 서비스로 간다는 사실을 말한다", () => {
+    expect(optionsOf("expo-location").locationWhenInUsePermission).toBe(
+      "사진에 담긴 장소를 사람이 읽을 수 있는 이름으로 바꾸는 데 위치를 씁니다. 이때 사진의 좌표를 Apple 지도 서비스에 보냅니다.",
+    );
+  });
+
+  it("086 — 사진 문구는 그대로다(사진 파일은 휴대폰 밖으로 나가지 않는다)", () => {
+    expect(optionsOf("expo-media-library").photosPermission).toBe(
+      "그날 찍힌 사진을 읽어 하루를 일기로 씁니다. 사진은 휴대폰 밖으로 나가지 않습니다.",
+    );
+  });
 });
 
 /**
