@@ -1,0 +1,54 @@
+name: Pocketlog Pages
+
+# 086 — 개인정보처리방침·지원 페이지(site/)를 GitHub Pages로 올린다.
+#
+# 계약: specs/086-privacy-policy/contracts/pages-workflow.md (P1~P8), __tests__/ci/pages-workflow.test.ts가 잠근다.
+#
+# - 퍼블릭 저장소다. 비밀을 쓰지 않고, 권한은 읽기와 Pages 게시뿐이다.
+# - 올리는 것은 site/ 폴더뿐이다(저장소 전체가 아니다).
+# - 자리표시자({SUPPORT_EMAIL}·{OPERATOR}·{EFFECTIVE_DATE})가 하나라도 남아 있으면 업로드 전에 실패한다 —
+#   채우지 않은 방침이 게시되지 않게.
+# - 저장소 설정 Settings → Pages → Source를 「GitHub Actions」로 두는 일은 소유자가 한다(이 파일이 강제하지 못한다).
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 겹친 게시가 서로를 덮지 않게 하나씩 돈다(진행 중인 게시는 끊지 않는다).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: 자리표시자 검사
+        run: |
+          if grep -rnE '\{(SUPPORT_EMAIL|OPERATOR|EFFECTIVE_DATE)\}' site; then
+            echo "::error::site/에 채우지 않은 자리표시자가 남아 있다 — 값을 채운 뒤 게시한다."
+            exit 1
+          fi
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v5

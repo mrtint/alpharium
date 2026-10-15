@@ -32,6 +32,9 @@ export const SETTINGS_TEXT = lazyText((c) => c.settings);
 /** 083 — 설정 「정보」의 「서체 라이선스」 행과 그 겹 화면(카탈로그 `fontLicense` 영역) */
 export const FONT_LICENSE_TEXT = lazyText((c) => c.fontLicense);
 
+/** 086 — 설정 「정보」의 「개인정보처리방침」·「도움말·문의」 행(카탈로그 `policyLinks` 영역) */
+export const POLICY_LINKS_TEXT = lazyText((c) => c.policyLinks);
+
 /** 058 — 보드 `wipe.title` 「일기 {n}편을 모두 지울까요?」. 편수는 숫자 그대로(천 단위 구분 없음, FR-010) */
 export function wipeTitle(n: number): string {
   return text().settings.wipeTitle(n);

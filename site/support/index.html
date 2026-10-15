@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>포켓로그 도움말·문의</title>
+<!--
+  086 — 지원 페이지(App Store 「지원 URL」). 답은 저장소에 실측된 사실만 쓴다(AGENTS 절 번호를 근거 주석에).
+  방침 링크는 src/app/policy-links.ts 의 PRIVACY_URL 과 같은 문자열이다(테스트가 대조한다).
+-->
+<style>
+  :root { color-scheme: light dark; --bg: #faf8f5; --fg: #1f1d1a; --muted: #6b655d; --line: #e4dfd8; --accent: #b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #1a1816; --fg: #ece8e2; --muted: #a39d94; --line: #34302c; --accent: #f2867d; } }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
+  main { max-width: 40rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+  h1 { font-size: 1.75rem; line-height: 1.3; margin: 0 0 1rem; }
+  h2 { font-size: 1.15rem; margin: 2.25rem 0 .5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
+  h3 { font-size: 1rem; margin: 1.5rem 0 .25rem; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>도움말·문의</h1>
+
+  <section id="contact">
+    <h2>문의</h2>
+    <p>궁금한 점이나 문제가 있으면 <a href="mailto:pocketlog.support@gmail.com">pocketlog.support@gmail.com</a>로 메일을 보내 주세요.</p>
+    <p>개인정보를 어떻게 다루는지는 <a href="https://mrtint.github.io/alpharium/privacy/">개인정보처리방침</a>에 있습니다.</p>
+  </section>
+
+  <section id="faq">
+    <h2>자주 묻는 것</h2>
+
+    <section data-faq="download">
+      <h3>처음 실행하면 무엇을 받나요?</h3>
+      <!-- 근거: AGENTS 058 [실측] — 필수 모듈 셋 합 약 2.0GB(1000 기준). 074의 모바일 데이터 안내는 실제 CELLULAR 값을 기기에서 보지 못해 적지 않는다 -->
+      <p>일기를 휴대폰 안에서 쓰는 데 필요한 모듈을 한 번 받습니다. 약 2.0GB라서 Wi-Fi에서 받는 것이 좋습니다.</p>
+    </section>
+
+    <section data-faq="auto-write">
+      <h3>정한 시각에 일기가 써지지 않아요.</h3>
+      <!-- 근거: AGENTS 085 [실측] — 쓸 차례 알림은 삼성 얼림 동안 미뤄진다(늦게 알릴 때가 있다); AGENTS 019·079 [실측] — 배터리 최적화 기본값이면 백그라운드 실행이 크게 억제된다; 057·082 [코드] — 앱 열기 자동 쓰기는 켜짐·사흘(selectableDays)·재료 있음·한 실행에 한 번일 때만; 068 — iOS 배터리 행 문구(실기기 미측정 → 「도움이 될 수 있습니다」) -->
+      <p>자동으로 쓰기가 켜져 있으면 정한 시각쯤 「쓸 차례」 알림이 옵니다. 휴대폰이 배터리를 아끼려고 앱을 멈춰 두면 알림이 늦거나, 앱을 열기 전에는 일기를 쓰지 못할 수 있습니다. 앱을 열면 최근 며칠 가운데 아직 쓰지 않았고 쓸 사진이 있는 날을 그 자리에서 쓰기 시작합니다.</p>
+      <ul>
+        <li>안드로이드: 휴대폰 설정에서 포켓로그의 배터리 사용을 「제한 없음」으로 두면 앱을 열지 않아도 먼저 써 둘 때가 있습니다.</li>
+        <li>iPhone: 저전력 모드를 끄고 백그라운드 앱 새로 고침을 켜 두면 도움이 될 수 있습니다. 실행 시점은 iPhone이 정합니다.</li>
+      </ul>
+    </section>
+
+    <section data-faq="uninstall">
+      <h3>앱을 지우면 일기는 어떻게 되나요?</h3>
+      <!-- 근거: AGENTS 「서명이 다르면 …」 [실측] — 앱을 지우면 일기·모델·설정이 함께 사라진다; 설계 §1.3 [미확인] — OS 백업 포함 여부는 재지 않았다(방침 retention과 같은 말) -->
+      <p>일기는 휴대폰 안에 있어서, 앱을 지우면 일기도 함께 지워집니다. 휴대폰의 백업(iCloud, Google 백업)에 포켓로그의 데이터가 포함될 수 있지만, 그 백업으로 되살아나는지는 확인하지 않았습니다. 운영자에게는 일기 사본이 없어 되살려 드릴 수 없습니다.</p>
+    </section>
+
+    <section data-faq="on-device">
+      <h3>일기는 어디서 쓰나요?</h3>
+      <!-- 근거: 헌법 원칙 I, 설계 §1.3 [코드] — 추론은 기기에서, 원격 추론 없음 -->
+      <p>휴대폰 안에서 씁니다. 사진과 일기는 서버로 보내지 않습니다.</p>
+    </section>
+
+    <section data-faq="place-name">
+      <h3>장소 이름을 끄고 싶어요.</h3>
+      <!-- 근거: 설계 §1.2 [코드] — geocodingEnabled: 「끔」이면 늘 꺼짐(위치 권한과 무관하게 확실한 끄는 길) -->
+      <p>설정 → 「장소 이름으로 보기」 → 「끔」을 고르세요. 장소 이름을 얻으려고 좌표를 휴대폰의 지도 서비스에 보내는 일이 멈춥니다.</p>
+    </section>
+  </section>
+</main>
+</body>
+</html>
