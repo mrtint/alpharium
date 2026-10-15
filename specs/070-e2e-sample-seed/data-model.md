@@ -31,14 +31,14 @@
 - 슬롯 시각은 그날 안(00:00~23:59), 시각순 정렬.
 
 ## 사진 목록 항목 `CatalogPhoto`
-`file`, `url`, `sha256`, `license`(허용: `CC0`, `PD`), `sourcePage`, `checkedOn`(YYYY-MM-DD), `tags[]`, `widthPx`.
-불변식: 모든 항목이 허용 라이선스, URL이 `https://upload.wikimedia.org/`로 시작, `sha256` 64 hex, 상황 태그 일곱을 모두 덮는다.
+`file`, `url`, `sha256[]`(받아들인 썸네일 변형), `originalSha1`(Commons 원본 sha1 — 사진의 정체), `license`(허용: `CC0`, `PD`), `sourcePage`, `checkedOn`(YYYY-MM-DD), `tags[]`, `widthPx`.
+불변식: 모든 항목이 허용 라이선스, URL이 `https://upload.wikimedia.org/`로 시작, `sha256[]` 원소 64 hex·중복 없음·1개 이상, `originalSha1` 40 hex, 상황 태그 일곱을 모두 덮는다. (084가 대체: `specs/084-sample-photo-identity/contracts/photo-identity.md` — 084 data-model)
 
 ## 심을 항목 `SeedItem` (plan.ts 출력)
 `day`(YYYY-MM-DD), `deviceName`(`s30-<offset 2자리>-<번호 2자리>.jpg`), `folder`, `takenAt`(Date), `coordinate | null`, `catalogFile`.
 
 ## 지문 `fingerprint`
-`sha256(JSON.stringify(정렬된 SeedItem 목록의 (offset, deviceName, folder, takenAt 분 단위, 좌표 소수 6자리, catalogFile, catalog sha256)))`의 앞 16 hex. 표나 사진 목록을 고치면 달라진다. 오늘 날짜(기준일)는 지문에 넣지 않는다 — `anchor`가 따로 본다.
+`sha256(JSON.stringify(정렬된 SeedItem 목록의 (offset, deviceName, folder, takenAt 분 단위, 좌표 소수 6자리, catalogFile, catalog originalSha1)))`의 앞 16 hex(084 — 썸네일 해시가 아니라 원본 sha1). 표나 사진 목록을 고치면 달라진다. 오늘 날짜(기준일)는 지문에 넣지 않는다 — `anchor`가 따로 본다.
 
 ## 표식 `Marker` (기기 `PocketlogSeed/s30-marker.txt`)
 ```

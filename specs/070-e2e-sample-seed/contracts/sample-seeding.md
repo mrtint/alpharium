@@ -5,9 +5,9 @@
 ## 내려받기 (`npm run sample:fetch`)
 
 - **F-1** `photos.json`의 항목을 순차로 받고(요청 간 ≥ 1초, 식별 가능한 UA), `.cache/<file>`에 쓴다. 이미 있고 sha256이 맞으면 건너뛴다.
-- **F-2** sha256이 목록과 다르면 그 파일을 지우고 실패한다(종료 코드 1, 이유에 파일명). 부분 캐시를 성공으로 보고하지 않는다.
+- **F-2** (084가 대체: `specs/084-sample-photo-identity/contracts/photo-identity.md` V-1~V-4) 받은 썸네일의 sha256이 받아들인 해시에 없으면 Commons 원본을 조회해, 원본 sha1이 목록과 같고 바이트가 그 원본의 썸네일 모양(폭 = `widthPx`, 높이 = 원본 비율 ±1px)일 때만 받아들여 목록에 덧붙인다. 원본이 다르거나 확인하지 못하면 그 파일을 남기지 않고 실패한다(종료 코드 1, 이유에 파일명). 부분 캐시를 성공으로 보고하지 않는다. 같은 썸네일 URL이 데이터센터마다 다른 바이트를 주기 때문이다(2026-10-15 실측).
 - **F-3** 네트워크는 주입된 `fetchBytes`로만 한다(테스트 대역). 429는 백오프 후 최대 3회, 그래도 실패면 이유와 함께 중단.
-- **F-5** `--record-hashes` 모드: 목록의 `sha256`이 비어 있는 항목만 받아 해시를 계산해 `photos.json`에 채운다(최초 1회). 이미 채워진 항목은 바꾸지 않고 대조만 한다 — 기록 모드가 있어도 F-2의 불일치 실패는 그대로다.
+- **F-5** (084가 대체: `specs/084-sample-photo-identity/contracts/photo-identity.md` V-5·W-1) `--record-hashes` 모드: 비어 있는 정체 필드만 채운다 — 빈 `originalSha1`은 Commons에서 읽되 원본의 최신 판이 `checkedOn` 이하일 때만, 빈 `sha256[]`은 원본 확인을 거친 받은 바이트로. 이미 채워진 값은 바꾸지 않는다. `photos.json`은 성공했고 바뀐 것이 있는 실행에서만(기록 모드와 무관) 진입점이 다시 쓴다.
 - **F-4** 승인 게이트: 처음 이 명령을 쓰기 전 목록을 소유자에게 보였는지는 코드가 아니라 **작업 절차**(tasks.md 게이트 태스크)로 지킨다.
 
 ## EXIF 작성 (`exif-write.ts`)
@@ -23,7 +23,7 @@
 - **P-1** `planSample(manifest, catalog, now)`는 모든 슬롯을 `SeedItem`으로 펼친다. 날짜는 `now` 기준 오프셋 일 전(`day-boundary.dayOf`로 날 문자열), 시각은 슬롯 `time`. 같은 입력이면 같은 출력(난수 없음).
 - **P-2** 슬롯 → 사진 파일은 태그별로 목록 순서를 돌며 결정적으로 고른다.
 - **P-3** 좌표는 군집 중심 + 결정적 흔들림(슬롯 번호로 정한 각도·거리, 방문 안 ≤ 40m / 걸어 다닌 날은 표가 지정한 오프셋). 난수는 쓰지 않는다.
-- **P-4** `fingerprint(items, catalog)`는 `data-model.md` 정의대로이고 표·목록·사진 sha가 바뀌면 바뀐다. 오늘 날짜에는 의존하지 않는다.
+- **P-4** `fingerprint(items, catalog)`는 `data-model.md` 정의대로이고 표·목록·사진의 원본 sha1이 바뀌면 바뀐다(썸네일 해시만 다르면 같다 — 084가 대체: `specs/084-sample-photo-identity/contracts/photo-identity.md` P-4'). 오늘 날짜에는 의존하지 않는다.
 - **P-5** `probeEnv(manifest, now)`는 대표 날 8곳의 `P<n>_*` 문자열 쌍을 만든다(`P_BACK`은 오늘과 그 날의 달 차).
 - **P-6** 이 파일은 `fs`·`adb`를 import하지 않는다.
 

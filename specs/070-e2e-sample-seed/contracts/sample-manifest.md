@@ -15,7 +15,7 @@
 
 ## 사진 목록 (photos.json)
 
-- **C-1** 모든 항목: `file`·`url`·`sha256`(64 hex)·`license`·`sourcePage`·`checkedOn`·`tags`·`widthPx`가 있다.
+- **C-1** 모든 항목: `file`·`url`·`sha256`·`originalSha1`·`license`·`sourcePage`·`checkedOn`·`tags`·`widthPx`가 있다. (084가 대체: `specs/084-sample-photo-identity/contracts/photo-identity.md` I-1·I-2 — `sha256`은 받아들인 썸네일 변형의 배열(64 hex, 중복 없음, 1개 이상), `originalSha1`은 Commons 원본 sha1(40 hex)이고 사진의 정체다.)
 - **C-2** `license`는 `CC0` 또는 `PD`뿐(허용 목록 상수 한 곳).
 - **C-3** `url`은 `https://upload.wikimedia.org/`로 시작하고 `sourcePage`는 `https://commons.wikimedia.org/`로 시작한다.
 - **C-4** 태그 일곱(`indoor`·`food`·`document`·`street`·`people`·`landscape`·`night`)을 각각 최소 20장이 가진다. 스크린샷·다운로드 폴더 슬롯은 같은 사진 파일을 그 폴더에 두는 것으로 다룬다(023은 폴더 이름만 본다) — 별도 `screenshot` 태그 사진을 목록에 두지 않는다.

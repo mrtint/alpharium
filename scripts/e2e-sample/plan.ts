@@ -107,11 +107,12 @@ export function planSample(catalog: readonly CatalogPhoto[], now: Date): SeedIte
 }
 
 /**
- * 표 지문 — 표·사진 목록·사진 해시가 바뀌면 바뀐다. **오늘 날짜에는 의존하지 않는다**(기준일은 표식의 `anchor`가 따로 본다).
- * 항목마다 (오프셋, 기기 이름, 폴더, 하루 안의 시각, 좌표 소수 6자리, 사진 파일, 그 사진의 sha256)를 정렬해 해시한다.
+ * 표 지문 — 표·사진 목록·사진의 정체(원본 sha1)가 바뀌면 바뀐다. **오늘 날짜에는 의존하지 않는다**(기준일은 표식의 `anchor`가 따로 본다).
+ * 항목마다 (오프셋, 기기 이름, 폴더, 하루 안의 시각, 좌표 소수 6자리, 사진 파일, 그 사진의 원본 sha1)를 정렬해 해시한다.
+ * **썸네일 해시는 넣지 않는다**(084 P-4'): 같은 썸네일 URL이 데이터센터마다 다른 바이트를 주므로, 넣으면 두 기계를 오갈 때마다 기기를 다시 심는다.
  */
 export function fingerprint(items: readonly SeedItem[], catalog: readonly CatalogPhoto[]): string {
-  const shaOf = new Map(catalog.map((p) => [p.file, p.sha256]));
+  const identityOf = new Map(catalog.map((p) => [p.file, p.originalSha1]));
   const rows = [...items]
     .sort((a, b) => a.deviceName.localeCompare(b.deviceName))
     .map((i) => [
@@ -121,7 +122,7 @@ export function fingerprint(items: readonly SeedItem[], catalog: readonly Catalo
       `${pad2(i.takenAt.getHours())}:${pad2(i.takenAt.getMinutes())}`,
       i.coordinate === null ? null : [i.coordinate.latitude.toFixed(6), i.coordinate.longitude.toFixed(6)],
       i.catalogFile,
-      shaOf.get(i.catalogFile) ?? "",
+      identityOf.get(i.catalogFile) ?? "",
     ]);
   return createHash("sha256").update(JSON.stringify(rows)).digest("hex").slice(0, 16);
 }

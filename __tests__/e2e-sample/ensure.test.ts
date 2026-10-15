@@ -32,7 +32,8 @@ function catalog(): CatalogPhoto[] {
       list.push({
         file: `commons-${tag}-${i}.jpg`,
         url: `https://upload.wikimedia.org/x/${tag}${i}.jpg`,
-        sha256: "c".repeat(64),
+        sha256: ["c".repeat(64)],
+        originalSha1: "d".repeat(40),
         license: "CC0",
         sourcePage: `https://commons.wikimedia.org/wiki/File:${tag}${i}.jpg`,
         checkedOn: "2026-10-10",
