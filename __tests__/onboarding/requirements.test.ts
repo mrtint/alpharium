@@ -80,10 +80,8 @@ describe("R3 — 문안 규칙 (원칙 II·III, SC-008)", () => {
     const byKey = Object.fromEntries(PERMISSION_REQUIREMENTS.map((r) => [r.key, r.ifDenied]));
     expect(byKey.photos).toBe("사진을 볼 수 없어서 일기는 사진 없이 써요.");
     expect(byKey.location).toBe("지명을 옮기지 못해서 장소는 비워 둬요.");
-    expect(byKey.notifications).toBe("일기가 완성돼도 바로 알려 드리지 못해요.");
-    expect(byKey["battery-exception"]).toBe(
-      "자동으로 쓰는 시간이 정한 때보다 많이 늦어질 수 있어요.",
-    );
+    expect(byKey.notifications).toBe("쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.");
+    expect(byKey["battery-exception"]).toBe("앱을 열 때까지 쓰지 못할 수 있어요.");
     for (const r of PERMISSION_REQUIREMENTS) expect(r.ifDenied).not.toMatch(/니다\.$/);
   });
 

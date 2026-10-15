@@ -76,6 +76,8 @@ import {
 } from "./notified-store";
 import { expoNotificationPort, type NotificationPort } from "./notification-port";
 import { autoWriteDoneText } from "./notification-text";
+import { expoReminderDeps } from "./reminder-deps";
+import { reconcileReminders } from "./reminders";
 import {
   expoAutoDiarySettingsPort,
   loadAutoDiarySettings,
@@ -119,6 +121,12 @@ export type AutoDiaryTaskDeps = {
   attemptPort?: AutoWriteAttemptPort;
   /** 078 — 창 밖 따라잡기 기록 통로. 주지 않으면 `preferences/auto-write-catch-up.json` */
   catchUpPort?: CatchUpStorePort;
+  /**
+   * 085 — 쓸 차례 알림 맞추기. 주지 않으면 기기 통로(`reconcileReminders(expoReminderDeps())`). 태스크가 **끝날 때마다** 한 번
+   * 부른다 — 저장에 성공했으면 완성 알림 **전에**(그 날의 「쓸 차례」를 거둔 뒤 「다 썼어요」가 선다, FR-011), 그 밖이면 끝에서
+   * (건너뛰기만 하는 실행도 7번 창을 이어 걸고 오래된 알림을 거둔다, FR-009·research R7). 실패는 결과를 바꾸지 않는다.
+   */
+  reconcileReminders?: () => Promise<void>;
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
@@ -147,7 +155,15 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
   await recordAttemptStart(attemptPort, path, now);
   const { result, outcome } = await runBody(deps, now);
   await recordAttemptEnd(attemptPort, path, now, outcome);
+  // 085 — 성공이면 본체가 완성 알림 전에 이미 맞췄다(한 번만).
+  if (result !== "ran") await reconcileAfterTask(deps);
   return result;
+}
+
+/** 085 — 쓸 차례 알림 맞추기. 던지지 않는다(TK2) */
+async function reconcileAfterTask(deps: AutoDiaryTaskDeps): Promise<void> {
+  const reconcile = deps.reconcileReminders ?? (() => reconcileReminders(expoReminderDeps()));
+  await reconcile().catch(() => {});
 }
 
 /** 본체. 결과와 기록 갈래를 함께 돌려준다 — 기록은 `runAutoDiaryTask`가 한다. */
@@ -244,6 +260,8 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
     });
 
     if (result.ok) {
+      // 085 FR-011 — 저장 → 맞추기(그 날의 쓸 차례 알림을 거둠) → 완성 알림.
+      await reconcileAfterTask(deps);
       await sendCompletionNotification(decision.day, character, deps);
       return { result: "ran", outcome: "ran" };
     }
@@ -303,6 +321,8 @@ async function sendCompletionNotification(
     if (decision.mode === "replace") {
       await notificationPort.dismiss(decision.dismissId);
     }
+    // 085 R17 — 앱을 열기 전 헤드리스 실행이면 채널이 없을 수 있다(없으면 기본 채널로 간다). 실패는 삼킨다.
+    await notificationPort.ensureChannel().catch(() => {});
     // 057 — 「{이름}{이|가} {M}월 {d}일 일기를 다 썼어요」. 이름을 읽지 못하면 기본 이름이다(035 N3 — 빈 이름은 없다).
     const names = await (
       deps.loadNames ?? (() => loadCustomNames(expoCharacterNamesPort()))

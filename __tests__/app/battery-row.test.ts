@@ -11,12 +11,12 @@ import { SETTINGS_TEXT } from "../../src/ui/settings-text";
 
 describe("068 C1 — batteryRowHint", () => {
   it("iOS는 저전력 모드 안내다", () => {
-    expect(batteryRowHint("ios")).toBe("저전력 모드를 끄면 제때 써요");
+    expect(batteryRowHint("ios")).toBe("저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요");
   });
 
   it("안드로이드는 기존 문구와 바이트 동일하다", () => {
     expect(batteryRowHint("android")).toBe(SETTINGS_TEXT.permBatteryHint);
-    expect(batteryRowHint("android")).toBe("배터리 사용 · 제한 없음으로 두면 제때 써요");
+    expect(batteryRowHint("android")).toBe("제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요");
   });
 
   it("두 플랫폼의 문구가 다르다(iOS가 안드로이드 설명을 그대로 쓰지 않는다)", () => {

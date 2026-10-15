@@ -25,6 +25,7 @@ import { monologue } from "./monologue";
 import { notification } from "./notification";
 import { onboarding } from "./onboarding";
 import { photoViewer } from "./photo-viewer";
+import { reminder } from "./reminder";
 import { frame, settings, skippedLine, targetHour } from "./settings";
 import { settingsPlatform } from "./settings-platform";
 import { simulation } from "./simulation";
@@ -51,5 +52,6 @@ export const ko = {
   onboarding,
   monologue,
   notification,
+  reminder,
   photoViewer,
 };

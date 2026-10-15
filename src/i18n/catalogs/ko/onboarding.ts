@@ -4,6 +4,8 @@
  * 원래 자리: `src/onboarding/requirements.ts`의 `rationale`·`ifDenied`(021, 048에서 `ifDenied`는 해요체 — 홈 캡션·온보딩·설정이 같은 값을 본다),
  * `src/ui/OnboardingScreen.tsx`의 리터럴(021·029·043).
  *
+ * 085 — 알림·배터리의 `rationale`·`ifDenied`는 「정한 시간대에 쓴다」를 약속하지 않는다(소유자 승인 2026-10-15).
+ *
  * 권한 목록의 키·순서·플랫폼은 `requirements.ts`에 그대로 있다 — 여기는 말만 둔다(K4). 모델 식별자 토큰을 담지 않는다(021, 원칙 III).
  */
 
@@ -20,12 +22,12 @@ export const onboarding = {
       ifDenied: "지명을 옮기지 못해서 장소는 비워 둬요.",
     },
     notifications: {
-      rationale: "정한 시간대에 일기가 다 쓰이면 알려 드리기 위해 씁니다.",
-      ifDenied: "일기가 완성돼도 바로 알려 드리지 못해요.",
+      rationale: "쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.",
+      ifDenied: "쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.",
     },
     "battery-exception": {
-      rationale: "기기가 절전에 들어가도 정한 시간대에 일기를 쓰도록 허용을 요청합니다.",
-      ifDenied: "자동으로 쓰는 시간이 정한 때보다 많이 늦어질 수 있어요.",
+      rationale: "휴대폰이 절전에 들어가도 열지 않아도 먼저 써 둘 수 있게 허용을 요청합니다.",
+      ifDenied: "앱을 열 때까지 쓰지 못할 수 있어요.",
     },
   } as {
     photos: PermissionText;

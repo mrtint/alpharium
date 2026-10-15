@@ -19,3 +19,13 @@ export function autoWriteDoneText(name: string, day: DayDate): string {
   const [, month, date] = day.split("-").map(Number);
   return text().notification.autoWriteDone(name, month, date);
 }
+
+/**
+ * 쓸 차례 알림의 제목 (085) — 「{name}{이|가} {M}월 {d}일 일기를 쓸 차례예요」 한 줄, 본문 없음.
+ *
+ * 완성 알림과 같은 규칙이다 — 일기 내용·감상을 담지 않는다(020 FR-012, 원칙 II). 문장 틀은 `catalogs/ko/reminder.ts`.
+ */
+export function reminderTitle(name: string, day: DayDate): string {
+  const [, month, date] = day.split("-").map(Number);
+  return text().reminder.title(name, month, date);
+}

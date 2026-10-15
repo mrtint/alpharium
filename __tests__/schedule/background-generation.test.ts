@@ -74,6 +74,8 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
     deps: {
       attemptPort: attempts,
       catchUpPort: catchUp,
+      // 085 — 쓸 차례 알림 맞추기는 task-reminder.test.ts가 본다. 여기서는 기기 통로에 닿지 않게 비운다.
+      reconcileReminders: async () => {},
       skipPort: { read: async () => null, write: skipWrite, remove: async () => {} },
       now: at(7),
       resolution: { ok: true, environment: "dev" } as never,

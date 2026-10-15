@@ -72,7 +72,7 @@ function Harness({
       developerHighlight={highlight}
       moduleSizeText={null}
       onOpenAppSettings={jest.fn()}
-      batteryHint="배터리 사용 · 제한 없음으로 두면 제때 써요"
+      batteryHint="제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요"
       onOpenDeveloper={() => setRoute("developer")}
       onOpenPlaceNames={jest.fn()}
       onOpenRename={jest.fn()}

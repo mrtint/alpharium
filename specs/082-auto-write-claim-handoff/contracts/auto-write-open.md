@@ -25,6 +25,7 @@
 - **CL4** `writeBlocked`가 참이 되면 소모한다 — 흉내를 꺼도 같은 실행에서 저절로 시작하지 않는다(064 AF3).
 - **CL5** `spendAutoWrite()`는 조건 없이 소모한다. 돌려주는 값이 없다. ★ 결함 B의 통로.
 - **CL6** 소모는 되돌릴 수 없다 — 훅에 되살리는 함수가 없다(spec Clarifications: 설정을 켜는 것이 「한 번」을 되살리지 않는다).
+  → **085 FR-023으로 개정**: 쓸 차례 알림을 누른 응답의 `rearmAutoWrite()`만 「한 번」을 한 번 다시 연다(설정을 켜는 것은 여전히 되살리지 않는다). `specs/085-write-reminder/contracts/write-reminder.md` RA1~RA8.
 - **CL7** `firstRunTried`는 렌더가 아니라 콜백 안에서 읽는다(React Compiler).
 
 ## WP — 조립 (`App.tsx`)

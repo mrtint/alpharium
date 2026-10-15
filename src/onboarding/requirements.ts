@@ -105,7 +105,7 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     order: 3,
     platforms: ["android", "ios"],
   }),
-  // 요구하는 기능: 백그라운드 자동 생성(019/020) — 절전 중에도 정한 시간대에 쓴다
+  // 요구하는 기능: 백그라운드 자동 생성(019/020) — 절전 중에도 먼저 써 둘 수 있게(085 — 시각을 약속하지 않는다)
   requirement({
     key: "battery-exception",
     order: 4,

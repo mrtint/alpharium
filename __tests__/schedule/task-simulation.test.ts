@@ -50,6 +50,8 @@ function make(environment: "dev" | "prod", simulation: SimulationStorePort) {
   };
   const deps = {
     catchUpPort: { read: async () => null, write: async () => {} },
+    // 085 — 쓸 차례 알림 맞추기는 task-reminder.test.ts가 본다. 여기서는 기기 통로에 닿지 않게 비운다.
+    reconcileReminders: async () => {},
     attemptPort: attempts,
     simulationPort: simulation,
     failurePort,

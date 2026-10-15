@@ -10,6 +10,10 @@
  *
  * **판정하지 않는다**(K4) — 오전/오후·12시간 칸·「어제」인가는 `target-hour.ts`·`skipped-line.ts`가 정해 인자로 준다.
  * 「쯤」을 늘 붙인다(020 FR-002 — 정확한 시각을 약속하지 않는다).
+ *
+ * **085 — 사실대로(소유자 승인 2026-10-15)**: `permBatteryHint`·`targetHour.preview`는 「그 시각에 쓴다」를 약속하지 않는다 —
+ * 배터리 예외가 없으면 백그라운드가 얼어 완주하지 못한다(079). 그 시각에 쓸 차례를 알리고, 열면 쓴다(085). 바뀐 값은
+ * `__tests__/i18n/ko-golden.test.ts`의 `CHANGED_AFTER_GOLDEN`에 옛 값과 함께 있다.
  */
 
 /** 사진 행의 건너뜀 보조 줄 (057, 보드 `6g`). `{M}`·`{d}`는 `skippedLineText()`가 채운다 */
@@ -31,7 +35,7 @@ export const settings = {
   permLocation: "위치",
   permNotif: "알림",
   permBattery: "배터리",
-  permBatteryHint: "배터리 사용 · 제한 없음으로 두면 제때 써요",
+  permBatteryHint: "제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요",
   permAllowed: "허용됨",
   permPartial: "일부 허용",
   permDenied: "허용 안 함",
@@ -102,7 +106,7 @@ export const targetHour = {
   previewSameDay: "그날",
   /** 보드 `time.preview` */
   preview: (hourText: string, day: string): string =>
-    `매일 ${hourText}쯤 ${day} 일기를 써요. 이미 쓴 날은 건너뛰어요.`,
+    `매일 ${hourText}쯤 ${day} 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.`,
   /** 보드 `time.tz` */
   timeZoneLine: (city: string, gmt: string): string => `이 휴대폰의 시간대 · ${city} (${gmt})`,
   /** 시간대 식별자 → 도시 이름. **사람이 못 박은 표다**(056 Clarification Q3). 없으면 식별자 꼬리를 쓴다 */

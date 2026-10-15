@@ -131,6 +131,11 @@ import {
   type AutoWriteAttemptPort,
 } from "./src/app/auto-write-attempts";
 import { useAutoWriteClaim } from "./src/app/use-auto-write-claim";
+import { isWriteReminderResponse, notificationBehaviorFor } from "./src/app/notification-behavior";
+import { notificationOffLine } from "./src/app/notification-off-line";
+import { reminderSummaryLine } from "./src/app/reminder-summary";
+import { useReminderSync } from "./src/app/use-reminder-sync";
+import { expoReminderPort } from "./src/schedule/reminder-port";
 import { useAutoWriteHandoff } from "./src/app/use-auto-write-handoff";
 import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
 import {
@@ -465,6 +470,11 @@ function AppFrame() {
    */
   const notificationPort = useMemo(() => expoNotificationPort(), []);
   const [pendingRoute, setPendingRoute] = useState<{ day: DayDate } | null>(null);
+  /**
+   * 085 FR-023 — 쓸 차례 알림을 누른 응답이 그 실행의 「한 번」을 다시 연다. `useAutoWriteClaim`은 아래(064 흉내·040 첫 실행 값이
+   * 선 뒤)에 있어 ref로 건넨다 — `rearmAutoWrite`는 정체가 바뀌지 않으므로 이 effect가 다시 돌 일이 없다(research 085 R21).
+   */
+  const rearmAutoWriteRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     // 전역 백그라운드 태스크를 등록한다(019 research §1 — 전역 스코프 요건).
@@ -475,16 +485,11 @@ function AppFrame() {
 
     void notificationPort.ensureChannel().catch(() => {});
 
-    // 포그라운드에서도 배너를 띄운다(research.md §1).
+    // 포그라운드에서도 배너를 띄운다(research.md §1). 085 — 쓸 차례 알림만은 앞에서 숨긴다(FR-021, 이미 앱 안이다).
     void import("expo-notifications")
       .then((Notifications) => {
         Notifications.setNotificationHandler({
-          handleNotification: async () => ({
-            shouldShowBanner: true,
-            shouldShowList: true,
-            shouldPlaySound: false,
-            shouldSetBadge: false,
-          }),
+          handleNotification: async (notification) => notificationBehaviorFor(notification),
         });
       })
       .catch(() => {});
@@ -499,6 +504,8 @@ function AppFrame() {
       .catch(() => {});
 
     const unsubscribe = notificationPort.onResponse((r) => {
+      // 085 FR-023 — 얼었다 풀린 같은 실행에서도 누르면 쓴다(판정은 앞으로 오는 순간 082 훅이 다시 돈다).
+      if (isWriteReminderResponse(r)) rearmAutoWriteRef.current();
       const route = routeFromNotification(r);
       if (route !== null) {
         setPendingRoute(route);
@@ -687,9 +694,24 @@ function AppFrame() {
    */
   const failurePort = useMemo(() => expoWriteFailurePort(), []);
   const [developerFailures, setDeveloperFailures] = useState<FailureLine[]>([]);
+  /**
+   * 085 — 개발자 화면의 쓸 차례 예약 줄. 운영체제 예약표를 겹이 열릴 때 읽는다. 읽지 못하면 줄이 없다(「없음」으로 단정하지 않는다,
+   * FR-022) — TestFlight 스크린샷으로 iOS 예약을 확인할 자리다.
+   */
+  const [developerReminderLine, setDeveloperReminderLine] = useState<string | undefined>(undefined);
   useEffect(() => {
     if (route !== "developer") return;
     let alive = true;
+    void expoReminderPort()
+      .scheduled()
+      .then(
+        (list) => {
+          if (alive) setDeveloperReminderLine(reminderSummaryLine(list));
+        },
+        () => {
+          if (alive) setDeveloperReminderLine(undefined);
+        },
+      );
     void loadAutoWriteAttempts(attemptPort).then((items) => {
       if (alive) setDeveloperAttempts(attemptLines(items));
     });
@@ -903,11 +925,15 @@ function AppFrame() {
    */
   const characterNamesPort = useMemo(() => expoCharacterNamesPort(), []);
   const [customNames, setCustomNames] = useState<CustomNames>({});
+  // 085 — 이름 파일을 읽었는가. 읽기 전에는 쓸 차례 알림 맞추기가 파일을 직접 읽는다(기본 이름으로 걸었다가 곧 다시 걸지 않게, R19).
+  const [namesLoaded, setNamesLoaded] = useState(false);
 
   useEffect(() => {
     let alive = true;
     void loadCustomNames(characterNamesPort).then((names) => {
-      if (alive) setCustomNames(names);
+      if (!alive) return;
+      setCustomNames(names);
+      setNamesLoaded(true);
     });
     return () => {
       alive = false;
@@ -1157,10 +1183,26 @@ function AppFrame() {
    * 첫 실행 흐름이 아직 끝나지 않았으면 홈(`DiarySection`)이 아예 그려지지 않으므로 그것은 따로 보지 않는다. 082 — 상태와
    * 064의 소모는 `useAutoWriteClaim`에 있다(테스트에서 돌릴 수 있게 뗐다).
    */
-  const { claimAutoWrite, spendAutoWrite } = useAutoWriteClaim({
+  const { claimAutoWrite, spendAutoWrite, rearmAutoWrite } = useAutoWriteClaim({
     simulationLoaded: simulation.loaded,
     writeBlocked,
     firstRunTried: autoGenerateTried,
+  });
+  useEffect(() => {
+    rearmAutoWriteRef.current = rearmAutoWrite;
+  }, [rearmAutoWrite]);
+
+  /**
+   * ★ 085 — 쓸 차례 알림 맞추기 (spec FR-009, contracts SY1).
+   *
+   * 마운트·앞으로 돌아올 때·자동 쓰기 설정이나 이름이 바뀔 때, 그리고 **등록부의 칸이 빌 때**(이 프로세스의 쓰기·지우기가 끝날 때마다)
+   * 목표 시각의 날짜별 예약을 다시 맞춘다. 앱이 얼어 있어도 운영체제가 정한 시각에 「쓸 차례예요」를 띄우고, 누르면 그 날로 열려 쓴다 —
+   * 배터리 예외가 없는 사용자에게 백그라운드 완주를 약속하지 않는 대신이다(소유자 결정 2026-10-13).
+   */
+  useReminderSync({
+    liveWrites,
+    settings: settingsValues?.autoDiary ?? null,
+    names: namesLoaded ? customNames : undefined,
   });
 
   /**
@@ -1667,6 +1709,7 @@ function AppFrame() {
             <DeveloperScreen
               attempts={developerAttempts}
               failures={developerFailures}
+              reminderLine={developerReminderLine}
               modules={moduleLines}
               onDisable={onDisableDeveloper}
               onOpenDiagnostics={showsDiagnostics ? openDiagnostics : undefined}
@@ -2412,6 +2455,11 @@ function SettingsSection({
     return { photos, photoLocation, location, notifications };
   }, [onboardingPorts, photoPort]);
   const permissionTags = usePermissionTags(readPermissions);
+  // 085 FR-015 — 자동 쓰기가 켜져 있고 알림이 「허용 안 함」이면 알림 행 아래 한 줄(쓸 차례 알림이 보이지 않는다).
+  const notificationOffText = notificationOffLine(
+    autoDiary?.enabled === true,
+    permissionTags.notifications,
+  );
 
   const onOpenAppSettings = useCallback(() => {
     void onboardingPorts.osSettings.openAppSettings().catch(() => {});
@@ -2506,6 +2554,7 @@ function SettingsSection({
         {...(skippedDay !== null && permissionTags.photos === "denied"
           ? { photoSkipText: skippedLineText(skippedDay, new Date()) }
           : {})}
+        {...(notificationOffText !== undefined ? { notificationOffText } : {})}
         moduleSizeText={moduleSizeText}
         wipeEnabled={diaryCount !== null && diaryCount > 0 && !wiping}
         onOpenWipe={() => void onOpenWipe()}

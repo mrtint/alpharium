@@ -64,13 +64,14 @@ describe("N2 (057) — 제목은 받은 것, 본문 없음", () => {
   });
 });
 
-describe("N3 — present는 trigger: null만 쓴다 (예약 알림 금지)", () => {
-  it("scheduleNotificationAsync 호출에 trigger: null이 있다", () => {
-    expect(CODE).toMatch(/trigger:\s*null/);
+describe("N3 → 085 CH1 — 완성 알림은 즉시 게시이고 diary-completed 채널로 간다 (예약은 이 파일에 없다)", () => {
+  it("scheduleNotificationAsync 호출의 트리거는 채널 하나다 — trigger: null이면 Expo 기본 채널로 갔다(C2)", () => {
+    expect(CODE).toMatch(/trigger:\s*\{\s*channelId:\s*CHANNEL_ID\s*\}/);
+    expect(CODE).not.toMatch(/trigger:\s*null/);
   });
 
-  it("DAILY / TIME_INTERVAL / seconds / hour 트리거를 쓰지 않는다", () => {
-    expect(CODE).not.toMatch(/SchedulableTriggerInputTypes|DAILY|TIME_INTERVAL|trigger:\s*\{/);
+  it("DAILY / TIME_INTERVAL / 날짜 트리거를 쓰지 않는다 — 예약은 쓸 차례 알림(reminder-port.ts)에만 있다", () => {
+    expect(CODE).not.toMatch(/SchedulableTriggerInputTypes|DAILY|TIME_INTERVAL|\bdate:/);
   });
 
   it("present가 data에 { day }를 싣는다", () => {
@@ -78,9 +79,18 @@ describe("N3 — present는 trigger: null만 쓴다 (예약 알림 금지)", () 
   });
 });
 
-describe("N3 — 안드로이드 채널", () => {
-  it("setNotificationChannelAsync로 채널을 보장한다", () => {
-    expect(CODE).toMatch(/setNotificationChannelAsync/);
+describe("N3 → 085 CH2 — 안드로이드 채널 둘", () => {
+  it("완성 알림은 HIGH, 쓸 차례 알림은 DEFAULT로, 하나씩 따로 보장한다(하나가 실패해도 다른 하나는 선다)", () => {
+    const body = CODE.slice(CODE.indexOf("async ensureChannel()"));
+    const ensure = body.slice(0, body.indexOf("async requestPermission()"));
+    expect(ensure).toMatch(
+      /\[CHANNEL_ID, text\(\)\.notification\.channelName, Notifications\.AndroidImportance\.HIGH\]/,
+    );
+    expect(ensure).toMatch(
+      /\[REMINDER_CHANNEL_ID, text\(\)\.reminder\.channelName, Notifications\.AndroidImportance\.DEFAULT\]/,
+    );
+    expect(ensure.match(/setNotificationChannelAsync\(/g)).toHaveLength(1);
+    expect(ensure).toMatch(/setNotificationChannelAsync\(id, \{ name, importance \}\)\.catch\(/);
   });
 });
 
