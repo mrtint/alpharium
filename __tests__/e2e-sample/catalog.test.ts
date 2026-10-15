@@ -19,7 +19,8 @@ import { PHOTO_TAGS } from "../../scripts/e2e-sample/manifest";
  */
 
 const SHA = "a".repeat(64);
-const SHA1 = "b".repeat(40);
+/** 사진마다 다른 원본 sha1 — 정체가 겹치면 안 된다 */
+const sha1For = (t: number, i: number) => (t * 100 + i).toString(16).padStart(40, "b");
 
 function validList(): CatalogPhoto[] {
   const list: CatalogPhoto[] = [];
@@ -30,7 +31,7 @@ function validList(): CatalogPhoto[] {
         file: `commons-${tag}-${i}.jpg`,
         url: `https://upload.wikimedia.org/wikipedia/commons/thumb/x/${t}${i}/960px-f.jpg`,
         sha256: [SHA],
-        originalSha1: SHA1,
+        originalSha1: sha1For(t, i),
         license: "CC0",
         sourcePage: `https://commons.wikimedia.org/wiki/File:F${t}${i}.jpg`,
         checkedOn: "2026-10-10",
@@ -141,6 +142,19 @@ describe("validateCatalog (C-1~C-5)", () => {
     const many = validList();
     for (let i = 0; i < 60; i += 1) many.push({ ...many[0], file: `extra-${i}.jpg` });
     expect(validateCatalog(many).ok).toBe(false);
+  });
+
+  it("I-2: 두 항목의 원본 sha1이 같으면(같은 사진을 두 번) 실패한다", () => {
+    const list = validList();
+    list[1] = { ...list[1], originalSha1: list[0].originalSha1 };
+    const result = validateCatalog(list);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.problems.join("\n")).toMatch(/originalSha1이 겹친다/);
+    // 기록 모드의 빈 값끼리는 겹침으로 세지 않는다
+    const empty = validList();
+    empty[0] = { ...empty[0], originalSha1: "" };
+    empty[1] = { ...empty[1], originalSha1: "" };
+    expect(validateCatalog(empty, { allowEmptyHashes: true }).ok).toBe(true);
   });
 
   it("file 이름이 겹치거나 안전하지 않으면 실패한다", () => {

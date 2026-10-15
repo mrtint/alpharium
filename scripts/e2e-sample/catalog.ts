@@ -141,6 +141,9 @@ export function validateCatalog(raw: unknown, options: { allowEmptyHashes?: bool
 
   const files = photos.map((x) => x.file);
   if (new Set(files).size !== files.length) problems.push("file 이름이 겹친다");
+  // 사진의 정체는 원본 sha1이다 — 같은 원본을 다른 파일 이름으로 두 번 두지 않는다 (빈 값은 기록 모드가 채울 자리라 세지 않는다)
+  const identities = photos.map((x) => x.originalSha1).filter((x) => x !== "");
+  if (new Set(identities).size !== identities.length) problems.push("originalSha1이 겹친다 — 같은 사진이 두 번 있다");
   if (photos.length < MIN_PHOTOS || photos.length > MAX_PHOTOS) {
     problems.push(`서로 다른 사진이 ${photos.length}장이다 (${MIN_PHOTOS}~${MAX_PHOTOS}장이어야 한다)`);
   }

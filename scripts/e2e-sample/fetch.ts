@@ -163,8 +163,9 @@ export async function fetchCatalog(options: FetchOptions): Promise<FetchResult> 
             `${photo.file}: 받은 바이트가 그 원본(${original.width}×${original.height})의 ${photo.widthPx}폭 썸네일 모양이 아니다 — 다른 사진을 쓰지 않는다`,
           );
         }
+        // 빈 목록을 처음 채운 것은 「새 변형」이 아니다 (기록 모드)
+        if (photo.sha256.length > 0) accepted.push(photo.file);
         photo.sha256.push(got);
-        accepted.push(photo.file);
         changed = true;
       }
 

@@ -44,7 +44,7 @@ description: "Task list for 084 표본 사진의 정체를 원본으로"
 ### Tests for User Story 1
 
 - [X] T006 [P] [US1] `__tests__/e2e-sample/commons.test.ts`(새 파일)를 쓴다(계약 O-1~O-5): `titleOf("https://commons.wikimedia.org/wiki/File:Living_room_(Unsplash).jpg")` = `"File:Living_room_(Unsplash).jpg"`, 퍼센트 인코딩 디코드, `File:`이 아니면 `null` / `originalApiUrl`에 `action=query`·`format=json`·`prop=imageinfo`·`iiprop=sha1|size|timestamp`(인코딩된 꼴)·`titles` / `parseOriginal`: 정상 응답 → `{ ok, sha1, width, height, timestamp }`, `missing` 페이지·`imageinfo` 없음·sha1 40 hex 아님·크기 이상 → `{ ok: false }`, 던지지 않음 / `jpegSize`: SOI + APP0 + SOF0을 손으로 만든 바이트에서 폭·높이, JPEG 아님·SOF 없음 → `null` / `looksLikeThumbnail`: 폭 일치 + 높이 ±1 → 참, 폭 다름·높이 2px 차·JPEG 아님 → 거짓(실측 예: 원본 4288×2848, 960폭 → 기대 637.6 → 638 참, 636 거짓)
-- [X] T007 [P] [US1] `__tests__/e2e-sample/fetch.test.ts`를 고친다(계약 V-1~V-3·V-6·V-7): 하네스에 `lookupJson` 대역(호출 기록)을 더하고 테스트 이미지 바이트를 `jpegSize`가 읽는 작은 JPEG(SOI+SOF0+EOI, 960×540 등)로 바꾼다. 단언: 목록에 있는 해시 → 원본 조회 0회(V-1) / 처음 보는 해시 + 원본 sha1 같음 + 모양 맞음 → `ok`, 캐시에 그 바이트, 결과 `photos`의 `sha256`에 그 해시가 덧붙음(앞 원소 유지), `accepted`에 파일명, `changed: true` / 같은 해시를 두 번 덧붙이지 않는다 / 덧붙인 뒤의 목록으로 다시 돌리면 조회 0회·네트워크 0회(캐시) / 원본 조회 앞에도 요청 간격(≥ 1000ms)이 들어간다(V-6) / 변화가 없으면 `changed: false`·`accepted: []`
+- [X] T007 [P] [US1] `__tests__/e2e-sample/fetch.test.ts`를 고친다(계약 V-1~V-3·V-6·V-7): 하네스에 `lookupJson` 대역(호출 기록)을 더하고 테스트 이미지 바이트를 `jpegSize`가 읽는 작은 JPEG(SOI+SOF0+EOI, 960×540 등)로 바꾼다. 단언: 목록에 있는 해시 → 원본 조회 0회(V-1) / 처음 보는 해시 + 원본 sha1 같음 + 모양 맞음 → `ok`, 캐시에 그 바이트, 결과 `photos`의 `sha256`에 그 해시가 덧붙음(앞 원소 유지), `accepted`에 파일명, `changed: true` / 사진마다 자기 목록에 덧붙인다(한 실행에서 사진을 한 번만 받으므로 같은 해시가 두 번 붙는 일은 구조상 없고, 생기면 목록 검사 I-1이 잡는다 — 코드 리뷰 반영) / 덧붙인 뒤의 목록으로 다시 돌리면 조회 0회·네트워크 0회(캐시) / 원본 조회 앞에도 요청 간격(≥ 1000ms)이 들어간다(V-6) / 변화가 없으면 `changed: false`·`accepted: []`
 
 ### Implementation for User Story 1
 
@@ -135,3 +135,7 @@ T023 070 문서         ∥  T024 AGENTS.md
 ## Phase 9: Convergence
 
 - [X] T027 `scripts/e2e-sample/catalog.ts`의 빈 `originalSha1` 검사 문구가 기록 모드를 가리키게 고치고(「originalSha1이 비었다 — 처음 한 번 --record-hashes로 채운다」, 빈 값이 아닌 형식 오류는 지금 문구 그대로) `__tests__/e2e-sample/catalog.test.ts`에서 그 문구를 단언한다 per US4/AC1 (partial)
+
+## 코드 리뷰 반영 (2026-10-15)
+
+- 리뷰: Critical 0 · Important 0 · Minor 7. 반영 — 원본 sha1 중복 검사(`catalog.ts`, I-2 보강), 기록 모드의 첫 채우기를 「새 변형」으로 세지 않음(`fetch.ts`), APP1 뒤 프로그레시브 SOF2 테스트(`commons.test.ts`), T007 문구, 로드맵 배경 문장(완료 처리). 미룸 — `validateCatalog`가 모르는 필드는 다시 쓸 때 사라짐(지금 그런 필드 없음), `photos.json` 원자적 쓰기(git으로 되돌릴 수 있음).

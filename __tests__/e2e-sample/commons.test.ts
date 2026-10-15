@@ -5,7 +5,7 @@ import {
   parseOriginal,
   titleOf,
 } from "../../scripts/e2e-sample/commons";
-import { tinyJpeg } from "./jpeg-fixture";
+import { progressiveJpegWithExif, tinyJpeg } from "./jpeg-fixture";
 
 /**
  * 084 — Commons 원본 조회와 썸네일 모양 판정 (contracts/photo-identity.md O-1~O-5). 순수 함수만 본다 — 네트워크 없음.
@@ -115,6 +115,10 @@ describe("parseOriginal (O-3)", () => {
 describe("jpegSize (O-4)", () => {
   it("SOF 세그먼트에서 폭·높이를 읽는다", () => {
     expect(jpegSize(tinyJpeg(960, 638))).toEqual({ width: 960, height: 638 });
+  });
+
+  it("APP1(EXIF)·DQT 뒤의 프로그레시브 SOF2도 읽는다", () => {
+    expect(jpegSize(progressiveJpegWithExif(960, 717))).toEqual({ width: 960, height: 717 });
   });
 
   it("JPEG가 아니거나 SOF가 없으면 null", () => {

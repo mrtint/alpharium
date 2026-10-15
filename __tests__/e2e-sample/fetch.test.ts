@@ -372,6 +372,8 @@ describe("fetchCatalog — 기록 모드 (US4, V-5)", () => {
     if (result.ok) {
       expect(result.photos[0].sha256).toEqual([sha(A)]);
       expect(result.changed).toBe(true);
+      // 처음 채운 것이지 「새 변형」이 아니다
+      expect(result.accepted).toEqual([]);
     }
   });
 
