@@ -1,0 +1,31 @@
+appId: com.a810labs.pocketlog
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 30000
+- tapOn:
+    id: "home-settings"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: "settings-font-license"
+- tapOn:
+    id: "settings-font-license"
+- extendedWaitUntil:
+    visible:
+      id: "font-license-screen"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: shot-08-font-license-top
+- scroll
+- scroll
+- scroll
+- scroll
+- waitForAnimationToEnd
+- takeScreenshot: shot-09-font-license-end

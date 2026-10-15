@@ -19,6 +19,7 @@ import { developer } from "./developer";
 import { diagnostics, diagnosticsLanguage } from "./diagnostics";
 import { download } from "./download";
 import { failures } from "./failures";
+import { fontLicense } from "./font-license";
 import { home } from "./home";
 import { monologue } from "./monologue";
 import { notification } from "./notification";
@@ -42,6 +43,7 @@ export const ko = {
   diagnosticsLanguage,
   attempts,
   failures,
+  fontLicense,
   simulation,
   welcome,
   download,

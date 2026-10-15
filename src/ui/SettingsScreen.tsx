@@ -25,12 +25,12 @@
  */
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Platform, Pressable, View, type TextStyle, type ViewStyle } from "react-native";
+import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import type { PermissionTag, TaggedPermission } from "../app/permission-tags";
 import { AppText } from "./components/Text";
-import { SETTINGS_TEXT } from "./settings-text";
+import { FONT_LICENSE_TEXT, SETTINGS_TEXT } from "./settings-text";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
 const { group, paperPadding, row, tag, toggle } = SETTINGS;
@@ -72,6 +72,8 @@ export type SettingsScreenProps = {
   /** 059 — 켜진 순간 1.5초 동안 「개발자」 행을 옅은 빨강 바탕으로 강조한다 */
   developerHighlight?: boolean;
   onOpenDeveloper?: () => void;
+  /** 083 — 「정보」의 「서체 라이선스」 행 누름(설정 위에 겹이 쌓인다). 없으면 누를 수 없는 행이다 */
+  onOpenFontLicense?: () => void;
 };
 
 export function SettingsScreen({
@@ -96,6 +98,7 @@ export function SettingsScreen({
   developerEnabled = false,
   developerHighlight = false,
   onOpenDeveloper,
+  onOpenFontLicense,
 }: SettingsScreenProps) {
   return (
     <View testID="settings-screen">
@@ -184,6 +187,13 @@ export function SettingsScreen({
           {...(onPressVersion !== undefined ? { onPress: onPressVersion } : {})}
           testID="settings-version"
           trailing={<Value text={versionText ?? ""} />}
+        />
+        {/* 083 — OFL 1.1 고지(FR-011). 개발자 메뉴와 무관하게 늘 있어 「개발자」 행 앞에 둔다 */}
+        <Row
+          label={FONT_LICENSE_TEXT.row}
+          {...(onOpenFontLicense !== undefined ? { onPress: onOpenFontLicense } : {})}
+          testID="settings-font-license"
+          trailing={<Chevron />}
         />
         {developerEnabled && (
           <Row
@@ -505,15 +515,15 @@ const VALUE: TextStyle = {
 };
 const VALUE_MONO: TextStyle = {
   ...VALUE,
-  // 보드 `6e`·`6h`: 고정폭 값은 13(일반 값 15보다 작다)
+  // 보드 `6e`·`6h`: 고정폭 값은 13(일반 값 15보다 작다). 서체는 Pretendard이고 숫자 폭만 고정폭(`VALUE`의
+  // `tabular-nums`) — 보드의 고정폭 서체는 따르지 않는다(083 FR-009)
   fontSize: 13,
-  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
 };
 const HINT_MONO: TextStyle = {
   fontSize: 11,
   lineHeight: 11 * row.hintLineHeightRatio,
   color: COLORS.textMuted,
-  fontFamily: Platform.select({ ios: "Menlo", default: "monospace" }),
+  fontVariant: ["tabular-nums"],
 };
 const HINT: TextStyle = {
   fontSize: row.hintSize,

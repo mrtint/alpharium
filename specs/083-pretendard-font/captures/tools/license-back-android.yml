@@ -1,0 +1,34 @@
+appId: com.a810labs.pocketlog
+---
+# 083 — 안드로이드 하드웨어 뒤로 가기: 서체 라이선스 → 설정(설정 겹이 받지 않고 라이선스 겹이 받는다, 055 S6)
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 30000
+- tapOn:
+    id: "home-settings"
+- scrollUntilVisible:
+    element:
+      id: "settings-font-license"
+- tapOn:
+    id: "settings-font-license"
+- extendedWaitUntil:
+    visible:
+      id: "font-license-text"
+    timeout: 5000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: "settings-font-license"
+    timeout: 5000
+- extendedWaitUntil:
+    notVisible:
+      id: "font-license-text"
+    timeout: 5000
+- pressKey: back
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 5000

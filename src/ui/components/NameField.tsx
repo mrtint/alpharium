@@ -12,7 +12,7 @@
 import { TextInput, View } from "react-native";
 
 import { AppText } from "./Text";
-import { COLORS } from "../theme/tokens";
+import { COLORS, TEXT_FONT } from "../theme/tokens";
 
 export function NameField({
   value,
@@ -50,7 +50,8 @@ export function NameField({
         placeholder={placeholder}
         placeholderTextColor={COLORS.textMuted}
         returnKeyType="done"
-        style={INPUT}
+        // 083 — 입력 중인 글자도 Pretendard다(공통 글자 스타일이 맨 앞, FR-001·FR-008)
+        style={[TEXT_FONT, INPUT]}
         testID={inputTestID}
         value={value}
       />

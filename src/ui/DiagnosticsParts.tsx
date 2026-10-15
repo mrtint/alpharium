@@ -13,7 +13,7 @@
  */
 
 import { useState } from "react";
-import { Platform, Pressable, View, type TextStyle } from "react-native";
+import { Pressable, View, type TextStyle } from "react-native";
 
 import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type { ProbeAxis, ProbeCell } from "../app/diagnostics-view";
@@ -166,13 +166,15 @@ export function PromptPreviewBox({
   );
 }
 
-const MONO = Platform.select({ ios: "Menlo", default: "monospace" });
-/** 보드 `6h` ④ — 칸 라벨 11/600, 숫자는 고정폭 15/700, 모름은 14/600 회색 */
+/**
+ * 보드 `6h` ④ — 칸 라벨 11/600, 숫자는 15/700, 모름은 14/600 회색. 보드의 고정폭 서체는 따르지 않는다 — 서체는 Pretendard
+ * 하나이고 숫자 폭만 고정폭 숫자(`tabular-nums`)로 맞춘다(083 FR-009, 소유자 결정).
+ */
 const LABEL: TextStyle = { fontSize: 11, fontWeight: "600", color: COLORS.textMuted };
 const VALUE_KNOWN: TextStyle = {
   fontSize: 15,
   fontWeight: "700",
-  fontFamily: MONO,
+  fontVariant: ["tabular-nums"],
   color: COLORS.text,
 };
 const VALUE_UNKNOWN: TextStyle = { fontSize: 14, fontWeight: "600", color: COLORS.textMuted };
@@ -180,5 +182,4 @@ const PROMPT: TextStyle = {
   fontSize: 12,
   lineHeight: 18,
   color: COLORS.text,
-  fontFamily: MONO,
 };

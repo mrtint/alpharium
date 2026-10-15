@@ -1,0 +1,17 @@
+appId: com.a810labs.pocketlog
+---
+# 083 코드 리뷰 — 대화상자 제목이 Pretendard인지(「날짜로 이동」). XCUITest가 홈 헤더 안 testID를 못 찾아 좌표로.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "day-strip"
+    timeout: 30000
+- tapOn:
+    point: "15%,16%"
+- extendedWaitUntil:
+    visible:
+      id: "calendar-dialog"
+    timeout: 5000
+- waitForAnimationToEnd
+- takeScreenshot: shot-02-calendar

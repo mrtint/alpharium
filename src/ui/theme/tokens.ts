@@ -17,8 +17,10 @@
  * **라이트 값만 있다**(spec FR-003·FR-019). 031이 앱을 라이트로 고정했고 이
  * 스펙은 되돌리지 않는다. 다크 팔레트는 후속 스펙에서 같은 역할 이름으로 얹는다.
  *
- * **서체는 시스템 기본이다**(spec FR-019a). 타이포 토큰은 크기·굵기·행간만 —
- * 폰트 파일을 번들하지 않는다.
+ * **서체는 Pretendard다**(083 — 032 FR-019a의 「시스템 기본」을 뒤집었다). 두 플랫폼이 서로 다른 시스템 서체로
+ * 그려져 확연히 달라 보였다. 서체 이름과 공통 글자 스타일은 아래 `FONT`·`TEXT_FONT` 한 곳에서만 정한다(083 FR-007 —
+ * `__tests__/config/font-rules.test.ts` F1이 다른 파일의 `fontFamily`를 막는다). 파일은 `assets/fonts/pretendard/`에
+ * 배포처 그대로 있고 `app.json`의 expo-font 설정이 빌드에 넣는다.
  *
  * **043 — Modernist 팔레트로 전면 교체**: 오프화이트 배경, 단일 레드 강조,
  * 제로 라디우스. 032의 따뜻한 미니멀(아이보리·테라코타)을 대체했다. 값은
@@ -70,10 +72,10 @@ export const RADIUS = {
 } as const;
 
 /**
- * 타이포그래피 — 시스템 서체, 크기·굵기·행간만.
+ * 타이포그래피 — 크기·굵기·행간만. 서체는 `TEXT_FONT`가 글자 부품에서 얹는다(083).
  *
- * `fontWeight`는 RN이 받는 문자열("400"/"600"). `fontFamily`를 두지 않는다
- * (시스템 기본 — FR-019a).
+ * `fontWeight`는 RN이 받는 문자열("400"/"600"). 여기 `fontFamily`를 두지 않는다 — `tailwind.config.js`가 이 표를
+ * fontSize 튜플로 옮기므로 서체까지 실으면 서체를 정하는 자리가 둘이 된다.
  */
 export const TYPE = {
   /** 화면 제목 */
@@ -88,6 +90,28 @@ export const TYPE = {
   caption: { fontSize: 13, fontWeight: "400", lineHeight: 19 },
   /** 버튼 라벨 */
   button: { fontSize: 15, fontWeight: "600", lineHeight: 20 },
+} as const;
+
+/**
+ * 083 — 서체. **앱의 모든 글자가 이 한 곳에서 서체를 받는다**(FR-007).
+ *
+ * - `family`는 expo-font 설정(`app.json`)의 안드로이드 `fontFamily`이자 iOS가 파일에서 읽는 family 이름이다 —
+ *   v1.3.9 정적 OTF 다섯 모두 family가 `Pretendard`다(fc-scan, 083 research R2).
+ * - `weights`는 화면이 쓰는 굵기 다섯이고 넣은 파일 다섯과 짝이다(Regular·Medium·SemiBold·Bold·ExtraBold). 화면이 이 밖의
+ *   굵기를 쓰면 F3이, 설정·파일과 어긋나면 F4가 실패한다. 굵기를 하나 더 쓰려면 배포처 파일을 하나 더 넣고 셋을 함께 고친다.
+ * - 가변 서체(파일 하나)는 쓰지 않는다 — 안드로이드는 굵기 축 값이 API 26+에서만 듣는다(minSdk 24, 083 brainstorming).
+ */
+export const FONT = {
+  family: "Pretendard",
+  weights: ["400", "500", "600", "700", "800"],
+} as const;
+
+/**
+ * 083 — 공통 글자 스타일. RN 글자 부품을 직접 쓰는 세 자리(`AppText`·`rnr/text.tsx`·`NameField`)가 스타일 배열 맨 앞에
+ * 둔다(F2). 화면은 이 부품들을 거치므로 서체를 따로 고르지 않는다.
+ */
+export const TEXT_FONT = {
+  fontFamily: FONT.family,
 } as const;
 
 /**

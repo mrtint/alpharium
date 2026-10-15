@@ -82,6 +82,7 @@ import { readDeviceClock } from "./src/app/device-clock";
 import { batteryRowHint } from "./src/app/battery-row";
 import { appPlatform } from "./src/app/platform";
 import { RenameScreen } from "./src/ui/RenameScreen";
+import { FontLicenseScreen } from "./src/ui/FontLicenseScreen";
 import { usePermissionTags } from "./src/ui/use-permission-tags";
 import type { PermissionFacts, PhotoLocationReading } from "./src/app/permission-tags";
 import { photoLocationProbe } from "./src/app/photo-location-probe";
@@ -105,7 +106,7 @@ import { formatModuleBytes, readModuleBytes } from "./src/app/module-size";
 import { wipeDiaries, type WipeOutcome } from "./src/app/wipe-diaries";
 import { clearPhotoCopies } from "./src/app/wipe-port";
 import { WipeConfirmDialog } from "./src/ui/WipeConfirmDialog";
-import { SETTINGS_TEXT } from "./src/ui/settings-text";
+import { FONT_LICENSE_TEXT, SETTINGS_TEXT } from "./src/ui/settings-text";
 import { StackLayer } from "./src/ui/StackLayer";
 import { AppText } from "./src/ui/components/Text";
 import { COLORS } from "./src/ui/theme/tokens";
@@ -289,9 +290,13 @@ function AppFrame() {
    */
   const [renaming, setRenaming] = useState(false);
   const closeRename = useCallback(() => setRenaming(false), []);
+  /** 083 — 서체 라이선스 겹이 설정 위에 열려 있는가(이름 바꾸기와 같은 방식 — 설정이 닫히면 함께 닫힌다). */
+  const [fontLicenseOpen, setFontLicenseOpen] = useState(false);
+  const closeFontLicense = useCallback(() => setFontLicenseOpen(false), []);
   const goHome = useCallback(() => {
     setRoute("home");
     setRenaming(false);
+    setFontLicenseOpen(false);
     setDiagnosing(false);
   }, []);
   /** 059 — 개발자 화면의 「‹ 설정」: 설정은 아래에 그대로 열려 있으므로 `route`만 되돌린다(R8) */
@@ -499,6 +504,7 @@ function AppFrame() {
         setPendingRoute(route);
         setRoute("home");
         setRenaming(false);
+        setFontLicenseOpen(false);
       }
     });
 
@@ -1587,7 +1593,7 @@ function AppFrame() {
         />
         {/* 059 — 설정 겹은 개발자가 열린 동안에도 열려 있다(개발자가 그 위에 쌓인다, R8). 그동안 뒤로 가기는 등록하지 않는다. */}
         <StackLayer
-          active={!renaming && route !== "developer"}
+          active={!renaming && !fontLicenseOpen && route !== "developer"}
           onClose={goHome}
           onSettled={onSettingsSettled}
           open={route === "settings" || route === "developer"}
@@ -1600,6 +1606,7 @@ function AppFrame() {
               onAutoDiaryChange={onAutoDiaryChange}
               onGeocodingChange={onGeocodingChange}
               onOpenRename={() => setRenaming(true)}
+              onOpenFontLicense={() => setFontLicenseOpen(true)}
               onboardingPorts={onboardingPorts}
               settingsPort={settingsPort}
               skippedDay={skippedDay}
@@ -1625,6 +1632,19 @@ function AppFrame() {
                 closeRename();
               }}
             />
+          </StackLayer>
+          {/*
+          083 — 서체 라이선스(OFL 1.1 고지)도 설정 위에 한 겹 더 쌓인다. 열린 동안 설정 겹은 뒤로 가기를 등록하지 않는다(`active`).
+        */}
+          <StackLayer onClose={closeFontLicense} open={fontLicenseOpen}>
+            <SettingsFrame
+              backLabel={SETTINGS_TEXT.backToSettings}
+              backTestID="back-from-font-license"
+              onBack={closeFontLicense}
+              title={FONT_LICENSE_TEXT.title}
+            >
+              <FontLicenseScreen />
+            </SettingsFrame>
           </StackLayer>
         </StackLayer>
         {/*
@@ -2292,6 +2312,7 @@ function SettingsSection({
   developerEnabled,
   onEnableDeveloper,
   onOpenDeveloper,
+  onOpenFontLicense,
   showToast,
 }: {
   /** 055 — 「1.0.0 (9)」. `AppFrame`이 한 번 읽어 든다(059 — 개발자 화면 머리글도 쓴다). 못 읽었으면 `null` */
@@ -2300,6 +2321,8 @@ function SettingsSection({
   developerEnabled: boolean;
   onEnableDeveloper: () => void;
   onOpenDeveloper: () => void;
+  /** 083 — 「정보」의 「서체 라이선스」 행 → 설정 위 겹 */
+  onOpenFontLicense: () => void;
   showToast: (text: string, sub?: string) => void;
   /** 058 — 일기 모두 지우기. `AppFrame`이 멈춤·지우기·홈으로를 맡는다 */
   requestWipe: () => Promise<WipeOutcome>;
@@ -2478,6 +2501,7 @@ function SettingsSection({
         developerEnabled={developerEnabled}
         developerHighlight={developerHighlight}
         onOpenDeveloper={onOpenDeveloper}
+        onOpenFontLicense={onOpenFontLicense}
         // 057 SL3 — 기록이 있고 사진 꼬리표가 「허용 안 함」일 때만(읽지 못함·일부 허용·허용이면 그리지 않는다, FR-010).
         {...(skippedDay !== null && permissionTags.photos === "denied"
           ? { photoSkipText: skippedLineText(skippedDay, new Date()) }

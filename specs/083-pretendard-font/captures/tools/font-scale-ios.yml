@@ -1,0 +1,31 @@
+appId: com.a810labs.pocketlog
+---
+# 083 — iOS 글꼴 2.0배 근사(accessibility-large — 본문 33/17 ≈ 1.94배; extra-large는 약 2.35배). 큰 글자에서 홈 헤더 안 testID를 XCUITest가 못 찾아 좌표로 짚는다.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: shot-01-home-written
+# 안 쓴 날(스트립 맨 왼쪽 일요일) — 큰 글자에서 칸 testID를 못 찾아 좌표로
+- tapOn:
+    point: "11%,43%"
+- waitForAnimationToEnd
+- takeScreenshot: shot-03-home-unwritten
+- tapOn:
+    point: "92%,12%"
+- extendedWaitUntil:
+    visible:
+      id: "settings-screen"
+    timeout: 10000
+- waitForAnimationToEnd
+- takeScreenshot: shot-04-settings-top
+- scrollUntilVisible:
+    element:
+      id: "settings-font-license"
+- tapOn:
+    id: "settings-font-license"
+- waitForAnimationToEnd
+- takeScreenshot: shot-08-font-license-top

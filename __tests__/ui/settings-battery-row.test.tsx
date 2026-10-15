@@ -60,10 +60,9 @@ describe("068 FR-007 — 화면은 플랫폼으로 문구를 고르지 않는다
     expect(SCREEN_CODE).not.toMatch(/permBatteryHint/);
   });
 
-  it("SettingsScreen의 Platform 사용은 글꼴 선택(Menlo)뿐이고 Platform.OS를 읽지 않는다", () => {
-    expect(SCREEN_CODE).not.toMatch(/Platform\.OS/);
-    const selects = SCREEN_CODE.match(/Platform\.select\([^)]*\)/g) ?? [];
-    for (const s of selects) expect(s).toMatch(/Menlo/);
+  // 083 — 글꼴 선택(Menlo)이 사라져 `Platform`을 쓸 자리가 없다. 「플랫폼으로 고르지 않는다」가 더 강하게 남는다.
+  it("SettingsScreen이 Platform을 쓰지 않는다 (Platform.OS·Platform.select 0회)", () => {
+    expect(SCREEN_CODE).not.toMatch(/\bPlatform\b/);
   });
 
   it("App.tsx가 batteryRowHint로 고른 문구를 SettingsScreen에 넘긴다", () => {

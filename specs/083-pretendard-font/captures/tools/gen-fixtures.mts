@@ -1,0 +1,10 @@
+import { writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { buildFixtureDiaries, fixturePhotoNames } from "../../../../scripts/layer1/fixtures.ts";
+import { BASELINE } from "../../../../scripts/layer1/baseline.ts";
+const out = process.argv[2];
+const now = new Date();
+for (const f of buildFixtureDiaries(now)) writeFileSync(join(out, "diary", f.name), f.content);
+for (const e of BASELINE) if (e.action === "write") writeFileSync(join(out, "preferences", e.file), e.content ?? "");
+console.log("photos:", fixturePhotoNames(now).join(" "));
+console.log("delete:", BASELINE.filter(e=>e.action==="delete").map(e=>e.file).join(" "));

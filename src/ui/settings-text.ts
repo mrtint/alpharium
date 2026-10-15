@@ -29,6 +29,9 @@ import { lazyText, text } from "../i18n/current";
 /** 062 — 문구는 한국어 카탈로그 `src/i18n/catalogs/ko/settings.ts`로 옮겼다. 이름은 그대로 두고 읽는 순간 카탈로그에서 꺼낸다 */
 export const SETTINGS_TEXT = lazyText((c) => c.settings);
 
+/** 083 — 설정 「정보」의 「서체 라이선스」 행과 그 겹 화면(카탈로그 `fontLicense` 영역) */
+export const FONT_LICENSE_TEXT = lazyText((c) => c.fontLicense);
+
 /** 058 — 보드 `wipe.title` 「일기 {n}편을 모두 지울까요?」. 편수는 숫자 그대로(천 단위 구분 없음, FR-010) */
 export function wipeTitle(n: number): string {
   return text().settings.wipeTitle(n);

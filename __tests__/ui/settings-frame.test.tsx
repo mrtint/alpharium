@@ -12,7 +12,7 @@ import { StyleSheet, Text } from "react-native";
 
 import { SettingsFrame } from "../../src/ui/SettingsFrame";
 import { SETTINGS_TEXT } from "../../src/ui/settings-text";
-import { COLORS, WRITTEN_DAY } from "../../src/ui/theme/tokens";
+import { COLORS, FONT, WRITTEN_DAY } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
 
@@ -103,10 +103,11 @@ describe("059 — 제목 오른쪽 작은 글자(titleAside)", () => {
     );
     const aside = screen.getByTestId("settings-title-aside");
     expect(aside).toHaveTextContent("DEV · 1.0.0 (24)");
-    // 보드 `6e`·`6h`: 고정폭 11/600
+    // 보드 `6e`·`6h`: 11/600. 보드의 고정폭은 따르지 않는다 — Pretendard + 고정폭 숫자(083 FR-009)
     expect(flat(aside).fontSize).toBe(11);
     expect(flat(aside).fontWeight).toBe("600");
-    expect(String(flat(aside).fontFamily ?? "")).toMatch(/mono|Menlo/i);
+    expect(flat(aside).fontFamily).toBe(FONT.family);
+    expect(flat(aside).fontVariant).toContain("tabular-nums");
     expect(flat(aside).color).toBe(COLORS.textMuted);
     expect(
       within(screen.getByTestId("settings-title-row")).getByTestId("settings-title-aside"),

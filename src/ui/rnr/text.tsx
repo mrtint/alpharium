@@ -4,7 +4,7 @@
  * 원본: github.com/founded-labs/react-native-reusables
  *       packages/registry/src/nativewind/components/ui/text.tsx (main @ 385834c, 2026-09-28)
  * 바꾼 것: 글자 변형(h1~muted)과 웹 갈래를 뺐다 — 대화상자·메뉴는 기본 하나만 쓴다. 경로 별칭 `@/`를
- * 상대 경로로.
+ * 상대 경로로. 083 — 공통 글자 스타일(`TEXT_FONT`, Pretendard)을 스타일 맨 앞에 둔다(className은 그대로).
  *
  * **대화상자·메뉴 부품 안에서만 쓴다**(Clarifications Q3, contracts DEP2). 화면의 글자는 기존
  * `components/Text.tsx`(`AppText`)다.
@@ -14,17 +14,25 @@ import { createContext, useContext, type ComponentProps } from "react";
 import { Text as RNText } from "react-native";
 
 import { cn } from "./utils";
+import { TEXT_FONT } from "../theme/tokens";
 
 const TextClassContext = createContext<string | undefined>(undefined);
 
 function Text({
   className,
   asChild = false,
+  style,
   ...props
 }: ComponentProps<typeof RNText> & { asChild?: boolean }) {
   const textClass = useContext(TextClassContext);
   const Component = asChild ? Slot : RNText;
-  return <Component className={cn("text-foreground text-base", textClass, className)} {...props} />;
+  return (
+    <Component
+      className={cn("text-foreground text-base", textClass, className)}
+      style={[TEXT_FONT, style]}
+      {...props}
+    />
+  );
 }
 
 export { Text, TextClassContext };

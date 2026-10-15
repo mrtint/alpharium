@@ -17,7 +17,7 @@
 
 import { Text as RNText, type TextProps } from "react-native";
 
-import { COLORS, TYPE } from "../theme/tokens";
+import { COLORS, TEXT_FONT, TYPE } from "../theme/tokens";
 
 export type TextVariant = "title" | "sectionTitle" | "body" | "bodyStrong" | "caption";
 
@@ -49,7 +49,10 @@ export function AppText({ variant = "body", style, className, ...rest }: AppText
       // 066 — iOS 기본 줄바꿈은 글자 단위라 「처음 뵙겠습/니다.」처럼 낱말 가운데서 갈린다.
       // 화면 문구가 전부 한국어이므로 기본값으로 낱말 단위를 준다. 안드로이드는 무시한다.
       lineBreakStrategyIOS="hangul-word"
+      // 083 — 서체는 공통 글자 스타일(`TEXT_FONT`)이 맨 앞에서 정한다. 화면의 `style`은 크기·굵기를 덮을 수 있지만
+      // 서체를 고르지 않는다(F1이 다른 파일의 `fontFamily`를 막는다).
       style={[
+        TEXT_FONT,
         {
           fontSize: type.fontSize,
           fontWeight: type.fontWeight,
