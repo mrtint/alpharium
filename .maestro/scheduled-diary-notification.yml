@@ -63,7 +63,7 @@ appId: com.a810labs.pocketlog
 
 # ★ M3 — **배터리 행과 보조 문구가 있다**(055 — 앱 정보 화면으로 간다).
 - assertVisible:
-    text: ".*제한 없음으로 두면 제때 써요.*"
+    text: ".*제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요.*"
 
 # ★ 원칙 II — **정밀도를 암시하는 문구가 없다**(FR-002).
 - assertNotVisible:

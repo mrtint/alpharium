@@ -77,23 +77,28 @@ export async function loadAutoDiarySettings(
   try {
     const raw = await port.read();
     if (raw === null) return { ...DEFAULT_AUTO_DIARY_SETTINGS };
-
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) {
-      return { ...DEFAULT_AUTO_DIARY_SETTINGS };
-    }
-
-    const obj = parsed as Record<string, unknown>;
-    return {
-      enabled: typeof obj.enabled === "boolean" ? obj.enabled : false,
-      targetHour: validHour(obj.targetHour)
-        ? obj.targetHour
-        : DEFAULT_AUTO_DIARY_SETTINGS.targetHour,
-      // `batteryExceptionPrompted`가 남아 있어도 무시한다(021이 필드를 제거).
-    };
+    return parseAutoDiarySettings(raw);
   } catch {
     return { ...DEFAULT_AUTO_DIARY_SETTINGS };
   }
+}
+
+/**
+ * 저장된 문자열을 설정으로 옮긴다. **깨졌으면 던진다** — `loadAutoDiarySettings`는 그것을 기본값으로 삼키고(종전 그대로),
+ * 085 쓸 차례 알림의 맞추기는 「읽지 못함」으로 다뤄 예약을 바꾸지 않는다(085 research R18).
+ */
+export function parseAutoDiarySettings(raw: string): AutoDiarySettings {
+  const parsed: unknown = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    throw new Error("auto-diary settings: not an object");
+  }
+
+  const obj = parsed as Record<string, unknown>;
+  return {
+    enabled: typeof obj.enabled === "boolean" ? obj.enabled : false,
+    targetHour: validHour(obj.targetHour) ? obj.targetHour : DEFAULT_AUTO_DIARY_SETTINGS.targetHour,
+    // `batteryExceptionPrompted`가 남아 있어도 무시한다(021이 필드를 제거).
+  };
 }
 
 /**

@@ -20,10 +20,10 @@
   - DATE 트리거: `DateTrigger(channelId, timestamp)`, `nextTriggerDate`는 그 시각이 지나면 `null`이다. 지난 시각을 걸면 저장하지 않고 지운다.
   - iOS: `TriggerRecords.swift`의 `DateTriggerRecord`(96–110)는 날짜 트리거를 `UNTimeIntervalNotificationTrigger(timeInterval: date.timeIntervalSinceNow)`로 바꾼다. 예약표에는 처음 간격만 남아 울릴 시각을 되읽을 수 없다. 그래서 울릴 시각은 알림 `data.at`에 함께 싣는다(R16). OS가 전달한다.
 - **Decision**: DATE 트리거로 날짜별 일회 예약을 건다. `SCHEDULE_EXACT_ALARM`은 더하지 않는다(Play가 알람·캘린더 앱에 제한, spec FR-019).
-- **짐작(실기기 quickstart §3에서 본다)**:
-  - 얼어 있는 프로세스(`freezer:/frozen`)에 알람 브로드캐스트가 닿는가
-  - Doze에서 부정확한 알람의 지연
-  - 게시된 예약 알림을 같은 id로 `dismissNotificationAsync`할 수 있는가
+- **실측(2026-10-15 SM-S901N, quickstart 「실측」)** — 짐작이던 셋:
+  - **얼어 있는 프로세스에는 닿지 않는다.** 삼성 `AlarmManager`가 `Deferring alarm … due to freecess`로 미룬다(45분 넘게, 화면을 켜도). 프로세스가 죽으면 미뤄진 알람이 곧바로 전달되어 게시된다. 그래서 이 기기에서 배터리 예외가 없는 사용자의 쓸 차례 알림은 **「캐시 프로세스가 정리될 때까지」 늦는다** — 이 기능의 핵심 가정이 부분적으로만 성립한다(소유자 결정 대상).
+  - Doze 지연: 첫 알람 `window=+42m`, 다음 날부터 `window=+1h`(부정확 알람의 허용 폭 — 실제 지연은 얼림에 가려 재지 못했다).
+  - 예약 id로 게시된 알림을 거둘 수 있다 — `notification_cancel … diary-reminder-2026-10-15`(사유 8). 거둔 뒤 완성 알림이 118ms 뒤에 게시됐다.
 
 ## R3. DAILY 반복을 고르지 않는다
 
@@ -73,7 +73,7 @@
 
 - **소스**: `task.ts`는 `loadSelection(expoSelectionPort())`로 캐릭터를 읽고 없으면 `no-character`로 건너뛴다. 이름은 `displayNameOf(character, await loadCustomNames(...))`다.
 - **Decision**: 맞추기도 같은 통로로 캐릭터·이름을 읽는다.
-  - 고른 캐릭터가 없으면 계획이 빈다. 자동 쓰기가 돌 수 없는 상태에서 「쓸 차례」를 알리지 않는다.
+  - ~~고른 캐릭터가 없으면 계획이 빈다~~ → **구현 중 실기기에서 뒤집혔다**(2026-10-15): 홈의 쓰기(`resolveGenerationParams`)는 선택 파일이 없으면 첫 실행 기본 캐릭터로 쓴다. 선택 파일은 홈의 쓰기가 성공할 때만 생기므로, 첫 실행 자동 첫 일기만 있는 사용자는 선택 없이도 열면 쓴다 — 그런데 예약이 하나도 걸리지 않았다. 맞추기도 홈과 같은 규칙(`선택 ?? ONBOARDING_DEFAULT_CHARACTER`)으로 이름을 정한다. 백그라운드 태스크는 여전히 선택 없이는 쓰지 않는다(`no-character`, 바꾸지 않는다).
   - 이름을 못 읽으면 기본 이름이다(035 N3).
 
 ## R9. 062 골든 — 바뀐 값을 드러내는 방법
@@ -193,3 +193,18 @@
   - CL6을 「키는 `claimAutoWrite,rearmAutoWrite,spendAutoWrite`, 소모를 되돌리는 길은 쓸 차례 알림 응답의 `rearmAutoWrite`뿐」으로 고친다.
   - 082 계약 문서·머리 주석·AGENTS에 「→ 085 FR-023」을 단다.
   - `rearmAutoWrite`는 정체가 바뀌지 않는다(`useCallback(…, [])`, state는 updater로 올린다). 마운트 effect(`lastResponse`·`onResponse`)의 deps에 넣어도 그 effect가 다시 돌지 않는다.
+
+## R22. 기존 계약이 잠그는 자리 (T002, 구현 전 읽기)
+
+| 파일 | 단언 | 이 기능에서 |
+| --- | --- | --- |
+| `__tests__/schedule/notification-port.test.ts` 67–74 | `trigger: null`, `trigger: {`·`DAILY` 금지 | CH1로 바꾼다(T034) |
+| 같은 파일 19–39 | `NotificationPort` 키 집합 | 그대로(CH3) |
+| `__tests__/schedule/background-generation.test.ts` 223–411 | `present` 호출 여부·제목 | 그대로 — 태스크 대역에 `reconcileReminders` 주입(T033) |
+| `__tests__/app/app-auto-write-source.test.ts` OP6·OP7·WP1–WP3 | 구간에 알림 통로 없음·`src/schedule/`에 `AppState` 없음·지우기 순서 | OP6 확장(SY4), 나머지 그대로 |
+| `__tests__/app/use-auto-write-claim.test.tsx` 128–133 (CL6) | 반환 키 `claimAutoWrite,spendAutoWrite` | RA8로 개정(T013) |
+| `__tests__/config/day-boundary-source.test.ts` DB11 | ALLOWED 밖 `getHours()` 금지 | `reminder-summary.ts`를 이유와 함께 올린다(T024) |
+| `__tests__/i18n/ko-golden.test.ts` G1·G2 | 리터럴 52·81·102·207·221·236행, 출력 `SETTINGS_TEXT`·`previewSentence` 여덟·`permission(notifications|battery-exception)` 넷 | `CHANGED_AFTER_GOLDEN`(T003) |
+| `__tests__/app/target-hour.test.ts`·`battery-row.test.ts`·`ui/settings-screen.test.tsx`·`ui/settings-battery-row.test.tsx`·`onboarding/requirements.test.ts` | 옛 문구 리터럴 | 새 문구로(T006) |
+| `.maestro/settings-time-place.yml` 106·`.maestro/scheduled-diary-notification.yml` 66 | 옛 문구 | 새 문구로(T006), 실기기에서 한 번 돈다(T044) |
+| SL3(`app-auto-write-source` 또는 skipped-line 소스 계약) | `photoSkipText` 넘김 꼴·한 번 | 그대로 — 알림 줄은 같은 꼴로 따로(T041) |

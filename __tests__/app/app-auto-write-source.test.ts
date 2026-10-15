@@ -37,7 +37,8 @@ describe("OP1 — 앱 열기 자동 쓰기의 문", () => {
   it("claimAutoWrite가 040 첫 실행 표식과 이미 시작했는가를 읽는다", () => {
     expect(CLAIM).toMatch(
       // 064 — 흉내 기록을 읽기 전에는 판정하지 않고, 흉내 중이면 한 번을 소모하고 거짓이다(simulation-wiring AF3)
-      /const claimAutoWrite = useCallback\(\(\) => \{\s*if \(!simulationLoaded\) return false;\s*if \(firstRunTried\.current \|\| claimed\.current\) return false;\s*claimed\.current = true;\s*return !writeBlocked;/,
+      // 085 — 「한 번」은 세대로 든다(쓸 차례 알림을 누르면 다시 연다 — FR-023). 그 세대에서 소모했으면 거짓이다.
+      /const claimAutoWrite = useCallback\(\(\) => \{\s*if \(!simulationLoaded\) return false;\s*if \(firstRunTried\.current \|\| spentIn\.current === generation\) return false;\s*spentIn\.current = generation;\s*return !writeBlocked;/,
     );
   });
 
@@ -126,6 +127,63 @@ describe("OP6 — 앱 열기 경로는 알림을 보내지 않는다", () => {
     expect(CLAIM).not.toMatch(/expoNotificationPort|\.present\(|expo-notifications/);
     const home = strip(readFileSync(join(ROOT, "src/ui/DiaryHomeScreen.tsx"), "utf8"));
     expect(home).not.toMatch(/expoNotificationPort|\.present\(|expo-notifications/);
+  });
+
+  it("085 SY4 — DiarySection과 홈은 쓸 차례 알림 통로에도 닿지 않는다", () => {
+    const section = APP.slice(
+      APP.indexOf("function DiarySection("),
+      APP.indexOf("function SettingsSection("),
+    );
+    const home = strip(readFileSync(join(ROOT, "src/ui/DiaryHomeScreen.tsx"), "utf8"));
+    for (const code of [section, home]) {
+      expect(code).not.toMatch(/expo-notifications|reminder-port|reconcileReminders/);
+    }
+  });
+});
+
+describe("085 — 쓸 차례 알림의 조립", () => {
+  it("SY1 — AppFrame이 맞추기 훅을 정확히 한 번 쓴다(설정·이름을 넘긴다)", () => {
+    expect(APP.match(/useReminderSync\(/g)).toHaveLength(1);
+    expect(APP).toMatch(
+      /useReminderSync\(\{\s*liveWrites,\s*settings: settingsValues\?\.autoDiary \?\? null,\s*names: namesLoaded \? customNames : undefined,\s*\}\)/,
+    );
+  });
+
+  it("FG3 — 앞에서 받은 알림의 보임새는 notificationBehaviorFor가 정한다", () => {
+    const handler = APP.slice(APP.indexOf("setNotificationHandler({"));
+    expect(handler.slice(0, handler.indexOf("});"))).toMatch(
+      /handleNotification: async \(notification\) => notificationBehaviorFor\(notification\)/,
+    );
+  });
+
+  it("ST — 알림 꺼짐 줄은 notificationOffLine이 한 번 정하고 그 값만 넘긴다", () => {
+    expect(APP.match(/notificationOffLine\(/g)).toHaveLength(1);
+    expect(APP).toMatch(
+      /const notificationOffText = notificationOffLine\(\s*autoDiary\?\.enabled === true,\s*permissionTags\.notifications,?\s*\);/,
+    );
+    expect(APP).toMatch(
+      /\{\.\.\.\(notificationOffText !== undefined \? \{ notificationOffText \} : \{\}\)\}/,
+    );
+  });
+
+  it("DV2 — 개발자 겹이 열릴 때 예약표를 읽어 줄을 만들고, 읽지 못하면 줄이 없다", () => {
+    const effect = APP.slice(APP.indexOf("void expoReminderPort()"));
+    const body = effect.slice(0, effect.indexOf("});"));
+    expect(body).toMatch(/\.scheduled\(\)/);
+    expect(body).toMatch(/setDeveloperReminderLine\(reminderSummaryLine\(list\)\)/);
+    expect(body).toMatch(/\(\) => \{\s*if \(alive\) setDeveloperReminderLine\(undefined\);\s*\}/);
+    const before = APP.slice(0, APP.indexOf("void expoReminderPort()"));
+    expect(before.slice(before.lastIndexOf("useEffect(() => {"))).toMatch(
+      /if \(route !== "developer"\) return;/,
+    );
+  });
+
+  it("RA6 — 웜 응답이 쓸 차례 알림이면 「한 번」을 다시 연다", () => {
+    const response = APP.slice(APP.indexOf("notificationPort.onResponse("));
+    expect(response.slice(0, response.indexOf("});"))).toMatch(
+      /if \(isWriteReminderResponse\(r\)\) rearmAutoWriteRef\.current\(\);/,
+    );
+    expect(APP).toMatch(/rearmAutoWriteRef\.current = rearmAutoWrite;/);
   });
 });
 

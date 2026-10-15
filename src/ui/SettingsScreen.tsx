@@ -56,6 +56,11 @@ export type SettingsScreenProps = {
   versionText: string | null;
   /** 057 — 사진 행의 건너뜀 보조 줄(보드 `6g`). 없으면 그리지 않는다 */
   photoSkipText?: string;
+  /**
+   * 085 — 자동 쓰기가 켜져 있고 알림이 「허용 안 함」일 때 알림 행 아래 빨간 보조 줄(「알림이 꺼져 있어 쓸 차례를 알리지 못해요」).
+   * 판정은 조립부가 `notificationOffLine`으로 한다 — 화면은 문자열만 받는다.
+   */
+  notificationOffText?: string;
   /** 058 — 「쓰는 모듈」 값(「2.0GB」). 못 읽었으면 `null` — 값을 비운다 */
   moduleSizeText: string | null;
   /** 058 — 「일기 모두 지우기」를 누를 수 있는가(편수 > 0, 지우는 중 아님) */
@@ -90,6 +95,7 @@ export function SettingsScreen({
   batteryHint,
   versionText,
   photoSkipText,
+  notificationOffText,
   moduleSizeText,
   wipeEnabled,
   onOpenWipe,
@@ -145,6 +151,9 @@ export function SettingsScreen({
             label={label}
             {...(key === "photos" && photoSkipText !== undefined
               ? { hint: photoSkipText, hintTone: "danger" as const }
+              : {})}
+            {...(key === "notifications" && notificationOffText !== undefined
+              ? { hint: notificationOffText, hintTone: "danger" as const }
               : {})}
             onPress={onOpenAppSettings}
             testID={`settings-perm-${key}`}

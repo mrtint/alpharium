@@ -44,6 +44,11 @@ export type DeveloperScreenProps = {
    */
   failures: readonly FailureLine[];
   /**
+   * 085 — 운영체제 예약표에서 읽은 쓸 차례 예약 한 줄(「쓸 차례 알림 · N개 예약 · 다음 M월 d일 H시」). 읽지 못했으면 없다 —
+   * 「없음」으로 단정하지 않는다(spec FR-022). 배포 빌드에서도 그린다(TestFlight 스크린샷으로 iOS 예약을 확인할 자리).
+   */
+  reminderLine?: string;
+  /**
    * 064 — 「상태 흉내」 묶음(보드 `6e` ③). **개발 환경일 때만 조립부가 넘긴다**(S7) — 없으면 묶음 자체가 없다. 화면은 상태를 그리고 누름을
    * 알릴 뿐이다(저장·효력은 `use-simulation.ts`).
    */
@@ -66,6 +71,7 @@ export function DeveloperScreen({
   onOpenDiagnostics,
   attempts,
   failures,
+  reminderLine,
   simulation,
 }: DeveloperScreenProps) {
   return (
@@ -162,6 +168,13 @@ export function DeveloperScreen({
 
       {/* 081 — 시도 묶음 바로 아래, 새 맨 아래다: 위 행들의 자리가 바뀌지 않고 스크린샷 한 장에 두 묶음이 함께 찍힌다 */}
       <FailuresGroup failures={failures} idPrefix="developer" />
+
+      {/* 085 — 실패 묶음 아래, 새 맨 아래다: 위 행들의 자리가 바뀌지 않는다 */}
+      {reminderLine !== undefined ? (
+        <View style={{ marginTop: SETTINGS.group.marginTop }}>
+          <Row label={reminderLine} testID="developer-reminder-line" />
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -60,7 +60,7 @@ describe("TD1 — 열린 모양", () => {
       selected: true,
     });
     expect(screen.getByTestId("target-hour-preview")).toHaveTextContent(
-      "매일 오후 10시쯤 그날 일기를 써요. 이미 쓴 날은 건너뛰어요.",
+      "매일 오후 10시쯤 그날 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.",
     );
     expect(screen.getByTestId("target-hour-cancel")).toBeTruthy();
     expect(screen.queryByText("저장")).toBeNull();
@@ -111,7 +111,7 @@ describe("TD2 — 형식별 격자", () => {
     expect(screen.queryByTestId("target-hour-am")).toBeNull();
     expect(screen.getAllByTestId(/^target-hour-cell-/)).toHaveLength(24);
     expect(screen.getByTestId("target-hour-preview")).toHaveTextContent(
-      "매일 22시쯤 그날 일기를 써요. 이미 쓴 날은 건너뛰어요.",
+      "매일 22시쯤 그날 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.",
     );
   });
 });
@@ -124,7 +124,7 @@ describe("TD3 — 오전/오후는 선택만 바꾼다", () => {
       selected: true,
     });
     expect(screen.getByTestId("target-hour-preview")).toHaveTextContent(
-      "매일 오전 10시쯤 어제 일기를 써요. 이미 쓴 날은 건너뛰어요.",
+      "매일 오전 10시쯤 어제 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.",
     );
     expect(onSelect).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();

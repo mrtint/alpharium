@@ -17,7 +17,7 @@
 
 ## RC — 맞추기 (`src/schedule/reminders.ts`)
 
-`reconcileReminders(deps): Promise<void>`. deps는 `{ port: ReminderPort, now: () => Date, prepare: () => Promise<void>, loadSettings: () => Promise<AutoDiarySettings>, listDiaryDays: () => Promise<readonly DayDate[]>, loadName: () => Promise<string | null> }`다. `loadSettings`·`listDiaryDays`는 읽지 못하면 던진다(research R18).
+`reconcileReminders(deps): Promise<void>`. deps는 `{ port: ReminderPort, now: () => Date, prepare: () => Promise<void>, loadSettings: () => Promise<AutoDiarySettings>, listDiaryDays: () => Promise<readonly DayDate[]>, loadName: () => Promise<string | null> }`다. `loadSettings`·`listDiaryDays`·`loadName`은 읽지 못하면 던진다(research R18).
 
 - **RC1** 차이만 고친다(research R16).
   1. `prepare()`
@@ -30,11 +30,12 @@
 - **RC3** 어떤 통로가 던져도 밖으로 던지지 않고 남은 단계를 이어 간다.
   - `prepare`가 던져도 계속한다.
   - `cancel` 하나가 던져도 나머지를 이어 간다. `schedule` 하나가 던져도 같다.
-  - `scheduled()`가 던지면 취소 없이 계획 전부를 `schedule`한다(같은 id는 바꿔 낀다).
+  - `scheduled()`가 던지면 계획 전부를 `schedule`하고(같은 id는 바꿔 낀다), 우리 예약이 있을 수 있는 날(어제 ~ 8일 뒤)의 id 중 계획에 없는 것을 `cancel`한다(꺼졌는데 예약이 남지 않게 — 코드 리뷰 반영).
   - `presented()`가 던지면 거두기를 건너뛴다.
 - **RC4** 동시에 불려도 한 줄로 선다 — 모듈 하나의 순서 줄이 앞 맞추기가 끝난 뒤 다음을 시작한다.
 - **RC5** 설정·일기 목록·이름은 부를 때마다 deps로 다시 읽는다.
-- **RC6** `loadSettings`나 `listDiaryDays`가 던지면 `cancel`·`schedule`·`dismiss`를 하나도 하지 않는다(research R18).
+- **RC6** `loadSettings`·`listDiaryDays`·`loadName`(켜져 있을 때) 중 하나라도 던지면 `cancel`·`schedule`·`dismiss`를 하나도 하지 않는다(research R18).
+- **RC8** 시각이 지났지만(`at <= now`) 아직 걸려 있는 예약은, 켜져 있고 그 날을 안 썼고 그 날이 `selectableDays(now)` 안이면 취소하지 않는다 — 부정확 알람·삼성 얼림 동안은 아직 전달 전이다(085 실기기 2026-10-15: 17:01:53 백그라운드 잡의 맞추기가 아직 안 뜬 17:00 예약을 취소함). `scheduled()`를 읽지 못한 경로도 켜져 있으면 쓴 날의 id만 취소한다.
 - **RC7** `src/schedule/reminders.ts`·`reminder-plan.ts`·`reminder-port.ts`·`reminder-deps.ts`는 `AppState`·`react-native`를 참조하지 않는다(OP7). `reminders.ts`·`reminder-plan.ts`는 `../app/`을 import하지 않는다.
 
 ## RD — 기본 조립 (`src/schedule/reminder-deps.ts`)
@@ -44,13 +45,13 @@
 - **RD1** `prepare`는 `expoNotificationPort().ensureChannel()`이다.
 - **RD2** `loadSettings`는 설정 통로의 `read()`를 직접 부른다. 던지면 던지고, 해석에 실패하면(깨진 JSON) 던지고, `null`(파일 없음)이면 기본값이다. 읽은 문자열의 해석은 `src/schedule/settings.ts`의 해석 함수를 쓴다. 해석 함수가 export되지 않았으면 그 파일에 `parseAutoDiarySettings`를 export로 뗀다.
 - **RD3** `listDiaryDays`는 `fileStore(expoFileSystemPort("diary")).listDays()`다(App.tsx와 같은 통로). 실패는 던진다.
-- **RD4** `loadName`: `loadSelection(expoSelectionPort())`가 `null`이면 `null`을 준다. 아니면 `displayNameOf(character, names ?? await loadCustomNames(...).catch(() => ({})))`다. `names`가 주어지면 파일을 읽지 않는다. `undefined`면 파일을 읽는다(research R19).
+- **RD4** `loadName`: 캐릭터는 `loadSelection(expoSelectionPort()) ?? ONBOARDING_DEFAULT_CHARACTER`다(홈의 `resolveGenerationParams`와 같은 규칙 — research R8, 구현 중 실기기에서 바뀜). 이름은 `displayNameOf(character, names ?? await loadCustomNames(...).catch(() => ({})))`다. `names`가 주어지면 파일을 읽지 않는다. `undefined`면 파일을 읽는다(research R19).
 
 ## RT — 통로 (`src/schedule/reminder-port.ts`)
 
 `ReminderPort`는 `{ scheduled(); schedule(entry); cancel(id); presented(); dismiss(id) }`이다.
 
-- **RT1** `expo-notifications`는 메서드 안에서 `await import`한다.
+- **RT1** `expo-notifications`는 메서드 안에서 불러온다(`expoReminderPort(load = () => import("expo-notifications"))` — jest `logic`에서는 동적 import가 돌지 않아 `load`로 대역을 넘긴다).
 - **RT2** `schedule`은 `scheduleNotificationAsync({ identifier: entry.id, content: { title: entry.title, data: { day: entry.day, kind: "write-reminder", at: entry.at } }, trigger: { type: SchedulableTriggerInputTypes.DATE, date: entry.at, channelId: REMINDER_CHANNEL_ID } })`를 부른다. 본문(`body`)은 없다.
 - **RT3** `scheduled()`는 `getAllScheduledNotificationsAsync()`의 결과를 접두사로 거르고 `{ id, day, at, title }`를 준다(data-model — 트리거를 되읽지 않는다). `presented()`는 `getPresentedNotificationsAsync()`의 결과를 `request.identifier` 접두사로 거르고 `{ id, day }`를 준다. 둘 다 **실패하면 던진다**(빈 목록으로 바꾸지 않는다).
 - **RT4** `cancel`·`dismiss`는 대상이 없어도 던지지 않는다.
@@ -69,7 +70,7 @@
 ## CH — 채널과 완성 알림 (`src/schedule/notification-port.ts`, `task.ts`)
 
 - **CH1** `present`는 `trigger: { channelId: CHANNEL_ID }`를 보낸다(C2). 이 파일에는 `SchedulableTriggerInputTypes`·`DAILY`·`TIME_INTERVAL`·`date:`가 없다.
-- **CH2** `ensureChannel`은 `diary-completed`(「일기 완성 알림」)와 `diary-reminder`(「일기 쓸 시각 알림」)를 HIGH로 만든다.
+- **CH2** `ensureChannel`은 `diary-completed`(「일기 완성 알림」, HIGH)와 `diary-reminder`(「일기 쓸 시각 알림」, DEFAULT — 소유자 결정 2026-10-15)를 각각 따로 만든다(하나가 실패해도 다른 하나는 선다).
 - **CH3** `NotificationPort`의 키 집합은 그대로다(쓸 차례 통로는 따로 있다).
 - **CH4** `sendCompletionNotification`은 `present` 전에 `ensureChannel()`을 부른다(research R17). 실패는 삼킨다.
 
@@ -98,7 +99,7 @@
 
 - **ST1** `notificationOffLine(enabled, tag)`는 `enabled && tag === "denied"`일 때만 「알림이 꺼져 있어 쓸 차례를 알리지 못해요」를 주고, 그 밖은 `undefined`다(`unread`도 `undefined`).
 - **ST2** `SettingsScreen`의 알림 행이 `notificationOffText`를 빨간 보조 줄(`hintTone: "danger"`)로 그린다. 사진 행의 `photoSkipText`는 그대로다(SL3).
-- **ST3** `previewSentence(hour, format)`는 「매일 {시각}쯤 {그날|어제} 일기를 쓸 차례라고 알려요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.」다.
+- **ST3** `previewSentence(hour, format)`는 「매일 {시각}쯤 {그날|어제} 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.」다.
 - **ST4** `batteryRowHint("android")`는 「제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요」, `batteryRowHint("ios")`는 「저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요」다.
 - **ST5** `PERMISSION_REQUIREMENTS`의 알림·배터리 `rationale`·`ifDenied`가 FR-024의 넷이다.
 - **ST6** 카탈로그 `settings.ts`·`settings-platform.ts`·`onboarding.ts`에 「제때 써요」·「일기를 써요.」·「정한 시간대에」가 없다(SC-005).

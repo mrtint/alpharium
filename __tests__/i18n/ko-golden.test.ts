@@ -77,7 +77,8 @@ const ADDED_AFTER_GOLDEN: readonly string[] = [
   "끄기",
   "닫기",
   "사진 크게 보기",
-  "저전력 모드를 끄면 제때 써요",
+  // 068 → 085 — iOS 배터리 행을 사실대로(값만 바뀜). 옛 값은 「저전력 모드를 끄면 제때 써요」(068) — 골든 밖 문구라 CHANGED_AFTER_GOLDEN이 아니라 여기서 바꿨다
+  "저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요",
   "Wi-Fi에서 받는 게 좋아요",
   "나중에 받기",
   "다시 확인하기",
@@ -115,7 +116,132 @@ const ADDED_AFTER_GOLDEN: readonly string[] = [
   "다른 쓰기가 진행 중",
   // 080 — 시도 기록의 열넷째 갈래(합류한 홈의 그만두기·지우기가 끊은 쓰기)
   "사용자가 그만둠",
+  // 085 — 쓸 차례 알림(새 영역 `reminder`)
+  "${}${} ${}월 ${}일 일기를 쓸 차례예요",
+  "일기 쓸 시각 알림",
+  "알림이 꺼져 있어 쓸 차례를 알리지 못해요",
+  "쓸 차례 알림 · ${}개 예약 · 다음 ${}월 ${}일 ${}시",
+  "쓸 차례 알림 · 예약 없음",
 ];
+
+/**
+ * 골든 뒤에 **값이 바뀐** 문구 (085부터).
+ *
+ * 골든 json은 다시 쓰지 않는다(「이전」이 사라진다). 대신 바뀐 것마다 스펙 번호·옛 값(`from`)·새 값(`to`)을 여기 적는다 —
+ * 테스트는 골든에 `from`이 **있음을 먼저 단언**하고 `to`로 바꿔 비교한다(085 contracts GD1). 그래서 「바뀜」은 이 표에, 「이전」은 json에 남는다.
+ */
+type GoldenChange = {
+  spec: string;
+  literal?: { from: string; to: string };
+  outputs?: readonly { key: string; path?: string; from: string; to: string }[];
+};
+
+const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
+  {
+    spec: "085",
+    literal: {
+      from: "배터리 사용 · 제한 없음으로 두면 제때 써요",
+      to: "제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요",
+    },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "permBatteryHint",
+        from: "배터리 사용 · 제한 없음으로 두면 제때 써요",
+        to: "제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요",
+      },
+    ],
+  },
+  {
+    spec: "085",
+    literal: {
+      from: "매일 ${}쯤 ${} 일기를 써요. 이미 쓴 날은 건너뛰어요.",
+      to: "매일 ${}쯤 ${} 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.",
+    },
+    outputs: (
+      [
+        [0, "h12", "오전 12시", "어제"],
+        [0, "h24", "0시", "어제"],
+        [9, "h12", "오전 9시", "어제"],
+        [9, "h24", "9시", "어제"],
+        [12, "h12", "오후 12시", "그날"],
+        [12, "h24", "12시", "그날"],
+        [22, "h12", "오후 10시", "그날"],
+        [22, "h24", "22시", "그날"],
+      ] as const
+    ).map(([h, f, hour, day]) => ({
+      key: `previewSentence(${h},${f})`,
+      from: `매일 ${hour}쯤 ${day} 일기를 써요. 이미 쓴 날은 건너뛰어요.`,
+      to: `매일 ${hour}쯤 ${day} 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.`,
+    })),
+  },
+  ...(
+    [
+      [
+        "permission(notifications).rationale",
+        "정한 시간대에 일기가 다 쓰이면 알려 드리기 위해 씁니다.",
+        "쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.",
+      ],
+      [
+        "permission(notifications).ifDenied",
+        "일기가 완성돼도 바로 알려 드리지 못해요.",
+        "쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.",
+      ],
+      [
+        "permission(battery-exception).rationale",
+        "기기가 절전에 들어가도 정한 시간대에 일기를 쓰도록 허용을 요청합니다.",
+        "휴대폰이 절전에 들어가도 열지 않아도 먼저 써 둘 수 있게 허용을 요청합니다.",
+      ],
+      [
+        "permission(battery-exception).ifDenied",
+        "자동으로 쓰는 시간이 정한 때보다 많이 늦어질 수 있어요.",
+        "앱을 열 때까지 쓰지 못할 수 있어요.",
+      ],
+    ] as const
+  ).map(([key, from, to]) => ({
+    spec: "085",
+    literal: { from, to },
+    outputs: [{ key, from, to }],
+  })),
+];
+
+/** 골든 리터럴 집합에 바뀐 값을 얹는다 — `from`이 골든에 없으면 실패한다(V10) */
+function changedLiterals(golden: readonly string[]): string[] {
+  const set = new Set(golden);
+  for (const change of CHANGED_AFTER_GOLDEN) {
+    if (change.literal === undefined) continue;
+    expect({ spec: change.spec, inGolden: set.has(change.literal.from) }).toEqual({
+      spec: change.spec,
+      inGolden: true,
+    });
+    set.delete(change.literal.from);
+    set.add(change.literal.to);
+  }
+  return [...set].sort();
+}
+
+/** 골든 출력에 바뀐 값을 얹는다 — 그 자리가 `from`이 아니면 실패한다(V10) */
+function changedOutputs(golden: Record<string, string>): Record<string, string> {
+  const out = { ...golden };
+  for (const change of CHANGED_AFTER_GOLDEN) {
+    for (const o of change.outputs ?? []) {
+      if (o.path === undefined) {
+        expect({ key: o.key, value: out[o.key] }).toEqual({ key: o.key, value: o.from });
+        out[o.key] = o.to;
+      } else {
+        const parsed = JSON.parse(out[o.key]) as Record<string, unknown>;
+        expect({ key: o.key, path: o.path, value: parsed[o.path] }).toEqual({
+          key: o.key,
+          path: o.path,
+          value: o.from,
+        });
+        parsed[o.path] = o.to;
+        out[o.key] = JSON.stringify(parsed);
+      }
+    }
+  }
+  return out;
+}
 
 /** 한국어 카탈로그 파일 전부 */
 function catalogFiles(): string[] {
@@ -261,7 +387,7 @@ describe("062 G1 — 화면 문구 리터럴 집합이 이관 전과 같다", ()
     const now = currentLiterals();
     if (WRITE) writeFileSync(LITERALS_GOLDEN, JSON.stringify(now, null, 2) + "\n");
     const golden = JSON.parse(readFileSync(LITERALS_GOLDEN, "utf8")) as string[];
-    expect(now).toEqual(golden);
+    expect(now).toEqual(changedLiterals(golden));
   });
 });
 
@@ -270,6 +396,6 @@ describe("062 G2 — 문구 함수·상수의 출력이 이관 전과 바이트 
     const now = outputs();
     if (WRITE) writeFileSync(OUTPUTS_GOLDEN, JSON.stringify(now, null, 2) + "\n");
     const golden = JSON.parse(readFileSync(OUTPUTS_GOLDEN, "utf8")) as Record<string, string>;
-    expect(now).toEqual(golden);
+    expect(now).toEqual(changedOutputs(golden));
   });
 });

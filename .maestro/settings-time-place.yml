@@ -103,7 +103,7 @@ appId: com.a810labs.pocketlog
     timeout: 5000
 - tapOn:
     id: "target-hour-am"
-- assertVisible: "매일 오전 9시쯤 어제 일기를 써요. 이미 쓴 날은 건너뛰어요."
+- assertVisible: "매일 오전 9시쯤 어제 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요."
 - tapOn:
     id: "target-hour-cancel"
 - extendedWaitUntil:

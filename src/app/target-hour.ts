@@ -64,7 +64,7 @@ export function formatTargetHour(hour: number, format: HourFormat): string {
   return text().targetHour.approx(hourText(hour, format));
 }
 
-/** 미리보기 — 「매일 오후 10시쯤 그날 일기를 써요. 이미 쓴 날은 건너뛰어요.」(보드 `time.preview`, 오전은 「어제」) */
+/** 미리보기 — 「매일 오후 10시쯤 그날 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.」(보드 `time.preview`, 오전은 「어제」) */
 export function previewSentence(hour: number, format: HourFormat): string {
   const T = text().targetHour;
   const day = hour < 12 ? T.previewYesterday : T.previewSameDay;

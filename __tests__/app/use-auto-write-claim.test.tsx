@@ -28,6 +28,8 @@ function Harness({ onResult, ...deps }: Props) {
     <>
       <Pressable onPress={() => onResult(claim.claimAutoWrite())} testID="claim" />
       <Pressable onPress={() => onResult(claim.spendAutoWrite())} testID="spend" />
+      <Pressable onPress={() => onResult(claim.rearmAutoWrite())} testID="rearm" />
+      <Pressable onPress={() => onResult(claim)} testID="snapshot" />
       <Text testID="keys">{Object.keys(claim).sort().join(",")}</Text>
     </>
   );
@@ -44,6 +46,8 @@ const base = (over: Partial<Props> = {}): Props => ({
 const results = (props: Props) => (props.onResult as jest.Mock).mock.calls.map(([v]) => v);
 const claim = () => fireEvent.press(screen.getByTestId("claim"));
 const spend = () => fireEvent.press(screen.getByTestId("spend"));
+const rearm = () => fireEvent.press(screen.getByTestId("rearm"));
+const snapshot = () => fireEvent.press(screen.getByTestId("snapshot"));
 
 describe("CL1 — 흉내 기록을 읽기 전에는 판정하지 않는다", () => {
   it("읽기 전에는 거짓이고 소모하지 않는다 — 읽은 뒤에는 참이다", async () => {
@@ -125,10 +129,71 @@ describe("CL5 — 묻지 않고 소모한다 (082 — 일기 모두 지우기)",
   });
 });
 
-describe("CL6 — 소모는 되돌릴 수 없다", () => {
-  it("훅이 돌려주는 것에 되살리는 함수가 없다", async () => {
+describe("CL6 — 소모를 되돌리는 길은 쓸 차례 알림의 rearm 하나다 (085 FR-023 예외, RA8)", () => {
+  it("훅이 돌려주는 것은 셋이다", async () => {
     await render(<Harness {...base()} />);
-    expect(screen.getByTestId("keys").props.children).toBe("claimAutoWrite,spendAutoWrite");
+    expect(screen.getByTestId("keys").props.children).toBe(
+      "claimAutoWrite,rearmAutoWrite,spendAutoWrite",
+    );
+  });
+});
+
+describe("085 RA — 쓸 차례 알림을 누르면 한 번 더", () => {
+  it("RA1 — 소모한 뒤 다시 열면 참이다", async () => {
+    const props = base();
+    await render(<Harness {...props} />);
+    await claim();
+    await claim();
+    await rearm();
+    await claim();
+    expect(results(props)).toEqual([true, false, undefined, true]);
+  });
+
+  it("RA1 — 지우기로 소모한 뒤에도 다시 연다", async () => {
+    const props = base();
+    await render(<Harness {...props} />);
+    await spend();
+    await rearm();
+    await claim();
+    expect(results(props)).toEqual([undefined, undefined, true]);
+  });
+
+  it("RA2 — 다시 열면 claimAutoWrite의 정체가 바뀌고 rearmAutoWrite는 그대로다", async () => {
+    const props = base();
+    await render(<Harness {...props} />);
+    await snapshot();
+    await rearm();
+    await snapshot();
+    const [before, , after] = results(props) as {
+      claimAutoWrite: unknown;
+      rearmAutoWrite: unknown;
+    }[];
+    expect(after!.claimAutoWrite).not.toBe(before!.claimAutoWrite);
+    expect(after!.rearmAutoWrite).toBe(before!.rearmAutoWrite);
+  });
+
+  it("RA3 — 첫 실행·흉내가 앞선다", async () => {
+    const first = base({ firstRunTried: { current: true } });
+    const view = await render(<Harness {...first} />);
+    await rearm();
+    await claim();
+    expect(results(first)).toEqual([undefined, false]);
+
+    const blocked = base({ writeBlocked: true });
+    await view.rerender(<Harness {...blocked} />);
+    await rearm();
+    await claim();
+    expect(results(blocked)).toEqual([undefined, false]);
+  });
+
+  it("RA4 — 누름 하나에 한 번이다", async () => {
+    const props = base();
+    await render(<Harness {...props} />);
+    await claim();
+    await rearm();
+    await claim();
+    await claim();
+    expect(results(props)).toEqual([true, undefined, true, false]);
   });
 });
 

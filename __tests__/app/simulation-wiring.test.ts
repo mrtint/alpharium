@@ -59,8 +59,9 @@ describe("AF3 — 앱 열기 자동 쓰기의 claim", () => {
   });
 
   it("막혀 있으면 한 번을 소모하고 거짓", () => {
-    expect(claim()).toMatch(/claimed\.current = true;\s*return !writeBlocked;/);
-    expect(CLAIM).toMatch(/if \(writeBlocked\) claimed\.current = true;/);
+    // 085 — 「한 번」은 세대로 든다(쓸 차례 알림의 rearm). 소모는 「그 세대에서 소모했다」이다.
+    expect(claim()).toMatch(/spentIn\.current = generation;\s*return !writeBlocked;/);
+    expect(CLAIM).toMatch(/if \(writeBlocked\) spentIn\.current = generation;/);
     // 조립부가 흉내의 두 값을 그대로 넘긴다.
     expect(APP).toMatch(
       /useAutoWriteClaim\(\{\s*simulationLoaded: simulation\.loaded,\s*writeBlocked,/,
