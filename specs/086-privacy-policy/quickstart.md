@@ -109,4 +109,8 @@ bash -c '<pages.yml의 검사 명령>'
 
 ### 게시 (T032)
 
-(소유자가 자리표시자 값을 주고 Pages를 켠 뒤 채운다.)
+- 자리표시자 값(소유자, 2026-10-15): `pocketlog.support@gmail.com` / `A810 Labs (남한산)` / `2026년 10월 20일`. 소유자가 채운 원문을 읽고 승인했다(PIPA 기재 항목 대조 포함). Play 위치 「공유 안 함」, 「일시 처리」·「전송 중 암호화」 「아니요」도 소유자 결정.
+- 소유자가 Settings → Pages → Source를 「GitHub Actions」로 켰다(`gh api …/pages`의 `build_type: workflow`).
+- 첫 머지 시도는 085가 먼저 머지돼 충돌 — `origin/main`에 rebase해 `.specify/feature.json`·`AGENTS.md`·골든·카탈로그 index를 양쪽 다 살려 풀고, 085가 바꾼 사실(쓸 차례 알림, 배터리 문구 「먼저 써 둘 때가 있어요」)에 맞춰 방침·지원 문장을 고쳤다. CI 넷(test·bundle·android·ios) 통과 뒤 PR #171 머지(`fbc668b`).
+- 「Pocketlog Pages」 run 38718454986 — 자리표시자 검사 포함 모든 단계 성공. `https://mrtint.github.io/alpharium/privacy/`·`/support/` 둘 다 HTTP 200, 게시본에 메일·운영자·시행일이 들어 있다.
+- **실기기 재확인(2026-10-16 07:02~07:04, SM-S901N dev, `main` 코드)**: 설정 「개인정보처리방침」 → Chrome에 게시된 방침(제목·시행일 2026년 10월 20일·한 줄 요약), 「도움말·문의」 → 게시된 지원 페이지(메일·방침 링크·자주 묻는 것). 앱을 다시 띄우려 `am force-stop`을 썼다 — 자동 쓰기 설정 파일이 없고(꺼짐) 우리 알람 0이라 085의 「강제 중지로 예약이 끊긴다」 위험에 걸리지 않았다. 끝나고 `stayon false`·`adb reverse` 해제·Metro 종료.
