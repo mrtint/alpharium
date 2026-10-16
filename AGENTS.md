@@ -35,8 +35,8 @@
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 2026-10-11 첫 실행 성공 — 약 13분 30초, Play 내부 테스트 versionCode 10 반영; 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
 - **화면 글자는 두 플랫폼 모두 앱에 넣은 Pretendard다**(083) — v1.3.9 정적 OTF 다섯(400~800)을 배포처 그대로 `assets/fonts/pretendard/`에 두고 expo-font config plugin이 빌드에 넣는다. 서체는 `tokens.ts`의 `FONT`·`TEXT_FONT` 한 곳에서 정하고, 설정 「정보」 → 「서체 라이선스」에 OFL 1.1 전문이 있다. 아래 「083」.
 - **개인정보처리방침·지원 페이지는 이 저장소의 `site/`이고 GitHub Pages로 올라간다**(086) — 설정 「정보」의 「개인정보처리방침」·「도움말·문의」가 기기 브라우저로 연다. 방침이 기대는 코드의 사실은 `__tests__/privacy/`가 잠근다. 아래 「086」.
-- **iOS는 시뮬레이터에서만 돌아 봤다**(066, 2026-10-08) — 첫 실행부터 일기 저장까지 간다. **실제 iPhone은 한 대도 없다**(메모리 한도·속도·백그라운드·TestFlight 미확인).
-  절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공 — 처리 통과·iPhone 설치는 미확인; 아래 「iOS 빌드·서명·TestFlight」).
+- **iOS는 실제 iPhone 한 대(iPhone 14, iOS 27.0.1)에서 087로 검증 중이다**(2026-10-16~) — TestFlight 빌드 12가 처리를 통과해 설치됐고, 첫 실행부터 첫 일기(사진 2장 · 사진 읽기 14.8초 · 본문 26.0초)까지 갔으며, OS가 BGTask로 앱을 깨운다(충전·Wi-Fi 조건에서 약 30분 간격). 백그라운드 완주·메모리·쓸 차례 알림은 진행 중 — 절차·통로는 `specs/087-ios-real-device-verify/quickstart.md`.
+  절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공, 빌드 12는 처리 통과·iPhone 설치 확인(087); 아래 「iOS 빌드·서명·TestFlight」).
 
 **이전 작업의 결론을 기억에서 꺼내 복원하지 않는다.** 헌법에 적힌 것만이 확정이다.
 헌법에 없는 이전 결론은 되돌려진 것이며, 복원하면 되돌린 의미가 없어진다.
@@ -1017,7 +1017,7 @@
 ### 078 — 자동 쓰기: 놓친 날 다시 쓰기와 시도 기록 (iOS 자동 쓰기 미동작 조사)
 
 - **iPhone에서 자동 쓰기가 안 되는 원인은 배선이 아니라 판정이었다**(2026-10-13, 코드·`expo-background-task`·`expo-task-manager` iOS 소스 읽기 — 실제 iPhone 없음). `Info.plist`(`BGTaskSchedulerPermittedIdentifiers`·`UIBackgroundModes: processing`)·모듈 최상단 `defineTask`·네이티브 큐잉은 bare 앱에서 성립한다. 그러나
-  iOS는 `BGProcessingTaskRequest` 하나를 `earliestBeginDate = +15분`·`requiresNetworkConnectivity = true`로 제출하고 실행 시점은 OS가 유휴·충전 조건에서 고른다(하루 한 번 안팎) — 020의 「목표 시각 +3시간 창」 안에 깨운다는 보장이 없어 `skipped`만 쌓였다.
+  iOS는 `BGProcessingTaskRequest` 하나를 `earliestBeginDate = +15분`·`requiresNetworkConnectivity = true`로 제출하고 실행 시점은 OS가 고른다(087 실기기: 맥에 USB로 꽂혀 충전·Wi-Fi인 오후에 약 30분 간격으로 깨웠다 — 배터리만일 때는 미확인) — 020의 「목표 시각 +3시간 창」 안에 깨운다는 보장이 없어 `skipped`만 쌓였다.
   스와이프 종료·백그라운드 앱 새로 고침 꺼짐·저전력 모드면 아예 깨우지 않고, 깨워도 시간 예산 만료·메모리로 정지되면 일기·알림·실패 기록이 모두 없다(expo의 만료 이벤트는 `userInfo["url"]` 가드 때문에 JS에 오지 않는다). **시뮬레이터는 `supportsBackgroundTasks()`가 거짓이라 어느 것도 재현하지 못한다.**
 - **판정**(020 D2 개정): `decideSchedule`이 `today`·`targetDay`를 주입받는다. **창 안**이면 종전대로 사흘 전부가 후보다. **창 밖**이면 차례가 이미 지난 날만 쓴다 — 오늘은 빼고(오늘은 창 안에서만),
   **창이 어제를 겨냥하는 오전 목표(`targetDay === "yesterday"`)는 오늘 목표 시각 전까지 어제도 뺀다**(리뷰에서 잡힘: 이 줄이 없으면 「오전 7시쯤 어제 일기를 써요」를 고른 사용자가 자정 직후에 일기·알림을 받는다 — 고른 시각이 무의미해진다).
@@ -1374,7 +1374,7 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 ## iOS 빌드·서명·TestFlight — 요청받았을 때만 탄다 (066)
 
 **아이폰 배포물을 만드는 절차다.** 안드로이드 절차(위)와 같은 성격 — 기본 작업 흐름이 아니며 저장소 소유자가 그 세션에서 요청했을 때만 탄다.
-**실제 iPhone이 한 대도 없다**(2026-10-08) — 아래에서 「실측」이라 적은 것은 iPhone 17 시뮬레이터(iOS 26.5, Xcode 26.6)에서 본 것이고, 업로드·TestFlight 설치는 미실측이다.
+아래에서 「실측」이라 적은 것은 iPhone 17 시뮬레이터(iOS 26.5, Xcode 26.6)에서 본 것이다. 실제 iPhone(087)에서는 빌드 12가 TestFlight로 설치됐고, 개발용 인증서·프로파일(소유주 발급, 2026-10-16)로 개발 빌드도 깐다 — 절차는 087 quickstart 4절.
 
 ### 서명 주체 — 개인 계정의 수동 서명 (2026-10-08 확정)
 
