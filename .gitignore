@@ -12,6 +12,7 @@ expo-env.d.ts
 .metro-health-check*
 
 # Generated Native Builds
+/build
 /ios
 /android
 *.apk
