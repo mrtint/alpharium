@@ -20,7 +20,7 @@
 
 **Purpose**: 새 패키지나 디렉터리 생성이 없으므로 기존 테스트 기준선(baseline)이 통과하는지 확인한다.
 
-- [ ] T001 Run baseline test suite for target token and UI test files in `__tests__/theme-tokens.test.ts`, `__tests__/ui/settings-screen.test.tsx`, `__tests__/ui/writing-in-place.test.tsx`, `__tests__/ui/diary-list.test.tsx`, `__tests__/ui/welcome-screen.test.tsx`, and `__tests__/ui/day-picker.test.tsx`
+- [X] T001 Run baseline test suite for target token and UI test files in `__tests__/theme-tokens.test.ts`, `__tests__/ui/settings-screen.test.tsx`, `__tests__/ui/writing-in-place.test.tsx`, `__tests__/ui/diary-list.test.tsx`, `__tests__/ui/welcome-screen.test.tsx`, and `__tests__/ui/day-picker.test.tsx`
 
 ---
 
@@ -28,8 +28,8 @@
 
 **Purpose**: US1·US2·US3가 공통으로 참조하는 디자인 토큰(`src/ui/theme/tokens.ts`)과 토큰 대비 불변식 테스트(`__tests__/theme-tokens.test.ts`)를 먼저 확립한다 (FR-003, FR-006, FR-008, SC-001, SC-002, SC-003, C3, C5, C6).
 
-- [ ] T002 Write failing token contract tests for `contrastRatio(COLORS.danger, COLORS.bg) >= 4.5` (DT4), `DAY_STRIP.dowMuted` (`"#5f5e5d"`, `contrastRatio(DAY_STRIP.dowMuted, COLORS.bg) >= 4.5`, excluded from `Object.values(COLORS)` while keeping 9 `COLORS` keys), and `SETTINGS.toggle.hitSlop === 9` (`height + hitSlop * 2 === SETTINGS.row.minHeight`) in `__tests__/theme-tokens.test.ts`
-- [ ] T003 Add `DAY_STRIP = { dowMuted: "#5f5e5d" } as const` and `hitSlop: 9` on `SETTINGS.toggle` (`{ width: 44, height: 26, padding: 3, knob: 20, knobOff: COLORS.textMuted, hitSlop: 9 }`) in `src/ui/theme/tokens.ts` and verify `__tests__/theme-tokens.test.ts` passes
+- [X] T002 Write failing token contract tests for `contrastRatio(COLORS.danger, COLORS.bg) >= 4.5` (DT4), `DAY_STRIP.dowMuted` (`"#5f5e5d"`, `contrastRatio(DAY_STRIP.dowMuted, COLORS.bg) >= 4.5`, excluded from `Object.values(COLORS)` while keeping 9 `COLORS` keys), and `SETTINGS.toggle.hitSlop === 9` (`height + hitSlop * 2 === SETTINGS.row.minHeight`) in `__tests__/theme-tokens.test.ts`
+- [X] T003 Add `DAY_STRIP = { dowMuted: "#5f5e5d" } as const` and `hitSlop: 9` on `SETTINGS.toggle` (`{ width: 44, height: 26, padding: 3, knob: 20, knobOff: COLORS.textMuted, hitSlop: 9 }`) in `src/ui/theme/tokens.ts` and verify `__tests__/theme-tokens.test.ts` passes
 
 **Checkpoint**: `src/ui/theme/tokens.ts`의 새 상수와 `__tests__/theme-tokens.test.ts` 통과 완료 — US1, US2, US3 시작 가능.
 
@@ -45,17 +45,17 @@
 
 > **NOTE: 먼저 테스트를 작성·수정한 뒤 실행하여 구현 전 실패(RED)를 확인한다**
 
-- [ ] T004 [P] [US1] Add failing test asserting `home-month` text style `color` is `COLORS.danger` (`"#ae1800"`) in `__tests__/ui/diary-list.test.tsx`
-- [ ] T005 [P] [US1] Update W3 test (`home-day-state` `color: COLORS.danger`) and add W2 assertion that `writing-kicker` text style `color` is `COLORS.danger` (`"#ae1800"`) in `__tests__/ui/writing-in-place.test.tsx`
-- [ ] T006 [P] [US1] Add failing test asserting `welcome-kicker` text style `color` is `COLORS.danger` (`"#ae1800"`) in `__tests__/ui/welcome-screen.test.tsx`
-- [ ] T007 [P] [US1] Update F3 test (`settings-group-*-label` `color: COLORS.danger`) and add C2 source contract test scanning all `.ts`/`.tsx` files under `src/ui/` (with comments stripped) for 0 occurrences of `color:\s*COLORS\.accent\b` in `__tests__/ui/settings-screen.test.tsx`
+- [X] T004 [P] [US1] Add failing test asserting `home-month` text style `color` is `COLORS.danger` (`"#ae1800"`) in `__tests__/ui/diary-list.test.tsx`
+- [X] T005 [P] [US1] Update W3 test (`home-day-state` `color: COLORS.danger`) and add W2 assertion that `writing-kicker` text style `color` is `COLORS.danger` (`"#ae1800"`) in `__tests__/ui/writing-in-place.test.tsx`
+- [X] T006 [P] [US1] Add failing test asserting `welcome-kicker` text style `color` is `COLORS.danger` (`"#ae1800"`) in `__tests__/ui/welcome-screen.test.tsx`
+- [X] T007 [P] [US1] Update F3 test (`settings-group-*-label` `color: COLORS.danger`) and add C2 source contract test scanning all `.ts`/`.tsx` files under `src/ui/` (with comments stripped) for 0 occurrences of `color:\s*COLORS\.accent\b` in `__tests__/ui/settings-screen.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T008 [P] [US1] Change `home-month` label color and `WRITING_STATE` text color from `COLORS.accent` to `COLORS.danger` in `src/ui/DiaryListScreen.tsx`
-- [ ] T009 [P] [US1] Change `writing-kicker` text color from `COLORS.accent` to `COLORS.danger` in `src/ui/WritingPaper.tsx`
-- [ ] T010 [P] [US1] Change `KICKER` (`welcome-kicker`) text color from `COLORS.accent` to `COLORS.danger` in `src/ui/WelcomeScreen.tsx`
-- [ ] T011 [P] [US1] Change `Group` header label (`${testID}-label`) text color from `COLORS.accent` to `COLORS.danger` (keeping `Tag` denied `borderColor: COLORS.accent` unchanged) in `src/ui/SettingsScreen.tsx`
+- [X] T008 [P] [US1] Change `home-month` label color and `WRITING_STATE` text color from `COLORS.accent` to `COLORS.danger` in `src/ui/DiaryListScreen.tsx`
+- [X] T009 [P] [US1] Change `writing-kicker` text color from `COLORS.accent` to `COLORS.danger` in `src/ui/WritingPaper.tsx`
+- [X] T010 [P] [US1] Change `KICKER` (`welcome-kicker`) text color from `COLORS.accent` to `COLORS.danger` in `src/ui/WelcomeScreen.tsx`
+- [X] T011 [P] [US1] Change `Group` header label (`${testID}-label`) text color from `COLORS.accent` to `COLORS.danger` (keeping `Tag` denied `borderColor: COLORS.accent` unchanged) in `src/ui/SettingsScreen.tsx`
 
 **Checkpoint**: User Story 1의 모든 컴포넌트·소스 계약 테스트가 통과한다 (GREEN).
 
@@ -71,11 +71,11 @@
 
 > **NOTE: 먼저 테스트를 작성한 뒤 실행하여 구현 전 실패(RED)를 확인한다**
 
-- [ ] T012 [US2] Add failing contract tests in `__tests__/ui/day-picker.test.tsx` asserting: (1) selected cell weekday text has `color: COLORS.accentForeground` (`"#f3f2f2"`), `fontSize: 10`, `letterSpacing: 0.6`, and `opacity: undefined`, (2) unselected cell weekday text has `color: DAY_STRIP.dowMuted` (`"#5f5e5d"`), `fontSize: 10`, `letterSpacing: 0.6`, and `opacity: undefined`, and (3) comment-stripped `src/ui/DayPicker.tsx` source contains `opacity` only once (`CELL_DIMMED = { opacity: 0.3 }`) and never in `DOW`
+- [X] T012 [US2] Add failing contract tests in `__tests__/ui/day-picker.test.tsx` asserting: (1) selected cell weekday text has `color: COLORS.accentForeground` (`"#f3f2f2"`), `fontSize: 10`, `letterSpacing: 0.6`, and `opacity: undefined`, (2) unselected cell weekday text has `color: DAY_STRIP.dowMuted` (`"#5f5e5d"`), `fontSize: 10`, `letterSpacing: 0.6`, and `opacity: undefined`, and (3) comment-stripped `src/ui/DayPicker.tsx` source contains `opacity` only once (`CELL_DIMMED = { opacity: 0.3 }`) and never in `DOW`
 
 ### Implementation for User Story 2
 
-- [ ] T013 [US2] Remove `opacity: 0.7` from `DOW` (`{ fontSize: 10, letterSpacing: 0.6 } as const`) and set weekday `AppText` color to `selected ? COLORS.accentForeground : DAY_STRIP.dowMuted` in `src/ui/DayPicker.tsx`
+- [X] T013 [US2] Remove `opacity: 0.7` from `DOW` (`{ fontSize: 10, letterSpacing: 0.6 } as const`) and set weekday `AppText` color to `selected ? COLORS.accentForeground : DAY_STRIP.dowMuted` in `src/ui/DayPicker.tsx`
 
 **Checkpoint**: User Story 2(`__tests__/ui/day-picker.test.tsx`)가 통과한다 (GREEN).
 
@@ -91,11 +91,11 @@
 
 > **NOTE: 먼저 테스트를 작성한 뒤 실행하여 구현 전 실패(RED)를 확인한다**
 
-- [ ] T014 [US3] Add failing test in `__tests__/ui/settings-screen.test.tsx` (under C2 toggle section) asserting `auto-diary-toggle` has `hitSlop: { top: 9, bottom: 9 }` and preserves `width: 44, height: 26`
+- [X] T014 [US3] Add failing test in `__tests__/ui/settings-screen.test.tsx` (under C2 toggle section) asserting `auto-diary-toggle` has `hitSlop: { top: 9, bottom: 9 }` and preserves `width: 44, height: 26`
 
 ### Implementation for User Story 3
 
-- [ ] T015 [US3] Add `hitSlop={{ top: toggle.hitSlop, bottom: toggle.hitSlop }}` to `Toggle` `Pressable` in `src/ui/SettingsScreen.tsx`
+- [X] T015 [US3] Add `hitSlop={{ top: toggle.hitSlop, bottom: toggle.hitSlop }}` to `Toggle` `Pressable` in `src/ui/SettingsScreen.tsx`
 
 **Checkpoint**: User Story 3(`__tests__/ui/settings-screen.test.tsx`)가 통과한다 (GREEN).
 
@@ -105,9 +105,9 @@
 
 **Purpose**: 위반 주입(C7), 전체 테스트·린트·헌법 검사, 실기기(`SM-S901N` dev) 검증(SC-004).
 
-- [ ] T016 Execute fault injection C7-1 (temporarily revert `home-month` in `src/ui/DiaryListScreen.tsx` to `COLORS.accent`, confirm C2 source contract and `diary-list.test.tsx` fail, then restore) and C7-2 (temporarily add `opacity: 0.7` to `DOW` in `src/ui/DayPicker.tsx`, confirm `day-picker.test.tsx` fails, then restore)
-- [ ] T017 Run full test suite (`npm test`), linter (`npm run lint`), and constitution check (`npm run check:constitution`) across repository root
-- [ ] T018 Execute real-device verification D1, D2, and D3 on `SM-S901N` dev per `specs/088-small-text-contrast-hit-target/quickstart.md` (lowest brightness check, font scale 1.0/2.0 captures, toggle hitSlop positive/negative tap coordinates, and Maestro Layer 1 `settings-time-place.yml` + `week-strip-swipe.yml`) and record results in `specs/088-small-text-contrast-hit-target/quickstart.md`
+- [X] T016 Execute fault injection C7-1 (temporarily revert `home-month` in `src/ui/DiaryListScreen.tsx` to `COLORS.accent`, confirm C2 source contract and `diary-list.test.tsx` fail, then restore) and C7-2 (temporarily add `opacity: 0.7` to `DOW` in `src/ui/DayPicker.tsx`, confirm `day-picker.test.tsx` fails, then restore)
+- [X] T017 Run full test suite (`npm test`), linter (`npm run lint`), and constitution check (`npm run check:constitution`) across repository root
+- [X] T018 Execute device/simulator verification D1, D2, and D3 per `specs/088-small-text-contrast-hit-target/quickstart.md` (verified on iOS Simulator `iPhone 17 Pro Max` iOS 26.5 with `SM-S901N` noted as unverified due to home Mac environment; includes font scale 1.0/`accessibility-large` captures, toggle hitSlop positive/negative tap coordinates, and Maestro week-strip-swipe + settings-time-place flows) and record results in `specs/088-small-text-contrast-hit-target/quickstart.md`
 
 ---
 

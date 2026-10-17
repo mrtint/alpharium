@@ -100,10 +100,10 @@ describe("W2 — KO 원문 (보드 2b)", () => {
 });
 
 describe("W3 — 헤더", () => {
-  it("상태 줄이 accent 13/600 「쓰는 중」이고 제목·dayStateText가 없다", async () => {
+  it("상태 줄이 danger(진한 레드, 088 FR-001) 13/600 「쓰는 중」이고 제목·dayStateText가 없다", async () => {
     await render(<DiaryListScreen {...props()} />);
     const state = screen.getByTestId("home-day-state");
-    expect(state).toHaveStyle({ color: COLORS.accent, fontSize: 13, fontWeight: "600" });
+    expect(state).toHaveStyle({ color: COLORS.danger, fontSize: 13, fontWeight: "600" });
     expect(screen.queryByTestId("home-day-title")).toBeNull();
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("28");
   });
@@ -175,8 +175,13 @@ describe("W6 — 지면", () => {
     expect(order).toEqual(["writing-kicker", "writing-monologue", "writing-byline"]);
   });
 
-  it("혼잣말 24/700, 안내 줄 13이다", async () => {
+  it("머리말 11/600 danger(088 FR-001), 혼잣말 24/700, 안내 줄 13이다", async () => {
     await render(<DiaryListScreen {...props()} />);
+    expect(screen.getByTestId("writing-kicker")).toHaveStyle({
+      color: COLORS.danger,
+      fontSize: WRITING.kicker.fontSize,
+      fontWeight: WRITING.kicker.fontWeight,
+    });
     expect(screen.getByTestId("writing-monologue-text")).toHaveStyle({
       fontSize: WRITING.monologue.fontSize,
       fontWeight: WRITING.monologue.fontWeight,

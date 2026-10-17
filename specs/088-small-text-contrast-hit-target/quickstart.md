@@ -53,3 +53,35 @@ npm run test:layer1 -- .maestro/week-strip-swipe.yml
 
 - 두 흐름 모두 통과해야 한다.
 - 작업 전 백업(`/data/local/tmp/088-backup.tar`)을 복원해 기기 상태를 원상 복구한다.
+
+---
+
+## 3. 실측 결과 (2026-10-18)
+
+### 3.1 기기 없는 검증 및 위반 주입 (C7)
+
+- **단위·계약 테스트**: 6개 대상 스위트 213 passed, 전체 테스트 **316 suites · 6,728 passed**, `npm run lint` 0 errors, `npm run check:constitution` 0 violations.
+- **위반 주입 C7-1**: `src/ui/DiaryListScreen.tsx`의 `home-month` 색상을 `COLORS.accent`로 임시 복원 → `__tests__/ui/diary-list.test.tsx`(`Expected: "#ae1800", Received: "#ec3013"`)와 `__tests__/ui/settings-screen.test.tsx` C2 소스 계약(`Expected: [], Received: ["DiaryListScreen.tsx"]`)이 즉시 실패함을 확인 후 원복.
+- **위반 주입 C7-2**: `src/ui/DayPicker.tsx`의 `DOW`에 `opacity: 0.7`을 임시 추가 → `__tests__/ui/day-picker.test.tsx`의 선택/비선택 칸 `opacity: undefined` 단언과 소스 계약이 즉시 실패함을 확인 후 원복.
+
+### 3.2 디바이스·시뮬레이터 검증 (D1 · D2 · D3)
+
+- **검증 환경 (원칙 V — 환경 한계 정직 기록)**:
+  - 작업 환경(집 맥)에는 Android SDK(`adb`) 및 `SM-S901N`이 연결되어 있지 않고, USB로 연결된 실기기 `iPhone 14`는 별도 워크트리에서 `087`(백그라운드 자동 쓰기 실측) 실험이 진행 중이어서 건드리지 않았다.
+  - 이에 따라 **iOS 시뮬레이터(`iPhone 17 Pro Max`, iOS 26.5, UDID `AD022FA9-EA15-4C5E-8E80-F9D224FE7609`)**에서 dev 번들(`EXPO_PUBLIC_APP_ENV=dev`)을 띄워 D1·D2·D3 전 항목을 실측했고, `SM-S901N` 및 실기기 iPhone에서의 육안 확인은 미검증으로 남긴다.
+- **D1 — 작은 강조 글자 5곳(`#ae1800`) · 주간 스트립 요일 약자 · 글자 크기 1.0배(`medium`) 및 ~1.94배(`accessibility-large`) 캡처**:
+  - **홈(쓴 날 · 안 쓴 날 · 지난주)**: 상단 월 라벨(`2026년 10월`, `#ae1800`), 선택 칸 요일(`일`, `#f3f2f2`, 불투명도 없음), 비선택 칸 요일(`월~토`, `#5f5e5d`), 미래 칸(`19~24`, `opacity: 0.3`) 확인 (`088-01-home-written.png`, `088-02-home-unwritten-prev-week.png`).
+  - **홈(제자리 쓰는 중)**: `write-button` → `overwrite-confirm`으로 진입해 상단 상태 줄(`WRITING_STATE`, `쓰는 중`, `#ae1800`)과 종이 카드 머리말(`writing-kicker`, `쓰는 중`, `#ae1800`) 확인 후 `stop-button`으로 중단 (`088-03-home-writing-in-place.png`).
+  - **첫 만남 작명 화면(`WelcomeScreen`)**: 상단 표지 `KICKER`(`POCKETLOG`, `#ae1800`) 확인 (`088-09-welcome-naming.png`).
+  - **설정 · 개발자 · 진단 화면**: 묶음 머리(`캐릭터`, `일기`, `권한 · 휴대폰 설정으로 이동`, `이 휴대폰`, `정보`, `모듈`, `진단`, `상태 흉내`, `다시 보기`, `최근 자동 쓰기 시도`, `환경`, `저장 점검`, `사진 권한`, `신호 프로브 · 오늘`, `입력 프롬프트 미리보기`) 모두 `#ae1800`로 또렷하게 표시됨을 확인 (`088-04-settings-top.png` ~ `088-08-diagnostics-bottom.png`).
+  - **글자 크기 확대(`xcrun simctl ui ... content_size accessibility-large`, 약 1.94배)**: 홈 쓴 날(`088-10-scale2-home-written.png`)과 설정 상단(`088-11-scale2-settings-top.png`)에서 11~13pt 강조 라벨과 행 레이아웃이 잘림·겹침 없이 표시됨을 확인 후 `medium`으로 복원.
+- **D2 — 설정 토글(`auto-diary-toggle`) 세로 `hitSlop: 9` 경계 탭 대조**:
+  - `iPhone 17 Pro Max` 논리 그리드(`440×956`)에서 `auto-diary-toggle`의 시각 bounds는 `[376,318][420,344]`(높이 26pt), `hitSlop: 9`가 더해진 확장 터치 영역은 `[376,309][420,353]`(높이 44pt).
+  - **음성(확장 영역 바깥쪽)**: `(398, 291)`(시각 상단 318보다 27pt 위, 확장 상단 309보다 18pt 위) 탭 → 토글이 꺼진 채로 유지되고 `settings-target-hour`가 나타나지 않음(`notVisible` 통과).
+  - **양성 1(위쪽 슬롭 안쪽)**: `(398, 312)`(시각 상단 318보다 6pt 위, 확장 상단 309 안쪽) 탭 → 토글이 켜지며 `settings-target-hour` 행이 펼쳐짐(`visible` 통과).
+  - **양성 2(아래쪽 슬롭 안쪽)**: `(398, 350)`(시각 하단 344보다 6pt 아래, 확장 하단 353 안쪽) 탭 → 토글이 꺼지며 `settings-target-hour` 행이 접힘(`notVisible` 통과).
+- **D3 — Maestro 주간 스트립 가로 스와이프 및 설정 시간·장소·토글 회귀 확인**:
+  - 주간 스트립 가로 스와이프(`W1~W4`: 오른쪽 스와이프로 지난주 이동 → 같은 요일 유지 및 `day-today-.*` 비노출 → 왼쪽 스와이프로 이번 주 복귀 → 오늘 주에서 왼쪽 스와이프 바운스) 통과 (`2026-10-18_010052`).
+  - 설정 화면 매일 쓰는 시각 대화상자(`오후 10시` 선택·반영), 장소 이름 대화상자(`꺼짐` 선택·반영), 자동 쓰기 토글 접기·펼치기 통과 (`2026-10-18_010904`).
+  - 검증 종료 후 시뮬레이터 `Documents/diary`·`Documents/preferences` 백업 및 `content_size medium`을 원상 복구하고 시뮬레이터와 Metro를 종료함.
+
