@@ -2,7 +2,7 @@
 
 ## 생성기
 
-- 코어 `scripts/design/tokens-build.ts`: `async buildOutputs(tokens: TokensJson): Promise<{ appRegion: string; css: string }>` — 입력만으로 정해지는 결정적 함수(prettier 3의 `format`이 비동기라 `Promise`). 시각·경로·환경을 읽지 않고, 같은 입력은 같은 바이트를 낸다. 정본 검증 `validateTokens`는 동기다.
+- 코어 `scripts/design/tokens-build.ts`: `buildOutputs(tokens: TokensJson): { appRegion: string; css: string }`(동기)와 `validateTokens`·`extractRegion`·`replaceRegion` — 입력만으로 정해지는 결정적 함수. 시각·경로·환경을 읽지 않고 같은 입력은 같은 바이트를 낸다. **prettier를 부르지 않는다**(jest의 CJS에서 prettier 3의 동적 import가 안 돈다) — 저장소 prettier 설정(printWidth 100·큰따옴표·후행 쉼표)과 같은 모양으로 직접 쓰고, 같은 모양인지는 `tokens-sync` 테스트가 `prettier --check`로 본다(G-A5).
 - CLI `scripts/design/build-tokens.mts`: 정본을 읽어 (1) `src/ui/theme/tokens.ts`의 생성 영역을 바꿔 쓰고 (2) `site/assets/tokens.css`를 쓴다. `--check`는 쓰지 않고 다르면 종료 코드 1.
 - 정본이 규칙(tokens-json C1~C9)을 어기면 아무것도 쓰지 않고 실패한다.
 - 생성기는 값을 만들지 않는다(V8): 출력의 모든 수치·문자열은 정본의 값이거나 고정 꼴(식별자·구두점)이다.

@@ -10,31 +10,22 @@
   외부 전송 절의 data-outbound 값은 __tests__/privacy/outbound.ts 의 목록과 짝이다(테스트가 대조한다).
   고칠 때의 순서: 이 방침 → docs/store/privacy-declarations.md → __tests__/privacy/outbound.ts. 고치면 changes 절에 한 줄을 더한다.
 -->
-<style>
-  :root { color-scheme: light dark; --bg: #faf8f5; --fg: #1f1d1a; --muted: #6b655d; --line: #e4dfd8; --accent: #b3261e; }
-  @media (prefers-color-scheme: dark) { :root { --bg: #1a1816; --fg: #ece8e2; --muted: #a39d94; --line: #34302c; --accent: #f2867d; } }
-  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.75 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
-  main { max-width: 40rem; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
-  h1 { font-size: 1.75rem; line-height: 1.3; margin: 0 0 .25rem; }
-  h2 { font-size: 1.15rem; margin: 2.25rem 0 .5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); }
-  h3 { font-size: 1rem; margin: 1.25rem 0 .25rem; }
-  .meta { color: var(--muted); margin: 0 0 1.5rem; }
-  a { color: var(--accent); }
-  li { margin: .3rem 0; }
-</style>
+<link rel="stylesheet" href="../assets/tokens.css">
+<link rel="stylesheet" href="../assets/fonts.css">
+<link rel="stylesheet" href="../assets/site.css">
 </head>
 <body>
-<main>
+<main class="page doc">
   <h1>개인정보처리방침</h1>
   <p class="meta">포켓로그(Pocketlog) · 시행일 2026년 10월 20일</p>
 
-  <section id="summary">
+  <section id="summary" class="summary">
     <h2>한 줄 요약</h2>
     <!-- 근거: 설계 §1.3 — 분석·크래시·광고 SDK 없음, 계정 없음, 추론은 기기에서(헌법 원칙 I) -->
     <p>포켓로그의 일기는 휴대폰 안에서 쓰이고 휴대폰 안에 남습니다(휴대폰 백업에 대해서는 아래 「보존과 삭제」). 문의 메일을 보내 주시는 경우를 빼면, 운영자는 사용자의 개인정보를 받거나 보관하지 않습니다(운영체제가 모아 운영자에게 보여 주는 오류 보고는 아래 「운영체제의 진단 보고」에 적었습니다). 포켓로그에는 계정이 없습니다.</p>
   </section>
 
-  <section id="on-device">
+  <section id="on-device" class="section">
     <h2>휴대폰 안에서 다루는 것</h2>
     <!-- 근거: 설계 §1.2·§1.3 [코드] — 사진·좌표·일기·설정은 앱 저장 공간, 사진 설명은 기기 안 모듈이 만든다 -->
     <p>아래는 휴대폰 안의 포켓로그 저장 공간에서 다루며, 운영자에게 보내지 않습니다. 이 가운데 휴대폰 밖으로 나가는 것은 사진의 좌표 하나뿐이며 아래 「장소 이름」에 적었습니다.</p>
@@ -49,7 +40,7 @@
     </ul>
   </section>
 
-  <section id="outbound">
+  <section id="outbound" class="section">
     <h2>휴대폰 밖으로 나가는 것</h2>
     <!-- 근거: 설계 §1.3 [코드] — 앱 소스(JS)의 외부 통신은 모듈 내려받기와 지오코더 호출뿐(__tests__/privacy/policy-facts.test.ts F1~F7). 네이티브 라이브러리의 자체 통신은 패킷으로 재지 않았다 → 주체를 「포켓로그가 보내는 것」으로 한정한다 -->
     <p>포켓로그가 휴대폰 밖으로 보내는 것은 아래 셋입니다. 이 셋 말고 포켓로그가 휴대폰 밖으로 보내는 것은 없습니다. 설정의 「개인정보처리방침」·「도움말·문의」를 누르면 휴대폰의 브라우저가 이 페이지를 열고, 문의 메일은 휴대폰의 메일 앱이 보냅니다.</p>
@@ -78,13 +69,13 @@
     </section>
   </section>
 
-  <section id="third-party">
+  <section id="third-party" class="section">
     <h2>제3자 제공과 처리 위탁</h2>
     <!-- 근거: 설계 §1.3 — 운영자가 받는 개인정보가 문의 메일뿐이고 그것을 넘기지 않는다 -->
     <p>운영자는 개인정보를 제3자에게 제공하거나 처리를 맡기지 않습니다.</p>
   </section>
 
-  <section id="retention">
+  <section id="retention" class="section">
     <h2>보존과 삭제</h2>
     <!-- 근거: AGENTS 058 [실측] — 설정 「일기 모두 지우기」, 앱 데이터는 앱을 지우면 함께 사라진다 -->
     <!-- 근거: 설계 §1.3 [미확인] — OS 백업 포함 여부는 재지 않았다 → 「포함될 수 있습니다」 -->
@@ -95,7 +86,7 @@
     </ul>
   </section>
 
-  <section id="permissions">
+  <section id="permissions" class="section">
     <h2>권한과 철회</h2>
     <!-- 근거: src/onboarding/requirements.ts [코드] — 요구 권한 넷, 거부해도 건너뛸 수 있다 -->
     <p>포켓로그는 아래 권한을 씁니다. 허용하지 않아도 앱을 쓸 수 있으며, 휴대폰 설정에서 언제든 거둘 수 있습니다.</p>
@@ -107,7 +98,7 @@
     </ul>
   </section>
 
-  <section id="contact">
+  <section id="contact" class="section">
     <h2>문의</h2>
     <!-- 근거: spec FR-002a (clarify 2026-10-15) — 소유자가 정한 보관 약속 -->
     <p>개인정보에 관한 문의는 아래 메일로 보내 주세요.</p>
@@ -118,7 +109,7 @@
     <p>문의 메일의 주소와 내용은 답장에만 쓰고, 문의 처리가 끝나면 지체 없이 지웁니다. 처리가 끝나기 전이라도 보내신 메일의 열람이나 삭제를 위 메일로 요청하실 수 있습니다.</p>
   </section>
 
-  <section id="changes">
+  <section id="changes" class="section">
     <h2>시행일과 변경 이력</h2>
     <p>이 방침이 바뀌면 이 페이지에 날짜와 바뀐 요지를 적습니다. 이전 원문은 <a href="https://github.com/mrtint/alpharium/commits/main/site/privacy/index.html">저장소 기록</a>에서 볼 수 있습니다.</p>
     <ol>

@@ -6,13 +6,13 @@
 
 ## Summary
 
-`design/tokens.json`을 토큰의 정본으로 세우고, 작은 생성 스크립트(결정적, prettier 때문에 비동기)가 (1) `src/ui/theme/tokens.ts` 안의 생성 영역(`COLORS`·`RADIUS`·`TYPE`·`FONT`)과 (2) `site/assets/tokens.css`를 다시 쓴다. 웹 서체는 Pretendard 공식 분할 배포본(npm `pretendard@1.3.9`의 `woff2-dynamic-subset`, 굵기 400·600·700)을 `site/assets/fonts/`에 바이트 그대로 둔다. `site/` 세 페이지는 `tokens.css`·`fonts.css`·`site.css`만 링크하고 페이지별 스타일을 갖지 않는다. 규칙 문서 `design/DESIGN.md`를 쓰고 AGENTS.md·CLAUDE.md가 가리킨다. 정본↔생성물 동기, 앱 값 불변, 대비, 사이트 하드코딩 금지, 서체 파일·용량, 문서 이름 실재를 기기 없는 테스트가 잠근다. 앱 화면 코드는 바뀌지 않는다.
+`design/tokens.json`을 토큰의 정본으로 세우고, 작은 생성 스크립트(결정적, prettier를 부르지 않고 같은 모양으로 직접 씀)가 (1) `src/ui/theme/tokens.ts` 안의 생성 영역(`COLORS`·`RADIUS`·`TYPE`·`FONT`)과 (2) `site/assets/tokens.css`를 다시 쓴다. 웹 서체는 Pretendard 공식 분할 배포본(npm `pretendard@1.3.9`의 `woff2-dynamic-subset`, 굵기 400·600·700)을 `site/assets/fonts/`에 바이트 그대로 둔다. `site/` 세 페이지는 `tokens.css`·`fonts.css`·`site.css`만 링크하고 페이지별 스타일을 갖지 않는다. 규칙 문서 `design/DESIGN.md`를 쓰고 AGENTS.md·CLAUDE.md가 가리킨다. 정본↔생성물 동기, 앱 값 불변, 대비, 사이트 하드코딩 금지, 서체 파일·용량, 문서 이름 실재를 기기 없는 테스트가 잠근다. 앱 화면 코드는 바뀌지 않는다.
 
 ## Technical Context
 
 **Language/Version**: TypeScript(생성 코어·테스트), `.mts` CLI(Node 24, 기존 `scripts/*.mts` 방식), CSS3·HTML(사이트)
 
-**Primary Dependencies**: 기존 것만 — `prettier`(생성 영역 형식, 이미 devDependency), jest. 새 의존성 0. 서체 가져오기는 npm 레지스트리 tarball을 Node `fetch`로 받는다(저장소 의존성에 올리지 않는다)
+**Primary Dependencies**: 기존 것만 — jest(생성 영역이 prettier 기준을 지키는지는 테스트가 `prettier --check` CLI로 본다). 새 의존성 0. 서체 가져오기는 npm 레지스트리 tarball을 Node `fetch`로 받는다(저장소 의존성에 올리지 않는다)
 
 **Storage**: 파일(`design/tokens.json`, 생성물, `site/assets/**`)
 
@@ -69,7 +69,7 @@ design/
 └── DESIGN.md                         규칙 문서(신규)
 
 scripts/design/
-├── tokens-build.ts                   결정적 코어(async): 정본 → {tokensTsRegion, tokensCss} (jest와 CLI가 함께 import)
+├── tokens-build.ts                   결정적 코어: 정본 → {tokensTsRegion, tokensCss} (jest와 CLI가 함께 import)
 ├── build-tokens.mts                  CLI: 생성 영역과 tokens.css를 다시 쓴다 / --check
 └── import-pretendard-web.mts         CLI: npm tarball → site/assets/fonts (무결성 검증, 바이트 복사, fonts.css·source.json 생성)
 
