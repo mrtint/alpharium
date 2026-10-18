@@ -29,5 +29,11 @@
 - **Decision**: 시작 줄에 옵셔널 `launch: "active" | "background"`. 통로 `launch-state-port.ts`가 호출 시점 `require("react-native").AppState.currentState`를 읽는다(066: 동적 import 금지). 그 밖의 값·실패는 기록하지 않는다.
 - **Rationale**: lldb 강제 깨우기(앞)와 OS 깨움(뒤)을 기록으로 가른다. `src/schedule/`은 `AppState`를 직접 참조하지 않는다(024 규칙 — 판정 입력이 아니라 기록 값이다).
 
+## R7. iOS CPU 감시 (구현 중 실기기)
+- **관측**: 고친 빌드의 OS 깨움(11:23:57, `launch: background`)이 51초 만에 `Pocketlog.cpu_resource_fatal-2026-10-18-112448.ips` — 「48 seconds cpu time over 51 seconds (95%), exceeding limit of 80% cpu over 60 seconds」, `Action taken: Process killed`. 고치기 전 빌드의 11:04 실행도 11:07 같은 보고서. 087 lldb 강제 실행(앞)은 이 감시가 걸리지 않아 완주했다.
+- **Decision**: `patch-package`로 `BackgroundTaskScheduler.swift`의 요청을 `requiresExternalPower = true`·`requiresNetworkConnectivity = false`로(소유자 2026-10-18 — 추천안 A).
+- **Rationale**: 외부 전원을 요구하는 처리 작업은 CPU 감시가 꺼진다(WWDC19, Apple 포럼 690666·675166 — 충전 중에도 죽었다는 보고가 있어 실기기로 확인). 087에서 깨움은 이미 충전 중에만 왔다 — 잃는 것이 없다.
+- **Alternatives**: 로컬 모듈에서 `BGTaskScheduler.submit` swizzle(새 의존성 없음, 덜 투명·조용히 무력해질 수 있음), 스레드·쉼으로 80% 아래(본문이 몇 배 느려져 예산을 넘긴다).
+
 ## R6. 문구
 - **Decision**: `permBatteryHintIos` → 「충전 중이고 저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요」(clarify), 062 `CHANGED_AFTER_GOLDEN`. 새 문구 `expired: "시간 예산이 끝남"`, 상태 꼬리 「· 앞」/「· 뒤」 — `attempts` 영역(078 뒤에 생긴 영역이라 골든 밖인지 확인 후 처리).

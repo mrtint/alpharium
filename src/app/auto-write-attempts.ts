@@ -36,7 +36,12 @@ export type AttemptOutcome =
   /** 080 — 사용자가 그 쓰기를 그만두었다(합류한 홈의 「그만두기」·「일기 모두 지우기」). 실패도 미완주도 아니다 */
   | "cancelled"
   | "ran"
-  | "failed";
+  | "failed"
+  /**
+   * 090 — iOS가 백그라운드 실행의 시간 예산이 끝났다고 알렸다. 만료된 시각의 **따로 선 줄**이다 — 그 실행의 시작 줄은 그대로 남아
+   * (멈췄다 이어서 끝나면 끝남 갈래로 바뀐다) 「만료됐다」와 「죽었다」를 가른다.
+   */
+  | "expired";
 export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = [
   "started",
   "simulation",
@@ -52,9 +57,23 @@ export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = [
   "cancelled",
   "ran",
   "failed",
+  "expired",
 ];
 
-export type AutoWriteAttempt = { at: Date; path: AttemptPath; outcome: AttemptOutcome };
+/**
+ * 090 — 백그라운드·수동 실행이 시작될 때 앱이 앞에 있었는가. lldb 강제 깨우기(앞)와 OS 깨움(뒤)을 기록으로 가른다.
+ * 판정 입력이 아니라 기록 값이다.
+ */
+export type LaunchState = "active" | "background";
+const LAUNCH_STATES: readonly LaunchState[] = ["active", "background"];
+
+export type AutoWriteAttempt = {
+  at: Date;
+  path: AttemptPath;
+  outcome: AttemptOutcome;
+  /** 090 — 시작 줄에만. 옛 줄·두 값 밖은 없다 */
+  launch?: LaunchState;
+};
 
 /** 최근 몇 건을 남기는가 — 사람이 정한 값 */
 export const MAX_AUTO_WRITE_ATTEMPTS = 20;
@@ -75,6 +94,10 @@ function isPath(value: unknown): value is AttemptPath {
   return typeof value === "string" && (ATTEMPT_PATHS as readonly string[]).includes(value);
 }
 
+function isLaunch(value: unknown): value is LaunchState {
+  return typeof value === "string" && (LAUNCH_STATES as readonly string[]).includes(value);
+}
+
 function isOutcome(value: unknown): value is AttemptOutcome {
   return typeof value === "string" && (ATTEMPT_OUTCOMES as readonly string[]).includes(value);
 }
@@ -93,11 +116,18 @@ export async function loadAutoWriteAttempts(
     const out: AutoWriteAttempt[] = [];
     for (const item of items) {
       if (typeof item !== "object" || item === null) continue;
-      const { at, path, outcome } = item as { at?: unknown; path?: unknown; outcome?: unknown };
+      const { at, path, outcome, launch } = item as {
+        at?: unknown;
+        path?: unknown;
+        outcome?: unknown;
+        launch?: unknown;
+      };
       if (typeof at !== "string" || !isPath(path) || !isOutcome(outcome)) continue;
       const date = new Date(at);
       if (Number.isNaN(date.getTime())) continue;
-      out.push({ at: date, path, outcome });
+      out.push(
+        isLaunch(launch) ? { at: date, path, outcome, launch } : { at: date, path, outcome },
+      );
     }
     return out.slice(0, MAX_AUTO_WRITE_ATTEMPTS);
   } catch {
@@ -108,9 +138,12 @@ export async function loadAutoWriteAttempts(
 async function save(port: AutoWriteAttemptPort, items: readonly AutoWriteAttempt[]): Promise<void> {
   await port.write(
     JSON.stringify({
-      items: items
-        .slice(0, MAX_AUTO_WRITE_ATTEMPTS)
-        .map((item) => ({ at: item.at.toISOString(), path: item.path, outcome: item.outcome })),
+      items: items.slice(0, MAX_AUTO_WRITE_ATTEMPTS).map((item) => ({
+        at: item.at.toISOString(),
+        path: item.path,
+        outcome: item.outcome,
+        ...(item.launch !== undefined ? { launch: item.launch } : {}),
+      })),
     }),
   );
 }
@@ -126,16 +159,21 @@ function inOrder(work: () => Promise<void>): Promise<void> {
   return queue;
 }
 
-/** 시작 — `started` 줄을 맨 앞에. 실패는 삼킨다. */
+/** 시작 — `started` 줄을 맨 앞에. 090 — 깨운 순간의 앱 상태를 함께 싣는다(모르면 없음). 실패는 삼킨다. */
 export function recordAttemptStart(
   port: AutoWriteAttemptPort,
   path: AttemptPath,
   at: Date,
+  launch?: LaunchState,
 ): Promise<void> {
   return inOrder(async () => {
     try {
       const previous = await loadAutoWriteAttempts(port);
-      await save(port, [{ at, path, outcome: "started" }, ...previous]);
+      const line: AutoWriteAttempt =
+        launch !== undefined
+          ? { at, path, outcome: "started", launch }
+          : { at, path, outcome: "started" };
+      await save(port, [line, ...previous]);
     } catch {
       // 기록이 자동 쓰기를 막지 않는다.
     }
@@ -172,6 +210,26 @@ export function recordAttemptEnd(
         return;
       }
       await save(port, [{ at, path, outcome }, ...previous]);
+    } catch {
+      // 기록이 자동 쓰기를 막지 않는다.
+    }
+  });
+}
+
+/**
+ * 090 — 백그라운드 실행의 시간 예산이 끝났다. 만료된 시각의 `background` 줄을 따로 남긴다(합치기 규칙은 끝과 같다 — 짝을 찾지 않는다).
+ * 시작 줄은 건드리지 않는다. 실패는 삼킨다.
+ */
+export function recordAttemptExpired(port: AutoWriteAttemptPort, at: Date): Promise<void> {
+  return inOrder(async () => {
+    try {
+      const previous = await loadAutoWriteAttempts(port);
+      const head = previous[0];
+      if (head !== undefined && head.path === "background" && head.outcome === "expired") {
+        await save(port, [{ ...head, at }, ...previous.slice(1)]);
+        return;
+      }
+      await save(port, [{ at, path: "background", outcome: "expired" }, ...previous]);
     } catch {
       // 기록이 자동 쓰기를 막지 않는다.
     }

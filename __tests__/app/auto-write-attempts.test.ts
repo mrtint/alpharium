@@ -12,6 +12,7 @@ import {
   attemptOutcomeOf,
   loadAutoWriteAttempts,
   recordAttemptEnd,
+  recordAttemptExpired,
   recordAttemptStart,
   type AutoWriteAttemptPort,
 } from "../../src/app/auto-write-attempts";
@@ -35,7 +36,7 @@ const AT = new Date("2026-10-13T13:12:03.456Z");
 const LATER = new Date("2026-10-13T14:00:00.000Z");
 
 describe("AT1 — 갈래는 사람이 못 박은 상수다", () => {
-  it("경로 셋, 결과 열넷 — 순서까지 (080: 사용자가 그만둠)", () => {
+  it("경로 셋, 결과 열다섯 — 순서까지 (080: 사용자가 그만둠, 090: 시간 예산이 끝남)", () => {
     expect(ATTEMPT_PATHS).toEqual(["background", "app-open", "manual"]);
     expect(ATTEMPT_OUTCOMES).toEqual([
       "started",
@@ -52,8 +53,9 @@ describe("AT1 — 갈래는 사람이 못 박은 상수다", () => {
       "cancelled",
       "ran",
       "failed",
+      "expired",
     ]);
-    expect(ATTEMPT_OUTCOMES).toHaveLength(14);
+    expect(ATTEMPT_OUTCOMES).toHaveLength(15);
     expect(MAX_AUTO_WRITE_ATTEMPTS).toBe(20);
   });
 });
@@ -261,5 +263,68 @@ describe("AT9 — 소스 계약", () => {
 
   it("시간·바이트·토큰을 기록하지 않는다 (원칙 IV)", () => {
     expect(SRC).not.toMatch(/elapsed|duration|bytes|token|timings/i);
+  });
+});
+
+describe("AT11~AT14 — 090 깨운 상태와 시간 예산 만료", () => {
+  it("AT12 — 시작 줄이 깨운 상태를 싣고, 끝으로 바뀌어도 남는다", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT, "background");
+    expect((await loadAutoWriteAttempts(port))[0]).toEqual({
+      at: AT,
+      path: "background",
+      outcome: "started",
+      launch: "background",
+    });
+    await recordAttemptEnd(port, "background", AT, "ran");
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: AT, path: "background", outcome: "ran", launch: "background" },
+    ]);
+  });
+
+  it("AT12 — 상태를 주지 않으면 필드가 없다 (옛 모양 그대로)", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "manual", AT);
+    expect(JSON.parse(port.content ?? "")).toEqual({
+      items: [{ at: AT.toISOString(), path: "manual", outcome: "started" }],
+    });
+  });
+
+  it("AT13 — 두 값 밖의 상태는 필드 없이 읽는다 (줄은 산다)", async () => {
+    const port = memoryPort(
+      JSON.stringify({
+        items: [
+          { at: AT.toISOString(), path: "background", outcome: "started", launch: "inactive" },
+          { at: LATER.toISOString(), path: "background", outcome: "ran", launch: "active" },
+        ],
+      }),
+    );
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: AT, path: "background", outcome: "started" },
+      { at: LATER, path: "background", outcome: "ran", launch: "active" },
+    ]);
+  });
+
+  it("AT14 — 만료는 그 시각의 백그라운드 줄을 맨 앞에 따로 남기고 시작 줄은 그대로 둔다", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT, "background");
+    await recordAttemptExpired(port, LATER);
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: LATER, path: "background", outcome: "expired" },
+      { at: AT, path: "background", outcome: "started", launch: "background" },
+    ]);
+    // 멈췄던 실행이 이어서 끝나면 시작 줄만 끝남으로 바뀐다 — 둘 다 보인다
+    await recordAttemptEnd(port, "background", AT, "ran");
+    expect((await loadAutoWriteAttempts(port)).map((i) => i.outcome)).toEqual(["expired", "ran"]);
+  });
+
+  it("AT14 — 만료 기록의 쓰기 실패는 삼킨다", async () => {
+    const port: AutoWriteAttemptPort = {
+      read: async () => null,
+      write: async () => {
+        throw new Error("disk");
+      },
+    };
+    await expect(recordAttemptExpired(port, AT)).resolves.toBeUndefined();
   });
 });

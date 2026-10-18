@@ -36,7 +36,10 @@ import {
   attemptOutcomeOf,
   recordAttemptEnd,
   type AutoWriteAttemptPort,
+  type LaunchState,
 } from "./auto-write-attempts";
+import { readLaunchState } from "./launch-state-port";
+import type { AppPlatform } from "./platform";
 import type { DayPreview } from "./state";
 
 export type AutoWriteHandoffDeps = {
@@ -52,6 +55,10 @@ export type AutoWriteHandoffDeps = {
   onSkipped?: ((day: DayDate) => void) | undefined;
   /** 「지금」 — 테스트가 갈아 끼운다 */
   now?: (() => Date) | undefined;
+  /** 090 — 앱이 도는 플랫폼. 조립부가 `appPlatform(Platform.OS)`로 넘긴다(훅은 `Platform`을 읽지 않는다). 없으면 안드로이드 갈래(종전대로) */
+  platform?: AppPlatform | undefined;
+  /** 090 — 마운트 순간 앱이 앞에 있는가. 테스트가 갈아 끼운다 */
+  launchState?: (() => LaunchState | undefined) | undefined;
 };
 
 const systemNow = () => new Date();
@@ -67,6 +74,8 @@ export function useAutoWriteHandoff({
   attemptPort,
   onSkipped,
   now = systemNow,
+  platform,
+  launchState = readLaunchState,
 }: AutoWriteHandoffDeps): DayDate | null {
   const [handed, setHanded] = useState<Handed | null>(null);
   useEffect(() => {
@@ -102,7 +111,11 @@ export function useAutoWriteHandoff({
         // 남은 날이 덮어쓰기로 이어지지는 않는다.
         .catch(() => {});
     };
-    check();
+    // ★ 090 — iOS가 BGTask로 앱을 새로 띄우면 이 트리가 화면 없이 그려진다. 여기서 판정하면 보이지 않는 홈이 쓰기를 가져가고
+    // 백그라운드 태스크는 「다른 쓰기가 진행 중」으로 곧바로 끝나 iOS가 앱을 멈춘다(078·080 남은 위험). 뒤에서 그려졌으면 첫 판정을
+    // 앞으로 올 때(아래 `active`)로 미룬다. 안드로이드 헤드리스는 이 트리를 그리지 않으므로 종전대로다(078 — 콜드 스타트의 상태를
+    // 재 보지 않았다). 「뒤」로 확실할 때만 미룬다 — 모르면 종전대로 판정한다.
+    if (!(platform === "ios" && launchState() === "background")) check();
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active") check();
     });
@@ -110,7 +123,17 @@ export function useAutoWriteHandoff({
       alive = false;
       sub.remove();
     };
-  }, [settings, previewDay, skipPort, listDiaryDays, attemptPort, onSkipped, now]);
+  }, [
+    settings,
+    previewDay,
+    skipPort,
+    listDiaryDays,
+    attemptPort,
+    onSkipped,
+    now,
+    platform,
+    launchState,
+  ]);
 
   // ★ 지금 설정으로 한 판정의 결과만 준다(HO5). 설정이 바뀐 그 렌더부터 새 판정이 반영될 때까지는 없음이다.
   return handed !== null && handed.settings === settings ? handed.day : null;

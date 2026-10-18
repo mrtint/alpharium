@@ -1,0 +1,17 @@
+diff --git a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
+index 906678b..ac042f7 100644
+--- a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
++++ b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
+@@ -90,8 +90,10 @@ public class BackgroundTaskScheduler {
+       stopWorkerOnce()
+ 
+       let request = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
+-      request.requiresNetworkConnectivity = true
+-      request.requiresExternalPower = false
++      // Pocketlog 090 (patches/): on-device inference needs no network, and only a task that requires
++      // external power is exempt from the iOS CPU monitor (cpu_resource_fatal, 80% over 60s, seen on device).
++      request.requiresNetworkConnectivity = false
++      request.requiresExternalPower = true
+       request.earliestBeginDate = Date().addingTimeInterval(intervalSeconds)
+ 
+       do {

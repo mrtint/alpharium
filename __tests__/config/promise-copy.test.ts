@@ -30,7 +30,9 @@ describe("ST3 — 시각 미리보기", () => {
 describe("ST4 — 배터리 행", () => {
   it("안드로이드·iOS", () => {
     expect(batteryRowHint("android")).toBe("제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요");
-    expect(batteryRowHint("ios")).toBe("저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요");
+    expect(batteryRowHint("ios")).toBe(
+      "충전 중이고 저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요",
+    );
   });
 });
 

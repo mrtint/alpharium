@@ -10,7 +10,7 @@ iOS가 깨워 준 백그라운드 기회를 버리지 않게 판정 두 곳을 �
 ## Technical Context
 
 **Language/Version**: TypeScript(RN 0.86, Expo SDK 57, Hermes) + Swift 소량(로컬 Expo 모듈)
-**Primary Dependencies**: `expo-background-task` 57.0.14(무변경), `expo-task-manager`, `expo-modules-core`(로컬 모듈 — 새 npm 의존성 0)
+**Primary Dependencies**: `expo-background-task` 57.0.14(`patches/` — 요청 조건 두 줄, R7), `patch-package`(개발 의존성, `postinstall`), `expo-task-manager`, `expo-modules-core`(로컬 모듈 — 새 npm 의존성 0)
 **Storage**: `preferences/auto-write-attempts.json`(필드 하나 추가, 옵셔널), `preferences/auto-write-catch-up.json`(모양 그대로)
 **Testing**: jest 두 프로젝트(`logic`·`ui`), 소스 계약 테스트, 실기기(iPhone 14 iOS 27.0.1 — 개발 환경 Release 빌드, 087 4절)
 **Target Platform**: iOS 27(실기기), 안드로이드는 회귀 없음 확인
@@ -53,4 +53,5 @@ __tests__/…                           # 아래 contracts의 번호
 
 | 추가 | 왜 필요한가 | 더 단순한 대안을 버린 이유 |
 | --- | --- | --- |
+| `patch-package` | iOS CPU 감시가 백그라운드 추론을 죽인다 — 요청 조건은 expo 소스에만 있다(R7) | swizzle은 덜 투명, 쉼은 예산 초과 |
 | 로컬 Swift 모듈 | expo가 만료 이벤트를 `userInfo["url"]` 가드로 JS에 넘기지 않는다 | `patch-package`는 새 의존성 + node_modules 수정, 기록 없이 두면 만료와 종료를 못 가른다 |

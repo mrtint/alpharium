@@ -233,6 +233,7 @@ function attemptOutcomeText(outcome: AttemptOutcome): string {
     cancelled: A.cancelled,
     ran: A.ran,
     failed: A.failed,
+    expired: A.expired,
   };
   return byOutcome[outcome];
 }
@@ -244,7 +245,14 @@ export function attemptLines(items: readonly AutoWriteAttempt[]): AttemptLine[] 
       attemptPathText(item.path),
       T.failureTime(item.at.getMonth() + 1, item.at.getDate(), item.at.toTimeString().slice(0, 5)),
     ),
-    outcomeText: attemptOutcomeText(item.outcome),
+    // 090 — 시작 줄의 깨운 상태가 있으면 꼬리로(옛 줄·만료 줄은 없다)
+    outcomeText:
+      item.launch === undefined
+        ? attemptOutcomeText(item.outcome)
+        : A.withLaunch(
+            attemptOutcomeText(item.outcome),
+            item.launch === "active" ? A.launchActive : A.launchBackground,
+          ),
   }));
 }
 

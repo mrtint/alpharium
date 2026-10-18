@@ -45,10 +45,12 @@ describe("068 C2 — 배터리 행", () => {
   it("batteryHint prop 문자열이 행에 그려진다", async () => {
     await render(
       <SettingsScreen
-        {...props({ batteryHint: "저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요" })}
+        {...props({ batteryHint: "충전 중이고 저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요" })}
       />,
     );
-    expect(screen.getByText("저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요")).toBeTruthy();
+    expect(
+      screen.getByText("충전 중이고 저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요"),
+    ).toBeTruthy();
   });
 
   it("행을 누르면 onOpenAppSettings를 부른다", async () => {

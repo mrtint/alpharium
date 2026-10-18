@@ -2220,6 +2220,8 @@ function DiarySection({
     listDiaryDays,
     attemptPort,
     onSkipped,
+    // 090 — iOS 백그라운드 실행에서는 앞으로 올 때까지 판정하지 않는다(HO13)
+    platform: appPlatform(Platform.OS),
   });
 
   /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
