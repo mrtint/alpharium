@@ -18,7 +18,7 @@ Google Play 내부 테스트나 TestFlight에 올리기 **전에** 사람이 따
 npm run test:layer2
 ```
 
-- 흐름 네 개가 **하나씩** 돈다(각각 기준 상태를 다시 만든다). 전체 10~20분. 쓰기 하나가 1~4분이다.
+- 흐름 네 개가 **하나씩** 돈다(각각 기준 상태를 다시 만든다). 전체 10~~20분. 쓰기 하나가 1~~4분이다.
 - [ ] 끝에 `PASSED`가 나왔다. `SKIPPED`·`ABORTED`·`FAILED`는 통과가 아니다 — 이유를 읽는다.
 - [ ] 흐름 네 개가 모두 `PASS`다: `layer2-write-and-read`, `layer2-open-app-writes`, `layer2-diagnostics-try-write`, `layer2-first-run-auto-diary`.
 
@@ -41,7 +41,7 @@ npm run test:layer2
 
 ## iOS
 
-층 2의 iOS 갈래는 없다(맥이 필요해 로드맵에 남아 있다). **TestFlight에서 받은 앱이 실제 iPhone의 첫 실측이다** — 설치 → 권한 → 내려받기 → 첫 일기 → 다음 날 자동 쓰기 알림을 테스터가 확인한다(AGENTS 「iOS 빌드·서명·TestFlight」).
+층 2의 iOS 자동화 갈래는 없다(로드맵 과제). iOS는 **TestFlight 빌드 또는 개발 서명 빌드로 실제 iPhone(087)에서 확인한다** — 설치 → 권한 → 내려받기 → 첫 일기 → 백그라운드·쓸 차례 알림을 사람이 확인한다(AGENTS 「iOS 빌드·서명·TestFlight」).
 
 ## 결과 기록
 

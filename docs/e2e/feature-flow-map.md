@@ -13,7 +13,7 @@
 | 기능 | 층 1 흐름 | 계약 테스트가 지킴 | 층 2 | 사람이 봄(이유) |
 | --- | --- | --- | --- | --- |
 | 첫 실행(로고·권한·동의·진행·작명·정상 동작 확인) | — | `__tests__/firstrun/progress.test.ts`(단계 판정 우선순위), `__tests__/ui/AppFrame.firstrun.test.tsx`(단계별 화면 배선), `__tests__/welcome/naming.test.ts`(작명 검증) | `.maestro/layer2-first-run-auto-diary.yml`(모델이 있는 채 로고 → 작명 → 정상 동작 확인 → 자동 첫 일기 → 쓴 날 홈; 내려받기는 제외) | 모델 내려받기 실제 동작·OS 권한 창 — `pm clear`·새 설치가 전제라 층 1이 만들 수 없다. 기존 흐름 `first-run-flow`·`download-consent-flow`·`unified-permission-onboarding`이 일반 실행(FLOWS)에서 본다 |
-| 일기 쓰기·그만두기(제자리 쓰기) | — | `__tests__/ui/writing-in-place.test.tsx`(쓰는 중 홈 배선), `__tests__/ui/writing-in-place-stop.test.tsx`(그만두면 쓰기 전 상태) | `.maestro/layer2-write-and-read.yml`(어제를 골라 쓰기 → 쓰는 중 → 쓴 날 홈) | 실제 생성은 모델·50~240초라 층 1이 아니다. 일반 실행 `in-place-writing`·`generate-diary`가 일부 본다. 빠른 반복 시 부작용은 로드맵의 별도 과제 |
+| 일기 쓰기·그만두기(제자리 쓰기) | — | `__tests__/ui/writing-in-place.test.tsx`(쓰는 중 홈 배선), `__tests__/ui/writing-in-place-stop.test.tsx`(그만두면 쓰기 전 상태) | `.maestro/layer2-write-and-read.yml`(어제를 골라 쓰기 → 쓰는 중 → 쓴 날 홈) | 실제 생성은 모델·50~240초라 층 1이 아니다. 일반 실행 `in-place-writing`·`generate-diary`가 일부 본다. 빠른 반복 시 부작용은 071에서 실기기로 검증·수정했다 |
 | 쓴 날 읽기(홈이 곧 상세) | `.maestro/restart-persistence.yml`, `.maestro/diary-body-screen.yml` | `__tests__/ui/written-day-home.test.tsx`, `__tests__/app/written-day.test.ts`, `__tests__/diary/store.test.ts`(직렬화 왕복) | — | — |
 | 강제 종료 후 재시작해도 읽힘 | `.maestro/restart-persistence.yml` | `__tests__/diary/expo-file-sync.test.ts`(비동기 `text()` 호출이 소스에 없음 — 소스만 센다) | — | — (GC가 끼는 확률 결함은 jest에 런타임이 없어 이 흐름이 유일한 방어) |
 | 읽기 스크롤(스트립 접힘) | — | `__tests__/ui/reading-scroll.test.tsx`, `__tests__/app/reading-scroll.test.ts`(접힘 판정) | — | 접힘 움직임·손맛 — 기존 `reading-scroll`이 `-e` 변수를 받아 실행기로 못 돈다. 사람이 `maestro test`로 직접 돌린다 |
