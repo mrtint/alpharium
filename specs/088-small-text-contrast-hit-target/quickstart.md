@@ -67,8 +67,14 @@ npm run test:layer1 -- .maestro/week-strip-swipe.yml
 ### 3.2 디바이스·시뮬레이터 검증 (D1 · D2 · D3)
 
 - **검증 환경 (원칙 V — 환경 한계 정직 기록)**:
-  - 작업 환경(집 맥)에는 Android SDK(`adb`) 및 `SM-S901N`이 연결되어 있지 않고, USB로 연결된 실기기 `iPhone 14`는 별도 워크트리에서 `087`(백그라운드 자동 쓰기 실측) 실험이 진행 중이어서 건드리지 않았다.
-  - 이에 따라 **iOS 시뮬레이터(`iPhone 17 Pro Max`, iOS 26.5, UDID `AD022FA9-EA15-4C5E-8E80-F9D224FE7609`)**에서 dev 번들(`EXPO_PUBLIC_APP_ENV=dev`)을 띄워 D1·D2·D3 전 항목을 실측했고, `SM-S901N` 및 실기기 iPhone에서의 육안 확인은 미검증으로 남긴다.
+  - 작업 환경(집 맥)에는 Android SDK(`adb`) 및 `SM-S901N`이 연결되어 있지 않아 안드로이드 실기기는 미검증으로 남긴다.
+  - **iOS 시뮬레이터(`iPhone 17 Pro Max`, iOS 26.5, UDID `AD022FA9-EA15-4C5E-8E80-F9D224FE7609`)**에서 dev 번들(`EXPO_PUBLIC_APP_ENV=dev`)을 띄워 D1·D2·D3 전 항목을 실측했고, 이어서 **실기기 `iPhone 14`(`Hansan의 iPhone`, iOS 27.0.1, `4EE24F59-A58C-5C8D-A002-141CEE07AE19`)**에도 `088` 개발 환경 Release 번들을 덮어 설치(`Documents/` 모델·일기·설정 보존)해 실행·뷰 계층·화면 렌더링을 확인했다.
+- **실기기 `iPhone 14`(iOS 27.0.1) 확인**:
+  - `npx expo export:embed`(`EXPO_PUBLIC_APP_ENV=dev`) → `hermesc -emit-binary -O` → 개발 인증서(`FE9ACD06…`) 재서명 → `xcrun devicectl device install app` 및 `device process launch`로 기기 데이터를 유지한 채 설치·기동(PID 1585).
+  - `lldb`로 실기기 `UIWindow` 뷰 트리(`recursiveDescription`) 및 레이어 PNG(`088-iphone14-home.png`)를 추출해 확인:
+    - 홈 월 라벨(`2026년 10월`): `NSColor = "UIExtendedSRGBColorSpace 0.682353 0.0941176 0 1"` (`#ae1800`, `COLORS.danger`).
+    - 주간 스트립 선택 칸(`18`, 배경 `0.92549 0.188235 0.0745098 1` = `#ec3013`) 요일 약자(`일`): `NSColor = "UIExtendedSRGBColorSpace 0.952941 0.94902 0.94902 1"` (`#f3f2f2`, `COLORS.accentForeground`), 텍스트 뷰 `alpha` 감쇠 없음(불투명도 1.0).
+    - 주간 스트립 비선택 칸 요일 약자(`월~토`): `NSColor = "UIExtendedSRGBColorSpace 0.372549 0.368627 0.364706 1"` (`#5f5e5d`, `DAY_STRIP.dowMuted`), 텍스트 뷰 `alpha` 감쇠 없음(미래 칸 컨테이너만 `alpha = 0.3`).
 - **D1 — 작은 강조 글자 5곳(`#ae1800`) · 주간 스트립 요일 약자 · 글자 크기 1.0배(`medium`) 및 ~1.94배(`accessibility-large`) 캡처**:
   - **홈(쓴 날 · 안 쓴 날 · 지난주)**: 상단 월 라벨(`2026년 10월`, `#ae1800`), 선택 칸 요일(`일`, `#f3f2f2`, 불투명도 없음), 비선택 칸 요일(`월~토`, `#5f5e5d`), 미래 칸(`19~24`, `opacity: 0.3`) 확인 (`088-01-home-written.png`, `088-02-home-unwritten-prev-week.png`).
   - **홈(제자리 쓰는 중)**: `write-button` → `overwrite-confirm`으로 진입해 상단 상태 줄(`WRITING_STATE`, `쓰는 중`, `#ae1800`)과 종이 카드 머리말(`writing-kicker`, `쓰는 중`, `#ae1800`) 확인 후 `stop-button`으로 중단 (`088-03-home-writing-in-place.png`).
@@ -84,4 +90,3 @@ npm run test:layer1 -- .maestro/week-strip-swipe.yml
   - 주간 스트립 가로 스와이프(`W1~W4`: 오른쪽 스와이프로 지난주 이동 → 같은 요일 유지 및 `day-today-.*` 비노출 → 왼쪽 스와이프로 이번 주 복귀 → 오늘 주에서 왼쪽 스와이프 바운스) 통과 (`2026-10-18_010052`).
   - 설정 화면 매일 쓰는 시각 대화상자(`오후 10시` 선택·반영), 장소 이름 대화상자(`꺼짐` 선택·반영), 자동 쓰기 토글 접기·펼치기 통과 (`2026-10-18_010904`).
   - 검증 종료 후 시뮬레이터 `Documents/diary`·`Documents/preferences` 백업 및 `content_size medium`을 원상 복구하고 시뮬레이터와 Metro를 종료함.
-
