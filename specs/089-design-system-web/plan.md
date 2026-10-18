@@ -1,6 +1,6 @@
 # Implementation Plan: 디자인 시스템 기반과 웹 재디자인
 
-**Branch**: `worktree-design-system` (머지 시점에 소유자가 이름 변경) | **Date**: 2026-10-18 | **Spec**: [spec.md](./spec.md)
+**Branch**: `089-design-system-web` | **Date**: 2026-10-18 | **Spec**: [spec.md](./spec.md)
 
 **Input**: `specs/089-design-system-web/spec.md`, 설계 `docs/superpowers/specs/2026-10-17-design-system-design.md`
 

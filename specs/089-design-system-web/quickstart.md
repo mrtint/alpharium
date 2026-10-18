@@ -4,7 +4,7 @@
 
 ## 준비
 
-1. 작업 위치: `.claude/worktrees/design-system`(브랜치 `worktree-design-system`). `npm ci`가 필요하면 이 워크트리에서 한다.
+1. 작업 위치: `.claude/worktrees/design-system`(브랜치 `089-design-system-web`). `npm ci`가 필요하면 이 워크트리에서 한다.
 2. 서체 가져오기(네트워크 필요, 한 번): `node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/design/import-pretendard-web.mts` → `site/assets/fonts/`·`fonts.css`·`source.json`. 무결성이 다르면 아무것도 쓰지 않고 실패한다.
 
 ## 값을 바꾸고 확인하는 법
