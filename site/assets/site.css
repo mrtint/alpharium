@@ -1,0 +1,140 @@
+/*
+ * 089 — 사이트 공용 스타일. 값은 전부 tokens.css의 변수다 — 색·서체·크기·간격·반경을 여기서 정하지 않는다.
+ * 규칙: design/DESIGN.md · specs/089-design-system-web/contracts/site-style.md
+ *
+ * 쓰는 클래스: .page(본문 컨테이너) · .doc(긴 글 타이포) · .meta(보조 줄) · .summary(한 줄 요약 상자)
+ *              · .section(절 구분) · .links(링크 목록)
+ * 링크·강조 글자는 danger 역할이다(accent는 라이트 배경 위 3.76:1이라 글자에 쓰지 않는다 — 면·표식에만).
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-reading-size);
+  font-weight: var(--text-reading-weight);
+  line-height: var(--text-reading-line);
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+.page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: calc(var(--space-24) * 2) var(--space-16) calc(var(--space-24) * 3);
+}
+
+/* 글자 위계: h1 display · h2 title · h3 sectionTitle · 본문 reading · 보조 caption */
+.doc h1 {
+  margin: 0 0 var(--space-8);
+  font-size: var(--text-display-size);
+  font-weight: var(--text-display-weight);
+  line-height: var(--text-display-line);
+}
+
+.doc h2 {
+  margin: 0 0 var(--space-12);
+  font-size: var(--text-title-size);
+  font-weight: var(--text-title-weight);
+  line-height: var(--text-title-line);
+}
+
+.doc h3 {
+  margin: calc(var(--space-24) + var(--space-4)) 0 var(--space-4);
+  font-size: var(--text-sectionTitle-size);
+  font-weight: var(--text-sectionTitle-weight);
+  line-height: var(--text-sectionTitle-line);
+}
+
+.doc p {
+  margin: 0 0 var(--space-12);
+}
+
+.doc ul,
+.doc ol {
+  margin: 0 0 var(--space-12);
+  padding-left: var(--space-20);
+}
+
+.doc li {
+  margin: var(--space-4) 0;
+}
+
+.doc .meta {
+  margin: 0 0 var(--space-24);
+  color: var(--color-textMuted);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line);
+}
+
+a {
+  color: var(--color-danger);
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+a:focus-visible {
+  outline: 2px solid var(--color-text);
+  outline-offset: 2px;
+}
+
+/* 한 줄 요약 — surface 면 + accent 표식 */
+.summary {
+  margin: 0 0 var(--space-24);
+  padding: var(--space-16) var(--space-20);
+  background: var(--color-surface);
+  border-left: 4px solid var(--color-accent);
+}
+
+.summary h2 {
+  font-size: var(--text-sectionTitle-size);
+  font-weight: var(--text-sectionTitle-weight);
+  line-height: var(--text-sectionTitle-line);
+}
+
+.summary p:last-child {
+  margin-bottom: 0;
+}
+
+/* 절 구분 — 위 구분선 + 간격 */
+.section {
+  margin: calc(var(--space-24) * 2) 0 0;
+  padding: var(--space-24) 0 0;
+  border-top: 1px solid var(--color-border);
+}
+
+/* 제목 바로 아래의 첫 절은 간격을 줄인다 */
+.doc h1 + .section {
+  margin-top: var(--space-24);
+}
+
+/* 링크 목록 — 한 줄에 하나, 구분선으로 나눈다 */
+.doc .links {
+  margin: var(--space-24) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.doc .links li {
+  margin: 0;
+  padding: var(--space-12) 0;
+  border-top: 1px solid var(--color-border);
+  font-weight: var(--text-bodyStrong-weight);
+}
+
+.doc .links li:last-child {
+  border-bottom: 1px solid var(--color-border);
+}

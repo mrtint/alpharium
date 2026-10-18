@@ -1,0 +1,60 @@
+{
+  "COLORS": {
+    "bg": "#f3f2f2",
+    "surface": "#eae9e9",
+    "border": "#9f9d9d",
+    "text": "#201e1d",
+    "textMuted": "#6b6767",
+    "accent": "#ec3013",
+    "accentForeground": "#f3f2f2",
+    "danger": "#ae1800",
+    "dangerForeground": "#f3f2f2"
+  },
+  "RADIUS": {
+    "card": 0,
+    "pill": 0,
+    "control": 6
+  },
+  "TYPE": {
+    "title": {
+      "fontSize": 20,
+      "fontWeight": "600",
+      "lineHeight": 28
+    },
+    "sectionTitle": {
+      "fontSize": 16,
+      "fontWeight": "600",
+      "lineHeight": 22
+    },
+    "body": {
+      "fontSize": 15,
+      "fontWeight": "400",
+      "lineHeight": 22
+    },
+    "bodyStrong": {
+      "fontSize": 15,
+      "fontWeight": "600",
+      "lineHeight": 22
+    },
+    "caption": {
+      "fontSize": 13,
+      "fontWeight": "400",
+      "lineHeight": 19
+    },
+    "button": {
+      "fontSize": 15,
+      "fontWeight": "600",
+      "lineHeight": 20
+    }
+  },
+  "FONT": {
+    "family": "Pretendard",
+    "weights": [
+      "400",
+      "500",
+      "600",
+      "700",
+      "800"
+    ]
+  }
+}

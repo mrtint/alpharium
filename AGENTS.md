@@ -1204,6 +1204,16 @@
 - **Play 데이터 보안은 비공개 테스트 트랙에도 필수다**([문서] 내부 테스트 트랙만 예외) — 방침 URL이 Play 14일 시계 앞에 선다. Play 위치는 보수적으로 「정확한 위치 — 수집함」(OS API 경유를 Play 문서가 직접 다루지 않는다), App Store는 「Data Not Collected」(「Apple이 모으는 것은 선언할 책임이 없다」).
 - **미확인**: 패킷으로 본 지오코더 전송·안드로이드 제공자, OS 백업에 앱 데이터가 실리는지(방침은 「포함될 수 있습니다」), 지오코더의 전송 암호화. 상세·위반 주입·실기기는 `specs/086-privacy-policy/quickstart.md` 「실측」.
 
+### 089 — 디자인 시스템 기반과 웹 재디자인
+
+- **토큰의 정본은 `design/tokens.json` 하나다**(색 라이트·다크, 반경, 글자 스케일, 서체, 간격, 대비 쌍 표). `scripts/design/build-tokens.mts`가 (1) `src/ui/theme/tokens.ts`의 **생성 영역**(표식 `// <design-tokens:generated>` … `// </design-tokens:generated>` 사이 — `COLORS`·`RADIUS`·`TYPE`·`FONT`)과 (2) `site/assets/tokens.css`를 다시 쓴다. 값을 바꾸는 순서는 정본 → 생성 → 테스트이고 생성 영역을 손으로 고치지 않는다. 규칙·뜻·쓰는 법은 `design/DESIGN.md`(디자인 산출물을 만들기 전에 먼저 읽는다).
+- **생성 영역 방식인 까닭**: 앱 토큰 테스트(`theme-tokens`·`font-rules`)가 `tokens.ts` **소스**를 읽어 「const·리터럴·키 아홉·`COLORS_DARK` 없음·`fontFamily`는 `FONT.family`로만」을 단언한다. 별도 `tokens.generated.ts`로 나누면 그 단언을 옮겨야 한다. 영역 앞 머리 주석에 낱말 `COLORS`를 쓰면 `theme-tokens`의 소스 조각 단언이 머리 주석을 코드로 읽는다 — 영역 앞에는 쓰지 않는다. 앱 영역에는 **라이트 값만** 들어가고 다크 값·웹 전용 글자 역할(`display`·`reading`)은 웹 쪽(`tokens.css`)에만 나온다.
+- **생성기는 값을 만들지 않는다**(원칙 V). prettier를 부르지 않고 저장소 prettier 모양으로 직접 쓴다(jest(CJS)에서 prettier 3의 동적 import가 안 돈다) — 같은 모양인지는 `__tests__/design/tokens-sync.test.ts`가 `prettier --check`로 본다. 정본이 규칙(C1~C9)을 어기면 아무것도 쓰지 않고 실패한다.
+- **웹에서 `accent`를 글자·링크 색으로 쓰지 않는다.** 라이트 배경 위 3.76:1이라 본문 4.5:1 미달이다. 링크·강조는 `danger`(라이트 6.41:1)이고 accent는 면·표식(요약 상자의 세로 막대)에만 쓴다. 대비 쌍은 정본의 `contrast` 표에 사람이 적고 테스트가 라이트·다크로 계산한다 — 사이트가 표에 없는 조합을 쓰지 못하게 `site.css`의 규칙 블록마다 글자색·배경 짝이 표에 있어야 하고(배경이 없으면 `bg`·`surface` 둘 위의 쌍이 모두 표에 있어야 하며, accent·danger 면에는 글자색을 규칙 안에 적어야 한다), 색을 받는 속성에는 `var()`·크기·선 종류 말고 이름 있는 색 같은 낱말이 없어야 한다. 이 검사는 CSS 규칙 안의 한 블록만 본다 — 조상 요소가 바꾼 상속 글자색은 보지 못한다.
+- **웹 서체는 npm `pretendard@1.3.9`의 분할 배포본(`woff2-dynamic-subset`) 400·600·700을 `site/assets/fonts/`에 바이트 그대로 둔다**(굵기당 92조각, 276개 약 4.0MB). GitHub 릴리스 zip의 웹 배포(`woff2`·`woff2-subset`)에는 분할본이 없다. 가져오는 길은 `scripts/design/import-pretendard-web.mts` 하나(레지스트리 `dist.integrity`가 다르면 아무것도 쓰지 않는다). 브라우저가 쓰인 글자의 `unicode-range` 조각만 받으므로 페이지당 글꼴 합계가 방침 587,756바이트·지원 481,696·소개 282,604다 — 상한 1,000,000바이트를 `fonts-budget`이 (페이지 글자 집합 × 범위)로 계산해 잠근다. CDN을 쓰지 않는다(방문자 IP가 제3자로 간다 — 방침과 모순).
+- **사이트는 같은 출처의 스타일시트 셋(`tokens.css`·`fonts.css`·`site.css`)만 링크한다.** 086 S3의 「`rel="stylesheet"` 전면 금지」는 「상대 경로가 아닌 stylesheet 금지」로 좁혔다(외부 주소·절대 경로·`<script>`·`@import`·외부 `src`는 그대로 금지). 페이지에 `<style>`·`style=`·색 리터럴·정의 안 된 클래스가 들어가면 `site-hardcode`가 실패한다. 간격은 앱 `src/ui/`의 padding·margin·gap 정수 리터럴 중 9회 이상 쓰인 값(4·8·10·12·16·20·24)만이고 웹은 그 단계 변수·정수배·합만 쓴다.
+- **미확인**: 안드로이드 실기기와 Safari iOS·Chrome Android에서의 웹 렌더링, GitHub Pages 게시 뒤 서체 URL, 앱 OTF와 웹 woff2의 글리프 동일성(눈 대조 안 함). 앱 화면이 토큰·공용 부품을 벗어난 곳의 점검·정리와 소개 페이지의 랜딩화는 후속 과제(로드맵). 상세·위반 주입 27건·캡처는 `specs/089-design-system-web/quickstart.md` 「실측」.
+
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크
@@ -1504,6 +1514,7 @@ CPU를 서로 뺏어 `render()`가 기본 5초 타임아웃을 넘겼던 것이 
 ## 작업 습관
 
 - 커밋 메시지는 한국어로 쓴다(헌법 「개발 방식」). 계약을 먼저 정하고 테스트를 먼저 쓴다.
+- **화면·페이지·문서 같은 디자인 산출물을 만들기 전에 [design/DESIGN.md](design/DESIGN.md)를 먼저 읽는다** — 토큰의 정본은 `design/tokens.json` 하나이고 앱·웹이 그것을 쓴다(089).
 - **`main`에서 직접 작업하지 않는다.** 기능마다 브랜치를 파고 PR로 머지한다. **작업을 시작하기 전에 `git branch --show-current`로 지금 브랜치를 눈으로 확인한다** — 스펙킷(`setup-plan.ps1` 등)이
   출력하는 `BRANCH:` 필드는 스펙 디렉터리 이름이지 체크아웃된 브랜치가 아니다(022를 통째로 `main`에서 작업·커밋한 사고가 있었다). `.githooks/pre-commit`·`pre-push`가 `main`/`master` 직접
   커밋·push를 막는다(`core.hooksPath=.githooks`, clone 후 `git config core.hooksPath .githooks` 한 번 필요; 우회는 `--no-verify`).

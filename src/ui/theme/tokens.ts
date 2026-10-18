@@ -10,6 +10,10 @@
  * 값을 잇는 유일한 자리이고, `tailwind.config.js`가 이것을 `require`한다 — 톤을
  * 바꾸려면 여기 한 곳만 고친다(SC-002).
  *
+ * **089 — 색·반경·글자·서체 상수 넷(생성 영역 안의 `export const`)은 `design/tokens.json`이 만든다**(웹 `site/`와 같은
+ * 정본). 그 영역은 손으로 고치지 않는다 — 값을 바꾸려면 정본을 고치고 `scripts/design/build-tokens.mts`를 돌린다.
+ * 영역 밖(`TEXT_FONT`·`PRESS`·`WRITING`… 컴포넌트 전용 값)은 이 파일이 그대로 정본이다. 규칙은 `design/DESIGN.md`.
+ *
  * **값은 사람이 정한 상수다**(헌법 원칙 V, 012 `USER_VISIBLE_SIGNAL_AXES`·021
  * `PERMISSION_REQUIREMENTS` 선례). 코드가 색을 계산하지 않는다 — `darken()`·
  * 조건 분기를 넣는 순간 임계값 코드가 되고 그것이 원칙 IV로 가는 길이다.
@@ -34,25 +38,25 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-/** 색 역할 → 값. 키는 역할이지 색 이름이 아니다(다크 대응 시 같은 키에 다른 값). */
+// <design-tokens:generated> — design/tokens.json에서 만든다. 손으로 고치지 않는다.
+
+/** 색 역할 → 값. 키는 역할이지 색 이름이 아니다. 라이트가 앱의 값이고 다크는 웹 전용이다(앱은 031부터 라이트 고정). */
 export const COLORS = {
   /** 화면 배경 — 오프화이트 (043 Modernist) */
   bg: "#f3f2f2",
   /** 카드·행 배경 — 옅은 회색 */
   surface: "#eae9e9",
-  /** 구분선·경계 (hairline) — 마크업 divider(어두운 텍스트색 40% 불투명도)를
-   *  bg(#f3f2f2) 위에 합성한 불투명 hex 근사(DT1 — COLORS는 #rrggbb만 허용) */
+  /** 구분선·경계 (hairline) — 마크업 divider(어두운 텍스트색 40% 불투명도)를 bg(#f3f2f2) 위에 합성한 불투명 hex 근사(DT1 — COLORS는 #rrggbb만 허용) */
   border: "#9f9d9d",
   /** 본문 글자 — 짙은 블랙 (vs bg 14.86:1) */
   text: "#201e1d",
   /** 보조·캡션 — 중간 회색, WCAG 대비 위해 원본보다 근소하게 어둡게 조정 (vs bg 5.00:1) */
   textMuted: "#6b6767",
-  /** 주요 버튼·강조 배경 — 단일 레드 */
+  /** 주요 버튼·강조 배경 — 단일 레드. 면·표식에만 쓰고 웹에서는 글자 색으로 쓰지 않는다(vs bg 3.76:1) */
   accent: "#ec3013",
-  /** accent 배경 위 글자 — 보드의 오프화이트(vs accent 3.76:1, 큰 글자·UI 기준만 충족).
-   *  AA 본문 기준 미달을 알고 보드를 따른다(2026-10-01 저장소 소유자 결정). */
+  /** accent 배경 위 글자 — 보드의 오프화이트(vs accent 3.76:1, 큰 글자·UI 기준만 충족). AA 본문 기준 미달을 알고 보드를 따른다(2026-10-01 저장소 소유자 결정). */
   accentForeground: "#f3f2f2",
-  /** 삭제·되돌릴 수 없는 동작 + 강조 텍스트/버튼용 진한 레드 (vs bg 6.41:1) */
+  /** 삭제·되돌릴 수 없는 동작 + 강조 텍스트/버튼용 진한 레드 (vs bg 6.41:1). 웹의 링크·강조 글자도 이 색이다. */
   danger: "#ae1800",
   /** danger 위 글자 — 오프화이트 (vs danger 6.41:1) */
   dangerForeground: "#f3f2f2",
@@ -64,18 +68,14 @@ export const RADIUS = {
   card: 0,
   /** 알약형 */
   pill: 0,
-  /**
-   * 050 — 대화상자·달력의 버튼(보드 `2d`·`2j`). 면은 여전히 직선(반경 0)이고 **버튼만** 6이다 —
-   * 보드가 하단 바 버튼과 맞춘 값이다(설계 §3.1, 사람이 정한 값).
-   */
+  /** 050 — 대화상자·달력의 버튼(보드 `2d`·`2j`). 면은 여전히 직선(반경 0)이고 **버튼만** 6이다 — 보드가 하단 바 버튼과 맞춘 값이다(설계 §3.1, 사람이 정한 값). */
   control: 6,
 } as const;
 
 /**
  * 타이포그래피 — 크기·굵기·행간만. 서체는 `TEXT_FONT`가 글자 부품에서 얹는다(083).
- *
- * `fontWeight`는 RN이 받는 문자열("400"/"600"). 여기 `fontFamily`를 두지 않는다 — `tailwind.config.js`가 이 표를
- * fontSize 튜플로 옮기므로 서체까지 실으면 서체를 정하는 자리가 둘이 된다.
+ * `fontWeight`는 RN이 받는 문자열("400"/"600"). 여기 `fontFamily`를 두지 않는다 — `tailwind.config.js`가 이 표를 fontSize 튜플로 옮기므로 서체까지 실으면 서체를 정하는 자리가 둘이 된다.
+ * 앱은 `platforms`가 없는 여섯 역할만 받고, 웹 전용(`display`·`reading`)은 `tokens.css`에만 나온다.
  */
 export const TYPE = {
   /** 화면 제목 */
@@ -93,18 +93,17 @@ export const TYPE = {
 } as const;
 
 /**
- * 083 — 서체. **앱의 모든 글자가 이 한 곳에서 서체를 받는다**(FR-007).
- *
- * - `family`는 expo-font 설정(`app.json`)의 안드로이드 `fontFamily`이자 iOS가 파일에서 읽는 family 이름이다 —
- *   v1.3.9 정적 OTF 다섯 모두 family가 `Pretendard`다(fc-scan, 083 research R2).
- * - `weights`는 화면이 쓰는 굵기 다섯이고 넣은 파일 다섯과 짝이다(Regular·Medium·SemiBold·Bold·ExtraBold). 화면이 이 밖의
- *   굵기를 쓰면 F3이, 설정·파일과 어긋나면 F4가 실패한다. 굵기를 하나 더 쓰려면 배포처 파일을 하나 더 넣고 셋을 함께 고친다.
- * - 가변 서체(파일 하나)는 쓰지 않는다 — 안드로이드는 굵기 축 값이 API 26+에서만 듣는다(minSdk 24, 083 brainstorming).
+ * 083 — 서체. 앱의 모든 글자가 이 한 곳에서 서체를 받는다(`__tests__/config/font-rules.test.ts` F1이 다른 파일의 fontFamily를 막는다).
+ * `family`는 expo-font 설정(`app.json`)의 안드로이드 `fontFamily`이자 iOS가 파일에서 읽는 family 이름이다 — v1.3.9 정적 OTF 다섯 모두 family가 `Pretendard`다(083 research R2).
+ * `weights`는 앱이 쓰는 굵기 다섯이고 넣은 파일 다섯과 짝이다. 화면이 이 밖의 굵기를 쓰면 F3이, 설정·파일과 어긋나면 F4가 실패한다. 굵기를 하나 더 쓰려면 배포처 파일을 하나 더 넣고 셋을 함께 고친다.
+ * 가변 서체(파일 하나)는 쓰지 않는다 — 안드로이드는 굵기 축 값이 API 26+에서만 듣는다(minSdk 24, 083 brainstorming).
+ * 웹은 그중 `webWeights`만 npm 분할 배포본으로 자체 호스팅한다(089 research R2). 글자 역할의 굵기는 `webWeights` 안이어야 한다.
  */
 export const FONT = {
   family: "Pretendard",
   weights: ["400", "500", "600", "700", "800"],
 } as const;
+// </design-tokens:generated>
 
 /**
  * 083 — 공통 글자 스타일. RN 글자 부품을 직접 쓰는 세 자리(`AppText`·`rnr/text.tsx`·`NameField`)가 스타일 배열 맨 앞에
