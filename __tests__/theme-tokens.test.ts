@@ -17,6 +17,7 @@ import { join } from "node:path";
 
 import {
   COLORS,
+  DAY_STRIP,
   FONT,
   RADIUS,
   RNR_COLOR_ALIASES,
@@ -132,7 +133,8 @@ describe("DT4 — 팔레트가 WCAG AA를 만족한다 (spec FR-002, SC-005)", (
     // 큰 글자·UI 기준(3:1)은 지킨다 — 더 옅은 글자로 바뀌는 것은 막는다.
     ["accentForeground", "accent", 3.0],
     ["dangerForeground", "danger", 4.5],
-    ["danger", "bg", 3.0],
+    // 088 FR-003 — 작은 강조 글자(11~13px)가 danger를 쓰므로 AA 본문 기준(4.5:1)으로 잠근다(계산 6.41:1).
+    ["danger", "bg", 4.5],
   ];
 
   it.each(pairs)("★ %s vs %s ≥ %f", (a, b, min) => {
@@ -245,5 +247,18 @@ describe("055 — 설정 면 색의 대비 (research R10)", () => {
 
   it("056 FR-029·SC-007 — 토글 꺼짐 손잡이가 꺼짐 면과 3:1 이상 구분된다", () => {
     expect(contrastRatio(SETTINGS.toggle.knobOff, SETTINGS.tagFill)).toBeGreaterThanOrEqual(3);
+  });
+
+  it("088 FR-008·SC-003 — 토글 세로 누름 영역이 시각 높이(26) + 위아래 hitSlop(9×2) = 행 최소 높이(44)다", () => {
+    expect(SETTINGS.toggle.hitSlop).toBe(9);
+    expect(SETTINGS.toggle.height + SETTINGS.toggle.hitSlop * 2).toBe(SETTINGS.row.minHeight);
+  });
+});
+
+describe("088 — 주간 스트립 비선택 칸 요일 색 대비 (FR-006·C5)", () => {
+  it("DAY_STRIP.dowMuted(#5f5e5d)가 bg(#f3f2f2) 위에서 AA 4.5:1 이상이고 COLORS 9역할에 들지 않는다", () => {
+    expect(DAY_STRIP.dowMuted).toBe("#5f5e5d");
+    expect(contrastRatio(DAY_STRIP.dowMuted, COLORS.bg)).toBeGreaterThanOrEqual(4.5);
+    expect(Object.values(COLORS)).not.toContain(DAY_STRIP.dowMuted);
   });
 });

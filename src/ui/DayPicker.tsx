@@ -36,7 +36,7 @@ import { dayParts, type StripCell, type SwipeDirection } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { weekdayShort } from "./home-text";
-import { COLORS } from "./theme/tokens";
+import { COLORS, DAY_STRIP } from "./theme/tokens";
 
 /**
  * 넘김 판정 수치 — **사람이 정한 값이다**(보드에 수치 없음, research R7).
@@ -140,6 +140,7 @@ export function DayPicker({ cells, onSelect, onSwipe, canSwipeNext = false }: Da
         {cells.map(({ day, hasDiary, isToday, selectable, selected }) => {
           const { date, weekday } = dayParts(day);
           const fg = selected ? COLORS.accentForeground : COLORS.text;
+          const dowColor = selected ? COLORS.accentForeground : DAY_STRIP.dowMuted;
 
           return (
             <Pressable
@@ -153,7 +154,7 @@ export function DayPicker({ cells, onSelect, onSwipe, canSwipeNext = false }: Da
               // 통하지 않는다(008 실측). 009의 `day-<date>` 규칙을 그대로 잇는다(FR-023).
               testID={`day-${day}`}
             >
-              <AppText style={[DOW, { color: fg }]}>{weekdayShort(weekday)}</AppText>
+              <AppText style={[DOW, { color: dowColor }]}>{weekdayShort(weekday)}</AppText>
               <View style={{ alignItems: "center" }}>
                 <AppText style={[NUM, { color: fg }]}>{date}</AppText>
                 {/* 오늘 — 숫자 밑줄(선택되면 선택 칸 글자색). 헤더에는 「오늘」 글자가 없다.
@@ -180,7 +181,7 @@ export function DayPicker({ cells, onSelect, onSwipe, canSwipeNext = false }: Da
 }
 
 /**
- * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(032·047 관례). 색은 `COLORS.*`만.
+ * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(032·047 관례). 색은 `COLORS.*`·`DAY_STRIP.*`만.
  * 선택 칸 글자는 `accentForeground`(보드의 오프화이트).
  */
 const STRIP = {
@@ -205,7 +206,8 @@ const CELL_SELECTED = { backgroundColor: COLORS.accent } as const;
 /** 미래 칸 — 흐리게(보드 달력 기준 0.3). 누름 자체는 `disabled`가 막는다. */
 const CELL_DIMMED = { opacity: 0.3 } as const;
 
-const DOW = { fontSize: 10, letterSpacing: 0.6, opacity: 0.7 } as const;
+/** 088 FR-004~FR-006 — `opacity` 없이 명시적 색(`accentForeground` / `DAY_STRIP.dowMuted`)으로 구분한다 */
+const DOW = { fontSize: 10, letterSpacing: 0.6 } as const;
 
 const NUM: TextStyle = { fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] };
 

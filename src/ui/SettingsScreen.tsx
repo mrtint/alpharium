@@ -285,7 +285,7 @@ export function Group({
             fontWeight: group.fontWeight,
             letterSpacing: group.fontSize * group.letterSpacingEm,
             textTransform: "uppercase",
-            color: COLORS.accent,
+            color: COLORS.danger,
           }}
           testID={testID === undefined ? undefined : `${testID}-label`}
         >
@@ -518,6 +518,7 @@ export function Toggle({
       accessibilityLabel={accessibilityLabel ?? SETTINGS_TEXT.autoWrite}
       accessibilityRole="switch"
       accessibilityState={{ checked: on }}
+      hitSlop={{ top: toggle.hitSlop, bottom: toggle.hitSlop }}
       onPress={() => onChange(!on)}
       style={{
         width: toggle.width,

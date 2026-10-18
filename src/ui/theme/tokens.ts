@@ -412,10 +412,11 @@ export const SETTINGS = {
     outlinedPadding: { v: 2, h: 7 },
   },
   /**
-   * 토글 — 44×26, 안쪽 3, 손잡이 20×20. 꺼짐 손잡이는 `textMuted`(보드 neutral-600 근처) — 꺼짐 면(`tagFill`) 대비 4.54:1.
+   * 토글 — 44×26, 안쪽 3, 손잡이 20×20, 위아래 누름 확장 9(26 + 9×2 = 44dp, 088 FR-008).
+   * 꺼짐 손잡이는 `textMuted`(보드 neutral-600 근처) — 꺼짐 면(`tagFill`) 대비 4.54:1.
    * 055의 「꺼짐 = 바탕색 손잡이」는 면과 거의 구분되지 않아 056 FR-029가 뒤집었다(theme-tokens.test가 3:1 하한을 잠근다).
    */
-  toggle: { width: 44, height: 26, padding: 3, knob: 20, knobOff: COLORS.textMuted },
+  toggle: { width: 44, height: 26, padding: 3, knob: 20, knobOff: COLORS.textMuted, hitSlop: 9 },
   /** 056 — 「매일 쓰는 시각」 행이 펼쳐지고 접히는 시간(보드 `6c` ③ 「0→44, 200ms」) */
   expandMs: 200,
   /**
@@ -476,6 +477,19 @@ export const SIMULATION = {
   barText: "#444141",
   /** 월 라벨 옆 DEV 꼬리표 테두리 */
   badgeBorder: COLORS.text,
+} as const;
+
+/**
+ * 주간 스트립(088, 보드 `1d` ③) — 비선택 칸 요일(10px) 글자 색.
+ *
+ * 보드의 `.dow { opacity: .7 }`는 선택 칸(`#f3f2f2` 위 `opacity: 0.7`)에서 대비를 2.44:1까지 떨어뜨려
+ * `opacity`를 걷어내고(FR-004), 비선택 칸 요일은 본문색(`#201e1d`)이 배경(`#f3f2f2`) 위에 0.7로 합성된
+ * 불투명 hex(`#5f5e5d`, vs `bg` 5.79:1 — AA 4.5:1 충족)로 명시한다(043 `COLORS.border`와 같은 합성 관례).
+ * `COLORS` 아홉 역할(DT1)을 늘리지 않고 화면 영역 상수로 둔다(FR-006).
+ */
+export const DAY_STRIP = {
+  /** 비선택 칸 요일 글자 — `#201e1d` 70% 불투명도를 `bg(#f3f2f2)` 위에 합성한 불투명 hex (vs bg 5.79:1) */
+  dowMuted: "#5f5e5d",
 } as const;
 
 /**

@@ -98,7 +98,7 @@ e2e로 다시 만들지 않는다. 시뮬레이터 통과는 실제 iPhone을 �
 **위험**: 번호를 자동으로 정하는 순간 「어느 빌드가 어느 번호인가」의 추적이 코드 쪽으로 넘어간다 — 번호와 커밋의 대응이 문서·로그에 남아야 한다. 퍼블릭 저장소에서 쓰기 권한이나 읽기 통로를 늘리는 변경이므로 076·075의 비밀 방어 계약(수동 시작 하나, 허용된 비밀만, 정리 단계)을 약하게 하지 않는다.
 
 > [!NOTE]
-> **아래 세 과제는 외부 UX 검토서에서 헌법 안쪽만 골라낸 것이다**(2026-10-16). 후보 22개의 근거·장단점·심판 결과는 `docs/pocketlog-usability-review/ux-task-candidates.md`에 있고, 거기 붙은 ID(UX-NN)를 그대로 쓴다. 검토서의 화자 교체(반려동물)·캐릭터 아트·Warm/Cozy는 헌법 원칙 II 개정이 선행돼야 해 올리지 않았다. 소유자 결정이 먼저인 넷(UX-09 큰 날짜 접근성 라벨 — 052 FR-013, UX-14 재료 없는 날 낱말 — 053 R5, UX-17 권한 안내 중복 — 048 FR-015, UX-22 본문 복사 — D4)과 실사용 뒤로 미룬 일곱(UX-02~06·18·19)도 올리지 않았다. 사용자 관측은 0건이다 — 셋 다 출시를 막는 과제가 아니다.
+> **아래 두 과제는 외부 UX 검토서에서 헌법 안쪽만 골라낸 것이다**(2026-10-16, 처음 셋 가운데 「작은 글자 대비와 누름 영역」은 088로 끝났다 — 완료 이력). 후보 22개의 근거·장단점·심판 결과는 `docs/pocketlog-usability-review/ux-task-candidates.md`에 있고, 거기 붙은 ID(UX-NN)를 그대로 쓴다. 검토서의 화자 교체(반려동물)·캐릭터 아트·Warm/Cozy는 헌법 원칙 II 개정이 선행돼야 해 올리지 않았다. 소유자 결정이 먼저인 넷(UX-09 큰 날짜 접근성 라벨 — 052 FR-013, UX-14 재료 없는 날 낱말 — 053 R5, UX-17 권한 안내 중복 — 048 FR-015, UX-22 본문 복사 — D4)과 실사용 뒤로 미룬 일곱(UX-02~06·18·19)도 올리지 않았다. 사용자 관측은 0건이다 — 둘 다 출시를 막는 과제가 아니다.
 
 ### 화면 문구를 사실대로 — 자동 쓰기 약속·장소 이름·교체/삭제 예고
 
@@ -120,23 +120,6 @@ e2e로 다시 만들지 않는다. 시뮬레이터 통과는 실제 iPhone을 �
 **완료 조건**: 062 골든은 다시 쓰지 않고 `CHANGED_AFTER_GOLDEN`(literal + outputs)과 새 영역의 `ADDED_AFTER_GOLDEN`에 올린다. 함께 깨지는 단언을 고친다 — `home-text.test.ts` TXT1·`overwrite-confirm.test.tsx` OW1(UX-20), `settings-this-phone.test.tsx` TX1·UI5(UX-21), `place-name-dialog.test.tsx`·`settings-screen.test.tsx`(UX-15 보드 원문 하드코딩), `site-pages.test.ts` S9(FAQ 다섯 → 여섯), `writing-in-place`·`writing-monologue-rotation`·`diary-home` 단언(UX-16). 소스 주석이 옛 문구를 인용하는 자리(`WipeConfirmDialog.tsx:10`, 058 계약 UI5, `download.ts` 머리)도 고친다. 실기기(dev): 074 절차로 모델을 보존한 채 슬라이드 3, 설정 장소 대화상자, 다시 쓰기·지우기 대화상자(오늘·지난날), 지운 뒤 `files/models` md5·`/sdcard/DCIM` 사진 수 동일, TalkBack으로 장소 칸 발화, 글꼴 2.0배. 지원 페이지 게시 뒤 URL 200.
 
 **위험**: 슬라이드 3은 「무엇이 좋은가」를 파는 자리라 사실대로 쓰면 매력이 떨어진다 — 로드맵 「백그라운드 자동 쓰기」의 배터리 예외 유도가 잘 먹히면 되돌리고 싶어질 수 있다. 「되돌릴 수 없어요」는 가벼운 다시 쓰기를 무겁게 느끼게 할 수 있다. 재료 없는 날의 「상상」·「지어낸 하루」(UX-14)는 낱말 결정이 먼저라 이 과제에 넣지 않았다 — 같은 화면을 두 번 고치게 될 수 있다.
-
-### 작은 글자 대비와 누름 영역 — accent 글자·선택 칸 요일·설정 토글
-
-**배경**: 테스트가 잠그지 않는 접근성 사각 셋(WCAG 공식 계산값 — 실기기 측정 아님).
-
-- **UX-07** 밝은 배경 위 11~13pt·600의 `COLORS.accent` 글자 다섯 자리 — 홈 월 라벨(`DiaryListScreen.tsx:449`)·「쓰는 중」 상태 줄(`:1015`)·쓰는 중 머리말(`WritingPaper.tsx:58-68`)·작명 표지(`WelcomeScreen.tsx:321-327`)·설정/개발자/진단 묶음 머리(`SettingsScreen.tsx:281-293`). bg 위 3.76:1·paper 위 3.85:1로 일반 글자 AA(4.5:1) 미달. `theme-tokens.test.ts` DT4는 accent 면 위 글자만 본다. 043 결정(accent 면 위 오프화이트 3.76 — 바꾸지 않는다)과는 반대 방향 쌍이다.
-- **UX-08** 주간 스트립 선택 칸의 요일 약자 — `DayPicker.tsx:208` `opacity: 0.7`이 accent 면 위에도 걸려 실효 2.44:1. 043이 세운 3:1 하한 아래이고 불투명도 합성이라 DT4가 못 잡는다.
-- **UX-10** 설정 토글 44×26에 hitSlop 없음(`SettingsScreen.tsx:517-525`) — 「자동으로 쓰기」 행은 onPress가 없어 26dp 토글만 눌린다.
-
-**할 일**:
-- UX-07: 다섯 줄을 `COLORS.danger`(#ae1800 — bg 6.41·paper 6.56, 043 FR-012 선례·보드 accent-700)로. 착수할 때 소유자가 보드 1d·2b·1a·6a의 accent 라벨 이탈을 승인한다 — 「보드 그대로」면 과제를 닫고 accent/bg·accent/paper ≥ 3.0 잠금만 넣는다. 잠금은 토큰 쌍(DT4)이 아니라 컴포넌트 단언 또는 `src/ui`에 `color: COLORS.accent` 글자 0건 소스 계약 — 토큰이 안 바뀌어 DT4로는 되돌림을 못 잡는다. 「허용 안 함」 꼬리표의 accent 테두리(`:448`)는 넣지 않는다.
-- UX-08: `DayPicker.tsx` 한 파일에서 불투명도를 색으로 — 선택 칸 `accentForeground`(3.76), 선택 안 된 칸은 .7 합성값 hex(#5f5e5d, 픽셀 동일). 글자 불투명도 합성을 막는 소스 계약 한 줄 + 대비 쌍 테스트. 보드 1d의 .7을 걷는 이탈은 소유자 확인. 크기(10 → 11/12)는 캡처를 본 뒤 따로 정한다.
-- UX-10: 토글 Pressable에 `hitSlop={{ top: 9, bottom: 9 }}`(→ 44, 부모 Row가 44라 성립). 시각은 그대로(055 FR-018). `Toggle`을 쓰는 개발자 화면 흉내 토글도 함께 바뀐다. 달력 ‹ ›는 부모 HEADER(40) 밖으로 hitSlop이 안 나가 넣지 않는다.
-
-**완료 조건**: `npm test` 초록 + 위반 주입(한 자리를 accent로·opacity 되살림) 실패 확인. 깨지는 단언 — `settings-screen.test.tsx:153` F3·`writing-in-place.test.tsx:106`(색 `COLORS.accent` 고정). SM-S901N dev에서 홈(안 쓴 날·쓴 날·쓰는 중)·작명 화면·설정/개발자/진단 묶음 머리·스트립 선택 칸(미래 칸 요일 포함 — 실효 불투명도 0.21 → 0.3)을 **화면 밝기 최저**로 소유자가 읽고, 글꼴 1.0/2.0배 캡처. 토글 위·아래 가장자리 2dp 안쪽 탭과 바깥 2dp 음성 대조. `npm run test:layer1 -- .maestro/settings-time-place.yml`·`week-strip-swipe` 통과.
-
-**위험**: danger를 장식 라벨에도 쓰면 검토서 §8.2의 역할 분리(위험 색과 강조 색)와 반대로 간다 — 두 빨강의 상호 대비가 1.71:1이라 사용자가 색만으로 가르지 못해 실질 피해는 작다. 월 라벨·묶음 머리의 빨간 강세가 약해지면 모더니스트 인상이 달라진다(소유자 육안 판단). 저시력 사용자의 불만은 관측된 적이 없다.
 
 ### 실측 세 가지 — 제목 구간·동작 줄이기·작은 화면의 쓴 날
 
@@ -321,6 +304,7 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 |    —    |    086    | 개인정보처리방침·지원 페이지와 데이터 선언 — `site/`(한국어 정적 HTML, 사실 문장마다 근거 주석)를 GitHub Pages(`pages.yml`, 비밀 0, 자리표시자가 남으면 게시 실패)로 `https://mrtint.github.io/alpharium/privacy/`·`/support/`에 게시, 설정 「정보」에 「개인정보처리방침」·「도움말·문의」(기기 브라우저), iOS 위치 문구에 좌표 전송 사실, Play 데이터 보안·App Privacy 답변 초안(`docs/store/privacy-declarations.md` — 콘솔 입력은 소유자). M7: 장소 이름의 좌표 하나가 OS 지도 서비스로 나간다(소스·플랫폼 문서, 패킷 미측정), iOS는 「켬」이면 위치 권한과 무관하게 보낸다. 방침이 기대는 코드 사실(SDK·푸시·외부 주소·지오코딩·현재 위치)과 방침 표식을 테스트로 잠금(소스만 본다). D2 크래시 SDK 없음·D4 안내 문구만(소유자). SM-S901N dev에서 행 순서·브라우저·글꼴 2.0배 확인, 게시 뒤 두 URL 200. OS 백업 포함 여부·안드로이드 지오코더 제공자·iOS 미확인(`specs/086-privacy-policy/quickstart.md`) |
 |    —    |    —    | iOS 시뮬레이터에서 일기 생성이 실패하는 원인 찾기 — 생성 시간 한도(180초) 초과로 확인(디코드가 8토큰에 40~50초). Metal·코드 변경 아님, 개발 맥의 메모리 부족(RAM 8GB·스왑 가득)이 원인일 가능성이 커 환경 한계로 AGENTS에 남기고 닫음(소유자 결정, 메모리를 비운 재측정은 안 함) |
 |    —    |    089    | 디자인 시스템 기반과 웹 재디자인 — `design/tokens.json`(색 라이트·다크·반경·글자·서체·간격·대비 쌍 표)을 앱·웹 토큰의 정본으로 세우고 `scripts/design/build-tokens.mts`가 `tokens.ts`의 생성 영역(표식 사이 — 앱 토큰 테스트가 소스를 읽어 파일을 나누지 않음, 라이트 값만)과 `site/assets/tokens.css`를 만든다(값을 만들지 않음, 앱 값 불변 스냅샷 테스트). `site/` 세 페이지는 `<style>`을 걷고 `tokens.css`·`fonts.css`·`site.css`만 링크(086 S3 한 단언을 같은 출처 상대 경로만 허용으로 좁힘)하며 Pretendard 분할 woff2(npm `pretendard@1.3.9` 400·600·700, 276개)를 바이트 그대로 자체 호스팅 — 방침 페이지 글꼴 합계 587,756바이트(상한 1MB). 웹의 링크·강조는 `danger`(accent는 라이트 3.76:1이라 글자에 쓰지 않음), 규칙 블록마다 글자색·배경 짝이 대비 표에 있어야 함. `design/DESIGN.md` 규칙 문서와 AGENTS.md·CLAUDE.md 안내. 위반 주입 33건·전체 `npm test` 초록, iOS 시뮬레이터 로고 화면 색이 `COLORS`와 일치. 안드로이드 실기기·Safari iOS·Chrome Android·Pages 게시 뒤 서체 URL·글리프 눈 대조·소유자 캡처 확정(SC-009) 미확인(`specs/089-design-system-web/quickstart.md`). |
+|    —    |    088    | 작은 글자 대비와 누름 영역 — 밝은 배경 위 11~13pt·600 강조 글자 다섯 자리(홈 월 라벨·홈 쓰는 중 상태 줄·쓰는 중 머리말·첫 만남 작명 표지·설정/개발자/진단 묶음 머리)를 `COLORS.danger`(`#ae1800`, 계산 대비 6.41·6.56:1)로 바꾸고 `src/ui/` 내 글자 스타일 `color: COLORS.accent` 0건을 소스 계약으로 잠금(UX-07, 테두리·면·인디케이터 제외). 주간 스트립(`DayPicker`) 요일 약자의 `opacity: 0.7`을 걷어 선택 칸은 `COLORS.accentForeground`(`#f3f2f2`, 3.76:1), 비선택 칸은 불투명 합성 상수 `DAY_STRIP.dowMuted`(`#5f5e5d`, 5.79:1)로 분리하고 글자 불투명도 합성을 금지(UX-08, 10pt 유지). 공용 설정 토글(`Toggle`, 44×26dp)에 `hitSlop={{ top: 9, bottom: 9 }}`를 더해 시각 변화 없이 세로 누름 영역을 44dp로 확장(UX-10). 위반 주입 C7-1·C7-2 실패 확인, 실기기 `iPhone 14`(iOS 27.0.1, 뷰 계층 색상·불투명도 및 화면 캡처) 및 iOS 시뮬레이터(`iPhone 17 Pro Max`, D1 글자 크기 `medium`·`accessibility-large` 캡처·D2 슬롭 안팎 좌표 탭 대조·D3 주간 스트립 스와이프·설정 시각/장소 대화상자) 확인, SM-S901N은 미검증(`specs/088-small-text-contrast-hit-target/quickstart.md`) |
 
 ## 참고 — 디자인 리뷰 보드
 

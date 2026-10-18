@@ -57,7 +57,7 @@ export function WritingPaper({ line, name }: { line?: string; name?: string }) {
     >
       <AppText
         style={{
-          color: COLORS.accent,
+          color: COLORS.danger,
           fontSize: WRITING.kicker.fontSize,
           fontWeight: WRITING.kicker.fontWeight,
           letterSpacing: WRITING.kicker.letterSpacing,

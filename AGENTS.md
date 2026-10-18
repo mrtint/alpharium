@@ -59,10 +59,10 @@
   `READ_MEDIA_VISUAL_USER_SELECTED`만 granted. `describePhotoAccessLimit`가
   `"partial"`을 주고 `visiblePhotoCount` 분기는 이 기기에서 dead path(구형 대비 유지).
 - **`react-native`의 `SafeAreaView`는 안드로이드에서 no-op다.** `react-native-safe-area-context`
-  + 루트 `SafeAreaProvider`가 필요하다. 조용히 실패하는 버그라 화면을 눈으로 봐야 드러난다.
+  - 루트 `SafeAreaProvider`가 필요하다. 조용히 실패하는 버그라 화면을 눈으로 봐야 드러난다.
 - **★ edge-to-edge(Android 16)에서는 `adjustResize`가 있어도 키보드가 레이아웃을 줄이지
   않는다.** 세로 중앙 배치의 입력줄이 키보드 뒤로 숨는다 — `KeyboardAvoidingView
-  behavior="padding"` + 하단 내비게이션 바 높이만큼 `keyboardVerticalOffset`(48)이 필요했다.
+behavior="padding"` + 하단 내비게이션 바 높이만큼 `keyboardVerticalOffset`(48)이 필요했다.
   키보드 위에 무언가를 두는 화면은 실기기에서 키보드를 연 채로 본다.
 - **release는 `run-as`가 안 된다**(`package not debuggable`). 재부팅 뒤에는 첫 잠금 해제
   전까지 debug도 `run-as`가 실패한다(Direct Boot) — 데이터 손실이 아니다.
@@ -72,7 +72,7 @@
   `false`, 027). 켜면 동적 `import`·`llama.rn` JNI 심볼·모듈 최상단 부수 효과가 깨질 수
   있으나 실측한 적 없다.
 - **이 기기(SM-G986N)는 GPU/NPU 추론 경로를 못 쓴다** — `hasDotProd && hasI8mm &&
-  hasHexagon && hasAdreno`가 모두 참이어야 하는데 `i8mm`이 없다(ARMv8.2). 다른 기기는 다를 수 있다.
+hasHexagon && hasAdreno`가 모두 참이어야 하는데 `i8mm`이 없다(ARMv8.2). 다른 기기는 다를 수 있다.
 - **`babel.config.js`에 `react-native-worklets/plugin`이 없으면 reanimated가 조용히 안
   돈다**(오류 없이 애니메이션만 안 된다). 플러그인은 `plugins` 배열의 마지막.
 - **★ React Native의 `fetch`는 응답 스트림을 주지 않는다 — `res.body`가 언제나 `undefined`다**
@@ -158,7 +158,7 @@
   `accessibilityState.disabled`를 덮어쓴다** — 공용 `Button`이 `disabled={disabled || undefined}`를 넘긴다.
 - **`ScrollView`의 `onMomentumScrollEnd`는 테스트에서 전달되지 않는다** — `onScroll` + `fireEvent.scroll`은 된다.
   **여러 텍스트 조각이 한 `<Text>`에 있으면 `testID`가 접근성 트리에 안 나온다** — `accessibilityLabel`
-  + 자식을 템플릿 리터럴 하나로 합친다(025).
+  - 자식을 템플릿 리터럴 하나로 합친다(025).
 - **RN 리스트의 `key`는 위치여야 한다**(표시 문자열이면 이름을 바꿀 때 줄이 리마운트되어 편집 중 로컬
   state가 사라진다, 035). jest는 리렌더를 자동으로 안 시키므로 `rerender()`로 부모 갱신을 흉내낸다.
 - **`@rn-primitives`는 설치본이 JSX를 그대로 담아** `ui` 프로젝트 `transformIgnorePatterns`에 넣어야 한다.
@@ -319,7 +319,7 @@
 
 - 사진 보는 VLM이 장별 캡션을 만들어 프롬프트의 재료가 된다. **캐릭터 로스터와 무관한 모델 하나**이고
   `src/vision/roster.ts`는 `models/roster.ts`와 서로 import하지 않는다. 파이프라인은 `사진 → [VLM 열기 → 캡션 →
-  닫기] → 텍스트 → [캐릭터 모델 → 일기]`이고 `on-device.ts`가 순서를 지킨다(한 번에 모델 하나).
+닫기] → 텍스트 → [캐릭터 모델 → 일기]`이고 `on-device.ts`가 순서를 지킨다(한 번에 모델 하나).
 - **캡션 샘플링은 `inference/sampling.ts`를 재사용하지 않는다**(낮추면 일기 생성도 바뀌어 원칙 I을 깬다) —
   `src/vision/sampling.ts`에 따로 두고 헌법 검사가 막는다. 헌법 검사: `src/vision/`이 `diary/store`에도 못 닿는다.
 - 캡션은 되뱉기 판정 대상이 아니다(신호 자체). 캡션에 「틀릴 수 있다」 같은 불확실성 표현을 붙이지 않는다(붙이면
@@ -371,9 +371,9 @@
 
 ### 019·020 — 백그라운드 자동 생성
 
-- **019(스파이크) 결론: 조건부 가능.** 배터리 최적화 **기본값**에서는 15분 등록이 실제로 하루 1~2회(관측 간격 19시간
+- **019(스파이크) 결론: 조건부 가능.** 배터리 최적화 **기본값**에서는 15분 등록이 실제로 하루 1~~2회(관측 간격 19시간
   33분, 약 78배 억제 — OS의 Doze/앱 대기 버킷 탓)로 억제되고, **배터리 예외**를 주면 standby bucket이 `EXEMPTED(5)`가
-  되어 10~32분 간격으로 돈다. 사진 권한은 방치 후에도 유효했다.
+  되어 10~~32분 간격으로 돈다. 사진 권한은 방치 후에도 유효했다.
 - **020 구조**: 순수 판정은 `src/schedule/`(`decision.ts`·`retry.ts`·`notify.ts`·`settings-effects.ts`,
   전부 `now`를 인자로 받는다), 기기 통로는 `*-port.ts`. `retry.ts`는 `selectableDays`만 보므로 사흘 범위가 자동으로
   걸린다. **경합은 살아 있는 쓰기 등록부가 막는다**(080 — `src/diary/live-write.ts`, 아래 「080」): `pipeline.run()`이 옵셔널
@@ -413,7 +413,7 @@
 - `src/vision/select.ts`(순수 함수 하나)가 (1) 상위 폴더 이름으로 잡사진을 거르고(전부 걸러지면 원본 유지) (2) 남은 것을 찍힌
   **시각** 분포로 배분한다(칸마다 최소 1장 + 사진 수에 비례한 최대 잔여법). 011의 「하루 균일」을 대체했다.
 - **`VISION_PHOTO_LIMIT = 8`**(실측 상한). 12장 하루로 총 ~138초 / 생성 시간 한도 180초 — **걸린 제약은 시간**이고
-  컨텍스트는 여유(캡션 5장 프롬프트 852토큰 / `n_ctx` 2048). 올리려면 헤드리스 완주(포그라운드의 ~3~4배 느림, 042)를 먼저
+  컨텍스트는 여유(캡션 5장 프롬프트 852토큰 / `n_ctx` 2048). 올리려면 헤드리스 완주(포그라운드의 ~~3~~4배 느림, 042)를 먼저
   잰다. `BUCKET_COUNT = 6`(4시간 칸)과 `NON_CAMERA_FOLDERS`(`Screenshots`·`Download`·`KakaoTalk`·`WhatsApp Images`·`Telegram`)는
   사람이 정한 상수다(코드가 분포를 보고 정하지 않는다). `BUCKET_COUNT < 상한`이라 칸 수 == 예산 경계는 dead path.
   **실촬 스크린샷 경로(`Pictures/` vs `DCIM/Screenshots`)는 미확인.**
@@ -496,7 +496,7 @@
 
 - 디자인 토큰(`src/ui/theme/tokens.ts`)은 오프화이트 배경·진한 레드·웜그레이이고 `theme-tokens.test.ts`가 WCAG 대비를 자동 검증한다.
   **빨간(accent) 면 위 글자는 보드 그대로 오프화이트다**(3.76:1 — AA 본문 4.5:1 미달, 큰 글자·UI 3:1만 충족; 2026-10-01 저장소 소유자
-  결정으로 043의 「검정」을 뒤집었다). 테스트는 3:1을 하한으로 잠근다 — 대비를 이유로 다시 검정으로 바꾸지 않는다.
+  결정으로 043의 「검정」을 뒤집었다). 테스트는 3:1을 하한으로 잠근다 — 대비를 이유로 다시 검정으로 바꾸지 않는다. **반대로 밝은 면(`bg`·`WRITTEN_DAY.paper`) 위의 작은 강조 글자(11~13pt·600 다섯 자리)는 `COLORS.danger`(`#ae1800`, 계산 6.41·6.56:1)를 쓰고 `src/ui/`에서 글자 스타일 `color: COLORS.accent`는 금지한다**(088, `settings-screen.test.tsx` C2; 주간 스트립 요일 약자도 `opacity: 0.7` 없이 `accentForeground`/`DAY_STRIP.dowMuted`를 쓴다).
 - 사진·위치·알림 단계는 설명 카드·[허용]/[건너뛰기]를 없애고 **빈 배경 위에서 OS 다이얼로그를 연속 호출**한다. 거부는 자동으로
   건너뛰기이고 `blocked`(「다시 묻지 않음」)일 때만 [설정 열기]가 있다. `battery-exception`은 호출 통로가 없어 카드 + [설정 열기]/[건너뛰기]를 유지한다.
 - **★ `busy` stale closure**: `allow`가 `useState`의 `busy`를 캡처하고 effect deps에서 빠져 있어 첫 단계의 `busy = true`가 다음 단계
@@ -912,14 +912,14 @@
 - **iOS 시뮬레이터는 합성 마우스 클릭(`CGEvent`·`osascript`)을 무시한다**(손쉬운 사용 권한이 있어도). 조작은 **Maestro**(`brew install openjdk mobile-dev-inc/tap/maestro`,
   `JAVA_HOME=/opt/homebrew/opt/openjdk`)로 한다 — 흐름은 `.maestro/ios/`(FLOWS 미등록, 훑기 도구다). **`launchApp`은 기본이 앱 종료 후 재실행이라 상태가 사라져 크래시와 구분되지 않는다** —
   앱 설정을 다녀오는 흐름은 `launchApp: stopApp: false`로 돌아와 화면 상태가 남았는지로 가른다. 개발 클라이언트를 다시 앞으로 올리면 iOS가 「'포켓로그'에서 열겠습니까?」를 묻는다(`_dismiss-open-prompt.yml`).
-  XCUITest는 접힘 애니메이션 안쪽 행의 `testID`(`settings-target-hour`)를 못 찾는다 — 글자로 짚는다.
+  XCUITest는 접힘 애니메이션 안쪽 행의 `testID`(`settings-target-hour`)를 못 찾는다 — 글자로 짚는다. **Maestro 기본 드라이버 기동 한도(15초)가 `xcodebuild test-without-building` 콜드 기동(약 24초)보다 짧아 재시도 루프에 걸리면 `MAESTRO_DRIVER_STARTUP_TIMEOUT=180000`을 준다**(088). `tapOn: point:`에 소수 퍼센트(`"90%,32.7%"`)를 주면 `NumberFormatException`이 나므로 논리 그리드 정수 좌표(`"398,312"`)나 정수 퍼센트를 쓰고, `accessibilityLabel`이 있는 부모 `Pressable`(`home-date-button`) 안쪽 자식 `testID`(`home-day-number`)는 iOS XCUITest 계층에 따로 노출되지 않는다.
 - **개발 빌드는 오류를 화면 아래 알림(LogBox)으로만 보이고 앱을 죽이지 않는다** — 066의 `await import("react-native")` 결함은 시뮬레이터 dev에서 `ERROR [Invariant Violation: new NativeEventEmitter() requires a non-null argument.]`
   로그로만 드러났고 배포 빌드에서는 종료다. 훑기는 Metro `ERROR`와 `xcrun simctl spawn booted log show`를 읽는다(흐름이 끝까지 간다는 것은 「앱이 살아 있다」뿐이다). 수정 전 코드 재현·수정 후 정상은 시뮬레이터(iOS 26.5)에서 확인했고
   `__tests__/onboarding/no-react-native-dynamic-import.test.ts`가 잠근다. **실제 iPhone(iOS 27.0.1 TestFlight)은 미확인이다.**
 - **`ios/`가 옛 `prebuild`면 이름·패키지가 옛 것이다**(`com.anonymous.alpharium`) — 현재 `app.json`으로 `prebuild --platform ios --clean`을 다시 해야 `com.a810labs.pocketlog`다(`NETRC=<빈 디렉터리>`). 새 `ios/`로 다시 만들자 시뮬레이터의 「정상 동작 확인」이 통과했다.
 - **iOS에는 배터리 최적화 예외가 없다.** 온보딩 배터리 단계는 043부터 안드로이드 전용이고(`platforms: ["android"]`, `battery-ios.test.ts`가 잠근다), 설정의 「배터리」 행은 iOS에서 보조 줄이 「저전력 모드를 끄면 제때 써요」다(`src/app/battery-row.ts`의
   `batteryRowHint(platform)` — 화면은 `Platform`으로 문구를 고르지 않고 조립부가 넘긴다, `src/app/platform.ts`의 `appPlatform`이 플랫폼 값 한 곳). 자동 쓰기 토글·「매일 쓰는 시각」은 iOS에서도 그대로 두었고 BGTask의 실제 시각은 미확인이다.
-- **iOS 시뮬레이터의 일기 생성 실패(`unwritten`)는 개발 맥의 메모리 부족일 가능성이 크다**(2026-10-11, 소유자 결정으로 환경 한계로 둔다). 생성 갈래는 180초 한도 초과였다 — 모델 적재 8초 뒤 `completion()`이 글 한 글자 없이 180초를 넘겼고, 8토큰짜리 짧은 호출도 40~50초가 걸렸다(`sample`: 추론 스레드가 놀고 CPU 2~40%).
+- **iOS 시뮬레이터의 일기 생성 실패(`unwritten`)는 개발 맥의 메모리 부족일 가능성이 크다**(2026-10-11, 소유자 결정으로 환경 한계로 둔다). 생성 갈래는 180초 한도 초과였다 — 모델 적재 8초 뒤 `completion()`이 글 한 글자 없이 180초를 넘겼고, 8토큰짜리 짧은 호출도 40~~50초가 걸렸다(`sample`: 추론 스레드가 놀고 CPU 2~~40%).
   Metal 탓이 아니다(`devices: ["CPU"]`로 해도 같다). 추론 코드는 066 이후 바뀐 게 없다. 그때 맥은 RAM 8GB에 스왑이 16GB 중 약 15GB 차 있었고 Illustrator·Chrome이 메모리를 쓰고 있었다 — 메모리 매핑된 1.5GB 모델이 스왑과 디스크를 오간 것으로 본다. **메모리를 비운 재측정은 하지 않았다**(소유자 환경에서 앱을 끌 수 없다). 시뮬레이터에서 생성이 시간 한도에 걸리면 코드를 의심하기 전에 맥의 메모리 압박(`memory_pressure`·`vm.swapusage`)부터 본다. 실제 iPhone은 TestFlight에서 따로 본다(원칙 V).
 - 진단 화면의 「기기」 줄은 iOS에서 비어 있었다(안드로이드 릴리스만 읽었다) — `os: { platform, version }`으로 「iOS 26.5」를 보인다. 「사진 위치 정보」 값이 비는 것은 최근 30일에 사진이 없는 정상 상태(`no-photo`)다.
 
@@ -961,7 +961,7 @@
 
 ### 071 — 쓰기·그만두기 빠른 반복
 
-- **관측**(2026-10-10, SM-G986N dev, 오늘 사진 0장 쓰기 약 24초·사진 6장 쓰기 약 2분): 쓰기 → 그만두기 → 다시 쓰기를 간격 0~10초로 되풀이했다. 잠금 파일·`.json.writing`·같은 날 중복·메모리 누적은 문제가 없었다. 드러난 것은 셋이다 — (SE-1) **그만두면 화면은 곧바로 홈이지만 앞 쓰기는 모델 적재를 못 끊어(016 FR-013) 잠금을 5~12초 더 쥔다**(중단 2.5초 시점 10~12.5초, 15초 시점 0.7초). 그 사이 새 쓰기는 `already-running`으로 거절되고 토스트가 떴다. (SE-2) 새 쓰기가 `cancelled` 불리언을 되돌려, 앞 쓰기가 풀릴 때 **사용자가 그만둔 쓰기가 `write-failures.json`에 `unwritten`으로 기록됐다**(4/4, 060 위반). (SE-3) 생성이 끝나는 순간(약 26초)의 그만두기가 일기를 저장했다.
+- **관측**(2026-10-10, SM-G986N dev, 오늘 사진 0장 쓰기 약 24초·사진 6장 쓰기 약 2분): 쓰기 → 그만두기 → 다시 쓰기를 간격 0~~10초로 되풀이했다. 잠금 파일·`.json.writing`·같은 날 중복·메모리 누적은 문제가 없었다. 드러난 것은 셋이다 — (SE-1) **그만두면 화면은 곧바로 홈이지만 앞 쓰기는 모델 적재를 못 끊어(016 FR-013) 잠금을 5~12초 더 쥔다**(중단 2.5초 시점 10~~12.5초, 15초 시점 0.7초). 그 사이 새 쓰기는 `already-running`으로 거절되고 토스트가 떴다. (SE-2) 새 쓰기가 `cancelled` 불리언을 되돌려, 앞 쓰기가 풀릴 때 **사용자가 그만둔 쓰기가 `write-failures.json`에 `unwritten`으로 기록됐다**(4/4, 060 위반). (SE-3) 생성이 끝나는 순간(약 26초)의 그만두기가 일기를 저장했다.
 - **고침**: `DiaryHomeScreen`이 쓰기 시도마다 번호를 붙여 취소·`finally` 정리를 시도별로 하고(`attempt`·`cancelledThrough`), 새 시도는 앞 시도(`inFlight`)가 풀리기를 기다린 뒤 시작한다. `PipelineInput.isCancelled?`가 저장 직전에 한 번 취소를 본다(새 `PipelineStage` 없음). 재검증: 같은 간격 15/15·5/5에서 실패 기록·토스트 0. **불리언 하나로 「그만두었는가」를 들지 않는다** — 시도가 겹치면 뒤 시도가 앞 시도의 판단을 덮는다.
 - **남은 것**: 저장 I/O가 시작된 뒤의 그만두기는 일기를 남긴다(저장은 대상을 지우고 옮기는 것이라 되돌리면 다시 쓰기에서 옛 일기까지 잃고 `DiaryStore`에 하루 단위 삭제가 없다) — 소유자 확정(2026-10-10). 그만두기 뒤 그 쓰기가 등록부의 칸(080 이전에는 잠금 파일)을 쥐고 있는 5~12초 동안 백그라운드 자동 쓰기는 건너뛴다(보지 않았다). 앱을 내렸다 올리면 쓰기가 끊겨 `unwritten`이 기록되는 것은 054·005 FR-014b의 알려진 동작이다. 상세·표는 `specs/071-rapid-repeat-side-effects/quickstart.md` 끝.
 
@@ -1217,7 +1217,7 @@
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
 013의 리사이즈 결정 근거(SM-G986N, release, `quiet`, 「빠르게 봄」, `adb logcat`만 읽음). **원인은 타일링이지 파일 크기가 아니다.** `image_max_tokens`(256)는 청크 하나의 크기만 정하고 청크
-**수**는 해상도가 정한다 — 4032×3024 사진 한 장이 IMAGE 청크 7~9개(장당 약 24~30초)를 만든다. 파일 크기 0.97MB와 4.15MB가 똑같이 7~9청크였고 시간의 96%가 IMAGE 청크
+**수**는 해상도가 정한다 — 4032×3024 사진 한 장이 IMAGE 청크 7~~9개(장당 약 24~~30초)를 만든다. 파일 크기 0.97MB와 4.15MB가 똑같이 7~9청크였고 시간의 96%가 IMAGE 청크
 평가이며 디코드는 1% 미만이므로 압축률·포맷 변경은 효과가 없다. **리사이즈만 유효하다** — 4032×3024→1024×768에서 청크 9→1개, 장당 30.9초→1.3초(약 20배; 같은 실행 안에서
 원본·리사이즈본을 함께 캡션해 대조). 제품 반영(013): 캡션 129초→23초. 미확인: 품질이 무너지는 해상도 하한(512·768), `image_min_tokens`의 효과, `i8mm`이 있는 기기에서 GPU 경로가 열리는가.
 
@@ -1274,11 +1274,11 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 
 ## 환경은 셋이다
 
-| 환경 | 어디서 | 추론 |
-| --- | --- | --- |
+| 환경    | 어디서                 | 추론                                                     |
+| ------- | ---------------------- | -------------------------------------------------------- |
 | `local` | 개발자 기계 시뮬레이터 | 데스크톱 서버 (기본값), 실기기 연결 시 온디바이스도 가능 |
-| `dev` | 실기기, 개발 빌드 | 온디바이스만 |
-| `prod` | 실기기, 배포 빌드 | 온디바이스만 |
+| `dev`   | 실기기, 개발 빌드      | 온디바이스만                                             |
+| `prod`  | 실기기, 배포 빌드      | 온디바이스만                                             |
 
 환경은 실행 시점에 `EXPO_PUBLIC_APP_ENV`로 정해진다. 빌드는 하나다. **Expo Go로는 실행할 수 없다**(`llama.rn`이 없다) — `npx expo run:android`로 development build를 쓴다.
 
@@ -1368,13 +1368,13 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 
 ### 확인 — 빌드 성공을 믿지 않는다
 
-| 무엇 | 어떻게 | 통과 |
-| --- | --- | --- |
-| 서명 | `apksigner verify --print-certs <apk>`, AAB는 `keytool -printcert -jarfile <aab>` | `CN=Android Debug`가 **아니다** |
-| 키 비커밋 | `git status`, `git ls-files \| grep -i jks` | 아무것도 안 나온다 |
-| 매니페스트 | `aapt2 dump permissions <apk>` 또는 설치 뒤 `dumpsys package com.a810labs.pocketlog` | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`가 **없다** |
-| Metro 없이 도는가 | **Metro를 끄고 USB를 뽑거나 `adb reverse --remove-all` 하고** 앱을 연다 | `Unable to load script`가 없다 |
-| 환경 | 앱 화면 | 「이 빌드는 잘못 만들어졌다」가 **아니다** |
+| 무엇              | 어떻게                                                                               | 통과                                              |
+| ----------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| 서명              | `apksigner verify --print-certs <apk>`, AAB는 `keytool -printcert -jarfile <aab>`    | `CN=Android Debug`가 **아니다**                   |
+| 키 비커밋         | `git status`, `git ls-files \| grep -i jks`                                          | 아무것도 안 나온다                                |
+| 매니페스트        | `aapt2 dump permissions <apk>` 또는 설치 뒤 `dumpsys package com.a810labs.pocketlog` | `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`가 **없다** |
+| Metro 없이 도는가 | **Metro를 끄고 USB를 뽑거나 `adb reverse --remove-all` 하고** 앱을 연다              | `Unable to load script`가 없다                    |
+| 환경              | 앱 화면                                                                              | 「이 빌드는 잘못 만들어졌다」가 **아니다**        |
 
 **debug에서 돌았다는 것은 release에서 돈다는 뜻이 아니다**(원칙 V) — minify·R8이 켜지면 동적 `import`·`llama.rn` JNI 심볼이 깨질 수 있다(현재는 꺼져 있다, 위 실측 규칙).
 **Play에서 받은 앱은 Play가 다시 서명한 것이다** — 내부 테스트 트랙으로 받은 앱에서 설치·모델 내려받기·일기 쓰기를 한 번 본다.
@@ -1389,8 +1389,8 @@ cd android && NODE_ENV=production ./gradlew assembleRelease -PreactNativeArchite
 ### 서명 주체 — 개인 계정의 수동 서명 (2026-10-08 확정)
 
 - **Apple 계정 구조**: 소유주 Hyunmin Lee 님의 **개인(Individual) Apple Developer Program**(팀 `PGNGG84B39`)이고, 저장소 소유자(`mrtint0729@gmail.com`)는 그 App Store
-  Connect의 **Admin**이다. 개인 가입은 팀원을 Developer Program 팀에 넣지 못하므로(Apple 「roles」: *"Certificates, Identifiers & Profiles is only available to Account Holders and
-  members of an organization's team"*) **Xcode 자동 서명이 안 된다** — Accounts에는 `Hyunmin Lee|208773025|1`로 보이지만 Signing의 Team 드롭다운에는 안 뜬다. App Store Connect
+  Connect의 **Admin**이다. 개인 가입은 팀원을 Developer Program 팀에 넣지 못하므로(Apple 「roles」: _"Certificates, Identifiers & Profiles is only available to Account Holders and
+  members of an organization's team"_) **Xcode 자동 서명이 안 된다** — Accounts에는 `Hyunmin Lee|208773025|1`로 보이지만 Signing의 Team 드롭다운에는 안 뜬다. App Store Connect
   쪽(앱 레코드·TestFlight·업로드)은 Admin 권한으로 된다. `app.json`의 옛 `S6B8RQH6YQ`는 8월 다른 맥의 Personal Team이었다.
 - **그래서 수동 서명이다.** 이 맥에서 만든 CSR로 소유주가 발급한 **Apple Distribution 인증서** + **App Store 프로파일 「Pocketlog App Store」**(App ID `com.a810labs.pocketlog`,
   entitlement는 `increased-memory-limit` 하나)를 쓴다. 파일은 **저장소 밖** `~/.pocketlog-signing/ios/`(`distribution.key`·`distribution.cer`·`Pocketlog_App_Store.mobileprovision`;
@@ -1428,7 +1428,7 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 
 - `scripts/ios/ExportOptions.plist`는 `method: app-store-connect`·`signingStyle: manual`·프로파일 매핑이고 **`destination: export`**다 — IPA까지만 만든다. 업로드는 사람이 확인한 뒤
   따로 한다: Xcode Organizer(Distribute App → App Store Connect → Upload, 본인 Apple ID의 Admin 권한) 또는 `xcrun altool --upload-app -f build/export/Pocketlog.ipa -t ios
-  -u mrtint0729@gmail.com -p <앱 암호>`(appleid.apple.com의 앱 암호) 또는 App Store Connect API 키(`--apiKey/--apiIssuer`).
+-u mrtint0729@gmail.com -p <앱 암호>`(appleid.apple.com의 앱 암호) 또는 App Store Connect API 키(`--apiKey/--apiIssuer`).
 - **Release는 `NODE_ENV`를 셸에서 줄 필요가 없다** — Xcode의 「Bundle React Native code and images」 단계가 `export:embed`로 번들하며 `.env.development*`는 싣지 않는다(실측: Release
   시뮬레이터 앱 번들에 `localhost:8080`이 0건, Metro 없이 홈이 뜨고 설정에 「개발자」 행이 없다). 서명 없는 Release 아카이브(`CODE_SIGNING_ALLOWED=NO`)는 약 10분, 45MB.
 - EAS Build/Submit(`eas-cli`)은 이 저장소가 안 쓴다(안드로이드도 로컬 gradle).
@@ -1441,7 +1441,7 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 ### 다른 맥에서 올리려면 (대안)
 
 1. `~/.pocketlog-signing/ios/` 통째로 옮긴다(`distribution.key`·`.cer`·`.mobileprovision`). 옮기기 쉽게 한 파일로 묶으려면 `openssl pkcs12 -export -inkey distribution.key -in distribution.pem
-   -out distribution.p12`(비밀번호는 그때 정한다; `.cer`는 DER라 바로 못 넣는다 — `distribution.pem`이 PEM 변환본) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
+-out distribution.p12`(비밀번호는 그때 정한다; `.cer`는 DER라 바로 못 넣는다 — `distribution.pem`이 PEM 변환본) — 받는 맥에서는 `.p12`를 더블클릭하면 키·인증서가 함께 들어간다.
 2. 받는 맥 키체인에 **WWDR G3**를 넣고(위), 프로파일을 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`에 둔다. `security find-identity -v -p codesigning`에 valid 1개.
 3. Xcode(26 기준 실측)·CocoaPods(`brew install cocoapods`)·Node 20+. `~/.netrc`가 644면 `NETRC=<빈 디렉터리>`.
 4. 앱 암호를 그 맥 키체인에 다시 저장한다(위 `--item` 명령; 암호 자체는 Apple ID에 묶여 어디서나 같다).
@@ -1449,13 +1449,13 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 
 ### 확인 — 빌드 성공을 믿지 않는다
 
-| 무엇 | 어떻게 | 통과 |
-| --- | --- | --- |
-| 서명 | `codesign -dv --verbose=2 <app>` | `Authority=Apple Distribution: …` (`Apple Development`·unsigned가 **아니다**) |
-| 번호 | `PlistBuddy -c "Print :CFBundleVersion"` | 지난 업로드보다 크다 |
-| 권한 문구 | `PlistBuddy -c "Print :NSPhotoLibraryUsageDescription"` | 한국어 |
-| Metro 없이 도는가 | Release 시뮬레이터 빌드(`-sdk iphonesimulator -configuration Release`)를 Metro 끄고 연다 | 홈이 뜨고 일기가 써진다 (2026-10-08 실측) |
-| 환경 | 설정에 「개발자」 행 | 배포 환경이면 버전 7번 탭 전까지 **없다** |
+| 무엇              | 어떻게                                                                                   | 통과                                                                          |
+| ----------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 서명              | `codesign -dv --verbose=2 <app>`                                                         | `Authority=Apple Distribution: …` (`Apple Development`·unsigned가 **아니다**) |
+| 번호              | `PlistBuddy -c "Print :CFBundleVersion"`                                                 | 지난 업로드보다 크다                                                          |
+| 권한 문구         | `PlistBuddy -c "Print :NSPhotoLibraryUsageDescription"`                                  | 한국어                                                                        |
+| Metro 없이 도는가 | Release 시뮬레이터 빌드(`-sdk iphonesimulator -configuration Release`)를 Metro 끄고 연다 | 홈이 뜨고 일기가 써진다 (2026-10-08 실측)                                     |
+| 환경              | 설정에 「개발자」 행                                                                     | 배포 환경이면 버전 7번 탭 전까지 **없다**                                     |
 
 **TestFlight에서 받은 앱은 실제 iPhone의 첫 실측이다** — 2GB 모델 적재(메모리), 사진 읽기 시간(mmproj CPU), 백그라운드 자동 쓰기(BGTask)가 거기서 처음 재진다. 테스터에게
 「설치 → 권한 → 내려받기 → 첫 일기 → 다음 날 자동 쓰기 알림」을 확인해 달라고 한다.
@@ -1464,13 +1464,13 @@ xcodebuild -exportArchive -archivePath build/Pocketlog.xcarchive -exportOptionsP
 
 ## 테스트
 
-| 명령 | 무엇 | 기기 |
-| --- | --- | --- |
-| `npm test` | 기기 불필요 갈래 전부 (약 13초) | 필요 없음. **항상 돈다** |
-| `npm run test:logic` | 순수 로직만 (**약 7초**) — 개발 중 기본 | 필요 없음 |
-| `npm run test:ui` | 화면만 | 필요 없음 |
-| `npm run test:device` | 실기기 갈래 (Maestro) | 있으면 돌고 없으면 건너뛴다 |
-| `npm run lint` | eslint + tsc + 헌법 검사 + prettier 포맷 검사 | 필요 없음 |
+| 명령                  | 무엇                                          | 기기                        |
+| --------------------- | --------------------------------------------- | --------------------------- |
+| `npm test`            | 기기 불필요 갈래 전부 (약 13초)               | 필요 없음. **항상 돈다**    |
+| `npm run test:logic`  | 순수 로직만 (**약 7초**) — 개발 중 기본       | 필요 없음                   |
+| `npm run test:ui`     | 화면만                                        | 필요 없음                   |
+| `npm run test:device` | 실기기 갈래 (Maestro)                         | 있으면 돌고 없으면 건너뛴다 |
+| `npm run lint`        | eslint + tsc + 헌법 검사 + prettier 포맷 검사 | 필요 없음                   |
 
 **건너뛴 실기기 테스트는 통과가 아니다.** 기기 없이 전부 초록불이어도 온디바이스는 검증되지 않은 상태다. 기능이 끝났다고 말하려면 최소 한 번은 실기기에서 돌아야 한다(원칙 V).
 
