@@ -895,3 +895,55 @@ describe("090 EX·LS — 시간 예산 만료와 깨운 상태", () => {
 async function waitUntil(condition: () => boolean): Promise<void> {
   for (let i = 0; i < 100 && !condition(); i += 1) await new Promise((r) => setTimeout(r, 0));
 }
+
+describe("091 WK2 — 깬 요청을 시작 줄에", () => {
+  const items = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: Record<string, string>[] }).items;
+  const quiet = { launchState: () => undefined, subscribeExpiry: () => () => {} };
+
+  it("백그라운드는 깬 요청을 싣는다", async () => {
+    const made = baseDeps({ ...quiet, wakeKind: () => "battery" });
+    await runAutoDiaryTask(made.deps);
+    expect(items(made.attempts)[0]).toMatchObject({ path: "background", wake: "battery" });
+  });
+
+  it("수동 실행은 싣지 않는다 (깬 요청이 없다)", async () => {
+    const wakeKind = jest.fn(() => "power" as const);
+    const made = baseDeps({ ...quiet, manual: true, wakeKind });
+    await runAutoDiaryTask(made.deps);
+    expect(items(made.attempts)[0]?.wake).toBeUndefined();
+    expect(wakeKind).not.toHaveBeenCalled();
+  });
+
+  it("US1 AC3 — 두 요청이 함께 깨 둘째가 살아 있는 쓰기에 막히면 already-running으로 건너뛴다", async () => {
+    const run = jest.fn().mockResolvedValue({ ok: false, stage: "already-running", reason: "" });
+    const made = baseDeps({
+      ...quiet,
+      wakeKind: () => "power",
+      makePipeline: pipelineWith(WITH_PHOTOS, run),
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(items(made.attempts)[0]).toMatchObject({ outcome: "already-running", wake: "power" });
+  });
+});
+
+describe("091 FR-003 — 깬 요청이 조립에 간다", () => {
+  it("배터리로 깨면 makePipeline이 wake: battery를 받고, 모르면 싣지 않는다", async () => {
+    const seen: unknown[] = [];
+    const recordingPipeline = ((resolution: unknown, deps: unknown) => {
+      seen.push(deps);
+      return (pipelineWith(WITH_PHOTOS) as (r: unknown, d: unknown) => unknown)(resolution, deps);
+    }) as never;
+    const quiet = { launchState: () => undefined, subscribeExpiry: () => () => {} };
+    await runAutoDiaryTask(
+      baseDeps({ ...quiet, wakeKind: () => "battery", makePipeline: recordingPipeline }).deps,
+    );
+    await runAutoDiaryTask(
+      baseDeps({ ...quiet, wakeKind: () => undefined, makePipeline: recordingPipeline }).deps,
+    );
+    expect(seen).toEqual([
+      { lockOwner: "background", wake: "battery" },
+      { lockOwner: "background" },
+    ]);
+  });
+});

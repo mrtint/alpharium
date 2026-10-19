@@ -35,6 +35,7 @@
 - **이름은 포켓로그(Pocketlog), 패키지는 `com.a810labs.pocketlog`다**(065) — Google Play 내부 테스트로 배포를 준비 중이다. **서명 AAB 빌드·Play 업로드는 개발 기계 없이 GitHub Actions 수동 워크플로로 한다**(076, 2026-10-11 첫 실행 성공 — 약 13분 30초, Play 내부 테스트 versionCode 10 반영; 실측은 `specs/076-android-release-ci/quickstart.md`). 절차는 아래 「release 빌드·서명·Google Play」.
 - **화면 글자는 두 플랫폼 모두 앱에 넣은 Pretendard다**(083) — v1.3.9 정적 OTF 다섯(400~800)을 배포처 그대로 `assets/fonts/pretendard/`에 두고 expo-font config plugin이 빌드에 넣는다. 서체는 `tokens.ts`의 `FONT`·`TEXT_FONT` 한 곳에서 정하고, 설정 「정보」 → 「서체 라이선스」에 OFL 1.1 전문이 있다. 아래 「083」.
 - **개인정보처리방침·지원 페이지는 이 저장소의 `site/`이고 GitHub Pages로 올라간다**(086) — 설정 「정보」의 「개인정보처리방침」·「도움말·문의」가 기기 브라우저로 연다. 방침이 기대는 코드의 사실은 `__tests__/privacy/`가 잠근다. 아래 「086」.
+- **iPhone 배터리 상태 백그라운드는 요청·느린 쓰기를 넣었지만 iOS가 31시간 동안 한 번도 깨우지 않았다**(091, 아래 「091」).
 - **★ iPhone 백그라운드 자동 쓰기가 충전 중 OS 깨움에서 완주한다**(090, 2026-10-18 — CPU 감시·따라잡기 몫·보이지 않는 홈, 아래 「090」).
 - **iOS는 실제 iPhone 한 대(iPhone 14, iOS 27.0.1)에서 087로 검증 중이다**(2026-10-16~) — TestFlight 빌드 12가 처리를 통과해 설치됐고, 첫 실행부터 첫 일기(사진 2장 · 사진 읽기 14.8초 · 본문 26.0초)까지 갔으며, OS가 BGTask로 앱을 깨운다(충전·Wi-Fi 조건에서 약 30분 간격). 백그라운드 완주·메모리·쓸 차례 알림은 진행 중 — 절차·통로는 `specs/087-ios-real-device-verify/quickstart.md`.
   절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공, 빌드 12는 처리 통과·iPhone 설치 확인(087); 아래 「iOS 빌드·서명·TestFlight」).
@@ -1219,6 +1220,14 @@
 - iOS 배터리 행 보조 줄은 「충전 중이고 저전력 모드가 꺼져 있으면 먼저 써 둘 때가 있어요」 — **두 플랫폼은 메커니즘이 아니라 사용자의 기대가 같아야 한다**(소유자): 「먼저 써 둘 때가 있어요」는 같고 조건만 플랫폼의 사실이다.
 - **실기기에서 진짜 백그라운드를 재는 절차**(OS 깨움을 기다린다 — 15분 안팎): 앱을 `--start-stopped`로 띄워 lldb `breakpoint set -n UIApplicationMain` → 이어 돌려 멈춘 뒤 `NSFileManager`로 일기를 빼고(앞에서 JS가 돌면 앱 열기 판정이 그 날을 가져간다), 또는 앱을 앞에서 띄워 판정이 끝난 뒤 붙어서 뺀다 → 다른 앱을 띄워 뒤로 보내고 `devicectl device process terminate`로 끝낸다(OS가 새로 띄워야 백그라운드 재실행 경로가 된다) → 시도 기록·`systemCrashLogs`를 읽는다. **새 바이너리를 깔면 한 번 앞에서 띄워야** 바뀐 요청이 제출된다.
 - **미확인**: 하룻밤·벽 충전기·화면 잠금이 확실한 상태, 충전하지 않을 때(이제 깨우지 않는 것이 정상), dasd 로그(`sudo log collect` — 에이전트 셸 불가), 만료 갈래가 실제로 서는 것(예산 만료를 일부러 만들 수 없다), 완성 알림(이 실험은 같은 날을 되풀이해 「이미 확인함」에 막혔다), TestFlight 빌드, 안드로이드 실기기 회귀(이 맥에 안드로이드 기기 없음 — 바뀐 것은 몫 판정뿐이고 테스트로 잠금).
+
+### 091 — iPhone 충전 없이 백그라운드에서 쓰기 (요청 둘·느린 쓰기)
+
+- **iOS 백그라운드 요청이 둘이다**(`patches/expo-background-task+57.0.14.patch` 확장): 충전 요청(`com.expo.modules.backgroundtask.processing`, 외부 전원 요구 — 090)과 **배터리 요청**(`….processing.battery`, 외부 전원·네트워크 불요 — CPU 감시 아래). 두 식별자를 같은 처리기로 등록하고, 처리기가 깬 식별자를 `UserDefaults` `pocketlog.bgWakeIdentifier`에 남긴다 → 로컬 모듈의 `wakeKind()` → 태스크가 시작 때 읽는다. Info.plist는 `plugins/with-battery-bg-task.js`. 시도 기록 꼬리 「· 충전」/「· 배터리」(필드 `wake`).
+- **배터리 요청으로 깨면 「느린 쓰기」**(`assembly.ts` `pacingFor` — 백그라운드·iOS·battery만): 두 모델 스레드 1, 모델 호출마다 그 시간 × 0.5를 쉼(`inference/pacing.ts` — 평균 ≈ 67%, 한도 80%), **본문·제목은 `getFormattedChat`으로 두른 프롬프트에 지금까지 쓴 글을 이어 붙여 32토큰씩 조각 생성**(`llama-port.ts` `completePaced` — 앞부분 KV 재사용으로 조각마다 다시 읽는 것은 1토큰), 한도 30분. 충전 요청·화면·안드로이드는 그대로(인자 바이트 동일).
+- **실기기**(iPhone 14, lldb 강제 실행 — 앱이 앞이라 CPU 감시는 안 걸린다): `n_threads=1` 둘·조각 15번·제목까지, 사진 8장 읽기 약 63초 · 본문 47~84초로 정상 저장(표본 2). 스레드 1의 속도: 프리필 약 62토큰/초, 생성 약 7.5토큰/초.
+- **★ 그러나 배터리 상태에서 iOS가 깨우지 않았다** — 충전하지 않고 가방 속에 둔 약 31시간 동안 백그라운드 깨움 0회(요청은 대기 목록에 둘 다 있었다). 충전 중에는 같은 앱을 약 15분마다 깨웠다(090). **iPhone 백그라운드 쓰기는 사실상 충전 중에만 돈다** — 배터리 요청·느린 쓰기는 iOS가 깨우는 날을 위해 남겨 두었다. 배터리 행 문구는 090 문구(「충전 중이고 …」) 유지(FR-008). 충전 없이 쓰는 길은 로드맵 「알림을 눌러 시작한 쓰기를 앱을 나가도 끝까지」(`BGContinuedProcessingTask`).
+- **실기기 통로**: iPhone은 페어링돼 있으면 같은 Wi-Fi에서 선 없이 붙는다(`transportType: localNetwork` — 최신 Xcode에는 「Connect via network」 체크가 없다). 선은 충전이라 배터리 측정을 망친다. 잠겨 있으면 앱 띄우기·lldb가 `Locked`로 거부되고 컨테이너 읽기도 실패할 수 있다. 대기 중인 요청은 lldb로 앱을 띄워(앞에서 1.5초 돌린 뒤 멈춤) `getPendingTaskRequestsWithCompletionHandler` 블록에 `NSMutableArray`를 채운 다음 잠깐 더 돌려 읽는다 — `UIApplicationMain`에 멈춘 채로는 평가가 돌아오지 않았다. 네이티브 출력(llama 성능 줄, Swift `print`)은 `devicectl device process launch --console`로 본다.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 

@@ -829,7 +829,9 @@ describe("079 — 모델을 여는 값 (assembly.md A4·A5)", () => {
   });
 
   it("llamaEngine이 받은 스레드 수를 contextParams로 initLlama에 넘긴다", () => {
-    expect(code).toMatch(/export function llamaEngine\(threads\?: number\)/);
+    expect(code).toMatch(
+      /export function llamaEngine\(threads\?: number, pacing\?: EnginePacing\)/,
+    );
     expect(code).toMatch(/initLlama\(contextParams\(modelPath, threads\)\)/);
   });
 });
@@ -1082,5 +1084,193 @@ describe("079 — 도는 생성이 끝나기 전에 놓지 않는다 (assembly.m
     await expect(fake.engine.unload()).resolves.toBeUndefined();
     await expect(fake.engine.load(QUIET)).resolves.toEqual({ ok: true, warm: false });
     expect(fake.state.opened).toBe(2);
+  });
+});
+
+/**
+ * 091 PC3·PC5 — 느린 쓰기의 조각 생성. 배터리 요청으로 깬 iOS 백그라운드 쓰기는 한 번의 생성 호출이 CPU 감시 한도를 넘지 않게
+ * 서식 프롬프트에 지금까지 쓴 글을 이어 붙여 조각씩 생성하고 조각 사이에 쉰다.
+ */
+describe("091 — 조각 생성 (PC3·PC5)", () => {
+  const PACING = { pauseRatio: 0.5, chunkTokens: 32 };
+  const FORMATTED = "<|user|>프롬프트<|assistant|>";
+
+  function chunkedContext(pieces: { text: string; eos?: boolean; interrupted?: boolean }[]) {
+    const calls: Record<string, unknown>[] = [];
+    let i = 0;
+    const context = {
+      completion: jest.fn(async (params: Record<string, unknown>) => {
+        calls.push(params);
+        const piece = pieces[Math.min(i++, pieces.length - 1)]!;
+        return {
+          text: piece.text,
+          stopped_eos: piece.eos === true,
+          stopped_limit: piece.eos === true || piece.interrupted === true ? 0 : 1,
+          interrupted: piece.interrupted === true,
+          timings: { predicted_ms: 1 },
+          tokens_predicted: 32,
+        };
+      }),
+      formatChat: jest.fn(async () => ({ prompt: FORMATTED, stops: [] as string[] })),
+      stopCompletion: jest.fn(async () => {}),
+      release: jest.fn(async () => {}),
+    };
+    return { context, calls };
+  }
+
+  async function pacedEngine(context: ReturnType<typeof chunkedContext>["context"]) {
+    const sleep = jest.fn(async () => {});
+    let now = 0;
+    const clock = () => (now += 1000);
+    const engine = createLlamaEngine(async () => context, pathFor, {
+      pacing: PACING,
+      clock,
+      sleep,
+    });
+    await engine.load(QUIET);
+    return { engine, sleep };
+  }
+
+  it("서식 프롬프트 + 누적 생성분으로 조각씩 부르고, eos 조각에서 끝낸다", async () => {
+    const { context, calls } = chunkedContext([
+      { text: "오늘은 " },
+      { text: "맑았어요.", eos: true },
+    ]);
+    const { engine, sleep } = await pacedEngine(context);
+    const result = await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(result).toEqual({ text: "오늘은 맑았어요.", ending: { kind: "eos" } });
+    expect(calls.map((c) => c.prompt)).toEqual([FORMATTED, FORMATTED + "오늘은 "]);
+    for (const call of calls) {
+      expect(call.n_predict).toBe(32);
+      expect(call.grammar).toBe(ROMAN_LETTER_BLOCK_GRAMMAR);
+      expect(call.temperature).toBe(SAMPLING.temperature);
+      expect(call.messages).toBeUndefined();
+      expect(call.jinja).toBeUndefined();
+    }
+    expect(context.formatChat).toHaveBeenCalledWith([{ role: "user", content: "프롬프트" }]);
+    // 조각마다 쉰다(시계 대역: 호출당 1000ms × 0.5)
+    expect(sleep).toHaveBeenCalledWith(500);
+    // 원칙 IV — 지표가 결과에 없다
+    expect(Object.keys(result).sort()).toEqual(["ending", "text"]);
+  });
+
+  it("누적이 전체 길이(SAMPLING.n_predict)에 닿으면 length로 끝낸다", async () => {
+    const { context, calls } = chunkedContext([{ text: "가" }]);
+    const { engine } = await pacedEngine(context);
+    const result = await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(result.ending).toEqual({ kind: "length" });
+    expect(calls).toHaveLength(Math.ceil(SAMPLING.n_predict / 32));
+  });
+
+  it("빈 조각이 오면 더 부르지 않고 length로 끝낸다 (무한히 돌지 않는다)", async () => {
+    const { context, calls } = chunkedContext([{ text: "" }]);
+    const { engine } = await pacedEngine(context);
+    expect((await engine.run("프롬프트", { timeoutMs: 1000 })).ending).toEqual({ kind: "length" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("멈춤이 오면 다음 조각을 부르지 않고 interrupted로 끝난다", async () => {
+    const { context, calls } = chunkedContext([
+      { text: "하나 " },
+      { text: "둘 " },
+      { text: "셋", eos: true },
+    ]);
+    const { engine } = await pacedEngine(context);
+    context.completion.mockImplementationOnce(async (params: Record<string, unknown>) => {
+      calls.push(params);
+      await engine.stop();
+      return {
+        text: "하나 ",
+        stopped_eos: false,
+        stopped_limit: 1,
+        interrupted: false,
+        timings: { predicted_ms: 1 },
+        tokens_predicted: 32,
+      };
+    });
+    const result = await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(result.ending).toEqual({ kind: "interrupted" });
+    expect(calls).toHaveLength(1);
+    expect(context.stopCompletion).toHaveBeenCalled();
+  });
+
+  it("조각이 interrupted로 끝나면 그대로 돌려준다", async () => {
+    const { context } = chunkedContext([{ text: "하나 ", interrupted: true }]);
+    const { engine } = await pacedEngine(context);
+    expect((await engine.run("프롬프트", { timeoutMs: 1000 })).ending).toEqual({
+      kind: "interrupted",
+    });
+  });
+
+  it("제목 질문(ask)도 같은 방식이다 — 대화 셋을 서식으로", async () => {
+    const { context, calls } = chunkedContext([{ text: "맑은 날", eos: true }]);
+    const { engine } = await pacedEngine(context);
+    expect(await engine.ask("프롬프트", "본문", "제목은?", { timeoutMs: 1000 })).toEqual({
+      text: "맑은 날",
+      ending: { kind: "eos" },
+    });
+    expect(context.formatChat).toHaveBeenCalledWith([
+      { role: "user", content: "프롬프트" },
+      { role: "assistant", content: "본문" },
+      { role: "user", content: "제목은?" },
+    ]);
+    expect(calls[0]?.prompt).toBe(FORMATTED);
+  });
+
+  it("코드 리뷰 — 길이로 끊긴 조각 끝의 U+FFFD는 떼고 다음 조각이 그 음절부터 다시 쓴다", async () => {
+    const { context, calls } = chunkedContext([
+      { text: "오늘\uFFFD" },
+      { text: "은 맑았어요.", eos: true },
+    ]);
+    const { engine } = await pacedEngine(context);
+    const result = await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(result.text).toBe("오늘은 맑았어요.");
+    expect(calls[1]?.prompt).toBe(FORMATTED + "오늘");
+  });
+
+  it("코드 리뷰 — 템플릿의 멈춤 문자열을 조각마다 싣는다, 서식 프롬프트가 비면 종전 경로", async () => {
+    const { context, calls } = chunkedContext([{ text: "끝", eos: true }]);
+    context.formatChat.mockResolvedValueOnce({ prompt: FORMATTED, stops: ["<|end|>"] });
+    const { engine } = await pacedEngine(context);
+    await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(calls[0]?.stop).toEqual(["<|end|>"]);
+
+    context.formatChat.mockResolvedValueOnce({ prompt: "", stops: [] });
+    await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(calls[1]?.messages).toEqual([{ role: "user", content: "프롬프트" }]);
+    expect(calls[1]?.jinja).toBe(true);
+  });
+
+  it("코드 리뷰 — 멈춤 문자열에서 멈춘 조각은 차례의 끝(eos)이다", async () => {
+    const { context, calls } = chunkedContext([{ text: "맑았어요." }]);
+    context.completion.mockImplementationOnce(async (params: Record<string, unknown>) => {
+      calls.push(params);
+      return {
+        text: "맑았어요.",
+        stopped_eos: false,
+        stopped_limit: 0,
+        interrupted: false,
+        timings: { predicted_ms: 1 },
+        tokens_predicted: 5,
+        stopped_word: "<|end|>",
+      } as never;
+    });
+    const { engine } = await pacedEngine(context);
+    expect(await engine.run("프롬프트", { timeoutMs: 1000 })).toEqual({
+      text: "맑았어요.",
+      ending: { kind: "eos" },
+    });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("PC5 — pacing이 없으면 종전 경로(messages + jinja, n_predict 전체)", async () => {
+    const { context, calls } = chunkedContext([{ text: "끝", eos: true }]);
+    const engine = createLlamaEngine(async () => context, pathFor);
+    await engine.load(QUIET);
+    await engine.run("프롬프트", { timeoutMs: 1000 });
+    expect(calls[0]?.messages).toEqual([{ role: "user", content: "프롬프트" }]);
+    expect(calls[0]?.jinja).toBe(true);
+    expect(calls[0]?.n_predict).toBe(SAMPLING.n_predict);
+    expect(context.formatChat).not.toHaveBeenCalled();
   });
 });

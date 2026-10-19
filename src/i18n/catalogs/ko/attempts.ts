@@ -35,5 +35,8 @@ export const attempts = {
   /** 090 — 시작할 때 앱이 앞에 있었는가(lldb 강제 깨우기·수동은 앞, OS 깨움은 뒤). 결과 뒤 꼬리 */
   launchActive: "앞에서",
   launchBackground: "뒤에서",
+  /** 091 — 깨운 요청(충전 요청·배터리 요청) 꼬리 */
+  wakePower: "충전",
+  wakeBattery: "배터리",
   withLaunch: (outcome: string, launch: string): string => `${outcome} · ${launch}`,
 };

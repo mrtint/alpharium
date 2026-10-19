@@ -68,3 +68,43 @@ export function inferenceThreadsFor(
 export function generationTimeoutFor(owner: AssemblyOwner): number {
   return owner === "background" ? BACKGROUND_GENERATION_TIMEOUT_MS : GENERATION_TIMEOUT_MS;
 }
+
+/**
+ * 091 — 백그라운드 실행을 깨운 iOS 요청. `power`는 외부 전원을 요구하는 요청(CPU 감시 없음, 090), `battery`는 요구하지 않는 요청이다.
+ * 부르는 쪽(백그라운드 태스크)이 네이티브에서 읽어 넘긴다 — 이 파일은 기기를 읽지 않는다(A2).
+ */
+export type BackgroundWake = "power" | "battery";
+
+/**
+ * 091 — 「느린 쓰기」의 값. 배터리 요청은 iOS CPU 감시 아래에서 돈다 — 「60초 동안 CPU 48초(코어 하나의 80%)」를 넘으면 앱이 죽는다
+ * (090 실측 `cpu_resource_fatal`, CPU 시간은 모든 스레드의 합).
+ *
+ * - `threads` 1 — CPU 시간 ≈ 벽시계 시간이 되어 쉼 비율로 평균을 다룰 수 있다.
+ * - `pauseRatio` 0.5 — 모델 호출 하나가 `t` 걸리면 `t × 0.5`를 쉰다: 평균 1/1.5 ≈ 67%(한도 80% 아래). 사람이 정한 값, 실측으로 조정.
+ * - `chunkTokens` 32 — 본문·제목을 이만큼씩 나눠 생성하고 사이에 쉰다. 한 번의 생성 호출이 쉼 없이 48초를 넘지 않게 짧게.
+ * - `timeoutMs` 30분 — 느린 쓰기를 감당하는 생성 시간 한도(사람이 정한 값). 실제 상한은 iOS의 예산 만료다(090 `expired`).
+ */
+export type Pacing = {
+  readonly threads: number;
+  readonly pauseRatio: number;
+  readonly chunkTokens: number;
+  readonly timeoutMs: number;
+};
+
+const BATTERY_PACING: Pacing = {
+  threads: 1,
+  pauseRatio: 0.5,
+  chunkTokens: 32,
+  timeoutMs: 1_800_000,
+};
+
+/** 091 — 느린 쓰기를 할 조립인가. 백그라운드·iOS·배터리 요청만 값을 주고, 그 밖은 `undefined`(종전 경로 — 바이트 같은 인자). */
+export function pacingFor(
+  owner: AssemblyOwner,
+  platform: "android" | "ios",
+  wake: BackgroundWake | undefined,
+): Pacing | undefined {
+  return owner === "background" && platform === "ios" && wake === "battery"
+    ? BATTERY_PACING
+    : undefined;
+}

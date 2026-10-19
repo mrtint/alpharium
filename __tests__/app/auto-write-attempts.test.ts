@@ -328,3 +328,22 @@ describe("AT11~AT14 — 090 깨운 상태와 시간 예산 만료", () => {
     await expect(recordAttemptExpired(port, AT)).resolves.toBeUndefined();
   });
 });
+
+describe("091 WK2 — 깬 요청(wake)", () => {
+  it("시작 줄이 깬 요청을 싣고 끝으로 바뀌어도 남는다, 두 값 밖은 필드 없이", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT, "background", "battery");
+    await recordAttemptEnd(port, "background", AT, "ran");
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: AT, path: "background", outcome: "ran", launch: "background", wake: "battery" },
+    ]);
+    const odd = memoryPort(
+      JSON.stringify({
+        items: [{ at: AT.toISOString(), path: "background", outcome: "ran", wake: "solar" }],
+      }),
+    );
+    expect(await loadAutoWriteAttempts(odd)).toEqual([
+      { at: AT, path: "background", outcome: "ran" },
+    ]);
+  });
+});

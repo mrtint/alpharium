@@ -293,6 +293,19 @@ describe("DV10 — 090 깨운 상태 꼬리", () => {
   });
 });
 
+describe("DV11 — 091 깬 요청 꼬리", () => {
+  it("깬 상태 꼬리 뒤에 「· 충전」/「· 배터리」", () => {
+    const at = new Date(2026, 9, 18, 3, 0);
+    expect(
+      attemptLines([
+        { path: "background", outcome: "ran", at, launch: "background", wake: "battery" },
+        { path: "background", outcome: "ran", at, launch: "background", wake: "power" },
+        { path: "background", outcome: "started", at, wake: "battery" },
+      ]).map((l) => l.outcomeText),
+    ).toEqual(["썼음 · 뒤에서 · 배터리", "썼음 · 뒤에서 · 충전", "시작한 뒤 끝나지 않음 · 배터리"]);
+  });
+});
+
 describe("DV9 — 078 자동 쓰기 시도 줄", () => {
   it("경로 · 시각이 머리, 결과가 값", () => {
     const lines = attemptLines([

@@ -8,6 +8,11 @@ import ExpoModulesCore
 /// expo-background-task가 게시하는 이름과 같아야 한다 — __tests__/config/bg-expiry-module.test.ts가 대조한다
 private let expoTasksExpired = Notification.Name("onTasksExpired")
 
+/// 091 — expo 패치의 처리기가 깬 식별자를 남기는 키·배터리 요청 식별자. 패치(BackgroundTaskConstants)와 같아야 한다.
+private let wakeIdentifierKey = "pocketlog.bgWakeIdentifier"
+private let batteryIdentifier = "com.expo.modules.backgroundtask.processing.battery"
+private let powerIdentifier = "com.expo.modules.backgroundtask.processing"
+
 public class PocketlogBgExpiryModule: Module {
   private var observer: NSObjectProtocol?
 
@@ -15,6 +20,15 @@ public class PocketlogBgExpiryModule: Module {
     Name("PocketlogBgExpiry")
 
     Events("onExpired")
+
+    // 091 — 마지막으로 깬 요청. 백그라운드 태스크가 시작할 때 한 번 읽어 느린 쓰기를 고른다. 모르면 nil.
+    Function("wakeKind") { () -> String? in
+      switch UserDefaults.standard.string(forKey: wakeIdentifierKey) {
+      case batteryIdentifier: return "battery"
+      case powerIdentifier: return "power"
+      default: return nil
+      }
+    }
 
     OnStartObserving("onExpired") {
       guard self.observer == nil else { return }

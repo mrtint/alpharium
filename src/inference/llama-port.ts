@@ -21,6 +21,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { paced, type Clock, type Sleep } from "./pacing";
 import type { Character } from "../diary/types";
 import { assetFor } from "../models/roster";
 import { modelFilePath } from "../models/expo-port";
@@ -70,6 +71,29 @@ type LlamaLike = {
   completion(params: Record<string, unknown>): Promise<NativeResult>;
   stopCompletion(): Promise<void>;
   release(): Promise<void>;
+  /**
+   * 091 — 대화를 모델의 채팅 템플릿으로 두른 프롬프트 문자열(`getFormattedChat(…, { jinja: true })`의 `prompt`). 느린 쓰기의 조각 생성이
+   * 그 뒤에 지금까지 쓴 글을 이어 붙인다. 없으면 조각 생성을 하지 않는다(종전 경로).
+   */
+  formatChat?(messages: ChatMessage[]): Promise<FormattedChat>;
+};
+
+/**
+ * 091 — 채팅 템플릿으로 두른 프롬프트와, 그 템플릿이 차례의 끝으로 쓰는 멈춤 문자열(`getFormattedChat`의 `additional_stops`).
+ * `messages` 경로에서는 llama.rn이 이 멈춤을 스스로 싣는다 — 조각 생성은 직접 실어야 차례를 넘어 쓰지 않는다(코드 리뷰).
+ */
+export type FormattedChat = { prompt: string; stops: string[] };
+
+/**
+ * 091 — 느린 쓰기(`assembly.ts`의 `Pacing` 중 이 파일이 쓰는 둘). 주면 `run()`·`ask()`가 조각 생성 + 쉼으로 돈다(PC3).
+ */
+export type EnginePacing = { readonly pauseRatio: number; readonly chunkTokens: number };
+
+export type EngineOptions = {
+  pacing?: EnginePacing;
+  /** 쉼 계산의 시계·잠자기 — 테스트가 갈아 끼운다 */
+  clock?: Clock;
+  sleep?: Sleep;
 };
 
 /**
@@ -87,6 +111,8 @@ type NativeResult = {
   truncated?: boolean;
   context_full?: boolean;
   interrupted?: boolean;
+  /** 091 — 멈춤 문자열(`stop`)에서 멈췄으면 그 문자열. 조각 생성에서는 차례의 끝이다 */
+  stopped_word?: string;
 };
 
 /**
@@ -126,7 +152,22 @@ export type LlamaLoader = (modelPath: string) => Promise<LlamaLike>;
 export function createLlamaEngine(
   loader: LlamaLoader,
   resolvePath: (character: Character) => Promise<string> = defaultPathFor,
+  options: EngineOptions = {},
 ): GenerationEngine {
+  /**
+   * 091 — 느린 쓰기에서 멈춤이 왔는가. `stop()`이 세우고 `run()`·`ask()`가 시작할 때 비운다 — 조각 생성은 이것을 조각 경계마다 보고
+   * 다음 조각·쉼을 시작하지 않는다(FR-004). 종전 경로는 이 값을 보지 않는다.
+   */
+  let stopRequested = false;
+
+  /** 대화 하나를 보낸다 — 느린 쓰기면 조각 생성, 아니면 종전 `complete()` */
+  function send(open: LlamaLike, messages: ChatMessage[]): Promise<RunResult> {
+    stopRequested = false;
+    const pacing = options.pacing;
+    if (pacing === undefined || open.formatChat === undefined) return complete(open, messages);
+    return completePaced(open, messages, pacing, () => stopRequested, options.clock, options.sleep);
+  }
+
   /** 지금 열려 있는 것. **하나뿐이다**(E1) */
   let context: LlamaLike | null = null;
   let openFor: Character | null = null;
@@ -271,7 +312,7 @@ export function createLlamaEngine(
       // 같은 문자열을 보낸다. 모델마다 템플릿이 다르지만 **우리가 넣는 것은 하나**이며,
       // 그 동일성이 테스트로 검증된다.
       // ─────────────────────────────────────────────────────────────────────
-      return tracked(complete(context, [{ role: "user", content: prompt }]));
+      return tracked(send(context, [{ role: "user", content: prompt }]));
     },
 
     /**
@@ -289,7 +330,7 @@ export function createLlamaEngine(
     ): Promise<RunResult> {
       if (context === null) return { text: "", ending: { kind: "length" } };
       return tracked(
-        complete(context, [
+        send(context, [
           { role: "user", content: prompt },
           { role: "assistant", content: body },
           { role: "user", content: question },
@@ -300,6 +341,8 @@ export function createLlamaEngine(
     async stop(): Promise<void> {
       // **조용히 실패해도 된다**(E5). 이미 끝난 생성을 멈추려는 것은 정상이며 알릴
       // 것이 없다.
+      // 091 — 느린 쓰기는 다음 조각·쉼을 시작하지 않는다.
+      stopRequested = true;
       try {
         await context?.stopCompletion();
       } catch {
@@ -393,6 +436,75 @@ async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<Ru
 }
 
 /**
+ * 091 — 느린 쓰기의 조각 생성 (contracts/ios-bg-battery.md PC3).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * iOS 배터리 요청은 CPU 감시(60초 동안 CPU 48초) 아래에서 돈다. 한 번의 생성 호출은 중간에 쉴 수 없으므로 짧게 자른다: 대화를 채팅
+ * 템플릿으로 두른 프롬프트 `P`(`messages`+jinja와 같은 문자열)에 지금까지 쓴 글 `G`를 이어 `P + G`로 `chunkTokens`씩 생성하고, 조각
+ * 사이에 그 조각 시간 × 비율만큼 쉰다. 같은 컨텍스트에서 앞 프롬프트와 공통 접두사의 KV가 재사용되므로(018의 원리) 조각마다 새로
+ * 읽는 것은 직전 조각뿐이다.
+ *
+ * - 끝: 조각이 `eos`면 `eos`. 조각이 길이로 끝나면 이어 가고, 조각 수 × `chunkTokens`가 `SAMPLING.n_predict`에 닿으면 `length`.
+ *   `interrupted`·`context`는 그대로 돌려준다. 빈 조각은 `length`로 끝낸다(무한히 돌지 않는다).
+ * - 멈춤: 조각 경계에서 `stopped()`를 본다 — 서 있으면 다음 조각·쉼 없이 `interrupted`(도는 조각은 `stop()`의 `stopCompletion`이 끊는다).
+ * - 텍스트는 조각 원문(`text`)을 잇는다 — 다음 조각의 프롬프트가 되므로 걸러낸 `content`가 아니라 원문이어야 한다.
+ * - **토큰 콜백을 넘기지 않는다**(FR-028b), 지표는 `{ text, ending }` 밖으로 나가지 않는다(원칙 IV).
+ * - 위험: 조각마다 샘플링이 다시 시작된다 — 한 번에 생성한 글과 같지 않을 수 있다(판정을 그대로 지난다).
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+async function completePaced(
+  context: LlamaLike,
+  messages: ChatMessage[],
+  pacing: EnginePacing,
+  stopped: () => boolean,
+  clock?: Clock,
+  sleep?: Sleep,
+): Promise<RunResult> {
+  const formatted = await (context.formatChat as NonNullable<LlamaLike["formatChat"]>)(messages);
+  // 서식 프롬프트를 못 얻었으면 빈 프롬프트로 생성하지 않고 종전 경로로(코드 리뷰)
+  if (formatted.prompt === "") return complete(context, messages);
+  const base = formatted.prompt;
+  const maxChunks = Math.max(1, Math.ceil(SAMPLING.n_predict / pacing.chunkTokens));
+  let written = "";
+  for (let chunk = 0; chunk < maxChunks; chunk += 1) {
+    if (stopped()) return { text: written.trim(), ending: { kind: "interrupted" } };
+    const result = await paced(
+      () =>
+        context.completion({
+          prompt: base + written,
+          temperature: SAMPLING.temperature,
+          top_p: SAMPLING.top_p,
+          top_k: SAMPLING.top_k,
+          n_predict: pacing.chunkTokens,
+          grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
+          ...(formatted.stops.length > 0 ? { stop: formatted.stops } : {}),
+        }),
+      pacing.pauseRatio,
+      stopped,
+      clock,
+      sleep,
+    );
+    // ★ 원칙 IV — 원문과 끝 갈래만 꺼낸다. `timings`·`tokens_*`는 이 줄을 넘지 못한다.
+    // 원문이 비면 걸러낸 쪽(`complete()`와 같은 이유 — 빈 문자열은 `??`로 넘어가지 않는다)
+    const raw = result.text || result.content || "";
+    // 템플릿의 멈춤 문자열에서 멈췄으면 차례가 끝난 것이다 — `endingOf`는 그것을 길이로 보지만 조각 생성은 여기서 끝낸다(코드 리뷰)
+    const ending: Ending =
+      typeof result.stopped_word === "string" && result.stopped_word !== ""
+        ? { kind: "eos" }
+        : endingOf(result);
+    // ★ 길이로 끊긴 조각은 한글 음절 한가운데서 끝날 수 있다 — llama.rn이 끝의 불완전한 UTF-8을 U+FFFD로 바꾼다. 그것을 이으면 다음
+    // 조각의 프롬프트와 저장된 일기에 「�」가 남는다(판정은 한글만 보므로 못 잡는다, 코드 리뷰). 끝의 U+FFFD를 떼고 다음 조각이 그 음절을
+    // 처음부터 다시 쓰게 한다.
+    const piece = ending.kind === "length" ? raw.replace(/\uFFFD+$/u, "") : raw;
+    written += piece;
+    if (ending.kind !== "length") return { text: written.trim(), ending };
+    if (stopped()) return { text: written.trim(), ending: { kind: "interrupted" } };
+    if (piece === "") break;
+  }
+  return { text: written.trim(), ending: { kind: "length" } };
+}
+
+/**
  * 캐릭터의 모델 파일 경로.
  *
  * **003의 매핑을 통해서만 안다**(FR-007a). 이 기능이 캐릭터→모델 매핑을 새로 만들지
@@ -410,19 +522,35 @@ async function defaultPathFor(character: Character): Promise<string> {
  *
  * `threads`는 조립 주체가 정한 스레드 수다(079 — `assembly.ts`). 화면 조립은 주지 않는다.
  */
-export function llamaEngine(threads?: number): GenerationEngine {
-  return createLlamaEngine(async (modelPath) => {
-    const llama = await import("llama.rn");
-    const context = await llama.initLlama(contextParams(modelPath, threads));
+export function llamaEngine(threads?: number, pacing?: EnginePacing): GenerationEngine {
+  return createLlamaEngine(
+    async (modelPath) => {
+      const llama = await import("llama.rn");
+      const context = await llama.initLlama(contextParams(modelPath, threads));
 
-    // **`LlamaContext`를 그대로 돌려주지 않는다**(원칙 III). `model`·`systemInfo`·
-    // `devices`가 딸려 오며, 그것이 밖으로 나가면 캐릭터 뒤의 모델이 드러난다.
-    // 쓰는 세 함수만 묶어 내보낸다.
-    return {
-      completion: (params) =>
-        context.completion(params as Parameters<typeof context.completion>[0]),
-      stopCompletion: () => context.stopCompletion(),
-      release: () => context.release(),
-    };
-  });
+      // **`LlamaContext`를 그대로 돌려주지 않는다**(원칙 III). `model`·`systemInfo`·
+      // `devices`가 딸려 오며, 그것이 밖으로 나가면 캐릭터 뒤의 모델이 드러난다.
+      // 쓰는 세 함수만 묶어 내보낸다.
+      return {
+        completion: (params) =>
+          context.completion(params as Parameters<typeof context.completion>[0]),
+        stopCompletion: () => context.stopCompletion(),
+        release: () => context.release(),
+        // 091 — 느린 쓰기만 쓴다. `messages`+jinja 경로와 같은 템플릿 문자열이다.
+        formatChat: async (messages) => {
+          const formatted = await context.getFormattedChat(messages, null, { jinja: true });
+          if (typeof formatted === "string") return { prompt: formatted, stops: [] };
+          const stops = (formatted as { additional_stops?: unknown }).additional_stops;
+          return {
+            prompt: formatted.prompt ?? "",
+            stops: Array.isArray(stops)
+              ? stops.filter((s): s is string => typeof s === "string")
+              : [],
+          };
+        },
+      };
+    },
+    defaultPathFor,
+    pacing === undefined ? {} : { pacing },
+  );
 }

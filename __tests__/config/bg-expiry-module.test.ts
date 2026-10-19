@@ -7,7 +7,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { BG_EXPIRY_EVENT, BG_EXPIRY_MODULE_NAME, expiryTimeOf } from "../../src/app/bg-expiry-port";
+import {
+  BG_EXPIRY_EVENT,
+  BG_EXPIRY_MODULE_NAME,
+  expiryTimeOf,
+  readWakeKind,
+} from "../../src/app/bg-expiry-port";
 
 const ROOT = join(__dirname, "../..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -56,4 +61,39 @@ describe("EX5 — 만료 시각은 네이티브가 넘긴 값", () => {
       expect(expiryTimeOf(payload, RECEIVED)).toBe(RECEIVED);
     },
   );
+});
+
+describe("091 WK1 — 깬 요청 읽기", () => {
+  it("Swift가 패치와 같은 키·식별자로 읽는다", () => {
+    const constants = read("node_modules/expo-background-task/ios/BackgroundTaskConstants.swift");
+    for (const value of [
+      "pocketlog.bgWakeIdentifier",
+      "com.expo.modules.backgroundtask.processing.battery",
+      "com.expo.modules.backgroundtask.processing",
+    ]) {
+      expect(constants).toContain(`"${value}"`);
+      expect(SWIFT).toContain(`"${value}"`);
+    }
+    expect(SWIFT).toContain('Function("wakeKind")');
+  });
+
+  it.each([
+    ["battery", "battery"],
+    ["power", "power"],
+    [null, undefined],
+    ["x", undefined],
+  ])("네이티브 %p → %p", (value, expected) => {
+    expect(
+      readWakeKind(() => ({ addListener: () => ({ remove() {} }), wakeKind: () => value })),
+    ).toBe(expected);
+  });
+
+  it("모듈이 없거나 던지면 undefined", () => {
+    expect(readWakeKind(() => null)).toBeUndefined();
+    expect(
+      readWakeKind(() => {
+        throw new Error("x");
+      }),
+    ).toBeUndefined();
+  });
 });

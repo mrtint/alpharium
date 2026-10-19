@@ -1368,14 +1368,15 @@ describe("079 — 조립 주체가 스레드 수와 시간 한도를 정한다 (
 
   it("A6 — 주체와 플랫폼으로 스레드 수를 한 번 정한다", () => {
     expect(onDeviceBackendBody).toMatch(
-      /const threads = inferenceThreadsFor\(owner,\s*isIOS\(\) \? "ios" : "android"\);/,
+      // 091 — 배터리 느린 쓰기(pacing)가 먼저, 아니면 079 그대로
+      /const platform = isIOS\(\) \? "ios" : "android";[\s\S]*const threads = pacing\?\.threads \?\? inferenceThreadsFor\(owner, platform\);/,
     );
     expect(code.split("inferenceThreadsFor(").length - 1).toBe(1);
   });
 
   it("A6 — 같은 스레드 수를 본문 엔진과 사진 엔진 둘 다에 넘긴다", () => {
-    expect(onDeviceBackendBody).toMatch(/llamaEngine\(threads\)/);
-    expect(onDeviceBackendBody).toMatch(/visionSupport\(threads\)/);
+    expect(onDeviceBackendBody).toMatch(/llamaEngine\(\s*threads,/);
+    expect(onDeviceBackendBody).toMatch(/visionSupport\(\s*threads,/);
     expect(code).toMatch(/initLlama\(visionContextParams\(path, threads\)\)/);
   });
 

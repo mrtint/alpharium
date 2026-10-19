@@ -47,8 +47,9 @@ import {
   type AttemptPath,
   type AutoWriteAttemptPort,
   type LaunchState,
+  type WakeKind,
 } from "../app/auto-write-attempts";
-import { subscribeBackgroundExpiry } from "../app/bg-expiry-port";
+import { readWakeKind, subscribeBackgroundExpiry } from "../app/bg-expiry-port";
 import { readLaunchState } from "../app/launch-state-port";
 import { createAppPipeline } from "../app/wiring";
 import { showsOnScreen } from "../diagnostics/sink";
@@ -141,6 +142,11 @@ export type AutoDiaryTaskDeps = {
    * 한 실행 동안만 구독하고, 만료가 오면 따로 선 `expired` 줄을 한 번 남긴다(EX1·EX2).
    */
   subscribeExpiry?: (listener: (at: Date) => void) => () => void;
+  /**
+   * 091 — 이 백그라운드 실행을 깨운 iOS 요청(`power` 충전 · `battery` 배터리). 주지 않으면 `bg-expiry-port`. 백그라운드 경로만 읽는다 —
+   * 시작 줄에 남기고, 배터리면 조립이 느린 쓰기를 고른다.
+   */
+  wakeKind?: () => WakeKind | undefined;
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
@@ -168,11 +174,13 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
   // 「깼지만 완주하지 못했다」의 유일한 증거다. 기록 실패는 안에서 삼킨다 — 기록이 자동 쓰기를 막지 않는다.
   // 090 — 깨운 순간의 앱 상태를 시작 줄에 싣는다. 통로가 던지면 모름이다.
   const launch = safely(deps.launchState ?? readLaunchState);
-  await recordAttemptStart(attemptPort, path, now, launch);
+  // 091 — 깬 요청은 백그라운드 실행에만 있다(수동 실행은 요청이 깨운 것이 아니다)
+  const wake = path === "background" ? safely(deps.wakeKind ?? readWakeKind) : undefined;
+  await recordAttemptStart(attemptPort, path, now, launch, wake);
   const stopListening = path === "background" ? listenForExpiry(deps, attemptPort) : () => {};
   let ended: BodyOutcome;
   try {
-    ended = await runBody(deps, now);
+    ended = await runBody(deps, now, wake);
   } finally {
     stopListening();
   }
@@ -216,7 +224,11 @@ async function reconcileAfterTask(deps: AutoDiaryTaskDeps): Promise<void> {
 }
 
 /** 본체. 결과와 기록 갈래를 함께 돌려준다 — 기록은 `runAutoDiaryTask`가 한다. */
-async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome> {
+async function runBody(
+  deps: AutoDiaryTaskDeps,
+  now: Date,
+  wake: WakeKind | undefined,
+): Promise<BodyOutcome> {
   try {
     const settingsPort = deps.settingsPort ?? expoAutoDiarySettingsPort();
     const loaded = await loadAutoDiarySettings(settingsPort);
@@ -238,7 +250,11 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
     // 020 L5 — 백그라운드 owner로 조립한다. wiring.ts가 그 주체를 묶어 pipeline.run()이
     // 살아 있는 쓰기 등록부의 칸을 차지한다(080). 다른 쓰기가 살아 있어 못 차지한
     // already-running 결과는 아래에서 "skipped"로 매핑한다.
-    const app = makePipeline(resolution, { lockOwner: "background" });
+    // 091 — 깬 요청을 함께 넘긴다: 배터리 요청이면 조립이 느린 쓰기(CPU 감시 밑)를 고른다
+    const app = makePipeline(resolution, {
+      lockOwner: "background",
+      ...(wake === undefined ? {} : { wake }),
+    });
     if (!app.ok) {
       return FAILED;
     }

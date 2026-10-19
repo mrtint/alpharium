@@ -374,3 +374,65 @@ describe("V7. 일기의 샘플링을 재사용하지 않는다 (원칙 I)", () =
     expect(SAMPLING.temperature).toBe(0.8);
   });
 });
+
+/**
+ * 091 PC4 — 느린 쓰기의 사진 캡션: 장마다 끝나면 쉰다. 쉼은 조립부가 넘긴 감싸개(`pace`)가 하고 엔진은 감싸기만 한다(vision이 inference를
+ * import하지 않는다).
+ */
+describe("091 PC4 — 장마다 쉬는 감싸개", () => {
+  it("pace를 주면 캡션 호출을 그것으로 감싼다", async () => {
+    const calls: Call[] = [];
+    const seen: string[] = [];
+    const pace = <T>(call: () => Promise<T>): Promise<T> => {
+      seen.push("pace");
+      return call();
+    };
+    const engine = createVisionEngine(loaderFor(calls), paths, { pace });
+    await engine.load("quick");
+    await engine.caption("/a.jpg");
+    await engine.caption("/b.jpg");
+    expect(seen).toHaveLength(2);
+    expect(calls.filter((c) => c.kind === "completion")).toHaveLength(2);
+  });
+
+  it("pace가 없으면 종전대로", async () => {
+    const calls: Call[] = [];
+    const engine = createVisionEngine(loaderFor(calls), paths);
+    await engine.load("quick");
+    expect((await engine.caption("/a.jpg")).text).toBe("A cup of coffee on a table.");
+  });
+});
+
+describe("091 T017 — 쉼은 멈춤 신호를 본다 (PC2)", () => {
+  it("stop()이 오면 pace가 받은 stopped()가 참이다", async () => {
+    const calls: Call[] = [];
+    let seen: boolean | undefined;
+    let engineRef: { stop(): Promise<void> } | undefined;
+    const pace = async <T>(call: () => Promise<T>, stopped: () => boolean): Promise<T> => {
+      const result = await call();
+      await engineRef?.stop();
+      seen = stopped();
+      return result;
+    };
+    const engine = createVisionEngine(loaderFor(calls), paths, { pace });
+    engineRef = engine;
+    await engine.load("quick");
+    await engine.caption("/a.jpg");
+    expect(seen).toBe(true);
+  });
+
+  it("다시 열면 신호가 비워진다", async () => {
+    const calls: Call[] = [];
+    const flags: boolean[] = [];
+    const pace = async <T>(call: () => Promise<T>, stopped: () => boolean): Promise<T> => {
+      flags.push(stopped());
+      return call();
+    };
+    const engine = createVisionEngine(loaderFor(calls), paths, { pace });
+    await engine.load("quick");
+    await engine.stop();
+    await engine.load("quick");
+    await engine.caption("/a.jpg");
+    expect(flags).toEqual([false]);
+  });
+});

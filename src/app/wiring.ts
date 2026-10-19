@@ -158,6 +158,10 @@ export type WiringDeps = {
    */
   lockOwner?: "screen" | "background";
   /**
+   * 091 — 백그라운드 실행을 깨운 iOS 요청(`power` 충전 · `battery` 배터리). 배터리면 온디바이스 어댑터가 느린 쓰기로 연다. 태스크만 넘긴다.
+   */
+  wake?: "power" | "battery";
+  /**
    * 살아 있는 쓰기 등록부 (080). 테스트가 새 등록부로 갈아끼운다. 주지 않으면 앱의 하나(`liveWrites`) —
    * 화면이 조립한 파이프라인과 백그라운드가 조립한 파이프라인이 그 하나를 나눠 써야 서로를 본다.
    */
@@ -216,6 +220,7 @@ export function createAppPipeline(
     loadSignals,
     deps.loadCustomNames ?? deviceCustomNames,
     owner,
+    deps.wake,
   );
   if (!selection.ok) {
     return { ok: false, reason: selection.reason, detail: selection.detail };

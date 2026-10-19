@@ -1,8 +1,112 @@
+diff --git a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
+index 98d87f8..33c3097 100644
+--- a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
++++ b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
+@@ -7,15 +7,32 @@ import ExpoModulesCore
+ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+   public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+     if BackgroundTaskScheduler.supportsBackgroundTasks() {
+-      BGTaskScheduler.shared.register(forTaskWithIdentifier: BackgroundTaskConstants.BackgroundWorkerIdentifier, using: nil) { task in
++      // Pocketlog 091 (patches/): both identifiers run the same handler. While charging both requests can
++      // launch together; each runTasks call would run the same JS task, and expo's task service completes
++      // every request containing that task when the first run finishes — the quick duplicate run would end
++      // both BGTasks while the real write is still going. So only the first task of a group runs the JS
++      // work; later tasks join the group and complete with it.
++      for identifier in [BackgroundTaskConstants.BackgroundWorkerIdentifier, BackgroundTaskConstants.BatteryWorkerIdentifier] {
++      BGTaskScheduler.shared.register(forTaskWithIdentifier: identifier, using: nil) { task in
+         log.debug("Expo Background Tasks - starting background work")
++        guard BackgroundTaskGroup.shared.join(task) else {
++          // Joined a running group — it completes with the first task (expiry ends just this one).
++          task.expirationHandler = {
++            BackgroundTaskGroup.shared.leave(task)
++            task.setTaskCompleted(success: false)
++          }
++          return
++        }
++        // Pocketlog 091: which request woke us — read by the app before it decides how fast to write.
++        // Written only by the first task of a group, so a joining task cannot overwrite it.
++        UserDefaults.standard.set(task.identifier, forKey: BackgroundTaskConstants.WakeIdentifierDefaultsKey)
+ 
+         // Set up expiration handler
+         task.expirationHandler = { ()
+           log.warn("Expo Background Tasks - task expired")
+           // Send message to Expo module
+           NotificationCenter.default.post(name: onTasksExpiredNotification, object: self, userInfo: [:])
+-          task.setTaskCompleted(success: false)
++          BackgroundTaskGroup.shared.finishAll(success: false)
+           self.reschedule()
+         }
+ 
+@@ -23,14 +40,15 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+         if let taskService = EXTaskServiceHelper.sharedTaskService() {
+           taskService.runTasks(with: EXTaskLaunchReasonBackgroundTask, userInfo: nil, completionHandler: { _ in
+             // Mark iOS task as finished - this is important so that we can continue calling it
+-            task.setTaskCompleted(success: true)
++            BackgroundTaskGroup.shared.finishAll(success: true)
+             self.reschedule()
+           })
+         } else {
+-          task.setTaskCompleted(success: false)
++          BackgroundTaskGroup.shared.finishAll(success: false)
+           log.error("Expo Background Tasks: Could not find TaskService module")
+         }
+       }
++      }
+ 
+       // Signal to the scheduler that we're done.
+       BackgroundTaskScheduler.bgTaskSchedulerDidFinishRegister()
+@@ -51,3 +69,31 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+     }
+   }
+ }
++
++/// Pocketlog 091 (patches/): BGTasks launched while one is running. The first runs the JS work; the rest
++/// wait and are completed together with it. Guarded by a lock — handlers run on BGTaskScheduler's queue.
++final class BackgroundTaskGroup {
++  static let shared = BackgroundTaskGroup()
++  private let lock = NSLock()
++  private var tasks: [BGTask] = []
++
++  /// Adds the task. Returns true when it is the first of a new group (it should run the work).
++  func join(_ task: BGTask) -> Bool {
++    lock.lock(); defer { lock.unlock() }
++    tasks.append(task)
++    return tasks.count == 1
++  }
++
++  func leave(_ task: BGTask) {
++    lock.lock(); defer { lock.unlock() }
++    tasks.removeAll { $0 === task }
++  }
++
++  func finishAll(success: Bool) {
++    lock.lock()
++    let finishing = tasks
++    tasks.removeAll()
++    lock.unlock()
++    for task in finishing { task.setTaskCompleted(success: success) }
++  }
++}
+diff --git a/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift b/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift
+index 39478bb..457b202 100644
+--- a/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift
++++ b/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift
+@@ -3,6 +3,10 @@ import Foundation
+ 
+ public struct BackgroundTaskConstants {
+   public static let BackgroundWorkerIdentifier = "com.expo.modules.backgroundtask.processing"
++  // Pocketlog 091 (patches/): a second request that does not require external power. It runs under the
++  // iOS CPU monitor, so the app writes slowly when woken by it. The handler records which one woke us.
++  public static let BatteryWorkerIdentifier = "com.expo.modules.backgroundtask.processing.battery"
++  public static let WakeIdentifierDefaultsKey = "pocketlog.bgWakeIdentifier"
+   public static let EVENT_PERFORM_WORK = "onPerformWork"
+   public static let EVENT_WORK_DONE = "onWorkDone"
+ 
 diff --git a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
-index 906678b..ac042f7 100644
+index 906678b..ed37746 100644
 --- a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
 +++ b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
-@@ -90,8 +90,10 @@ public class BackgroundTaskScheduler {
+@@ -90,12 +90,21 @@ public class BackgroundTaskScheduler {
        stopWorkerOnce()
  
        let request = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
@@ -14,4 +118,23 @@ index 906678b..ac042f7 100644
 +      request.requiresExternalPower = true
        request.earliestBeginDate = Date().addingTimeInterval(intervalSeconds)
  
++      // Pocketlog 091 (patches/): the battery request — runs without power, under the CPU monitor.
++      let batteryRequest = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BatteryWorkerIdentifier)
++      batteryRequest.requiresNetworkConnectivity = false
++      batteryRequest.requiresExternalPower = false
++      batteryRequest.earliestBeginDate = request.earliestBeginDate
++
        do {
+         try scheduler.submit(request)
++        try scheduler.submit(batteryRequest)
+       } catch let error as BGTaskScheduler.Error {
+         switch error.code {
+         case .unavailable:
+@@ -133,6 +142,7 @@ public class BackgroundTaskScheduler {
+ 
+     private func stopWorkerOnce() {
+       scheduler.cancel(taskRequestWithIdentifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
++      scheduler.cancel(taskRequestWithIdentifier: BackgroundTaskConstants.BatteryWorkerIdentifier)
+     }
+   }
+ 

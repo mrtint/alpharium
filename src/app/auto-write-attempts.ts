@@ -67,12 +67,21 @@ export const ATTEMPT_OUTCOMES: readonly AttemptOutcome[] = [
 export type LaunchState = "active" | "background";
 const LAUNCH_STATES: readonly LaunchState[] = ["active", "background"];
 
+/**
+ * 091 — 백그라운드 실행을 깨운 iOS 요청. `power`는 외부 전원을 요구하는 요청(CPU 감시 없음, 090), `battery`는 요구하지 않는 요청
+ * (감시 아래 — 느린 쓰기). 배터리 하루 깨움 수를 이 갈래로 센다. 기록 값이다.
+ */
+export type WakeKind = "power" | "battery";
+const WAKE_KINDS: readonly WakeKind[] = ["power", "battery"];
+
 export type AutoWriteAttempt = {
   at: Date;
   path: AttemptPath;
   outcome: AttemptOutcome;
   /** 090 — 시작 줄에만. 옛 줄·두 값 밖은 없다 */
   launch?: LaunchState;
+  /** 091 — 백그라운드 시작 줄에만. 옛 줄·두 값 밖은 없다 */
+  wake?: WakeKind;
 };
 
 /** 최근 몇 건을 남기는가 — 사람이 정한 값 */
@@ -98,6 +107,10 @@ function isLaunch(value: unknown): value is LaunchState {
   return typeof value === "string" && (LAUNCH_STATES as readonly string[]).includes(value);
 }
 
+function isWake(value: unknown): value is WakeKind {
+  return typeof value === "string" && (WAKE_KINDS as readonly string[]).includes(value);
+}
+
 function isOutcome(value: unknown): value is AttemptOutcome {
   return typeof value === "string" && (ATTEMPT_OUTCOMES as readonly string[]).includes(value);
 }
@@ -116,18 +129,23 @@ export async function loadAutoWriteAttempts(
     const out: AutoWriteAttempt[] = [];
     for (const item of items) {
       if (typeof item !== "object" || item === null) continue;
-      const { at, path, outcome, launch } = item as {
+      const { at, path, outcome, launch, wake } = item as {
         at?: unknown;
         path?: unknown;
         outcome?: unknown;
         launch?: unknown;
+        wake?: unknown;
       };
       if (typeof at !== "string" || !isPath(path) || !isOutcome(outcome)) continue;
       const date = new Date(at);
       if (Number.isNaN(date.getTime())) continue;
-      out.push(
-        isLaunch(launch) ? { at: date, path, outcome, launch } : { at: date, path, outcome },
-      );
+      out.push({
+        at: date,
+        path,
+        outcome,
+        ...(isLaunch(launch) ? { launch } : {}),
+        ...(isWake(wake) ? { wake } : {}),
+      });
     }
     return out.slice(0, MAX_AUTO_WRITE_ATTEMPTS);
   } catch {
@@ -143,6 +161,7 @@ async function save(port: AutoWriteAttemptPort, items: readonly AutoWriteAttempt
         path: item.path,
         outcome: item.outcome,
         ...(item.launch !== undefined ? { launch: item.launch } : {}),
+        ...(item.wake !== undefined ? { wake: item.wake } : {}),
       })),
     }),
   );
@@ -165,14 +184,18 @@ export function recordAttemptStart(
   path: AttemptPath,
   at: Date,
   launch?: LaunchState,
+  wake?: WakeKind,
 ): Promise<void> {
   return inOrder(async () => {
     try {
       const previous = await loadAutoWriteAttempts(port);
-      const line: AutoWriteAttempt =
-        launch !== undefined
-          ? { at, path, outcome: "started", launch }
-          : { at, path, outcome: "started" };
+      const line: AutoWriteAttempt = {
+        at,
+        path,
+        outcome: "started",
+        ...(launch !== undefined ? { launch } : {}),
+        ...(wake !== undefined ? { wake } : {}),
+      };
       await save(port, [line, ...previous]);
     } catch {
       // 기록이 자동 쓰기를 막지 않는다.

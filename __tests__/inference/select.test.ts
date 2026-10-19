@@ -192,11 +192,14 @@ describe("079 — selectBackend가 조립 주체를 온디바이스 어댑터에
     .replace(/\/\/.*$/gm, "");
 
   it("마지막 인자로 주체를 받는다", () => {
-    expect(code).toMatch(/owner\?:\s*AssemblyOwner,?\s*\):\s*BackendSelection/);
+    // 091 — 그 뒤에 깬 요청(wake)이 하나 더 온다
+    expect(code).toMatch(
+      /owner\?:\s*AssemblyOwner,[\s\S]*?wake\?:\s*BackgroundWake,?\s*\):\s*BackendSelection/,
+    );
   });
 
   it("받은 주체를 onDeviceBackend에 그대로 넘긴다", () => {
-    expect(code).toMatch(/onDeviceBackend\(loadSignals,\s*loadCustomNames,\s*owner\)/);
+    expect(code).toMatch(/onDeviceBackend\(loadSignals,\s*loadCustomNames,\s*owner,\s*wake\)/);
   });
 
   it("데스크톱 어댑터에는 넘기지 않는다", () => {
