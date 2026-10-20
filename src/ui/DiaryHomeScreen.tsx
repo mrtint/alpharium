@@ -57,6 +57,7 @@ import {
   type DayPreview,
   type DiaryListItem,
 } from "../app/state";
+import type { ContinuedSession, ContinuedWrite } from "../app/continued-write";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
 import { TOAST_TEXT, type PipelineFailure, type ToastKind } from "../app/failure-toast";
 import { paperFor, type LoadedEntry } from "../app/written-day";
@@ -259,6 +260,18 @@ export type DiaryHomeScreenProps = {
   simulation?: { onOpenDeveloper: () => void };
   /** 064 — 「실패 토스트 보기」. 켜져 있으면 홈이 다시 보일 때(마운트·덮개가 걷힐 때)마다 054 토스트를 한 번 올린다 */
   simulatedFailToast?: boolean;
+  /**
+   * 092 — iPhone 이어 쓰기(specs/092-ios-continued-write/contracts/continued-write.md CW4). **조립부가 iOS에서만 준다** — 홈은 네이티브에
+   * 닿지 않는다. 홈이 시작한 쓰기(「쓰기」·057 앱 열기·085 알림 누름 → 057)는 시작할 때 신청하고, 진행 단계를 넘기고, 끝나면 성패로
+   * 닫는다. **받아들여진 쓰기는 앞을 벗어나도 끊지 않는다**(005 FR-014b의 예외, FR-001). 시스템이 끝내면(만료) 앞을 벗어날 때처럼
+   * `stop()`으로 끊는다 — 기록은 「도중에 끊김」(FR-006). 진단의 수동 실행(060 `writeRequest`)은 신청하지 않는다. 주지 않으면 종전 그대로다.
+   */
+  continuedWrite?: ContinuedWrite;
+  /**
+   * 092 FR-008 — 이어 하기를 받은 쓰기가 저장됐다. 조립부가 앱이 앞에 없으면 완성 알림을 띄운다(앞 판정은 조립부가 한다). 홈은 이것이
+   * 끝나기를 기다린 뒤 이어 하기를 닫는다 — 닫으면 iOS가 앱을 멈춘다. 던져도 쓰기는 그대로다.
+   */
+  onContinuedSaved?: (day: DayDate, character: Character) => Promise<void>;
 };
 
 /**
@@ -268,6 +281,26 @@ export type DiaryHomeScreenProps = {
  * 다시 판정해도 오늘이 옮겨지지 않는다. **사람이 정한 여유다**(원칙 V).
  */
 const MIDNIGHT_TIMER_SLACK_MS = 1000;
+
+/**
+ * 092 — 이어 쓰기 저장 뒤 완성 알림(맞추기 + 알림)을 기다리는 한도(ms). 사람이 정한 값 — 파일 몇 개와 알림 하나라 보통 1초 안이다(짐작).
+ */
+const CONTINUED_SAVED_LIMIT_MS = 10_000;
+
+/** `work`가 끝나거나 `ms`가 지나면 풀린다. 던지지 않는다 */
+async function withinLimit(work: Promise<unknown>, ms: number): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      work.catch(() => {}),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, ms);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
 
 /** 오늘의 일기 작성 시각을 다시 그리는 간격 (051 FR-019 — 「N분 전」이 1분 단위라서) */
 const WRITTEN_AT_REFRESH_MS = 60_000;
@@ -324,6 +357,8 @@ export function DiaryHomeScreen({
   barLockMs = WRITING.barLockMs,
   simulation,
   simulatedFailToast = false,
+  continuedWrite,
+  onContinuedSaved,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -454,6 +489,12 @@ export function DiaryHomeScreen({
    */
   const running = useRef(false);
 
+  /**
+   * 092 — 지금 도는 홈의 쓰기가 받은 이어 하기(시스템이 받아들였을 때만). 서 있는 동안 앞을 벗어나도 끊지 않는다(FR-001). 그 쓰기의
+   * `finally`가 비운다.
+   */
+  const continued = useRef<ContinuedSession | null>(null);
+
   /** 080 — 등록부의 칸이 차거나 비었다는 신호. 값은 쓰지 않는다 — 합류·057·018 effect를 다시 돌릴 뿐이다 */
   const [liveTick, setLiveTick] = useState(0);
   /**
@@ -572,8 +613,9 @@ export function DiaryHomeScreen({
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
         // 080 H3 — `running`은 **홈이 시작한 쓰기**만 가리킨다. 합류한 남의 쓰기는 여기서 끊기지 않는다 — 뒤에서 계속 돈다.
+        // 092 FR-001 — 시스템이 이어 하기를 받아 준 쓰기는 끊지 않는다(iOS가 앱 밖에서 이어 돌린다).
         if (running.current) {
-          void stop?.().catch(() => {});
+          if (continued.current === null) void stop?.().catch(() => {});
         } else {
           void release?.().catch(() => {});
         }
@@ -883,7 +925,12 @@ export function DiaryHomeScreen({
    * 배선(`createAppPipeline`)이 이미 파이프라인에 넣어 두었다.
    */
   const generate = useCallback(
-    async (params: ResolvedParams, items: DiaryListItem[], options: { auto?: boolean } = {}) => {
+    async (
+      params: ResolvedParams,
+      items: DiaryListItem[],
+      // 092 — `continuable: false`는 이어 하기를 신청하지 않는다(진단의 수동 실행)
+      options: { auto?: boolean; continuable?: boolean } = {},
+    ) => {
       if (pipeline === undefined) return;
 
       // 071 — 이 시도의 번호. 그만두기·늦은 결과 처리·정리가 모두 이 번호로 가려진다(위 `attempt` 주석).
@@ -906,10 +953,33 @@ export function DiaryHomeScreen({
       lockBar();
       running.current = true;
 
+      // 092 — 이 쓰기의 이어 하기와 성패(닫을 때 넘긴다). 그만두기·실패·예외는 거짓으로 닫힌다(FR-007).
+      let session: ContinuedSession | null = null;
+      let succeeded = false;
+
       try {
         if (previous !== null) {
           await previous;
           // 기다리는 동안 그만두었으면 시작하지 않는다 — 화면은 `cancel()`이 이미 홈으로 돌려놓았다.
+          if (isCancelled()) return;
+        }
+
+        // 092 CW4 — 시작할 때 이어 하기를 신청한다. 만료면 앞을 벗어날 때처럼 끊는다(그만두기가 아니다 — 「도중에 끊김」으로 기록된다).
+        // **앞에 있을 때의 만료는 쓰기를 끊지 않는다**(코드 리뷰) — 시스템은 멈춘 듯한 작업을 끝낼 수 있고(BGTask.h), 사용자가 보고 있는
+        // 쓰기가 실패로 끝나면 092 전에는 없던 일이다. 이어 하기만 잃는다: 그 뒤 앞을 벗어나면 005 FR-014b대로 끊긴다.
+        if (continuedWrite !== undefined && options.continuable !== false) {
+          session = await continuedWrite
+            .start(
+              { name: String(nameOf(params.character, characterNames)), day: params.day },
+              () => {
+                if (attempt.current !== mine || !running.current) return;
+                if (continued.current === session) continued.current = null;
+                if (AppState.currentState === "active") return;
+                void stop?.().catch(() => {});
+              },
+            )
+            .catch(() => null);
+          if (session?.accepted === true) continued.current = session;
           if (isCancelled()) return;
         }
 
@@ -936,10 +1006,23 @@ export function DiaryHomeScreen({
             // 071 — 저장을 시작하기 직전의 마지막 취소 확인(SE-3). 시도별 판정이다.
             isCancelled,
           },
-          (stage, branch) => showProgress(stage, branch, nameOf(params.character, characterNames)),
+          (stage, branch) => {
+            session?.progress(stage);
+            showProgress(stage, branch, nameOf(params.character, characterNames));
+          },
         );
 
         if (isCancelled()) return;
+        succeeded = result.ok;
+
+        // 092 FR-008 — 이어 하기를 받은 쓰기가 저장됐다(만료로 잃지 않았다). 앞에 없으면 조립부가 완성 알림을 띄운다 — 닫기(아래
+        // `finally`) 전에 끝낸다. 걸려도 닫기를 붙잡지 않게 한도를 둔다(코드 리뷰 — 닫지 않으면 홈이 「쓰는 중」에 남는다).
+        if (result.ok && session !== null && continued.current === session) {
+          await withinLimit(
+            onContinuedSaved?.(params.day, params.character) ?? Promise.resolve(),
+            CONTINUED_SAVED_LIMIT_MS,
+          );
+        }
 
         // 060 — 쓰기 실패를 기록한다(그만두기는 위에서 걸렀다 — 실패가 아니다). 기록은 던지지 않는다.
         if (!result.ok) recordFailure?.(result);
@@ -967,6 +1050,9 @@ export function DiaryHomeScreen({
           setToast({ id: ++toastId.current, kind: next.toast });
         }
       } finally {
+        // 092 FR-007 — 이어 하기를 닫는다(받지 않았으면 세션이 아무 일도 하지 않는다).
+        session?.finish(succeeded);
+        if (continued.current === session) continued.current = null;
         // 071 — 더 새 시도가 이미 섰으면 그쪽의 「쓰는 중」·`inFlight`를 끄지 않는다(앞 시도가 뒤늦게 풀릴 때).
         if (attempt.current === mine) {
           running.current = false;
@@ -987,6 +1073,9 @@ export function DiaryHomeScreen({
       lockBar,
       showProgress,
       liveWrites,
+      continuedWrite,
+      onContinuedSaved,
+      stop,
     ],
   );
 
@@ -1263,7 +1352,8 @@ export function DiaryHomeScreen({
         return undefined;
       }
       setChosenDay(day);
-      return generate({ ...outcome.params, day }, items);
+      // 092 — 진단의 수동 실행은 이어 하기를 신청하지 않는다(소유자 결정 — 홈이 시작한 쓰기만)
+      return generate({ ...outcome.params, day }, items, { continuable: false });
     });
   }, [
     writeRequest,

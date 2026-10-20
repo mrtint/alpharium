@@ -85,10 +85,18 @@ export type BackgroundWake = "power" | "battery";
  * - `timeoutMs` 30분 — 느린 쓰기를 감당하는 생성 시간 한도(사람이 정한 값). 실제 상한은 iOS의 예산 만료다(090 `expired`).
  */
 export type Pacing = {
-  readonly threads: number;
+  /** 092 — 없으면 주지 않는다(조립 주체의 종전 값, `inferenceThreadsFor`) */
+  readonly threads?: number;
   readonly pauseRatio: number;
   readonly chunkTokens: number;
-  readonly timeoutMs: number;
+  /** 092 — 없으면 조립 주체의 종전 한도(`generationTimeoutFor`) */
+  readonly timeoutMs?: number;
+  /** 092 — 첫 조각 전 프롬프트를 이 글자 수씩 미리 읽는다(`llama-port.ts` `EnginePacing`). 없으면 미리 읽지 않는다 */
+  readonly prefillChars?: number;
+  /** 092 — 앱이 앞에 있을 때의 토막 길이(`llama-port.ts` `EnginePacing.prefillCharsActive`) */
+  readonly prefillCharsActive?: number;
+  /** 092 — 모델을 메모리에 읽어 올린다(`llama-port.ts` `EnginePacing.residentModel`). 없으면 종전(파일 매핑) */
+  readonly residentModel?: boolean;
 };
 
 const BATTERY_PACING: Pacing = {
@@ -98,13 +106,51 @@ const BATTERY_PACING: Pacing = {
   timeoutMs: 1_800_000,
 };
 
-/** 091 — 느린 쓰기를 할 조립인가. 백그라운드·iOS·배터리 요청만 값을 주고, 그 밖은 `undefined`(종전 경로 — 바이트 같은 인자). */
+/**
+ * 092 CW6 — iOS 화면 쓰기의 조각 생성. 조각 하나·프롬프트 토막 하나가 끝날 때마다 박동이 나가 이어 하기의 막대가 실제 일로 움직인다(FR-003).
+ * 앞에 있는지는 쓰기 도중 바뀌므로 조립 때 가를 수 없어 iOS 화면 쓰기 전부가 이 값이다(research R5). 쉼은 없다(CPU 감시의 「배터리 요청」이 아니다).
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * **실측이다**(2026-10-21, iPhone 14 · iOS 27.0.1 · 개발 환경 Release, 10월 19일 사진 6장).
+ *
+ * | 조건 | 사진 한 장 | 결과 |
+ * | --- | --- | --- |
+ * | 앞, 스레드 기본(4) | 약 4.5초 | 71초에 저장 |
+ * | 앱 밖(이어 하기), 스레드 기본 | 50~58초 | 사진 뒤 첫 조각에서 진행 없이 59초 → 만료 |
+ * | 앱 밖, 스레드 2 | 28~32초 | 사진 뒤 첫 조각에서 진행 없이 39초 → 만료 |
+ * | 앱 밖, 스레드 2 · 파일 매핑 · 8토큰 조각 | — | 만료는 없었으나 본문 0.17토큰/초로 600초 시간 초과 |
+ * | 앱 밖, 스레드 2 · 모델 메모리 상주 · 32토큰 조각 · 토큰 박동 | 약 26초 | 본문 475초, 약 18분 40초에 저장(run J) |
+ *
+ * 앱 밖에서는 iOS가 CPU를 크게 줄인다(앞의 6~12배 느림) — 스레드 넷이 줄어든 코어를 나눠 써 더 느렸다(079 안드로이드와 같은 꼴).
+ * 파일 매핑이면 모델 데이터가 밀려나 저장소에서 다시 읽히는 것으로 본다(짐작) — 메모리에 읽어 올리면 본문이 약 7배 빨랐다.
+ * - `threads` 2 — 앱 밖에서 스레드 기본값보다 약 두 배 빠르다. 앞에서의 대가는 quickstart 「실측」(SC-003).
+ * - `prefillChars` 24 — 첫 조각의 프롬프트 읽기를 이 글자 수씩 나눠 토막마다 박동한다(사람이 정한 값). 진행이 멈춘 작업은 만료된다(BGTask.h).
+ * - `prefillCharsActive` 240 — 토막을 읽는 순간 앱이 앞에 있으면 이 길이다. 24자 토막만 쓰면 앞에서 프롬프트 읽기가 120초였다(run K,
+ *   생성은 26초 — 작은 토막은 토큰당 비용이 크다). 토막 하나를 읽는 도중 앱을 나가도 공백이 짧게 남을 크기다(사람이 정한 값).
+ * - `residentModel` — 모델을 파일 매핑 대신 메모리에 읽어 올린다(`use_mmap: false`).
+ * - `timeoutMs` 30분 — 앱 밖의 본문이 475초 걸렸다(600초 한도에 너무 가깝다). 091 느린 쓰기와 같은 값.
+ * ─────────────────────────────────────────────────────────────────────────────
+ */
+const SCREEN_IOS_PACING: Pacing = {
+  threads: 2,
+  pauseRatio: 0,
+  chunkTokens: 32,
+  prefillChars: 24,
+  prefillCharsActive: 240,
+  residentModel: true,
+  timeoutMs: 1_800_000,
+};
+
+/**
+ * 조각 생성을 할 조립인가. 091 — 백그라운드·iOS·배터리 요청은 느린 쓰기, 092 — iOS 화면 쓰기는 쉼 없는 조각 생성. 그 밖은 `undefined`
+ * (종전 경로 — 바이트 같은 인자, 안드로이드 전부).
+ */
 export function pacingFor(
   owner: AssemblyOwner,
   platform: "android" | "ios",
   wake: BackgroundWake | undefined,
 ): Pacing | undefined {
-  return owner === "background" && platform === "ios" && wake === "battery"
-    ? BATTERY_PACING
-    : undefined;
+  if (platform !== "ios") return undefined;
+  if (owner === "screen") return SCREEN_IOS_PACING;
+  return wake === "battery" ? BATTERY_PACING : undefined;
 }

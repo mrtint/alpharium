@@ -368,11 +368,13 @@ async function runBody(
  * `decideNotify`가 "보낼지/어떻게"를 정하고, 어댑터가 고정 문구를 쓴다.
  * 알림 자체가 실패해도 예외를 밖으로 던지지 않는다 — 생성은 이미 저장됐고
  * 알림 실패가 그걸 되돌리지 않는다(notification.md N8).
+ *
+ * 092 — iPhone 이어 쓰기가 앱 밖에서 저장했을 때 `App.tsx`도 이것을 부른다(FR-008 — 같은 문구·채널·확인 기록).
  */
-async function sendCompletionNotification(
+export async function sendCompletionNotification(
   day: DayDate,
   character: Character,
-  deps: AutoDiaryTaskDeps,
+  deps: AutoDiaryTaskDeps = {},
 ): Promise<void> {
   try {
     const notifiedPort = deps.notifiedPort ?? expoNotifiedStorePort();

@@ -2,7 +2,7 @@
  * 091 PC2 — 느린 쓰기의 쉼. 호출 시간 × 비율만큼 쉬고, 멈춤 신호가 서 있으면 쉬지 않는다.
  */
 
-import { paced, pauseAfter } from "../../src/inference/pacing";
+import { PAUSE_SLICE_MS, paced, pauseAfter, rest } from "../../src/inference/pacing";
 
 describe("PC2 — pauseAfter", () => {
   it.each([
@@ -32,7 +32,9 @@ describe("PC2 — paced", () => {
       sleep,
     );
     expect(result).toBe("ok");
-    expect(sleep).toHaveBeenCalledWith(20_000);
+    // 092 — 토막으로 나눠 잔다. 합이 쉼 길이다
+    const total = (sleep.mock.calls as unknown as [number][]).reduce((sum, [ms]) => sum + ms, 0);
+    expect(total).toBe(20_000);
   });
 
   it("멈춤 신호가 서 있으면 쉬지 않는다", async () => {
@@ -60,6 +62,40 @@ describe("PC2 — paced", () => {
         sleep,
       ),
     ).rejects.toThrow("boom");
+    expect(sleep).not.toHaveBeenCalled();
+  });
+});
+
+describe("092 CW8 — rest (멈춤이 끊는 쉼)", () => {
+  it("쉼을 토막으로 나눠 자고 합이 쉼 길이와 같다", async () => {
+    const slept: number[] = [];
+    await rest(
+      PAUSE_SLICE_MS * 2 + 100,
+      () => false,
+      async (ms) => {
+        slept.push(ms);
+      },
+    );
+    expect(slept).toEqual([PAUSE_SLICE_MS, PAUSE_SLICE_MS, 100]);
+  });
+
+  it("멈춤이 서면 남은 토막을 자지 않는다", async () => {
+    let stop = false;
+    const slept: number[] = [];
+    await rest(
+      PAUSE_SLICE_MS * 5,
+      () => stop,
+      async (ms) => {
+        slept.push(ms);
+        stop = true;
+      },
+    );
+    expect(slept).toEqual([PAUSE_SLICE_MS]);
+  });
+
+  it("0 이하면 자지 않는다", async () => {
+    const sleep = jest.fn(async () => {});
+    await rest(0, () => false, sleep);
     expect(sleep).not.toHaveBeenCalled();
   });
 });

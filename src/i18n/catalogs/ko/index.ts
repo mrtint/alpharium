@@ -15,6 +15,7 @@
 import { attempts } from "./attempts";
 import { calendar } from "./calendar";
 import { consentGate } from "./consent-gate";
+import { continued } from "./continued";
 import { developer } from "./developer";
 import { diagnostics, diagnosticsLanguage } from "./diagnostics";
 import { download } from "./download";
@@ -56,4 +57,5 @@ export const ko = {
   notification,
   reminder,
   photoViewer,
+  continued,
 };

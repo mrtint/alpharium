@@ -21,7 +21,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { paced, type Clock, type Sleep } from "./pacing";
+import { pauseAfter, rest, systemClock, systemSleep, type Clock, type Sleep } from "./pacing";
 import type { Character } from "../diary/types";
 import { assetFor } from "../models/roster";
 import { modelFilePath } from "../models/expo-port";
@@ -57,12 +57,14 @@ const GPU_LAYERS = 0;
  *
  * `threads`가 없으면 **`n_threads` 키를 만들지 않는다** — 화면 조립의 인자는 079 이전과 같다.
  */
-export function contextParams(modelPath: string, threads?: number) {
+export function contextParams(modelPath: string, threads?: number, resident?: boolean) {
   return {
     model: modelPath,
     n_ctx: CONTEXT_SIZE,
     n_gpu_layers: GPU_LAYERS,
     ...(threads === undefined ? {} : { n_threads: threads }),
+    // 092 — 모델을 파일 매핑이 아니라 메모리에 읽어 올린다(`EnginePacing.residentModel`). 주지 않으면 키가 없다(종전 인자).
+    ...(resident === true ? { use_mmap: false } : {}),
   };
 }
 
@@ -76,6 +78,11 @@ type LlamaLike = {
    * 그 뒤에 지금까지 쓴 글을 이어 붙인다. 없으면 조각 생성을 하지 않는다(종전 경로).
    */
   formatChat?(messages: ChatMessage[]): Promise<FormattedChat>;
+  /**
+   * 092 — `completion()`과 같되 토큰 하나가 생성될 때마다 `tick()`을 부른다. **토큰 데이터는 이 경계에서 버린다** — `tick`은 인자가
+   * 없다(005 FR-028b의 취지: 판정 전의 글이 경계 밖으로 나가지 않는다). iOS 이어 하기의 진행 보고를 고르게 하려고만 쓴다.
+   */
+  completionTicking?(params: Record<string, unknown>, tick: () => void): Promise<NativeResult>;
 };
 
 /**
@@ -87,10 +94,41 @@ export type FormattedChat = { prompt: string; stops: string[] };
 /**
  * 091 — 느린 쓰기(`assembly.ts`의 `Pacing` 중 이 파일이 쓰는 둘). 주면 `run()`·`ask()`가 조각 생성 + 쉼으로 돈다(PC3).
  */
-export type EnginePacing = { readonly pauseRatio: number; readonly chunkTokens: number };
+export type EnginePacing = {
+  readonly pauseRatio: number;
+  readonly chunkTokens: number;
+  /**
+   * 092 — 주면 첫 조각 전에 서식 프롬프트를 이 글자 수씩 늘려 미리 읽는다(`n_predict: 1`, 018 미리 준비와 같은 방식 — 앞부분 KV가
+   * 이어진다). 토막 하나가 끝날 때마다 박동한다 — 프롬프트 읽기도 실제 일이다. iOS 이어 하기는 진행이 멈춘 작업을 끝내는데(BGTask.h),
+   * 앱 밖에서 느려진 첫 조각(프롬프트 전체 읽기)이 진행 없이 40초를 넘겨 만료됐다(2026-10-21 실측). 주지 않으면 종전대로(091 배터리 값).
+   */
+  readonly prefillChars?: number;
+  /**
+   * 092 — 앱이 앞에 있을 때의 토막 길이(`EngineOptions.isActive`가 참일 때). 작은 토막은 토큰당 비용이 커서 앞에서 쓰는 시간을 크게
+   * 늘렸다(2026-10-21 run K: 24자 토막으로 프롬프트 읽기 120초 — 생성은 26초). 토막을 읽을 때마다 앱 상태를 다시 본다. 없으면 `prefillChars`.
+   */
+  readonly prefillCharsActive?: number;
+  /** 092 — 참이면 모델을 메모리에 읽어 올린다(`contextParams`의 `use_mmap: false`). 앱 밖 iOS에서 매핑된 쪽이 밀려나 생성이 매우 느렸다 */
+  readonly residentModel?: boolean;
+};
 
 export type EngineOptions = {
   pacing?: EnginePacing;
+  /**
+   * 092 CW7 — 조각 생성에서 조각 하나가 끝날 때마다 부른다(인자 없음 — 글·시간·토큰 수를 싣지 않는다, FR-004). 조립부가
+   * `heartbeat.beat("chunk")`를 넘긴다. 던져도 생성은 이어진다. 종전 경로(`pacing` 없음)는 부르지 않는다.
+   */
+  onChunk?: () => void;
+  /**
+   * 092 — 조각 생성에서 토큰 하나가 생성될 때마다 부른다(인자 없음). 조립부가 `heartbeat.beat("token")`을 넘긴다. 네이티브가
+   * `completionTicking`을 줄 때만 돈다. 던져도 생성은 이어진다.
+   */
+  onToken?: () => void;
+  /**
+   * 092 — 지금 앱이 앞에 있는가. 미리 읽기 토막의 길이를 고른다(`EnginePacing.prefillCharsActive`). 없거나 던지면 앞이 아닌 것으로
+   * 본다 — 큰 토막을 앱 밖에서 읽으면 진행 없는 공백이 길어져 이어 하기가 만료된다.
+   */
+  isActive?: () => boolean;
   /** 쉼 계산의 시계·잠자기 — 테스트가 갈아 끼운다 */
   clock?: Clock;
   sleep?: Sleep;
@@ -155,17 +193,28 @@ export function createLlamaEngine(
   options: EngineOptions = {},
 ): GenerationEngine {
   /**
-   * 091 — 느린 쓰기에서 멈춤이 왔는가. `stop()`이 세우고 `run()`·`ask()`가 시작할 때 비운다 — 조각 생성은 이것을 조각 경계마다 보고
-   * 다음 조각·쉼을 시작하지 않는다(FR-004). 종전 경로는 이 값을 보지 않는다.
+   * 091 — 조각 생성에서 멈춤이 왔는가. `stop()`이 세우고 **`load()`가 비운다**(쓰기 하나의 시작) — 조각 생성은 이것을 조각 경계·쉼마다
+   * 보고 다음 조각·쉼을 시작하지 않는다(FR-004). 종전 경로는 이 값을 보지 않는다.
+   *
+   * 092 FR-010 — 091은 `run()`·`ask()`가 시작할 때 비워, 본문과 제목 사이에 온 멈춤을 제목 호출이 지우고 제목을 끝까지 썼다(091 리뷰).
    */
   let stopRequested = false;
 
-  /** 대화 하나를 보낸다 — 느린 쓰기면 조각 생성, 아니면 종전 `complete()` */
+  /** 대화 하나를 보낸다 — 조각 생성(pacing이 있을 때), 아니면 종전 `complete()` */
   function send(open: LlamaLike, messages: ChatMessage[]): Promise<RunResult> {
-    stopRequested = false;
     const pacing = options.pacing;
     if (pacing === undefined || open.formatChat === undefined) return complete(open, messages);
-    return completePaced(open, messages, pacing, () => stopRequested, options.clock, options.sleep);
+    return completePaced(
+      open,
+      messages,
+      pacing,
+      () => stopRequested,
+      options.clock,
+      options.sleep,
+      options.onChunk,
+      options.onToken,
+      options.isActive,
+    );
   }
 
   /** 지금 열려 있는 것. **하나뿐이다**(E1) */
@@ -212,6 +261,8 @@ export function createLlamaEngine(
 
   return {
     async load(character: Character): Promise<LoadResult> {
+      // 092 FR-010 — 쓰기 하나가 여기서 시작한다. 지난 쓰기의 멈춤을 비운다(조각 생성만 본다).
+      stopRequested = false;
       // 같은 캐릭터가 이미 열려 있으면 재사용한다. 닫았다 여는 것은 느리고, 같은 것이
       // 열려 있는 것은 E1을 어기지 않는다.
       //
@@ -448,8 +499,11 @@ async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<Ru
  *   `interrupted`·`context`는 그대로 돌려준다. 빈 조각은 `length`로 끝낸다(무한히 돌지 않는다).
  * - 멈춤: 조각 경계에서 `stopped()`를 본다 — 서 있으면 다음 조각·쉼 없이 `interrupted`(도는 조각은 `stop()`의 `stopCompletion`이 끊는다).
  * - 텍스트는 조각 원문(`text`)을 잇는다 — 다음 조각의 프롬프트가 되므로 걸러낸 `content`가 아니라 원문이어야 한다.
- * - **토큰 콜백을 넘기지 않는다**(FR-028b), 지표는 `{ text, ending }` 밖으로 나가지 않는다(원칙 IV).
+ * - 토큰 콜백은 `completionTicking`으로만 넘기고 데이터를 거기서 버린다(092 — 인자 없는 박동, FR-028b의 취지), 지표는 `{ text, ending }` 밖으로 나가지 않는다(원칙 IV).
  * - 위험: 조각마다 샘플링이 다시 시작된다 — 한 번에 생성한 글과 같지 않을 수 있다(판정을 그대로 지난다).
+ * - **호출 한 번의 CPU 상한**: 쉼은 호출 사이에만 있다 — 호출 하나가 그 자체로 60초 창의 CPU 48초를 넘으면 막지 못한다. 스레드 1의
+ *   실측(091, iPhone 14): 생성 약 7.5토큰/초라 32토큰 조각은 약 4초, 첫 조각은 프롬프트 전체(약 900토큰)를 약 62토큰/초로 읽어 약 15초다.
+ *   프롬프트가 3,000토큰을 넘으면 첫 조각이 48초에 닿는다 — 그때는 프롬프트 읽기도 나눠야 한다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 async function completePaced(
@@ -459,6 +513,9 @@ async function completePaced(
   stopped: () => boolean,
   clock?: Clock,
   sleep?: Sleep,
+  onChunk?: () => void,
+  onToken?: () => void,
+  isActive?: () => boolean,
 ): Promise<RunResult> {
   const formatted = await (context.formatChat as NonNullable<LlamaLike["formatChat"]>)(messages);
   // 서식 프롬프트를 못 얻었으면 빈 프롬프트로 생성하지 않고 종전 경로로(코드 리뷰)
@@ -466,24 +523,74 @@ async function completePaced(
   const base = formatted.prompt;
   const maxChunks = Math.max(1, Math.ceil(SAMPLING.n_predict / pacing.chunkTokens));
   let written = "";
+  const now = clock ?? systemClock;
+  // 092 CW8 — 앞 조각 뒤의 쉼. 다음 조각을 부르기 **직전**에 쉰다 — 마지막 조각 뒤에는 쉬지 않는다(091은 조각마다 끝나고 쉬어 마지막 쉼이
+  // 쓰기를 그만큼 늦췄다, 091 리뷰).
+  let pending = 0;
+  // 092 — 프롬프트를 토막씩 미리 읽는다(위 `prefillChars`). 마지막 토막(프롬프트 전체)은 첫 조각이 읽는다.
+  if (pacing.prefillChars !== undefined && pacing.prefillChars > 0) {
+    const small = pacing.prefillChars;
+    const step = () => {
+      let active = false;
+      try {
+        active = isActive?.() === true;
+      } catch {
+        // 모르면 앞이 아니다
+      }
+      return active ? Math.max(small, pacing.prefillCharsActive ?? small) : small;
+    };
+    for (let end = step(); end < base.length; end += step()) {
+      // 서로게이트 쌍 한가운데서 자르지 않는다 — 외톨이 반쪽이 네이티브로 간다(이름의 이모지, 코드 리뷰)
+      const code = base.charCodeAt(end - 1);
+      if (code >= 0xd800 && code <= 0xdbff) end += 1;
+      if (end >= base.length) break;
+      if (stopped()) return { text: "", ending: { kind: "interrupted" } };
+      await context.completion({
+        prompt: base.slice(0, end),
+        temperature: SAMPLING.temperature,
+        top_p: SAMPLING.top_p,
+        top_k: SAMPLING.top_k,
+        n_predict: 1,
+      });
+      try {
+        onChunk?.();
+      } catch {
+        // 삼킨다
+      }
+    }
+  }
   for (let chunk = 0; chunk < maxChunks; chunk += 1) {
+    if (pending > 0) await rest(pending, stopped, sleep ?? systemSleep);
     if (stopped()) return { text: written.trim(), ending: { kind: "interrupted" } };
-    const result = await paced(
-      () =>
-        context.completion({
-          prompt: base + written,
-          temperature: SAMPLING.temperature,
-          top_p: SAMPLING.top_p,
-          top_k: SAMPLING.top_k,
-          n_predict: pacing.chunkTokens,
-          grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
-          ...(formatted.stops.length > 0 ? { stop: formatted.stops } : {}),
-        }),
-      pacing.pauseRatio,
-      stopped,
-      clock,
-      sleep,
-    );
+    const start = now();
+    const params = {
+      prompt: base + written,
+      temperature: SAMPLING.temperature,
+      top_p: SAMPLING.top_p,
+      top_k: SAMPLING.top_k,
+      n_predict: pacing.chunkTokens,
+      grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
+      ...(formatted.stops.length > 0 ? { stop: formatted.stops } : {}),
+    };
+    // 092 — 토큰마다 박동(데이터 없음). 듣는 쪽의 실패가 생성을 무너뜨리지 않는다.
+    const tick = () => {
+      try {
+        onToken?.();
+      } catch {
+        // 삼킨다
+      }
+    };
+    const result =
+      onToken !== undefined && context.completionTicking !== undefined
+        ? await context.completionTicking(params, tick)
+        : await context.completion(params);
+    pending = pauseAfter(now() - start, pacing.pauseRatio);
+    // 092 CW7 — 실제 일 하나(조각)가 끝났다. 이어 하기의 막대가 이것으로만 움직인다. 듣는 쪽의 실패가 생성을 무너뜨리지 않는다.
+    try {
+      onChunk?.();
+    } catch {
+      // 삼킨다
+    }
     // ★ 원칙 IV — 원문과 끝 갈래만 꺼낸다. `timings`·`tokens_*`는 이 줄을 넘지 못한다.
     // 원문이 비면 걸러낸 쪽(`complete()`와 같은 이유 — 빈 문자열은 `??`로 넘어가지 않는다)
     const raw = result.text || result.content || "";
@@ -522,11 +629,19 @@ async function defaultPathFor(character: Character): Promise<string> {
  *
  * `threads`는 조립 주체가 정한 스레드 수다(079 — `assembly.ts`). 화면 조립은 주지 않는다.
  */
-export function llamaEngine(threads?: number, pacing?: EnginePacing): GenerationEngine {
+export function llamaEngine(
+  threads?: number,
+  pacing?: EnginePacing,
+  onChunk?: () => void,
+  onToken?: () => void,
+  isActive?: () => boolean,
+): GenerationEngine {
   return createLlamaEngine(
     async (modelPath) => {
       const llama = await import("llama.rn");
-      const context = await llama.initLlama(contextParams(modelPath, threads));
+      const context = await llama.initLlama(
+        contextParams(modelPath, threads, pacing?.residentModel),
+      );
 
       // **`LlamaContext`를 그대로 돌려주지 않는다**(원칙 III). `model`·`systemInfo`·
       // `devices`가 딸려 오며, 그것이 밖으로 나가면 캐릭터 뒤의 모델이 드러난다.
@@ -534,6 +649,9 @@ export function llamaEngine(threads?: number, pacing?: EnginePacing): Generation
       return {
         completion: (params) =>
           context.completion(params as Parameters<typeof context.completion>[0]),
+        // 092 — 토큰 데이터는 여기서 버린다(`tick`은 인자 없음, `LlamaLike.completionTicking`)
+        completionTicking: (params, tick) =>
+          context.completion(params as Parameters<typeof context.completion>[0], () => tick()),
         stopCompletion: () => context.stopCompletion(),
         release: () => context.release(),
         // 091 — 느린 쓰기만 쓴다. `messages`+jinja 경로와 같은 템플릿 문자열이다.
@@ -551,6 +669,11 @@ export function llamaEngine(threads?: number, pacing?: EnginePacing): Generation
       };
     },
     defaultPathFor,
-    pacing === undefined ? {} : { pacing },
+    {
+      ...(pacing === undefined ? {} : { pacing }),
+      ...(onChunk === undefined ? {} : { onChunk }),
+      ...(onToken === undefined ? {} : { onToken }),
+      ...(isActive === undefined ? {} : { isActive }),
+    },
   );
 }

@@ -12,7 +12,7 @@ iOS 26 `BGContinuedProcessingTask`로 홈이 시작한 쓰기를 앱 밖에서 �
 **Primary Dependencies**: `BackgroundTasks`(`BGContinuedProcessingTaskRequest`·`BGContinuedProcessingTask`), 091 `completePaced`·`pacing.ts`, 057 완성 알림(`sendCompletionNotification`), 080 등록부
 **Storage**: 없음(세션은 프로세스 안)
 **Testing**: jest(`logic`·`ui`), 소스 계약(Swift 이름·Info.plist 와일드카드·이벤트 이름), 실기기 iPhone 14(무선, 충전 안 함)
-**Constraints**: 원칙 IV·005 FR-028b(박동은 종류뿐, 토큰 콜백 없음), 062(문구는 카탈로그), 화면은 네이티브에 닿지 않는다(세션은 `App.tsx`가 주입), 안드로이드 바이트 동일
+**Constraints**: 원칙 IV·005 FR-028b(박동은 종류뿐 — 토큰 콜백은 `llama-port.ts` 경계에서 데이터를 버리고 인자 없는 박동만 낸다, 실측 뒤 개정), 062(문구는 카탈로그), 화면은 네이티브에 닿지 않는다(세션은 `App.tsx`가 주입), 안드로이드 바이트 동일
 
 ## Constitution Check
 

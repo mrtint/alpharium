@@ -159,6 +159,11 @@ export type VisionEngineOptions = {
    * (iOS 배터리 요청의 CPU 감시, `inference/pacing.ts`). 이 파일은 쉼을 모른다(inference를 import하지 않는다).
    */
   pace?: <T>(call: () => Promise<T>, stopped: () => boolean) => Promise<T>;
+  /**
+   * 092 CW7 — 캡션 한 장이 끝날 때마다 부른다(성공·실패 모두 — 실패한 장도 일이 끝났다). 인자 없음 — 글·시간을 싣지 않는다(FR-004).
+   * 조립부가 `heartbeat.beat("photo")`를 넘긴다(이 파일은 inference를 import하지 않는다). 던져도 캡션은 그대로다.
+   */
+  onCaptioned?: () => void;
 };
 
 export function createVisionEngine(
@@ -254,6 +259,13 @@ export function createVisionEngine(
       } catch {
         // 한 장의 실패가 나머지를 무너뜨리지 않는다(E4). 빈 문자열이 곧 실패다.
         return { text: "" };
+      } finally {
+        // 092 CW7 — 한 장이 끝났다(성공·실패 모두). 듣는 쪽의 실패가 캡션을 무너뜨리지 않는다.
+        try {
+          options.onCaptioned?.();
+        } catch {
+          // 삼킨다
+        }
       }
     },
 

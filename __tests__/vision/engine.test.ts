@@ -436,3 +436,40 @@ describe("091 T017 — 쉼은 멈춤 신호를 본다 (PC2)", () => {
     expect(flags).toEqual([false]);
   });
 });
+
+/**
+ * 092 CW7 — 캡션 한 장이 끝날 때 한 번 박동한다. 이 파일은 inference를 모른다 — 조립부가 `onCaptioned`로 `beat("photo")`를 넘긴다.
+ * 실패한 장도 일이 끝난 것이다(다음 장으로 넘어간다). 열지 않은 채 부른 것은 일이 없었으니 박동하지 않는다.
+ */
+describe("092 CW7 — 캡션 한 장마다 박동", () => {
+  it("성공·실패한 장마다 한 번, 열기 전에는 없다", async () => {
+    const beats: number[] = [];
+    const onCaptioned = () => beats.push(1);
+    const idle = createVisionEngine(loaderFor([]), paths, { onCaptioned });
+    await idle.caption("/p/0.jpg");
+    expect(beats).toHaveLength(0);
+
+    const engine = createVisionEngine(loaderFor([]), paths, { onCaptioned });
+    await engine.load("quick");
+    await engine.caption("/p/1.jpg");
+    await engine.caption("/p/2.jpg");
+    expect(beats).toHaveLength(2);
+
+    const failing = createVisionEngine(loaderFor([], { completionThrows: true }), paths, {
+      onCaptioned,
+    });
+    await failing.load("quick");
+    expect(await failing.caption("/p/3.jpg")).toEqual({ text: "" });
+    expect(beats).toHaveLength(3);
+  });
+
+  it("박동이 던져도 캡션은 그대로다", async () => {
+    const engine = createVisionEngine(loaderFor([]), paths, {
+      onCaptioned: () => {
+        throw new Error("x");
+      },
+    });
+    await engine.load("quick");
+    expect((await engine.caption("/p/1.jpg")).text).toBe("A cup of coffee on a table.");
+  });
+});

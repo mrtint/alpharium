@@ -25,8 +25,8 @@
 
 ### 네이티브 — 로컬 Expo 모듈 `modules/pocketlog-continued-write`
 
-- 처리기는 앱 시작 때 한 번 등록(와일드카드 `com.a810labs.pocketlog.write.*`).
-- `begin(title, subtitle) -> Bool`: iOS 26 미만·제출 실패면 거짓(지금처럼 앞을 벗어나면 끊는다). `.fail` 전략으로 `…write.<날짜>` 하나를 제출.
+- 처리기는 신청마다 꼬리를 붙인 온전한 식별자(`com.a810labs.pocketlog.write.<UUID>`)로 등록한다 — 와일드카드는 Info.plist에만 둔다(구현 중 확인: 와일드카드 처리기 등록은 막혀 있다, research R1).
+- `begin(title, subtitle) -> Promise<Bool>`(제출 결과를 기다린다): iOS 26 미만·제출 실패면 거짓(지금처럼 앞을 벗어나면 끊는다). `.fail` 전략으로 `…write.<날짜>` 하나를 제출.
 - `report(subtitle, completed, total)`: 처리기가 아직 안 섰으면 값을 들고 있다가 서는 순간 반영.
 - `finish(success)`: `setTaskCompleted`. 처리기가 서기 전이면 섰을 때 곧바로 끝낸다.
 - 이벤트 `onExpired`: 시스템이 끝냄(만료·사용자가 진행 UI에서 취소) → JS가 그 쓰기를 끊는다.
@@ -45,7 +45,7 @@
 ### 심장 박동 — 실제 일이 끝날 때만
 
 - 사진: 캡션 한 장이 끝날 때(`vision-port.ts`).
-- 본문·제목: iOS에서 이 경로의 생성은 091의 조각 생성(`completePaced`)을 쉼 없이(`pauseRatio: 0`) 쓴다 — 조각이 끝날 때마다 박동. 토큰 콜백은 쓰지 않는다(005 FR-028b — 글을 밖으로 내지 않는다, 박동은 횟수뿐).
+- 본문·제목: iOS에서 이 경로의 생성은 091의 조각 생성(`completePaced`)을 쉼 없이(`pauseRatio: 0`) 쓴다 — 조각이 끝날 때마다 박동. 처음에는 토큰 콜백을 쓰지 않으려 했으나 앱 밖에서 조각 하나가 30초를 넘겨 만료돼(2026-10-21 실측), `llama-port.ts`가 토큰 콜백을 받되 데이터를 경계에서 버리고 인자 없는 「토큰」 박동만 낸다(005 FR-028b의 뜻 — 글을 밖으로 내지 않는다 — 은 그대로).
 - CPU 감시가 이 작업을 죽이면(실기기 `cpu_resource_fatal`) 091의 느린 쓰기 값(스레드 1·쉼 0.5)을 이 경로에도 쓴다 — 실측으로 정한다.
 
 ### 로드맵의 091 잔여 (같이 고친다)
