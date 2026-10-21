@@ -270,6 +270,14 @@ describe("074 — 동의 단계의 조립 (CG15·CG16·CG17, 소스 배선)", ()
     expect(APP_SOURCE).toMatch(/^async function readConsentSizeLabel\(/m);
   });
 
+  it("095 DS12 — 받을 양은 remainingSizeLabel을 거친다(「0MB」를 받는다고 말하지 않는다)", () => {
+    const code = APP_SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    const body = code.slice(code.indexOf("async function readConsentSizeLabel("));
+    expect(body.slice(0, body.indexOf("\n}"))).toMatch(
+      /return remainingSizeLabel\(await readEssentialRemainingBytes\(\)\)/,
+    );
+  });
+
   it("CG15 — DownloadConsentGate는 download-consent 분기 한 곳에서만 그려진다(다른 사용자는 연결을 읽지 않는다)", () => {
     const uses = [...APP_SOURCE.matchAll(/<DownloadConsentGate[\s/>]/g)];
     expect(uses).toHaveLength(1);

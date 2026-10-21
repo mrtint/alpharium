@@ -3,7 +3,7 @@
  *
  * 원래 자리: `src/ui/CellularConsentDialog.tsx`·`src/ui/DownloadDeferredScreen.tsx`.
  * 기존 `download` 영역(045 표준 동의·진행)은 건드리지 않는다 — 062 골든이 그 문구를 바이트 단위로 잠근다.
- * **받을 양은 모바일 갈래의 이 본문에만 나온다**(표준 동의에는 용량을 노출하지 않는다, 045 FR-003).
+ * 받을 양은 이 본문과 표준 동의 본문(`download.consent.body`, 095)에 같은 값으로 나온다.
  */
 
 export const consentGate = {

@@ -4,7 +4,7 @@
  * 계약: specs/058-settings-this-phone/contracts/this-phone.md MS1·MS2, spec FR-004(1000 기준)
  */
 
-import { formatModuleBytes, readModuleBytes } from "../../src/app/module-size";
+import { formatModuleBytes, readModuleBytes, remainingSizeLabel } from "../../src/app/module-size";
 import { ESSENTIAL_ASSET_KEYS } from "../../src/onboarding/essential-assets";
 
 describe("MS1 — formatModuleBytes (1000 기준)", () => {
@@ -45,5 +45,15 @@ describe("MS2 — readModuleBytes", () => {
         },
       }),
     ).rejects.toThrow("못 읽음");
+  });
+});
+
+describe("DS12 — remainingSizeLabel (095 FR-003a): 「0MB」를 받는다고 말하지 않는다", () => {
+  it.each([0, -1, 499_999])("%d바이트면 null(양을 모름과 같다)", (bytes) => {
+    expect(remainingSizeLabel(bytes)).toBeNull();
+  });
+
+  it.each([500_000, 350_000_000, 2_000_000_000])("%d바이트면 formatModuleBytes와 같다", (bytes) => {
+    expect(remainingSizeLabel(bytes)).toBe(formatModuleBytes(bytes));
   });
 });

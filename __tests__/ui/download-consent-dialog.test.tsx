@@ -12,6 +12,8 @@ import { renderWithPortal } from "./render-with-portal";
  * 계약: specs/045-onboarding-download-consent/contracts/download-consent-gate.md
  *       C9
  *       spec.md FR-002a·FR-003
+ *       specs/095-download-size-notice/contracts/consent-size.md DS8·DS9 — 045 FR-003의 「바이트·GB 비노출」을 대체한다
+ *       (받을 양은 prop으로만 받는다 — 화면이 양을 지어내지 않는다)
  *
  * **RNTL 14는 `render`도 `fireEvent`도 Promise를 반환한다** — `await` 없이는
  * 렌더·상태 갱신이 flush되지 않는다(025 실측, 043·044가 이어받은 관례).
@@ -27,7 +29,9 @@ const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 describe("FR-002a — [확인/시작] 하나만 있다", () => {
   it("확인 버튼이 렌더된다", async () => {
-    await renderWithPortal(<DownloadConsentDialog onConfirm={jest.fn()} visible={true} />);
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel={null} visible={true} />,
+    );
     expect(screen.queryByTestId("download-consent-confirm")).not.toBeNull();
   });
 
@@ -47,20 +51,51 @@ describe("FR-002a — [확인/시작] 하나만 있다", () => {
   });
 });
 
-describe("FR-003 — 모델 식별자·바이트 크기를 노출하지 않는다 (원칙 III·IV, C9)", () => {
-  it("소스에 모델 식별자·자산 키·바이트·GB 텍스트가 없다", () => {
-    expect(CODE).not.toMatch(/\b(?:v1|v2|a1|ESSENTIAL_ASSET_KEYS|MB|GB|byte)\b/i);
+describe("DS9 — 모델 식별자·자산 키를 노출하지 않고, 받을 양은 prop으로만 받는다 (원칙 III·V)", () => {
+  it("소스에 모델 식별자·자산 키 텍스트가 없다", () => {
+    expect(CODE).not.toMatch(/\b(?:v1|v2|a1|ESSENTIAL_ASSET_KEYS)\b/i);
   });
 
-  it("essential-assets.ts를 import하지 않는다", () => {
-    expect(CODE).not.toMatch(/from\s+["'][^"']*essential-assets["']/);
+  it("essential-assets·network-port를 import하지 않는다", () => {
+    expect(CODE).not.toMatch(/from\s+["'][^"']*(essential-assets|network-port)[^"']*["']/);
+  });
+
+  it("★ 숫자·단위 리터럴이 없다 — 양을 지어낼 길이 없다(import 경로의 `i18n`은 빼고 본다)", () => {
+    const body = CODE.replace(/^import .*$/gm, "");
+    expect(body).not.toMatch(/\d|\b(?:MB|GB|byte)\b/i);
+  });
+});
+
+describe("DS8 — 본문에 받을 양 (095 FR-001·FR-002)", () => {
+  it("sizeLabel이 있으면 「약 {양}」이 든 본문이다", async () => {
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel="2.0GB" visible />,
+    );
+    expect(
+      screen.getByText(
+        "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 약 2.0GB 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+      ),
+    ).toBeTruthy();
+  });
+
+  it("sizeLabel이 null이면 숫자 없는 원래 문장이다", async () => {
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel={null} visible />,
+    );
+    expect(
+      screen.getByText(
+        "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+      ),
+    ).toBeTruthy();
   });
 });
 
 describe("onConfirm 콜백", () => {
   it("확인 버튼을 누르면 onConfirm이 정확히 1회 호출된다", async () => {
     const onConfirm = jest.fn();
-    await renderWithPortal(<DownloadConsentDialog onConfirm={onConfirm} visible={true} />);
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={onConfirm} sizeLabel={null} visible={true} />,
+    );
     await fireEvent.press(screen.getByTestId("download-consent-confirm"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
@@ -68,7 +103,9 @@ describe("onConfirm 콜백", () => {
 
 describe("visible: false — 그리지 않는다", () => {
   it("visible=false면 대화상자가 없다", async () => {
-    await renderWithPortal(<DownloadConsentDialog onConfirm={jest.fn()} visible={false} />);
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel={null} visible={false} />,
+    );
     expect(screen.queryByTestId("download-consent-dialog")).toBeNull();
   });
 });
@@ -78,7 +115,9 @@ describe("★ 050 MIG1 — 덮개·뒤로 가기로 닫히지 않는다 (045 「
 
   it("덮개를 눌러도 남고, onConfirm도 불리지 않는다", async () => {
     const onConfirm = jest.fn();
-    await renderWithPortal(<DownloadConsentDialog onConfirm={onConfirm} visible />);
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={onConfirm} sizeLabel={null} visible />,
+    );
     await fireEvent.press(screen.getByTestId("download-consent-dialog-overlay"));
     expect(screen.getByTestId("download-consent-dialog")).toBeTruthy();
     expect(onConfirm).not.toHaveBeenCalled();
@@ -90,7 +129,9 @@ describe("★ 050 MIG1 — 덮개·뒤로 가기로 닫히지 않는다 (045 「
       if (event === "hardwareBackPress") handlers.push(handler as Listener);
       return { remove: () => {} } as ReturnType<typeof BackHandler.addEventListener>;
     });
-    await renderWithPortal(<DownloadConsentDialog onConfirm={jest.fn()} visible />);
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel={null} visible />,
+    );
 
     let consumed = false;
     await act(async () => {
@@ -106,7 +147,9 @@ describe("★ 050 MIG1 — 덮개·뒤로 가기로 닫히지 않는다 (045 「
   });
 
   it("문구가 그대로다", async () => {
-    await renderWithPortal(<DownloadConsentDialog onConfirm={jest.fn()} visible />);
+    await renderWithPortal(
+      <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel={null} visible />,
+    );
     expect(screen.getByText("받을 것이 있어요")).toBeTruthy();
     expect(screen.getByText("받을게요")).toBeTruthy();
   });

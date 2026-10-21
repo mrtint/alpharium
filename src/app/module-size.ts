@@ -28,6 +28,14 @@ export function formatModuleBytes(bytes: number): string {
   return mb >= 1000 ? "1.0GB" : `${mb}MB`;
 }
 
+/**
+ * 첫 실행 동의에 보일 「받을 양」(095 FR-003a). 「0MB」로 표기될 크기(0.5MB 미만, 0 포함)면 `null` — 파일 크기는 찼는데 준비 판정이
+ * 안 된 경우 등에 「약 0MB 내려받아야 해요」라고 말하지 않고 양을 모를 때와 같은 문장을 쓰게 한다.
+ */
+export function remainingSizeLabel(bytes: number): string | null {
+  return bytes < MB / 2 ? null : formatModuleBytes(bytes);
+}
+
 /** 필수 모듈 파일이 차지하는 바이트 합. 하나라도 못 읽으면 던진다 — 부르는 쪽이 값을 비운다(FR-005) */
 export async function readModuleBytes(files: Pick<ModelFilePort, "bytesUsed">): Promise<number> {
   const sizes = await Promise.all(ESSENTIAL_ASSET_KEYS.map((key) => files.bytesUsed(key)));
