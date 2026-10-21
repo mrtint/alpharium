@@ -52,8 +52,8 @@ describe("094 — UIScene 대응 설정", () => {
   });
 
   it("C4: expo-background-task는 패치와 같은 정확한 버전이다", () => {
-    expect(pkg.dependencies["expo-background-task"]).toBe("57.0.14");
-    expect(read("patches/expo-background-task+57.0.14.patch")).toContain(
+    expect(pkg.dependencies["expo-background-task"]).toBe("57.0.21");
+    expect(read("patches/expo-background-task+57.0.21.patch")).toContain(
       "BackgroundTaskAppDelegate.swift",
     );
   });
