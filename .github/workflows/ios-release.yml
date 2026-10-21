@@ -73,6 +73,9 @@ jobs:
             failed=1
           fi
           exit "$failed"
+      # 비밀이 없는 단계다. 릴리스 노트(release-notes/ko.txt)가 비었거나 4000자를 넘으면 아카이브 전에 끝낸다. TestFlight 「테스트할 내용」으로 간다.
+      - name: 릴리스 노트 점검
+        run: node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/release-notes/check.mts --store testflight
       - name: 러너 사양
         run: |
           {
@@ -177,6 +180,20 @@ jobs:
           mkdir -p "$HOME/.appstoreconnect/private_keys"
           printf '%s' "$ASC_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_KEY_ID}.p8"
           xcrun altool --upload-app -f "$RUNNER_TEMP/export/Pocketlog.ipa" -t ios --apiKey "$ASC_KEY_ID" --apiIssuer "$ASC_ISSUER_ID"
+      # 업로드된 빌드의 처리가 끝나길 기다렸다가(최대 30분) 「테스트할 내용」을 쓴다. altool은 이 글을 올리지 못한다.
+      # 실패하면 이 단계가 빨갛게 보이지만 빌드는 이미 올라가 있다(오류 문장이 그렇게 말한다) — continue-on-error로 가리지 않는다.
+      - name: TestFlight 테스트할 내용
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          start=$(date +%s)
+          trap 'echo "| 테스트할 내용 | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
+          node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/ios-release/testflight-notes.mts \
+            --notes release-notes/ko.txt --bundle com.a810labs.pocketlog \
+            --version "$(node -p "require('./app.json').expo.version")" \
+            --build "$(node -p "require('./app.json').expo.ios.buildNumber")"
       # 성공·실패와 무관하게 돈다. 이 단계 뒤에 다른 단계를 두지 않는다.
       - name: 정리
         if: always()

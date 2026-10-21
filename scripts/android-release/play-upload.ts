@@ -21,6 +21,8 @@ export type UploadArgs = {
   packageName: string;
   track: string;
   aab: Uint8Array;
+  /** 릴리스 노트(언어당 하나). 없으면 노트 없이 올린다 — 검증(길이·빈 값)은 부르는 쪽(`release-notes/notes.ts`)이 한다 */
+  releaseNotes?: { language: string; text: string }[];
 };
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
@@ -134,7 +136,7 @@ async function jsonOf(response: Response): Promise<Record<string, unknown>> {
 }
 
 export async function uploadBundle(args: UploadArgs): Promise<{ versionCode: number }> {
-  const { deps, packageName, track, aab } = args;
+  const { deps, packageName, track, aab, releaseNotes } = args;
   const account = parseServiceAccount(args.serviceAccountJson);
   const assertion = signJwt(account, deps.now());
 
@@ -189,7 +191,13 @@ export async function uploadBundle(args: UploadArgs): Promise<{ versionCode: num
         headers: { ...auth, "Content-Type": "application/json" },
         body: JSON.stringify({
           track,
-          releases: [{ versionCodes: [String(versionCode)], status: "completed" }],
+          releases: [
+            {
+              versionCodes: [String(versionCode)],
+              status: "completed",
+              ...(releaseNotes === undefined ? {} : { releaseNotes }),
+            },
+          ],
         }),
       },
     );

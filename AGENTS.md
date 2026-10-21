@@ -128,13 +128,13 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 > **⚠️ 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug) 빌드로만 하며, release 빌드·업로드는 저장소 소유자가 명시적으로 요청했을 때만 탄다.
 
 - **GitHub Actions 수동 워크플로**(076): `.github/workflows/android-release.yml`(`main`). 보호 환경 `android-release`의 secrets 넷(`ANDROID_KEYSTORE_BASE64`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_PASSWORD`·`PLAY_SERVICE_ACCOUNT_JSON`)으로 `bundleRelease`(arm64-v8a) → 서명 지문(`scripts/android-release/upload-key.sha256`) 대조 → `scripts/android-release/play-upload.ts`로 Play 내부 테스트 업로드를 수행한다(`__tests__/ci/android-release-workflow.test.ts`).
-- **올리기 전에**: `app.json`의 `android.versionCode`를 1 올려 커밋하고, 실제 모델로 쓰는 경로를 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md)(`npm run test:layer2` + 일기 본문 읽기 + 사람이 보는 항목)로 확인한다. 제외 권한(`blockedPermissions`): `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`·`SYSTEM_ALERT_WINDOW`(065).
+- **올리기 전에**: `app.json`의 `android.versionCode`를 1 올려 커밋하고, 실제 모델로 쓰는 경로를 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md)(`npm run test:layer2` + 일기 본문 읽기 + 사람이 보는 항목)로 확인한다. 제외 권한(`blockedPermissions`): `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`·`SYSTEM_ALERT_WINDOW`(065). **릴리스 노트(`release-notes/ko.txt`, 한국어 한 파일)를 이번 버전에 맞게 고쳐 같은 커밋에 넣는다** — Play 「출시 노하우」로 가고(`play-upload.mts --notes`, 500자 한도), 비었거나 넘으면 빌드 전에 설정 점검이 실패한다. 이 파일은 iOS와 같은 글이다.
 
 ## iOS 빌드·서명·TestFlight — 요청받았을 때만 탄다
 
 - **수동 서명과 entitlements**(066): 개인 Apple Developer Program(팀 `PGNGG84B39`), 수동 서명(`Apple Distribution` + `Pocketlog App Store` 프로파일, 로컬 `~/.pocketlog-signing/ios/`). entitlements는 `increased-memory-limit` 하나뿐이며 `aps-environment`는 `plugins/with-no-push-entitlement.js`가 걷는다. `NSMotionUsageDescription`은 유지한다(ITMS-90683).
 - **GitHub Actions 수동 워크플로**(075): `.github/workflows/ios-release.yml`(`main`). 보호 환경 `ios-release`의 secrets 여섯(`IOS_DIST_P12_BASE64`·`IOS_DIST_P12_PASSWORD`·`IOS_PROFILE_BASE64`·`ASC_API_KEY_P8`·`ASC_KEY_ID`·`ASC_ISSUER_ID`)으로 아카이브·`altool` 업로드를 수행한다(`__tests__/ci/ios-release-workflow.test.ts`).
-- **올리기 전에**: `app.json`의 `ios.buildNumber`를 1 올려 커밋한다. 안드로이드 쪽 층 2 확인은 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md)를 따르고, 업로드 후 TestFlight 실기기 동작을 확인한다.
+- **올리기 전에**: `app.json`의 `ios.buildNumber`를 1 올려 커밋한다. 안드로이드 쪽 층 2 확인은 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md)를 따르고, 업로드 후 TestFlight 실기기 동작을 확인한다. **릴리스 노트(`release-notes/ko.txt`)도 같이 고친다** — 업로드 뒤 `scripts/ios-release/testflight-notes.mts`가 App Store Connect API로 빌드 처리를 기다렸다가(최대 30분) TestFlight 「테스트할 내용」(`ko`, 4000자 한도)에 쓴다. 이 단계가 실패해도 빌드는 이미 올라가 있다(오류 문장이 그렇게 말한다) — `continue-on-error`로 가리지 않고 실행이 빨갛게 보인다. **Apple의 실제 응답은 첫 릴리스에서 처음 본다**(테스트는 대역).
 
 ## 테스트
 

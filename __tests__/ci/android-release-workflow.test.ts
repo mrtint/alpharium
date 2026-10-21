@@ -332,4 +332,17 @@ describe("076 android-release 워크플로", () => {
       expect(verify).toMatch(/GITHUB_STEP_SUMMARY/);
     });
   });
+
+  describe("릴리스 노트 → Play 출시 노하우", () => {
+    it("설정 점검이 500자 한도를 본다 — 긴 빌드 전에 끝난다", () => {
+      const check = step(read(), "설정 점검");
+      expect(check).toMatch(/release-notes\/check\.mts --store play/);
+      expect(check).not.toMatch(/secrets\./);
+    });
+
+    it("Play 업로드가 release-notes/ko.txt를 --notes로 넘긴다", () => {
+      const upload = step(read(), "Play 업로드");
+      expect(upload).toMatch(/--notes release-notes\/ko\.txt/);
+    });
+  });
 });

@@ -82,8 +82,9 @@ describe("076 android-release 스크립트 소스 계약", () => {
     const entry = source("play-upload.mts");
     expect(entry).toMatch(/process\.env\.PLAY_SERVICE_ACCOUNT_JSON/);
     expect(entry).not.toMatch(/option\("(?:service|account|sa|key|json)/);
-    // 읽는 파일은 AAB 하나뿐이다
-    expect(entry.match(/readFileSync\(/g)).toHaveLength(1);
+    // 읽는 파일은 AAB와 릴리스 노트 둘뿐이다 — 서비스 계정은 파일로 읽지 않는다
+    expect(entry.match(/readFileSync\(/g)).toHaveLength(2);
     expect(entry).toMatch(/readFileSync\(aabPath\)/);
+    expect(entry).toMatch(/readFileSync\(notesPath, "utf8"\)/);
   });
 });

@@ -249,4 +249,31 @@ describe("075 ios-release 워크플로", () => {
       ).toBeGreaterThanOrEqual(5);
     });
   });
+
+  describe("릴리스 노트 → TestFlight 「테스트할 내용」", () => {
+    it("릴리스 노트 점검은 비밀 없이 prebuild보다 앞서고 4000자 한도를 본다", () => {
+      const text = read();
+      const check = step(text, "릴리스 노트 점검");
+      expect(check).toMatch(/release-notes\/check\.mts --store testflight/);
+      expect(check).not.toMatch(/secrets\./);
+      expect(text.indexOf("- name: 릴리스 노트 점검")).toBeLessThan(text.indexOf("expo prebuild"));
+    });
+
+    it("테스트할 내용 단계는 업로드 뒤·정리 앞이고, API 키 셋만 env로 받으며 버전·빌드 번호는 app.json에서 읽는다", () => {
+      const text = read();
+      const notes = step(text, "TestFlight 테스트할 내용");
+      expect(notes).toMatch(/testflight-notes\.mts/);
+      expect(notes).toMatch(/--notes release-notes\/ko\.txt/);
+      expect(notes).toMatch(/expo\.version/);
+      expect(notes).toMatch(/expo\.ios\.buildNumber/);
+      expect(notes).toMatch(/GITHUB_STEP_SUMMARY/);
+      const secrets = [...notes.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((m) => m[1]).sort();
+      expect(secrets).toEqual(["ASC_API_KEY_P8", "ASC_ISSUER_ID", "ASC_KEY_ID"]);
+      const at = text.indexOf("- name: TestFlight 테스트할 내용");
+      expect(at).toBeGreaterThan(text.indexOf("- name: TestFlight 업로드"));
+      expect(at).toBeLessThan(text.indexOf("- name: 정리"));
+      // 실패를 가리지 않는다 — 빌드는 올라갔지만 노트가 안 들어갔다는 것이 실행 결과에 보여야 한다
+      expect(notes).not.toMatch(/continue-on-error|\|\|\s*true/);
+    });
+  });
 });
