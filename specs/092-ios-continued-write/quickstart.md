@@ -41,7 +41,7 @@
 - 진행 표시에서 사람이 취소한 것과 시스템이 끝낸 것은 같은 만료 처리기로 와서 가를 수 없다 — 둘 다 「도중에 끊김」이고 홈은 토스트를 띄운다.
 - 그만두기·만료로 끊긴 쓰기의 막대는 남은 채 실패로 닫힌다. 앱을 다시 열면 057이 그 날을 다시 쓴다.
 
-**빌드 함정**: Xcode 27(iOS 27 SDK)로 그대로 빌드하면 UIScene을 쓰지 않는 앱이 실행 즉시 `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` SIGTRAP으로 죽는다. 측정용으로만 `npm install --no-save expo@57.0.23 expo-build-properties@57.0.20` + `app.json`에 `["expo-build-properties",{"ios":{"enableSceneSupport":true}}]`를 넣었다가 되돌렸다(커밋 안 함). CI는 Xcode 26.6이라 영향이 없다 — 로드맵 「Xcode 27 UIScene 대응」.
+**빌드 함정**: Xcode 27(iOS 27 SDK) 빌드가 UIScene 미채택으로 죽던 문제는 094에서 `enableSceneSupport`로 풀렸다(이 실측은 임시 설정으로 했다).
 
 **미확인**: 충전 없는 회차는 표본 1, 다른 iPhone·iOS 26.x, 사진 8장 날, 화면을 끈 채 오래 둔 경우, 시스템이 자원 부족으로 끊는 경우, TestFlight 빌드.
 

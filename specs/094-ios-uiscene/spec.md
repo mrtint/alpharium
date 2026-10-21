@@ -62,7 +62,7 @@ iPhone 사용자(와 개발자)가 Xcode 27(iOS 27 SDK)로 빌드한 포켓로�
 
 - **FR-001**: 앱은 UIScene 생명 주기를 채택해 빌드된다(`app.json`이 iOS 장면 지원을 켠다).
 - **FR-002**: SDK 57을 유지한 채 `expo`는 장면 지원이 있는 패치 버전(57.0.23 이상)이고, 장면 지원을 켜는 빌드 속성 패키지가 정식 의존성이다.
-- **FR-003**: `npx expo install --check`가 통과한다(버전을 추측하지 않는다).
+- **FR-003**: 이 기능이 올리는 `expo`·`expo-build-properties`는 `npx expo install --check`의 기대 버전이다(버전을 추측하지 않는다). 그 밖에 이 기능 전부터 밀려 있던 패키지(`expo-background-task`는 패치 고정 등)는 범위 밖이다.
 - **FR-004**: 앞·뒤 전환, 알림 응답(085), 딥링크, BGTask 처리기(090·091), 이어 하기(092)가 종전과 같이 동작한다.
 - **FR-005**: 기존 Info.plist 손질(`BGTaskSchedulerPermittedIdentifiers` 등)·entitlements·`expo-background-task` 패치가 prebuild 뒤에도 유지된다.
 - **FR-006**: 위 설정은 계약 테스트로 잠긴다. 위반을 주입하면 테스트가 잡는다.
@@ -89,3 +89,4 @@ iPhone 사용자(와 개발자)가 Xcode 27(iOS 27 SDK)로 빌드한 포켓로�
 - `expo-background-task`는 패치(`57.0.14`)에 묶여 있어 올리지 않는다.
 - `ios-release.yml`은 Xcode 버전을 고정하지 않고 「26 이상」 점검을 유지한다. 워크플로 실행은 요청받았을 때만 한다.
 - 빌드 번호·릴리스는 소유자 몫이다.
+- `expo install --check`가 지적하는 다른 오래된 패키지는 이 기능이 올리지 않는다(네이티브 변경 범위를 이 기능에 섞지 않는다).
