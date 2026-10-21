@@ -41,11 +41,16 @@ import {
   attemptOutcomeOf,
   expoAutoWriteAttemptPort,
   recordAttemptEnd,
+  recordAttemptExpired,
   recordAttemptStart,
   type AttemptOutcome,
   type AttemptPath,
   type AutoWriteAttemptPort,
+  type LaunchState,
+  type WakeKind,
 } from "../app/auto-write-attempts";
+import { readWakeKind, subscribeBackgroundExpiry } from "../app/bg-expiry-port";
+import { readLaunchState } from "../app/launch-state-port";
 import { createAppPipeline } from "../app/wiring";
 import { showsOnScreen } from "../diagnostics/sink";
 import {
@@ -127,6 +132,21 @@ export type AutoDiaryTaskDeps = {
    * (건너뛰기만 하는 실행도 7번 창을 이어 걸고 오래된 알림을 거둔다, FR-009·research R7). 실패는 결과를 바꾸지 않는다.
    */
   reconcileReminders?: () => Promise<void>;
+  /**
+   * 090 — 시작 순간 앱이 앞에 있었는가(기록 값 — 판정에 쓰지 않는다). 주지 않으면 `launch-state-port`. lldb 강제 깨우기·수동은 앞,
+   * OS가 깨운 실행은 뒤로 남아 시도 기록으로 둘을 가른다.
+   */
+  launchState?: () => LaunchState | undefined;
+  /**
+   * 090 — iOS 백그라운드 실행의 시간 예산 만료를 듣는다. 주지 않으면 `bg-expiry-port`(모듈이 없으면 아무것도 안 한다). 백그라운드 경로의
+   * 한 실행 동안만 구독하고, 만료가 오면 따로 선 `expired` 줄을 한 번 남긴다(EX1·EX2).
+   */
+  subscribeExpiry?: (listener: (at: Date) => void) => () => void;
+  /**
+   * 091 — 이 백그라운드 실행을 깨운 iOS 요청(`power` 충전 · `battery` 배터리). 주지 않으면 `bg-expiry-port`. 백그라운드 경로만 읽는다 —
+   * 시작 줄에 남기고, 배터리면 조립이 느린 쓰기를 고른다.
+   */
+  wakeKind?: () => WakeKind | undefined;
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
@@ -152,12 +172,49 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
 
   // ★ 078 — 시작을 먼저 쓴다. 끝이 영영 안 오면(iOS 시간 예산 만료·메모리, 안드로이드 kill) `started`가 남고 그것이
   // 「깼지만 완주하지 못했다」의 유일한 증거다. 기록 실패는 안에서 삼킨다 — 기록이 자동 쓰기를 막지 않는다.
-  await recordAttemptStart(attemptPort, path, now);
-  const { result, outcome } = await runBody(deps, now);
+  // 090 — 깨운 순간의 앱 상태를 시작 줄에 싣는다. 통로가 던지면 모름이다.
+  const launch = safely(deps.launchState ?? readLaunchState);
+  // 091 — 깬 요청은 백그라운드 실행에만 있다(수동 실행은 요청이 깨운 것이 아니다)
+  const wake = path === "background" ? safely(deps.wakeKind ?? readWakeKind) : undefined;
+  await recordAttemptStart(attemptPort, path, now, launch, wake);
+  const stopListening = path === "background" ? listenForExpiry(deps, attemptPort) : () => {};
+  let ended: BodyOutcome;
+  try {
+    ended = await runBody(deps, now, wake);
+  } finally {
+    stopListening();
+  }
+  const { result, outcome } = ended;
   await recordAttemptEnd(attemptPort, path, now, outcome);
   // 085 — 성공이면 본체가 완성 알림 전에 이미 맞췄다(한 번만).
   if (result !== "ran") await reconcileAfterTask(deps);
   return result;
+}
+
+function safely<T>(read: () => T | undefined): T | undefined {
+  try {
+    return read();
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * 090 — 이 실행 동안 시간 예산 만료를 듣는다. 만료는 그 시각의 따로 선 줄 하나다(여러 번 와도 한 번) — 시작 줄은 그대로 두어,
+ * 멈췄다 이어서 끝나면 끝남 갈래로 바뀐다. 구독이 던지면 듣지 않는다(기록이 자동 쓰기를 막지 않는다).
+ */
+function listenForExpiry(deps: AutoDiaryTaskDeps, attemptPort: AutoWriteAttemptPort): () => void {
+  let heard = false;
+  try {
+    return (deps.subscribeExpiry ?? subscribeBackgroundExpiry)((at) => {
+      if (heard) return;
+      heard = true;
+      // 시각은 네이티브가 만료 순간에 잰 값이다 — 이 콜백은 앱이 다시 깨어날 때에야 돌 수 있다(늦게, 또는 프로세스가 죽으면 영영 안 돈다)
+      void recordAttemptExpired(attemptPort, at);
+    });
+  } catch {
+    return () => {};
+  }
 }
 
 /** 085 — 쓸 차례 알림 맞추기. 던지지 않는다(TK2) */
@@ -167,7 +224,11 @@ async function reconcileAfterTask(deps: AutoDiaryTaskDeps): Promise<void> {
 }
 
 /** 본체. 결과와 기록 갈래를 함께 돌려준다 — 기록은 `runAutoDiaryTask`가 한다. */
-async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome> {
+async function runBody(
+  deps: AutoDiaryTaskDeps,
+  now: Date,
+  wake: WakeKind | undefined,
+): Promise<BodyOutcome> {
   try {
     const settingsPort = deps.settingsPort ?? expoAutoDiarySettingsPort();
     const loaded = await loadAutoDiarySettings(settingsPort);
@@ -189,7 +250,11 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
     // 020 L5 — 백그라운드 owner로 조립한다. wiring.ts가 그 주체를 묶어 pipeline.run()이
     // 살아 있는 쓰기 등록부의 칸을 차지한다(080). 다른 쓰기가 살아 있어 못 차지한
     // already-running 결과는 아래에서 "skipped"로 매핑한다.
-    const app = makePipeline(resolution, { lockOwner: "background" });
+    // 091 — 깬 요청을 함께 넘긴다: 배터리 요청이면 조립이 느린 쓰기(CPU 감시 밑)를 고른다
+    const app = makePipeline(resolution, {
+      lockOwner: "background",
+      ...(wake === undefined ? {} : { wake }),
+    });
     if (!app.ok) {
       return FAILED;
     }
@@ -221,10 +286,6 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
       previewDay: app.previewDay,
       skipPort: deps.skipPort ?? expoSkipStorePort(),
     });
-    // 쓰거나 건너뛴 판정(그 날을 실제로 들여다봤다)만 오늘 몫을 쓴다 — 돌 일이 없었던 판정은 쓰지 않는다.
-    if (catchingUp && decision.kind !== "idle") {
-      await saveCatchUpDay(catchUpPort, today).catch(() => {});
-    }
     if (decision.kind !== "write") {
       return skipped(attemptOutcomeOf(decision));
     }
@@ -248,6 +309,13 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
     //
     // 헌법 v1.7.0: 「사진 접근이 허용되어 있으면 그 하루의 사진은 반드시 본다(MUST).」
     // 화면 경로와 **같은 판정**이어야 하므로 분기 자체가 없다.
+
+    // ★ 090 — 오늘 몫은 **파이프라인을 부르기 직전에만** 쓴다. 078은 건너뛴 판정(재료 없음·사진 권한 없음)에도 썼고, 087 실기기에서
+    // 낮의 첫 깨움이 몫을 쓰자 밤 충전 중 15분마다 온 깨움 스물이 전부 「이미 한 번 시도함」으로 끝났다(2026-10-18). 몫이 막던 비용은
+    // 모델을 여는 이 실행이고, 건너뜀은 미리보기 읽기뿐이다 — 캐릭터 없음도 몫을 쓰지 않는다.
+    if (catchingUp) {
+      await saveCatchUpDay(catchUpPort, today).catch(() => {});
+    }
 
     // B2-7 — 등록부의 칸은 pipeline.run() 안에서 차지한다(wiring.ts가 "background"
     // owner로 배선). 못 차지한 already-running 결과는 "skipped"로
@@ -300,11 +368,13 @@ async function runBody(deps: AutoDiaryTaskDeps, now: Date): Promise<BodyOutcome>
  * `decideNotify`가 "보낼지/어떻게"를 정하고, 어댑터가 고정 문구를 쓴다.
  * 알림 자체가 실패해도 예외를 밖으로 던지지 않는다 — 생성은 이미 저장됐고
  * 알림 실패가 그걸 되돌리지 않는다(notification.md N8).
+ *
+ * 092 — iPhone 이어 쓰기가 앱 밖에서 저장했을 때 `App.tsx`도 이것을 부른다(FR-008 — 같은 문구·채널·확인 기록).
  */
-async function sendCompletionNotification(
+export async function sendCompletionNotification(
   day: DayDate,
   character: Character,
-  deps: AutoDiaryTaskDeps,
+  deps: AutoDiaryTaskDeps = {},
 ): Promise<void> {
   try {
     const notifiedPort = deps.notifiedPort ?? expoNotifiedStorePort();

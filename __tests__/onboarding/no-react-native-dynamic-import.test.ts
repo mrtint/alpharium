@@ -52,6 +52,14 @@ describe("068 C3 — react-native 동적 import 금지", () => {
     );
   });
 
+  it('090 — launch-state-port.ts는 `require("react-native")`를 readLaunchState 안에서 호출한다', () => {
+    const code = read("src/app/launch-state-port.ts");
+    const at = code.indexOf("export function readLaunchState");
+    expect(at).toBeGreaterThan(-1);
+    expect(code.slice(at)).toMatch(/require\(\s*["']react-native["']\s*\)/);
+    expect(code.slice(0, at)).not.toMatch(/require\(\s*["']react-native["']\s*\)/);
+  });
+
   it('086 — browser-port.ts는 `require("react-native")`를 openInBrowser 안에서 호출한다', () => {
     const code = read("src/app/browser-port.ts");
     const at = code.indexOf("export async function openInBrowser");

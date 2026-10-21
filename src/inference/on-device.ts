@@ -43,7 +43,15 @@ import {
   LIVENESS_TIMEOUT_MS,
   type LivenessOutcome,
 } from "../welcome/liveness";
-import { type AssemblyOwner, generationTimeoutFor, inferenceThreadsFor } from "./assembly";
+import {
+  type AssemblyOwner,
+  type BackgroundWake,
+  generationTimeoutFor,
+  inferenceThreadsFor,
+  pacingFor,
+} from "./assembly";
+import { beat } from "./heartbeat";
+import { paced } from "./pacing";
 import type { GenerationEngine, RunResult } from "./engine-port";
 import { llamaEngine } from "./llama-port";
 import { GENERATION_TIMEOUT_MS } from "./sampling";
@@ -799,9 +807,16 @@ export function onDeviceBackend(
    * 한도가 600초가 된다 — 값과 근거는 `assembly.ts`. `wiring.ts`가 등록부의 칸에 싣는 주체와 같은 값을 넘긴다.
    */
   owner: AssemblyOwner = "screen",
+  /**
+   * 091 — 백그라운드 실행을 깨운 iOS 요청. 배터리 요청이면 「느린 쓰기」다 — 스레드 1, 호출 사이 쉼, 본문 조각 생성, 30분 한도
+   * (`assembly.ts` `pacingFor`). iOS CPU 감시(60초 동안 CPU 48초) 밑으로 돌게 한다. 그 밖은 종전대로.
+   */
+  wake?: BackgroundWake,
 ): StoppableBackend {
-  // 본문 모델과 사진 모델이 같은 값을 쓴다. 화면 조립·iOS는 undefined다(키를 싣지 않는다).
-  const threads = inferenceThreadsFor(owner, isIOS() ? "ios" : "android");
+  const platform = isIOS() ? "ios" : "android";
+  const pacing = pacingFor(owner, platform, wake);
+  // 본문 모델과 사진 모델이 같은 값을 쓴다. 화면 조립·iOS 충전 요청은 undefined다(키를 싣지 않는다).
+  const threads = pacing?.threads ?? inferenceThreadsFor(owner, platform);
 
   return createOnDeviceBackend(
     async () => {
@@ -810,15 +825,55 @@ export function onDeviceBackend(
     },
     // 005가 더한 것. `llamaEngine()` 자체는 지연 import를 안에서 하므로 여기서
     // 만들어도 시뮬레이터에서 모듈 해석이 터지지 않는다.
-    llamaEngine(threads),
-    generationTimeoutFor(owner),
+    llamaEngine(
+      threads,
+      pacing === undefined
+        ? undefined
+        : {
+            pauseRatio: pacing.pauseRatio,
+            chunkTokens: pacing.chunkTokens,
+            ...(pacing.prefillChars === undefined ? {} : { prefillChars: pacing.prefillChars }),
+            ...(pacing.prefillCharsActive === undefined
+              ? {}
+              : { prefillCharsActive: pacing.prefillCharsActive }),
+            ...(pacing.residentModel === undefined ? {} : { residentModel: pacing.residentModel }),
+          },
+      // 092 CW7 — 조각 하나가 끝날 때마다 박동(iOS 이어 하기의 막대). 듣는 쪽이 없으면 아무 일도 없다.
+      () => beat("chunk"),
+      // 092 — 토큰 하나마다 박동(데이터 없음 — 경계에서 버린다, `llama-port.ts` `completionTicking`)
+      () => beat("token"),
+      // 092 — 미리 읽기 토막의 길이를 고른다(앞이면 큰 토막)
+      isAppActive,
+    ),
+    pacing?.timeoutMs ?? generationTimeoutFor(owner),
     // ★ 011 — 사진을 읽는 수단. **이것을 넘기지 않으면 `quick`/`detailed`가 영영
     // `not-implemented`로 거부된다** — 006의 `GenerationProbe`, 007의 끊긴 `stop`
     // 배선과 같은 종류의 조용한 실패가 나는 자리다.
-    visionSupport(threads),
+    visionSupport(
+      threads,
+      // 091 — 느린 쓰기면 캡션 한 장이 끝날 때마다 그 시간 × 비율만큼 쉰다
+      pacing === undefined
+        ? undefined
+        : <T>(call: () => Promise<T>, stopped: () => boolean) =>
+            paced(call, pacing.pauseRatio, stopped),
+    ),
     loadSignals,
     loadCustomNames,
   );
+}
+
+/**
+ * 092 — 지금 앱이 앞에 있는가. 호출 시점 `require`로 본다(`isIOS()`와 같은 방식 — `await import`는 iOS 배포 빌드에서 앱을 죽인다, 066).
+ * 모르면 거짓이다 — 미리 읽기가 작은 토막으로 떨어진다(앱 밖에서 안전한 쪽).
+ */
+function isAppActive(): boolean {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { AppState } = require("react-native") as { AppState: { currentState: unknown } };
+    return AppState.currentState === "active";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -842,7 +897,10 @@ function isIOS(): boolean {
  * `llamaEngine()`과 같은 방식으로 지연 import 한다 — 시뮬레이터·웹에서 네이티브 모듈
  * 해석이 터지지 않게 하기 위해서다.
  */
-function visionSupport(threads?: number): VisionSupport {
+function visionSupport(
+  threads?: number,
+  pace?: <T>(call: () => Promise<T>, stopped: () => boolean) => Promise<T>,
+): VisionSupport {
   return {
     engine: createVisionEngine(
       async (path: string) => {
@@ -851,7 +909,12 @@ function visionSupport(threads?: number): VisionSupport {
       },
       undefined,
       // 066 — iOS만 mmproj를 CPU에 둔다. 안드로이드는 라이브러리 기본값 그대로다(`VisionEngineOptions`).
-      { projectorOnGpu: !isIOS() },
+      // 092 CW7 — 캡션 한 장이 끝날 때마다 박동(iOS 이어 하기의 막대)
+      {
+        projectorOnGpu: !isIOS(),
+        ...(pace === undefined ? {} : { pace }),
+        onCaptioned: () => beat("photo"),
+      },
     ),
     /**
      * ★ **사진 id를 실제 파일 경로로 바꾼다** (2026-08-22 실기기에서 고쳤다).

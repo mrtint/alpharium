@@ -13,7 +13,7 @@ export const attempts = {
   pathManual: "지금 실행",
   /** 머리 줄 — 「백그라운드 · 10월 13일 22:05」 */
   line: (path: string, time: string): string => `${path} · ${time}`,
-  /** 결과 열넷 — `AttemptOutcome` 순서 */
+  /** 결과 열다섯 — `AttemptOutcome` 순서 */
   started: "시작한 뒤 끝나지 않음",
   simulation: "상태 흉내가 막음",
   disabled: "자동 쓰기 꺼짐",
@@ -30,4 +30,13 @@ export const attempts = {
   cancelled: "사용자가 그만둠",
   ran: "썼음",
   failed: "실패",
+  /** 090 — iOS가 백그라운드 실행의 시간 예산이 끝났다고 알렸다 */
+  expired: "시간 예산이 끝남",
+  /** 090 — 시작할 때 앱이 앞에 있었는가(lldb 강제 깨우기·수동은 앞, OS 깨움은 뒤). 결과 뒤 꼬리 */
+  launchActive: "앞에서",
+  launchBackground: "뒤에서",
+  /** 091 — 깨운 요청(충전 요청·배터리 요청) 꼬리 */
+  wakePower: "충전",
+  wakeBattery: "배터리",
+  withLaunch: (outcome: string, launch: string): string => `${outcome} · ${launch}`,
 };

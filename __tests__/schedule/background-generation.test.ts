@@ -684,16 +684,48 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
     expect(lastOutcome(made.attempts)).toBe("catch-up-spent");
   });
 
-  it("두 번째는 신호도 읽지 않는다 (재료 없는 날·사진 권한 없는 날을 15분마다 훑지 않는다)", async () => {
-    const preview = jest.fn(previewOf({ kind: "known", count: 0 }));
-    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(preview as never) });
+  /**
+   * ★ 090 — 078은 건너뛴 판정에도 몫을 썼다. 087 실기기(2026-10-18 05:36~10:32): OS가 15분마다 스무 번 깨웠는데 전부 이 갈래였다 —
+   * 낮의 첫 깨움이 「재료 없음」이면 사진이 생긴 뒤 밤 충전 중의 깨움이 아무것도 안 했다. 몫이 막던 비용은 파이프라인(모델)이고,
+   * 건너뜀은 미리보기 읽기뿐이다. **몫은 파이프라인을 부를 때만 쓴다.**
+   */
+  it("090 CU2 — 재료 없음은 몫을 쓰지 않는다 — 같은 날 다음 깨움이 다시 판정하고, 사진이 생겼으면 쓴다", async () => {
+    let photos: { kind: "known"; count: number } = { kind: "known", count: 0 };
+    const preview = jest.fn(async (day: string) => previewOf(photos)(day));
+    const run = jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false });
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(preview as never, run) });
     expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
     expect(lastOutcome(made.attempts)).toBe("no-material");
-    expect(preview).toHaveBeenCalledTimes(1);
+    expect(made.catchUp.content).toBeNull();
 
-    expect(await runAutoDiaryTask({ ...made.deps, now: at(16) })).toBe("skipped");
-    expect(preview).toHaveBeenCalledTimes(1);
-    expect(lastOutcome(made.attempts)).toBe("catch-up-spent");
+    photos = { kind: "known", count: 4 };
+    expect(await runAutoDiaryTask({ ...made.deps, now: at(23) })).toBe("ran");
+    expect(preview).toHaveBeenCalledTimes(2);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
+  });
+
+  it("090 CU2 — 사진 권한 없음도 몫을 쓰지 않는다", async () => {
+    const made = baseDeps({
+      now: at(15),
+      makePipeline: pipelineWith(previewOf({ kind: "unknown" }, "denied")),
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(lastOutcome(made.attempts)).toBe("no-photo-access");
+    expect(made.catchUp.content).toBeNull();
+  });
+
+  it("090 CU4 — 쓸 날이 있어도 캐릭터 없음으로 끝나면 몫을 쓰지 않는다 (몫은 파이프라인 직전)", async () => {
+    const run = jest.fn();
+    const made = baseDeps({
+      now: at(15),
+      loadCharacter: async () => null,
+      makePipeline: pipelineWith(WITH_PHOTOS, run),
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(lastOutcome(made.attempts)).toBe("no-character");
+    expect(run).not.toHaveBeenCalled();
+    expect(made.catchUp.content).toBeNull();
   });
 
   it("다음 날에는 다시 한 번 시도한다", async () => {
@@ -763,5 +795,155 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
     await runAutoDiaryTask(made.deps);
     expect(await runAutoDiaryTask({ ...made.deps, now: at(16), manual: true })).toBe("failed");
     expect(run).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * 090 — 시간 예산 만료와 깨운 상태를 시도 기록에 남긴다(앱 동작 기록 — 원칙 IV의 측정이 아니다).
+ * expo는 만료를 JS에 넘기지 않아(`BackgroundTaskModule.swift`의 `userInfo["url"]` 가드) 만료가 「시작한 뒤 끝나지 않음」에 묻혔다.
+ */
+describe("090 EX·LS — 시간 예산 만료와 깨운 상태", () => {
+  const items = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: Record<string, string>[] }).items;
+
+  /** 구독 대역 — 실행 중에 손으로 만료를 쏜다 */
+  function expiryBus() {
+    const listeners = new Set<(at: Date) => void>();
+    return {
+      subscribeExpiry: jest.fn((listener: (at: Date) => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      }),
+      fire: (at: Date) => listeners.forEach((l) => l(at)),
+      count: () => listeners.size,
+    };
+  }
+
+  it("LS — 백그라운드 시작 줄에 깨운 상태가 실리고 끝으로 바뀌어도 남는다", async () => {
+    const made = baseDeps({ launchState: () => "background", subscribeExpiry: () => () => {} });
+    expect(await runAutoDiaryTask(made.deps)).toBe("ran");
+    expect(items(made.attempts)[0]).toMatchObject({
+      path: "background",
+      outcome: "ran",
+      launch: "background",
+    });
+  });
+
+  it("LS — 수동 실행도 깨운 상태를 싣는다", async () => {
+    const made = baseDeps({
+      manual: true,
+      launchState: () => "active",
+      subscribeExpiry: () => () => {},
+    });
+    await runAutoDiaryTask(made.deps);
+    expect(items(made.attempts)[0]).toMatchObject({ path: "manual", launch: "active" });
+  });
+
+  it("EX1·EX2 — 실행 중 만료는 따로 선 한 줄, 여러 번 와도 한 번, 끝나면 구독을 푼다", async () => {
+    const bus = expiryBus();
+    let release!: () => void;
+    const run = jest.fn(
+      () =>
+        new Promise((resolve) => {
+          release = () => resolve({ ok: true, entry: {}, overwrote: false });
+        }),
+    );
+    const made = baseDeps({
+      launchState: () => "background",
+      subscribeExpiry: bus.subscribeExpiry,
+      makePipeline: pipelineWith(WITH_PHOTOS, run),
+    });
+    const done = runAutoDiaryTask(made.deps);
+    await waitUntil(() => run.mock.calls.length === 1);
+    // 시각은 네이티브가 만료 순간에 잰 값이다(통로가 넘긴 값) — JS가 받은 시각이 아니다
+    const EXPIRED_AT = new Date("2026-08-28T03:00:00.000Z");
+    bus.fire(EXPIRED_AT);
+    bus.fire(new Date("2026-08-28T05:00:00.000Z"));
+    release();
+    expect(await done).toBe("ran");
+    const outcomes = items(made.attempts).map((i) => i.outcome);
+    expect(outcomes.filter((o) => o === "expired")).toHaveLength(1);
+    expect(items(made.attempts).find((i) => i.outcome === "expired")?.at).toBe(
+      EXPIRED_AT.toISOString(),
+    );
+    expect(outcomes).toContain("ran");
+    expect(bus.count()).toBe(0);
+  });
+
+  it("EX1 — 수동 실행은 만료를 구독하지 않는다", async () => {
+    const bus = expiryBus();
+    const made = baseDeps({
+      manual: true,
+      subscribeExpiry: bus.subscribeExpiry,
+      launchState: () => undefined,
+    });
+    await runAutoDiaryTask(made.deps);
+    expect(bus.subscribeExpiry).not.toHaveBeenCalled();
+  });
+
+  it("EX3 — 구독 통로가 던져도 실행은 계속된다", async () => {
+    const made = baseDeps({
+      launchState: () => undefined,
+      subscribeExpiry: () => {
+        throw new Error("no module");
+      },
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("ran");
+  });
+});
+
+async function waitUntil(condition: () => boolean): Promise<void> {
+  for (let i = 0; i < 100 && !condition(); i += 1) await new Promise((r) => setTimeout(r, 0));
+}
+
+describe("091 WK2 — 깬 요청을 시작 줄에", () => {
+  const items = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: Record<string, string>[] }).items;
+  const quiet = { launchState: () => undefined, subscribeExpiry: () => () => {} };
+
+  it("백그라운드는 깬 요청을 싣는다", async () => {
+    const made = baseDeps({ ...quiet, wakeKind: () => "battery" });
+    await runAutoDiaryTask(made.deps);
+    expect(items(made.attempts)[0]).toMatchObject({ path: "background", wake: "battery" });
+  });
+
+  it("수동 실행은 싣지 않는다 (깬 요청이 없다)", async () => {
+    const wakeKind = jest.fn(() => "power" as const);
+    const made = baseDeps({ ...quiet, manual: true, wakeKind });
+    await runAutoDiaryTask(made.deps);
+    expect(items(made.attempts)[0]?.wake).toBeUndefined();
+    expect(wakeKind).not.toHaveBeenCalled();
+  });
+
+  it("US1 AC3 — 두 요청이 함께 깨 둘째가 살아 있는 쓰기에 막히면 already-running으로 건너뛴다", async () => {
+    const run = jest.fn().mockResolvedValue({ ok: false, stage: "already-running", reason: "" });
+    const made = baseDeps({
+      ...quiet,
+      wakeKind: () => "power",
+      makePipeline: pipelineWith(WITH_PHOTOS, run),
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(items(made.attempts)[0]).toMatchObject({ outcome: "already-running", wake: "power" });
+  });
+});
+
+describe("091 FR-003 — 깬 요청이 조립에 간다", () => {
+  it("배터리로 깨면 makePipeline이 wake: battery를 받고, 모르면 싣지 않는다", async () => {
+    const seen: unknown[] = [];
+    const recordingPipeline = ((resolution: unknown, deps: unknown) => {
+      seen.push(deps);
+      return (pipelineWith(WITH_PHOTOS) as (r: unknown, d: unknown) => unknown)(resolution, deps);
+    }) as never;
+    const quiet = { launchState: () => undefined, subscribeExpiry: () => () => {} };
+    await runAutoDiaryTask(
+      baseDeps({ ...quiet, wakeKind: () => "battery", makePipeline: recordingPipeline }).deps,
+    );
+    await runAutoDiaryTask(
+      baseDeps({ ...quiet, wakeKind: () => undefined, makePipeline: recordingPipeline }).deps,
+    );
+    expect(seen).toEqual([
+      { lockOwner: "background", wake: "battery" },
+      { lockOwner: "background" },
+    ]);
   });
 });

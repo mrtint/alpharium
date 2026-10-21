@@ -17,6 +17,7 @@ import type { DayDate } from "./src/config/day-boundary";
 import {
   ensureAutoDiaryTaskDefined,
   runAutoDiaryTask,
+  sendCompletionNotification,
   // 부수 효과: 전역 스코프 TaskManager.defineTask 등록 경로를 모듈에 들인다.
 } from "./src/schedule/task";
 import {
@@ -83,6 +84,11 @@ import { formatTargetHour, timeZoneLine } from "./src/app/target-hour";
 import { readDeviceClock } from "./src/app/device-clock";
 import { batteryRowHint } from "./src/app/battery-row";
 import { appPlatform } from "./src/app/platform";
+import { createContinuedWrite } from "./src/app/continued-write";
+import { notifyContinuedSaved, type ContinuedSavedDeps } from "./src/app/continued-saved";
+import { readLaunchState } from "./src/app/launch-state-port";
+import { expoReminderDeps } from "./src/schedule/reminder-deps";
+import { reconcileReminders } from "./src/schedule/reminders";
 import { RenameScreen } from "./src/ui/RenameScreen";
 import { FontLicenseScreen } from "./src/ui/FontLicenseScreen";
 import { usePermissionTags } from "./src/ui/use-permission-tags";
@@ -1936,6 +1942,20 @@ function DiagnosticsLayer({
 }
 
 /**
+ * 092 — 이어 쓰기 저장 뒤 완성 알림의 기기 통로. 앞 판정은 090 `readLaunchState()`, 맞추기는 085, 알림은 057(`task.ts`)과 같은 함수다.
+ */
+const CONTINUED_SAVED_DEPS: ContinuedSavedDeps = {
+  launchState: () => readLaunchState(),
+  reconcile: (names) => reconcileReminders(expoReminderDeps({ names })),
+  notify: (day, character, names) =>
+    sendCompletionNotification(
+      day,
+      character,
+      names === undefined ? {} : { loadNames: () => Promise.resolve(names) },
+    ),
+};
+
+/**
  * 일기 화면을 조립한다.
  *
  * **어댑터를 직접 만들지 않는다**(FR-026, SC-024) — `createAppPipeline()`이 `select.ts`를
@@ -2220,7 +2240,28 @@ function DiarySection({
     listDiaryDays,
     attemptPort,
     onSkipped,
+    // 090 — iOS 백그라운드 실행에서는 앞으로 올 때까지 판정하지 않는다(HO13)
+    platform: appPlatform(Platform.OS),
   });
+
+  /**
+   * ★ 092 — iPhone 이어 쓰기(`BGContinuedProcessingTask`). **iOS에서만 준다** — 안드로이드는 홈이 종전대로 앞을 벗어날 때 끊는다(FR-011).
+   * 홈은 네이티브에 닿지 않는다 — 세션을 여기서 만들어 넘긴다(모듈이 없거나 iOS 26 미만이면 신청이 거절되어 종전과 같다).
+   */
+  const continuedWrite = useMemo(
+    () => (Platform.OS === "ios" ? createContinuedWrite() : undefined),
+    [],
+  );
+
+  /**
+   * 092 FR-008 — 이어 하기를 받은 쓰기가 저장됐다. 앱이 뒤에 있을 때만 쓸 차례 알림을 맞춘 뒤 완성 알림을 띄운다 — 판정·순서는
+   * `notifyContinuedSaved`(`src/app/continued-saved.ts`)가 갖는다. 통로는 백그라운드 자동 쓰기와 같은 것이다(085 맞추기·057 완성 알림).
+   */
+  const onContinuedSaved = useCallback(
+    (day: DayDate, character: Character) =>
+      notifyContinuedSaved(day, character, characterNames, CONTINUED_SAVED_DEPS),
+    [characterNames],
+  );
 
   /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
   const onGenerated = useCallback(
@@ -2275,6 +2316,9 @@ function DiarySection({
       onWriteBlocked={onWriteBlocked}
       simulation={simulation}
       simulatedFailToast={simulatedFailToast}
+      // 092 — iPhone 이어 쓰기(iOS만)와 앱 밖 저장의 완성 알림
+      continuedWrite={continuedWrite}
+      onContinuedSaved={onContinuedSaved}
     />
   );
 }

@@ -81,6 +81,7 @@
         }
       ],
       "expo-background-task",
+      "./plugins/with-battery-bg-task",
       [
         "expo-location",
         {

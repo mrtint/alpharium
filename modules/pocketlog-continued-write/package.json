@@ -1,0 +1,9 @@
+{
+  "name": "pocketlog-continued-write",
+  "version": "1.0.0",
+  "private": true,
+  "description": "홈이 시작한 쓰기를 앱 밖에서 이어 돌리는 로컬 Expo 모듈 — iOS 26 BGContinuedProcessingTask (092)",
+  "license": "UNLICENSED",
+  "author": "a810labs",
+  "homepage": "https://github.com/mrtint/alpharium"
+}

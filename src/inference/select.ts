@@ -16,7 +16,7 @@ import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import type { DaySignals } from "../signals/types";
 import type { VisionOutcome } from "../vision/types";
 import type { LivenessOutcome } from "../welcome/liveness";
-import type { AssemblyOwner } from "./assembly";
+import type { AssemblyOwner, BackgroundWake } from "./assembly";
 import { createDesktopServerBackend, httpProbe } from "./desktop-server";
 import { onDeviceBackend } from "./on-device";
 import type { InferenceBackend, InferenceLocation, SelectionFailure } from "./types";
@@ -131,6 +131,8 @@ export function selectBackend(
    * 한도를 이것으로 정한다(`assembly.ts`). 데스크톱 경로는 쓰지 않는다. 주지 않으면 화면이다.
    */
   owner?: AssemblyOwner,
+  /** 091 — 백그라운드 실행을 깨운 iOS 요청. 배터리면 온디바이스 어댑터가 느린 쓰기로 연다(`assembly.ts` `pacingFor`) */
+  wake?: BackgroundWake,
 ): BackendSelection {
   const selection = selectLocation(resolution, requested);
 
@@ -145,7 +147,7 @@ export function selectBackend(
 
   const backend =
     selection.location === "on-device"
-      ? onDeviceBackend(loadSignals, loadCustomNames, owner)
+      ? onDeviceBackend(loadSignals, loadCustomNames, owner, wake)
       : createDesktopServerBackend(serverBaseUrl, httpProbe);
 
   return { ok: true, backend };

@@ -12,6 +12,7 @@ import {
   BACKGROUND_THREADS,
   generationTimeoutFor,
   inferenceThreadsFor,
+  pacingFor,
 } from "../../src/inference/assembly";
 import {
   BACKGROUND_GENERATION_TIMEOUT_MS,
@@ -67,4 +68,82 @@ describe("079 A2 — 판정은 기기를 읽지 않는다", () => {
       expect(code).not.toContain(word);
     },
   );
+});
+
+/**
+ * 091 PC1 — 배터리 요청으로 깬 iOS 백그라운드 쓰기만 「느린 쓰기」다. CPU 감시(60초 동안 코어 하나의 80%) 밑으로 돌게 스레드 1,
+ * 호출 사이 쉼, 본문 조각 생성, 그리고 길어진 쓰기를 감당하는 한도.
+ */
+describe("091 PC1 — 느린 쓰기는 iOS 백그라운드 배터리 깨움에만", () => {
+  it("background·ios·battery → 느린 쓰기", () => {
+    expect(pacingFor("background", "ios", "battery")).toEqual({
+      threads: 1,
+      pauseRatio: 0.5,
+      chunkTokens: 32,
+      timeoutMs: 1_800_000,
+    });
+  });
+
+  it.each([
+    ["background", "ios", "power"],
+    ["background", "ios", undefined],
+    ["background", "android", "battery"],
+    ["screen", "android", undefined],
+    ["screen", "android", "battery"],
+  ] as const)("%s·%s·%s → 없음 (종전 경로)", (owner, platform, wake) => {
+    expect(pacingFor(owner, platform, wake)).toBeUndefined();
+  });
+
+  it("평균 CPU가 한도(80%) 아래다 — 스레드 1이면 CPU ≈ 벽시계, 쉼 비율 r이면 1/(1+r)", () => {
+    const p = pacingFor("background", "ios", "battery");
+    expect(p).toBeDefined();
+    expect(1 / (1 + (p?.pauseRatio ?? 0))).toBeLessThan(0.8);
+  });
+});
+
+/**
+ * 092 CW6 — iOS 화면 쓰기는 조각 생성(쉼 없음)이다. 이어 하기의 막대가 글 한 조각마다 움직이게 하려는 것이다 — 토큰 콜백은 쓰지 않는다
+ * (005 FR-028b). 앱 밖에서 iOS가 CPU를 줄여 스레드 2·프롬프트 토막 읽기·30분 한도를 싣는다(2026-10-21 실측 — `assembly.ts`).
+ */
+describe("092 CW6 — iOS 화면 쓰기는 쉼 없는 조각 생성", () => {
+  it.each([[undefined], ["battery"], ["power"]] as const)(
+    "screen·ios·%s → 조각 32, 쉼 0",
+    (wake) => {
+      expect(pacingFor("screen", "ios", wake)).toEqual({
+        threads: 2,
+        pauseRatio: 0,
+        chunkTokens: 32,
+        prefillChars: 24,
+        prefillCharsActive: 240,
+        residentModel: true,
+        timeoutMs: 1_800_000,
+      });
+    },
+  );
+
+  it("iOS 백그라운드 배터리 값은 그대로다", () => {
+    expect(pacingFor("background", "ios", "battery")).toEqual({
+      threads: 1,
+      pauseRatio: 0.5,
+      chunkTokens: 32,
+      timeoutMs: 1_800_000,
+    });
+  });
+});
+
+describe("091 — 깬 요청이 조립까지 닿는다 (소스)", () => {
+  const read = (rel: string) =>
+    readFileSync(join(__dirname, "../..", rel), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+  it("wiring → select → onDeviceBackend → pacingFor", () => {
+    expect(read("src/app/wiring.ts")).toMatch(/owner,\s*deps\.wake,\s*\)/);
+    expect(read("src/inference/select.ts")).toMatch(
+      /onDeviceBackend\(loadSignals, loadCustomNames, owner, wake\)/,
+    );
+    const onDevice = read("src/inference/on-device.ts");
+    expect(onDevice).toMatch(/pacingFor\(owner, platform, wake\)/);
+    expect(onDevice).toMatch(/pacing\?\.timeoutMs \?\? generationTimeoutFor\(owner\)/);
+    expect(onDevice).toMatch(/pacing\?\.threads \?\? inferenceThreadsFor\(owner, platform\)/);
+  });
 });

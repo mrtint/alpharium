@@ -273,7 +273,8 @@ describe("079 createAppPipeline — 조립 주체를 백엔드 선택에도 넘�
   });
 
   it("그 변수가 selectBackend의 마지막 인자다", () => {
-    expect(code).toMatch(/selectBackend\([^;]*,\s*owner,?\s*\);/);
+    // 091 — owner 뒤에 깬 요청(deps.wake)
+    expect(code).toMatch(/selectBackend\([^;]*,\s*owner,\s*deps\.wake,?\s*\);/);
   });
 
   it("같은 변수가 등록부의 칸을 차지할 때 쓰인다 (080 P7)", () => {

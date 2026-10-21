@@ -154,6 +154,16 @@ export type VisionEngineOptions = {
    * `initLlama`와 달리 `initMultimodal`에는 llama.rn의 시뮬레이터 가드가 없다(RNLlamaJSI.cpp).
    */
   projectorOnGpu?: boolean;
+  /**
+   * 091 — 느린 쓰기의 감싸개. 주면 캡션 호출 하나를 이것으로 감싼다 — 조립부(`on-device.ts`)가 「끝나면 그 시간 × 비율만큼 쉰다」를 넘긴다
+   * (iOS 배터리 요청의 CPU 감시, `inference/pacing.ts`). 이 파일은 쉼을 모른다(inference를 import하지 않는다).
+   */
+  pace?: <T>(call: () => Promise<T>, stopped: () => boolean) => Promise<T>;
+  /**
+   * 092 CW7 — 캡션 한 장이 끝날 때마다 부른다(성공·실패 모두 — 실패한 장도 일이 끝났다). 인자 없음 — 글·시간을 싣지 않는다(FR-004).
+   * 조립부가 `heartbeat.beat("photo")`를 넘긴다(이 파일은 inference를 import하지 않는다). 던져도 캡션은 그대로다.
+   */
+  onCaptioned?: () => void;
 };
 
 export function createVisionEngine(
@@ -163,9 +173,12 @@ export function createVisionEngine(
 ): VisionEngine {
   /** 지금 열려 있는 것. **하나뿐이다** */
   let context: VisionContext | null = null;
+  /** 091 — `stop()`이 왔는가. 느린 쓰기의 쉼이 이것을 보고 쉬지 않는다(PC2). `load()`가 비운다 */
+  let stopRequested = false;
 
   const engine: VisionEngine = {
     async load(depth: VisionDepth): Promise<VisionLoadResult> {
+      stopRequested = false;
       // 이미 열려 있으면 먼저 닫는다. 깊이가 바뀌었을 수 있고, 두 컨텍스트가 열려
       // 있으면 안 된다.
       if (context !== null) await engine.unload();
@@ -226,13 +239,16 @@ export function createVisionEngine(
         //
         // **`messages` + jinja를 쓴다** — 005가 실기기에서 배운 것이다(2026-08-17).
         // 평문 프롬프트로는 instruct 모델이 **빈 글만 낸다.**
-        const result = await context.completion({
-          messages: [{ role: "user", content: CAPTION_PROMPT }],
-          media_paths: [photoPath],
-          jinja: true,
-          temperature: CAPTION_SAMPLING.temperature,
-          n_predict: CAPTION_SAMPLING.n_predict,
-        });
+        const open = context;
+        const call = () =>
+          open.completion({
+            messages: [{ role: "user", content: CAPTION_PROMPT }],
+            media_paths: [photoPath],
+            jinja: true,
+            temperature: CAPTION_SAMPLING.temperature,
+            n_predict: CAPTION_SAMPLING.n_predict,
+          });
+        const result = await (options.pace ? options.pace(call, () => stopRequested) : call());
 
         // ★ 여기가 경계다. **`text`/`content`만 꺼내고 나머지를 버린다.**
         //
@@ -243,10 +259,18 @@ export function createVisionEngine(
       } catch {
         // 한 장의 실패가 나머지를 무너뜨리지 않는다(E4). 빈 문자열이 곧 실패다.
         return { text: "" };
+      } finally {
+        // 092 CW7 — 한 장이 끝났다(성공·실패 모두). 듣는 쪽의 실패가 캡션을 무너뜨리지 않는다.
+        try {
+          options.onCaptioned?.();
+        } catch {
+          // 삼킨다
+        }
       }
     },
 
     async stop(): Promise<void> {
+      stopRequested = true;
       // 이미 끝난 것을 멈추려는 것은 정상이며, 그때의 오류는 알릴 것이 없다.
       await context?.stopCompletion().catch(() => {});
     },

@@ -233,8 +233,17 @@ function attemptOutcomeText(outcome: AttemptOutcome): string {
     cancelled: A.cancelled,
     ran: A.ran,
     failed: A.failed,
+    expired: A.expired,
   };
   return byOutcome[outcome];
+}
+
+function attemptTails(item: AutoWriteAttempt): string[] {
+  const tails: string[] = [];
+  if (item.launch !== undefined)
+    tails.push(item.launch === "active" ? A.launchActive : A.launchBackground);
+  if (item.wake !== undefined) tails.push(item.wake === "power" ? A.wakePower : A.wakeBattery);
+  return tails;
 }
 
 /** 기록 순서 그대로(최신이 위). 머리는 「경로 · M월 d일 HH:mm」(시각 형식은 실패 줄과 같다), 값은 결과 문구다. */
@@ -244,7 +253,11 @@ export function attemptLines(items: readonly AutoWriteAttempt[]): AttemptLine[] 
       attemptPathText(item.path),
       T.failureTime(item.at.getMonth() + 1, item.at.getDate(), item.at.toTimeString().slice(0, 5)),
     ),
-    outcomeText: attemptOutcomeText(item.outcome),
+    // 090 — 시작 줄의 깨운 상태, 091 — 깨운 요청이 있으면 꼬리로(옛 줄·만료 줄은 없다)
+    outcomeText: attemptTails(item).reduce(
+      (text, tail) => A.withLaunch(text, tail),
+      attemptOutcomeText(item.outcome),
+    ),
   }));
 }
 

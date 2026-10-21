@@ -26,7 +26,10 @@ describe("079 A9 — 자동 쓰기 태스크의 파이프라인 조립", () => {
   });
 
   it("백그라운드 주체로 조립한다", () => {
-    expect(code).toMatch(/makePipeline\(resolution,\s*\{\s*lockOwner:\s*"background"\s*\}\)/);
+    // 091 — 깬 요청(wake)이 있으면 함께 싣는다
+    expect(code).toMatch(
+      /makePipeline\(resolution,\s*\{\s*lockOwner:\s*"background",\s*\.\.\.\(wake === undefined \? \{\} : \{ wake \}\),?\s*\}\)/,
+    );
   });
 
   it("주체를 수동 실행 여부로 가르지 않는다", () => {

@@ -422,3 +422,40 @@ describe("HO7 — 겹친 판정은 늦게 시작한 것만 반영한다", () => 
     expect(handed()).toBe("없음");
   });
 });
+
+/**
+ * 090 — iOS 백그라운드 실행에서는 보이지 않는 홈이 쓰기를 가져가지 않는다.
+ * iOS가 BGTask로 앱을 새로 띄우면 `App.tsx`가 그려져 이 훅이 마운트 즉시 판정했고, 홈이 쓰기를 시작해 백그라운드 태스크는
+ * 「다른 쓰기가 진행 중」으로 곧바로 끝났다(그러면 iOS가 앱을 멈춘다 — 078·080 남은 위험). 첫 판정은 앱이 앞으로 올 때까지 미룬다.
+ */
+describe("HO13·HO14 — iOS 백그라운드 실행은 앞으로 올 때까지 판정하지 않는다", () => {
+  it("HO13 — iOS·뒤에서 마운트 → 판정·기록 없음, 앞으로 오면 그때 판정한다", async () => {
+    const spy = jest.spyOn(AppState, "addEventListener");
+    const listDiaryDays = jest.fn(async () => []);
+    const { props, attemptPort } = setup({
+      listDiaryDays,
+      platform: "ios",
+      launchState: () => "background",
+    });
+    await render(<Harness {...props} />);
+    await act(async () => {});
+    expect(listDiaryDays).not.toHaveBeenCalled();
+    expect(attemptPort.write).not.toHaveBeenCalled();
+    expect(handed()).toBe("없음");
+
+    await fireActive(spy);
+    await decided(attemptPort, 1);
+    expect(handed()).toBe(YESTERDAY);
+  });
+
+  it.each([
+    ["iOS·앞", "ios", "active"],
+    ["iOS·모름", "ios", undefined],
+    ["안드로이드·뒤", "android", "background"],
+  ] as const)("HO14 — %s 마운트는 종전대로 곧바로 판정한다", async (_name, platform, launch) => {
+    const { props, attemptPort } = setup({ platform, launchState: () => launch });
+    await render(<Harness {...props} />);
+    await decided(attemptPort, 1);
+    expect(handed()).toBe(YESTERDAY);
+  });
+});

@@ -1,0 +1,9 @@
+{
+  "name": "pocketlog-bg-expiry",
+  "version": "1.0.0",
+  "private": true,
+  "description": "iOS 백그라운드 태스크의 시간 예산 만료를 JS로 넘기는 로컬 Expo 모듈 (090)",
+  "license": "UNLICENSED",
+  "author": "a810labs",
+  "homepage": "https://github.com/mrtint/alpharium"
+}

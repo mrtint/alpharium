@@ -374,3 +374,102 @@ describe("V7. 일기의 샘플링을 재사용하지 않는다 (원칙 I)", () =
     expect(SAMPLING.temperature).toBe(0.8);
   });
 });
+
+/**
+ * 091 PC4 — 느린 쓰기의 사진 캡션: 장마다 끝나면 쉰다. 쉼은 조립부가 넘긴 감싸개(`pace`)가 하고 엔진은 감싸기만 한다(vision이 inference를
+ * import하지 않는다).
+ */
+describe("091 PC4 — 장마다 쉬는 감싸개", () => {
+  it("pace를 주면 캡션 호출을 그것으로 감싼다", async () => {
+    const calls: Call[] = [];
+    const seen: string[] = [];
+    const pace = <T>(call: () => Promise<T>): Promise<T> => {
+      seen.push("pace");
+      return call();
+    };
+    const engine = createVisionEngine(loaderFor(calls), paths, { pace });
+    await engine.load("quick");
+    await engine.caption("/a.jpg");
+    await engine.caption("/b.jpg");
+    expect(seen).toHaveLength(2);
+    expect(calls.filter((c) => c.kind === "completion")).toHaveLength(2);
+  });
+
+  it("pace가 없으면 종전대로", async () => {
+    const calls: Call[] = [];
+    const engine = createVisionEngine(loaderFor(calls), paths);
+    await engine.load("quick");
+    expect((await engine.caption("/a.jpg")).text).toBe("A cup of coffee on a table.");
+  });
+});
+
+describe("091 T017 — 쉼은 멈춤 신호를 본다 (PC2)", () => {
+  it("stop()이 오면 pace가 받은 stopped()가 참이다", async () => {
+    const calls: Call[] = [];
+    let seen: boolean | undefined;
+    let engineRef: { stop(): Promise<void> } | undefined;
+    const pace = async <T>(call: () => Promise<T>, stopped: () => boolean): Promise<T> => {
+      const result = await call();
+      await engineRef?.stop();
+      seen = stopped();
+      return result;
+    };
+    const engine = createVisionEngine(loaderFor(calls), paths, { pace });
+    engineRef = engine;
+    await engine.load("quick");
+    await engine.caption("/a.jpg");
+    expect(seen).toBe(true);
+  });
+
+  it("다시 열면 신호가 비워진다", async () => {
+    const calls: Call[] = [];
+    const flags: boolean[] = [];
+    const pace = async <T>(call: () => Promise<T>, stopped: () => boolean): Promise<T> => {
+      flags.push(stopped());
+      return call();
+    };
+    const engine = createVisionEngine(loaderFor(calls), paths, { pace });
+    await engine.load("quick");
+    await engine.stop();
+    await engine.load("quick");
+    await engine.caption("/a.jpg");
+    expect(flags).toEqual([false]);
+  });
+});
+
+/**
+ * 092 CW7 — 캡션 한 장이 끝날 때 한 번 박동한다. 이 파일은 inference를 모른다 — 조립부가 `onCaptioned`로 `beat("photo")`를 넘긴다.
+ * 실패한 장도 일이 끝난 것이다(다음 장으로 넘어간다). 열지 않은 채 부른 것은 일이 없었으니 박동하지 않는다.
+ */
+describe("092 CW7 — 캡션 한 장마다 박동", () => {
+  it("성공·실패한 장마다 한 번, 열기 전에는 없다", async () => {
+    const beats: number[] = [];
+    const onCaptioned = () => beats.push(1);
+    const idle = createVisionEngine(loaderFor([]), paths, { onCaptioned });
+    await idle.caption("/p/0.jpg");
+    expect(beats).toHaveLength(0);
+
+    const engine = createVisionEngine(loaderFor([]), paths, { onCaptioned });
+    await engine.load("quick");
+    await engine.caption("/p/1.jpg");
+    await engine.caption("/p/2.jpg");
+    expect(beats).toHaveLength(2);
+
+    const failing = createVisionEngine(loaderFor([], { completionThrows: true }), paths, {
+      onCaptioned,
+    });
+    await failing.load("quick");
+    expect(await failing.caption("/p/3.jpg")).toEqual({ text: "" });
+    expect(beats).toHaveLength(3);
+  });
+
+  it("박동이 던져도 캡션은 그대로다", async () => {
+    const engine = createVisionEngine(loaderFor([]), paths, {
+      onCaptioned: () => {
+        throw new Error("x");
+      },
+    });
+    await engine.load("quick");
+    expect((await engine.caption("/p/1.jpg")).text).toBe("A cup of coffee on a table.");
+  });
+});
