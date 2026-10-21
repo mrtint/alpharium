@@ -76,15 +76,13 @@ e2e로 다시 만들지 않는다. 시뮬레이터 통과는 실제 iPhone을 �
 
 **완료 조건**: iOS는 테스터의 기록을 한 건 이상 읽어 다음 조치를 정했다. 안드로이드는 OS가 스스로 깨운 잡의 `백그라운드 · 썼음`을 한 번 봤고, 배터리 예외가 없는 사용자에 대한 제품 동작(설정 문구·목표 시각 알림 포함)을 반영했다.
 
-### Xcode 27 UIScene 대응 — iOS 27 SDK로 빌드한 앱이 실행 즉시 죽는다
+### 094 UIScene 실기기 잔여 확인 — 알림 누름·충전 없는 이어 하기
 
-**배경**: 092 실측 중 Xcode 27(iOS 27 SDK)로 그대로 빌드한 앱이 실행 즉시 `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` SIGTRAP으로 죽었다(UIScene을 쓰지 않는 앱). 측정은 `expo@57.0.23` + `expo-build-properties`의 `ios.enableSceneSupport`를 커밋 없이 넣고 했다. CI(`ios-release.yml`, Xcode 26.6)는 지금 영향이 없지만 러너가 Xcode 27로 올라가는 순간 TestFlight 빌드가 열자마자 죽는다.
+094가 UIScene을 채택했다(완료 이력). Xcode 27.1 Release는 iPhone 14에서 열리고 앞·뒤 전환과 BGTask 등록이 그대로지만, 화면 조작이 필요한 둘은 못 봤다.
 
-**할 일**:
-1. expo 57 패치 버전(57.0.23 이상)과 `expo-build-properties`를 정식 의존성으로 올리고 `enableSceneSupport`를 켠다 — 생명 주기가 UIScene으로 바뀌므로 `AppState`·알림 응답(085)·딥링크·BGTask 처리기(090·091)·이어 하기(092)가 그대로 도는지 실기기로 본다.
-2. `ios-release.yml`이 쓰는 Xcode 버전을 고정할지 정한다.
+**할 일**: 사람이 (1) 쓸 차례 알림(085)을 콜드·웜에서 눌러 앱이 열리고 쓰기가 시작되는지, (2) 사진 있는 안 쓴 날 「쓰기」를 누르고 앱을 나가 완성 알림까지 가는지 본다(`--console`의 `[continued-write]` 줄). `expo-task-manager`·`expo-notifications`가 57.0.30 기대값보다 낮은 조합이라 TestFlight 전에 본다.
 
-**완료 조건**: Xcode 27로 빌드한 Release가 실제 iPhone에서 첫 실행·쓰기·알림 누름·충전 중 백그라운드 쓰기까지 돈다.
+**완료 조건**: 위 둘이 실기기에서 돈다. 어긋나면 `expo install --check`가 지적한 패키지를 맞추는 과제를 만든다.
 
 ### 릴리스 빌드 번호 자동 올림 — `versionCode`·`buildNumber`를 사람이 안 올리게
 
@@ -316,6 +314,7 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 |    —    |    091    | iPhone 충전 없이 백그라운드에서 쓰기(시도) — iOS 요청을 둘(충전·배터리)로 내고(expo 패치 확장, Info.plist plugin, 함께 깨면 처음 것만 JS를 돌리고 한 무리로 끝냄 — 코드 리뷰 C1), 깬 요청을 기록(「· 충전/· 배터리」), 배터리로 깨면 느린 쓰기(스레드 1·호출마다 쉼·본문/제목 32토큰 조각 생성·U+FFFD 정리·템플릿 멈춤 문자열·30분 한도). iPhone 14 무선 연결로 강제 실행 완주(n_threads=1, 조각 15번, 약 2분)·두 요청 동시 깸 확인. **충전하지 않은 약 31시간 동안 iOS가 배터리 요청을 한 번도 깨우지 않아 SC-001 미확인** — 배터리 행 문구는 090 그대로, 다음 길은 위 「알림을 눌러 시작한 쓰기」(`specs/091-ios-bg-battery/quickstart.md`) |
 |    —    |    092    | iPhone 사용자가 시작한 쓰기를 앱을 나가도 끝까지 — iOS 26 `BGContinuedProcessingTask`(로컬 모듈, 와일드카드 Info.plist + 신청마다 온전한 식별자로 처리기 등록), 홈이 시작한 쓰기(「쓰기」·057·085)만 신청, 진행 표시는 단계 문구 셋 + 실제 일의 박동(사진·조각·토큰 — 토큰 데이터는 경계에서 버림)으로만 움직이는 막대. **시스템은 `completedUnitCount`가 오르지 않으면 멈춤으로 끝낸다** — 1,000,000칸·보고마다 한 칸 이상. 앱 밖 CPU 감소에 맞춰 스레드 2·모델 메모리 상주·프롬프트 토막(앞 240자·밖 24자)·한도 30분. iPhone 14에서 **충전 없이 앱을 나가도 저장 + 완성 알림**(약 23분), 앱에 머문 쓰기 51초(`specs/092-ios-continued-write/quickstart.md`) |
 |    —    |    093    | iOS 자동 쓰기 동작 조건을 화면 문구로 밝힘 — 설정 「배터리」 행(iOS)·시각 대화상자 미리보기(iOS)·쓰는 중 화면 상시 안내 한 줄(iOS)·지원 FAQ의 iPhone 항목을 090~092의 사실(홈이 시작한 쓰기는 나가도 계속, 저절로 써 두기는 충전 중에만, 그 밖에는 알림 누름)로 맞춤. 안드로이드 문구·동작은 바이트 그대로(새 문구는 `settingsPlatform`에 따로 두고 조립부가 플랫폼을 넘김). 세부 조건(쓸어 올려 끄기·저전력 모드·백그라운드 앱 새로 고침)은 FAQ로 보냄 |
+|    —    |    094    | iOS UIScene 생명 주기 채택 — `expo` 57.0.30 + `expo-build-properties` `ios.enableSceneSupport`로 Xcode 27(iOS 27 SDK) 빌드가 열자마자 죽던 문제를 풂. 계약 테스트(`ios-scene-support`)가 설정·플러그인 순서·패치 고정·빌드 번호 불변을 잠금. Xcode 27.1 Release가 iPhone 14에서 열리고 앞·뒤 전환·BGTask 등록 확인, 알림 누름·이어 하기는 사람 확인 대기(위 잔여 과제). `ios-release.yml`의 Xcode는 고정하지 않음 |
 |    —    |    —    | iOS 시뮬레이터에서 일기 생성이 실패하는 원인 찾기 — 생성 시간 한도(180초) 초과로 확인(디코드가 8토큰에 40~50초). Metal·코드 변경 아님, 개발 맥의 메모리 부족(RAM 8GB·스왑 가득)이 원인일 가능성이 커 환경 한계로 AGENTS에 남기고 닫음(소유자 결정, 메모리를 비운 재측정은 안 함) |
 |    —    |    089    | 디자인 시스템 기반과 웹 재디자인 — `design/tokens.json`(색 라이트·다크·반경·글자·서체·간격·대비 쌍 표)을 앱·웹 토큰의 정본으로 세우고 `scripts/design/build-tokens.mts`가 `tokens.ts`의 생성 영역(표식 사이 — 앱 토큰 테스트가 소스를 읽어 파일을 나누지 않음, 라이트 값만)과 `site/assets/tokens.css`를 만든다(값을 만들지 않음, 앱 값 불변 스냅샷 테스트). `site/` 세 페이지는 `<style>`을 걷고 `tokens.css`·`fonts.css`·`site.css`만 링크(086 S3 한 단언을 같은 출처 상대 경로만 허용으로 좁힘)하며 Pretendard 분할 woff2(npm `pretendard@1.3.9` 400·600·700, 276개)를 바이트 그대로 자체 호스팅 — 방침 페이지 글꼴 합계 587,756바이트(상한 1MB). 웹의 링크·강조는 `danger`(accent는 라이트 3.76:1이라 글자에 쓰지 않음), 규칙 블록마다 글자색·배경 짝이 대비 표에 있어야 함. `design/DESIGN.md` 규칙 문서와 AGENTS.md·CLAUDE.md 안내. 위반 주입 33건·전체 `npm test` 초록, iOS 시뮬레이터 로고 화면 색이 `COLORS`와 일치. 안드로이드 실기기·Safari iOS·Chrome Android·Pages 게시 뒤 서체 URL·글리프 눈 대조·소유자 캡처 확정(SC-009) 미확인(`specs/089-design-system-web/quickstart.md`). |
 |    —    |    088    | 작은 글자 대비와 누름 영역 — 밝은 배경 위 11~13pt·600 강조 글자 다섯 자리(홈 월 라벨·홈 쓰는 중 상태 줄·쓰는 중 머리말·첫 만남 작명 표지·설정/개발자/진단 묶음 머리)를 `COLORS.danger`(`#ae1800`, 계산 대비 6.41·6.56:1)로 바꾸고 `src/ui/` 내 글자 스타일 `color: COLORS.accent` 0건을 소스 계약으로 잠금(UX-07, 테두리·면·인디케이터 제외). 주간 스트립(`DayPicker`) 요일 약자의 `opacity: 0.7`을 걷어 선택 칸은 `COLORS.accentForeground`(`#f3f2f2`, 3.76:1), 비선택 칸은 불투명 합성 상수 `DAY_STRIP.dowMuted`(`#5f5e5d`, 5.79:1)로 분리하고 글자 불투명도 합성을 금지(UX-08, 10pt 유지). 공용 설정 토글(`Toggle`, 44×26dp)에 `hitSlop={{ top: 9, bottom: 9 }}`를 더해 시각 변화 없이 세로 누름 영역을 44dp로 확장(UX-10). 위반 주입 C7-1·C7-2 실패 확인, 실기기 `iPhone 14`(iOS 27.0.1, 뷰 계층 색상·불투명도 및 화면 캡처) 및 iOS 시뮬레이터(`iPhone 17 Pro Max`, D1 글자 크기 `medium`·`accessibility-large` 캡처·D2 슬롭 안팎 좌표 탭 대조·D3 주간 스트립 스와이프·설정 시각/장소 대화상자) 확인, SM-S901N은 미검증(`specs/088-small-text-contrast-hit-target/quickstart.md`) |
