@@ -9,7 +9,7 @@
 안드로이드 층 1·층 2가 쓰는 **기기 접촉 포트**(`Layer1Device`/`Layer2Device`, `SampleDevice`)를 iOS 구현체로 한 겹 더 만든다. 실행기(`runLayer1`·`prepareBaseline`·`runLayer2`)와 기준 상태 표(`BASELINE`)·픽스처는 플랫폼 중립이라 그대로 쓴다.
 
 - **층 1 (시뮬레이터)**: `simctl`이 컨테이너 `Documents/`를 직접 보여 주므로(`get_app_container … data`) 파일 읽기·쓰기가 호스트 파일 복사다. 사진은 `simctl addmedia`, 권한은 `simctl privacy`. Maestro는 `--device <UDID>`로 시뮬레이터를 구동한다. 안드로이드 전용 `- back`은 화면의 뒤로 가기 id로 바꾸거나 플랫폼 분기한다.
-- **층 2 (iPhone 14)**: Maestro 없음. 새 실행기가 `devicectl device copy`로 기준 상태를 컨테이너 `Documents/`에 쓰고, `ios:seed`로 사진을 심고, `devicectl device process launch`로 앱을 띄운 뒤 사람에게 조작을 안내하고 컨테이너를 폴링해 단언한다. 기준 상태 준비는 `prepareBaseline`을 그대로 재사용한다(`Layer2Device` 모양의 iOS 구현체).
+- **층 2 (iPhone 14)**: Maestro 없음. 새 실행기가 `devicectl device copy to`(파일 단위)로 기준 상태를 컨테이너 `Documents/`에 쓰고(지우기는 lldb), `ios:seed`로 사진을 심고, `devicectl device process launch`로 앱을 띄운 뒤 사람에게 조작을 안내하고 컨테이너를 폴링해 단언한다. 기준 상태 준비는 `prepareBaseline`을 그대로 재사용한다(`Layer2Device` 모양의 iOS 구현체).
 - 명령은 iOS 전용 둘(`test:layer1:ios`, `test:layer2:ios`)이다. 기존 안드로이드 명령은 바이트 그대로다(clarify).
 - 제품 코드(`src/`)는 바꾸지 않는다.
 
@@ -29,7 +29,7 @@
 
 **Performance Goals**: 층 1 소요 시간은 목표를 두지 않고 실측해 기록한다(SC-006, 원칙 V). 층 2 흐름당 조작 대기(Enter) 5분, 생성 대기 10분.
 
-**Constraints**: 앱 삭제·재설치·모델 삭제 금지(I-1과 동일). 시뮬레이터는 모델 파일이 있어야 기준 상태를 만든다(L3). 시뮬레이터 사진 보관함에는 단건 삭제 통로가 없다(research R4).
+**Constraints**: 앱 삭제·재설치·모델 삭제 금지(I-1과 동일). 시뮬레이터는 모델 파일이 있어야 기준 상태를 만든다(L3). 시뮬레이터 사진 보관함에는 단건 삭제 통로가 없어 표본이 낡으면 보관함을 통째로 초기화한다(research R4). iPhone에는 파일 삭제 명령도 없고 `--remove-existing-content`는 부모를 비우므로(research R2) 지우기는 앱 안에서 lldb로 한다.
 
 **Scale/Scope**: 새 파일 대략 8개(`scripts/layer1/ios-simulator-device.ts`, `scripts/e2e-sample/ios-device.ts`, `scripts/layer2-ios/{device,flows,runner,run}.ts`, 테스트), 바뀌는 파일 `scripts/run-device-tests.mjs`·`package.json`·`.maestro/*.yml` 일부·문서.
 
@@ -75,7 +75,8 @@ scripts/
 ├── e2e-sample/
 │   └── ios-device.ts                # 신규 — simctl addmedia 기반 SampleDevice
 ├── layer2-ios/
-│   ├── device.ts                    # 신규 — devicectl 기반 Layer2Device + 앱 실행·폴링 포트
+│   ├── device.ts                    # 신규 — devicectl 기반 기기 포트(파일 단위 올리기, 앱 실행·목록·가져오기)
+│   ├── app-delete.ts                # 신규 — lldb로 앱 안에서 파일 지우기(devicectl에 삭제 명령이 없다)
 │   ├── flows.ts                     # 신규 — iOS 층 2 흐름 표(안내문·대기 한도)
 │   ├── runner.ts                    # 신규 — 흐름 조립(기준 상태 → 안내 → 폴링 → 단언)
 │   └── run.ts                       # 신규 — 실제 포트로 부르는 진입점

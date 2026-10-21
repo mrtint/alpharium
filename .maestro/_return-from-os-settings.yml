@@ -1,0 +1,18 @@
+# OS 설정 앱에서 앱으로 돌아온다 — 안드로이드는 뒤로 키, iOS는 같은 프로세스로 앱을 다시 앞에 올리고 재진입 확인 창을 닫는다 (068·095).
+#
+# 다른 흐름이 부르는 보조 흐름이다 — 최상위로 돌리지 않는다(FLOWS에 없다). **iOS에서 기본 `launchApp`은 앱을 종료했다 다시 띄워 상태가 사라진다** —
+# 그래서 `stopApp: false`다.
+appId: com.a810labs.pocketlog
+---
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - back
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - launchApp:
+          stopApp: false
+      - runFlow: ios/_dismiss-open-prompt.yml

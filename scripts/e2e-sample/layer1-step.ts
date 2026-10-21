@@ -7,13 +7,25 @@
 import type { SampleStep } from "../layer1/with-sample.ts";
 import { loadCatalog } from "./catalog.ts";
 import { adbSampleDevice } from "./device.ts";
-import { ensureSample } from "./ensure.ts";
+import { ensureSample, type Outcome, type SampleDevice } from "./ensure.ts";
 import { realSampleFs } from "./fs-port.ts";
 import { probeEnv } from "./plan.ts";
 
-export function realSampleStep(log: (line: string) => void): SampleStep {
+/**
+ * `device`는 기본이 안드로이드다. 095: iOS 시뮬레이터는 `iosSampleDevice()`와 권한 부여(`beforeEnsure`)를 넘긴다.
+ * `beforeEnsure`가 실패하면 표본을 심지 않고 실패로 돌려준다.
+ */
+export function realSampleStep(
+  log: (line: string) => void,
+  device: SampleDevice = adbSampleDevice(),
+  beforeEnsure?: () => Outcome<void>,
+): SampleStep {
   return {
     async ensure() {
+      if (beforeEnsure !== undefined) {
+        const prepared = beforeEnsure();
+        if (!prepared.ok) return { status: "failed", reason: "push-failed", detail: prepared.detail };
+      }
       const catalog = loadCatalog();
       if (!catalog.ok) {
         return {
@@ -23,7 +35,7 @@ export function realSampleStep(log: (line: string) => void): SampleStep {
         };
       }
       return ensureSample({
-        device: adbSampleDevice(),
+        device,
         fs: realSampleFs(),
         catalog: catalog.photos,
         now: new Date(),

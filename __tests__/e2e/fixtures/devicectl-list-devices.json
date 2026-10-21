@@ -1,0 +1,40 @@
+{
+ "info": {
+  "commandType": "devicectl.list.devices",
+  "outcome": "success"
+ },
+ "result": {
+  "devices": [
+   {
+    "connectionProperties": {
+     "pairingState": "paired",
+     "tunnelState": "disconnected"
+    },
+    "hardwareProperties": {
+     "deviceType": "iPhone",
+     "marketingName": "iPhone 14",
+     "reality": "physical",
+     "udid": "00008110-000000000000001E"
+    },
+    "deviceProperties": {
+     "name": "테스트 iPhone"
+    }
+   },
+   {
+    "connectionProperties": {
+     "pairingState": "paired",
+     "tunnelState": "connected"
+    },
+    "hardwareProperties": {
+     "deviceType": "iPhone",
+     "marketingName": "iPhone 18 Pro",
+     "reality": "simulated",
+     "udid": "SIM-0000"
+    },
+    "deviceProperties": {
+     "name": "iPhone 18 Pro"
+    }
+   }
+  ]
+ }
+}

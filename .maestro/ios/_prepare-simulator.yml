@@ -1,13 +1,15 @@
-# iOS 시뮬레이터 — 새 설치에서 첫 실행 흐름을 지나 홈까지 간다 (068).
+# iOS 시뮬레이터 준비 — 새 설치에서 첫 실행 흐름을 지나 홈까지 가며 필수 모듈(~2GB)을 앱의 정상 내려받기로 받는다 (068·095).
 #
 # ─────────────────────────────────────────────────────────────────────────────
-# **`scripts/run-device-tests.mjs`의 `FLOWS`에 등록하지 않았다** — 등록하지 않은 흐름은 아무것도 검증하지 않는다(AGENTS 「Maestro」).
-# 이 파일은 훑기(`settings-sweep.yml`·`developer-diagnostics-sweep.yml`)를 하려는 사람이 손으로 홈에 가는 수고를 덜려는 도구다 —
-# 검증이 아니라 준비 단계다. 실행: `maestro --device <UDID> test .maestro/ios/first-run-to-home.yml`
-# (`JAVA_HOME=/opt/homebrew/opt/openjdk`, Metro는 `EXPO_PUBLIC_APP_ENV=dev`).
+# **검증 흐름이 아니다** — 층 1(`npm run test:layer1:ios`)이 전제하는 「모델이 있는 시뮬레이터」를 처음 한 번 만드는 준비 단계다. 보조 흐름(`_` 접두)이라
+# `FLOWS`에 없고 최상위로 돌리지 않는다. 가짜 모델 파일을 두지 않는다(042) — 앱이 실제로 받는다.
+# 실행: `maestro --device <UDID> test .maestro/ios/_prepare-simulator.yml`
+# (`JAVA_HOME=/opt/homebrew/opt/openjdk@17`, `MAESTRO_DRIVER_STARTUP_TIMEOUT=180000`, Metro는 `EXPO_PUBLIC_APP_ENV=dev`).
 #
-# 시스템 권한 창(사진·위치·알림)은 한국어 시뮬레이터 기준 버튼 글자로 누른다. 모델 약 2GB를 받으므로 10분까지 기다린다.
-# 시뮬레이터에서는 작명 뒤 「정상 동작 확인」이 실패할 수 있다(로드맵 「iOS 시뮬레이터 liveness」) — 「그냥 시작하기」로 홈에 간다.
+# **`clearState: true`라 앱 데이터(모델 포함)를 지운다** — 새 시뮬레이터에서만 돌린다. 시스템 권한 창(사진·위치·알림)은 한국어 시뮬레이터 기준 버튼
+# 글자로 누른다. 모델 약 2GB를 받으므로 10분까지 기다린다(2026-10-22 실측: 받기 자체는 수 분).
+# 작명 화면의 완료 버튼은 키보드에 가려 탭이 닿지 않는다 — 키보드의 완료 키(Enter)로 제출한다(095 실측).
+# 시뮬레이터에서는 작명 뒤 「정상 동작 확인」이 실패할 수 있다 — 「그냥 시작하기」로 홈에 간다.
 # ─────────────────────────────────────────────────────────────────────────────
 appId: com.a810labs.pocketlog
 ---
@@ -73,8 +75,7 @@ appId: com.a810labs.pocketlog
 - tapOn:
     id: "welcome-name-input"
 - inputText: "금동"
-- tapOn:
-    id: "welcome-name-submit"
+- pressKey: Enter
 
 # 「정상 동작 확인」 결과를 기다린다 — 홈이 뜨거나 실패 화면(「그냥 시작하기」)이 뜬다.
 - repeat:

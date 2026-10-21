@@ -21,7 +21,7 @@
 
 ## IosSampleDevice (`SampleDevice` 구현)
 
-`pushDir`(= `simctl addmedia`로 폴더 안 사진 심기), `scanVolume`(no-op: 보관함이 즉시 반영), `queryRows`(시뮬레이터 `Photos.sqlite` 읽기 전용 질의 — 이름이 `s30-`로 시작하는 행의 촬영 시각), `readMarker/writeMarker`(호스트 쪽 표식 파일 — 시뮬레이터 UDID별, 개발 기계에는 기록을 두지 않는다는 070 결정과 충돌하므로 **표식은 시뮬레이터 데이터 폴더 안**에 둔다), `removeSampleFiles`(**없음 → 표본이 어긋나면 중단**, research R4).
+`pushDir`(= `simctl addmedia`로 폴더 안 사진 심기), `scanVolume`(no-op: 보관함이 즉시 반영), `queryRows`(시뮬레이터 `Photos.sqlite` 읽기 전용 질의 — `ZORIGINALFILENAME`이 `s30-`로 시작하는 행의 촬영 시각), `readMarker/writeMarker`(**표식은 시뮬레이터 `Media/` 폴더 안**에 둔다 — 개발 기계에는 기록을 두지 않는다는 070 결정), `removeSampleFiles`(**사진 보관함 초기화**: shutdown → `Media/PhotoData`·`DCIM`만 삭제 → boot → bootstatus. 앱 컨테이너·모델은 그대로, research R4).
 
 ## IosDeviceTarget (층 2 실기기)
 
@@ -32,10 +32,11 @@
 | `probe` | 컨테이너 목록(`info files`)이 성공하고 `Documents/`가 있다 |
 | `listDir(rel)` | `info files --json-output`을 파싱해 `Documents/<rel>`의 직접 자식 이름들 |
 | `pullFile(rel, local)` | `copy from --source Documents/<rel>` |
-| `writeFile/copyFile` | 호스트의 스테이징 폴더에 쓰고 해당 디렉터리를 `copy to`로 올린다 |
-| `removeFile` | `devicectl`에는 파일 삭제 명령이 없다(`copy to`/`from`뿐 — 실측). 디렉터리 단위 `--remove-existing-content true`로 올려서 지운다: 스테이징 폴더에서 파일을 빼고 그 디렉터리를 통째로 올린다 |
+| `writeFile/copyFile` | 파일 하나를 `copy to`로 올린다(덮어쓰기, 없는 부모 디렉터리는 만들어진다) |
+| `removeFile` | 기기에 있는 파일만 지울 목록에 모은다(`devicectl`에는 파일 삭제 명령이 없다 — 실측). `flush`가 모인 목록을 앱 프로세스 안에서 lldb로 지운다(`app-delete.ts`). 지우려던 파일을 같은 실행에서 다시 쓰면 목록에서 뺀다 |
+| `flush` | 비동기. 모아 둔 삭제를 수행한다. 지울 것이 없으면 아무것도 하지 않는다 |
 
-**스테이징**: `preferences/`·`diary/`·`vision-cache/` 세 디렉터리만 호스트에 미러링해 수정하고 올린다. `models/`는 읽기만 하며 올리거나 `--remove-existing-content`를 쓰지 않는다(모델 보존 — I-1). 이 디렉터리 단위 교체는 기준 상태 단계(앱이 꺼진 동안)에서만 일어난다.
+**쓸 수 있는 곳**: `preferences/`·`diary/`·`vision-cache/` 아래 파일뿐이다. `models/`는 읽기만 한다(모델 보존 — I-1). **`copy to`에 `--remove-existing-content`를 쓰지 않는다** — 대상의 부모를 통째로 비운다(research R2, 한 번 모델이 지워졌다).
 
 ## Layer2IosFlow (iOS 층 2 흐름 정의)
 

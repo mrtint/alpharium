@@ -25,6 +25,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 # 진단 화면은 개발 환경(local·dev) 전용이다 — 홈의 점 셋 → 설정 → 개발자 → 진단. prod 빌드에는 진단 행이 없어 이 흐름 자체가 돌지 않는다.
 # 059 — 설정 → 개발자 → 진단. 개발 환경은 「개발자」 행이 처음부터 있다(7번 탭 불필요).
@@ -68,7 +69,19 @@ appId: com.a810labs.pocketlog
 # 저장 점검 행은 눌러야 값이 펼쳐진다(›)
 - tapOn:
     id: "diagnostics-storage"
-- assertVisible:
-    text: ".*편 · 정상"
-- assertNotVisible:
-    text: ".*읽기 실패.*"
+# iOS는 행이 한 접근성 요소(「저장 점검, ›」)라 값(「N편 · 정상」)이 접근성 트리에 없다 — 화면에는 보이지만(095 실측 스크린샷) 글자로 단언할 수 없어
+# 행이 보이는 것까지만 본다. 값은 사람이 본다(docs/e2e/feature-flow-map.md 「사람이 봄」).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          text: ".*편 · 정상"
+      - assertNotVisible:
+          text: ".*읽기 실패.*"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "diagnostics-storage"

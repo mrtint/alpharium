@@ -25,7 +25,25 @@ export type Outcome<T = undefined> =
   | { ok: true; value: T }
   | { ok: false; detail: string };
 
+/** 건너뜀·중단 이유에 쓰는 플랫폼 문구 — 없으면 안드로이드 문구다(095: 두 플랫폼이 같은 실행기를 쓴다) */
+export type DeviceLabels = {
+  /** 기기 도구(adb·simctl)를 못 찾았다 */
+  toolMissing: string;
+  /** 도구는 있는데 붙은 기기가 없다 */
+  noDevice: string;
+  /** 앱 데이터에 못 닿을 때 덧붙이는 짐작 */
+  probeHint: string;
+};
+
+export const ANDROID_LABELS: DeviceLabels = {
+  toolMissing: "adb를 찾지 못했다",
+  noDevice: "연결된 안드로이드 기기가 없다",
+  probeHint: "release 빌드이거나 재부팅 뒤 첫 잠금 해제 전일 수 있다",
+};
+
 export interface Layer1Device {
+  /** 플랫폼 문구. 없으면 안드로이드(`ANDROID_LABELS`) */
+  labels?: DeviceLabels;
   /** 붙어 있는 기기 시리얼들. adb를 못 찾으면 null */
   listDevices(): string[] | null;
   hasMaestro(): boolean;
@@ -45,6 +63,12 @@ export interface Layer1Device {
     env?: Readonly<Record<string, string>>,
   ): { status: number | null; failed: string[] | null };
 }
+
+/** 기준 상태를 만드는 데 쓰는 연산만 — 기준 상태 단계(`prepareBaseline`)는 Maestro·기기 목록을 모른다 */
+export type BaselineDevice = Pick<
+  Layer1Device,
+  "probe" | "listDir" | "forceStop" | "ensureDirs" | "writeFile" | "copyFile" | "removeFile"
+>;
 
 /** 073 — 층 2는 흐름이 쓴 일기를 개발 기계로 가져온다(사람이 읽는 출력). 읽기만 한다. */
 export interface Layer2Device extends Layer1Device {

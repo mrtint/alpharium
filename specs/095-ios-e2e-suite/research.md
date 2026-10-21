@@ -12,7 +12,7 @@
 
 - 시뮬레이터: `xcrun simctl get_app_container <UDID> com.a810labs.pocketlog data`가 컨테이너 경로를 준다(실측: 앱이 깔려 있고 `Documents/{preferences,models,diary}`가 있다). 호스트 파일 시스템이므로 `Documents/`에 직접 읽고 쓴다. 앱은 `simctl terminate`로 끈 뒤 바꾼다(안드로이드 L4 `forceStop`과 같다). **경로를 저장하지 않고 매번 찾는다**(컨테이너 UUID가 바뀐다, 066).
 - 실기기: `xcrun devicectl device info files --domain-type appDataContainer --domain-identifier com.a810labs.pocketlog`(목록, JSON 출력 가능), `devicectl device copy to/from`(복사). 실측: 목록에 `Documents/preferences/onboarding.json`, `Documents/models/v1.bin` 등이 보인다.
-- **삭제 통로 없음**: `devicectl device copy`는 `to`·`from`뿐이고 파일 삭제 명령이 없다(실측). 대신 `copy to … --remove-existing-content true`가 디렉터리를 올릴 때 그 디렉터리의 나머지 파일을 지운다 — 기준 상태 단계에서 `preferences/`·`diary/`·`vision-cache/`를 호스트 스테이징 폴더로 미러링해 수정한 뒤 디렉터리째 올려 지운다. `models/`에는 쓰지도 지우지도 않는다.
+- **삭제 통로 없음, 그리고 `--remove-existing-content`는 쓰면 안 된다**: `devicectl device copy`는 `to`·`from`뿐이고 파일 삭제 명령이 없다(실측). `copy to <디렉터리> --destination <경로> --remove-existing-content true`는 **대상 디렉터리의 부모를 통째로 비운다**(임시 영역 실측: `tree/keep`을 둔 채 `tree/replace`를 올리자 `tree/keep`이 사라졌다). 한 번 이 옵션으로 `Documents/preferences`를 올리다 기기의 `Documents/`가 비워졌고 모델 ~2GB가 지워졌다(2026-10-22, 사고). 그래서 이 옵션은 쓰지 않고(소스 계약이 문자열을 막는다) 쓰기는 **파일 하나씩** `copy to`(덮어쓰기, 없는 부모는 만들어진다 — 실측), 지우기는 **앱 프로세스 안에서 lldb로 `removeItemAtPath:`**(092 관찰법, `app-delete.ts`)로 한다. `models/`에는 쓰지도 지우지도 않는다.
 - **관측**: 이 시점 iPhone의 `Documents/models/v1.bin`이 0KB이고 `Library/Caches/com.apple.nsurlsessiond/Downloads/…`에 90.4MB 임시 조각이 있다 — 모델이 내려받기 중이거나 중단된 상태다. 층 2 전제(모델 있음)는 사람이 먼저 맞춰야 한다. 실행기는 L3처럼 모델이 없으면 중단한다.
 
 ## R3 — 층 1 흐름의 iOS 호환
@@ -54,3 +54,20 @@
 ## R8 — 시뮬레이터는 dev 환경으로 띄운다
 
 - `local` 환경이면 추론이 데스크톱 서버를 가리켜 진단 화면 문구(`skeleton`의 「기기 · CPU」)가 달라진다. 층 1 전제로 `.env.development.local`의 `EXPO_PUBLIC_APP_ENV=dev`와 Metro 번들을 둔다(AGENTS). 이미 시뮬레이터에 dev 클라이언트 앱이 설치돼 있다(실측).
+
+## 구현 실측 (2026-10-22, T001~T004)
+
+- **T001 시뮬레이터**: iPhone 18 Pro(`7D4BB86B-…`, iOS 27.0)에 dev 클라이언트가 설치돼 있고 `get_app_container data`가 `Documents/{preferences,models,diary}`를 준다. `.env.development.local`에 `EXPO_PUBLIC_APP_ENV=dev`가 있다. Metro는 층 1을 돌릴 때 띄운다(지금은 꺼짐). `scripts/e2e-sample/.cache/`는 비어 있어 표본 사진은 `npm run sample:fetch`가 먼저다.
+- **T003 시뮬레이터 사진 DB (R4 확정)**: `…/data/Media/PhotoData/Photos.sqlite`(WAL이라 `sqlite3 -readonly "file:<경로>?mode=ro"`로 읽는다). `simctl addmedia`는 **파일 이름을 `IMG_nnnn.JPG`로 바꾼다** — 원래 이름은 `ZADDITIONALASSETATTRIBUTES.ZORIGINALFILENAME`에 남는다(`aa.ZASSET = a.Z_PK`로 조인). 촬영 시각은 `ZASSET.ZDATECREATED`(Core Data 시간: 유닉스 + 978307200 초 이전), 좌표는 `ZLATITUDE`/`ZLONGITUDE`. addmedia는 파일의 EXIF 촬영 시각과 GPS를 존중하고 몇 초 안에 DB에 반영된다. 휴지통은 `ZTRASHEDSTATE`.
+- **R4 결정 변경 — 보관함 초기화로 지운다**: 표본은 기준일(오늘) 상대라(`ensure.ts`의 anchor) 날이 바뀌면 낡는다. 단건 삭제 통로가 없어 「어긋나면 중단」으로 두면 하루만 지나도 층 1을 못 쓴다. 실측: 시뮬레이터를 `shutdown` → `Media/PhotoData`와 `Media/DCIM`을 지움 → `boot` 하면 **라이브러리가 빈 채로 다시 만들어지고**(`ZASSET` 0행) 앱 컨테이너 UUID와 `Documents/`는 그대로다. 그래서 iOS `removeSampleFiles`는 「전용 시뮬레이터의 사진 보관함을 통째로 초기화」(shutdown → 두 폴더만 `rmSync` → boot → bootstatus)다. 전용 시뮬레이터 전제이며 앱 데이터·모델은 건드리지 않는다. 시간(몇십 초)은 층 1 소요 시간에 포함해 기록한다.
+- **T004 `devicectl info files` JSON**: `--json-output <경로>`, `--subdirectory Documents`, `-s`(검색), 기본 재귀. 모양: `result.files[]` = `{ name, relativePath, metadata:{size, lastModDate}, resources:{isDirectory,…} }`. 고정물: `__tests__/e2e/fixtures/devicectl-info-files.json`(이름·크기·디렉터리 여부만).
+- **iPhone 현재 상태**: `Documents/models/a1.bin` 등이 0바이트 — 모델 내려받기가 끝나지 않았다. 층 2 전제(모델 있음)는 사람이 먼저 맞춘다. `process launch --console` 시험(쓰는 중 관찰)은 사용 중인 기기의 내려받기를 끊을 수 있어 T032에서 흐름과 함께 시험한다.
+
+## 층 1 실측과 CI 판단 (2026-10-22, T021·T042)
+
+- **iOS 시뮬레이터 층 1 한 번**: iPhone 18 Pro 시뮬레이터(iOS 27.0), Maestro 2.11.0, 흐름 12개 **전부 통과 — 8분 19초**(흐름 합계), 실행기 전체 **약 9분**(기준 상태·표본 확인 포함, 2026-10-22 537초). 흐름별: `restart-persistence` 1분 37초, `settings-developer-sweep` 1분 43초, `sample-days` 1분 32초, 나머지는 14~30초.
+- **표본 첫 심기**: 129장 85.6초(`simctl addmedia` + 되읽기 검증 통과). 표본 사진 210장 내려받기 약 4분(Wikimedia 간격 규칙, 처음 한 번). 표본은 기준일(오늘)이 바뀌면 낡아 다음 실행에서 보관함 초기화(shutdown → 두 폴더 삭제 → boot) 뒤 다시 심는다.
+- **모델**: 시뮬레이터에서 앱 첫 실행 내려받기로 한 번 받았다(~2GB, 받는 시간은 수 분, 첫 실행 흐름 전체 약 14분). 층 1 흐름은 생성하지 않지만 기준 상태 점검(L3)과 설정의 「쓰는 모듈 2.0GB」 표시가 파일을 본다. 가짜 파일은 시험하지 않았다(042).
+- **모델 없이 닿는 화면**: 기준 상태가 온보딩 완료·모델 파일 있음을 전제하므로 첫 실행 게이트(로고·권한·동의·진행·작명) 화면은 층 1이 닿지 않는다 — 그 경로는 층 2 `first-run-auto-diary`(iPhone)가 본다.
+- **CI 판단 — 로컬 실행으로 둔다**: macOS 러너는 매 실행이 빈 상태라 시뮬레이터 모델 ~2GB(약 14분)·표본 사진 내려받기(약 4분)·표본 심기(약 1.5분)에 흐름 8분 남짓이 더해져 한 번에 30분 안팎이고, 모델 캐시를 러너 사이에 두려면 대용량 캐시·시뮬레이터 상태 보존이 필요하다. 층 1이 잡는 것(화면 회귀)에 비해 비용이 크고 릴리스 전 로컬 한 번으로 충분하다. 층 2는 실기기라 CI 대상이 아니다. 실측이 바뀌면(모델 없이도 닿는 화면 범위를 넓히는 등) 다시 정한다.
+- **iOS 시뮬레이터에서 처음 낸 결함 클래스**(층 1이 잡은 것): ① 시뮬레이터 키체인 오류 LogBox 토스트가 쓰기 바를 덮음(시뮬레이터 전용), ② RN `Modal` 루트 `testID`와 접근성 합쳐짐 때문에 날짜 숫자·진단 값·대화상자 루트를 못 봄(iOS 접근성 트리 차이 — 제품 결함이 아니라 e2e의 시야 차이). 앱 크래시·화면 오류 같은 제품 결함은 이번 실행에서 나오지 않았다.

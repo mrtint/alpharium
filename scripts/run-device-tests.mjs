@@ -210,6 +210,24 @@ const LAYER1_FLOWS = [
  * 069 — 층 1 기준 상태(쓴 날 픽스처)를 전제하는 흐름. **일반 실행(`pm clear` 뒤라 쓴 날이 없다)에서는 돌리지 않는다** — 돌리면 전제가 없어 실패한다.
  * 위 `FLOWS`에는 등록돼 있다(등록이 없으면 아무것도 검증하지 않는 초록불이다). `--layer1`로 돈다.
  */
+// 095 — iOS 시뮬레이터 층 1. 안드로이드 `LAYER1_FLOWS`와 같은 열두 흐름을 같은 순서로 돌린다 — 안드로이드 전용 동작(`back`·OS 설정 왕복)은 흐름 안에서 플랫폼으로 갈랐다.
+// iOS에서 지킬 수 없는 흐름이 생기면 여기서 빼고 이유를 docs/e2e/feature-flow-map.md 인벤토리에 적는다(등록 안 된 흐름은 아무것도 검증하지 않는다).
+// 시뮬레이터 통과는 실제 iPhone을 말해 주지 않는다 — 실제 모델 경로는 `npm run test:layer2:ios`(iPhone 14).
+const IOS_LAYER1_FLOWS = [
+  ".maestro/restart-persistence.yml",
+  ".maestro/single-photo-swipe.yml",
+  ".maestro/settings-developer-sweep.yml",
+  ".maestro/dialog-foundation.yml",
+  ".maestro/diary-home-1d.yml",
+  ".maestro/week-strip-swipe.yml",
+  ".maestro/diary-body-screen.yml",
+  ".maestro/skeleton.yml",
+  ".maestro/prompt-preview.yml",
+  ".maestro/today-diary.yml",
+  ".maestro/state-simulation.yml",
+  ".maestro/sample-days.yml",
+];
+
 const NEEDS_LAYER1_BASELINE = [
   ".maestro/restart-persistence.yml",
   ".maestro/single-photo-swipe.yml",
@@ -326,6 +344,56 @@ async function runLayer1Mode() {
   process.exit(1);
 }
 
+async function runIosLayer2Mode() {
+  const { runIosLayer2 } = await import("./layer2-ios/run.ts");
+  const requested = process.argv.slice(2).filter((arg) => arg !== "--ios-layer2");
+  const log = (line) => console.log(line);
+  const result = await runIosLayer2(requested, log);
+  const collected = result.perFlow.filter((f) => f.collected !== undefined);
+  if (collected.length > 0) {
+    console.log("");
+    console.log("사람이 읽을 일기 (자동 채점은 없다):");
+    for (const f of collected) console.log("  " + f.collected);
+  }
+  if (result.status === PASSED) {
+    report(PASSED);
+    process.exit(0);
+  }
+  if (result.status === SKIPPED) {
+    report(SKIPPED, result.reason);
+    process.exit(0);
+  }
+  report(result.status === ABORTED ? ABORTED : FAILED, result.reason);
+  process.exit(1);
+}
+
+async function runIosLayer1Mode() {
+  const { iosSimulatorDevice } = await import("./layer1/ios-simulator-device.ts");
+  const { runLayer1WithSample } = await import("./layer1/with-sample.ts");
+  const { realSampleStep } = await import("./e2e-sample/layer1-step.ts");
+  const { iosSampleDevice, grantSimulatorPermissions } = await import("./e2e-sample/ios-device.ts");
+  const requested = process.argv.slice(2).filter((arg) => arg !== "--ios-layer1");
+  const flows = requested.length > 0 ? requested : IOS_LAYER1_FLOWS;
+  const log = (line) => console.log(line);
+  console.log("  iOS 층 1은 시뮬레이터 하나에서 돈다 — 시뮬레이터의 사진 보관함은 표본이 낡으면 통째로 초기화된다(앱 데이터는 그대로).");
+  console.log("  앱은 dev 환경 번들로 떠 있어야 한다(Metro, EXPO_PUBLIC_APP_ENV=dev).");
+  const result = await runLayer1WithSample(
+    { device: iosSimulatorDevice(), flows, log },
+    realSampleStep(log, iosSampleDevice(), () => grantSimulatorPermissions()),
+  );
+  console.log("  (시뮬레이터 결과 — 실제 iPhone을 말해 주지 않는다. 실제 모델 경로는 npm run test:layer2:ios)");
+  if (result.status === PASSED) {
+    report(PASSED);
+    process.exit(0);
+  }
+  if (result.status === SKIPPED) {
+    report(SKIPPED, result.reason);
+    process.exit(0);
+  }
+  report(result.status === ABORTED ? ABORTED : FAILED, result.reason);
+  process.exit(1);
+}
+
 function main() {
   const devices = connectedDevices();
 
@@ -438,7 +506,11 @@ function failedFlows(path) {
   return names.length > 0 ? names.join(", ") : null;
 }
 
-if (process.argv.includes("--layer2")) {
+if (process.argv.includes("--ios-layer2")) {
+  await runIosLayer2Mode();
+} else if (process.argv.includes("--ios-layer1")) {
+  await runIosLayer1Mode();
+} else if (process.argv.includes("--layer2")) {
   await runLayer2Mode();
 } else if (process.argv.includes("--layer1")) {
   await runLayer1Mode();

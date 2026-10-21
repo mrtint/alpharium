@@ -13,6 +13,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 - extendedWaitUntil:
     visible:
       id: "photo-carousel-single"
@@ -25,14 +26,14 @@ appId: com.a810labs.pocketlog
     direction: LEFT
     duration: 400
 - assertNotVisible:
-    id: "photo-viewer"
+    id: "photo-viewer|photo-viewer-close"
 - swipe:
     from:
       id: "photo-face-e2e-0-1"
     direction: RIGHT
     duration: 400
 - assertNotVisible:
-    id: "photo-viewer"
+    id: "photo-viewer|photo-viewer-close"
 - assertVisible:
     id: "written-paper"
 
@@ -41,14 +42,17 @@ appId: com.a810labs.pocketlog
     id: "photo-open-e2e-0-1"
 - extendedWaitUntil:
     visible:
-      id: "photo-viewer"
+      id: "photo-viewer|photo-viewer-close"
     timeout: 5000
 
-# (3) 뒤로 가기 — 확대 화면만 닫히고 앱은 홈에 그대로다.
-- back
+# (3) 뒤로 가기 — 확대 화면만 닫히고 앱은 홈에 그대로다. (iOS는 뒤로 키가 없어 닫기 버튼을 누른다)
+- runFlow:
+    file: _system-back.yml
+    env:
+      IOS_TAP_ID: "photo-viewer-close"
 - extendedWaitUntil:
     notVisible:
-      id: "photo-viewer"
+      id: "photo-viewer|photo-viewer-close"
     timeout: 5000
 - assertVisible:
     id: "written-paper"

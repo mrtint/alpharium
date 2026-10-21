@@ -18,6 +18,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 - extendedWaitUntil:
     visible:
       id: "home-settings"
@@ -56,25 +57,25 @@ appId: com.a810labs.pocketlog
     id: "settings-target-hour"
 - extendedWaitUntil:
     visible:
-      id: "target-hour-dialog"
+      id: "target-hour-dialog|target-hour-cancel"
     timeout: 5000
 - tapOn:
     id: "target-hour-cancel"
 - extendedWaitUntil:
     notVisible:
-      id: "target-hour-dialog"
+      id: "target-hour-dialog|target-hour-cancel"
     timeout: 5000
 - tapOn:
     id: "settings-place-names"
 - extendedWaitUntil:
     visible:
-      id: "place-name-dialog"
+      id: "place-name-dialog|place-name-cancel"
     timeout: 5000
 - tapOn:
     id: "place-name-cancel"
 - extendedWaitUntil:
     notVisible:
-      id: "place-name-dialog"
+      id: "place-name-dialog|place-name-cancel"
     timeout: 5000
 - tapOn:
     id: "auto-diary-toggle"
@@ -83,7 +84,7 @@ appId: com.a810labs.pocketlog
       id: "settings-target-hour"
     timeout: 5000
 
-# 권한 행 — OS 설정 앱으로 나갔다가 뒤로 가기로 돌아온다
+# 권한 행 — OS 설정 앱으로 나갔다가 돌아온다 (안드로이드는 뒤로 키, iOS는 같은 프로세스로 앱을 다시 올린다 — `_return-from-os-settings.yml`)
 - scrollUntilVisible:
     element:
       id: "settings-perm-photos"
@@ -91,7 +92,7 @@ appId: com.a810labs.pocketlog
     id: "settings-perm-photos"
 - waitForAnimationToEnd:
     timeout: 3000
-- back
+- runFlow: _return-from-os-settings.yml
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
@@ -104,7 +105,7 @@ appId: com.a810labs.pocketlog
     id: "settings-perm-location"
 - waitForAnimationToEnd:
     timeout: 3000
-- back
+- runFlow: _return-from-os-settings.yml
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
@@ -116,7 +117,7 @@ appId: com.a810labs.pocketlog
     id: "settings-perm-notifications"
 - waitForAnimationToEnd:
     timeout: 3000
-- back
+- runFlow: _return-from-os-settings.yml
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
@@ -128,7 +129,7 @@ appId: com.a810labs.pocketlog
     id: "settings-perm-battery"
 - waitForAnimationToEnd:
     timeout: 3000
-- back
+- runFlow: _return-from-os-settings.yml
 - extendedWaitUntil:
     visible:
       id: "settings-screen"
@@ -147,13 +148,13 @@ appId: com.a810labs.pocketlog
     id: "settings-wipe"
 - extendedWaitUntil:
     visible:
-      id: "wipe-dialog"
+      id: "wipe-dialog|wipe-cancel"
     timeout: 5000
 - tapOn:
     id: "wipe-cancel"
 - extendedWaitUntil:
     notVisible:
-      id: "wipe-dialog"
+      id: "wipe-dialog|wipe-cancel"
     timeout: 5000
 
 # 버전
@@ -224,10 +225,24 @@ appId: com.a810labs.pocketlog
 # ── 진단 ──
 # ★ 078부터 「끄기」 아래에 묶음이 있어 화면이 더 내려간다 — 위에 있는 「진단」 행은 **올라가며** 찾는다.
 #   방향을 안 주면(기본 DOWN) 실기기(SM-S901N)에서 20초 동안 못 찾고 실패했다(2026-10-13).
-- scrollUntilVisible:
-    element:
-      id: "developer-diagnostics"
-    direction: UP
+# iOS는 위에 붙은 머리가 행을 가려도 「보임」으로 세어 탭이 머리에 떨어진다 — 행을 화면 가운데로 올린 뒤 누른다(095).
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "developer-diagnostics"
+          direction: UP
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - scrollUntilVisible:
+          element:
+            id: "developer-diagnostics"
+          direction: UP
+          centerElement: true
 - tapOn:
     id: "developer-diagnostics"
 - extendedWaitUntil:

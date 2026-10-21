@@ -13,7 +13,7 @@ import { join } from "node:path";
 
 import { ESSENTIAL_ASSET_KEYS } from "../../src/onboarding/essential-assets.ts";
 import { BASELINE } from "./baseline.ts";
-import type { Layer1Device, Outcome } from "./device.ts";
+import { ANDROID_LABELS, type BaselineDevice, type DeviceLabels, type Layer1Device, type Outcome } from "./device.ts";
 import {
   FIXTURES_DIRECTORY,
   buildFixtureDiaries,
@@ -63,17 +63,18 @@ function must(step: string, outcome: Outcome<unknown>): string | null {
  * 앱 데이터를 통째로 지우지 않고 모델은 읽기만 한다(I-1).
  */
 export function prepareBaseline(
-  device: Layer1Device,
+  device: BaselineDevice,
   serial: string,
   fixtures: Fixtures,
   log: (line: string) => void,
+  labels: DeviceLabels = ANDROID_LABELS,
 ): Layer1Result | null {
   // L2 — debug 앱 데이터에 닿는가
   const probe = device.probe(serial);
   if (!probe.ok) {
     return stop(
       "aborted",
-      `[${serial}] 앱 데이터에 닿지 못했다(release 빌드이거나 재부팅 뒤 첫 잠금 해제 전일 수 있다): ${probe.detail}`,
+      `[${serial}] 앱 데이터에 닿지 못했다(${labels.probeHint}): ${probe.detail}`,
     );
   }
 
@@ -141,8 +142,9 @@ export function runLayer1(options: Layer1Options): Layer1Result {
 
   // L1 — 기기·Maestro. 없으면 건너뜀(통과가 아니다)
   const serials = device.listDevices();
-  if (serials === null) return { status: "skipped", reason: "adb를 찾지 못했다" };
-  if (serials.length === 0) return { status: "skipped", reason: "연결된 안드로이드 기기가 없다" };
+  const labels = device.labels ?? ANDROID_LABELS;
+  if (serials === null) return { status: "skipped", reason: labels.toolMissing };
+  if (serials.length === 0) return { status: "skipped", reason: labels.noDevice };
   if (!device.hasMaestro()) return { status: "skipped", reason: "Maestro가 설치되지 않았다" };
 
   const fixtures = options.fixtures ?? {
@@ -154,7 +156,7 @@ export function runLayer1(options: Layer1Options): Layer1Result {
   };
 
   for (const serial of serials) {
-    const aborted = prepareBaseline(device, serial, fixtures, log);
+    const aborted = prepareBaseline(device, serial, fixtures, log, labels);
     if (aborted !== null) return aborted;
   }
 

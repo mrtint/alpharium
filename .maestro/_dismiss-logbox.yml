@@ -1,0 +1,22 @@
+# iOS 시뮬레이터 — 개발 클라이언트의 LogBox 오류 알림을 닫는다 (095).
+#
+# 시뮬레이터 빌드는 키체인 접근이 막혀 `expo-notifications`가 매 실행 `ERR_NOTIFICATIONS_KEYCHAIN_ACCESS`를 낸다(실기기에서는 나지 않는다). 개발 클라이언트는
+# 이것을 화면 아래 토스트로 띄우는데, 하단 쓰기 바와 겹쳐 「쓰기」 탭이 토스트를 눌러 전체 LogBox 화면이 열린다 — 흐름이 엉뚱한 곳에서 실패한다.
+# 다른 흐름이 `launchApp` 뒤에 부르는 보조 흐름이다 — 최상위로 돌리지 않는다(FLOWS에 없다). 안드로이드와 실기기에서는 아무것도 하지 않는다(토스트가 없다).
+appId: com.a810labs.pocketlog
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible: ".*expo-notifications.*"
+          timeout: 5000
+          optional: true
+      - runFlow:
+          when:
+            visible: ".*expo-notifications.*"
+          commands:
+            # 토스트의 ✕ 버튼
+            - tapOn:
+                point: "96%,93%"

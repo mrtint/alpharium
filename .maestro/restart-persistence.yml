@@ -17,6 +17,7 @@ appId: com.a810labs.pocketlog
     times: 10
     commands:
       - launchApp
+      - runFlow: _dismiss-logbox.yml
       - extendedWaitUntil:
           visible:
             id: "written-paper"

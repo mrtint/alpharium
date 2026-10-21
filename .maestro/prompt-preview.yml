@@ -24,6 +24,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 # 059 — 설정 → 개발자 → 진단. 개발 환경은 「개발자」 행이 처음부터 있다(7번 탭 불필요).
 - tapOn:

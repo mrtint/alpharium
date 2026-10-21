@@ -9,5 +9,5 @@
 - **L4~L6**: 앱을 끄고(`simctl terminate`) 설정 기준값·일기 픽스처·사진 사본을 만든다. `prepareBaseline`을 그대로 쓴다.
 - **L7**: 흐름 전부를 `maestro --device <UDID> test` 한 번에 돌린다. 하나라도 실패면 failed와 실패 흐름 이름.
 - **I-1**: 이 장치 구현에 앱 삭제·재설치·`erase`·모델 삭제 연산이 없다(`__tests__/e2e/ios-layer1-source-contract.test.ts`가 소스를 읽어 잠근다).
-- **S (표본)**: 흐름 앞에 30일 표본을 보장한다(070). 시뮬레이터 보관함이 표본과 어긋나면 지우지 않고 aborted(research R4)한다. 권한은 `simctl privacy grant`.
+- **S (표본)**: 흐름 앞에 30일 표본을 보장한다(070). 표식과 `Photos.sqlite` 되읽기가 모두 표와 맞으면 건너뛴다. 어긋나면(날이 바뀌어 낡았거나 일부가 빠졌다) **시뮬레이터의 사진 보관함만 초기화**한다 — shutdown → `Media/PhotoData`·`Media/DCIM`만 삭제 → boot(앱 컨테이너·모델은 그대로, research R4) — 한 뒤 다시 심고 되읽어 검증한다. 전용 시뮬레이터 전제이며 그 시뮬레이터의 사진은 모두 사라진다 — **이 도구가 전에 심은 적이 있거나(`Media/s30-marker.txt`) 환경변수 `POCKETLOG_E2E_RESET_SIM_PHOTOS=1`로 허락했을 때만** 한다. 둘 다 아니면 이유와 방법을 말하고 중단한다(범용 시뮬레이터의 사진을 지우지 않게). 권한은 `simctl privacy grant photos|location`.
 - **보고**: 끝 줄에 「시뮬레이터 결과 — 실제 iPhone을 말해 주지 않는다」를 덧붙인다.

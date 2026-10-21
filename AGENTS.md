@@ -34,6 +34,8 @@
 - **★ RN 전역 `fetch`는 `res.body`가 언제나 `undefined`다**(041). 큰 모델은 `DownloadTask`에 `headers: { Range }`를 줘 `.seg<i>`로 받고 `COPY_CHUNK_BYTES`(1MiB)씩 옮겨 붙인다(`__tests__/models/download-memory.test.ts`).
 - **★ `await import("react-native")`는 iOS에서 앱을 죽인다**(066·068). `PushNotificationIOS` getter가 크래시하므로 호출 시점 `require`로만 읽는다(`__tests__/onboarding/no-react-native-dynamic-import.test.ts`).
 - **★ iOS Hermes `formatToParts` 버그**(066): `GMT+9`의 「9」를 `minute`으로 돌려줘 datepicker `onChange`가 전날 23:51이 되므로 변환은 `src/app/calendar.ts`의 `dayDateFromPicker()`만 쓴다.
+- **★ `devicectl device copy to … --remove-existing-content true`는 대상 디렉터리의 부모를 통째로 비운다**(095 실측 — 사고: `Documents/preferences`를 올리다 기기의 `Documents/`가 비워져 모델 ~2GB가 지워졌다). 쓰지 않는다 — 파일은 하나씩 올리고(없는 부모는 만들어진다), 지우는 것은 앱 안에서 lldb로 한다(`scripts/layer2-ios/app-delete.ts`). `devicectl`에는 파일 삭제 명령이 없고 오류에도 종료 코드 0을 줄 수 있어 `--json-output`의 `outcome`을 본다(`__tests__/e2e/ios-layer2-source-contract.test.ts`가 옵션 문자열을 막는다).
+- **iOS 접근성 트리와 e2e**(095): `Pressable`이 자식 글자를 한 요소로 합쳐 날짜 버튼의 큰 숫자·설정/진단 행의 값은 Maestro가 못 읽는다(화면에는 보인다). RN `Modal`의 루트 `testID`(`photo-viewer`·`*-dialog`)도 노출되지 않아 안의 버튼 id로 갈음한다. 시뮬레이터 빌드는 `expo-notifications`가 매 실행 키체인 오류를 내 LogBox 토스트가 하단 쓰기 바를 덮는다(`.maestro/_dismiss-logbox.yml`). 위 값들은 제품의 접근성 라벨을 바꾸는 일(UX-09)이 아니면 사람이 본다.
 - **iOS 컨테이너 UUID 변경**(066): 업데이트·재설치마다 바뀌므로 리사이즈 사진 경로는 `fileStore.load()`가 `rehomeResizedPath()`(`src/diary/photo-path.ts`)로 현재 컨테이너 위치로 옮긴다.
 
 ### 화면·레이아웃·서체·동작
@@ -122,7 +124,8 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 1. **안드로이드 연결**: `~/Library/Android/sdk/platform-tools/adb` + `JAVA_HOME=/opt/homebrew/opt/openjdk@17` + `adb reverse tcp:8081 tcp:8081`. 네이티브·서체·플러그인이 안 바뀌었으면 기기의 debug APK를 지우지 않고 Metro 번들만 올린다(`pm clear`·재설치는 모델 ~2GB를 지운다). 플래그만 되돌릴 때는 `run-as com.a810labs.pocketlog`로 `files/preferences/*.json`만 고친다.
 2. **매니페스트·네이티브 설정 변경 시**: 반드시 `npx expo prebuild --platform android --clean`을 먼저 돌리고 `adb shell dumpsys package com.a810labs.pocketlog`로 확인한다.
 3. **iOS 시뮬레이터·실기기(066·068·087)**: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`로 `xcodebuild`를 쓰고, `pod install` 시 `~/.netrc`가 644면 `NETRC=<빈 디렉터리>`를 앞에 준다. 시뮬레이터는 Maestro(`maestro --device <UDID> test <flow>`, 콜드 기동은 `MAESTRO_DRIVER_STARTUP_TIMEOUT=180000`, 설정 왕복은 `stopApp: false`)로 조작한다. 실기기 사진 시딩은 `npm run ios:seed`(`scripts/ios-seed/README.md`, 087)를 쓴다.
-4. **Maestro 규칙과 층 1·층 2 e2e(069·070·073·084)**: 새 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`(및 `LAYER1_FLOWS`)와 [`docs/e2e/feature-flow-map.md`](docs/e2e/feature-flow-map.md)의 두 표에 함께 등록한다(`__tests__/e2e/flow-map.test.ts`). 전용 기기에서는 모델을 보존하는 `npm run test:layer1`·`npm run test:layer2`를 쓴다.
+4. **iOS e2e(095)**: **층 1은 iOS 시뮬레이터**(`npm run test:layer1:ios`, Maestro) — 전용 시뮬레이터 하나(부팅), 모델은 `.maestro/ios/_prepare-simulator.yml`로 앱이 한 번 받는다. 표본 사진 보관함은 낡으면 시뮬레이터 `Media/PhotoData`·`DCIM`만 지워 초기화한다(앱 데이터는 그대로). **층 2는 iPhone 실기기**(`npm run test:layer2:ios`) — Maestro가 iOS 실기기를 구동하지 못해(러너 서명·Xcode 27 배포 목표·iOS 27 미검증, 소유자가 채택하지 않았다) 실행기가 준비하고 안내하면 **사람이 쓰기를 누르고 Enter로 알린다**. 전제·절차는 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md) 「iOS」, 흐름과 한계는 [docs/e2e/feature-flow-map.md](docs/e2e/feature-flow-map.md).
+5. **Maestro 규칙과 층 1·층 2 e2e(069·070·073·084)**: 새 흐름은 `scripts/run-device-tests.mjs`의 `FLOWS`(및 `LAYER1_FLOWS`)와 [`docs/e2e/feature-flow-map.md`](docs/e2e/feature-flow-map.md)의 두 표에 함께 등록한다(`__tests__/e2e/flow-map.test.ts`). 전용 기기에서는 모델을 보존하는 `npm run test:layer1`·`npm run test:layer2`를 쓴다.
 
 ## release 빌드·서명·Google Play — 요청받았을 때만 탄다
 
@@ -146,6 +149,8 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 | `npm run test:ui`     | 화면만 (`.tsx`, `jest-expo`)                                    | 필요 없음                |
 | `npm run test:layer1` | 실기기 화면 흐름 e2e (생성 없음, 기준 상태·30일 표본 자동 보장) | 전용 테스트 기기         |
 | `npm run test:layer2` | 실기기 실제 모델 생성 스모크 4종                                | 전용 테스트 기기         |
+| `npm run test:layer1:ios` | iOS 시뮬레이터 화면 흐름 e2e (095, 생성 없음)             | 전용 iOS 시뮬레이터      |
+| `npm run test:layer2:ios` | iPhone 실기기 실제 모델 생성 스모크 4종 (095, 사람이 탭)  | 전용 iPhone              |
 | `npm run lint`        | eslint + tsc + 헌법 검사 + prettier 포맷 검사                   | 필요 없음                |
 
 - **건너뛴 실기기 테스트는 통과가 아니다**(헌법 원칙 V). 기능이 끝났다고 말하려면 **dev(debug) 빌드**로 실기기에서 최소 1회 확인한다.

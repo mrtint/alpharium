@@ -27,6 +27,13 @@ export type FlowMapInput = {
   newFlowSources: Readonly<Record<string, string>>;
   /** 픽스처 본문에서 가져온 조각들 — 흐름이 이것을 단언하면 안 된다 */
   fixtureTexts: readonly string[];
+  /** 095 — iOS 갈래. 없으면 iOS 검사(M-iOS-*)를 건너뛴다 */
+  ios?: {
+    /** `run-device-tests.mjs`의 `IOS_LAYER1_FLOWS` */
+    layer1: readonly string[];
+    /** `scripts/layer2-ios/flows.ts` 표의 `id`들 */
+    layer2Ids: readonly string[];
+  };
 };
 
 type Row = string[];
@@ -68,6 +75,21 @@ export function pathsIn(cell: string): string[] {
   return [...cell.matchAll(/`([^`]+)`/g)]
     .map((m) => m[1])
     .filter((p) => /^(\.maestro\/|__tests__\/)/.test(p));
+}
+
+/** 마크다운 표의 헤더 칸들을 첫 칸 이름으로 찾는다 (`parseTables`는 헤더를 버린다) */
+export function tableHeader(doc: string, firstCell: string): string[] | null {
+  for (const line of doc.split(/\r?\n/)) {
+    if (!line.trim().startsWith("|")) continue;
+    const cells = line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((c) => c.trim());
+    if (cells[0] === firstCell) return cells;
+  }
+  return null;
+}
+
+/** 셀에서 백틱으로 감싼 흐름 id(소문자·숫자·하이픈)들을 뽑는다 — 경로(`/`·`.`)는 아니다 */
+export function idsIn(cell: string): string[] {
+  return [...cell.matchAll(/`([^`]+)`/g)].map((m) => m[1]).filter((t) => /^[a-z0-9]+(-[a-z0-9]+)*$/.test(t));
 }
 
 const hasContent = (cell: string | undefined) => cell !== undefined && cell !== "" && cell !== "—";
@@ -160,6 +182,60 @@ export function checkFlowMap(input: FlowMapInput): string[] {
         problems.push(`M-10: ${file}이(가) 픽스처 본문 조각을 단언한다: ${fragment}`);
       }
     }
+  }
+  if (input.ios !== undefined) problems.push(...checkIos(input, features, inventory));
+  return problems;
+}
+
+/**
+ * 095 — iOS 열 검사 (contracts/ios-flow-map.md M-iOS-1~4).
+ * 기능 표: 5=「iOS 층 1」·6=「iOS 층 2」, 인벤토리: 6=「iOS 층 1」(○ 또는 「— 이유」).
+ */
+function checkIos(input: FlowMapInput, features: Row[], inventory: Row[]): string[] {
+  const problems: string[] = [];
+  const ios = input.ios!;
+  const featureHeader = tableHeader(input.doc, "기능");
+  const inventoryHeader = tableHeader(input.doc, "흐름 파일");
+  // M-iOS-1 — 두 표에 iOS 열이 있다
+  if (featureHeader?.[5] !== "iOS 층 1" || featureHeader?.[6] !== "iOS 층 2") {
+    problems.push("M-iOS-1: 기능 표에 「iOS 층 1」·「iOS 층 2」 열이 없다");
+  }
+  if (inventoryHeader?.[6] !== "iOS 층 1") problems.push("M-iOS-1: 흐름 인벤토리에 「iOS 층 1」 열이 없다");
+
+  // M-iOS-2 — 인벤토리의 iOS ○ 집합 == IOS_LAYER1_FLOWS, iOS ○는 층 1이다, 층 1인데 iOS가 아니면 이유가 있다
+  const iosMarked = inventory
+    .filter((row) => row[6] === "○")
+    .map((row) => pathsIn(row[0])[0] ?? row[0])
+    .sort();
+  if (JSON.stringify(iosMarked) !== JSON.stringify([...ios.layer1].sort())) {
+    problems.push("M-iOS-2: 인벤토리의 iOS 층 1 ○ 집합이 run-device-tests.mjs의 IOS_LAYER1_FLOWS와 다르다");
+  }
+  for (const file of ios.layer1) {
+    if (!input.layer1.includes(file)) problems.push(`M-iOS-2: IOS_LAYER1_FLOWS의 흐름이 LAYER1_FLOWS에 없다: ${file}`);
+    if (!input.flowFiles.includes(file)) problems.push(`M-iOS-2: IOS_LAYER1_FLOWS의 파일이 저장소에 없다: ${file}`);
+  }
+  for (const row of inventory) {
+    if (row[2] === "○" && row[6] !== "○" && !/^—\s*\S/.test(row[6] ?? "")) {
+      problems.push(`M-iOS-2: 층 1인데 iOS가 아닌 이유가 없다: ${row[0]}`);
+    }
+  }
+
+  // M-iOS-3 — .maestro/ios/ 아래 흐름은 등록됐거나 보조(`_` 접두)다
+  for (const file of input.flowFiles.filter((f) => f.startsWith(".maestro/ios/"))) {
+    const name = file.slice(".maestro/ios/".length);
+    if (!name.startsWith("_") && !ios.layer1.includes(file)) {
+      problems.push(`M-iOS-3: 등록되지도 보조도 아닌 iOS 흐름: ${file}`);
+    }
+  }
+
+  // M-iOS-4 — 기능 표 「iOS 층 2」 칸의 id들이 iOS 층 2 흐름 표와 같은 집합이다
+  const cited = new Set<string>();
+  for (const row of features) for (const id of idsIn(row[6] ?? "")) cited.add(id);
+  for (const id of cited) {
+    if (!ios.layer2Ids.includes(id)) problems.push(`M-iOS-4: 기능 표의 iOS 층 2 칸이 표에 없는 흐름을 가리킨다: ${id}`);
+  }
+  for (const id of ios.layer2Ids) {
+    if (!cited.has(id)) problems.push(`M-iOS-4: iOS 층 2 흐름이 기능 표 「iOS 층 2」 칸에 없다: ${id}`);
   }
   return problems;
 }
