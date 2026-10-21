@@ -45,6 +45,12 @@ describe("094 — UIScene 대응 설정", () => {
     expect(entries[0][1]).toEqual({ ios: { enableSceneSupport: true } });
   });
 
+  it("C3b: with-no-push-entitlement가 plugins의 맨 끝이다(그 뒤에 더하면 aps-environment가 되살아난다)", () => {
+    expect(app.expo.plugins[app.expo.plugins.length - 1]).toBe(
+      "./plugins/with-no-push-entitlement",
+    );
+  });
+
   it("C4: expo-background-task는 패치와 같은 정확한 버전이다", () => {
     expect(pkg.dependencies["expo-background-task"]).toBe("57.0.14");
     expect(read("patches/expo-background-task+57.0.14.patch")).toContain(
