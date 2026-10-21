@@ -30,7 +30,7 @@
 
 - [X] T012 문서: AGENTS.md의 「Xcode 27 UIScene」 경고·`specs/092-ios-continued-write/quickstart.md` 「빌드 함정」·로드맵 절을 고친다(우회 설명 삭제, 완료 이력으로 이동 — 로드맵 이동은 완료 처리 단계). 이로써 T002의 C6이 통과한다
 - [X] T013 `npm test`, `npm run lint`, `npx tsc --noEmit` 통과를 확인한다
-- [ ] T014 push 후 PR의 CI(iOS 빌드 Xcode 26.6 포함)가 통과하는지 확인한다(FR-007)
+- [X] T014 push 후 PR의 CI(iOS 빌드 Xcode 26.6 포함)가 통과하는지 확인한다(FR-007)
 
 ## 의존성
 
