@@ -11,7 +11,7 @@
 - **패키지·이름**: 포켓로그(Pocketlog), `com.a810labs.pocketlog`(065).
 - **온디바이스 일기 생성**: 프롬프트 조립(`src/diary/prompt.ts`, 원본 `my-ollama` `hand-prompt/v5`, `~요`체, 날짜별 첫 문장 틀 11개, 077) → `llama.rn` 추론(`root ::= [^A-Za-z]*`) → 4갈래 판정(`empty`/`echo`/`language`/`unfinished`, `acceptance.ts`) → 2차 호출 제목 질문(`title.ts`) → 저장. 사진이 있는 날은 VLM이 캡션을 읽는다(011·042, 1024px 리사이즈 013, 시간 분포·잡사진 제외 상한 8장 023).
 - **캐릭터 페르소나**: 검증 로스터는 `quiet`(`kanana-1.5-2.1b`, 기본 이름 금동이) 하나다(037). 다중 캐릭터 계약은 `__tests__/future-character.ts`의 `FUTURE_CHARACTER`로 잠근다.
-- **첫 실행**: 스플래시·로고 → 권한 순차 요청(`photos`·`photo-location`·`location`·`notifications`·`battery-exception`, 021·043) → 필수 모듈(~2GB) 동의(`CELLULAR`일 때만 모바일 데이터/나중에 받기 + 용량 표시, 045·074) → 진행 슬라이드(046) → 작명(보드 `1a`, 047) → 정상 동작 확인(liveness) → 자동 첫 일기(040).
+- **첫 실행**: 스플래시·로고 → 권한 순차 요청(`photos`·`photo-location`·`location`·`notifications`·`battery-exception`, 021·043) → 필수 모듈(~2GB) 동의(본문에 받을 양 — 못 읽거나 0MB면 양 없이, 095; `CELLULAR`일 때만 모바일 데이터/나중에 받기, 045·074) → 진행 슬라이드(046) → 작명(보드 `1a`, 047) → 정상 동작 확인(liveness) → 자동 첫 일기(040).
 - **홈(Modernist)**: 탭 줄 없음(048). 주간 스트립·달력(`DateJumpDialog`)으로 모든 지난날과 오늘을 고른다(자정 00:00 경계, 049·050). 안 쓴 날은 사진·장소 재료와 쓰기 전 확인(053), 쓰는 중은 제자리 쓰기·혼잣말·그만두기·실패 토스트(054), 쓴 날은 순환 사진 캐러셀(탭 시 확대 뷰어, 067)과 본문·스크롤 접힘(051·052)을 그린다.
 - **살아 있는 쓰기 등록부**: 프로세스 안의 쓰기·지우기는 메모리 등록부 하나(`src/diary/live-write.ts`)가 안다(080 — 잠금 파일·낡음 시간 폐지). 남의 쓰기 도중에 앱을 열면 홈이 「쓰는 중」으로 합류하고, 실패하면 이어서 한 번 새로 쓴다.
 - **iPhone 이어 하기(092)**: 홈이 시작한 iOS 쓰기(「쓰기」·057 앱 열기·085 알림 누름)는 iOS 26 `BGContinuedProcessingTask`를 신청해(`modules/pocketlog-continued-write/`, `src/app/continued-write.ts`) 앱을 나가도 충전 없이 끝까지 쓰고 완성 알림을 띄운다(iPhone 14, 사진 6장 약 23분). 안드로이드·첫 실행 자동 첫 일기·진단·백그라운드는 신청하지 않는다. 상세는 아래 「iPhone 이어 하기」.

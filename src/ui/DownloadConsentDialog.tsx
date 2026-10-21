@@ -3,7 +3,8 @@
  *
  * 계약: specs/045-onboarding-download-consent/contracts/download-consent-gate.md
  *       C9
- *       spec.md FR-001~FR-003·FR-002a
+ *       spec.md FR-001~FR-002a
+ *       specs/095-download-size-notice/contracts/consent-size.md DS8·DS9
  *       specs/050-dialog-foundation/contracts/dialogs.md MIG1
  *
  * ─────────────────────────────────────────────────────────────────────────────
@@ -12,9 +13,13 @@
  * Screen`이 "그만두기 경로가 없다"고 정한 것과 같은 논리를 여기 적용한다
  * (research.md R1, Clarifications 2026-09-19).
  *
- * **모델 식별자·자산 키·바이트 크기를 노출하지 않는다**(FR-003, C9) —
- * `essential-assets.ts`의 `ESSENTIAL_ASSET_KEYS`를 import하지 않는다. 화면이
- * 아는 것은 "사진을 읽는 모델"·"글을 쓰는 모델"이라는 역할 이름뿐이다(원칙 III).
+ * **모델 식별자·자산 키를 노출하지 않는다**(원칙 III, C9) — `essential-assets.ts`의
+ * `ESSENTIAL_ASSET_KEYS`를 import하지 않는다. 화면이 아는 것은 "사진을 읽는 모델"·"글을
+ * 쓰는 모델"이라는 역할 이름과 받을 양뿐이다.
+ *
+ * **095 — 받을 양을 싣는다**(App Store 4.2.3(ii), 045 FR-003의 용량 비노출을 대체). 양은
+ * `sizeLabel` prop으로만 온다 — 이 화면은 모듈 자산·연결 조회에 닿지 않고, 못 읽었으면
+ * `null`이라 양 없는 원래 문장을 보인다(원칙 V — 양을 지어내지 않는다).
  *
  * **050 — 공용 확인 대화상자(`ConfirmDialog`)로 옮겼다**(Clarifications Q4). 045는 「새 Dialog
  * 라이브러리를 추가하지 않는다」며 RN 코어 `Modal`을 썼는데, 050이 대화상자 기반(RNR)을 들이며 그
@@ -28,14 +33,20 @@ import { ConfirmDialog, DialogActionButton } from "./components/Dialog";
 
 export type DownloadConsentDialogProps = {
   visible: boolean;
+  /** 「2.0GB」꼴 받을 양. 못 읽었으면 `null`(095) */
+  sizeLabel: string | null;
   /** 사용자가 [확인/시작]을 눌렀다 — 거부 콜백은 없다(FR-002a). */
   onConfirm: () => void;
 };
 
-/** 문구는 전부 사람이 쓴 고정 상수다(FR-003, 원칙 II). 062 — 원문은 한국어 카탈로그(`src/i18n/catalogs/ko/download.ts`)에 있다 */
+/** 문구는 전부 사람이 쓴 고정 문장이다(원칙 II) — 받을 양만 끼워 넣는다(095). 062 — 원문은 한국어 카탈로그(`src/i18n/catalogs/ko/download.ts`)에 있다 */
 const TEXT = lazyText((c) => c.download.consent);
 
-export function DownloadConsentDialog({ visible, onConfirm }: DownloadConsentDialogProps) {
+export function DownloadConsentDialog({
+  visible,
+  sizeLabel,
+  onConfirm,
+}: DownloadConsentDialogProps) {
   return (
     <ConfirmDialog
       // [확인/시작] 하나뿐이다 — 거부·건너뛰기 버튼을 두지 않는다(FR-002a).
@@ -44,7 +55,7 @@ export function DownloadConsentDialog({ visible, onConfirm }: DownloadConsentDia
           {TEXT.confirm}
         </DialogActionButton>
       }
-      description={TEXT.body}
+      description={TEXT.body(sizeLabel)}
       open={visible}
       testID="download-consent-dialog"
       title={TEXT.title}

@@ -22,9 +22,14 @@
 - **DS10** `DownloadConsentGate`는 표준 동의에 `gate.sizeLabel`을 넘긴다. 모바일 동의(`CellularConsentDialog`)와 대기 화면은 바뀌지 않는다. (FR-007)
 - **DS11** 코드·테스트 주석이 「045 FR-003 — 표준 동의에는 용량을 노출하지 않는다」를 근거로 드는 자리가 남지 않는다. (FR-009)
 
+## 받을 양 문자열 (`src/app/module-size.ts`, 조립 `App.tsx`)
+
+- **DS12** `remainingSizeLabel(bytes)`는 `formatModuleBytes(bytes)`가 「0MB」가 될 크기(0.5MB 미만, 0·음수 포함)면 `null`, 그 밖에는 `formatModuleBytes(bytes)`와 같다. `App.tsx`의 `readConsentSizeLabel`이 이것을 쓴다. (FR-003a)
+
 ## 위반 주입(구현 때 한다)
 
 1. 훅이 연결을 다 읽은 뒤에 양을 읽게 되돌림 → DS3·DS6 실패.
 2. 표준 갈래의 `sizeLabel`을 `null`로 고정 → DS4 실패.
 3. 화면이 `sizeLabel ?? "2.0GB"`로 지어냄 → DS9(또는 DS1 null 문장 단언) 실패.
 4. 카탈로그가 `null`에도 「약 null」을 만듦 → DS1 실패.
+5. `remainingSizeLabel`이 0에도 「0MB」를 줌 → DS12 실패.

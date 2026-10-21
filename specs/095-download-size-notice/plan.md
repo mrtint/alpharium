@@ -65,6 +65,8 @@ src/i18n/catalogs/ko/download.ts      # consent.body → (size: string | null) =
 src/ui/DownloadConsentDialog.tsx      # sizeLabel prop, 머리 주석 095
 src/ui/DownloadConsentGate.tsx        # 표준 동의에 sizeLabel 전달, 머리 주석
 src/app/use-consent-gate.ts           # 연결·양 동시 읽기, 두 갈래 모두 sizeLabel
+src/app/module-size.ts                # remainingSizeLabel — 「0MB」면 null (FR-003a)
+App.tsx                               # readConsentSizeLabel이 remainingSizeLabel을 쓴다
 
 __tests__/i18n/download-consent-body.test.ts    # 새 파일 — 카탈로그 DS1(logic)
 __tests__/ui/download-consent-dialog.test.tsx   # FR-003 단언 교체(DS-UI)
@@ -73,7 +75,7 @@ __tests__/ui/download-consent-gate.test.tsx     # 표준에서 양 읽음(DS-G)
 __tests__/i18n/ko-golden.test.ts                # ADDED_AFTER_GOLDEN
 ```
 
-**Structure Decision**: 074의 구조(순수 판정 `consent-gate.ts` · 훅 `use-consent-gate.ts` · 화면은 prop만)를 그대로 따른다. 새 소스 파일을 만들지 않는다(새 파일은 카탈로그 계약 테스트 하나뿐). `consent-gate.ts`(순수)·`App.tsx`(`readConsentSizeLabel` 배선)·`CellularConsentDialog.tsx`는 바뀌지 않는다.
+**Structure Decision**: 074의 구조(순수 판정 `consent-gate.ts` · 훅 `use-consent-gate.ts` · 화면은 prop만)를 그대로 따른다. 새 소스 파일을 만들지 않는다(새 파일은 카탈로그 계약 테스트 하나뿐). `consent-gate.ts`(순수)·`CellularConsentDialog.tsx`는 바뀌지 않는다. 코드 리뷰 뒤(FR-003a) `src/app/module-size.ts`에 `remainingSizeLabel`을 더하고 `App.tsx`의 `readConsentSizeLabel`이 그것을 쓴다 — 양의 출처(남은 바이트)는 그대로다.
 
 ## Complexity Tracking
 

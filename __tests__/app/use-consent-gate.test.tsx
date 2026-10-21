@@ -11,6 +11,7 @@ import { useConsentGate } from "../../src/app/use-consent-gate";
  * 074 — 동의 게이트 훅.
  *
  * 계약: specs/074-wifi-download-consent/contracts/consent-gate.md CG5~CG10
+ *       specs/095-download-size-notice/contracts/consent-size.md DS3~DS7 — 074 CG6(표준에서는 양을 읽지 않는다)를 대체한다
  *
  * 훅을 눈으로 볼 수 있게 작은 시험용 컴포넌트에 올린다. 연결·받을 양 통로는 주입 대역이다.
  * `AppState.addEventListener`의 스파이는 복원하지 않는다 — jest-expo의 목은 복원하면 구독 반환값을 잃는다.
@@ -57,7 +58,7 @@ async function fireAppState(spy: jest.SpyInstance, state: string) {
   });
 }
 
-describe("CG5·CG6 — 읽는 순서", () => {
+describe("CG5·DS3·DS4 — 읽는 순서", () => {
   it("마운트에서 연결을 정확히 한 번 읽고, 읽는 동안 reading이다", async () => {
     let release: (c: Connection) => void = () => {};
     const deps = depsOf(() => new Promise<Connection>((resolve) => (release = resolve)));
@@ -69,7 +70,7 @@ describe("CG5·CG6 — 읽는 순서", () => {
     expect(deps.readConnection).toHaveBeenCalledTimes(1);
   });
 
-  it("cellular면 그 뒤에 받을 양을 읽고 cellular + sizeLabel이다", async () => {
+  it("cellular면 cellular + sizeLabel이다", async () => {
     const deps = depsOf("cellular", "2.0GB");
     await render(<Harness {...deps} />);
     await waitFor(() => expect(view()).toBe("cellular"));
@@ -77,14 +78,52 @@ describe("CG5·CG6 — 읽는 순서", () => {
     expect(deps.readSizeLabel).toHaveBeenCalledTimes(1);
   });
 
-  it("★ 표준이면 받을 양을 읽지 않는다 — wifi·other·unknown", async () => {
+  it("★ DS4 — 표준(wifi·other·unknown)도 받을 양을 한 번 읽어 sizeLabel에 싣는다", async () => {
     for (const c of ["wifi", "other", "unknown"] as const) {
-      const deps = depsOf(c);
+      const deps = depsOf(c, "2.0GB");
       const { unmount } = await render(<Harness {...deps} />);
       await waitFor(() => expect(view()).toBe("standard"));
-      expect(deps.readSizeLabel).not.toHaveBeenCalled();
+      expect(size()).toBe("2.0GB");
+      expect(deps.readSizeLabel).toHaveBeenCalledTimes(1);
       await unmount();
     }
+  });
+
+  it("★ DS3 — 연결 읽기가 끝나기 전에 받을 양 읽기가 이미 시작돼 있다(동시에 읽는다)", async () => {
+    // 끝나지 않는 연결 읽기의 한도 타이머(3초)가 테스트 뒤에 남지 않게 가짜 시계로 돌리고 마지막에 비운다
+    jest.useFakeTimers();
+    try {
+      const deps = depsOf(() => new Promise<Connection>(() => {}));
+      const { unmount } = await render(<Harness {...deps} />);
+      expect(view()).toBe("reading");
+      expect(deps.readConnection).toHaveBeenCalledTimes(1);
+      expect(deps.readSizeLabel).toHaveBeenCalledTimes(1);
+      await unmount();
+      jest.clearAllTimers();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+});
+
+describe("DS5 — 표준에서 받을 양을 못 읽으면 지어내지 않는다 (FR-002)", () => {
+  it("양 읽기가 거부되면 standard이고 sizeLabel은 없다", async () => {
+    const deps = {
+      readConnection: jest.fn(async (): Promise<Connection> => "wifi"),
+      readSizeLabel: jest.fn(async (): Promise<string | null> => {
+        throw new Error("읽기 실패");
+      }),
+    };
+    await render(<Harness {...deps} />);
+    await waitFor(() => expect(view()).toBe("standard"));
+    expect(size()).toBe("없음");
+  });
+
+  it("양 읽기가 null을 주면 standard이고 sizeLabel은 없다", async () => {
+    const deps = depsOf("wifi", null);
+    await render(<Harness {...deps} />);
+    await waitFor(() => expect(view()).toBe("standard"));
+    expect(size()).toBe("없음");
   });
 });
 
@@ -117,6 +156,70 @@ describe("CG7 — 읽기 한도 (FR-001a)", () => {
     });
     expect(view()).toBe("cellular");
     expect(size()).toBe("없음");
+  });
+
+  it("DS5 — wifi인데 양 읽기가 한도 안에 안 끝나면 한도 시점에 standard이고 sizeLabel은 없다", async () => {
+    const deps = {
+      readConnection: jest.fn(async (): Promise<Connection> => "wifi"),
+      readSizeLabel: jest.fn(() => new Promise<string | null>(() => {})),
+    };
+    await render(<Harness {...deps} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(view()).toBe("reading");
+    await act(async () => {
+      jest.advanceTimersByTime(READ_LIMIT_MS);
+    });
+    expect(view()).toBe("standard");
+    expect(size()).toBe("없음");
+  });
+
+  it("★ DS6 — 둘 다 응답하지 않아도 한도 3초에 standard다(6초가 아니다)", async () => {
+    const deps = {
+      readConnection: jest.fn(() => new Promise<Connection>(() => {})),
+      readSizeLabel: jest.fn(() => new Promise<string | null>(() => {})),
+    };
+    await render(<Harness {...deps} />);
+    await act(async () => {
+      jest.advanceTimersByTime(READ_LIMIT_MS - 1);
+    });
+    expect(view()).toBe("reading");
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(view()).toBe("standard");
+    expect(size()).toBe("없음");
+  });
+
+  it("★ DS6 — 모바일인데 양이 응답하지 않아도 한도 3초에 cellular다", async () => {
+    const deps = {
+      readConnection: jest.fn(async (): Promise<Connection> => "cellular"),
+      readSizeLabel: jest.fn(() => new Promise<string | null>(() => {})),
+    };
+    await render(<Harness {...deps} />);
+    await act(async () => {
+      jest.advanceTimersByTime(READ_LIMIT_MS);
+    });
+    expect(view()).toBe("cellular");
+  });
+
+  it("★ DS7 — 연결만 먼저 끝나고 양이 남은 동안은 reading이다(갈래는 둘 다 끝난 뒤 한 번에)", async () => {
+    let releaseSize: (s: string | null) => void = () => {};
+    const deps = {
+      readConnection: jest.fn(async (): Promise<Connection> => "wifi"),
+      readSizeLabel: jest.fn(
+        () => new Promise<string | null>((resolve) => (releaseSize = resolve)),
+      ),
+    };
+    await render(<Harness {...deps} />);
+    await act(async () => {
+      jest.advanceTimersByTime(READ_LIMIT_MS - 1);
+    });
+    expect(view()).toBe("reading");
+    await act(async () => releaseSize("2.0GB"));
+    expect(view()).toBe("standard");
+    expect(size()).toBe("2.0GB");
   });
 
   it("연결 읽기가 거부되면 standard다", async () => {
@@ -227,7 +330,7 @@ describe("CG10 — 늦게 온 옛 결과는 버린다", () => {
     const { unmount } = await render(<Harness {...deps} />);
     await unmount();
     await act(async () => release("cellular"));
-    expect(deps.readSizeLabel).not.toHaveBeenCalled();
+    expect(deps.readSizeLabel).toHaveBeenCalledTimes(1);
   });
 });
 
