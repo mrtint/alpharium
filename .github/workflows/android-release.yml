@@ -89,6 +89,8 @@ jobs:
               ;;
           esac
           node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/android-release/verify-signature.mts --check-expected-only || failed=1
+          # 릴리스 노트(release-notes/ko.txt)가 비었거나 500자를 넘으면 긴 빌드 전에 끝낸다. Play 「출시 노하우」로 간다.
+          node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/release-notes/check.mts --store play || failed=1
           exit "$failed"
       - run: npm ci
       - name: expo prebuild
@@ -142,7 +144,7 @@ jobs:
           trap 'echo "| Play 업로드 | $(( $(date +%s) - start ))초 |" | tee -a "$GITHUB_STEP_SUMMARY"' EXIT
           node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/android-release/play-upload.mts \
             --aab android/app/build/outputs/bundle/release/app-release.aab \
-            --package com.a810labs.pocketlog --track internal
+            --package com.a810labs.pocketlog --track internal --notes release-notes/ko.txt
       - name: 최대 메모리 사용량
         if: always()
         run: |

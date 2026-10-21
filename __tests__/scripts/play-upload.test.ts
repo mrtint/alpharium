@@ -103,6 +103,29 @@ describe("076 Play 업로드", () => {
     });
   });
 
+  it("릴리스 노트를 주면 그 릴리스에 언어와 글이 실린다", async () => {
+    const { fakeFetch, calls } = makeFetch();
+    await run(fakeFetch, { releaseNotes: [{ language: "ko-KR", text: "이어 하기\n- 하나" }] });
+    const track = calls.find((c) => c.method === "PUT")!;
+    expect(JSON.parse(track.body as string).releases).toEqual([
+      {
+        versionCodes: ["42"],
+        status: "completed",
+        releaseNotes: [{ language: "ko-KR", text: "이어 하기\n- 하나" }],
+      },
+    ]);
+  });
+
+  it("릴리스 노트를 안 주면 releaseNotes 키가 없다 (종전 요청과 같다)", async () => {
+    const { fakeFetch, calls } = makeFetch();
+    await run(fakeFetch, { releaseNotes: undefined });
+    const track = calls.find((c) => c.method === "PUT")!;
+    expect(Object.keys(JSON.parse(track.body as string).releases[0])).toEqual([
+      "versionCodes",
+      "status",
+    ]);
+  });
+
   it("모든 호출에 시간 제한(AbortSignal)이 붙는다 — 응답이 멈춰도 잡이 붙들리지 않는다", async () => {
     const { fakeFetch, calls } = makeFetch();
     await run(fakeFetch);
