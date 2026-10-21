@@ -28,6 +28,7 @@ import {
   type HourFormat,
   type Meridiem,
 } from "../app/target-hour";
+import type { AppPlatform } from "../app/platform";
 import { DialogCancelButton, DismissibleDialog } from "./components/Dialog";
 import { AppText } from "./components/Text";
 import { SETTINGS_TEXT } from "./settings-text";
@@ -45,6 +46,8 @@ export type TargetHourDialogProps = {
   /** 저장된 시와 다른 칸을 눌렀을 때 그 시로 한 번 */
   onSelect: (hour: number) => void;
   onClose: () => void;
+  /** 093 — 미리보기 문장을 고르는 플랫폼. 조립부가 `appPlatform(Platform.OS)`로 넘긴다(없으면 안드로이드 문장, 종전대로) */
+  platform?: AppPlatform;
 };
 
 export function TargetHourDialog({
@@ -54,6 +57,7 @@ export function TargetHourDialog({
   timeZoneLine,
   onSelect,
   onClose,
+  platform,
 }: TargetHourDialogProps) {
   const [meridiem, setMeridiem] = useState<Meridiem>(() => meridiemOf(hour));
   const done = useRef(false);
@@ -144,7 +148,7 @@ export function TargetHourDialog({
       </View>
 
       <AppText style={PREVIEW} testID="target-hour-preview">
-        {previewSentence(shownHour, format)}
+        {previewSentence(shownHour, format, platform)}
       </AppText>
 
       <DialogCancelButton onPress={onClose} testID="target-hour-cancel">
