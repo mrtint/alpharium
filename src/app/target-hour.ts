@@ -21,6 +21,8 @@
 
 import { text } from "../i18n/current";
 
+import type { AppPlatform } from "./platform";
+
 export type HourFormat = "h12" | "h24";
 export type Meridiem = "am" | "pm";
 
@@ -65,9 +67,14 @@ export function formatTargetHour(hour: number, format: HourFormat): string {
 }
 
 /** 미리보기 — 「매일 오후 10시쯤 그날 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.」(보드 `time.preview`, 오전은 「어제」) */
-export function previewSentence(hour: number, format: HourFormat): string {
+export function previewSentence(
+  hour: number,
+  format: HourFormat,
+  platform: AppPlatform = "android",
+): string {
   const T = text().targetHour;
   const day = hour < 12 ? T.previewYesterday : T.previewSameDay;
+  if (platform === "ios") return text().settingsPlatform.previewIos(hourText(hour, format), day);
   return T.preview(hourText(hour, format), day);
 }
 

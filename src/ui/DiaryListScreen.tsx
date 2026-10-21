@@ -159,7 +159,7 @@ export type DiaryListScreenProps = {
    * `onSelectDay`·`onSwipe`·`onPressDate`를 넘겨도 쓰지 않는다 — 잠금은 부르는 쪽의 깜빡임에 기대지 않고 이
    * 화면이 스스로 건다(FR-003·004).
    */
-  writing?: { line?: string; name?: string };
+  writing?: { line?: string; name?: string; leaveNote?: string };
   /** 「그만두기」 (054) */
   onStop?: () => void;
   /**
@@ -292,7 +292,7 @@ export function DiaryListScreen({
     return (
       <View style={ROOT}>
         <View style={FIXED_HEADER}>{header}</View>
-        <WritingPaper line={writing.line} name={writing.name} />
+        <WritingPaper leaveNote={writing.leaveNote} line={writing.line} name={writing.name} />
         <View
           onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
           style={REWRITE_SLOT}

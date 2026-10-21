@@ -33,7 +33,15 @@ const MONOLOGUE_STYLE = {
   letterSpacing: WRITING.monologue.letterSpacing,
 } as const;
 
-export function WritingPaper({ line, name }: { line?: string; name?: string }) {
+export function WritingPaper({
+  line,
+  name,
+  leaveNote,
+}: {
+  line?: string;
+  name?: string;
+  leaveNote?: string;
+}) {
   const text = line ?? WRITING_TEXT.fallback;
 
   // 렌더 중 이전 값 기억(049 `DayHeading`과 같은 방식) — effect 안 동기 `setState`는 lint가 막는다.
@@ -103,6 +111,20 @@ export function WritingPaper({ line, name }: { line?: string; name?: string }) {
           testID="writing-byline"
         >
           {WRITING_TEXT.byline(name)}
+        </AppText>
+      )}
+
+      {/* 093 — 플랫폼별 상시 안내 한 줄. 문구는 조립부가 고른다(없으면 줄도 없다) */}
+      {leaveNote !== undefined && (
+        <AppText
+          style={{
+            color: COLORS.textMuted,
+            fontSize: WRITING.byline.fontSize,
+            lineHeight: WRITING.byline.lineHeight,
+          }}
+          testID="writing-leave-note"
+        >
+          {leaveNote}
         </AppText>
       )}
     </View>

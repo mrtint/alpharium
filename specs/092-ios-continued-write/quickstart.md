@@ -44,3 +44,5 @@
 **빌드 함정**: Xcode 27(iOS 27 SDK)로 그대로 빌드하면 UIScene을 쓰지 않는 앱이 실행 즉시 `UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` SIGTRAP으로 죽는다. 측정용으로만 `npm install --no-save expo@57.0.23 expo-build-properties@57.0.20` + `app.json`에 `["expo-build-properties",{"ios":{"enableSceneSupport":true}}]`를 넣었다가 되돌렸다(커밋 안 함). CI는 Xcode 26.6이라 영향이 없다 — 로드맵 「Xcode 27 UIScene 대응」.
 
 **미확인**: 충전 없는 회차는 표본 1, 다른 iPhone·iOS 26.x, 사진 8장 날, 화면을 끈 채 오래 둔 경우, 시스템이 자원 부족으로 끊는 경우, TestFlight 빌드.
+
+**화면 문구(093)**: 쓰는 중 화면의 「앱을 나가도 계속 써요.」 한 줄은 iOS에만 넣었다 — 안드로이드는 앞을 벗어나면 쓰기가 멈춰(005 FR-014b) 맞는 문구를 새로 써야 하는데 그것은 이 과제 밖이라 줄을 두지 않았다.

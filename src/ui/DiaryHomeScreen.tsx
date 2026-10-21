@@ -91,6 +91,8 @@ export type PhotoAccessPort = {
 };
 
 export type DiaryHomeScreenProps = {
+  /** 093 — 쓰는 중 화면의 상시 안내 한 줄. 플랫폼마다 달라서 조립부가 `writingLeaveNote(platform)`으로 골라 넘긴다(없으면 줄이 없다) */
+  writingLeaveNote?: string;
   resolution: EnvironmentResolution;
   /** 조립이 실패했으면 없다 — 그때는 `build-error`로 간다(FR-035a) */
   pipeline?: Pipeline;
@@ -359,6 +361,7 @@ export function DiaryHomeScreen({
   simulatedFailToast = false,
   continuedWrite,
   onContinuedSaved,
+  writingLeaveNote,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
 
@@ -1501,7 +1504,9 @@ export function DiaryHomeScreen({
               toast={toast === null ? undefined : { id: toast.id, text: TOAST_TEXT[toast.kind] }}
               write={prompt}
               writing={
-                screen.kind === "writing" ? { line: screen.line, name: writingName } : undefined
+                screen.kind === "writing"
+                  ? { line: screen.line, name: writingName, leaveNote: writingLeaveNote }
+                  : undefined
               }
               writtenAt={writtenAt}
             />

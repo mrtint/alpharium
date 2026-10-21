@@ -51,6 +51,22 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe("093 — 플랫폼별 미리보기", () => {
+  it("iOS는 앱을 나가도 계속 쓴다고 말하고, 안드로이드는 종전 문장이다", async () => {
+    await open({ platform: "ios" });
+    expect(screen.getByTestId("target-hour-preview")).toHaveTextContent(
+      "매일 오후 10시쯤 그날 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 쓰고, 앱을 나가도 계속 써요. 이미 쓴 날은 건너뛰어요.",
+    );
+  });
+
+  it("안드로이드는 바이트 그대로다", async () => {
+    await open({ platform: "android" });
+    expect(screen.getByTestId("target-hour-preview")).toHaveTextContent(
+      "매일 오후 10시쯤 그날 일기를 쓸 차례라고 알려요. 휴대폰에 따라 늦게 알릴 때가 있어요. 열면 바로 써요. 이미 쓴 날은 건너뛰어요.",
+    );
+  });
+});
+
 describe("TD1 — 열린 모양", () => {
   it("제목·시간대 줄·저장된 시 선택·미리보기·「취소」가 있고 「저장」이 없다", async () => {
     await open();
