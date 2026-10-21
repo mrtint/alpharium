@@ -24,8 +24,8 @@ TDD 필수.
 ## Phase 4: 실기기·마무리
 
 - [X] T011 `npm test`·`npm run lint`
-- [ ] T012 prebuild·Release 빌드·무선 설치, quickstart 1~5 실측(충전 없음) — CPU 감시로 죽으면 R6대로 바꾸고 다시 (FR-009·SC-001~003)
-- [ ] T013 AGENTS 092 절·quickstart 「실측」
+- [X] T012 prebuild·Release 빌드·무선 설치, quickstart 1~5 실측(충전 없음) — CPU 감시로 죽으면 R6대로 바꾸고 다시 (FR-009·SC-001~003)
+- [X] T013 AGENTS 092 절·quickstart 「실측」
 
 ## Dependencies
 T001·T002 → T010. T003 → T004 → T005 → T006 → T007. T008 독립. T009 → T005의 문구. 모두 → T011 → T012 → T013.

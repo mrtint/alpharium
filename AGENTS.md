@@ -36,6 +36,7 @@
 - **화면 글자는 두 플랫폼 모두 앱에 넣은 Pretendard다**(083) — v1.3.9 정적 OTF 다섯(400~800)을 배포처 그대로 `assets/fonts/pretendard/`에 두고 expo-font config plugin이 빌드에 넣는다. 서체는 `tokens.ts`의 `FONT`·`TEXT_FONT` 한 곳에서 정하고, 설정 「정보」 → 「서체 라이선스」에 OFL 1.1 전문이 있다. 아래 「083」.
 - **개인정보처리방침·지원 페이지는 이 저장소의 `site/`이고 GitHub Pages로 올라간다**(086) — 설정 「정보」의 「개인정보처리방침」·「도움말·문의」가 기기 브라우저로 연다. 방침이 기대는 코드의 사실은 `__tests__/privacy/`가 잠근다. 아래 「086」.
 - **iPhone 배터리 상태 백그라운드는 요청·느린 쓰기를 넣었지만 iOS가 31시간 동안 한 번도 깨우지 않았다**(091, 아래 「091」).
+- **★ iPhone에서 홈이 시작한 쓰기는 앱을 나가도 충전 없이 끝까지 쓴다**(092, iOS 26 `BGContinuedProcessingTask` — 쓸 차례 알림을 누르거나 앱을 열면 쓰기가 시작되고 곧바로 나가도 저장·완성 알림까지, 2026-10-21 배터리 약 23분). 아래 「092」.
 - **★ iPhone 백그라운드 자동 쓰기가 충전 중 OS 깨움에서 완주한다**(090, 2026-10-18 — CPU 감시·따라잡기 몫·보이지 않는 홈, 아래 「090」).
 - **iOS는 실제 iPhone 한 대(iPhone 14, iOS 27.0.1)에서 087로 검증 중이다**(2026-10-16~) — TestFlight 빌드 12가 처리를 통과해 설치됐고, 첫 실행부터 첫 일기(사진 2장 · 사진 읽기 14.8초 · 본문 26.0초)까지 갔으며, OS가 BGTask로 앱을 깨운다(충전·Wi-Fi 조건에서 약 30분 간격). 백그라운드 완주·메모리·쓸 차례 알림은 진행 중 — 절차·통로는 `specs/087-ios-real-device-verify/quickstart.md`.
   절차와 함정은 아래 「iOS 시뮬레이터」. **iOS 빌드·TestFlight 업로드는 회사 맥 없이 GitHub Actions 수동 워크플로로 한다**(075, 2026-10-11 업로드까지 성공, 빌드 12는 처리 통과·iPhone 설치 확인(087); 아래 「iOS 빌드·서명·TestFlight」).
@@ -1226,8 +1227,21 @@
 - **iOS 백그라운드 요청이 둘이다**(`patches/expo-background-task+57.0.14.patch` 확장): 충전 요청(`com.expo.modules.backgroundtask.processing`, 외부 전원 요구 — 090)과 **배터리 요청**(`….processing.battery`, 외부 전원·네트워크 불요 — CPU 감시 아래). 두 식별자를 같은 처리기로 등록하고, 처리기가 깬 식별자를 `UserDefaults` `pocketlog.bgWakeIdentifier`에 남긴다 → 로컬 모듈의 `wakeKind()` → 태스크가 시작 때 읽는다. Info.plist는 `plugins/with-battery-bg-task.js`. 시도 기록 꼬리 「· 충전」/「· 배터리」(필드 `wake`).
 - **배터리 요청으로 깨면 「느린 쓰기」**(`assembly.ts` `pacingFor` — 백그라운드·iOS·battery만): 두 모델 스레드 1, 모델 호출마다 그 시간 × 0.5를 쉼(`inference/pacing.ts` — 평균 ≈ 67%, 한도 80%), **본문·제목은 `getFormattedChat`으로 두른 프롬프트에 지금까지 쓴 글을 이어 붙여 32토큰씩 조각 생성**(`llama-port.ts` `completePaced` — 앞부분 KV 재사용으로 조각마다 다시 읽는 것은 1토큰), 한도 30분. 충전 요청·화면·안드로이드는 그대로(인자 바이트 동일).
 - **실기기**(iPhone 14, lldb 강제 실행 — 앱이 앞이라 CPU 감시는 안 걸린다): `n_threads=1` 둘·조각 15번·제목까지, 사진 8장 읽기 약 63초 · 본문 47~84초로 정상 저장(표본 2). 스레드 1의 속도: 프리필 약 62토큰/초, 생성 약 7.5토큰/초.
-- **★ 그러나 iOS는 처리 작업을 충전 중에만 돌렸다** — 충전하지 않은 약 31시간과 13시간 모두 깨움 0회(요청은 대기 목록에 둘 다 있었다). 반대로 충전 중 밤에는 **배터리 요청도** 15분 간격 깨움 사이사이 네 번 깼다(2026-10-20 03:00~05:03) — `requiresExternalPower = false`는 「전원이 없어도 된다」일 뿐 배터리 상태에서 깨운다는 뜻이 아니다. 충전 중에는 같은 앱을 약 15분마다 깨웠다(090). **iPhone 백그라운드 쓰기는 사실상 충전 중에만 돈다** — 배터리 요청·느린 쓰기는 iOS가 깨우는 날을 위해 남겨 두었다. 배터리 행 문구는 090 문구(「충전 중이고 …」) 유지(FR-008). 충전 없이 쓰는 길은 로드맵 「알림을 눌러 시작한 쓰기를 앱을 나가도 끝까지」(`BGContinuedProcessingTask`).
+- **★ 그러나 iOS는 처리 작업을 충전 중에만 돌렸다** — 충전하지 않은 약 31시간과 13시간 모두 깨움 0회(요청은 대기 목록에 둘 다 있었다). 반대로 충전 중 밤에는 **배터리 요청도** 15분 간격 깨움 사이사이 네 번 깼다(2026-10-20 03:00~05:03) — `requiresExternalPower = false`는 「전원이 없어도 된다」일 뿐 배터리 상태에서 깨운다는 뜻이 아니다. 충전 중에는 같은 앱을 약 15분마다 깨웠다(090). **iPhone 백그라운드 쓰기는 사실상 충전 중에만 돈다** — 배터리 요청·느린 쓰기는 iOS가 깨우는 날을 위해 남겨 두었다. 배터리 행 문구는 090 문구(「충전 중이고 …」) 유지(FR-008). 충전 없이 쓰는 길은 092(사용자가 시작한 쓰기를 이어 돌린다).
 - **실기기 통로**: iPhone은 페어링돼 있으면 같은 Wi-Fi에서 선 없이 붙는다(`transportType: localNetwork` — 최신 Xcode에는 「Connect via network」 체크가 없다). 선은 충전이라 배터리 측정을 망친다. 잠겨 있으면 앱 띄우기·lldb가 `Locked`로 거부되고 컨테이너 읽기도 실패할 수 있다. 대기 중인 요청은 lldb로 앱을 띄워(앞에서 1.5초 돌린 뒤 멈춤) `getPendingTaskRequestsWithCompletionHandler` 블록에 `NSMutableArray`를 채운 다음 잠깐 더 돌려 읽는다 — `UIApplicationMain`에 멈춘 채로는 평가가 돌아오지 않았다. 네이티브 출력(llama 성능 줄, Swift `print`)은 `devicectl device process launch --console`로 본다.
+
+### 092 — iPhone 사용자가 시작한 쓰기를 앱을 나가도 끝까지 (이어 하기)
+
+- **홈이 시작한 iOS 쓰기(「쓰기」·057 앱 열기·085 알림 누름)는 `BGContinuedProcessingTask`를 신청한다**(로컬 모듈 `modules/pocketlog-continued-write/` — `begin`·`report`·`finish`·`onExpired`, iOS 26 미만은 신청하지 않는다). 받아들여지면 홈은 앞을 벗어나도 쓰기를 끊지 않고(005 FR-014b의 예외), 시스템이 잠금 화면·알림 센터에 진행 표시(제목 「{이름}{이|가} M월 d일 일기를 쓰고 있어요」, 보조 줄은 단계 문구 셋 — 숫자 없음)를 띄운다. 앱 밖에서 저장에 성공하면 완성 알림. 첫 실행 자동 첫 일기·진단 수동 실행·백그라운드는 신청하지 않는다. 안드로이드는 바뀌지 않았다.
+- **Info.plist에는 와일드카드 `com.a810labs.pocketlog.write.*`만, 처리기는 신청마다 UUID 꼬리를 붙인 온전한 식별자로 등록한다** — 와일드카드로 처리기를 등록하는 것은 막혀 있다(Apple DTS). strategy `.fail`(곧바로 못 돌면 거절 → 종전대로 앞을 벗어나면 끊는다), 만료 처리기는 처리기 맨 앞에서 단다.
+- **★ 시스템은 보고 횟수가 아니라 `completedUnitCount`가 오르는가를 본다** — dasd `ProgressTracker`가 보고 간격을 익힌 뒤 값이 오르지 않는 공백이 그보다 길면(약 35~39초) 「marking stalled」로 끝낸다. 1000칸에 남은 몫으로 다가가는 막대는 끝 무렵 걸음이 한 칸 아래로 줄어 7초마다 보고하면서도 947에서 36초 머문 뒤 만료됐다. **전체 1,000,000칸, 보고마다 한 칸 이상 오른다**(`src/app/continued-write.ts`). 막대는 실제 일(사진 한 장·조각·프롬프트 토막·토큰)의 박동으로만 움직이고 타이머가 없다(원칙 V); 박동 보고는 2초에 한 번까지.
+- **앱 밖에서는 iOS가 CPU를 크게 줄인다**(사진 한 장 앞 4.5초 → 밖 28~58초) — iOS 화면 쓰기의 값(`assembly.ts` `SCREEN_IOS_PACING`): 스레드 2, 쉼 없는 32토큰 조각 생성, 모델 메모리 상주(`use_mmap: false` — 파일 매핑이면 앱 밖 생성이 0.17토큰/초), 프롬프트 토막 미리 읽기(토막마다 앱 상태를 본다 — 앞 240자·밖 24자; 작은 토막은 토큰당 비용이 커 24자만 쓰면 앞에서 2분 50초였다), 한도 30분. 앱에 머문 쓰기는 51초(092 전 98초).
+- **토큰 박동은 데이터 없는 콜백이다** — `llama-port.ts` `completionTicking`이 llama.rn 토큰 콜백을 받아 인자 없이 `tick()`만 부른다(005 FR-028b의 뜻 — 생성 중인 글을 밖으로 내지 않는다 — 은 그대로, 위 「지켜야 할 경계」).
+- 진행 표시에서 사람이 취소한 것과 시스템이 끝낸 것은 같은 만료 처리기로 와 가를 수 없다 — 둘 다 「도중에 끊김」이고 앱을 다시 열면 토스트 뒤 057이 그 날을 다시 쓴다. 만료가 왔는데 앱이 앞에 있으면 이어 하기만 잃고 쓰기는 끊지 않는다.
+- **실기기에서 앱 밖 쓰기를 보는 법**: `devicectl device process launch --console`로 띄우면 Swift `[continued-write]` 줄(submitted·report·close·expired)이 보인다 — `submitted`를 본 뒤 `devicectl … launch com.apple.Preferences`로 앱을 뒤로 보낸다. 일기는 lldb로 지운다(`UIApplicationMain`에 멈춘 채 `NSFileManager removeItemAtPath:` 뒤 `process kill` — JS가 돌기 전). dasd 줄은 `sudo log collect --device-udid …`(에이전트 셸은 root가 없어 못 한다 — 사람이 돌린 아카이브는 `/usr/bin/log show`로 읽힌다; zsh의 `log`는 내장 명령이라 경로를 쓴다). 선을 꽂으면 충전이라 배터리 회차는 사람이 앱을 조작한다(이 맥의 Wi-Fi에서 무선 연결이 서지 않았다).
+- **★ Xcode 27(iOS 27 SDK)로 빌드하면 UIScene 미채택 앱이 실행 즉시 죽는다**(`UIApplicationEvaluateRuntimeIssueForNoSceneLifecycleAdoption` SIGTRAP) — 측정은 expo 57.0.23 + `expo-build-properties` `ios.enableSceneSupport`를 커밋 없이 넣고 했다. CI(Xcode 26.6)는 영향이 없다 — 로드맵 「Xcode 27 UIScene 대응」.
+- **남은 위험**(코드 리뷰, 고치지 않음): 모델을 메모리에 읽어 올리는 동안(`initLlama`)은 박동이 없다 — 앱 밖 적재가 공백 한계(약 36초)를 넘으면 생성 전에 만료된다(실측 회차는 모두 넘지 않았다; 적재 진행 콜백으로 박동을 낼 수 있다). 프롬프트 토막 박동이 글 단계 몫을 거의 다 채워 생성 동안 막대가 95% 근처에서 한 칸씩만 오른다(겉모습뿐 — 만료와 무관). iOS 화면 쓰기는 앞에서도 한도가 30분이다(멈춘 쓰기가 180초 대신 30분 기다린다).
+- **미확인**: 충전 없는 회차는 표본 1(사진 6장 날, 약 23분), 다른 iPhone·iOS 26.x, 시스템이 자원 부족으로 끊는 경우, TestFlight 빌드. 실측 표는 `specs/092-ios-continued-write/quickstart.md` 「실측」.
 
 ## VLM 캡션 60초의 원인 — 실측 (2026-08-22)
 
@@ -1283,7 +1297,7 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 - **하루는 기기 로컬 자정(00:00)에 바뀌고 오늘은 언제든 쓸 수 있다**(049). 경계는 `src/config/day-boundary.ts` 하나뿐이다(FR-021a) — 다른 파일에서 `getHours() ±`로 하루 기준을 옮기지 않는다(DB11).
   함수는 모두 「지금」을 인자로 받는다(`new Date()`를 안에서 부르면 테스트 불가). 정오는 `selectableDays()`(백그라운드의 사흘) 구성 규칙에만 남아 있다.
 - **모르는 것을 기본값으로 채우지 않는다**(FR-003, 원칙 V). `SignalValue<T>`는 `known`/`none`/`unknown` 셋을 가르며 `valueOr(signal, 0)` 같은 편의 함수를 만들지 않는다.
-- **실패가 텍스트를 반환하지 않는다**(FR-016, 원칙 I) — `GenerationFailure`의 어느 갈래에도 `text`가 없고 플레이스홀더도 금지. **생성 중인 글을 화면에 보여주지 않는다**(005 FR-028b) — 토큰 콜백을 `completion()`에 넘기지 않는다.
+- **실패가 텍스트를 반환하지 않는다**(FR-016, 원칙 I) — `GenerationFailure`의 어느 갈래에도 `text`가 없고 플레이스홀더도 금지. **생성 중인 글을 화면에 보여주지 않는다**(005 FR-028b) — 토큰 콜백은 `llama-port.ts`의 `completionTicking` 한 곳에서만 `completion()`에 넘기고 그 자리에서 데이터를 버린다(인자 없는 박동만 나간다, 092).
 - **프롬프트는 `src/diary/prompt.ts`에만 있다**(데스크톱 어댑터도 이것을 부른다). **출력 판정의 갈래는 넷이고 늘리지 않는다**(005 FR-018b) — 임계값을 두는 순간 채점 코드가 되고 그것이 원칙 IV다.
 - **네이티브 추론 결과의 지표를 경계 밖으로 내보내지 않는다**(005 FR-011, `llama-port.ts`가 유일한 경계).
 
