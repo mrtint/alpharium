@@ -12,3 +12,4 @@
 - 코드 리뷰 시: `requesting-code-review` / `receiving-code-review`
 - 브랜치 마무리: `finishing-a-development-branch`
 - 스킬 사용 전반 규칙: `using-superpowers`
+- 화면·페이지·문서 등 디자인 산출물을 만들기 전: `design/DESIGN.md`를 먼저 읽는다(디자인 시스템 규칙 문서 — 토큰 정본은 `design/tokens.json`)

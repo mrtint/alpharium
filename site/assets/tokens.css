@@ -1,0 +1,62 @@
+/* design/tokens.json에서 만든다. 손으로 고치지 않는다. */
+:root {
+  color-scheme: light dark;
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-border: #9f9d9d;
+  --color-text: #201e1d;
+  --color-textMuted: #6b6767;
+  --color-accent: #ec3013;
+  --color-accentForeground: #f3f2f2;
+  --color-danger: #ae1800;
+  --color-dangerForeground: #f3f2f2;
+  --radius-card: 0px;
+  --radius-pill: 0px;
+  --radius-control: 6px;
+  --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  --text-title-size: 20px;
+  --text-title-weight: 600;
+  --text-title-line: 28px;
+  --text-sectionTitle-size: 16px;
+  --text-sectionTitle-weight: 600;
+  --text-sectionTitle-line: 22px;
+  --text-body-size: 15px;
+  --text-body-weight: 400;
+  --text-body-line: 22px;
+  --text-bodyStrong-size: 15px;
+  --text-bodyStrong-weight: 600;
+  --text-bodyStrong-line: 22px;
+  --text-caption-size: 13px;
+  --text-caption-weight: 400;
+  --text-caption-line: 19px;
+  --text-button-size: 15px;
+  --text-button-weight: 600;
+  --text-button-line: 20px;
+  --text-display-size: 32px;
+  --text-display-weight: 700;
+  --text-display-line: 40px;
+  --text-reading-size: 17px;
+  --text-reading-weight: 400;
+  --text-reading-line: 30px;
+  --space-4: 4px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #1a1918;
+    --color-surface: #262423;
+    --color-border: #6f6b6a;
+    --color-text: #f3f2f2;
+    --color-textMuted: #a9a5a4;
+    --color-accent: #ff6a50;
+    --color-accentForeground: #1a1918;
+    --color-danger: #ff8f7a;
+    --color-dangerForeground: #1a1918;
+  }
+}

@@ -10,7 +10,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
@@ -140,7 +140,7 @@ describe("055 F3·F5 — 묶음", () => {
     ]);
   });
 
-  it("F3 — 묶음 머리 11/600·자간 .1em·대문자·accent, 위 14(첫 묶음 0)·아래 6", async () => {
+  it("F3 — 묶음 머리 11/600·자간 .1em·대문자·danger(진한 레드, 088 FR-001), 위 14(첫 묶음 0)·아래 6", async () => {
     await render(<SettingsScreen {...props()} />);
     const first = flat(screen.getByTestId("settings-group-character-head"));
     const next = flat(screen.getByTestId("settings-group-diary-head"));
@@ -150,7 +150,7 @@ describe("055 F3·F5 — 묶음", () => {
       expect(style.fontWeight).toBe("600");
       expect(style.letterSpacing).toBeCloseTo(1.1, 5);
       expect(style.textTransform).toBe("uppercase");
-      expect(style.color).toBe(COLORS.accent);
+      expect(style.color).toBe(COLORS.danger);
     }
     // 묶음 머리 줄이 위·아래 여백을 가진다(오른쪽 `aside`와 한 줄을 이루므로 줄이 갖는다)
     expect(first.marginBottom).toBe(6);
@@ -226,6 +226,10 @@ describe("055 C2·C3 — 자동으로 쓰기", () => {
       width: 20,
       height: 20,
       backgroundColor: COLORS.bg,
+    });
+    expect(toggle.props.hitSlop).toEqual({
+      top: SETTINGS.toggle.hitSlop,
+      bottom: SETTINGS.toggle.hitSlop,
     });
   });
 
@@ -529,5 +533,42 @@ describe("059 DV1~DV3 — 버전 탭과 「개발자」 행", () => {
     await render(<SettingsScreen {...props({ developerEnabled: true, onOpenDeveloper })} />);
     await fireEvent.press(screen.getByTestId("settings-developer"));
     expect(onOpenDeveloper).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("088 FR-001·FR-002 — 작은 강조 글자는 COLORS.danger만 쓰고 테두리는 COLORS.accent를 유지한다 (C2)", () => {
+  function listUiSourceFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        out.push(...listUiSourceFiles(full));
+      } else if (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) {
+        out.push(full);
+      }
+    }
+    return out;
+  }
+
+  it("src/ui/ 전체에서 글자 스타일 color: COLORS.accent가 0건이다", () => {
+    const uiDir = join(__dirname, "../../src/ui");
+    const offenders: string[] = [];
+    for (const file of listUiSourceFiles(uiDir)) {
+      const stripped = readFileSync(file, "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      if (/color:\s*COLORS\.accent\b/.test(stripped)) {
+        offenders.push(file.slice(uiDir.length + 1));
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("FR-002 — 권한 「허용 안 함」 꼬리표는 글자 COLORS.danger + 테두리 COLORS.accent를 유지한다", async () => {
+    await render(<SettingsScreen {...props()} />);
+    const tag = flat(screen.getByTestId("settings-tag-location"));
+    expect(tag.borderColor).toBe(COLORS.accent);
+    const label = flat(within(screen.getByTestId("settings-tag-location")).getByText("허용 안 함"));
+    expect(label.color).toBe(COLORS.danger);
   });
 });

@@ -228,6 +228,7 @@ describe("048 H — 1d 구조와 헤더", () => {
     await renderHome({ now, chosen: "2026-08-31" });
 
     expect(screen.getByTestId("home-month")).toHaveTextContent("2026년 8월");
+    expect(screen.getByTestId("home-month")).toHaveStyle({ color: COLORS.danger });
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("31");
   });
 

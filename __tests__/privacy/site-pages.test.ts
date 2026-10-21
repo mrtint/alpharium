@@ -51,7 +51,10 @@ describe("086 site — 사이트 원문", () => {
   it.each(PAGES)("S3 — %s 는 외부 자원을 부르지 않는다(스크립트·외부 스타일·외부 src 0)", (rel) => {
     const html = stripHtmlComments(readSite(rel));
     expect(html).not.toMatch(/<script/i);
-    expect(html).not.toMatch(/<link[^>]*rel="stylesheet"/i);
+    // 089 — 같은 출처의 상대 경로 스타일시트(`site/assets/`)는 허용한다. 외부 주소·절대 경로 스타일시트는 계속 금지.
+    for (const tag of html.match(/<link\b[^>]*\brel="stylesheet"[^>]*>/gi) ?? []) {
+      expect(tag).toMatch(/\bhref="(?![a-z][a-z0-9+.-]*:|\/)[^"]+"/i);
+    }
     expect(html).not.toMatch(/@import/);
     expect(html).not.toMatch(/\bsrc="https?:\/\//);
   });

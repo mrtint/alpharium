@@ -18,13 +18,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
 import { State } from "react-native-gesture-handler";
 import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
 
 import type { StripCell } from "../../src/app/state";
 import { DayPicker, swipeDirectionOf } from "../../src/ui/DayPicker";
-import { COLORS } from "../../src/ui/theme/tokens";
+import { COLORS, DAY_STRIP } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
 
@@ -124,6 +124,23 @@ describe("049 DayPicker — 일~토 주간 스트립", () => {
     expect(flatStyle(future.props.style).opacity).toBe(0.3);
   });
 
+  it("088 FR-004~FR-007 — 요일(DOW)에 opacity가 없고 선택 칸은 accentForeground, 비선택 칸은 DAY_STRIP.dowMuted다 (C4)", async () => {
+    await renderPicker();
+    const chosenDow = within(screen.getByTestId("day-2026-09-23")).getByText("수");
+    const chosenStyle = flatStyle(chosenDow.props.style);
+    expect(chosenStyle.color).toBe(COLORS.accentForeground);
+    expect(chosenStyle.opacity).toBeUndefined();
+    expect(chosenStyle.fontSize).toBe(10);
+    expect(chosenStyle.letterSpacing).toBe(0.6);
+
+    const unselectedDow = within(screen.getByTestId("day-2026-09-24")).getByText("목");
+    const unselectedStyle = flatStyle(unselectedDow.props.style);
+    expect(unselectedStyle.color).toBe(DAY_STRIP.dowMuted);
+    expect(unselectedStyle.opacity).toBeUndefined();
+    expect(unselectedStyle.fontSize).toBe(10);
+    expect(unselectedStyle.letterSpacing).toBe(0.6);
+  });
+
   /**
    * **팬 배선은 한 렌더 안에서만 쏜다.** gesture-handler의 jest 레지스트리는 testID로 핸들러를
    * 찾는데, 앞 테스트에서 팬을 쏜 뒤 새로 렌더한 스트립에 쏘면 **앞 테스트의 핸들러**가 불리는
@@ -184,5 +201,10 @@ describe("049 DayPicker — 일~토 주간 스트립", () => {
   it("★ S7 — 밑줄 자리는 오늘 칸에만 생기지 않는다 (주를 넘겨도 높이가 같다)", () => {
     expect(SOURCE).not.toMatch(/isToday\s*&&/);
     expect(SOURCE).toMatch(/testID=\{isToday \? `day-today-\$\{day\}` : undefined\}/);
+  });
+
+  it("088 FR-004 — DayPicker.tsx에서 opacity는 미래 칸 흐림(CELL_DIMMED) 한 곳에만 있다 (C4)", () => {
+    expect(SOURCE.match(/\bopacity\s*:/g) ?? []).toHaveLength(1);
+    expect(SOURCE).toMatch(/const CELL_DIMMED\s*=\s*\{\s*opacity:\s*0\.3\s*\}/);
   });
 });

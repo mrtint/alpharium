@@ -317,13 +317,13 @@ const WELCOME_OUTER = { flex: 1 } as const;
 /** 스크롤 내용 — [표지] → [가운데 묶음] → [버튼 줄] 세로 스택, 좌측 정렬. */
 const WELCOME_SECTION = { alignItems: "flex-start", flexGrow: 1 } as const;
 
-/** 1a 표지 — 11px / 600 / 자간 .1em / 강조색. */
+/** 1a 표지 — 11px / 600 / 자간 .1em / 진한 레드 danger(088 FR-001 AA 대비). */
 const KICKER = {
   fontSize: 11,
   lineHeight: 14,
   fontWeight: "600",
   letterSpacing: 1.1,
-  color: COLORS.accent,
+  color: COLORS.danger,
 } as const;
 
 /** 1a 가운데 묶음 — `flex: 1` + 세로 중앙, 간격 18(FR-010). */

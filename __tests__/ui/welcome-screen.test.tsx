@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { WelcomeScreen, type WelcomeScreenProps } from "../../src/ui/WelcomeScreen";
+import { COLORS } from "../../src/ui/theme/tokens";
 import { NAME_MAX_LENGTH } from "../../src/welcome/naming";
 
 /**
@@ -326,9 +327,10 @@ describe("025 회귀 — 접근성 라벨", () => {
 });
 
 describe("047 — 작명 화면이 디자인 보드 1a와 같다 (contracts/welcome-1a.md)", () => {
-  it("A1 — 표지 POCKETLOG", async () => {
+  it("A1 — 표지 POCKETLOG (088 FR-001 — 작은 강조 글자는 danger)", async () => {
     await setup();
     expect(screen.getByTestId("welcome-kicker").props.children).toBe("POCKETLOG");
+    expect(screen.getByTestId("welcome-kicker")).toHaveStyle({ color: COLORS.danger });
   });
 
   it("A2 — 얼굴 타일은 하나이고 🤖다", async () => {
