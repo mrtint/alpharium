@@ -103,11 +103,17 @@ public class PocketlogContinuedWriteModule: Module {
     let request = BGContinuedProcessingTaskRequest(identifier: identifier, title: title, subtitle: subtitle)
     request.strategy = .fail
     do {
+      // iOS 27 SDK(Swift 6.4, Xcode 27)에만 비동기 `submitTaskRequest`가 있다 — 동기 `submit`은 거기서 deprecated이고 모든 거절을 알리지
+      // 않는다(BGTaskScheduler.h). 26 SDK(CI의 Xcode 26.6)에는 그 이름이 없어 컴파일 자체가 막히므로 컴파일러 버전으로 가른다.
+      #if compiler(>=6.4)
       if #available(iOS 27, *) {
         try await BGTaskScheduler.shared.submitTaskRequest(request)
       } else {
         try BGTaskScheduler.shared.submit(request)
       }
+      #else
+      try BGTaskScheduler.shared.submit(request)
+      #endif
       trace("submitted \(identifier)")
       return identifier
     } catch {

@@ -77,6 +77,13 @@ describe("092 CW1 — 신청·처리기", () => {
     expect(SWIFT).toMatch(/try BGTaskScheduler\.shared\.submit\(request\)/);
   });
 
+  it("비동기 제출은 Swift 6.4(iOS 27 SDK) 컴파일러에서만 컴파일된다 — 26 SDK에는 그 이름이 없다 (CI의 Xcode 26.6이 막혔다)", () => {
+    // `#available`은 런타임 분기일 뿐 26 SDK에서도 이름을 해석하려 해 컴파일이 실패한다 → 컴파일 시점 분기가 감싼다
+    expect(SWIFT).toMatch(
+      /#if compiler\(>=6\.4\)[\s\S]*submitTaskRequest\(request\)[\s\S]*#else[\s\S]*try BGTaskScheduler\.shared\.submit\(request\)[\s\S]*#endif/,
+    );
+  });
+
   it("진행은 task.progress로, 보조 줄은 updateTitle로 보고하고 만료 처리기를 단다", () => {
     expect(SWIFT).toMatch(/\.progress\.totalUnitCount = /);
     expect(SWIFT).toMatch(/\.progress\.completedUnitCount = /);
