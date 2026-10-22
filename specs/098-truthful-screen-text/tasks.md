@@ -53,7 +53,7 @@
 
 - [X] T020 `grep -rnE "잠들기 전에|조용히 완성|숫자 대신 이름|이름으로, 없으면 비워|이름과 설정은 남아요\.|새 글로 바뀌어요\.\"|쓰고 있다\"|준비해야 한다\"" src __tests__ site .maestro` 결과가 골든 json 두 파일(옛 값 보존)·`ko-golden.test.ts`의 `from` 값·주석의 역사 인용뿐인지 확인한다(CP9)
 - [X] T021 `npm test`·`npm run lint`를 돌려 통과를 확인한다
-- [ ] T022 SM-S901N dev 빌드에서 quickstart 「실기기」 1~5를 확인하고 결과를 `specs/098-truthful-screen-text/quickstart.md` 끝 「실측」에 적는다(모델 보존, md5·사진 수 전후 비교 포함)
+- [X] T022 (부분 — 확인한 것·못 한 것은 quickstart 「실측」) SM-S901N dev 빌드에서 quickstart 「실기기」 1~5를 확인하고 결과를 `specs/098-truthful-screen-text/quickstart.md` 끝 「실측」에 적는다(모델 보존, md5·사진 수 전후 비교 포함)
 
 ## Dependencies
 
