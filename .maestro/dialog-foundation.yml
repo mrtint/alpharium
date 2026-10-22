@@ -18,6 +18,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 - extendedWaitUntil:
     visible:
@@ -38,7 +39,7 @@ appId: com.a810labs.pocketlog
       - tapOn:
           id: "write-button"
       - assertVisible:
-          id: "overwrite-dialog"
+          id: "overwrite-dialog|overwrite-cancel"
       - assertVisible: "일기를 다시 쓸까요?"
       # 051 — 쓴 날의 하단 바도 「다시 쓰기」라 글자로는 대화상자 버튼을 가리지 못한다.
       - assertVisible:
@@ -46,11 +47,14 @@ appId: com.a810labs.pocketlog
       # 오늘을 다시 쓸 때만 보이는 안내(Q5)
       - assertVisible:
           id: "overwrite-today-note"
-      # 뒤로 가기 = 취소. 앱이 닫히지 않고 홈이 그대로다.
-      - back
+      # 뒤로 가기 = 취소. 앱이 닫히지 않고 홈이 그대로다. (iOS는 취소 버튼을 누른다)
+      - runFlow:
+          file: _system-back.yml
+          env:
+            IOS_TAP_ID: "overwrite-cancel"
       - extendedWaitUntil:
           notVisible:
-            id: "overwrite-dialog"
+            id: "overwrite-dialog|overwrite-cancel"
           timeout: 5000
       - assertVisible:
           id: "day-strip"
@@ -61,14 +65,14 @@ appId: com.a810labs.pocketlog
           id: "overwrite-cancel"
       - extendedWaitUntil:
           notVisible:
-            id: "overwrite-dialog"
+            id: "overwrite-dialog|overwrite-cancel"
           timeout: 5000
 
 # ★ D2 — 헤더 날짜 → 달력 → 이전 달 → 그 달 1일 → 닫히고 헤더가 1일이다.
 - tapOn:
     id: "home-date-button"
 - assertVisible:
-    id: "calendar-dialog"
+    id: "calendar-dialog|calendar-cancel"
 - assertVisible: "날짜로 이동"
 - tapOn:
     id: "calendar-prev"
@@ -76,11 +80,24 @@ appId: com.a810labs.pocketlog
     id: "calendar-day-.*-01"
 - extendedWaitUntil:
     notVisible:
-      id: "calendar-dialog"
+      id: "calendar-dialog|calendar-cancel"
     timeout: 5000
-- assertVisible:
-    id: "home-day-number"
-    text: "1"
+# iOS는 날짜 버튼이 접근성 라벨(「날짜로 이동」)로 자식을 가려 큰 숫자(`home-day-number`)가 보이지 않는다 — 골라진 스트립 칸의 글자(「목, 22」)로 같은 것을 본다.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "home-day-number"
+          text: "1"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
+          selected: true
+          text: ".*, 1"
 # 오늘이 든 주가 아니므로 오늘 밑줄이 스트립에 없다.
 - assertNotVisible:
     id: "day-today-.*"
@@ -92,8 +109,21 @@ appId: com.a810labs.pocketlog
     id: "calendar-cancel"
 - extendedWaitUntil:
     notVisible:
-      id: "calendar-dialog"
+      id: "calendar-dialog|calendar-cancel"
     timeout: 5000
-- assertVisible:
-    id: "home-day-number"
-    text: "1"
+# iOS는 날짜 버튼이 접근성 라벨(「날짜로 이동」)로 자식을 가려 큰 숫자(`home-day-number`)가 보이지 않는다 — 골라진 스트립 칸의 글자(「목, 22」)로 같은 것을 본다.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "home-day-number"
+          text: "1"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
+          selected: true
+          text: ".*, 1"

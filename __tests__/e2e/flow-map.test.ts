@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { LAYER2_FLOWS } from "../../scripts/layer2/flows";
+import { IOS_LAYER2_FLOWS } from "../../scripts/layer2-ios/flows";
 import {
   checkFlowMap,
   parseTables,
@@ -67,6 +68,10 @@ function realInput(doc = DOC): FlowMapInput {
       NEW_FLOWS.map((f) => [f, strip(readFileSync(join(ROOT, f), "utf8"))]),
     ),
     fixtureTexts: fixtureTexts(),
+    ios: {
+      layer1: stringArray(RUNNER, "IOS_LAYER1_FLOWS"),
+      layer2Ids: IOS_LAYER2_FLOWS.map((f) => f.id),
+    },
   };
 }
 
@@ -157,8 +162,9 @@ describe("기능→흐름 대응표 (069)", () => {
     it("V7 — 인벤토리의 층 2 ○를 —로 바꾸면 M-3", () => {
       const line =
         DOC.split("\n").find((l) => l.startsWith("| `.maestro/layer2-write-and-read.yml`")) ?? "";
-      expect(line).toMatch(/\| ○ \|\s*$/);
-      const problems = mutate(line, line.replace(/\| ○ \|\s*$/, "| — |"));
+      // 마지막 칸은 097의 iOS 층 1 열이고, 그 앞이 층 2 열이다
+      expect(line).toMatch(/\| ○ \| — \|\s*$/);
+      const problems = mutate(line, line.replace(/\| ○ \| — \|\s*$/, "| — | — |"));
       expect(problems.some((p) => p.startsWith("M-3"))).toBe(true);
     });
 
@@ -183,6 +189,43 @@ describe("기능→흐름 대응표 (069)", () => {
         "`.maestro/restart-persistence.yml`",
       );
       expect(problems.some((p) => p.startsWith("M-12"))).toBe(true);
+    });
+
+    // 097 — iOS 열
+    it("V-iOS-1 — 인벤토리의 iOS ○를 지우면 M-iOS-2", () => {
+      const line =
+        DOC.split("\n").find((l) => l.startsWith("| `.maestro/week-strip-swipe.yml`")) ?? "";
+      expect(line).toMatch(/\| ○ \|\s*$/);
+      const problems = mutate(line, line.replace(/\| ○ \|\s*$/, "| — 시험 |"));
+      expect(problems.some((p) => p.startsWith("M-iOS-2"))).toBe(true);
+    });
+
+    it("V-iOS-2 — IOS_LAYER1_FLOWS에서 한 흐름이 빠지면 M-iOS-2", () => {
+      const input = realInput();
+      const withoutOne = checkFlowMap({
+        ...input,
+        ios: { ...input.ios!, layer1: input.ios!.layer1.slice(1) },
+      });
+      expect(withoutOne.some((p) => p.startsWith("M-iOS-2"))).toBe(true);
+    });
+
+    it("V-iOS-3 — 등록도 보조도 아닌 .maestro/ios 흐름이 있으면 M-iOS-3", () => {
+      const input = realInput();
+      const problems = checkFlowMap({
+        ...input,
+        flowFiles: [...input.flowFiles, ".maestro/ios/stray.yml"],
+      });
+      expect(problems.some((p) => p.startsWith("M-iOS-3"))).toBe(true);
+    });
+
+    it("V-iOS-4 — 기능 표의 iOS 층 2 칸에서 id 하나를 지우면 M-iOS-4", () => {
+      const problems = mutate("`write-and-read`", "`write-and-read-typo`");
+      expect(problems.some((p) => p.startsWith("M-iOS-4"))).toBe(true);
+    });
+
+    it("V-iOS-5 — iOS 열 머리를 지우면 M-iOS-1", () => {
+      const problems = mutate("| iOS 층 2 |", "| |");
+      expect(problems.some((p) => p.startsWith("M-iOS-1"))).toBe(true);
     });
 
     it("V6 — 새 흐름이 픽스처 본문을 단언하면 M-10", () => {

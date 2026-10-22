@@ -14,6 +14,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 # 설정 → 개발자 → 「쓸 재료 0으로 보기」 켬
 - tapOn:
@@ -38,9 +39,15 @@ appId: com.a810labs.pocketlog
 - tapOn:
     id: "sim-empty-toggle"
 
-# 홈으로 — 개발자 → 설정 → 홈
-- back
-- back
+# 홈으로 — 개발자 → 설정 → 홈 (iOS는 「‹」 버튼으로)
+- runFlow:
+    file: _system-back.yml
+    env:
+      IOS_TAP_ID: "back-to-settings"
+- runFlow:
+    file: _system-back.yml
+    env:
+      IOS_TAP_ID: "back-to-home"
 - extendedWaitUntil:
     visible:
       id: "home-dev-badge"
@@ -70,8 +77,14 @@ appId: com.a810labs.pocketlog
     timeout: 20000
 - tapOn:
     id: "sim-empty-toggle"
-- back
-- back
+- runFlow:
+    file: _system-back.yml
+    env:
+      IOS_TAP_ID: "back-to-settings"
+- runFlow:
+    file: _system-back.yml
+    env:
+      IOS_TAP_ID: "back-to-home"
 - extendedWaitUntil:
     notVisible:
       id: "home-dev-badge"

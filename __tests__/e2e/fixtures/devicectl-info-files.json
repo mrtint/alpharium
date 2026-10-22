@@ -1,0 +1,93 @@
+{
+ "info": {
+  "commandType": "devicectl.device.info.files",
+  "outcome": "success",
+  "jsonVersion": 5
+ },
+ "result": {
+  "domain": "appDataContainer",
+  "domainIdentifier": "com.a810labs.pocketlog",
+  "files": [
+   {
+    "name": "diary",
+    "relativePath": "diary",
+    "metadata": {
+     "size": 64
+    },
+    "resources": {
+     "isDirectory": true
+    }
+   },
+   {
+    "name": "models",
+    "relativePath": "models",
+    "metadata": {
+     "size": 192
+    },
+    "resources": {
+     "isDirectory": true
+    }
+   },
+   {
+    "name": "models/a1.bin",
+    "relativePath": "models/a1.bin",
+    "metadata": {
+     "size": 0
+    },
+    "resources": {
+     "isDirectory": false
+    }
+   },
+   {
+    "name": "models/state.json",
+    "relativePath": "models/state.json",
+    "metadata": {
+     "size": 255
+    },
+    "resources": {
+     "isDirectory": false
+    }
+   },
+   {
+    "name": "models/v1.bin",
+    "relativePath": "models/v1.bin",
+    "metadata": {
+     "size": 379219104
+    },
+    "resources": {
+     "isDirectory": false
+    }
+   },
+   {
+    "name": "models/v2.bin",
+    "relativePath": "models/v2.bin",
+    "metadata": {
+     "size": 102815168
+    },
+    "resources": {
+     "isDirectory": false
+    }
+   },
+   {
+    "name": "preferences",
+    "relativePath": "preferences",
+    "metadata": {
+     "size": 96
+    },
+    "resources": {
+     "isDirectory": true
+    }
+   },
+   {
+    "name": "preferences/onboarding.json",
+    "relativePath": "preferences/onboarding.json",
+    "metadata": {
+     "size": 90
+    },
+    "resources": {
+     "isDirectory": false
+    }
+   }
+  ]
+ }
+}

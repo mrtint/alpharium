@@ -39,9 +39,36 @@ npm run test:layer2
 - [ ] 큰 글꼴(2.0배)에서 설정·대화상자가 잘리지 않는지.
 - [ ] 설정의 「일기 모두 지우기」를 실제로 눌렀을 때(058 quickstart).
 
-## iOS
+## iOS (스펙 097) — iPhone 실기기, 사람이 쓰기를 누르고 스크립트가 단언한다
 
-층 2의 iOS 자동화 갈래는 없다(로드맵 과제). iOS는 **TestFlight 빌드 또는 개발 서명 빌드로 실제 iPhone(087)에서 확인한다** — 설치 → 권한 → 내려받기 → 첫 일기 → 백그라운드·쓸 차례 알림을 사람이 확인한다(AGENTS 「iOS 빌드·서명·TestFlight」).
+Maestro는 iOS 실기기를 구동하지 못한다(스파이크 결과는 [feature-flow-map.md](feature-flow-map.md) 머리). 그래서 층 2의 iOS 갈래는 **실행기가 준비하고 안내하면 사람이 누르고, 실행기가 일기 파일이 생기는지 본다.** 시뮬레이터는 실제 iPhone을 말해 주지 않으므로 실제 모델 경로는 늘 여기서 본다. 층 1의 iOS 갈래(`npm run test:layer1:ios`, 시뮬레이터)는 화면 흐름만 본다.
+
+### 전제
+
+- [ ] **전용 iPhone** 하나만 맥에 꽂혀 있고 페어링돼 있다(`xcrun devicectl list devices`). 이 기기의 일기와 설정이 바뀐다 — 사진 보관함에는 합성 사진이 남는다(지우는 도구가 없다, 087).
+- [ ] **개발 서명 빌드**가 깔려 있다(`get-task-allow`) — TestFlight 빌드에는 닿지 못한다. 기기 잠금이 풀려 있다. **`diagnostics-try-write`는 개발(dev) 환경 빌드에서만 돈다** — 진단 화면이 개발 환경 전용이라 배포(prod) 환경 빌드(7번 탭으로 개발자 메뉴만 켠 것)에는 「진단」 행이 없다(2026-10-22 iPhone 14 실측). 그런 빌드에서는 이 흐름을 빼고(`-- write-and-read open-app-writes first-run-auto-diary`) 돌리고 「미확인」으로 적는다.
+- [ ] **모델이 받아져 있다** — 앱에서 직접 받아 둔다. 컨테이너 `Documents/models/`의 세 `.bin`이 0바이트가 아니다. 없거나 0바이트면 실행기가 중단한다(모델을 받지 않는다).
+- [ ] **Xcode를 꺼 둔다** — 켜 두면 사진 시딩(lldb attach)이 멈춘다(087). 지우기(lldb)도 같다.
+- [ ] 앱에 사진 읽기·쓰기 권한이 허용돼 있다. 표본 사진이 내려받아져 있다(`npm run sample:fetch`).
+- [ ] 터미널에서 직접 실행한다(Enter 입력이 필요하다 — 표준 입력이 터미널이 아니면 사람 흐름은 중단한다).
+
+### 실행
+
+```
+npm run test:layer2:ios
+```
+
+흐름 하나를 단독으로 돌리려면 id를 준다: `npm run test:layer2:ios -- write-and-read`. **터미널이 아닌 셸(에이전트·CI)에서는** `POCKETLOG_IOS_L2_ENTER_FILE=<경로>`를 주고 Enter 대신 그 파일을 `touch`한다. 대기 한도를 줄이려면 `--operation-timeout <초> --generation-timeout <초>`(기본 300·600).
+
+- 흐름 넷이 **하나씩** 돈다 — 각각 기준 상태를 다시 만든다: `open-app-writes`(사람 조작 없음), `write-and-read`, `diagnostics-try-write`, `first-run-auto-diary`. 흐름마다 안내문이 나오면 그대로 하고 **조작을 마치면 터미널에서 Enter를 누른다.**
+- [ ] 끝에 `PASSED`가 나왔다. `SKIPPED`·`ABORTED`·`FAILED`는 통과가 아니다 — 이유를 읽는다. 조작 대기 초과(Enter 없음)와 생성 대기 초과(Enter 뒤 일기 파일 없음)는 다른 실패다.
+- [ ] 단언은 상태 전이까지다: 일기 파일이 10분 안에 생긴다, 날짜가 맞고 본문이 비어 있지 않다, 「최근 실패」 기록에 새 항목이 없다. **쓰는 중은 파일로 안 보여 자동 단언이 없다 — 쓰는 중 화면은 사람이 눈으로 본다.**
+- [ ] 본문은 자동으로 채점하지 않는다(원칙 IV) — 끝에 `.cache/layer2-ios/<시각>/`에 가져온 일기를 위 「본문 읽기」 체크리스트로 읽는다.
+
+### 그 밖에 사람이 보는 것
+
+- [ ] **TestFlight 빌드**로 설치 → 권한 → 내려받기 → 첫 일기 → 백그라운드·쓸 차례 알림을 확인한다(AGENTS 「iOS 빌드·서명·TestFlight」). 위 실행기는 개발 서명 빌드 전용이다.
+- [ ] 쓰는 중 화면과 iPhone 이어 하기(092)는 실행기가 보지 않는다.
 
 ## 결과 기록
 

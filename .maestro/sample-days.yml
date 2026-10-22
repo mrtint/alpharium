@@ -18,6 +18,7 @@ appId: com.a810labs.pocketlog
 - assertTrue: ${P0_DATE.length > 0}
 
 - launchApp
+- runFlow: _dismiss-logbox.yml
 - extendedWaitUntil:
     visible:
       id: "day-strip"

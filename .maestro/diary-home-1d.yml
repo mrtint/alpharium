@@ -20,6 +20,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 # 045 — 다운로드 완료 화면의 「시작할게요」는 세션 로컬 상태라 재시작마다 다시 뜬다(welcome-naming.yml
 # 참조). 뜨면 지나간다.
@@ -44,8 +45,19 @@ appId: com.a810labs.pocketlog
 # 오늘이고 기기에 오늘 일기가 있을 수 있다.
 - assertVisible:
     id: "home-month"
-- assertVisible:
-    id: "home-day-number"
+# iOS는 날짜 버튼이 큰 숫자를 가린다(접근성 라벨 「날짜로 이동」) — 버튼이 있는지로 같은 것을 본다.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "home-day-number"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "home-date-button"
 - assertVisible:
     id: "day-strip"
 - assertNotVisible:
@@ -81,13 +93,28 @@ appId: com.a810labs.pocketlog
     visible:
       id: "settings-title"
     timeout: 5000
-- back
+# (iOS는 시스템 뒤로 키가 없어 「‹ 일기」를 다시 누른다)
+- runFlow:
+    file: _system-back.yml
+    env:
+      IOS_TAP_ID: "back-to-home"
 - extendedWaitUntil:
     notVisible:
       id: "settings-title"
     timeout: 5000
-- assertVisible:
-    id: "home-day-number"
+# iOS는 날짜 버튼이 큰 숫자를 가린다(접근성 라벨 「날짜로 이동」) — 버튼이 있는지로 같은 것을 본다.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "home-day-number"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "home-date-button"
 
 # ★ 원칙 III·IV — 홈 어디에도 모델 정보·진행 지표가 없다.
 - assertNotVisible: "kanana"

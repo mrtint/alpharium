@@ -27,9 +27,13 @@ describe("층 2 릴리스 전 체크리스트 (073)", () => {
     expect(doc).toMatch(/사람이 봄/);
   });
 
-  it("C2 — iOS 층 2 갈래가 없다는 사실을 적는다", () => {
-    expect(doc).toMatch(/iOS/);
+  it("C2 — iOS 층 2의 실제 절차(097)와 TestFlight 확인을 담는다", () => {
+    expect(doc).toContain("npm run test:layer2:ios");
+    expect(doc).toMatch(/Enter/);
+    expect(doc).toMatch(/Xcode/);
     expect(doc).toMatch(/TestFlight/);
+    // 옛 문구(「iOS 자동화 갈래는 없다」)가 남아 있지 않다
+    expect(doc).not.toMatch(/층 2의 iOS 자동화 갈래는 없다/);
   });
 
   it.each([/release 빌드·서명·Google Play/, /iOS 빌드·서명·TestFlight/])(

@@ -25,6 +25,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 # 073 — 홈에서 「일기」 글자(048 kicker)가 사라졌다(055: 월 라벨 줄 + 점 셋). 홈이 떴는가는 스트립이 정한다.
 - extendedWaitUntil:
@@ -82,7 +83,7 @@ appId: com.a810labs.pocketlog
           id: "write-button"
       # ★ 확인 대화상자가 뜨고 곧바로 생성되지 않는다(050 — 홈 위의 대화상자, 보드 2d).
       - assertVisible:
-          id: "overwrite-dialog"
+          id: "overwrite-dialog|overwrite-cancel"
       - assertVisible:
           id: "overwrite-confirm"
       - assertVisible: "취소"
@@ -108,7 +109,20 @@ appId: com.a810labs.pocketlog
       notVisible:
         id: "day-strip"
     commands:
-      - back
+      - runFlow:
+          when:
+            platform: Android
+          commands:
+            - back
+      # iOS는 뒤로 키가 없다 — 홈 위에 겹친 화면이면 「‹」으로 돌아간다
+      - runFlow:
+          when:
+            platform: iOS
+            visible:
+              id: "back-to-home"
+          commands:
+            - tapOn:
+                id: "back-to-home"
 
 - assertVisible:
     id: "day-strip"

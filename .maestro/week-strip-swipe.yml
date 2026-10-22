@@ -20,6 +20,7 @@
 appId: com.a810labs.pocketlog
 ---
 - launchApp
+- runFlow: _dismiss-logbox.yml
 
 - extendedWaitUntil:
     visible:
@@ -29,8 +30,20 @@ appId: com.a810labs.pocketlog
 # ★ W1 — 오늘이 골라져 있다(오늘 칸 = 밑줄).
 - assertVisible:
     id: "day-today-.*"
-- copyTextFrom:
-    id: "home-day-number"
+# iOS는 날짜 버튼이 접근성 라벨(「날짜로 이동」)로 자식을 가려 큰 숫자(`home-day-number`)가 보이지 않는다 — 골라진 스트립 칸의 글자(「목, 22」)로 같은 것을 본다.
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - copyTextFrom:
+          id: "home-day-number"
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - copyTextFrom:
+          id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
+          selected: true
 - evalScript: ${output.today = maestro.copiedText}
 - copyTextFrom:
     id: "home-weekday"
@@ -58,9 +71,21 @@ appId: com.a810labs.pocketlog
     direction: LEFT
 - assertVisible:
     id: "day-today-.*"
-- assertVisible:
-    id: "home-day-number"
-    text: ${output.today}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "home-day-number"
+          text: ${output.today}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
+          selected: true
+          text: ${output.today}
 
 # ★ W4 — 오늘이 든 주에서 왼쪽으로 넘겨도 아무 것도 바뀌지 않는다(튕김).
 - swipe:
@@ -69,6 +94,18 @@ appId: com.a810labs.pocketlog
     direction: LEFT
 - assertVisible:
     id: "day-today-.*"
-- assertVisible:
-    id: "home-day-number"
-    text: ${output.today}
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - assertVisible:
+          id: "home-day-number"
+          text: ${output.today}
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - assertVisible:
+          id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
+          selected: true
+          text: ${output.today}

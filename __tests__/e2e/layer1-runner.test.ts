@@ -1,6 +1,6 @@
 import { BASELINE } from "../../scripts/layer1/baseline";
-import type { Layer1Device, Outcome } from "../../scripts/layer1/device";
-import { DEDICATED_DEVICE_NOTICE, runLayer1 } from "../../scripts/layer1/runner";
+import type { BaselineDevice, Layer1Device, Outcome } from "../../scripts/layer1/device";
+import { DEDICATED_DEVICE_NOTICE, prepareBaseline, runLayer1 } from "../../scripts/layer1/runner";
 
 /**
  * 069 — 층 1 실행기의 단계와 보고 (기기 대역).
@@ -22,11 +22,13 @@ type Overrides = Partial<{
   diary: string[];
   cache: string[];
   maestroResult: { status: number | null; failed: string[] | null };
+  labels: Layer1Device["labels"];
 }>;
 
 function fakeDevice(over: Overrides = {}) {
   const calls: string[] = [];
   const device: Layer1Device = {
+    labels: over.labels,
     listDevices: () => (over.devices === undefined ? [SERIAL] : over.devices),
     hasMaestro: () => over.maestro ?? true,
     probe: () => {
@@ -174,5 +176,42 @@ describe("층 1 실행기 (069)", () => {
     const { result } = run({ maestroResult: { status: 2, failed: null } });
     expect(result.status).toBe("failed");
     expect(result.reason).toContain("알 수 없음");
+  });
+
+  // 097 — 두 플랫폼이 같은 실행기를 쓴다. 안드로이드 문구는 바이트 그대로이고, iOS 장치는 자기 문구를 준다.
+  it("R13 — 장치 문구가 없으면 안드로이드 문구 그대로다 (회귀 0)", () => {
+    expect(run({ devices: null }).result.reason).toBe("adb를 찾지 못했다");
+    expect(run({ devices: [] }).result.reason).toBe("연결된 안드로이드 기기가 없다");
+    expect(run({ probe: { ok: false, detail: "X" } }).result.reason).toContain(
+      "release 빌드이거나 재부팅 뒤 첫 잠금 해제 전일 수 있다",
+    );
+  });
+
+  it("R14 — 장치가 준 문구를 건너뜀·중단 이유에 쓴다 (iOS)", () => {
+    const labels = {
+      toolMissing: "xcrun simctl을 찾지 못했다",
+      noDevice: "부팅된 iOS 시뮬레이터가 없다",
+      probeHint: "앱이 설치돼 있지 않을 수 있다",
+    };
+    expect(run({ labels, devices: null }).result.reason).toBe(labels.toolMissing);
+    expect(run({ labels, devices: [] }).result.reason).toBe(labels.noDevice);
+    const aborted = run({ labels, probe: { ok: false, detail: "no app" } }).result;
+    expect(aborted.reason).toContain(labels.probeHint);
+    expect(aborted.reason).not.toContain("release 빌드");
+  });
+
+  it("R15 — prepareBaseline은 기준 상태 연산만 가진 장치(BaselineDevice)로 돈다", () => {
+    const { device } = fakeDevice();
+    const baseline: BaselineDevice = {
+      probe: device.probe,
+      listDir: device.listDir,
+      forceStop: device.forceStop,
+      ensureDirs: device.ensureDirs,
+      writeFile: device.writeFile,
+      copyFile: device.copyFile,
+      removeFile: device.removeFile,
+    };
+    const result = prepareBaseline(baseline, SERIAL, { diaries: [], photos: [] }, () => {});
+    expect(result).toBeNull();
   });
 });
