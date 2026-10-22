@@ -110,6 +110,8 @@
 
 ### 일기·모델 백업과 유실 안내
 
+> **스펙 099** (`specs/099-backup-and-loss-notice/`, 설계 `docs/superpowers/specs/2026-10-22-backup-and-loss-notice-design.md`). 소유자 결정(2026-10-22): 일기·설정은 OS 기본 백업을 그대로 두고 모델만 뺀다.
+
 **배경**: 일기·설정·모델이 모두 앱 데이터 안에 있어 앱을 지우면 함께 사라진다. 두 플랫폼의 백업 동작은 의도해서 정한 것이 아니라 기본값이다 — iOS는 모델 2GB가 iCloud 백업 대상 자리
 (`NSDocumentDirectory`)에 있고 `expo-file-system` 57에는 백업 제외 API가 없다. 안드로이드는 `allowBackup="true"`에 백업 규칙이 없고 모델이 Auto Backup 한도(앱당 25MB)를 넘는다
 (넘었을 때 일기가 백업되는지는 미확인).
