@@ -13,8 +13,9 @@ name: Pocketlog iOS Release
 #   - 캐시를 쓰지 않는다. 072에서 Pods·DerivedData 캐시는 효과가 없었다.
 #   - 마지막 정리 단계는 성공·실패와 무관하게 키체인·프로파일·API 키 파일을 지운다.
 #
-# ios.buildNumber 올림은 사람이 커밋한다(CI는 올리지 않는다). 같은 버전·번호는 Apple이 거부하며
-# 그 실패를 숨기지 않는다. 업로드가 성공해도 App Store Connect의 처리 단계 통과는 따로 확인한다
+# ios.buildNumber 올림은 사람이 커밋한다(CI는 올리지 않는다). 같은 버전·번호는 Apple이 거부하므로 「번호 점검」 단계가 아카이브 전에
+# App Store Connect의 이 버전 빌드 번호를 읽어(읽기 전용, 096) 이번 번호가 마지막보다 크지 않으면 이미 있는 번호를 밝히며 실패한다.
+# 읽지 못해도 실패한다. 업로드가 성공해도 App Store Connect의 처리 단계 통과는 따로 확인한다
 # (ITMS 메일, TestFlight 목록 — 066의 ITMS-90683).
 on:
   workflow_dispatch:
@@ -42,7 +43,6 @@ jobs:
           node-version: 24
           cache: npm
       # 값이 틀리면 비싼 아카이브 전에 이름만 밝히고 끝낸다. 값은 찍지 않는다.
-      # 같은 버전·번호의 중복 업로드는 로컬에서 알 수 없어 점검하지 않는다(Apple이 거부한다).
       - name: 사전 점검
         env:
           IOS_DIST_P12_BASE64: ${{ secrets.IOS_DIST_P12_BASE64 }}
@@ -76,6 +76,22 @@ jobs:
       # 비밀이 없는 단계다. 릴리스 노트(release-notes/ko.txt)가 비었거나 4000자를 넘으면 아카이브 전에 끝낸다. TestFlight 「테스트할 내용」으로 간다.
       - name: 릴리스 노트 점검
         run: node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/release-notes/check.mts --store testflight
+      # 096 — 이번 buildNumber가 같은 expo.version의 스토어 마지막 번호보다 큰지 아카이브 전에 본다. 읽기(GET)만 한다.
+      # npm ci 앞이라 의존성 설치 스크립트가 API 키를 보지 못한다 — 스크립트는 Node 내장만 쓰는 저장소 코드 하나다.
+      # 값은 찍지 않고, 통과하면 번호와 커밋의 대응 한 줄을 요약에 남긴다. 못 읽으면(권한·네트워크) 건너뛰지 않고 실패한다.
+      - name: 번호 점검
+        env:
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          line=$(node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/ios-release/build-number-check.mts \
+            --app-json app.json --bundle com.a810labs.pocketlog --commit "$GITHUB_SHA")
+          {
+            echo
+            echo "### 번호 점검"
+            echo "- $line"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - name: 러너 사양
         run: |
           {

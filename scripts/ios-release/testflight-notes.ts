@@ -1,6 +1,7 @@
 /**
  * TestFlight 「테스트할 내용」 — 업로드된 빌드가 처리되길 기다렸다가 App Store Connect API로 `betaBuildLocalizations`에 쓴다.
  * 네트워크·시계·잠자기는 주입받는다. `altool`은 이 글을 올리지 못한다.
+ * 096 — 같은 인증·호출로 이 버전의 스토어 빌드 번호를 읽기만 한다(`listBuildNumbers`).
  *
  * `play-upload.ts`와 같은 규칙이다: 새 의존성 없이 Node 내장 `crypto`와 `fetch`만 쓰고, 비밀(API 개인 키·토큰)을 어디에도 출력하지
  * 않는다. 오류 메시지는 `HTTP <상태> <호출>: <사유>` 꼴 하나이고 사유는 응답의 `errors[0].detail`(없으면 `title`)에서만 가져온다.
@@ -74,36 +75,49 @@ async function reasonOf(response: Response): Promise<string> {
 
 type Json = Record<string, unknown>;
 
+/** 호출 하나. 실패는 `HTTP <상태> <이름>: <사유>`, 연결 실패는 `네트워크 오류 <이름>`. `forbiddenHint`는 403일 때 사유 뒤에 괄호로 붙는다 */
+async function callAsc(
+  deps: AscDeps,
+  token: string,
+  name: string,
+  method: string,
+  url: string,
+  body?: unknown,
+  forbiddenHint?: string,
+): Promise<Json> {
+  let response: Response;
+  try {
+    response = await deps.fetch(url, {
+      method,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
+    } as RequestInit);
+  } catch {
+    throw new Error(`네트워크 오류 ${name}`);
+  }
+  if (!response.ok) {
+    const hint =
+      response.status === 403 && forbiddenHint !== undefined ? ` (${forbiddenHint})` : "";
+    throw new Error(`HTTP ${response.status} ${name}: ${await reasonOf(response)}${hint}`);
+  }
+  try {
+    return (await response.json()) as Json;
+  } catch {
+    return {};
+  }
+}
+
 export async function publishWhatsNew(
   args: PublishArgs,
 ): Promise<{ buildId: string; action: "created" | "updated" }> {
   const { deps } = args;
   const token = signJwt(args, deps.now());
-
-  async function call(name: string, method: string, url: string, body?: unknown): Promise<Json> {
-    let response: Response;
-    try {
-      response = await deps.fetch(url, {
-        method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(CALL_TIMEOUT_MS),
-      } as RequestInit);
-    } catch {
-      throw new Error(`네트워크 오류 ${name}`);
-    }
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status} ${name}: ${await reasonOf(response)}`);
-    }
-    try {
-      return (await response.json()) as Json;
-    } catch {
-      return {};
-    }
-  }
+  const call = (name: string, method: string, url: string, body?: unknown) =>
+    callAsc(deps, token, name, method, url, body);
 
   const apps = await call(
     "apps",
@@ -180,4 +194,58 @@ export async function publishWhatsNew(
     },
   });
   return { buildId, action: "created" };
+}
+
+const API_ORIGIN = "https://api.appstoreconnect.apple.com/";
+const MAX_PAGES = 20;
+const READ_ROLE_HINT = "API 키 역할을 확인한다 — App Manager 이상";
+
+/**
+ * 이 앱·이 마케팅 버전으로 App Store Connect에 올라간 모든 빌드의 번호(`attributes.version`)를 읽는다(096). 읽기(GET)만 한다.
+ * 서버 정렬에 기대지 않고 모두 내려받아 부르는 쪽이 센다. 다음 쪽 주소는 API 호스트일 때만 따라간다 — 토큰을 다른 곳으로 보내지 않는다.
+ */
+export async function listBuildNumbers(
+  args: Pick<PublishArgs, "deps" | "keyP8" | "keyId" | "issuerId" | "bundleId" | "version">,
+): Promise<string[]> {
+  const { deps } = args;
+  const token = signJwt(args, deps.now());
+  const get = (name: string, url: string) =>
+    callAsc(deps, token, name, "GET", url, undefined, READ_ROLE_HINT);
+
+  const apps = await get(
+    "apps",
+    `${API}/apps?${new URLSearchParams({ "filter[bundleId]": args.bundleId, limit: "1" })}`,
+  );
+  const appId = (apps.data as { id?: string }[] | undefined)?.[0]?.id;
+  if (typeof appId !== "string" || appId === "") {
+    throw new Error(`앱을 찾지 못했다 (번들 id ${args.bundleId})`);
+  }
+
+  const numbers: string[] = [];
+  let url: string | undefined = `${API}/builds?${new URLSearchParams({
+    "filter[app]": appId,
+    "filter[preReleaseVersion.version]": args.version,
+    limit: "200",
+  })}`;
+  for (let page = 1; url !== undefined; page++) {
+    if (page > MAX_PAGES) {
+      throw new Error(`빌드 목록이 ${MAX_PAGES}쪽을 넘는다 — 번호를 다 읽지 못했다`);
+    }
+    const body = await get("builds", url);
+    if (!Array.isArray(body.data)) throw new Error("HTTP 200 builds: 응답 형식이 다르다");
+    for (const build of body.data as { attributes?: { version?: unknown } }[]) {
+      const version = build?.attributes?.version;
+      if (typeof version !== "string") throw new Error("HTTP 200 builds: 응답 형식이 다르다");
+      numbers.push(version);
+    }
+    const next = (body.links as { next?: unknown } | undefined)?.next;
+    if (next === undefined) {
+      url = undefined;
+    } else if (typeof next === "string" && next.startsWith(API_ORIGIN)) {
+      url = next;
+    } else {
+      throw new Error("HTTP 200 builds: 다음 쪽 주소가 App Store Connect API가 아니다");
+    }
+  }
+  return numbers;
 }

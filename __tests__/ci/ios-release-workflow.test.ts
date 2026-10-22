@@ -276,4 +276,64 @@ describe("075 ios-release 워크플로", () => {
       expect(notes).not.toMatch(/continue-on-error|\|\|\s*true/);
     });
   });
+
+  describe("번호 점검 (096 N1~N6)", () => {
+    const CHECK = "번호 점검";
+
+    /** `run:` 이후의 본문(env 블록 제외) */
+    function runBody(text: string): string {
+      const block = step(text, CHECK);
+      const at = block.indexOf("run:");
+      return at === -1 ? "" : block.slice(at);
+    }
+
+    it("N1 번호 점검이 릴리스 노트 점검 뒤·npm ci와 prebuild·서명 키 준비 앞이다", () => {
+      const text = read();
+      const at = text.indexOf("- name: 번호 점검");
+      expect(at).toBeGreaterThan(text.indexOf("- name: 릴리스 노트 점검"));
+      expect(at).toBeLessThan(text.indexOf("- run: npm ci"));
+      expect(at).toBeLessThan(text.indexOf("- name: expo prebuild"));
+      expect(at).toBeLessThan(text.indexOf("- name: 서명 키체인 준비"));
+    });
+
+    it("N2 env는 API 키 셋뿐이고 단계 env 깊이(10칸)에 `KEY: ${{ secrets.KEY }}` 꼴로 있다", () => {
+      const block = step(read(), CHECK);
+      const refs = block.split("\n").filter((l) => l.includes("secrets."));
+      expect(refs).toEqual([
+        "          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}",
+        "          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}",
+        "          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}",
+      ]);
+    });
+
+    it("N3 run 본문에 `${{` 보간이 없고 커밋은 $GITHUB_SHA로 넘긴다", () => {
+      const body = runBody(read());
+      expect(body).not.toBe("");
+      expect(body).not.toMatch(/\$\{\{/);
+      expect(body).toMatch(/--commit "\$GITHUB_SHA"/);
+    });
+
+    it("N4 저장소 스크립트 하나만 부르고 npm·npx·pod·xcodebuild는 부르지 않는다", () => {
+      const body = runBody(read());
+      expect(body.match(/build-number-check\.mts/g)).toHaveLength(1);
+      expect(body).toMatch(/--app-json app\.json/);
+      expect(body).not.toMatch(/\b(npm|npx|pod|xcodebuild)\b/);
+      expect(body.match(/\bnode\b/g)).toHaveLength(1);
+    });
+
+    it("N5 통과 줄을 실행 요약에 남기고 비밀 변수를 출력하지 않으며 실패를 가리지 않는다", () => {
+      const block = step(read(), CHECK);
+      expect(block).toMatch(/GITHUB_STEP_SUMMARY/);
+      expect(block).not.toMatch(
+        /\b(echo|cat|printenv)\b.*\b(ASC_API_KEY_P8|ASC_KEY_ID|ASC_ISSUER_ID)\b/,
+      );
+      expect(block).not.toMatch(/continue-on-error|\|\|\s*true|set\s+\+e/);
+    });
+
+    it("N6 시작은 수동 하나, 권한은 contents: read 하나다 (096이 이 계약을 약하게 하지 않는다)", () => {
+      const text = read();
+      expect(section(text, "permissions", 0).trimEnd()).toBe("permissions:\n  contents: read");
+      expect(section(text, "on", 0).trimEnd()).toBe("on:\n  workflow_dispatch:");
+    });
+  });
 });

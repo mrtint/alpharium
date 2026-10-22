@@ -20,7 +20,7 @@
 - **입력**: 시작한 `main` 커밋의 `app.json` `expo.version`·`expo.ios.buildNumber`.
 - **상태 전이**: 시작 → 소유자 승인 대기 → 사전 점검 → 빌드 → 서명·내보내기 → 업로드 → 정리. 어느 단계의 실패든 정리로 간다.
 - **출력**: App Store Connect의 빌드 한 개, 실행 요약(러너 사양·Xcode 버전·단계별 초). 파일 산출물 없음.
-- **유일성**: 같은 `version`+`buildNumber`는 Apple이 거부한다. 사람이 커밋으로 `buildNumber`를 올린다.
+- **유일성**: 같은 `version`+`buildNumber`는 Apple이 거부한다. 사람이 커밋으로 `buildNumber`를 올리고, 096의 「번호 점검」이 빌드 전에 스토어의 마지막 번호와 견준다.
 
 ## 러너 임시 상태 (잡이 끝나면 없어야 하는 것 — SC-005)
 

@@ -32,7 +32,7 @@ macos-latest 3코어·7,168MB·macOS 26.6.2·Xcode 26.6. 시뮬레이터 Debug �
   임시 키체인 생성·p12 import·프로파일 설치 → xcodebuild archive(수동 서명) → exportArchive(scripts/ios/ExportOptions.plist) → altool 업로드 → 정리(if: always())`.
   `xcodebuild`는 066의 세 줄을 그대로 쓴다. 단계별 걸린 시간은 072처럼 `GITHUB_STEP_SUMMARY`에 적는다.
 - **사전 점검**(비밀을 쓰기 전, 값이 틀리면 즉시 실패): (a) 필수 비밀 이름이 모두 비어 있지 않음, (b) `app.json`의 `ios.buildNumber`가 정수,
-  (c) 같은 `version`+`buildNumber`가 이미 올라갔는지는 로컬에서 알 수 없으므로 *점검하지 않는다*(Apple이 중복을 거부한다 — 실패는 그대로 보이게 둔다).
+  (c) 같은 `version`+`buildNumber`가 이미 올라갔는지는 이 사전 점검이 아니라 별도 단계 「번호 점검」(096)이 App Store Connect를 읽어 본다. 막지 못한 중복은 Apple이 거부하며 그 실패는 그대로 보이게 둔다.
 
 ### 비밀 (Environment `ios-release`의 secrets만, 저장소 수준에 두지 않는다)
 

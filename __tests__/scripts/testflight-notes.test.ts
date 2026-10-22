@@ -4,7 +4,7 @@
  */
 
 import { generateKeyPairSync, createVerify } from "node:crypto";
-import { publishWhatsNew } from "../../scripts/ios-release/testflight-notes.ts";
+import { listBuildNumbers, publishWhatsNew } from "../../scripts/ios-release/testflight-notes.ts";
 
 const API = "https://api.appstoreconnect.apple.com/v1";
 const NOW = 1_800_000_000_000;
@@ -238,5 +238,128 @@ describe("TestFlight 테스트할 내용", () => {
       await expect(failure).rejects.toThrow("네트워크 오류 apps");
       await expect(failure).rejects.not.toThrow("TOKEN-LEAK");
     });
+  });
+});
+
+describe("096 App Store Connect 빌드 번호 조회 (listBuildNumbers)", () => {
+  function listWith(fakeFetch: typeof fetch) {
+    return listBuildNumbers({
+      deps: { fetch: fakeFetch, now: () => NOW, sleep: async () => undefined },
+      keyP8: KEY_P8,
+      keyId: "KEYID12345",
+      issuerId: "issuer-uuid",
+      bundleId: "com.a810labs.pocketlog",
+      version: "1.0.0",
+    });
+  }
+
+  function lookup(override?: Responder) {
+    const { fakeFetch, calls } = make((call) => {
+      const custom = override?.(call);
+      if (custom) return custom;
+      if (call.url.startsWith(`${API}/builds?`)) {
+        return json({
+          data: [
+            { id: "B1", attributes: { version: "6" } },
+            { id: "B2", attributes: { version: "7" } },
+          ],
+        });
+      }
+      return undefined;
+    });
+    const result = () => listWith(fakeFetch);
+    return { calls, result };
+  }
+
+  it("T1 앱 → 빌드 순서로 GET만 부르고 번호 문자열을 돌려준다", async () => {
+    const { calls, result } = lookup();
+    await expect(result()).resolves.toEqual(["6", "7"]);
+    expect(calls.map((c) => `${c.method} ${c.url.split("?")[0]}`)).toEqual([
+      `GET ${API}/apps`,
+      `GET ${API}/builds`,
+    ]);
+    const builds = decodeURIComponent(calls[1].url);
+    expect(builds).toContain("filter[app]=APP1");
+    expect(builds).toContain("filter[preReleaseVersion.version]=1.0.0");
+    expect(builds).toContain("limit=200");
+    expect(builds).not.toContain("filter[version]");
+  });
+
+  it("T1 links.next를 끝까지 따라가며 모든 쪽의 번호를 모은다", async () => {
+    const next = `${API}/builds?cursor=2`;
+    const { fakeFetch, calls } = make((c) => {
+      if (c.url === next) return json({ data: [{ id: "B3", attributes: { version: "9" } }] });
+      if (c.url.startsWith(`${API}/builds?`)) {
+        return json({ data: [{ id: "B1", attributes: { version: "6" } }], links: { next } });
+      }
+      return undefined;
+    });
+    await expect(listWith(fakeFetch)).resolves.toEqual(["6", "9"]);
+    expect(calls.every((c) => c.method === "GET")).toBe(true);
+  });
+
+  it("T1 쪽이 20을 넘으면 실패한다", async () => {
+    const { fakeFetch } = make((c) =>
+      c.url.startsWith(`${API}/builds`)
+        ? json({ data: [], links: { next: `${API}/builds?cursor=${Math.random()}` } })
+        : undefined,
+    );
+    await expect(listWith(fakeFetch)).rejects.toThrow(/쪽/);
+  });
+
+  it("T2 앱을 못 찾으면 실패한다", async () => {
+    const { result } = lookup((c) =>
+      c.url.startsWith(`${API}/apps?`) ? json({ data: [] }) : undefined,
+    );
+    await expect(result()).rejects.toThrow("앱을 찾지 못했다 (번들 id com.a810labs.pocketlog)");
+  });
+
+  it("T2 빌드 항목의 version이 문자열이 아니면 건너뛰지 않고 실패한다", async () => {
+    for (const data of [[{ id: "B", attributes: { version: 7 } }], [{ id: "B" }], "x"]) {
+      const { fakeFetch } = make((c) =>
+        c.url.startsWith(`${API}/builds?`) ? json({ data }) : undefined,
+      );
+      await expect(listWith(fakeFetch)).rejects.toThrow("HTTP 200 builds: 응답 형식이 다르다");
+    }
+  });
+
+  it("T3 api.appstoreconnect.apple.com이 아닌 links.next는 따라가지 않고 실패한다 (토큰을 다른 호스트로 보내지 않는다)", async () => {
+    const { fakeFetch, calls } = make((c) =>
+      c.url.startsWith(`${API}/builds?`)
+        ? json({ data: [], links: { next: "https://evil.example/builds?cursor=2" } })
+        : undefined,
+    );
+    await expect(listWith(fakeFetch)).rejects.toThrow(/다음 쪽/);
+    expect(calls.some((c) => c.url.includes("evil.example"))).toBe(false);
+  });
+
+  it("T4 403이면 사유 뒤에 API 키 역할 안내를 덧붙인다", async () => {
+    const { result } = lookup((c) =>
+      c.url.startsWith(`${API}/builds?`)
+        ? json({ errors: [{ detail: "forbidden for this key" }] }, 403)
+        : undefined,
+    );
+    await expect(result()).rejects.toThrow(
+      /HTTP 403 builds: forbidden for this key .*App Manager 이상/,
+    );
+  });
+
+  it("FR-007 오류 문장에 토큰·개인 키·본문의 다른 필드가 실리지 않는다", async () => {
+    const { result } = lookup((c) =>
+      c.url.startsWith(`${API}/builds?`)
+        ? json({ errors: [{ detail: "no" }], debug: "LEAK-TOKEN" }, 403)
+        : undefined,
+    );
+    const error = (await result().catch((e: Error) => e)) as Error;
+    expect(error.message).not.toMatch(/LEAK|PRIVATE KEY|Bearer|eyJ/);
+  });
+
+  it("네트워크 오류는 호출 이름만 밝힌다", async () => {
+    const { fakeFetch } = make((c) => {
+      if (c.url.startsWith(`${API}/builds?`)) throw new Error("socket hang up LEAK");
+      return undefined;
+    });
+    const error = await listWith(fakeFetch).catch((e: Error) => e);
+    expect((error as Error).message).toBe("네트워크 오류 builds");
   });
 });
