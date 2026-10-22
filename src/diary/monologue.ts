@@ -66,6 +66,7 @@ function candidatesFor(stage: ProgressStage, branch: MonologueBranch | undefined
   const T = text().monologue;
   if (stage === "signals") return T.signals;
   if (stage === "generation") return T.generation;
+  if (stage === "title") return T.title;
 
   if (stage === "vision") {
     return branch === "many" ? T.visionMany : T.visionNormal;

@@ -60,6 +60,7 @@ export function continuedStageOf(stage: ProgressStage): ContinuedStage {
       return "photos";
     case "load":
     case "generation":
+    case "title":
       return "writing";
   }
 }
