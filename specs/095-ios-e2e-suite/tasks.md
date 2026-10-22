@@ -76,11 +76,11 @@
 - [x] T029 [US2] `scripts/layer2-ios/runner.ts` — contracts/ios-layer2-runner.md L2-0~L2-8: `prepareBaseline` 재사용(스테이징 장치 위), `humanSteps` 흐름의 Enter 대기(`operationTimeoutMs`), 5초 폴링, 형식 확인(JSON 파싱·날짜 일치·본문 비어 있지 않음만), `write-failures.json` 단언, 수집(`.cache/layer2-ios/<시각>/`), 마지막 기준 상태 복원. 대기 한도는 옵션으로 받는다(테스트·음성 확인용)
 - [x] T030 [US2] `scripts/layer2-ios/run.ts` — 실제 포트 연결: `ios:seed`를 어제 날짜·5장·위치 포함으로 호출(사진은 `scripts/e2e-sample/.cache/` 카탈로그의 풍경 사진 5장 — 없으면 `npm run sample:fetch`가 필요하다는 이유로 aborted), `.cache/layer2-ios/seeded.json`으로 같은 날 재시딩 방지(contracts L2-3), Xcode 실행 점검(`pgrep -x Xcode`), 안내문 출력
 - [x] T031 [US2] `scripts/run-device-tests.mjs`에 `--ios-layer2` 모드, `package.json`에 `"test:layer2:ios"`를 더한다(`--operation-timeout`·`--generation-timeout` 초 단위 인자 전달 — 기본 300·600). 기존 모드 변경 없음
-- [ ] T032 [US2] iPhone에서 (사람이 모델을 받은 뒤) `open-app-writes` 흐름을 `npm run test:layer2:ios`로 돌려 사람 조작 없이 PASS하는 것을 확인하고 일기 수집 경로를 `research.md`에 기록한다
-- [ ] T033 [US2] iPhone에서 `write-and-read` 흐름 완주(안내대로 어제 「쓰기」 탭) 확인
-- [ ] T034 [US2] iPhone에서 `diagnostics-try-write` 흐름 완주 확인
-- [ ] T035 [US2] iPhone에서 `first-run-auto-diary` 흐름 완주 확인(작명 입력 포함)
-- [ ] T036 [US2] 음성 확인(quickstart B6): `write-and-read`를 `--operation-timeout 5 --generation-timeout 5`(초)로 Enter를 누르지 않고 돌려 `failed-operation-timeout`이 나오는지, Enter만 누르고 쓰기를 하지 않으면 `failed-generation-timeout`이 나오는지 보고 기본값으로 되돌린다. 네 흐름 일기를 사람이 읽은 소견(원칙 II·IV)을 `research.md`에 한 줄 남긴다 — SC-002
+- [x] T032 [US2] iPhone에서 (사람이 모델을 받은 뒤) `open-app-writes` 흐름을 `npm run test:layer2:ios`로 돌려 사람 조작 없이 PASS하는 것을 확인하고 일기 수집 경로를 `research.md`에 기록한다
+- [x] T033 [US2] iPhone에서 `write-and-read` 흐름 완주(안내대로 어제 「쓰기」 탭) 확인
+- [ ] T034 [US2] iPhone에서 `diagnostics-try-write` 흐름 완주 확인 — **건너뜀(통과 아님)**: 2026-10-22 iPhone의 앱이 배포(prod) 환경 빌드라 진단 화면이 없다(진단은 개발 환경 전용 — `developer-menu.json`이 7번 탭으로 켜졌을 뿐이다). dev 환경 빌드를 설치한 iPhone에서 확인한다(소유자 결정: 지금은 건너뛴다)
+- [x] T035 [US2] iPhone에서 `first-run-auto-diary` 흐름 완주 확인(작명 입력 포함)
+- [x] T036 [US2] 음성 확인(quickstart B6): `write-and-read`를 `--operation-timeout 5 --generation-timeout 5`(초)로 Enter를 누르지 않고 돌려 `failed-operation-timeout`이 나오는지, Enter만 누르고 쓰기를 하지 않으면 `failed-generation-timeout`이 나오는지 보고 기본값으로 되돌린다. 네 흐름 일기를 사람이 읽은 소견(원칙 II·IV)을 `research.md`에 한 줄 남긴다 — SC-002
 
 **Checkpoint**: US1·US2가 각각 독립으로 동작한다.
 

@@ -19,7 +19,7 @@ describe("iOS 층 2 소스 계약 (095)", () => {
 
   it("S0 — 스캔이 실제로 장치·삭제 소스를 읽는다", () => {
     expect(device).toMatch(/appDataContainer/);
-    expect(appDelete).toMatch(/removeItemAtPath/);
+    expect(appDelete).toMatch(/"unlink"/);
   });
 
   it("I-1 — devicectl copy to에 --remove-existing-content를 쓰지 않는다 (대상의 부모를 통째로 비운다 — 실측으로 모델이 지워졌다)", () => {
@@ -43,9 +43,9 @@ describe("iOS 층 2 소스 계약 (095)", () => {
     expect(appDelete).not.toMatch(/DELETABLE_DIRECTORIES[^\]]*models/);
   });
 
-  it("I-1 — removeItemAtPath는 app-delete.ts 한 곳에만 있고, 그 앞에 허용 경로 검사가 있다", () => {
+  it("I-1 — 파일 삭제(unlink)는 app-delete.ts 한 곳에만 있고, 그 앞에 허용 경로 검사가 있다", () => {
     expect(appDelete).toMatch(/isDeletable\(p\)/);
-    for (const code of [device, runner, run]) expect(code).not.toMatch(/removeItemAtPath/);
+    for (const code of [device, runner, run]) expect(code).not.toMatch(/unlink|removeItemAtPath/);
   });
 
   it("I-1 — 실행기는 모델 폴더에 쓰지도 지우지도 않는다", () => {

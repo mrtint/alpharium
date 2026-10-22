@@ -71,3 +71,11 @@
 - **모델 없이 닿는 화면**: 기준 상태가 온보딩 완료·모델 파일 있음을 전제하므로 첫 실행 게이트(로고·권한·동의·진행·작명) 화면은 층 1이 닿지 않는다 — 그 경로는 층 2 `first-run-auto-diary`(iPhone)가 본다.
 - **CI 판단 — 로컬 실행으로 둔다**: macOS 러너는 매 실행이 빈 상태라 시뮬레이터 모델 ~2GB(약 14분)·표본 사진 내려받기(약 4분)·표본 심기(약 1.5분)에 흐름 8분 남짓이 더해져 한 번에 30분 안팎이고, 모델 캐시를 러너 사이에 두려면 대용량 캐시·시뮬레이터 상태 보존이 필요하다. 층 1이 잡는 것(화면 회귀)에 비해 비용이 크고 릴리스 전 로컬 한 번으로 충분하다. 층 2는 실기기라 CI 대상이 아니다. 실측이 바뀌면(모델 없이도 닿는 화면 범위를 넓히는 등) 다시 정한다.
 - **iOS 시뮬레이터에서 처음 낸 결함 클래스**(층 1이 잡은 것): ① 시뮬레이터 키체인 오류 LogBox 토스트가 쓰기 바를 덮음(시뮬레이터 전용), ② RN `Modal` 루트 `testID`와 접근성 합쳐짐 때문에 날짜 숫자·진단 값·대화상자 루트를 못 봄(iOS 접근성 트리 차이 — 제품 결함이 아니라 e2e의 시야 차이). 앱 크래시·화면 오류 같은 제품 결함은 이번 실행에서 나오지 않았다.
+
+## iPhone 실기기 실측 (2026-10-22, T032~T036)
+
+- **통과 셋**: `open-app-writes`(사람 조작 없음, 일기 파일 약 몇 분 안), `write-and-read`(사람이 어제를 골라 「쓰기」, 신호 파일로 Enter 대신), `first-run-auto-diary`(권한 허용·작명 뒤 자동 첫 일기). 가져온 일기 본문을 사람이 읽었다 — 화자가 휴대폰이고 사진 내용을 반영한다(원칙 II). 음성 확인(`--operation-timeout 5 --generation-timeout 5`): Enter를 안 누르면 `failed-operation-timeout`, Enter만 누르고 쓰기를 안 하면 `failed-generation-timeout`으로 갈라 실패했다.
+- **미확인 하나**: `diagnostics-try-write` — iPhone의 앱이 배포(prod) 환경 빌드라 진단 화면이 없다(`developer-menu.json`을 7번 탭으로 켰을 뿐 — 진단은 개발 환경 전용). 소유자 결정으로 건너뛰었다. dev 환경 빌드를 설치한 iPhone에서 확인해야 한다.
+- **실기기에서 처음 드러나 고친 것(기기 없는 테스트로는 못 잡았다)**: ① 앱 안 삭제를 lldb Objective-C 식(`stringByAppendingPathComponent:`·`NSHomeDirectory()`)으로 하면 Foundation 선언이 없어 거절된다 → `dlsym`으로 C 함수(`chdir`·`unlink`)를 부른다. ② 멈춘 채 띄운 앱은 라이브러리가 안 올라 `_dlsym` 심볼이 없다 → `UIApplicationMain`까지 달리게 한 뒤 삭제한다. ③ 그냥 띄우면 lldb가 붙기 전에 앱이 `auto-write-attempts.json`을 다시 만들어 삭제 확인(`verifyBaseline`)이 실패한다 → `--start-stopped`로 띄우고 `process kill`(detach 아님)로 끝낸다. 지우기 확인이 이 결함을 바로 잡았다.
+- **터미널이 아닌 셸**: Enter 대신 `POCKETLOG_IOS_L2_ENTER_FILE`로 준 파일을 `touch`해 알린다(`enter-signal.ts`).
+- **안드로이드 회귀**: 갤럭시(SM-S901N, dev 빌드)에서 `npm run test:layer1` **12/12 통과**(14분 3초) — 공유 흐름·실행기 변경이 안드로이드를 깨지 않았다. 첫 시도는 기기가 잠겨 있어 12개가 모두 홈에서 실패했다(환경 문제).

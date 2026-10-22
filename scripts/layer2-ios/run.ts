@@ -13,6 +13,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -21,6 +22,7 @@ import { createInterface } from "node:readline";
 
 import type { Outcome } from "../layer1/device.ts";
 import { iosPhoneDevice } from "./device.ts";
+import { waitForSignalFile } from "./enter-signal.ts";
 import { IOS_LAYER2_FLOWS } from "./flows.ts";
 import {
   runLayer2Ios,
@@ -45,7 +47,18 @@ const realPrompt: PromptPort = {
     for (const line of lines) console.log(`    ${line}`);
   },
   waitForEnter(timeoutMs) {
-    if (!process.stdin.isTTY) return Promise.resolve("no-tty");
+    if (!process.stdin.isTTY) {
+      // 터미널이 아니면(에이전트·CI 셸) 신호 파일로 알린다 — 환경변수가 없으면 중단한다
+      const file = process.env.POCKETLOG_IOS_L2_ENTER_FILE;
+      if (file === undefined || file === "") return Promise.resolve("no-tty");
+      console.log(`    (터미널이 아니라 신호 파일로 알린다: touch ${file})`);
+      return waitForSignalFile(file, timeoutMs, {
+        exists: (path) => existsSync(path),
+        remove: (path) => rmSync(path, { force: true }),
+        sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+        nowMs: () => Date.now(),
+      });
+    }
     return new Promise((resolve) => {
       const rl = createInterface({ input: process.stdin });
       const startedAt = Date.now();

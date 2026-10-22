@@ -46,7 +46,7 @@ Maestro는 iOS 실기기를 구동하지 못한다(스파이크 결과는 [featu
 ### 전제
 
 - [ ] **전용 iPhone** 하나만 맥에 꽂혀 있고 페어링돼 있다(`xcrun devicectl list devices`). 이 기기의 일기와 설정이 바뀐다 — 사진 보관함에는 합성 사진이 남는다(지우는 도구가 없다, 087).
-- [ ] **개발 서명 빌드**가 깔려 있다(`get-task-allow`) — TestFlight 빌드에는 닿지 못한다. 기기 잠금이 풀려 있다.
+- [ ] **개발 서명 빌드**가 깔려 있다(`get-task-allow`) — TestFlight 빌드에는 닿지 못한다. 기기 잠금이 풀려 있다. **`diagnostics-try-write`는 개발(dev) 환경 빌드에서만 돈다** — 진단 화면이 개발 환경 전용이라 배포(prod) 환경 빌드(7번 탭으로 개발자 메뉴만 켠 것)에는 「진단」 행이 없다(2026-10-22 iPhone 14 실측). 그런 빌드에서는 이 흐름을 빼고(`-- write-and-read open-app-writes first-run-auto-diary`) 돌리고 「미확인」으로 적는다.
 - [ ] **모델이 받아져 있다** — 앱에서 직접 받아 둔다. 컨테이너 `Documents/models/`의 세 `.bin`이 0바이트가 아니다. 없거나 0바이트면 실행기가 중단한다(모델을 받지 않는다).
 - [ ] **Xcode를 꺼 둔다** — 켜 두면 사진 시딩(lldb attach)이 멈춘다(087). 지우기(lldb)도 같다.
 - [ ] 앱에 사진 읽기·쓰기 권한이 허용돼 있다. 표본 사진이 내려받아져 있다(`npm run sample:fetch`).
@@ -58,7 +58,7 @@ Maestro는 iOS 실기기를 구동하지 못한다(스파이크 결과는 [featu
 npm run test:layer2:ios
 ```
 
-흐름 하나를 단독으로 돌리려면 id를 준다: `npm run test:layer2:ios -- write-and-read`. 대기 한도를 줄이려면 `--operation-timeout <초> --generation-timeout <초>`(기본 300·600).
+흐름 하나를 단독으로 돌리려면 id를 준다: `npm run test:layer2:ios -- write-and-read`. **터미널이 아닌 셸(에이전트·CI)에서는** `POCKETLOG_IOS_L2_ENTER_FILE=<경로>`를 주고 Enter 대신 그 파일을 `touch`한다. 대기 한도를 줄이려면 `--operation-timeout <초> --generation-timeout <초>`(기본 300·600).
 
 - 흐름 넷이 **하나씩** 돈다 — 각각 기준 상태를 다시 만든다: `open-app-writes`(사람 조작 없음), `write-and-read`, `diagnostics-try-write`, `first-run-auto-diary`. 흐름마다 안내문이 나오면 그대로 하고 **조작을 마치면 터미널에서 Enter를 누른다.**
 - [ ] 끝에 `PASSED`가 나왔다. `SKIPPED`·`ABORTED`·`FAILED`는 통과가 아니다 — 이유를 읽는다. 조작 대기 초과(Enter 없음)와 생성 대기 초과(Enter 뒤 일기 파일 없음)는 다른 실패다.
