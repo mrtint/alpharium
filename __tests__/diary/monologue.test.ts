@@ -30,6 +30,7 @@ const COMBOS: readonly [ProgressStage, MonologueBranch | undefined, string | und
   ["load", "cold", "루이"],
   ["load", "hot", "루이"],
   ["generation", undefined, undefined],
+  ["title", undefined, undefined],
 ];
 
 describe("pickMonologue — 단계별 문구 (FR-001)", () => {
@@ -87,7 +88,7 @@ describe("pickMonologue — roster.ts·persona.ts·Character를 import하지 않
   });
 });
 
-describe("문구 갈래 — 여섯 갈래 전부 10개 이상 (FR-009, SC-006, 016)", () => {
+describe("문구 갈래 — 일곱 갈래 전부 10개 이상 (FR-009, SC-006, 016, 100)", () => {
   const RICH_COMBOS: readonly [ProgressStage, MonologueBranch | undefined, string][] = [
     ["signals", undefined, ""],
     ["vision", "normal", ""],
@@ -95,6 +96,7 @@ describe("문구 갈래 — 여섯 갈래 전부 10개 이상 (FR-009, SC-006, 0
     ["load", "cold", "루이"],
     ["load", "hot", "루이"],
     ["generation", undefined, ""],
+    ["title", undefined, ""],
   ];
 
   it.each(RICH_COMBOS)(
@@ -111,6 +113,31 @@ describe("문구 갈래 — 여섯 갈래 전부 10개 이상 (FR-009, SC-006, 0
       expect(seen.size).toBeGreaterThanOrEqual(10);
     },
   );
+});
+
+describe("제목 구간 문구 — 본문 쓰는 풀과 다르다 (100 FR-004)", () => {
+  function pool(stage: ProgressStage): Set<string> {
+    const seen = new Set<string>();
+    let previous: string | undefined;
+    for (let i = 0; i < 200; i++) {
+      const line = pickMonologue(stage, undefined, previous, undefined, sequence(i / 200));
+      seen.add(line);
+      previous = line;
+    }
+    return seen;
+  }
+
+  it("제목 풀의 문구는 글을 쓰는 중 풀과 겹치지 않는다", () => {
+    const generation = pool("generation");
+    for (const line of pool("title")) expect(generation.has(line)).toBe(false);
+  });
+
+  it("제목 풀은 제목을 붙이는 일을 말하고 본문 조각·시간을 담지 않는다", () => {
+    for (const line of pool("title")) {
+      expect(line).toMatch(/제목|이름|한마디|한 줄/);
+      expect(line).not.toMatch(/\d|초|분/);
+    }
+  });
 });
 
 describe("사진 보기 문구 — 정직성 경계 (FR-005, SC-003)", () => {

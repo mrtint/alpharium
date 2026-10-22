@@ -750,6 +750,9 @@ export function createOnDeviceBackend(
         // **제목 호출이 실패해도 일기를 버리지 않는다** — 제목 없이 본문만 저장한다(지금의
         // 「못 떼면 제목 없음」과 같다). 단 그만두기는 이긴다(FR-018).
         const question = titleQuestion(request, seen);
+        // 100 — 제목 구간에는 본문 쓰는 중 문구가 아니라 제목을 붙이는 문구가 돈다(실측: 사진 있는 날 제목 호출 약 4.6초 ≥ 혼잣말 교체 간격).
+        // **저장 단계는 두지 않는다** — 파일 한 번 쓰기라 스친다. 제목을 묻지 않는 날(`question` 없음)에는 신호도 없다.
+        if (question !== undefined) onStage?.("title");
         const text =
           question === undefined
             ? run.run.text

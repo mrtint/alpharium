@@ -5,7 +5,11 @@
  * 박동 없이는 오르지 않고(타이머 없음, FR-003), 끝나기 전에 95%를 넘지 않는다.
  */
 
-import { createContinuedWrite, PROGRESS_TOTAL } from "../../src/app/continued-write";
+import {
+  continuedStageOf,
+  createContinuedWrite,
+  PROGRESS_TOTAL,
+} from "../../src/app/continued-write";
 import type { ContinuedWritePort } from "../../src/app/continued-write-port";
 import type { Beat } from "../../src/inference/heartbeat";
 
@@ -107,6 +111,17 @@ describe("092 CW3 — 막대", () => {
     session.progress("vision");
     session.progress("signals");
     expect(h.reports()).toHaveLength(before);
+  });
+
+  it("제목 단계는 글 단계에 든다 — 막대가 뒤로 가지 않고 같은 보조 줄이다 (100)", async () => {
+    expect(continuedStageOf("title")).toBe("writing");
+
+    // 사진 단계에서 제목 신호가 와도 글 단계 몫으로 올라가고 보조 줄이 「글을 쓰는 중」이다
+    const h = harness();
+    const session = await h.continued.start(WRITE, () => {});
+    session.progress("vision");
+    session.progress("title");
+    expect(h.reports().at(-1)).toEqual(["report", "글을 쓰는 중", 450_000, PROGRESS_TOTAL]);
   });
 
   it("끝나기 전에 95%를 넘지 않는다", async () => {

@@ -26,8 +26,12 @@ export type InferenceLocation = "on-device" | "desktop-server";
  * **`"load"`가 016에서 더해졌다.** 실행 순서상 `"vision"`과 `"generation"`
  * 사이다 — 캐릭터 모델은 사진 보기에 쓰인 VLM과 별개 엔진이라 사진을 다 본
  * 뒤에만 열린다(engine-port.ts E1 불변식, specs/016 data-model.md).
+ *
+ * **`"title"`이 100에서 더해졌다.** 본문 판정을 통과한 뒤 제목을 묻는 두 번째 호출 동안이다(`generation`
+ * 다음). 실측(specs/100-three-measurements/quickstart.md)에서 사진 있는 날 이 구간이 혼잣말 교체 간격(4초)을
+ * 넘었다. 저장은 단계가 아니다 — 파일 한 번 쓰기라 스친다.
  */
-export type ProgressStage = "signals" | "vision" | "generation" | "load";
+export type ProgressStage = "signals" | "vision" | "generation" | "load" | "title";
 
 /**
  * 진행 단계 안의 하위 갈래 (016 신설).
