@@ -50,6 +50,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { Carousel } from "react-native-reanimated-carousel";
 
+import { useReduceMotion } from "./reduce-motion";
+
 import { progressSegments } from "../firstrun/consent";
 import { text } from "../i18n/current";
 import { Button } from "./components/Button";
@@ -193,6 +195,9 @@ const CarouselSlides = memo(function CarouselSlides({
   onSnapToItem: (index: number) => void;
 }) {
   const style = useMemo(() => CAROUSEL_STYLE(width), [width]);
+  // 100 — OS 「동작 줄이기」가 켜져 있으면 자동 넘김만 멈춘다(안드로이드 실측: 켜도 약 4.06초마다 넘어갔다). 값을 아직 모르면
+  // 돌리지 않고 읽은 뒤에 켠다. 손으로 넘기기·순환·간격은 그대로다(046).
+  const reduceMotion = useReduceMotion();
 
   return (
     <Carousel<Slide>
@@ -200,7 +205,7 @@ const CarouselSlides = memo(function CarouselSlides({
       style={style}
       data={slides()}
       loop
-      autoplay
+      autoplay={reduceMotion === false}
       autoplayInterval={SLIDE_INTERVAL_MS}
       onSnapToItem={onSnapToItem}
       renderItem={renderSlide}

@@ -66,6 +66,17 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 100 — 제목 구간 혼잣말 풀(`monologue.title`, 사람이 쓴 열 문장)
+  "오늘의 제목을 고르는 중…",
+  "이 하루에 어울리는 이름을 떠올리는 중…",
+  "제목이 될 한 줄을 찾는 중…",
+  "쓴 글에서 제목거리를 찾는 중…",
+  "글에 이름표를 붙이는 중…",
+  "오늘을 한마디로 말해 보는 중…",
+  "제목이 될 말을 고르는 중…",
+  "마지막으로 이름을 붙여 주는 중…",
+  "어떤 이름이 어울릴지 생각하는 중…",
+  "마무리 삼아 제목을 짓는 중…",
   "언어",
   "한국어",
   "상태 흉내",
