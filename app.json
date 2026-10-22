@@ -71,6 +71,7 @@
       ],
       "./plugins/with-battery-exception",
       "./plugins/with-force-light-theme",
+      "./plugins/with-backup-rules",
       [
         "expo-media-library",
         {

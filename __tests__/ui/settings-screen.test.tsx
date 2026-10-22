@@ -572,3 +572,64 @@ describe("088 FR-001·FR-002 — 작은 강조 글자는 COLORS.danger만 쓰고
     expect(label.color).toBe(COLORS.danger);
   });
 });
+
+describe("099 FR-008 — 「이 휴대폰」의 유실 안내 한 줄", () => {
+  const NOTE = "앱을 지우거나 휴대폰을 바꾸면 일기가 사라질 수 있어요.";
+
+  /** 렌더 트리를 깊이 우선으로 훑어 testID 순서를 모은다 */
+  function testIdsInOrder(node: unknown, out: string[] = []): string[] {
+    if (node === null || typeof node !== "object") return out;
+    if (Array.isArray(node)) {
+      for (const child of node) testIdsInOrder(child, out);
+      return out;
+    }
+    const n = node as { props?: { testID?: string }; children?: unknown };
+    if (typeof n.props?.testID === "string") out.push(n.props.testID);
+    testIdsInOrder(n.children, out);
+    return out;
+  }
+
+  it("「일기 모두 지우기」 행 뒤, 같은 묶음 안에 보조 줄로 보인다", async () => {
+    await render(<SettingsScreen {...props()} />);
+    const group = screen.getByTestId("settings-group-device");
+    expect(within(group).getByTestId("settings-loss-note")).toBeTruthy();
+    expect(within(group).getByText(NOTE)).toBeTruthy();
+    const ids = testIdsInOrder(screen.toJSON());
+    expect(ids.indexOf("settings-device-modules")).toBeLessThan(ids.indexOf("settings-wipe"));
+    expect(ids.indexOf("settings-wipe")).toBeLessThan(ids.indexOf("settings-loss-note"));
+    expect(ids.indexOf("settings-loss-note")).toBeLessThan(ids.indexOf("settings-version"));
+  });
+
+  it("누를 수 없다 — 눌림 처리기가 없다", async () => {
+    await render(<SettingsScreen {...props()} />);
+    expect(screen.getByTestId("settings-loss-note").props.onPress).toBeUndefined();
+    expect(screen.getByTestId("settings-loss-note").props.onClick).toBeUndefined();
+  });
+
+  it("지우기가 막혀 있어도(wipeEnabled false) 안내는 늘 있다", async () => {
+    await render(<SettingsScreen {...props({ wipeEnabled: false })} />);
+    expect(screen.getByTestId("settings-loss-note")).toBeTruthy();
+  });
+
+  it("기존 「일기 모두 지우기」 행이 그대로 있다(대화상자 문구는 이 과제의 몫이 아니다)", async () => {
+    await render(<SettingsScreen {...props()} />);
+    expect(SETTINGS_TEXT.deviceWipe).toBe("일기 모두 지우기");
+    expect(screen.getByTestId("settings-wipe")).toBeTruthy();
+  });
+
+  it("줄 수를 제한하지 않는다 — 글꼴 2.0배에서 잘리지 않는다", async () => {
+    await render(<SettingsScreen {...props()} />);
+    const text = screen.getByText(NOTE);
+    expect(text.props.numberOfLines).toBeUndefined();
+  });
+});
+
+describe("099 — 유실 안내 문구는 새 영역 하나에만 있다", () => {
+  it("카탈로그 새 영역 lossNotice가 문구를 갖고, 화면은 그것을 읽는다", () => {
+    const src = readFileSync(join(__dirname, "../../src/ui/SettingsScreen.tsx"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(src).toContain("LOSS_NOTICE_TEXT.note");
+    expect(src).not.toContain("사라질 수 있어요");
+  });
+});

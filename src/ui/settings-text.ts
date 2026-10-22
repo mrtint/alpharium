@@ -32,6 +32,9 @@ export const SETTINGS_TEXT = lazyText((c) => c.settings);
 /** 083 — 설정 「정보」의 「서체 라이선스」 행과 그 겹 화면(카탈로그 `fontLicense` 영역) */
 export const FONT_LICENSE_TEXT = lazyText((c) => c.fontLicense);
 
+/** 099 — 설정 「이 휴대폰」의 유실 안내 한 줄(카탈로그 `lossNotice` 영역) */
+export const LOSS_NOTICE_TEXT = lazyText((c) => c.lossNotice);
+
 /** 086 — 설정 「정보」의 「개인정보처리방침」·「도움말·문의」 행(카탈로그 `policyLinks` 영역) */
 export const POLICY_LINKS_TEXT = lazyText((c) => c.policyLinks);
 

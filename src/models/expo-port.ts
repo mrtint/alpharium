@@ -15,6 +15,7 @@
  * 않으므로(사용자가 지울 수 있다) FR-021e가 필요하다.
  */
 
+import { excludeModelsFromBackup } from "./backup-exclusion-port";
 import type {
   DiskSpacePort,
   DownloadPort,
@@ -103,6 +104,10 @@ async function openDirectory() {
   const { Directory, File, FileMode, Paths } = await import("expo-file-system");
   const dir = new Directory(Paths.document, DIRECTORY);
   if (!dir.exists) dir.create({ intermediates: true });
+  // 099 — 약 2GB를 iCloud 백업에서 뺀다. 모델 상태를 읽는 모든 경로가 여기를 지나므로 첫 실행과 업데이트된 기존 설치를 한 자리가 덮고,
+  // 디렉터리가 지워졌다 다시 만들어져도 다음 프로세스 시작 때 다시 건다(프로세스당 한 번 — 한 프로세스 안에서 디렉터리를 통째로
+  // 지우는 코드가 생기면 이 기억을 무효화해야 한다). 실패해도 모델 받기는 막지 않는다.
+  excludeModelsFromBackup(dir.uri);
   return { dir, File, FileMode, Paths };
 }
 
