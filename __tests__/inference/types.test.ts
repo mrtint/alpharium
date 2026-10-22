@@ -36,9 +36,9 @@ function declarationOf(name: string): string {
 describe("ProgressStage — 문자열 리터럴 유니온뿐이다 (원칙 IV)", () => {
   const declaration = declarationOf("ProgressStage");
 
-  it("갈래가 signals·vision·generation·load 넷이다 (016)", () => {
+  it("갈래가 signals·vision·generation·load·title 다섯이다 (016, 100 — 제목 구간이 더했다)", () => {
     const kinds = [...declaration.matchAll(/"([a-z]+)"/g)].map((m) => m[1]);
-    expect(kinds.sort()).toEqual(["generation", "load", "signals", "vision"]);
+    expect(kinds.sort()).toEqual(["generation", "load", "signals", "title", "vision"]);
   });
 
   it("객체·필드를 담지 않는다 — 콜론이 없다", () => {

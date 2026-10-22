@@ -210,6 +210,7 @@ describe("P4 — 진행 신호를 칸에도 싣는다", () => {
           async generate(_request, onProgress) {
             onProgress?.("vision", "many");
             onProgress?.("generation");
+            onProgress?.("title");
             return { text: TEXT };
           },
         },
@@ -221,11 +222,12 @@ describe("P4 — 진행 신호를 칸에도 싣는다", () => {
       seen.push(branch === undefined ? stage : `${stage}:${branch}`);
     });
 
-    expect(seen).toEqual(["signals", "vision:many", "generation"]);
+    expect(seen).toEqual(["signals", "vision:many", "generation", "title"]);
     expect(log.filter((line) => line.startsWith("publish"))).toEqual([
       "publish:signals",
       "publish:vision:many",
       "publish:generation",
+      "publish:title",
     ]);
   });
 });

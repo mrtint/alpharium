@@ -10,6 +10,7 @@ import type { GenerationEngine, LoadResult, RunResult } from "../../src/inferenc
 import { emptyDay } from "../../src/signals/fake";
 import type { DaySignals, Photo } from "../../src/signals/types";
 import type { DiaryRequest } from "../../src/diary/types";
+import * as promptModule from "../../src/diary/prompt";
 import type { VisionEngine, VisionLoadResult, VisionRunResult } from "../../src/vision/vision-port";
 import type { PhotoVision } from "../../src/vision/types";
 
@@ -1142,6 +1143,53 @@ describe("061 — 제목 두 번째 호출 (TA2)", () => {
       },
     ]);
     expect(result).toMatchObject({ text: `심심한 가방 속\n\n${BODY}` });
+  });
+
+  it("제목을 묻기 직전에 onStage가 'title'로 불린다 — 판정 뒤, ask보다 먼저 (100)", async () => {
+    const stages: string[] = [];
+    const atAsk: string[][] = [];
+    const base = titledEngine(eos(BODY), async () => eos("심심한 가방 속"));
+    const engine: GenerationEngine = {
+      ...base.engine,
+      async ask(prompt, b, question, options) {
+        atAsk.push([...stages]);
+        return base.engine.ask(prompt, b, question, options);
+      },
+    };
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+    await backend.generate(request, (stage) => stages.push(stage));
+
+    // `load`는 둘이다 — 갈래 없는 시작 신호와 콜드/핫이 정해진 신호(016)
+    expect(stages).toEqual(["load", "load", "generation", "title"]);
+    expect(atAsk).toEqual([["load", "load", "generation", "title"]]);
+  });
+
+  it("제목 질문이 없으면(한국어가 아닌 캐릭터) 'title' 신호도 없다 (100)", async () => {
+    // 지금 로스터는 한국어뿐이라 질문이 없는 길은 대역으로 만든다 — 소스의 가드(`question !== undefined`)를 잠근다
+    const spy = jest.spyOn(promptModule, "titleQuestion").mockReturnValue(undefined);
+    try {
+      const stages: string[] = [];
+      const { engine, asks } = titledEngine(eos(BODY), async () => eos("제목"));
+      const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+      await backend.generate(request, (stage) => stages.push(stage));
+
+      expect(asks).toEqual([]);
+      expect(stages).not.toContain("title");
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("판정에서 거부되면 'title' 신호도 보내지 않는다 (100)", async () => {
+    const stages: string[] = [];
+    const { engine } = titledEngine(eos(""), async () => eos("제목"));
+    const backend = createOnDeviceBackend(async () => [], engine, 60_000, vision);
+
+    await backend.generate(request, (stage) => stages.push(stage));
+
+    expect(stages).not.toContain("title");
   });
 
   it("판정에서 거부되면 제목을 묻지 않는다", async () => {

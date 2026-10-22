@@ -19,6 +19,7 @@ import { AppState, BackHandler } from "react-native";
 import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { Pipeline, PipelineInput, PipelineResult } from "../../src/diary/pipeline";
+import type { ProgressStage } from "../../src/inference/types";
 import { memoryStore } from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
 import type { DaySignals } from "../../src/signals/types";
@@ -684,11 +685,11 @@ describe("011 US4 — 사진을 볼 수 없을 때 (054 — 토스트)", () => {
 describe("015 — 쓰는 중 독백", () => {
   /** onProgress를 밖에서 호출할 수 있게 노출하는 파이프라인 대역 */
   function progressPipeline(): Pipeline & {
-    onProgress: (stage: "signals" | "vision" | "generation") => void;
+    onProgress: (stage: ProgressStage) => void;
     finish: (result: PipelineResult) => void;
   } {
     let release: (result: PipelineResult) => void = () => {};
-    let sendProgress: (stage: "signals" | "vision" | "generation") => void = () => {};
+    let sendProgress: (stage: ProgressStage) => void = () => {};
     return {
       run: (_input, onProgress) =>
         new Promise<PipelineResult>((resolve) => {
@@ -757,7 +758,7 @@ describe("015 — 쓰는 중 독백", () => {
 
     // screen.toJSON() 전체(스타일 수치 포함)가 아니라 실제로 보이는 문구만 본다.
     // 039 — 타이핑 완료를 기다린 뒤(findByText) 완성된 문구로 검사한다.
-    for (const stage of ["signals", "vision", "generation"] as const) {
+    for (const stage of ["signals", "vision", "generation", "title"] as const) {
       await act(async () => pipeline.onProgress(stage));
       const line = await screen.findByTestId("writing-monologue-text");
       expect(String(line.props.children)).not.toMatch(/\d/);
