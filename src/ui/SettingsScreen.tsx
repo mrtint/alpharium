@@ -30,7 +30,12 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 
 import type { PermissionTag, TaggedPermission } from "../app/permission-tags";
 import { AppText } from "./components/Text";
-import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./settings-text";
+import {
+  FONT_LICENSE_TEXT,
+  LOSS_NOTICE_TEXT,
+  POLICY_LINKS_TEXT,
+  SETTINGS_TEXT,
+} from "./settings-text";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
 const { group, paperPadding, row, tag, toggle } = SETTINGS;
@@ -201,6 +206,13 @@ export function SettingsScreen({
             ? { hint: wipeBlockedText, hintTone: "danger" as const }
             : {})}
         />
+        {/* 099 — 유실 안내(C9). 누를 수 없는 보조 줄이라 Row가 아니라 글자만 둔다. 지우기가 막혀 있어도 늘 있다 */}
+        {/* 위아래 간격은 행 힌트 간격에 4를 더한 값 — 앞 행의 구분선과 다음 묶음 머리 사이에서 한 줄이 떠 보이게 하는 눈대중이다(보드 값 아님) */}
+        <View style={{ paddingVertical: row.hintGap + 4 }}>
+          <AppText style={HINT} testID="settings-loss-note">
+            {LOSS_NOTICE_TEXT.note}
+          </AppText>
+        </View>
       </Group>
 
       <Group label={SETTINGS_TEXT.groupAbout} testID="settings-group-about">

@@ -124,21 +124,34 @@ describe("086 site — 사이트 원문", () => {
     ]);
   });
 
-  it("S10 — 보존 절은 백업 포함을 단정하지 않는다(「포함될 수 있습니다」)", () => {
-    const retention = stripHtmlComments(
-      sectionBy(readSite("privacy/index.html"), "id", "retention") ?? "",
-    );
-    expect(retention).toContain("포함될 수 있습니다");
-    expect(retention).not.toMatch(/포함됩니다|포함되지 않습니다/);
+  // 099 — 실측한 사실(specs/099-backup-and-loss-notice/quickstart.md)을 두 페이지가 같은 문장으로 말한다.
+  const BACKUP_MODEL =
+    "모델(약 2GB)은 휴대폰의 백업(iCloud, Google 백업)에서 제외하도록 설정해 두었습니다.";
+  const BACKUP_DIARY =
+    "일기와 설정은 휴대폰의 기본 백업 방식을 따르므로 백업에 포함될 수 있지만, 그 백업으로 일기가 되살아난다고 보장하지 않습니다.";
+  const BACKUP_LIMIT =
+    "Android는 모델을 뺀 앱 데이터가 OS가 정한 한도를 넘으면 백업이 이뤄지지 않을 수 있습니다.";
+
+  const retention = () =>
+    stripHtmlComments(sectionBy(readSite("privacy/index.html"), "id", "retention") ?? "");
+  const uninstall = () =>
+    stripHtmlComments(sectionBy(readSite("support/index.html"), "data-faq", "uninstall") ?? "");
+
+  it("S10 — 보존 절이 모델 제외·일기 비보장·안드로이드 한도를 말한다", () => {
+    for (const sentence of [BACKUP_MODEL, BACKUP_DIARY, BACKUP_LIMIT]) {
+      expect(retention()).toContain(sentence);
+    }
   });
 
-  it("S10 — 지원 페이지도 백업을 단정하지 않는다(방침 보존 절과 같은 말)", () => {
-    const uninstall = stripHtmlComments(
-      sectionBy(readSite("support/index.html"), "data-faq", "uninstall") ?? "",
-    );
-    expect(uninstall).toContain("포함될 수 있지만");
-    expect(stripHtmlComments(readSite("support/index.html"))).not.toMatch(
-      /포함됩니다|포함되지 않습니다/,
-    );
+  it("S10 — 지원 「앱을 지우면」 답이 방침 보존 절과 같은 문장으로 말한다", () => {
+    for (const sentence of [BACKUP_MODEL, BACKUP_DIARY, BACKUP_LIMIT]) {
+      expect(uninstall()).toContain(sentence);
+    }
+  });
+
+  it("S10 — 일기가 백업으로 되살아난다고 단정하지 않고, 미실측 항목을 단정하지 않는다", () => {
+    const both = `${retention()}${stripHtmlComments(readSite("support/index.html"))}`;
+    expect(both).not.toMatch(/백업(으로|에서) (반드시|항상) (되살|복원)/);
+    expect(both).not.toMatch(/포함됩니다|포함되지 않습니다/);
   });
 });

@@ -1,0 +1,9 @@
+{
+  "name": "pocketlog-backup-exclusion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "iOS에서 모델 디렉터리를 iCloud 백업에서 빼는 로컬 Expo 모듈 (099)",
+  "license": "UNLICENSED",
+  "author": "a810labs",
+  "homepage": "https://github.com/mrtint/alpharium"
+}
