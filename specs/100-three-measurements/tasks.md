@@ -51,7 +51,7 @@
 
 - [X] T022 `adb reverse tcp:8081 tcp:8081` 원복, 내 Metro(8082) 종료, 기기 설정 대조 표 전부 일치 확인
 - [X] T023 AGENTS.md 「지금도 유효한 실측 규칙」에 판정 한 줄씩(제목·동작 줄이기·쓴 날) 추가 — 값과 출처, 닫음/후속 변경 표시(M8)
-- [ ] T024 로드맵 후속 과제(자동 넘김 외 `따르지 않음` 장면, 보드 2c 이탈 등 해당 시)를 `docs/roadmap/README.md`에 올린다 — 해당 없으면 사유를 한 줄로 quickstart에
+- [X] T024 로드맵 후속 과제(자동 넘김 외 `따르지 않음` 장면, 보드 2c 이탈 등 해당 시)를 `docs/roadmap/README.md`에 올린다 — 해당 없으면 사유를 한 줄로 quickstart에
 - [X] T025 `git status`/`git diff --stat`로 측정 도구가 저장소에 없음을 확인하고, 후속 변경이 없으면 `src/` 변경 0줄을 quickstart에 보인다(M7), `npm test`·`npm run lint` 통과
 - [X] T026 반영하지 않기로 한 지적이나 소유자 보류 항목이 있으면 사유와 함께 이 파일 맨 아래 「보류」에 기록
 
