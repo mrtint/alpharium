@@ -34,7 +34,7 @@ NEEDS CLARIFICATION은 없다. 아래는 결정과 **첫 실행에서 재야 하
 - **Decision**: `actions/cache`를 쓰지 않는다. **Rationale**: 072 실측에서 Pods·DerivedData 캐시는 효과가 없었고 저장·복원에 30~40초가 들었다.
 
 ### D7 — 사전 점검의 범위
-- **Decision**: 비밀 이름이 비었는지와 `buildNumber`가 정수인지만 본다. 같은 번호의 중복 업로드는 Apple이 거부하므로 점검하지 않는다.
+- **Decision**: 비밀 이름이 비었는지와 `buildNumber`가 정수인지만 본다. 같은 번호의 중복은 이 사전 점검이 아니라 별도 단계 「번호 점검」이 스토어의 마지막 번호를 읽어 본다(096).
 - **Rationale**: 업로드된 번호를 로컬에서 알 수 없다. API로 조회하려면 추가 코드·권한이 필요해 YAGNI.
 
 ## 미실측 (첫 실행에서 재서 quickstart에 기록)

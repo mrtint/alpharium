@@ -63,7 +63,7 @@ description: "076 안드로이드 클라우드 릴리스 — 구현 태스크"
 
 **Independent Test**: 비밀 하나를 비운 채 시작하면 1분 안에 이름을 밝히며 실패한다. 업로드 실패 테스트(T007의 P4)가 편집 폐기를 확인한다.
 
-- [x] T016 [US4] `__tests__/ci/android-release-workflow.test.ts`에 W13(단계 순서: 사전 점검 < `expo prebuild` < 키스토어 복원 < `bundleRelease` < 서명 확인 < Play 업로드 < 정리)과 W17·사전 점검 내용(넷 이름 모두 검사하고 값은 출력하지 않고 이름만 밝힘, `expo.android.versionCode`가 정수인지 검사, `verify-signature.mts --check-expected-only`로 기대 지문 파일 점검, 중복 `versionCode`는 점검하지 않음)을 추가하고 red를 확인한다.
+- [x] T016 [US4] `__tests__/ci/android-release-workflow.test.ts`에 W13(단계 순서: 사전 점검 < `expo prebuild` < 키스토어 복원 < `bundleRelease` < 서명 확인 < Play 업로드 < 정리)과 W17·사전 점검 내용(넷 이름 모두 검사하고 값은 출력하지 않고 이름만 밝힘, `expo.android.versionCode`가 정수인지 검사, `verify-signature.mts --check-expected-only`로 기대 지문 파일 점검, 중복 `versionCode`는 이 단계가 아니라 096의 「번호 점검」이 봄)을 추가하고 red를 확인한다.
 - [x] T017 [US4] `.github/workflows/android-release.yml`에 `사전 점검` 단계를 추가한다(위치는 T031에서 `npm ci` 앞으로 옮긴다) — 넷을 `env`로 받아 비었으면 `::error::`로 **이름만** 밝히고 실패, `app.json`의 `expo.android.versionCode`가 정수가 아니면 실패, `node … verify-signature.mts --check-expected-only` 실패면 실패(모두 모아 한 번에 종료 1). T016이 green이 되는지 확인한다.
 - [x] T018 [US4] 같은 `versionCode`가 Play에 있을 때의 거부가 숨겨지지 않는지 T007에 케이스를 더한다(`bundles.upload`가 HTTP 403/400 + `error.message`를 주면 그 문장이 `HTTP <상태> bundles.upload: …`로 보이고 편집이 폐기된다). red→green(필요하면 T008 수정).
 

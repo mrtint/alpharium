@@ -51,7 +51,7 @@ description: "075 iOS 클라우드 릴리스 — 구현 태스크"
 **Independent Test**: 비밀 하나를 비운 채 시작하면 1분 안에 이름을 밝히며 실패한다.
 
 - [x] T009 [US3] `__tests__/ci/ios-release-workflow.test.ts`에 W13(사전 점검 단계가 `expo prebuild`보다 앞)과 점검 내용(여섯 이름 모두 검사, `ios.buildNumber` 정수 검사, 값을 출력하지 않고 이름만 밝힘)을 추가하고 red를 확인한다.
-- [x] T010 [US3] `.github/workflows/ios-release.yml`에 사전 점검 단계를 `npm ci` 직후·`expo prebuild` 앞에 추가한다 — 비밀은 `env`로 받아 비었으면 `::error::`로 **이름만** 밝히고 실패, `app.json`의 `expo.ios.buildNumber`가 정수가 아니면 실패. 중복 번호는 점검하지 않는다(FR-009). T009가 green이 되는지 확인한다.
+- [x] T010 [US3] `.github/workflows/ios-release.yml`에 사전 점검 단계를 `npm ci` 직후·`expo prebuild` 앞에 추가한다 — 비밀은 `env`로 받아 비었으면 `::error::`로 **이름만** 밝히고 실패, `app.json`의 `expo.ios.buildNumber`가 정수가 아니면 실패. 중복 번호는 이 단계가 아니라 096의 「번호 점검」 단계가 본다(FR-009). T009가 green이 되는지 확인한다.
 - [ ] T011 [US3] (T006a 뒤) quickstart.md §4의 위반 주입 — 비밀 하나를 비운 채 실제로 시작해 빌드 전에 실패하는지, `main` 외 브랜치에서 거부되는지, 실패 실행의 정리 단계가 키체인·프로파일·`.p8`을 지웠는지(SC-005)를 로그로 확인한다. 또 T007에서 올린 것과 **같은 버전·번호로 한 번 더 업로드**해 Apple의 거부가 숨겨지지 않고 실패로 보이는지 확인한다(US3-3). 결과를 quickstart에 기록한다.
 
 ## Phase 6: User Story 4 - 절차 문서가 새 경로를 기본으로 말한다 (Priority: P3)

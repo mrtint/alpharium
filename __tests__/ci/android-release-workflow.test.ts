@@ -174,7 +174,8 @@ describe("076 android-release 워크플로", () => {
         const count = (text.match(new RegExp(`secrets\\.${secret}\\b`, "g")) ?? []).length;
         const inStep = (step(text, stepName).match(new RegExp(`secrets\\.${secret}\\b`, "g")) ?? [])
           .length;
-        expect(count).toBe(2);
+        // 서비스 계정은 096의 번호 점검 단계에도 있다 — 사전 점검·번호 점검·Play 업로드 셋
+        expect(count).toBe(secret === "PLAY_SERVICE_ACCOUNT_JSON" ? 3 : 2);
         expect(inStep).toBe(1);
         expect(precheck.match(new RegExp(`secrets\\.${secret}\\b`, "g"))).toHaveLength(1);
       }
@@ -267,6 +268,7 @@ describe("076 android-release 워크플로", () => {
       const order = [
         "- name: 사전 점검",
         "- name: 설정 점검",
+        "- name: 번호 점검",
         "- name: expo prebuild",
         "- name: 키스토어 복원",
         "- name: gradle bundleRelease",
@@ -343,6 +345,63 @@ describe("076 android-release 워크플로", () => {
     it("Play 업로드가 release-notes/ko.txt를 --notes로 넘긴다", () => {
       const upload = step(read(), "Play 업로드");
       expect(upload).toMatch(/--notes release-notes\/ko\.txt/);
+    });
+  });
+
+  describe("번호 점검 (096 N1~N6)", () => {
+    const CHECK = "번호 점검";
+
+    /** `run:` 이후의 본문(env 블록 제외) */
+    function runBody(text: string): string {
+      const block = step(text, CHECK);
+      const at = block.indexOf("run:");
+      return at === -1 ? "" : block.slice(at);
+    }
+
+    it("N1 번호 점검이 설정 점검 뒤·npm ci와 prebuild 앞이다", () => {
+      const text = read();
+      const at = text.indexOf("- name: 번호 점검");
+      expect(at).toBeGreaterThan(text.indexOf("- name: 설정 점검"));
+      expect(at).toBeLessThan(text.indexOf("- run: npm ci"));
+      expect(at).toBeLessThan(text.indexOf("- name: expo prebuild"));
+      expect(at).toBeLessThan(text.indexOf("- name: 키스토어 복원"));
+    });
+
+    it("N2 env는 서비스 계정 하나이고 단계 env 깊이(10칸)에 `KEY: ${{ secrets.KEY }}` 꼴로 있다", () => {
+      const block = step(read(), CHECK);
+      const refs = block.split("\n").filter((l) => l.includes("secrets."));
+      expect(refs).toHaveLength(1);
+      expect(refs[0]).toBe(
+        "          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}",
+      );
+    });
+
+    it("N3 run 본문에 `${{` 보간이 없고 커밋은 $GITHUB_SHA로 넘긴다", () => {
+      const body = runBody(read());
+      expect(body).not.toBe("");
+      expect(body).not.toMatch(/\$\{\{/);
+      expect(body).toMatch(/--commit "\$GITHUB_SHA"/);
+    });
+
+    it("N4 저장소 스크립트 하나만 부르고 npm·npx·gradlew는 부르지 않는다", () => {
+      const body = runBody(read());
+      expect(body.match(/version-check\.mts/g)).toHaveLength(1);
+      expect(body).toMatch(/--app-json app\.json/);
+      expect(body).not.toMatch(/\b(npm|npx|\.\/gradlew)\b/);
+      expect(body.match(/\bnode\b/g)).toHaveLength(1);
+    });
+
+    it("N5 통과 줄을 실행 요약에 남기고 비밀 변수를 출력하지 않으며 실패를 가리지 않는다", () => {
+      const block = step(read(), CHECK);
+      expect(block).toMatch(/GITHUB_STEP_SUMMARY/);
+      expect(block).not.toMatch(/\b(echo|cat|printenv)\b.*\bPLAY_SERVICE_ACCOUNT_JSON\b/);
+      expect(block).not.toMatch(/continue-on-error|\|\|\s*true|set\s+\+e/);
+    });
+
+    it("N6 사전 점검은 여전히 저장소 코드를 부르지 않고, 권한은 contents: read 하나다", () => {
+      const text = read();
+      expect(step(text, "사전 점검")).not.toMatch(/\b(node|npm|npx)\b/);
+      expect(section(text, "permissions", 0).trimEnd()).toBe("permissions:\n  contents: read");
     });
   });
 });

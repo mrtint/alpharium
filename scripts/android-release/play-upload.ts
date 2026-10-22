@@ -1,7 +1,9 @@
 /**
  * 076 — Play Developer API(edits)로 AAB를 내부 테스트 트랙에 올린다. 네트워크와 시계는 주입받는다.
+ * 096 — 같은 인증·호출로 Play에 올라간 번들 번호를 읽기만 한다(`listBundleVersionCodes`, 편집은 열었다가 버린다).
  *
- * 계약: specs/076-android-release-ci/contracts/scripts-contract.md P1~P7
+ * 계약: specs/076-android-release-ci/contracts/scripts-contract.md P1~P7,
+ *       specs/096-release-build-number-check/contracts/scripts-contract.md P5~P8
  *
  * 새 의존성 없이 Node 내장 `crypto`와 `fetch`만 쓴다 — 배포 권한을 가진 서비스 계정 JSON을 저장소 안 코드만 다루게 하려는
  * 소유자 결정(2026-10-11)이다. 그래서 이 파일은 비밀을 어디에도 출력하지 않는다: 오류 메시지는 `HTTP <상태> <호출>: <사유>`
@@ -106,13 +108,17 @@ async function reasonOf(response: Response): Promise<string> {
 
 type Init = { method: string; headers?: Record<string, string>; body?: string | Uint8Array };
 
-/** 호출 하나. 실패는 `HTTP <상태> <이름>: <사유>`, 연결 실패는 `네트워크 오류 <이름>` */
+/**
+ * 호출 하나. 실패는 `HTTP <상태> <이름>: <사유>`, 연결 실패는 `네트워크 오류 <이름>`.
+ * `forbiddenHint`를 주면 403일 때 사유 뒤에 괄호로 붙인다(무엇을 더 줘야 하는지).
+ */
 async function call(
   deps: PlayDeps,
   name: string,
   url: string,
   init: Init,
   timeoutMs = CALL_TIMEOUT_MS,
+  forbiddenHint?: string,
 ): Promise<Response> {
   let response: Response;
   try {
@@ -123,7 +129,11 @@ async function call(
   } catch {
     throw new Error(`네트워크 오류 ${name}`);
   }
-  if (!response.ok) throw new Error(`HTTP ${response.status} ${name}: ${await reasonOf(response)}`);
+  if (!response.ok) {
+    const hint =
+      response.status === 403 && forbiddenHint !== undefined ? ` (${forbiddenHint})` : "";
+    throw new Error(`HTTP ${response.status} ${name}: ${await reasonOf(response)}${hint}`);
+  }
   return response;
 }
 
@@ -135,9 +145,12 @@ async function jsonOf(response: Response): Promise<Record<string, unknown>> {
   }
 }
 
-export async function uploadBundle(args: UploadArgs): Promise<{ versionCode: number }> {
-  const { deps, packageName, track, aab, releaseNotes } = args;
-  const account = parseServiceAccount(args.serviceAccountJson);
+/** 서비스 계정 JSON으로 액세스 토큰을 받아 `Authorization` 헤더를 돌려준다 */
+async function authorize(
+  deps: PlayDeps,
+  serviceAccountJson: string,
+): Promise<{ Authorization: string }> {
+  const account = parseServiceAccount(serviceAccountJson);
   const assertion = signJwt(account, deps.now());
 
   const tokenResponse = await call(deps, "token", TOKEN_URL, {
@@ -152,7 +165,12 @@ export async function uploadBundle(args: UploadArgs): Promise<{ versionCode: num
   if (typeof accessToken !== "string" || accessToken === "") {
     throw new Error("HTTP 200 token: 응답에 액세스 토큰이 없다");
   }
-  const auth = { Authorization: `Bearer ${accessToken}` };
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
+export async function uploadBundle(args: UploadArgs): Promise<{ versionCode: number }> {
+  const { deps, packageName, track, aab, releaseNotes } = args;
+  const auth = await authorize(deps, args.serviceAccountJson);
 
   const base = `${API}/${packageName}`;
   const editResponse = await call(deps, "edits.insert", `${base}/edits`, {
@@ -213,5 +231,64 @@ export async function uploadBundle(args: UploadArgs): Promise<{ versionCode: num
       headers: auth,
     }).catch(() => undefined);
     throw error;
+  }
+}
+
+const READ_PERMISSION_HINT = "서비스 계정에 Play Console 앱 정보 보기·릴리스 보기 권한이 필요하다";
+
+/**
+ * Play에 올라간 모든 번들의 versionCode를 읽는다(096). versionCode는 트랙을 통틀어 단조 증가해야 하므로 트랙별 목록이 아니라
+ * 번들 목록이 정본이다. 읽기 전용이다: 목록을 읽으려면 편집이 필요해 열지만 커밋하지 않고 언제나 버린다(삭제 실패는 삼킨다).
+ */
+export async function listBundleVersionCodes(args: {
+  deps: PlayDeps;
+  serviceAccountJson: string;
+  packageName: string;
+}): Promise<number[]> {
+  const { deps, packageName } = args;
+  const auth = await authorize(deps, args.serviceAccountJson);
+  const base = `${API}/${packageName}`;
+
+  const editResponse = await call(
+    deps,
+    "edits.insert",
+    `${base}/edits`,
+    { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: "{}" },
+    CALL_TIMEOUT_MS,
+    READ_PERMISSION_HINT,
+  );
+  const editId = (await jsonOf(editResponse)).id;
+  if (typeof editId !== "string" || editId === "") {
+    throw new Error("HTTP 200 edits.insert: 응답에 편집 id가 없다");
+  }
+
+  try {
+    const listed = await call(
+      deps,
+      "bundles.list",
+      `${base}/edits/${editId}/bundles`,
+      { method: "GET", headers: auth },
+      CALL_TIMEOUT_MS,
+      READ_PERMISSION_HINT,
+    );
+    const { bundles } = await jsonOf(listed);
+    // 번들이 하나도 없는 앱은 `bundles` 키가 빠질 수 있다 — 키가 있는데 배열이 아니면 형식이 다른 것이다
+    if (bundles === undefined) return [];
+    if (!Array.isArray(bundles)) throw new Error("HTTP 200 bundles.list: 응답 형식이 다르다");
+    return bundles.map((bundle: unknown) => {
+      const versionCode =
+        typeof bundle === "object" && bundle !== null
+          ? (bundle as Record<string, unknown>).versionCode
+          : undefined;
+      if (typeof versionCode !== "number" || !Number.isInteger(versionCode)) {
+        throw new Error("HTTP 200 bundles.list: 응답 형식이 다르다");
+      }
+      return versionCode;
+    });
+  } finally {
+    await call(deps, "edits.delete", `${base}/edits/${editId}`, {
+      method: "DELETE",
+      headers: auth,
+    }).catch(() => undefined);
   }
 }
