@@ -91,7 +91,7 @@ describe("W9 — 간격 교체", () => {
     jest.restoreAllMocks();
   });
 
-  it("★ 첫 진행 신호 전에는 「쓰고 있다」이고 시간이 지나도 바뀌지 않는다", async () => {
+  it("★ 첫 진행 신호 전에는 「쓰고 있어요」이고 시간이 지나도 바뀌지 않는다", async () => {
     const pipeline = progressPipeline();
     await startWriting(pipeline);
     jest.useFakeTimers();
@@ -100,7 +100,7 @@ describe("W9 — 간격 교체", () => {
       jest.advanceTimersByTime(WRITING.rotateMs * 3);
     });
 
-    expect(line()).toHaveTextContent("쓰고 있다");
+    expect(line()).toHaveTextContent("쓰고 있어요");
   });
 
   it("★ 신호가 오면 그 단계 풀의 줄이 나오고, 간격마다 다음 줄로 바뀐다 (직전 줄 제외)", async () => {

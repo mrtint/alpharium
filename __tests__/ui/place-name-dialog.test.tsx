@@ -47,8 +47,8 @@ describe("PD1 — 열린 모양", () => {
     await open();
     expect(screen.getByText("장소 이름으로 보기")).toBeTruthy();
     const cases = [
-      ["auto", "자동", "위치 권한이 있으면 이름으로, 없으면 비워 둬요"],
-      ["on", "켬", "다닌 자리를 숫자 대신 이름으로 보여줘요"],
+      ["auto", "자동", "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요"],
+      ["on", "켬", "일기를 쓸 때 다닌 자리의 이름을 참고해요"],
       ["off", "끔", "장소 이름을 옮기지 않아요"],
     ] as const;
     for (const [mode, name, desc] of cases) {

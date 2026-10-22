@@ -130,6 +130,51 @@ describe("053 GRID — 두 칸", () => {
   });
 });
 
+describe("098 CP3 — 장소 값 줄의 접근성 라벨", () => {
+  const labelOf = (testID: string) => screen.getByTestId(testID).props.accessibilityLabel;
+
+  it("장소 3곳이면 값 줄이 「사진이 찍힌 자리 3곳」으로 읽힌다", async () => {
+    await render(
+      <MaterialGrid preview={preview({ kind: "known", count: 3 }, { kind: "known", count: 3 })} />,
+    );
+    expect(labelOf("signal-places")).toBe("사진이 찍힌 자리 3곳");
+    expect(screen.getByTestId("signal-places").props.accessible).toBe(true);
+  });
+
+  it("관측된 0곳(known 0·none)도 「…0곳」으로 읽힌다", async () => {
+    await render(<MaterialGrid preview={preview({ kind: "none" }, { kind: "known", count: 0 })} />);
+    expect(labelOf("signal-places")).toBe("사진이 찍힌 자리 0곳");
+    await screen.rerender(<MaterialGrid preview={preview({ kind: "none" }, { kind: "none" })} />);
+    expect(labelOf("signal-places")).toBe("사진이 찍힌 자리 0곳");
+  });
+
+  it("★ 모름·읽는 중·통로 없음·권한 없음에는 라벨을 달지 않는다 (원칙 V)", async () => {
+    await render(
+      <MaterialGrid preview={preview({ kind: "known", count: 3 }, { kind: "unknown" })} />,
+    );
+    expect(labelOf("signal-places")).toBeUndefined();
+    await screen.rerender(<MaterialGrid preview={{ kind: "loading", day: DAY }} />);
+    expect(labelOf("signal-places")).toBeUndefined();
+    await screen.rerender(<MaterialGrid preview={undefined} />);
+    expect(labelOf("signal-places")).toBeUndefined();
+    await screen.rerender(
+      <MaterialGrid
+        preview={preview({ kind: "known", count: 3 }, { kind: "known", count: 2 }, "denied")}
+      />,
+    );
+    expect(labelOf("signal-places")).toBeUndefined();
+  });
+
+  it("라벨은 값 줄에만 있다 — 칸 컨테이너·사진 칸에는 없다", async () => {
+    await render(
+      <MaterialGrid preview={preview({ kind: "known", count: 3 }, { kind: "known", count: 3 })} />,
+    );
+    expect(labelOf("signal-places-cell")).toBeUndefined();
+    expect(labelOf("signal-photos")).toBeUndefined();
+    expect(labelOf("signal-photos-cell")).toBeUndefined();
+  });
+});
+
 describe("053 SRC — 소스 계약", () => {
   const read = (file: string) =>
     readFileSync(join(__dirname, "../../src/ui", file), "utf8")

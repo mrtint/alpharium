@@ -111,7 +111,7 @@ describe("086 site — 사이트 원문", () => {
     );
   });
 
-  it("S9 — 지원 페이지: 방침 링크·메일 자리·자주 묻는 것 다섯", () => {
+  it("S9 — 지원 페이지: 방침 링크·메일 자리·자주 묻는 것 여섯", () => {
     const html = readSite("support/index.html");
     expect(stripHtmlComments(html)).toContain(`href="${PRIVACY_URL}"`);
     expect(stripHtmlComments(html)).toMatch(/\{SUPPORT_EMAIL\}|mailto:/);
@@ -121,7 +121,20 @@ describe("086 site — 사이트 원문", () => {
       "uninstall",
       "on-device",
       "place-name",
+      "places",
     ]);
+  });
+
+  it("S9b — 098 CP4: 장소 수 항목은 맨 끝이고 확정 답이며 짐작 상수를 적지 않는다", () => {
+    const html = readSite("support/index.html");
+    const body = stripHtmlComments(sectionBy(html, "data-faq", "places") ?? "");
+    expect(body).toContain("홈의 장소 수는 무엇인가요?");
+    expect(body).toContain(
+      "그날 사진이 찍힌 자리의 수예요. 가까운 곳에서 찍은 사진은 한 자리로 묶어 세고, 위치 정보가 없는 사진은 세지 않아요.",
+    );
+    expect(body).not.toMatch(/\d+\s*(m|미터)/);
+    // 「앱을 지우면」 답은 백업 과제 몫이라 이 과제가 바꾸지 않는다 — 항목이 그대로 있다.
+    expect(sectionBy(html, "data-faq", "uninstall")).toContain("앱을 지우면 일기는 어떻게 되나요?");
   });
 
   it("S10 — 보존 절은 백업 포함을 단정하지 않는다(「포함될 수 있습니다」)", () => {

@@ -128,7 +128,7 @@ describe("★ 055 E2 — 홈 헤더의 모든 상태에서 같은 자리에 있�
   it("★ 쓰는 중 — 버튼은 잠기지 않는다(쓰는 중에도 설정을 열 수 있다)", async () => {
     const onOpenSettings = jest.fn();
     await render(
-      <DiaryListScreen {...props({ writing: { line: "쓰고 있다" }, onOpenSettings })} />,
+      <DiaryListScreen {...props({ writing: { line: "쓰고 있어요" }, onOpenSettings })} />,
     );
     await fireEvent.press(screen.getByTestId("home-settings"));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);

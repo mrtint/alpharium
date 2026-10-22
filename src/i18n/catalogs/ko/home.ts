@@ -24,7 +24,7 @@ export const home = {
   /** 덮어쓰기 확인 (`2d`, 보드 `h2.confirm*`). `todayNote`는 사람이 정한 문장(050 Clarification Q5) */
   overwriteConfirm: {
     title: "일기를 다시 쓸까요?",
-    body: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
+    body: "다 쓰면 지금 일기가 새 글로 바뀌어요. 바뀐 뒤에는 되돌릴 수 없어요.",
     todayNote: "지금까지의 하루로 써요.",
     confirm: "다시 쓰기",
     cancel: "취소",
@@ -60,7 +60,7 @@ export const home = {
     kicker: "쓰는 중",
     stop: "그만두기",
     /** 첫 진행 신호가 오기 전의 자리 문구(039) */
-    fallback: "쓰고 있다",
+    fallback: "쓰고 있어요",
     /** 「{이름}{이/가} 쓰고 있어요. 진행률은 세지 않아요.」 — 진행률·시간을 말하지 않는다는 안내 */
     byline: (name: string): string =>
       `${name}${particleFor(name)} 쓰고 있어요. 진행률은 세지 않아요.`,
@@ -86,6 +86,8 @@ export const home = {
     settingsOpen: "설정 열기",
     settingsCancel: "취소",
     madeUpDay: "지어낸 하루",
+    /** 장소 값 줄의 화면 낭독 — 사진이 찍힌 자리의 수다(이동 거리가 아니다, 098) */
+    placesA11y: (n: number): string => `사진이 찍힌 자리 ${n}곳`,
   },
 
   /** 쓰기 실패 토스트 — 다섯 갈래 모두 이 한 줄(054, 2026-09-30 저장소 소유자 결정) */
@@ -95,7 +97,7 @@ export const home = {
   writeButton: "일기 쓰기",
 
   /** 쓰기 시작 전 — 준비된 작성자가 없다(029·055). 이 문구가 보이면 「모듈 다시 받기」 버튼이 함께 보인다 */
-  needsAuthor: "일기 작성자를 준비해야 한다",
+  needsAuthor: "일기 작성자를 준비해야 해요",
 
   /** 고른 캐릭터를 쓸 수 없어 다른 캐릭터로 옮겼다(007·029 FR-014). 조사는 「을(를)」·「(으)로」 그대로다 */
   movedNotice: (from: string, to: string): string =>
