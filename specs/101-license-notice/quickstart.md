@@ -56,3 +56,11 @@ npm run lint
 
 - 주입 후 복구: `npx jest __tests__/privacy __tests__/i18n/license-links.test.ts --selectProjects logic` 86 통과.
 - `npm run lint`: eslint 오류 0(경고 2건은 이 과제와 무관한 기존 파일), `tsc` 0, 헌법 검사 「위반 0건」, `format:check` 통과.
+
+### 실기기 (SM-S901N, dev 번들, 2026-10-22)
+
+- Metro를 이 워크트리에서 8083으로 띄우고(8081은 메인 체크아웃의 다른 Metro가 쓰고 있어 건드리지 않음) 앱의 `debug_http_host`를 `localhost:8083`으로 잠시 바꿨다(`run-as`로 shared_prefs만, 앱 재설치·`pm clear` 없음 — 모델 그대로). 끝나고 prefs 파일·`adb reverse`(8083·8085)·Metro·로컬 서버를 모두 정리했고 `tcp:8081`은 그대로다.
+- 설정 → 「정보」: 버전 → 개인정보처리방침 → 도움말·문의 → 서체 라이선스 → **오픈소스 라이선스** → 개발자 순으로 보였다(LR1).
+- 행을 한 번 누르자 크롬이 `mrtint.github.io/alpharium/licenses/`를 열었다. **사이트가 아직 배포되지 않아 GitHub Pages 404가 보였다**(예상된 결과 — 머지 뒤 배포).
+- 같은 페이지를 로컬 서버(`127.0.0.1:8085`)로 휴대폰 크롬에서 열어 제목·항목 머리·Apache 전문이 폰 폭에서 줄바꿈되며 읽히는 것을 확인했다(원문 자체의 `&lt;<http://…>&gt;` 표기도 그대로 보임).
+- **미확인**: 글꼴 2.0배에서 행 이름, 비행기 모드의 실패 한 줄, iOS 실기기, 배포된 실제 주소의 페이지.

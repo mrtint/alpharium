@@ -60,7 +60,7 @@
 
 - [x] T025 `npm test`와 `npm run lint`(eslint + tsc + 헌법 검사 + prettier)를 실제로 돌려 출력과 함께 통과를 확인한다. `format:check`는 `src/`·`__tests__/`·루트 `*.ts(x)`만 보므로 사이트 HTML과 `sources/*.txt`는 대상이 아니다(`.prettierignore` 변경 없음)
 - [x] T026 099가 바꾼 문장과 경계 밖 파일이 그대로임을 확인한다: `git diff origin/main -- site/privacy site/support`가 0줄이고, `git diff origin/main --stat`에 `plan.md`의 구조 목록 밖의 파일(홈 화면 문구, 제목 구간·동작 줄이기 코드, 기존 카탈로그 파일)이 없다
-- [ ] T027 dev 빌드 실기기 1회 확인(`quickstart.md` §3). 기기를 쓰기 전에 소유자에게 병렬 실측 세션과 겹치지 않는지 알린다. 결과를 `quickstart.md`에 기록한다
+- [x] T027 dev 빌드 실기기 1회 확인(`quickstart.md` §3). 기기를 쓰기 전에 소유자에게 병렬 실측 세션과 겹치지 않는지 알린다. 결과를 `quickstart.md`에 기록한다
 - [ ] T028 `git fetch origin && git merge origin/main`으로 충돌(특히 `ko-golden.test.ts`·`App.tsx`·`settings-text.ts`)을 푼다. 양쪽 항목을 모두 남긴다
 
 ## Dependencies & Execution Order
