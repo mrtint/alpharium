@@ -14,7 +14,12 @@ export const TOKENS_CSS = join(ROOT, "site", "assets", "tokens.css");
 export const SITE_CSS = join(ROOT, "site", "assets", "site.css");
 export const FONTS_CSS = join(ROOT, "site", "assets", "fonts.css");
 export const FONTS_DIR = join(ROOT, "site", "assets", "fonts");
-export const PAGES = ["index.html", "privacy/index.html", "support/index.html"] as const;
+export const PAGES = [
+  "index.html",
+  "privacy/index.html",
+  "support/index.html",
+  "licenses/index.html",
+] as const;
 
 /** LF로 읽는다(줄 끝이 CRLF여도 같게) */
 export function readText(path: string): string {

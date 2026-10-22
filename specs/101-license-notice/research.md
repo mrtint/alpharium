@@ -31,6 +31,18 @@
 | miniaudio 0.11.25 (`cpp/tools/mtmd/miniaudio/miniaudio.h`) | 공공 영역 또는 MIT-0 | David Reid | 파일 끝 전문 |
 | OpenCL-Headers (`third_party/OpenCL-Headers`) | Apache-2.0 | 2008-2021 Khronos Group | 헤더 고지 원문 + Apache 2.0 원문 링크(본문은 Kanana 항목의 Apache 2.0 전문 참조) |
 
+원문 파일(`sources/`, 2026-10-22 추출)과 SHA-256:
+
+| 파일 | 추출 위치 | SHA-256 |
+|------|-----------|---------|
+| `bundled-nlohmann-json-LICENSE.txt` | `https://raw.githubusercontent.com/nlohmann/json/v3.12.0/LICENSE.MIT` | `46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603` |
+| `bundled-anyascii-LICENSE.txt` | `cpp/anyascii.h` 2~16줄 | `7fdc009eed4276881273b4ced9b3a680e12cc2ad9199899aa27c5020cdfeb634` |
+| `bundled-stb-image-LICENSE.txt` | `cpp/tools/mtmd/stb/stb_image.h` 7949~7987줄 | `9407f57d550d1d36974de15c7aad3dbf21e59c4b3312fc762157f05fdea6ff41` |
+| `bundled-miniaudio-LICENSE.txt` | `cpp/tools/mtmd/miniaudio/miniaudio.h` 95820~95863줄 | `2a53a54907694b5791c884c23b1bcc514f3fc9cfeb8ff51944ebea10aa72a65d` |
+| `bundled-opencl-headers-NOTICE.txt` | `third_party/OpenCL-Headers/CL/opencl.h` 2~14줄(주석 `*` 포함) | `489f5e77b640140b7b1cda7becac217877ec420a1ccf2ac90a3386023b1f70ad` |
+
+OpenCL-Headers 블록은 헤더 고지 원문과 Apache 2.0 원문 링크(`https://www.apache.org/licenses/LICENSE-2.0`)를 두고 본문은 Kanana 항목의 Apache 2.0 전문을 가리킨다(별도 복사 없음).
+
 - **Decision**: llama.cpp 항목의 하위 블록으로 싣는다(항목 수는 넷 유지). 헤더에 전문이 있는 것은 그 글자 그대로, nlohmann은 상류 파일을 받는다.
 - **Rationale**: 번들된 코드의 MIT/ISC 고지 의무를 지키되, 사용자 눈에는 "llama.cpp 계열 하나"로 보이게 한다.
 - **Open**: 이것으로 충분한지는 소유자 확인(H4). 오디오·OpenCL이 실제 빌드에 컴파일되는지는 이 과제에서 재지 않는다 — 번들되어 배포되는 소스를 기준으로 안전하게 싣는다(Constitution V: 컴파일 여부는 미확인으로 표시).
@@ -42,17 +54,18 @@
 
 - 4(a) 사본 제공, 4(b) 수정 표시, 4(c)(d) 고지 유지.
 - 1절 Threshold: 연 매출 1,000만 달러 이상, 5절 상업적 이용 조건.
+- 사진 모델 GGUF 저장소(`LiquidAI/LFM2.5-VL-450M-GGUF`)의 `LICENSE`는 본체 저장소의 것과 줄 끝(CRLF/LF)만 다르고 내용이 같다(CR 제거 후 바이트 동일, 확인 2026-10-22). 정본은 LF 파일이다.
 - **Decision**: 페이지는 전문을 그대로 싣고 요약·해설을 붙이지 않는다. 조건에 대한 판단은 H1·H2로 소유자에게 올린다.
 
 ## R5 — Kanana
 
-원 저장소(`kakaocorp/kanana-1.5-2.1b-instruct-2505`)에 `LICENSE`(Apache 2.0 본문 마크다운 형)가 있다. 사용하는 GGUF는 DevQuasar 재배포본이며 HF 메타데이터에 라이선스 표기가 없다. **Decision**: 정본은 원 저장소의 LICENSE, 재배포자는 출처 줄에 적는다. 저작권자 줄(Kakao Corp.)은 모델 카드/원 저장소 표기를 구현 단계에서 확인해 그대로 옮긴다(미확인이면 쓰지 않고 H3로 올린다).
+원 저장소(`kakaocorp/kanana-1.5-2.1b-instruct-2505`)에 `LICENSE`(Apache 2.0 본문 마크다운 형)가 있다. 사용하는 GGUF는 DevQuasar 재배포본이며 HF 메타데이터에 라이선스 표기가 없다. **Decision**: 정본은 원 저장소의 LICENSE, 재배포자는 출처 줄에 적는다. **확인 결과(2026-10-22)**: 원 저장소의 `LICENSE`에는 Apache 2.0 본문만 있고 저작권자 줄이 없으며, 모델 카드 메타데이터는 `license: apache-2.0`뿐이다. DevQuasar 재배포본 카드에도 `license: apache-2.0`, 「Quantized version of: kakaocorp/kanana-1.5-2.1b-instruct-2505」 한 줄이 있다. → 페이지의 `kanana` 항목은 저작권자 줄에 「원문에 저작권자 표기가 없음」이라고 쓰고, 출처 줄에 「게시: kakaocorp(Hugging Face 조직), 사용 파일: DevQuasar가 양자화한 재배포본」을 적는다. 저작권자 이름(Kakao Corp.)은 원문에 없으므로 단정하지 않고 H3로 올린다.
 
 ## R6 — 페이지 구조와 테스트 방식
 
-- 086 방침 페이지와 같은 정적 구조(`<main class="page doc">`, 토큰·서체·`site.css`). 항목마다 `<section data-license="kanana|lfm|llama-cpp|llama-rn">`, 전문은 `<pre class="license-text">`(HTML 이스케이프).
+- 086 방침 페이지와 같은 정적 구조(`<main class="page doc">`, 토큰·서체·`site.css`). 항목마다 `<section data-license="kanana|lfm|llama-cpp|llama-rn">`, 전문은 클래스 없는 `<pre>`(HTML 이스케이프). 089 사이트 계약이 `site.css`에 정의된 클래스(`page`·`doc`·`meta`·`summary`·`section`·`links`)만 허용하므로 새 클래스를 만들지 않고 `.doc pre` 요소 선택자로 스타일한다.
 - 테스트는 086처럼 정규식으로 읽는다(HTML 파서 의존 없음). 전문 대조는 `<pre>`의 내용을 HTML 엔티티 복원 후 `sources/`와 비교한다.
-- `.doc`용 `pre` 스타일이 `site.css`에 없으면 같은 파일에 `pre.license-text` 규칙만 더한다(줄바꿈 유지·가로 스크롤 금지).
+- `site.css`에 `.doc pre` 규칙만 더한다(줄바꿈 유지·가로 스크롤 금지, 값은 토큰 변수만 — 089 `site-hardcode` 계약). `__tests__/design/helpers.ts`의 `PAGES`에 새 페이지를 더해 089 하드코딩·링크 계약이 이 페이지도 돈다.
 
 ## R7 — 앱 쪽 선례 확인
 

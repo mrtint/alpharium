@@ -65,7 +65,7 @@ src/i18n/catalogs/ko/license-links.ts   # 새 영역 { row }
 src/i18n/catalogs/ko/index.ts       # 영역 등록
 src/ui/settings-text.ts             # LICENSE_LINKS_TEXT
 src/ui/SettingsScreen.tsx           # onOpenLicenses·licensesFailedText 속성, 행 testID settings-licenses
-App.tsx                             # 배선 (linkFailed 유니온에 "licenses")
+App.tsx                             # 배선 (별도 licensesFailed 상태 — 086 linkFailed 유니온은 그대로)
 __tests__/privacy/license-page.test.ts          # LP1~LP10
 __tests__/privacy/policy-links.test.ts          # LICENSES_URL을 L1·L2에 포함 (추가만)
 __tests__/privacy/site-pages.test.ts            # PAGES에 licenses/index.html 추가

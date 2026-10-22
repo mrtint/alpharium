@@ -30,7 +30,12 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-na
 
 import type { PermissionTag, TaggedPermission } from "../app/permission-tags";
 import { AppText } from "./components/Text";
-import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./settings-text";
+import {
+  FONT_LICENSE_TEXT,
+  LICENSE_LINKS_TEXT,
+  POLICY_LINKS_TEXT,
+  SETTINGS_TEXT,
+} from "./settings-text";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
 const { group, paperPadding, row, tag, toggle } = SETTINGS;
@@ -88,6 +93,12 @@ export type SettingsScreenProps = {
   /** 086 — 브라우저를 열지 못했다는 그 행 아래 한 줄(주소 포함). 없으면 그리지 않는다 */
   privacyFailedText?: string;
   supportFailedText?: string;
+  /**
+   * 101 — 「오픈소스 라이선스」 행 누름(기기 브라우저로 앱 밖 고지 페이지를 연다). 없으면 누를 수 없는 행이다. 모델 이름은
+   * 이 화면에 나오지 않는다(헌법 원칙 III) — 고지는 앱 밖 페이지에만 있다.
+   */
+  onOpenLicenses?: () => void;
+  licensesFailedText?: string;
 };
 
 export function SettingsScreen({
@@ -118,6 +129,8 @@ export function SettingsScreen({
   onOpenSupport,
   privacyFailedText,
   supportFailedText,
+  onOpenLicenses,
+  licensesFailedText,
 }: SettingsScreenProps) {
   return (
     <View testID="settings-screen">
@@ -235,6 +248,16 @@ export function SettingsScreen({
           {...(onOpenFontLicense !== undefined ? { onPress: onOpenFontLicense } : {})}
           testID="settings-font-license"
           trailing={<Chevron />}
+        />
+        {/* 101 — 모델·오픈소스 라이선스 고지는 앱 밖 페이지다. 서체 라이선스 다음, 「개발자」 행 앞 */}
+        <Row
+          label={LICENSE_LINKS_TEXT.row}
+          {...(onOpenLicenses !== undefined ? { onPress: onOpenLicenses } : {})}
+          testID="settings-licenses"
+          trailing={<Chevron />}
+          {...(licensesFailedText !== undefined
+            ? { hint: licensesFailedText, hintTone: "danger" as const }
+            : {})}
         />
         {developerEnabled && (
           <Row

@@ -12,7 +12,7 @@
 | 라이선스 이름 | 예: "Apache License 2.0", "LFM Open License v1.0", "MIT License" | 예 |
 | 원문 링크 | 원문 주소(`<a href>`) | 예 |
 | 확인일 | `data-checked="2026-10-22"` | 예 |
-| 전문 | `<pre class="license-text">`, 원문 파일과 글자 동일 | 예 |
+| 전문 | `<pre>`(클래스 없음), 원문 파일과 글자 동일 | 예 |
 | 하위 블록 | `llama-cpp`만: 서드파티 `<section data-bundled="…">` 다섯 | 해당 시 |
 
 `lfm` 항목은 본체와 mmproj 파일 둘이 같은 라이선스에 속한다는 문장을 가진다.

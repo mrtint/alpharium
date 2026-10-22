@@ -126,7 +126,10 @@
 ## 소유자 확인 항목
 
 - **H1**: LFM Open License v1.0 5절 — 연 매출 1,000만 달러 이상 법인의 상업적 이용 조건. 이 앱의 배포가 해당하는지. **소유자 확인 필요.**
+  원문(`sources/lfm-LICENSE.txt`): 1절 「"Threshold" shall mean annual revenue of 10 million United States dollars ($10,000,000) or more.」 · 5(a) 「The rights granted under this License for Commercial Use are conditioned upon You or Your Legal Entity not exceeding the Threshold.」 · 5(b) 「Any Commercial Use of the Work or a Derivative Work by a Legal Entity that exceeds the Threshold is not licensed under this Agreement.」 · 1절 「"Commercial Use" shall mean any use of the Work for direct or indirect commercial advantage or monetary compensation.」
+- **H2** 원문 인용: 4절 도입 「You may reproduce and distribute copies of the Work or Derivative Works thereof in any medium, … provided that You meet the following conditions」 · 4(a) 「You must give any other recipients of the Work or Derivative Works a copy of this License」 · 4(d) 「If the Work includes a "NOTICE" text file … Derivative Works that You distribute must include a readable copy of the attribution notices」. 이 페이지는 전문을 싣는 것으로 4(a)를 이행하려는 것이다.
 - **H2**: LFM 4절 — 사본 제공(a)·고지문 유지(d). 앱이 모델 파일을 싣지 않고 사용자 기기가 직접 내려받는 방식에서 "배포"에 해당하는지, 고지를 어디에 어떻게 실어야 하는지. **소유자 확인 필요.**
+- **H3** 확인 사실: 원 저장소 `LICENSE`는 Apache 2.0 본문이며 저작권자 줄이 없고, 4절(Redistribution)은 「You must give any other recipients of the Work or Derivative Works a copy of this License」 등을 요구한다. 모델 카드는 `license: apache-2.0`뿐이다. DevQuasar 재배포본 카드에도 `license: apache-2.0`과 「Quantized version of: kakaocorp/kanana-1.5-2.1b-instruct-2505」 한 줄만 있다(research R5). 페이지는 저작권자 줄에 「원문에 저작권자 표기가 없음」이라 적고 Kakao Corp.를 단정하지 않는다.
 - **H3**: Kanana — Apache-2.0 본문·저작권 표기를 Kakao 원 저장소에서 인용, DevQuasar 재배포본 표기 확인. **소유자 확인 필요.**
 - **H4**: `llama.rn@0.12.9`에는 llama.cpp 외에 다른 코드가 함께 들어 있다 — nlohmann/json(MIT, © 2013-2025 Niels Lohmann), anyascii(ISC, © 2020-2023 Hunter WB), stb_image(MIT 또는 공공 영역, © 2017 Sean Barrett), miniaudio(공공 영역 또는 MIT-0), OpenCL-Headers(Apache-2.0, © Khronos Group). 이들의 고지를 llama.cpp 항목 안의 하위 블록으로 싣는 것(FR-011)이 충분한지. **소유자 확인 필요.**
 

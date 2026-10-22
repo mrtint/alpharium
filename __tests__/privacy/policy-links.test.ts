@@ -10,7 +10,7 @@ import { join, relative } from "node:path";
 import { FIX_POLICY } from "./outbound";
 import { ROOT, SITE, readSite, stripHtmlComments } from "./read-site";
 
-import { PRIVACY_URL, SUPPORT_URL } from "../../src/app/policy-links";
+import { LICENSES_URL, PRIVACY_URL, SUPPORT_URL } from "../../src/app/policy-links";
 
 const BASE = "https://mrtint.github.io/alpharium/";
 
@@ -25,12 +25,15 @@ function sourceFiles(dir: string): string[] {
 }
 
 describe("086 L — 방침·지원 주소", () => {
-  it.each([PRIVACY_URL, SUPPORT_URL])("L1 — %s 는 게시 주소 아래에 있고 /로 끝난다", (url) => {
-    expect(url.startsWith(BASE)).toBe(true);
-    expect(url.endsWith("/")).toBe(true);
-  });
+  it.each([PRIVACY_URL, SUPPORT_URL, LICENSES_URL])(
+    "L1 — %s 는 게시 주소 아래에 있고 /로 끝난다",
+    (url) => {
+      expect(url.startsWith(BASE)).toBe(true);
+      expect(url.endsWith("/")).toBe(true);
+    },
+  );
 
-  it.each([PRIVACY_URL, SUPPORT_URL])(
+  it.each([PRIVACY_URL, SUPPORT_URL, LICENSES_URL])(
     "L2 — %s 의 경로마다 site/<경로>index.html 이 있다",
     (url) => {
       const path = url.slice(BASE.length);

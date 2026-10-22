@@ -38,3 +38,21 @@ npm run lint
 - H1·H2: `sources/lfm-LICENSE.txt` 1절·4절·5절
 - H3: `sources/kanana-LICENSE.txt` (Apache 2.0)와 Kakao 원 저장소의 저작권 표기
 - H4: `research.md` R3의 서드파티 다섯 블록
+
+## 5. 실측 (2026-10-22)
+
+### 위반 주입 (치환 적용을 먼저 확인했고, 모두 되돌렸다)
+
+| 주입 | 결과 |
+|------|------|
+| `licenseLinks.row` = 「Kanana 라이선스」 | LK1·LK2(kanana)·LK2(소스) 실패 |
+| `lfm` 전문 한 글자(`Liquid AI, Inc.` → `Liquid AI Inc.`) | LP5 실패 |
+| `data-license="llama-rn"` 제거 | LP3·LP4·LP5 실패 |
+| `sources/llama-cpp-LICENSE.txt` 연도를 상류 2023-2026으로 | LP6·LP5·LP7 실패 |
+| 페이지에 `<script>` 추가 | LP2 + 사이트 계약(S3)·089 하드코딩 계약 3건 실패 |
+| `App.tsx`가 주소를 하드코딩 | LR3·LR6 실패 |
+
+### 명령
+
+- 주입 후 복구: `npx jest __tests__/privacy __tests__/i18n/license-links.test.ts --selectProjects logic` 86 통과.
+- `npm run lint`: eslint 오류 0(경고 2건은 이 과제와 무관한 기존 파일), `tsc` 0, 헌법 검사 「위반 0건」, `format:check` 통과.

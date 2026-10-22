@@ -22,6 +22,7 @@ import { download } from "./download";
 import { failures } from "./failures";
 import { fontLicense } from "./font-license";
 import { home } from "./home";
+import { licenseLinks } from "./license-links";
 import { monologue } from "./monologue";
 import { notification } from "./notification";
 import { onboarding } from "./onboarding";
@@ -48,6 +49,7 @@ export const ko = {
   failures,
   fontLicense,
   policyLinks,
+  licenseLinks,
   simulation,
   welcome,
   download,
