@@ -23,7 +23,12 @@ import {
 
 import { PRIVACY_URL } from "../../src/app/policy-links";
 
-const PAGES = ["index.html", "privacy/index.html", "support/index.html"] as const;
+const PAGES = [
+  "index.html",
+  "privacy/index.html",
+  "support/index.html",
+  "licenses/index.html",
+] as const;
 const POLICY_SECTIONS = [
   "summary",
   "on-device",

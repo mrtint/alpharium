@@ -138,3 +138,17 @@ a:focus-visible {
 .doc .links li:last-child {
   border-bottom: 1px solid var(--color-border);
 }
+
+/* 101 — 라이선스 전문 블록: 줄바꿈을 지키되 가로로 넘치지 않는다(새 클래스 없이 요소 선택자) */
+.doc pre {
+  margin: 0 0 var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-caption-size);
+  font-weight: var(--text-caption-weight);
+  line-height: var(--text-caption-line);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
