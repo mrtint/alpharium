@@ -45,7 +45,8 @@ OpenCL-Headers 블록은 헤더 고지 원문과 Apache 2.0 원문 링크(`https
 
 - **Decision**: llama.cpp 항목의 하위 블록으로 싣는다(항목 수는 넷 유지). 헤더에 전문이 있는 것은 그 글자 그대로, nlohmann은 상류 파일을 받는다.
 - **Rationale**: 번들된 코드의 MIT/ISC 고지 의무를 지키되, 사용자 눈에는 "llama.cpp 계열 하나"로 보이게 한다.
-- **Open**: 이것으로 충분한지는 소유자 확인(H4). 오디오·OpenCL이 실제 빌드에 컴파일되는지는 이 과제에서 재지 않는다 — 번들되어 배포되는 소스를 기준으로 안전하게 싣는다(Constitution V: 컴파일 여부는 미확인으로 표시).
+- **확인(2026-10-23)**: Android `librnllama_*.so`(arm64-v8a·x86_64)와 iOS `rnllama.xcframework` 바이너리·소스를 확인해 nlohmann/json·stb_image·anyascii(Android)·nlohmann(iOS) 흔적과 miniaudio 컴파일(`mtmd-helper.cpp`의 `MINIAUDIO_IMPLEMENTATION`), OpenCL 변형의 `libOpenCL` 참조를 확인했다. 빠진 코드는 찾지 못했다(`llama-sampler.cpp`의 「공공 영역 구현에서 가져옴」 주석은 고지 의무 없음). 소유자 최종 판단은 spec H4.
+- **Open(해소됨)**: 이것으로 충분한지는 H4. 오디오·OpenCL이 실제 빌드에 컴파일되는지는 이 과제에서 재지 않는다 — 번들되어 배포되는 소스를 기준으로 안전하게 싣는다(Constitution V: 컴파일 여부는 미확인으로 표시).
 - **Alternatives**: 항목을 다섯 이상으로 늘림(페이지 구성이 복잡), 전문 생략하고 링크만(MIT 사본 요구 못 채움).
 
 ## R4 — LFM 라이선스의 요점 (소유자가 원문을 읽는다)
@@ -55,11 +56,12 @@ OpenCL-Headers 블록은 헤더 고지 원문과 Apache 2.0 원문 링크(`https
 - 4(a) 사본 제공, 4(b) 수정 표시, 4(c)(d) 고지 유지.
 - 1절 Threshold: 연 매출 1,000만 달러 이상, 5절 상업적 이용 조건.
 - 사진 모델 GGUF 저장소(`LiquidAI/LFM2.5-VL-450M-GGUF`)의 `LICENSE`는 본체 저장소의 것과 줄 끝(CRLF/LF)만 다르고 내용이 같다(CR 제거 후 바이트 동일, 확인 2026-10-22). 정본은 LF 파일이다.
+- LFM 두 저장소(`LiquidAI/LFM2.5-VL-450M`·`-GGUF`)의 파일 목록(HF API, 2026-10-23)에는 NOTICE 파일이 없어 4(d)는 해당하지 않는다. 소유자는 5절 기준(1,000만 달러)이 해당하지 않는다고 판단했다(H1).
 - **Decision**: 페이지는 전문을 그대로 싣고 요약·해설을 붙이지 않는다. 조건에 대한 판단은 H1·H2로 소유자에게 올린다.
 
 ## R5 — Kanana
 
-원 저장소(`kakaocorp/kanana-1.5-2.1b-instruct-2505`)에 `LICENSE`(Apache 2.0 본문 마크다운 형)가 있다. 사용하는 GGUF는 DevQuasar 재배포본이며 HF 메타데이터에 라이선스 표기가 없다. **Decision**: 정본은 원 저장소의 LICENSE, 재배포자는 출처 줄에 적는다. **확인 결과(2026-10-22)**: 원 저장소의 `LICENSE`에는 Apache 2.0 본문만 있고 저작권자 줄이 없으며, 모델 카드 메타데이터는 `license: apache-2.0`뿐이다. DevQuasar 재배포본 카드에도 `license: apache-2.0`, 「Quantized version of: kakaocorp/kanana-1.5-2.1b-instruct-2505」 한 줄이 있다. → 페이지의 `kanana` 항목은 저작권자 줄에 「원문에 저작권자 표기가 없음」이라고 쓰고, 출처 줄에 「게시: kakaocorp(Hugging Face 조직), 사용 파일: DevQuasar가 양자화한 재배포본」을 적는다. 저작권자 이름(Kakao Corp.)은 원문에 없으므로 단정하지 않고 H3로 올린다.
+원 저장소(`kakaocorp/kanana-1.5-2.1b-instruct-2505`)에 `LICENSE`(Apache 2.0 본문 마크다운 형)가 있다. 사용하는 GGUF는 DevQuasar 재배포본이며 HF 메타데이터에 라이선스 표기가 없다. **Decision**: 정본은 원 저장소의 LICENSE, 재배포자는 출처 줄에 적는다. **확인 결과(2026-10-22)**: 원 저장소의 `LICENSE`에는 Apache 2.0 본문만 있고 저작권자 줄이 없으며, 모델 카드 메타데이터는 `license: apache-2.0`뿐이다. DevQuasar 재배포본 카드에도 `license: apache-2.0`, 「Quantized version of: kakaocorp/kanana-1.5-2.1b-instruct-2505」 한 줄이 있다. → 페이지의 `kanana` 항목은 저작권자 줄에 「원문에 저작권자 표기가 없음」이라고 쓰고, 출처 줄에 「게시: kakaocorp(Hugging Face 조직), 사용 파일: DevQuasar가 양자화한 재배포본」을 적는다. 저작권자 이름(Kakao Corp.)은 원문에 없으므로 단정하지 않는다. **추가 확인(2026-10-23)**: 모델 카드 메타데이터 `developers: Kanana LLM`, 조직 `kakaocorp`, `github.com/kakao/kanana`의 LICENSE·NOTICE는 404, 두 Kanana 저장소 파일 목록에 NOTICE 없음 → 페이지 출처 줄에 「개발은 Kanana LLM, 게시는 kakaocorp」를 적었다(H3).
 
 ## R6 — 페이지 구조와 테스트 방식
 
