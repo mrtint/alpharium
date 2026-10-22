@@ -88,14 +88,14 @@ describe("W2 — KO 원문 (보드 2b)", () => {
     expect(screen.queryByTestId("writing-byline")).toBeNull();
   });
 
-  it("혼잣말 줄이 그대로 보이고, 첫 신호 전에는 「쓰고 있다」다", async () => {
+  it("혼잣말 줄이 그대로 보이고, 첫 신호 전에는 「쓰고 있어요」다", async () => {
     const { rerender } = await render(<DiaryListScreen {...props()} />);
     expect(screen.getByTestId("writing-monologue-text")).toHaveTextContent(
       "사진 속에 뭐가 담겼는지 찬찬히 보는 중…",
     );
 
     await rerender(<DiaryListScreen {...props({ writing: { name: "금동이" } })} />);
-    expect(screen.getByTestId("writing-monologue-text")).toHaveTextContent("쓰고 있다");
+    expect(screen.getByTestId("writing-monologue-text")).toHaveTextContent("쓰고 있어요");
   });
 });
 

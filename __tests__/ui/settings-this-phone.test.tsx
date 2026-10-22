@@ -72,7 +72,7 @@ describe("TX — 보드 KO 원문", () => {
       groupDevice: "이 휴대폰",
       deviceModules: "쓰는 모듈",
       deviceWipe: "일기 모두 지우기",
-      wipeBody: "되돌릴 수 없어요. 이름과 설정은 남아요.",
+      wipeBody: "되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.",
       wipeConfirm: "지우기",
       wipeCancel: "취소",
     });
@@ -194,7 +194,7 @@ describe("UI5 — 확인 대화상자", () => {
       <WipeConfirmDialog count={41} onCancel={() => {}} onConfirm={() => {}} />,
     );
     expect(screen.getByText("일기 41편을 모두 지울까요?")).toBeTruthy();
-    expect(screen.getByText("되돌릴 수 없어요. 이름과 설정은 남아요.")).toBeTruthy();
+    expect(screen.getByText("되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.")).toBeTruthy();
     expect(flat(screen.getByTestId("wipe-confirm")).backgroundColor).toBe(COLORS.danger);
     expect(flat(screen.getByText("지우기")).color).toBe(COLORS.dangerForeground);
     expect(screen.getByText("취소")).toBeTruthy();

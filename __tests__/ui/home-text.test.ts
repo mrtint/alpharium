@@ -101,7 +101,7 @@ describe("★ 050 대화상자 문구 (TXT1·TXT2)", () => {
   it("TXT1 — 덮어쓰기 확인 (보드 2d h2.confirm*)", () => {
     expect(OVERWRITE_CONFIRM).toEqual({
       title: "일기를 다시 쓸까요?",
-      body: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
+      body: "다 쓰면 지금 일기가 새 글로 바뀌어요. 바뀐 뒤에는 되돌릴 수 없어요.",
       todayNote: "지금까지의 하루로 써요.",
       confirm: "다시 쓰기",
       cancel: "취소",

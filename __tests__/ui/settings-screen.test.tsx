@@ -85,9 +85,9 @@ describe("055 FR-031 — 보드 KO 원문", () => {
       timeCancel: "취소",
       placeTitle: "장소 이름으로 보기",
       placeAuto: "자동",
-      placeAutoDesc: "위치 권한이 있으면 이름으로, 없으면 비워 둬요",
+      placeAutoDesc: "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요",
       placeOn: "켬",
-      placeOnDesc: "다닌 자리를 숫자 대신 이름으로 보여줘요",
+      placeOnDesc: "일기를 쓸 때 다닌 자리의 이름을 참고해요",
       placeOff: "끔",
       placeOffDesc: "장소 이름을 옮기지 않아요",
       placeCancel: "취소",
@@ -611,10 +611,9 @@ describe("099 FR-008 — 「이 휴대폰」의 유실 안내 한 줄", () => {
     expect(screen.getByTestId("settings-loss-note")).toBeTruthy();
   });
 
-  it("기존 행·문구는 그대로다 — 일기 모두 지우기 라벨과 대화상자 문구가 바뀌지 않았다", async () => {
+  it("기존 「일기 모두 지우기」 행이 그대로 있다(대화상자 문구는 이 과제의 몫이 아니다)", async () => {
     await render(<SettingsScreen {...props()} />);
     expect(SETTINGS_TEXT.deviceWipe).toBe("일기 모두 지우기");
-    expect(SETTINGS_TEXT.wipeBody).toBe("되돌릴 수 없어요. 이름과 설정은 남아요.");
     expect(screen.getByTestId("settings-wipe")).toBeTruthy();
   });
 

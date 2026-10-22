@@ -114,7 +114,9 @@ describe("OW1~OW5 — 홈 위의 확인 대화상자", () => {
 
     expect(screen.getByTestId("home-day-number")).toBeTruthy();
     expect(screen.getByText("일기를 다시 쓸까요?")).toBeTruthy();
-    expect(screen.getByText("다 쓰면 지금 일기가 새 글로 바뀌어요.")).toBeTruthy();
+    expect(
+      screen.getByText("다 쓰면 지금 일기가 새 글로 바뀌어요. 바뀐 뒤에는 되돌릴 수 없어요."),
+    ).toBeTruthy();
     // 051 — 쓴 날의 하단 바도 「다시 쓰기」다. 대화상자의 버튼은 대화상자 안에서 찾는다.
     expect(within(screen.getByTestId("overwrite-confirm")).getByText("다시 쓰기")).toBeTruthy();
     expect(screen.getByText("취소")).toBeTruthy();
