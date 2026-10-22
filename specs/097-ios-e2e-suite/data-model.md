@@ -1,4 +1,4 @@
-# Data Model: iOS e2e 세트 (095)
+# Data Model: iOS e2e 세트 (097)
 
 개발 도구의 값 모양이다. 앱 데이터 형식은 바꾸지 않는다.
 

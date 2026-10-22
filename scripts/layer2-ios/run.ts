@@ -1,5 +1,5 @@
 /**
- * 095 — iOS 층 2 진입점: 실제 `devicectl`·키보드·`ios:seed`를 `runLayer2Ios`에 꽂는다 (`npm run test:layer2:ios`).
+ * 097 — iOS 층 2 진입점: 실제 `devicectl`·키보드·`ios:seed`를 `runLayer2Ios`에 꽂는다 (`npm run test:layer2:ios`).
  *
  * `run-device-tests.mjs`는 `.ts`를 정적으로 불러오지 않으므로(경고) 동적 import로 이 한 함수만 부른다. 판정은 `runner.ts`에 있다.
  *

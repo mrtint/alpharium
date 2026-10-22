@@ -27,7 +27,7 @@ describe("층 2 릴리스 전 체크리스트 (073)", () => {
     expect(doc).toMatch(/사람이 봄/);
   });
 
-  it("C2 — iOS 층 2의 실제 절차(095)와 TestFlight 확인을 담는다", () => {
+  it("C2 — iOS 층 2의 실제 절차(097)와 TestFlight 확인을 담는다", () => {
     expect(doc).toContain("npm run test:layer2:ios");
     expect(doc).toMatch(/Enter/);
     expect(doc).toMatch(/Xcode/);

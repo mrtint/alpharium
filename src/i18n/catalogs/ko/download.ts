@@ -1,14 +1,19 @@
 /**
  * 한국어 카탈로그 — 필수 모듈 내려받기 동의·진행 (062).
  *
- * 원래 자리: `src/ui/DownloadConsentDialog.tsx`(045 FR-003), `src/ui/DownloadProgressScreen.tsx`(045·046 — 사람이 쓴 고정 헤드라인·본문).
+ * 원래 자리: `src/ui/DownloadConsentDialog.tsx`(045 FR-003 — 095에서 받을 양을 더함), `src/ui/DownloadProgressScreen.tsx`(045·046 — 사람이 쓴 고정 헤드라인·본문).
  * **진행 문구에 바이트·퍼센트·시간을 넣지 않는다**(045, 원칙 IV는 측정 장치만 막지만 이 화면은 고정 문구로 정했다).
+ * 동의 본문만은 받을 양을 싣는다(095 — App Store 4.2.3(ii)). 못 읽었으면 양 없는 원래 문장이다.
  */
 
 export const download = {
   consent: {
     title: "받을 것이 있어요",
-    body: "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+    /** `size`는 「2.0GB」꼴 문자열, 읽지 못했으면 `null`(양을 지어내지 않는다, 095) */
+    body: (size: string | null): string =>
+      size === null
+        ? "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요."
+        : `일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 약 ${size} 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.`,
     confirm: "받을게요",
   },
   /** 실패 시 진행 바 하단 — 오류 원문을 담지 않는다(원칙 III) */

@@ -9,9 +9,9 @@ import { IOS_LAYER2_FLOWS } from "../../scripts/layer2-ios/flows";
 import { runLayer2Ios, type IosLayer2Deps } from "../../scripts/layer2-ios/runner";
 
 /**
- * 095 — iOS 층 2 실행기의 단계와 보고 (기기 대역·가짜 시계).
+ * 097 — iOS 층 2 실행기의 단계와 보고 (기기 대역·가짜 시계).
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-0~L2-8, I-1), FR-010·FR-012
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-0~L2-8, I-1), FR-010·FR-012
  */
 
 const UDID = "PHONE-1";
@@ -166,7 +166,7 @@ function build(over: Setup = {}, flows = IOS_LAYER2_FLOWS) {
 
 const only = (id: string) => IOS_LAYER2_FLOWS.filter((f) => f.id === id);
 
-describe("iOS 층 2 실행기 (095)", () => {
+describe("iOS 층 2 실행기 (097)", () => {
   it("L2-0 — 안내 한 줄을 출력한다 (보관함에 합성 사진이 남는다는 말 포함)", async () => {
     const { deps, events } = build({ diaryAppearsAtPoll: 1 }, only("open-app-writes"));
     await runLayer2Ios(deps);

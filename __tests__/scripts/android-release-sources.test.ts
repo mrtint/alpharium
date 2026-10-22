@@ -38,6 +38,8 @@ describe("076 android-release 스크립트 소스 계약", () => {
       "play-upload.ts",
       "verify-signature.mts",
       "verify-signature.ts",
+      "version-check.mts",
+      "version-check.ts",
     ]);
   });
 
@@ -86,5 +88,23 @@ describe("076 android-release 스크립트 소스 계약", () => {
     expect(entry.match(/readFileSync\(/g)).toHaveLength(2);
     expect(entry).toMatch(/readFileSync\(aabPath\)/);
     expect(entry).toMatch(/readFileSync\(notesPath, "utf8"\)/);
+  });
+
+  it("096 번호 점검 진입점은 서비스 계정을 환경변수로만 받고 app.json 하나만 읽는다", () => {
+    const entry = source("version-check.mts");
+    expect(entry).toMatch(/process\.env\.PLAY_SERVICE_ACCOUNT_JSON/);
+    expect(entry).not.toMatch(/option\("(?:service|account|sa|key|json)/);
+    expect(entry.match(/readFileSync\(/g)).toHaveLength(1);
+    expect(entry).toMatch(/readFileSync\(appJsonPath, "utf8"\)/);
+  });
+
+  it("096 조회 함수는 스토어에 쓰지 않는다 — 번들 목록은 GET이고 편집은 커밋하지 않는다", () => {
+    const text = source("play-upload.ts");
+    const start = text.indexOf("export async function listBundleVersionCodes");
+    expect(start).toBeGreaterThan(-1);
+    const body = text.slice(start);
+    expect(body).not.toMatch(/:commit|bundles\.upload|tracks\.update|UPLOAD_API/);
+    expect(body).toMatch(/method: "GET"/);
+    expect(body).toMatch(/edits\.delete/);
   });
 });

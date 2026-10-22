@@ -1,8 +1,8 @@
 # Implementation Plan: iOS e2e 세트 — 안드로이드와 같은 층 1·층 2를 iOS에 갖춘다
 
-**Branch**: `095-ios-e2e-suite` | **Date**: 2026-10-22 | **Spec**: [spec.md](spec.md)
+**Branch**: `097-ios-e2e-suite` | **Date**: 2026-10-22 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/095-ios-e2e-suite/spec.md`. 설계: `docs/superpowers/specs/2026-10-22-ios-e2e-suite-design.md`.
+**Input**: Feature specification from `specs/097-ios-e2e-suite/spec.md`. 설계: `docs/superpowers/specs/2026-10-22-ios-e2e-suite-design.md`.
 
 ## Summary
 
@@ -52,7 +52,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/095-ios-e2e-suite/
+specs/097-ios-e2e-suite/
 ├── plan.md
 ├── research.md
 ├── data-model.md

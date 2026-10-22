@@ -10,9 +10,9 @@ import {
 } from "../../scripts/e2e-sample/ios-device";
 
 /**
- * 095 — iOS 시뮬레이터 표본 장치 (`SampleDevice` 구현). `xcrun`·`sqlite3`는 대역이고 시뮬레이터 데이터 폴더는 임시 폴더다.
+ * 097 — iOS 시뮬레이터 표본 장치 (`SampleDevice` 구현). `xcrun`·`sqlite3`는 대역이고 시뮬레이터 데이터 폴더는 임시 폴더다.
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer1-runner.md (S), research R4 (보관함 초기화로 지운다)
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer1-runner.md (S), research R4 (보관함 초기화로 지운다)
  */
 
 const UDID = "11111111-2222-3333-4444-555555555555";
@@ -44,7 +44,7 @@ function setup(
   return { device, calls, media, root };
 }
 
-describe("iOS 표본 장치 (095)", () => {
+describe("iOS 표본 장치 (097)", () => {
   it("pushDir — 폴더 안의 사진 파일 전부를 simctl addmedia로 심는다 (하위 폴더 포함)", () => {
     const { device, calls } = setup();
     const dir = mkdtempSync(join(tmpdir(), "pocketlog-push-"));

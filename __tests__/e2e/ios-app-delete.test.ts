@@ -7,9 +7,9 @@ import {
 import type { Ctl } from "../../scripts/layer2-ios/device";
 
 /**
- * 095 — 앱 안에서 파일 지우기 (lldb). `devicectl`·`lldb`·시계는 대역이다.
+ * 097 — 앱 안에서 파일 지우기 (lldb). `devicectl`·`lldb`·시계는 대역이다.
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-3, I-1), research R2
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-3, I-1), research R2
  */
 
 const UDID = "00008110-000000000000001E";
@@ -46,7 +46,7 @@ function setup(options: { lldbStdout?: string; processes?: unknown; xcode?: bool
   return { run, calls, scripts };
 }
 
-describe("앱 안에서 파일 지우기 (095)", () => {
+describe("앱 안에서 파일 지우기 (097)", () => {
   it("isDeletable — preferences·diary·vision-cache 아래 파일만 허용한다 (models는 없다)", () => {
     expect(isDeletable("diary/2026-10-21.json")).toBe(true);
     expect(isDeletable("preferences/auto-diary.json")).toBe(true);

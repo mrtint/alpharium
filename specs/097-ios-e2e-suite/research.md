@@ -1,4 +1,4 @@
-# Research: iOS e2e 세트 (095)
+# Research: iOS e2e 세트 (097)
 
 2026-10-22 실측·조사. 값은 이 맥(Xcode 27.1)과 iPhone 14(iOS 27.0.1)에서 본 것이다.
 

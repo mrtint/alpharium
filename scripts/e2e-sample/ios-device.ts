@@ -1,7 +1,7 @@
 /**
- * 095 — iOS 시뮬레이터에서 표본이 기기에 닿는 유일한 자리 (`xcrun simctl`·`sqlite3`·시뮬레이터 데이터 폴더).
+ * 097 — iOS 시뮬레이터에서 표본이 기기에 닿는 유일한 자리 (`xcrun simctl`·`sqlite3`·시뮬레이터 데이터 폴더).
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer1-runner.md (S), research R4
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer1-runner.md (S), research R4
  *
  * 안드로이드 `adbSampleDevice()`(device.ts)의 iOS 짝이다. `ensure.ts`는 `SampleDevice` 모양만 보므로 기기 없이 테스트된다.
  *

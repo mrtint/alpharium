@@ -6,7 +6,7 @@
 **층 1**은 일기를 쓰지 않고 기준 상태(모델 있음·온보딩 완료·자동 쓰기 꺼짐·오늘부터 사흘 쓴 날 픽스처)에서 끝나는 화면 흐름이다. `npm run test:layer1` — 전용 테스트 기기에서만 돈다(이 기기의 일기를 지운다).
 **층 2**는 실제 모델로 일기를 쓰는 스모크다(스펙 073). `npm run test:layer2` — 전용 테스트 기기에서만 돌고, 흐름마다 기준 상태를 다시 만들어 따로 부른다. 릴리스 전 체크리스트는 [layer2-release-checklist.md](layer2-release-checklist.md). 
 
-**iOS 갈래**(스펙 095): **층 1**은 같은 YAML을 iOS **시뮬레이터**에서 돌린다 — `npm run test:layer1:ios`(`IOS_LAYER1_FLOWS`). 안드로이드 전용 동작(뒤로 키·OS 설정 왕복·접근성 트리에서 값이 가려지는 곳)은 흐름 안에서 플랫폼으로 갈랐다(`when: platform`, 보조 흐름 `_system-back`·`_return-from-os-settings`·`_dismiss-logbox`). **층 2**는 Maestro가 iOS 실기기를 구동하지 못해(스파이크: 러너 서명·Xcode 27 배포 목표·iOS 27 미검증, 소유자가 채택하지 않았다) **iPhone 실기기에서 사람이 쓰기를 누르고 스크립트가 준비·단언한다** — `npm run test:layer2:ios`(`scripts/layer2-ios/flows.ts`의 id 넷). 시뮬레이터 통과는 실제 iPhone을 말해 주지 않는다.
+**iOS 갈래**(스펙 097): **층 1**은 같은 YAML을 iOS **시뮬레이터**에서 돌린다 — `npm run test:layer1:ios`(`IOS_LAYER1_FLOWS`). 안드로이드 전용 동작(뒤로 키·OS 설정 왕복·접근성 트리에서 값이 가려지는 곳)은 흐름 안에서 플랫폼으로 갈랐다(`when: platform`, 보조 흐름 `_system-back`·`_return-from-os-settings`·`_dismiss-logbox`). **층 2**는 Maestro가 iOS 실기기를 구동하지 못해(스파이크: 러너 서명·Xcode 27 배포 목표·iOS 27 미검증, 소유자가 채택하지 않았다) **iPhone 실기기에서 사람이 쓰기를 누르고 스크립트가 준비·단언한다** — `npm run test:layer2:ios`(`scripts/layer2-ios/flows.ts`의 id 넷). 시뮬레이터 통과는 실제 iPhone을 말해 주지 않는다.
 
 「계약 테스트가 지킴」은 파일을 열어 **무엇을 단언하는지** 확인한 것만 적었다. jest는 타입을 지우고 네이티브·레이아웃·타이밍이 없으므로(AGENTS 「조용히 실패하는 결함의 계열」) 계약 테스트가 지키는 것은 e2e로 다시 만들지 않는다.
 
@@ -87,7 +87,7 @@
 - **빈 칸**: 쓸 재료·읽기 스크롤·자동 쓰기·완성 알림은 층 1 흐름이 없다. 앞의 둘은 `-e` 변수나 권한 상태가 전제라 층 1 기준 상태와 맞지 않고, 뒤의 둘은 생성·OS가 깨우는 일이다.
 - **스펙 069 FR-022 판단**: 달력·스트립·권한 행·대화상자는 기존 흐름(`dialog-foundation`·`week-strip-swipe`·`diary-home-1d`)과 새 훑기가 이미 본다 — 새 흐름을 더하지 않았다. 남은 빈 칸(쓸 재료·읽기 스크롤·자동 쓰기·완성 알림)은 층 1 기준 상태와 맞지 않아 「사람이 봄」/층 2로 두었다.
 - **중복**: 설정 시각·장소는 `settings-developer-sweep`(열고 취소)과 `settings-time-place`(값이 바뀜)가 겹친다 — 뒤의 것이 토글을 켠 채 끝나 층 1에 못 들어온다.
-- **iOS 갈래의 결정**(095): 옛 iOS 훑기 흐름 셋은 정리했다 — 설정·개발자·진단 훑기 둘은 `settings-developer-sweep`이 iOS에서 같은 범위를 보게 되어 중복이고, `first-run-to-home`은 새 설치 전제(`clearState` + 모델 ~2GB 내려받기)가 층 1 기준 상태와 맞지 않아 보조 `_prepare-simulator`로 바꿨다 — 같은 경로(첫 실행 → 자동 첫 일기)는 층 2 `first-run-auto-diary`가 실제 모델로 본다. 등록하지 않은 흐름은 초록불인데 아무것도 검증하지 않으므로 `.maestro/ios/`에는 보조(`_` 접두)만 둔다(`flow-map.test.ts` M-iOS-3).
-- **iOS에서 접근성 트리가 값을 가리는 곳**(095 실측): 날짜 버튼(큰 날짜 숫자)과 설정·진단 행(값 칸 「N편 · 정상」 등)은 한 접근성 요소로 합쳐져 자식 글자가 트리에 없다 — 화면에는 보인다. 흐름은 골라진 스트립 칸의 글자·행 라벨로 갈음하고, 값 자체는 사람이 본다. 제품의 접근성 라벨을 바꾸는 일은 UX-09(소유자 결정)이며 이 과제의 범위가 아니다.
+- **iOS 갈래의 결정**(097): 옛 iOS 훑기 흐름 셋은 정리했다 — 설정·개발자·진단 훑기 둘은 `settings-developer-sweep`이 iOS에서 같은 범위를 보게 되어 중복이고, `first-run-to-home`은 새 설치 전제(`clearState` + 모델 ~2GB 내려받기)가 층 1 기준 상태와 맞지 않아 보조 `_prepare-simulator`로 바꿨다 — 같은 경로(첫 실행 → 자동 첫 일기)는 층 2 `first-run-auto-diary`가 실제 모델로 본다. 등록하지 않은 흐름은 초록불인데 아무것도 검증하지 않으므로 `.maestro/ios/`에는 보조(`_` 접두)만 둔다(`flow-map.test.ts` M-iOS-3).
+- **iOS에서 접근성 트리가 값을 가리는 곳**(097 실측): 날짜 버튼(큰 날짜 숫자)과 설정·진단 행(값 칸 「N편 · 정상」 등)은 한 접근성 요소로 합쳐져 자식 글자가 트리에 없다 — 화면에는 보인다. 흐름은 골라진 스트립 칸의 글자·행 라벨로 갈음하고, 값 자체는 사람이 본다. 제품의 접근성 라벨을 바꾸는 일은 UX-09(소유자 결정)이며 이 과제의 범위가 아니다.
 - **iOS 시뮬레이터 키체인 오류**: 시뮬레이터 빌드는 `expo-notifications`가 매 실행 `ERR_NOTIFICATIONS_KEYCHAIN_ACCESS`를 내 개발 클라이언트가 LogBox 토스트를 하단 쓰기 바 위에 띄운다 — `_dismiss-logbox`가 `launchApp` 뒤에 닫는다. 실기기에서는 나지 않는다.
 - **실행기 버그 하나를 고쳤다**: JUnit 보고서에서 실패한 흐름을 가리는 정규식이 통과한 흐름을 실패로 보고했다(`dialog-foundation`이 통과했는데 실패 목록에 올랐다). 자기 닫힘 `<testcase/>`를 건너뛰도록 고쳤다(`scripts/layer1/junit.ts`, 같은 규칙을 `run-device-tests.mjs`에도 넣었다).

@@ -25,7 +25,7 @@ export type Outcome<T = undefined> =
   | { ok: true; value: T }
   | { ok: false; detail: string };
 
-/** 건너뜀·중단 이유에 쓰는 플랫폼 문구 — 없으면 안드로이드 문구다(095: 두 플랫폼이 같은 실행기를 쓴다) */
+/** 건너뜀·중단 이유에 쓰는 플랫폼 문구 — 없으면 안드로이드 문구다(097: 두 플랫폼이 같은 실행기를 쓴다) */
 export type DeviceLabels = {
   /** 기기 도구(adb·simctl)를 못 찾았다 */
   toolMissing: string;

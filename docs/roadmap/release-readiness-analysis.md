@@ -33,7 +33,7 @@
 
 **새로 찾은 것** (처음 판에 없었다)
 
-- **App Store 4.2.3(ii)**: 첫 실행에 추가 자원을 받아야 하면 받을 크기를 알리고 먼저 물어야 한다 [문서]. 그런데 표준 동의 화면은 받을 양을 보이지 않는다 [코드: `src/i18n/catalogs/ko/download.ts:9-13`]. 045 FR-003에서 일부러 그렇게 정했다. 받을 양은 모바일 데이터일 때만 보인다(074).
+- **App Store 4.2.3(ii)**: 첫 실행에 추가 자원을 받아야 하면 받을 크기를 알리고 먼저 물어야 한다 [문서]. 그런데 표준 동의 화면은 받을 양을 보이지 않는다 [코드: `src/i18n/catalogs/ko/download.ts:9-13`]. 045 FR-003에서 일부러 그렇게 정했다. 받을 양은 모바일 데이터일 때만 보인다(074). → **095로 해결(2026-10-21)** — 표준 동의에도 받을 양을 싣는다.
 - **iOS 모델 2GB가 iCloud 백업 대상 자리에 있다.** 모델은 `Paths.document` 아래에 있고 [코드: `src/models/expo-port.ts:104`], 이 경로는 iOS의 `NSDocumentDirectory`다 [문서: expo-file-system `Paths.ts`]. `expo-file-system` 57에는 백업 제외 API가 없다 [코드: `node_modules/expo-file-system`에서 backup 0건].
 - **Android `allowBackup="true"`에 백업 규칙이 없다** [코드: 생성된 `android/app/src/main/AndroidManifest.xml:21`]. Auto Backup 한도는 앱당 25MB다 [문서: developer.android.com autobackup]. 모델이 같은 `files/` 아래에 있어 한도를 넘는다. 넘었을 때 일기가 백업되는지는 공식 문서에서 찾지 못했다 [미확인].
 - **완성 알림이 앱이 만든 채널로 가지 않는다.** `diary-completed` 채널은 만들지만 [코드: `src/schedule/notification-port.ts:62`], 알림을 보낼 때 `trigger: null`을 쓴다 [코드: 같은 파일 `:96`]. `null`이면 Expo가 기본 채널로 보낸다 [문서: expo-notifications `channelId`]. 특정 채널로 즉시 보내려면 `trigger: { channelId }`(`ChannelAwareTriggerInput`)를 써야 한다 [코드: `node_modules/expo-notifications/build/Notifications.types.d.ts:233`]. 062에서 실기기가 「Miscellaneous」 채널로 게시한 관측과 맞는다 [실측: AGENTS 062].
@@ -90,7 +90,7 @@
 
 | ID | 할 일 | 근거 | 선행 |
 | --- | --- | --- | --- |
-| **C1** | 표준 동의 화면에 받을 양을 보인다 | App Store 4.2.3(ii) [문서]. 045 FR-003의 「표준 동의에는 용량을 노출하지 않는다」를 뒤집어야 한다 | 소유자 승인 (045 결정 번복) |
+| **C1** | 표준 동의 화면에 받을 양을 보인다 — **095로 완료**(실기기 확인 남음) | App Store 4.2.3(ii) [문서]. 045 FR-003의 「표준 동의에는 용량을 노출하지 않는다」를 뒤집어야 한다 | 소유자 승인 (045 결정 번복) — 2026-10-21 승인 |
 | **C2** | 완성 알림을 `trigger: { channelId: "diary-completed" }`로 보낸다 | 0장 「새로 찾은 것」 [코드·문서]. 지금은 사용자가 끌 수 없는 기본 채널이 생긴다 [문서: 「Default 채널은 지우지 못할 수 있다」] | 없음 |
 | **C3** | iOS 모델을 iCloud 백업에서 뺀다(백업 제외 속성 또는 자리 옮김) | 모델 2GB가 `NSDocumentDirectory`에 있다 [코드·문서]. Apple 심사 지침의 「제출 전」 목록에 「iCloud 백업용 데이터 최적화」 문서가 있다 [문서] | 통로 조사(expo-file-system에 API 없음 → 설정 플러그인이나 네이티브 코드) |
 | **C4** | Android 백업 규칙(`dataExtractionRules`·`fullBackupContent`)으로 모델을 빼고 일기를 어떻게 할지 정한다 | `allowBackup="true"`, 규칙 없음 [코드] | D4, M5 |

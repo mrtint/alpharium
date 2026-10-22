@@ -5,9 +5,9 @@ import { join } from "node:path";
 import { iosSimulatorDevice, type Exec } from "../../scripts/layer1/ios-simulator-device";
 
 /**
- * 095 — iOS 시뮬레이터 장치 (`Layer1Device` 구현). `xcrun`·`maestro`는 대역이고 컨테이너는 임시 폴더다.
+ * 097 — iOS 시뮬레이터 장치 (`Layer1Device` 구현). `xcrun`·`maestro`는 대역이고 컨테이너는 임시 폴더다.
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer1-runner.md (L1·L2, I-1)
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer1-runner.md (L1·L2, I-1)
  */
 
 const UDID = "11111111-2222-3333-4444-555555555555";
@@ -47,7 +47,7 @@ function fixture(options: { containers?: string[]; list?: string; app?: boolean 
   return { device, calls, containers };
 }
 
-describe("iOS 시뮬레이터 장치 (095)", () => {
+describe("iOS 시뮬레이터 장치 (097)", () => {
   it("listDevices — 부팅된 iOS 시뮬레이터만 준다 (watchOS 제외)", () => {
     expect(fixture().device.listDevices()).toEqual([UDID]);
   });

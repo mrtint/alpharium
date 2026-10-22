@@ -1,7 +1,7 @@
 /**
- * 095 — iOS 시뮬레이터가 층 1에 닿는 유일한 자리 (`xcrun simctl`·`maestro`·호스트 파일).
+ * 097 — iOS 시뮬레이터가 층 1에 닿는 유일한 자리 (`xcrun simctl`·`maestro`·호스트 파일).
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer1-runner.md (L1·L2, I-1)
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer1-runner.md (L1·L2, I-1)
  *
  * 안드로이드 `adbDevice()`(device.ts)의 iOS 짝이다. 시뮬레이터의 앱 컨테이너는 호스트 파일 시스템에 있으므로
  * `get_app_container … data`가 준 경로의 `Documents/`를 직접 읽고 쓴다. **컨테이너 위치는 호출마다 다시 찾는다** — 재설치마다 바뀐다(066).

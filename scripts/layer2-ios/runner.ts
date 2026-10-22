@@ -1,7 +1,7 @@
 /**
- * 095 — iOS 층 2 실행: 흐름마다 기준 상태를 다시 만들고, 사람이 눌러야 할 것을 안내하고, 일기 파일이 생기는지 본다.
+ * 097 — iOS 층 2 실행: 흐름마다 기준 상태를 다시 만들고, 사람이 눌러야 할 것을 안내하고, 일기 파일이 생기는지 본다.
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-0~L2-8, I-1), data-model 「상태 전이」
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-0~L2-8, I-1), data-model 「상태 전이」
  *
  * Maestro가 없다(실기기를 구동하지 못한다 — research R1). 그래서 안드로이드 `runLayer2`(073)를 일반화하지 않고 따로 둔다 — 기준 상태 만들기
  * (`prepareBaseline`)만 재사용한다. **일기 본문을 읽거나 점수화하지 않는다**(원칙 IV): 일기 파일이 생겼는가, 정상 형식(JSON·날짜 일치·본문이 빈 문자열이

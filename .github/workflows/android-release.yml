@@ -13,7 +13,8 @@ name: Pocketlog Android Release
 #   - 캐시를 쓰지 않는다(actions/cache도 setup-node의 cache도). 서명 키가 열린 빌드에서 캐시 복원은 오염 경로다(072의 gradle 캐시도 여기서는 쓰지 않는다).
 #   - 마지막 정리 단계는 성공·실패와 무관하게 키스토어 파일과 AAB를 지운다.
 #
-# android.versionCode 올림은 사람이 커밋한다(CI는 올리지 않는다). 같은 번호는 Play가 거부하며 그 실패를 숨기지 않는다.
+# android.versionCode 올림은 사람이 커밋한다(CI는 올리지 않는다). 같은 번호는 Play가 거부하므로 「번호 점검」 단계가 긴 빌드 전에
+# Play의 번들 번호를 읽어(읽기 전용, 096) 이번 번호가 마지막보다 크지 않으면 이미 있는 번호를 밝히며 실패한다. 읽지 못해도 실패한다.
 # 서명 설정은 plugins/with-release-signing.js가 선언한다 — 이 파일은 android/ 를 고치지 않고 키스토어 파일과 비밀번호
 # 환경변수만 준다. 서명 키가 debug 키이거나 저장소의 기대 지문과 다르면 업로드 전에 실패한다.
 on:
@@ -76,7 +77,6 @@ jobs:
             fi
           done
           exit "$failed"
-      # 같은 versionCode의 중복 업로드는 로컬에서 알 수 없어 점검하지 않는다(Play가 거부한다).
       # 기대 지문 파일이 없으면 서명 확인이 반드시 실패하므로 여기서 먼저 알린다. 비밀이 env에 없는 단계다.
       - name: 설정 점검
         run: |
@@ -92,6 +92,20 @@ jobs:
           # 릴리스 노트(release-notes/ko.txt)가 비었거나 500자를 넘으면 긴 빌드 전에 끝낸다. Play 「출시 노하우」로 간다.
           node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/release-notes/check.mts --store play || failed=1
           exit "$failed"
+      # 096 — 이번 versionCode가 Play의 마지막 번호보다 큰지 긴 빌드 전에 본다. 읽기 전용이다(편집은 열었다가 버린다).
+      # npm ci 앞이라 의존성 설치 스크립트가 서비스 계정을 보지 못한다 — 스크립트는 Node 내장만 쓰는 저장소 코드 하나다.
+      # 값은 찍지 않고, 통과하면 번호와 커밋의 대응 한 줄을 요약에 남긴다. 못 읽으면(권한·네트워크) 건너뛰지 않고 실패한다.
+      - name: 번호 점검
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          line=$(node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/android-release/version-check.mts \
+            --app-json app.json --package com.a810labs.pocketlog --commit "$GITHUB_SHA")
+          {
+            echo
+            echo "### 번호 점검"
+            echo "- $line"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
       - run: npm ci
       - name: expo prebuild
         run: |

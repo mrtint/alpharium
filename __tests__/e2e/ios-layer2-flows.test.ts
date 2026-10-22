@@ -2,14 +2,14 @@ import { LAYER2_FLOWS as ANDROID_FLOWS } from "../../scripts/layer2/flows";
 import { IOS_LAYER2_FLOWS } from "../../scripts/layer2-ios/flows";
 
 /**
- * 095 — iOS 층 2 흐름 표. 안드로이드 `LAYER2_FLOWS`와 출발 상태·쓴 날·이야기가 같고, 사람이 눌러야 하는 것만 더한다.
+ * 097 — iOS 층 2 흐름 표. 안드로이드 `LAYER2_FLOWS`와 출발 상태·쓴 날·이야기가 같고, 사람이 눌러야 하는 것만 더한다.
  *
- * 계약: specs/095-ios-e2e-suite/data-model.md 「Layer2IosFlow」
+ * 계약: specs/097-ios-e2e-suite/data-model.md 「Layer2IosFlow」
  */
 
 const NOW = new Date(2026, 9, 22, 14, 30);
 
-describe("iOS 층 2 흐름 표 (095)", () => {
+describe("iOS 층 2 흐름 표 (097)", () => {
   it("흐름 id 넷이 순서대로 있다", () => {
     expect(IOS_LAYER2_FLOWS.map((f) => f.id)).toEqual([
       "write-and-read",

@@ -162,7 +162,7 @@ describe("기능→흐름 대응표 (069)", () => {
     it("V7 — 인벤토리의 층 2 ○를 —로 바꾸면 M-3", () => {
       const line =
         DOC.split("\n").find((l) => l.startsWith("| `.maestro/layer2-write-and-read.yml`")) ?? "";
-      // 마지막 칸은 095의 iOS 층 1 열이고, 그 앞이 층 2 열이다
+      // 마지막 칸은 097의 iOS 층 1 열이고, 그 앞이 층 2 열이다
       expect(line).toMatch(/\| ○ \| — \|\s*$/);
       const problems = mutate(line, line.replace(/\| ○ \| — \|\s*$/, "| — | — |"));
       expect(problems.some((p) => p.startsWith("M-3"))).toBe(true);
@@ -191,7 +191,7 @@ describe("기능→흐름 대응표 (069)", () => {
       expect(problems.some((p) => p.startsWith("M-12"))).toBe(true);
     });
 
-    // 095 — iOS 열
+    // 097 — iOS 열
     it("V-iOS-1 — 인벤토리의 iOS ○를 지우면 M-iOS-2", () => {
       const line =
         DOC.split("\n").find((l) => l.startsWith("| `.maestro/week-strip-swipe.yml`")) ?? "";

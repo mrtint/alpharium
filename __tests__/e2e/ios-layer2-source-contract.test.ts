@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * 095 — iOS 층 2 소스 계약 (I-1).
+ * 097 — iOS 층 2 소스 계약 (I-1).
  *
  * 앱 삭제·재설치·모델 폴더 변경이 iPhone 장치·실행기에 들어오는 것을 소스를 읽어 막는다. 주석을 먼저 걷는다.
  */
@@ -10,7 +10,7 @@ import { join } from "node:path";
 const strip = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 const read = (...parts: string[]) => strip(readFileSync(join(process.cwd(), ...parts), "utf8"));
 
-describe("iOS 층 2 소스 계약 (095)", () => {
+describe("iOS 층 2 소스 계약 (097)", () => {
   const device = read("scripts", "layer2-ios", "device.ts");
   const runner = read("scripts", "layer2-ios", "runner.ts");
   const appDelete = read("scripts", "layer2-ios", "app-delete.ts");

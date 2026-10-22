@@ -1,7 +1,7 @@
 /**
- * 095 — iPhone 실기기가 층 2에 닿는 유일한 자리 (`xcrun devicectl`).
+ * 097 — iPhone 실기기가 층 2에 닿는 유일한 자리 (`xcrun devicectl`).
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-1·L2-3, I-1), data-model 「IosDeviceTarget」
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-1·L2-3, I-1), data-model 「IosDeviceTarget」
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **`devicectl device copy to`에 `--remove-existing-content`를 쓰지 않는다.** 그 옵션은 대상 디렉터리의 **부모**를 통째로 비운다 — 실측(임시 영역과

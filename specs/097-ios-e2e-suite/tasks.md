@@ -1,6 +1,6 @@
 # Tasks: iOS e2e 세트 — 안드로이드와 같은 층 1·층 2를 iOS에 갖춘다
 
-**Input**: `specs/095-ios-e2e-suite/` — [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
+**Input**: `specs/097-ios-e2e-suite/` — [spec.md](spec.md), [plan.md](plan.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
 
 **Tests**: 이 프로젝트는 계약을 먼저 정하고 테스트를 먼저 쓴다(헌법 「개발 방식」, AGENTS). 테스트 태스크는 구현 태스크보다 앞선다. 기기 없는 jest(`logic`)는 포트를 대역으로 주입한다. `.ts`는 `npx jest <경로> --selectProjects logic`.
 
@@ -10,7 +10,7 @@
 
 ## Phase 1: Setup — 계획이 남긴 실측 (기기 확인, 코드 변경 없음)
 
-- [x] T001 시뮬레이터 하나(iPhone 18 Pro `7D4BB86B-…`)를 부팅해 dev 클라이언트가 깔려 있고 `get_app_container … data`가 `Documents/`를 주는지, Metro가 dev 환경(`.env.development.local`)으로 번들하는지 확인하고 결과를 `specs/095-ios-e2e-suite/research.md`에 한 줄 덧붙인다
+- [x] T001 시뮬레이터 하나(iPhone 18 Pro `7D4BB86B-…`)를 부팅해 dev 클라이언트가 깔려 있고 `get_app_container … data`가 `Documents/`를 주는지, Metro가 dev 환경(`.env.development.local`)으로 번들하는지 확인하고 결과를 `specs/097-ios-e2e-suite/research.md`에 한 줄 덧붙인다
 - [x] T002 [P] R5 실측 — 시뮬레이터 `Documents/models/`를 채우는 방법(앱 첫 실행 내려받기 vs 호스트 사본 복사)을 하나 골라 실제로 `a1.bin`·`v1.bin`·`v2.bin`(+`state.json`)을 두고, 걸린 시간과 방법을 `research.md` R5에 확정으로 적는다 (가짜 파일 금지 — 042)
 - [x] T003 [P] R4 실측 — 시뮬레이터 사진 DB(`…/data/Media/PhotoData/Photos.sqlite`)에서 `simctl addmedia`로 심은 사진의 이름·촬영 시각을 `sqlite3` 읽기 전용으로 질의할 수 있는지, EXIF 촬영 시각이 반영되는지 시험(연습 사진 1장)하고 테이블·열 이름을 `research.md` R4에 확정으로 적는다
 - [x] T004 [P] R7 실측 — `xcrun devicectl device info files … --json-output -`의 JSON 모양(경로·디렉터리 구분 필드)을 iPhone에서 한 번 받아 `__tests__/e2e/fixtures/devicectl-info-files.json`에 저장(개인 경로 제외)하고, `devicectl device process launch --console`로 앱 출력에서 쓰기 진행을 볼 수 있는지 시험해 결과를 `research.md` R7에 적는다
@@ -49,7 +49,7 @@
 - [x] T017 [P] [US1] 위와 같이 `.maestro/dialog-foundation.yml`(50행)·`.maestro/diary-home-1d.yml`(84행)·`.maestro/today-diary.yml`(111행)
 - [x] T018 [P] [US1] 위와 같이 `.maestro/state-simulation.yml`(42·43·73·74행)
 - [x] T019 [US1] 위와 같이 `.maestro/settings-developer-sweep.yml`(94·107·119·131행의 `back` + OS 설정 왕복 부분은 `.maestro/ios/settings-sweep.yml`이 이미 푼 방식 재사용: `launchApp stopApp: false` + `_dismiss-open-prompt`)
-- [x] T020 [US1] `.maestro/ios/` 정리(FR-006, 결정): `settings-sweep.yml`·`developer-diagnostics-sweep.yml`은 T019로 `settings-developer-sweep.yml`이 iOS에서 같은 범위를 보므로 삭제하고, `first-run-to-home.yml`은 새 설치 전제(`clearState`)에 모델 ~2GB 내려받기가 걸려 층 1 기준 상태와 맞지 않고 같은 경로를 층 2 `first-run-auto-diary`가 실제 모델로 보므로 검증 흐름에서는 뺀다 — 단 시뮬레이터에 모델을 처음 받는 준비 도구로는 쓸모가 있어(research R5) 보조 `.maestro/ios/_prepare-simulator.yml`로 이름을 바꿔 남긴다(작명 제출은 키보드가 버튼을 가려 `pressKey: Enter`로 바꿨다 — 095 실측). 보조 `_dismiss-open-prompt.yml`도 남긴다. 사유를 `docs/e2e/feature-flow-map.md` 인벤토리에 적는다
+- [x] T020 [US1] `.maestro/ios/` 정리(FR-006, 결정): `settings-sweep.yml`·`developer-diagnostics-sweep.yml`은 T019로 `settings-developer-sweep.yml`이 iOS에서 같은 범위를 보므로 삭제하고, `first-run-to-home.yml`은 새 설치 전제(`clearState`)에 모델 ~2GB 내려받기가 걸려 층 1 기준 상태와 맞지 않고 같은 경로를 층 2 `first-run-auto-diary`가 실제 모델로 보므로 검증 흐름에서는 뺀다 — 단 시뮬레이터에 모델을 처음 받는 준비 도구로는 쓸모가 있어(research R5) 보조 `.maestro/ios/_prepare-simulator.yml`로 이름을 바꿔 남긴다(작명 제출은 키보드가 버튼을 가려 `pressKey: Enter`로 바꿨다 — 097 실측). 보조 `_dismiss-open-prompt.yml`도 남긴다. 사유를 `docs/e2e/feature-flow-map.md` 인벤토리에 적는다
 - [x] T021 [US1] 시뮬레이터에서 `npm run test:layer1:ios`를 돌려 모든 흐름이 통과할 때까지 흐름/실행기를 고친다(모델 없는 상태에서 닿는 화면 범위·소요 시간 메모, `--no-reinstall-driver` 효과 포함). `PASSED` 출력 확보 — SC-001
 - [x] T022 [US1] 위반 주입(quickstart A5·A6): (a) 흐름 하나의 기대 id를 치환했음을 단언한 뒤 실행해 `FAILED`와 흐름 이름이 나오는지 확인하고 되돌린다, (b) 실행 뒤 시뮬레이터 `Documents/diary/`가 픽스처 사흘뿐인지 확인한다 — SC-003
 
@@ -112,7 +112,7 @@
 - [x] T045 제품 코드 무변경 확인(FR-008): `git diff --stat main -- src/ app.json plugins/ modules/`가 비어 있음을 확인한다
 - [x] T046 위반 주입(FR-019): (a) `scripts/layer1/ios-simulator-device.ts`에 `uninstall` 문자열을 넣어(치환이 적용됐는지 먼저 단언) `ios-layer1-source-contract.test.ts`가 실패하는지, (b) `scripts/layer2-ios/device.ts`에서 `models`를 `--remove-existing-content` 대상에 넣어 `ios-layer2-source-contract.test.ts`가 실패하는지, (c) `scripts/layer2-ios/runner.ts`가 일기 본문을 읽는 코드를 넣어 T026(g)가 실패하는지 확인하고 모두 되돌린다
 - [x] T047 `npm test`와 `npm run lint`를 실제로 실행해 통과를 확인한다 (SC-007)
-- [x] T048 `specs/095-ios-e2e-suite/quickstart.md`의 명령·기대 문구를 실제 구현과 맞추고 quickstart를 처음부터 한 번 따라 해 본다
+- [x] T048 `specs/097-ios-e2e-suite/quickstart.md`의 명령·기대 문구를 실제 구현과 맞추고 quickstart를 처음부터 한 번 따라 해 본다
 - [x] T049 `docs/roadmap/README.md`의 「주요 기능별 e2e 테스트」 항목 본문(배경·할 일 1·2·3·완료 조건·위험)에서 「iOS 시뮬레이터 갈래」·「층 2의 iOS 갈래」 서술을 실제 결정(층 1 시뮬레이터, 층 2 iPhone 14 실기기 + 사람 조작, Maestro 실기기 구동 미채택과 이유)에 맞게 고친다 — 낡은 서술은 덧대지 않고 고친다(FR-018). 실제 이력 이동은 kickoff 완료 처리 단계에서 한다
 
 ---

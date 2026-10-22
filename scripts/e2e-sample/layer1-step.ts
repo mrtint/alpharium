@@ -12,7 +12,7 @@ import { realSampleFs } from "./fs-port.ts";
 import { probeEnv } from "./plan.ts";
 
 /**
- * `device`는 기본이 안드로이드다. 095: iOS 시뮬레이터는 `iosSampleDevice()`와 권한 부여(`beforeEnsure`)를 넘긴다.
+ * `device`는 기본이 안드로이드다. 097: iOS 시뮬레이터는 `iosSampleDevice()`와 권한 부여(`beforeEnsure`)를 넘긴다.
  * `beforeEnsure`가 실패하면 표본을 심지 않고 실패로 돌려준다.
  */
 export function realSampleStep(

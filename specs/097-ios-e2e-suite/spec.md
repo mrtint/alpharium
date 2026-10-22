@@ -1,6 +1,6 @@
 # Feature Specification: iOS e2e 세트 — 안드로이드와 같은 층 1·층 2를 iOS에 갖춘다
 
-**Feature Branch**: `095-ios-e2e-suite`
+**Feature Branch**: `097-ios-e2e-suite`
 **Created**: 2026-10-22
 **Status**: Draft
 **Input**: 설계 문서 `docs/superpowers/specs/2026-10-22-ios-e2e-suite-design.md`. 안드로이드와 같은 e2e 세트를 iOS에 갖춘다 — 층 1은 iOS 시뮬레이터, 층 2는 iPhone 14 실기기(사람이 쓰기를 탭하고 스크립트가 준비하고 상태를 단언한다). 소유자 결정(2026-10-22): 실기기 구동 도구는 채택하지 않는다. 선행 068·069·070·073·084·087.

@@ -6,9 +6,9 @@ import { iosSimulatorDevice, type Exec } from "../../scripts/layer1/ios-simulato
 import { runLayer1 } from "../../scripts/layer1/runner";
 
 /**
- * 095 — iOS 층 1: 실제 `iosSimulatorDevice`(임시 컨테이너)를 `runLayer1`에 꽂아 단계와 보고를 본다.
+ * 097 — iOS 층 1: 실제 `iosSimulatorDevice`(임시 컨테이너)를 `runLayer1`에 꽂아 단계와 보고를 본다.
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer1-runner.md (L1~L7, I-1)
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer1-runner.md (L1~L7, I-1)
  */
 
 const UDID = "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE";
@@ -58,7 +58,7 @@ function setup(
   return { result, lines, docs, maestroCalls };
 }
 
-describe("iOS 층 1 실행기 (095)", () => {
+describe("iOS 층 1 실행기 (097)", () => {
   it("시뮬레이터가 없으면 skipped이고 iOS 문구로 이유를 말한다", () => {
     const { result } = setup({ udids: [] });
     expect(result.status).toBe("skipped");

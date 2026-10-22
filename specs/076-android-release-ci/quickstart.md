@@ -33,7 +33,7 @@ npm test && npm run lint
 ## 3. 실제 실행 (원칙 V — 건너뛰면 통과가 아니다)
 
 0. **구현 PR(워크플로 포함)이 먼저 `main`에 머지되어 있어야 한다** — 워크플로가 기본 브랜치에 있어야 Run workflow가 보이고 보호 환경이 `main`만 허용한다.
-1. `app.json`의 `android.versionCode`를 올려 커밋하고 `main`에 머지한다(Play에 이미 있는 번호는 거부된다).
+1. `app.json`의 `android.versionCode`를 올려 커밋하고 `main`에 머지한다(Play에 이미 있는 번호는 096의 「번호 점검」이 빌드 전에 막는다).
 2. Actions > 「Pocketlog Android Release」 > Run workflow (`main`) → 소유자가 승인한다.
 3. 실행 요약에서 단계별 시간·러너 사양·최대 메모리·서명 소유자와 지문을 읽어 아래 「실측 기록」에 옮긴다. **첫 실행은 실패할 수 있다고 가정한다** — 결과를 직접 보기 전에 성공이라고 말하지 않는다.
 4. **서명**: 요약의 지문이 `upload-key.sha256`과 같고 소유자가 `CN=Android Debug`가 아니다(워크플로가 이미 강제하지만 눈으로도 본다).

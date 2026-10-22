@@ -1,4 +1,4 @@
-# Quickstart: iOS e2e 세트 (095)
+# Quickstart: iOS e2e 세트 (097)
 
 이 기능을 확인하는 절차다. 명령은 구현된 그대로다. 근거·실측은 [research.md](research.md), 계약은 [contracts/](contracts/).
 

@@ -178,7 +178,7 @@ describe("층 1 실행기 (069)", () => {
     expect(result.reason).toContain("알 수 없음");
   });
 
-  // 095 — 두 플랫폼이 같은 실행기를 쓴다. 안드로이드 문구는 바이트 그대로이고, iOS 장치는 자기 문구를 준다.
+  // 097 — 두 플랫폼이 같은 실행기를 쓴다. 안드로이드 문구는 바이트 그대로이고, iOS 장치는 자기 문구를 준다.
   it("R13 — 장치 문구가 없으면 안드로이드 문구 그대로다 (회귀 0)", () => {
     expect(run({ devices: null }).result.reason).toBe("adb를 찾지 못했다");
     expect(run({ devices: [] }).result.reason).toBe("연결된 안드로이드 기기가 없다");

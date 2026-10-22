@@ -11,6 +11,7 @@ import { renderWithPortal } from "./render-with-portal";
  * 074 — 첫 실행 동의 단계의 조립: 연결 종류에 따라 표준 동의 / 모바일 동의 / 대기 화면.
  *
  * 계약: specs/074-wifi-download-consent/contracts/consent-gate.md CG11~CG17, spec FR-001~FR-008·SC-001~SC-003a
+ *       specs/095-download-size-notice/contracts/consent-size.md DS10 — 표준 동의에도 받을 양을 싣는다(074 CG11 대체)
  *
  * `App.tsx`는 jest에서 완전히 렌더하기 어려워(AppFrame.firstrun.test.tsx) 이 조립을 별도 화면으로 떼어 실제로 그린다.
  * `onConfirm`은 `App.tsx`의 `onConfirmDownloadConsent`(동의 저장 → 다운로드 시작)이므로, 이 콜백이 불리지 않았다 =
@@ -37,21 +38,38 @@ const ui = (p: ReturnType<typeof setup>) => (
   />
 );
 
-describe("표준 갈래 (FR-002, CG11) — wifi·other·unknown", () => {
+describe("표준 갈래 (074 FR-002, 095 DS10) — wifi·other·unknown", () => {
   it.each(["wifi", "other", "unknown"] as const)(
-    "%s이면 지금과 같은 [받을게요] 하나뿐이다",
+    "%s이면 [받을게요] 하나에 받을 양이 실린다",
     async (c) => {
-      const p = setup(c);
+      const p = setup(c, "2.0GB");
       await renderWithPortal(ui(p));
       await screen.findByTestId("download-consent-confirm");
       expect(screen.getByText("받을게요")).toBeTruthy();
       expect(screen.queryByTestId("download-consent-defer")).toBeNull();
-      expect(screen.queryByText(/GB|MB|모바일/)).toBeNull();
-      expect(p.readSizeLabel).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("cellular-consent-dialog")).toBeNull();
+      expect(screen.getByText(/모델을 약 2\.0GB 내려받아야 해요/)).toBeTruthy();
+      expect(screen.queryByText(/모바일/)).toBeNull();
+      expect(p.readSizeLabel).toHaveBeenCalledTimes(1);
       await fireEvent.press(screen.getByTestId("download-consent-confirm"));
       expect(p.onConfirm).toHaveBeenCalledTimes(1);
     },
   );
+
+  it("DS5 — 받을 양 읽기가 거부되면 숫자 없는 원래 문장이다(지어내지 않는다)", async () => {
+    const p = setup("wifi");
+    p.readSizeLabel.mockImplementation(async () => {
+      throw new Error("읽기 실패");
+    });
+    await renderWithPortal(ui(p));
+    await screen.findByTestId("download-consent-confirm");
+    expect(
+      screen.getByText(
+        "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText(/GB|MB|약 /)).toBeNull();
+  });
 });
 
 describe("모바일 갈래 (FR-001·FR-003·FR-004·FR-005)", () => {

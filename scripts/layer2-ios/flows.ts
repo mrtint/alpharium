@@ -1,7 +1,7 @@
 /**
- * 095 — iOS 층 2 흐름 표 (사람이 못 박은 상수).
+ * 097 — iOS 층 2 흐름 표 (사람이 못 박은 상수).
  *
- * 계약: specs/095-ios-e2e-suite/data-model.md 「Layer2IosFlow」, contracts/ios-layer2-runner.md
+ * 계약: specs/097-ios-e2e-suite/data-model.md 「Layer2IosFlow」, contracts/ios-layer2-runner.md
  *
  * 출발 상태·쓴 날·이야기는 안드로이드 층 2(`scripts/layer2/flows.ts`)와 같은 값이라 **그것을 다시 쓴다**(복제하지 않는다) —
  * 같은 기능을 두 플랫폼에서 같은 전제로 본다. 여기서 더하는 것은 Maestro가 없는 대신 사람이 해야 할 조작(`humanSteps`)과 사진 심기 여부다.

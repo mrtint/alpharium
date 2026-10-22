@@ -4,7 +4,7 @@
  */
 
 import { generateKeyPairSync, verify } from "node:crypto";
-import { uploadBundle } from "../../scripts/android-release/play-upload.ts";
+import { listBundleVersionCodes, uploadBundle } from "../../scripts/android-release/play-upload.ts";
 
 const PKG = "com.a810labs.pocketlog";
 const BASE = `https://androidpublisher.googleapis.com/androidpublisher/v3/applications/${PKG}`;
@@ -302,5 +302,123 @@ describe("076 Play 업로드", () => {
       expect(e2.message).toBe("네트워크 오류 bundles.upload");
       expect(e2.message).not.toContain(TOKENISH);
     });
+  });
+});
+
+describe("096 Play 번들 번호 조회 (listBundleVersionCodes)", () => {
+  const LIST = `${BASE}/edits/EDIT1/bundles`;
+
+  function lookup(override?: Responder) {
+    const { fakeFetch, calls } = makeFetch((call) => {
+      const custom = override?.(call);
+      if (custom) return custom;
+      if (call.url === LIST) return json({ bundles: [{ versionCode: 9 }, { versionCode: 12 }] });
+      return undefined;
+    });
+    const result = () =>
+      listBundleVersionCodes({
+        deps: { fetch: fakeFetch, now: () => NOW },
+        serviceAccountJson: SERVICE_ACCOUNT,
+        packageName: PKG,
+      });
+    return { calls, result };
+  }
+
+  it("P5 토큰 → insert → 번들 목록 → 편집 삭제 순서로 부르고 번호를 돌려준다", async () => {
+    const { calls, result } = lookup();
+    await expect(result()).resolves.toEqual([9, 12]);
+    expect(calls.map((c) => `${c.method} ${c.url}`)).toEqual([
+      "POST https://oauth2.googleapis.com/token",
+      `POST ${BASE}/edits`,
+      `GET ${LIST}`,
+      `DELETE ${BASE}/edits/EDIT1`,
+    ]);
+    expect(calls[2].headers.Authorization).toBe("Bearer ya29.TOKEN-VALUE");
+  });
+
+  it("P5 읽기 전용이다 — 업로드·트랙·commit을 부르지 않는다", async () => {
+    const { calls, result } = lookup();
+    await result();
+    for (const call of calls) {
+      expect(call.url).not.toMatch(/upload\/androidpublisher|\/tracks\/|:commit/);
+    }
+  });
+
+  it("목록 조회가 성공하면 편집 삭제가 실패해도 번호를 그대로 돌려준다", async () => {
+    const { calls, result } = lookup((c) =>
+      c.method === "DELETE" ? json({ error: { message: "삭제 실패" } }, 500) : undefined,
+    );
+    await expect(result()).resolves.toEqual([9, 12]);
+    expect(calls.at(-1)).toMatchObject({ method: "DELETE" });
+  });
+
+  it("P7 bundles 키가 없으면(번들이 없는 앱) 빈 배열이고 편집은 버린다", async () => {
+    const { calls, result } = lookup((c) => (c.url === LIST ? json({}) : undefined));
+    await expect(result()).resolves.toEqual([]);
+    expect(calls.at(-1)).toMatchObject({ method: "DELETE" });
+  });
+
+  it("P7 bundles가 배열이 아니거나 versionCode가 정수가 아니면 실패한다", async () => {
+    for (const body of [
+      { bundles: "x" },
+      { bundles: [{ versionCode: "12" }] },
+      { bundles: [{ versionCode: 1.5 }] },
+      { bundles: [{}] },
+    ]) {
+      const { calls, result } = lookup((c) => (c.url === LIST ? json(body) : undefined));
+      await expect(result()).rejects.toThrow("HTTP 200 bundles.list: 응답 형식이 다르다");
+      expect(calls.at(-1)).toMatchObject({ method: "DELETE" });
+    }
+  });
+
+  it("P6 목록 조회가 실패해도 편집을 버리고 원래 오류를 던진다 (삭제 실패는 삼킨다)", async () => {
+    const { calls, result } = lookup((c) => {
+      if (c.url === LIST) return json({ error: { message: "boom" } }, 500);
+      if (c.method === "DELETE") return json({ error: { message: "삭제 실패" } }, 500);
+      return undefined;
+    });
+    await expect(result()).rejects.toThrow("HTTP 500 bundles.list: boom");
+    expect(calls.at(-1)).toMatchObject({ method: "DELETE" });
+  });
+
+  it("P8 403이면 사유 뒤에 필요한 권한을 덧붙인다", async () => {
+    const { result } = lookup((c) =>
+      c.url === LIST
+        ? json({ error: { message: "The caller does not have permission" } }, 403)
+        : undefined,
+    );
+    await expect(result()).rejects.toThrow(
+      /HTTP 403 bundles\.list: The caller does not have permission .*앱 정보 보기·릴리스 보기 권한/,
+    );
+  });
+
+  it("편집을 만들 때 403이어도 같은 권한 안내가 붙는다", async () => {
+    const { result } = lookup((c) =>
+      c.url === `${BASE}/edits` ? json({ error: { message: "denied" } }, 403) : undefined,
+    );
+    await expect(result()).rejects.toThrow(/HTTP 403 edits\.insert: denied .*권한/);
+  });
+
+  it("FR-007 오류 문장에 토큰·개인 키·서비스 계정·응답 본문의 다른 필드가 실리지 않는다", async () => {
+    const { result } = lookup((c) =>
+      c.url === LIST
+        ? json({ error: { message: "nope" }, debug: "ya29.LEAK", access_token: "ya29.LEAK2" }, 403)
+        : undefined,
+    );
+    const error = (await result().catch((e: Error) => e)) as Error;
+    expect(error.message).not.toMatch(/ya29|PRIVATE KEY|ci@example|LEAK/);
+  });
+
+  it("네트워크 오류는 호출 이름만 밝힌다", async () => {
+    const { fakeFetch } = makeFetch((c) => {
+      if (c.url === LIST) throw new Error("socket hang up ya29.LEAK");
+      return undefined;
+    });
+    const error = await listBundleVersionCodes({
+      deps: { fetch: fakeFetch, now: () => NOW },
+      serviceAccountJson: SERVICE_ACCOUNT,
+      packageName: PKG,
+    }).catch((e: Error) => e);
+    expect((error as Error).message).toBe("네트워크 오류 bundles.list");
   });
 });

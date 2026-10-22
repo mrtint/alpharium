@@ -111,7 +111,7 @@ import { planRedownload } from "./src/app/redownload-plan";
 import { readConnection } from "./src/app/network-port";
 import { onboardingGateNeeded, permissionStepsDecided } from "./src/app/onboarding-gate";
 import { skippedLineText } from "./src/app/skipped-line";
-import { formatModuleBytes, readModuleBytes } from "./src/app/module-size";
+import { formatModuleBytes, readModuleBytes, remainingSizeLabel } from "./src/app/module-size";
 import { wipeDiaries, type WipeOutcome } from "./src/app/wipe-diaries";
 import { clearPhotoCopies } from "./src/app/wipe-port";
 import { WipeConfirmDialog } from "./src/ui/WipeConfirmDialog";
@@ -238,11 +238,11 @@ const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;
 const HOME_TOAST_BOTTOM = 88;
 
 /**
- * 074 — 모바일 데이터 동의에 보일 받을 양(`DownloadConsentGate`가 `cellular`로 확인된 뒤에만 부른다). 059 `planRedownload`와 같은 통로·같은 표기(1000 기준)다.
- * 못 읽으면 거부한다 — 게이트가 한도·거부를 「양 없음」으로 다룬다(양을 지어내지 않는다). 모듈 최상단 함수라 렌더마다 새로 만들어지지 않는다.
+ * 074·095 — 첫 실행 동의(표준·모바일)에 보일 받을 양. `DownloadConsentGate`가 연결 종류와 함께 읽는다(095). 059 `planRedownload`와 같은 통로·같은
+ * 표기(1000 기준)이고, 「0MB」가 될 크기면 `null`이다(095 FR-003a — 0을 받는다고 말하지 않는다). 못 읽으면 거부한다 — 게이트가 한도·거부를 「양 없음」으로 다룬다(양을 지어내지 않는다). 모듈 최상단 함수라 렌더마다 새로 만들어지지 않는다.
  */
 async function readConsentSizeLabel(): Promise<string | null> {
-  return formatModuleBytes(await readEssentialRemainingBytes());
+  return remainingSizeLabel(await readEssentialRemainingBytes());
 }
 
 function AppFrame() {

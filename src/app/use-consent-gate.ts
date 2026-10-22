@@ -2,12 +2,14 @@
  * 첫 실행 다운로드 동의 게이트의 상태 (074).
  *
  * 계약: specs/074-wifi-download-consent/contracts/consent-gate.md CG5~CG10, data-model.md 「ConsentGateView」
+ *       specs/095-download-size-notice/contracts/consent-size.md DS3~DS7 (074 CG6 대체)
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * 이 훅은 `download-consent` 단계에서만 마운트된다 — 모델이 준비됐거나 이미 동의한 사용자는 이 훅을 거치지 않으므로 연결 종류를 읽지도 않는다(FR-009).
  *
- * 마운트하면 연결을 한 번 읽는다(`reading`). `cellular`로 **확인되면** 그 뒤에 받을 양을 읽고 `cellular`, 그 밖(읽지 못함·한도 초과 포함)은 `standard`다. 표준에서는
- * 받을 양을 읽지 않는다(045 FR-003 — 표준 동의에는 용량을 노출하지 않는다).
+ * 마운트하면 연결과 받을 양을 **동시에** 한 번씩 읽는다(`reading`, 각자 한도 `READ_LIMIT_MS`). 둘 다 끝나거나 한도가 지난 뒤 한 번에 갈래를 정한다 — 연결이
+ * `cellular`로 **확인되면** `cellular`, 그 밖(읽지 못함·한도 초과 포함)은 `standard`이고, 두 갈래 모두 읽은 양(못 읽으면 `null`)을 싣는다(095 — App Store
+ * 4.2.3(ii)). 차례로 읽으면 동의가 최대 6초 빈 화면이 되므로 동시에 읽는다. 뜬 뒤에 본문이 양 때문에 바뀌지 않는다.
  *
  * **「나중에 받기」(`defer`)는 이 훅 안의 세션 상태뿐이다** — 저장 통로를 받지 않는다. 앱을 다시 열면 처음부터 읽는다. `deferred`에서만 `recheck()`와
  * 전경 복귀(`AppState` `change → active`)가 다시 읽는다 — 눈앞에 떠 있는 대화상자(`cellular`·`standard`)는 전경 복귀에 바뀌지 않는다. `AppState`는 「다시 판정할 때」의
@@ -52,23 +54,12 @@ export function useConsentGate(deps: ConsentGateDeps): ConsentGate {
   useEffect(() => {
     let live = true;
     void (async () => {
-      const connection = await withTimeout<Connection>(
-        latest.current.readConnection(),
-        READ_LIMIT_MS,
-        "unknown",
-      );
+      const [connection, sizeLabel] = await Promise.all([
+        withTimeout<Connection>(latest.current.readConnection(), READ_LIMIT_MS, "unknown"),
+        withTimeout<string | null>(latest.current.readSizeLabel(), READ_LIMIT_MS, null),
+      ]);
       if (!live) return;
-      if (consentViewOf(connection) === "standard") {
-        setState({ view: "standard", sizeLabel: null });
-        return;
-      }
-      const sizeLabel = await withTimeout<string | null>(
-        latest.current.readSizeLabel(),
-        READ_LIMIT_MS,
-        null,
-      );
-      if (!live) return;
-      setState({ view: "cellular", sizeLabel });
+      setState({ view: consentViewOf(connection), sizeLabel });
     })();
     return () => {
       live = false;

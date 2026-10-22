@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * 095 — iOS 층 1 소스 계약 (I-1).
+ * 097 — iOS 층 1 소스 계약 (I-1).
  *
  * 앱 삭제·재설치·시뮬레이터 초기화·모델 파일 쓰기가 iOS 시뮬레이터 장치에 들어오는 것을 소스를 읽어 막는다.
  * 소스를 읽을 때는 주석을 먼저 걷는다. 사진 보관함 초기화(`removeSampleFiles`)는 `scripts/e2e-sample/ios-device.ts`의 일이며
@@ -12,7 +12,7 @@ import { join } from "node:path";
 const strip = (source: string) => source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 const read = (...parts: string[]) => strip(readFileSync(join(process.cwd(), ...parts), "utf8"));
 
-describe("iOS 층 1 소스 계약 (095)", () => {
+describe("iOS 층 1 소스 계약 (097)", () => {
   const code = read("scripts", "layer1", "ios-simulator-device.ts");
 
   it("S0 — 스캔이 실제로 장치 소스를 읽는다", () => {

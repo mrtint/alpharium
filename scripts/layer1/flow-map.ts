@@ -27,7 +27,7 @@ export type FlowMapInput = {
   newFlowSources: Readonly<Record<string, string>>;
   /** 픽스처 본문에서 가져온 조각들 — 흐름이 이것을 단언하면 안 된다 */
   fixtureTexts: readonly string[];
-  /** 095 — iOS 갈래. 없으면 iOS 검사(M-iOS-*)를 건너뛴다 */
+  /** 097 — iOS 갈래. 없으면 iOS 검사(M-iOS-*)를 건너뛴다 */
   ios?: {
     /** `run-device-tests.mjs`의 `IOS_LAYER1_FLOWS` */
     layer1: readonly string[];
@@ -188,7 +188,7 @@ export function checkFlowMap(input: FlowMapInput): string[] {
 }
 
 /**
- * 095 — iOS 열 검사 (contracts/ios-flow-map.md M-iOS-1~4).
+ * 097 — iOS 열 검사 (contracts/ios-flow-map.md M-iOS-1~4).
  * 기능 표: 5=「iOS 층 1」·6=「iOS 층 2」, 인벤토리: 6=「iOS 층 1」(○ 또는 「— 이유」).
  */
 function checkIos(input: FlowMapInput, features: Row[], inventory: Row[]): string[] {

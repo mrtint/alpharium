@@ -1,7 +1,7 @@
 import { waitForSignalFile } from "../../scripts/layer2-ios/enter-signal";
 
 /**
- * 095 — 표준 입력이 터미널이 아닐 때(에이전트·CI 셸) 「조작을 마쳤다」를 파일로 알린다. 파일이 생기면 entered, 한도까지 안 생기면 timeout.
+ * 097 — 표준 입력이 터미널이 아닐 때(에이전트·CI 셸) 「조작을 마쳤다」를 파일로 알린다. 파일이 생기면 entered, 한도까지 안 생기면 timeout.
  * 앞 흐름이 남긴 신호 파일은 시작할 때 지워 새 신호만 센다(터미널의 남은 Enter 처리와 같은 이유).
  */
 
@@ -30,7 +30,7 @@ function fake(appearsAtPoll: number | null, stale = false) {
   };
 }
 
-describe("조작 완료 신호 파일 (095)", () => {
+describe("조작 완료 신호 파일 (097)", () => {
   it("파일이 생기면 entered", async () => {
     const { deps } = fake(3);
     expect(await waitForSignalFile("signal", 60_000, deps)).toBe("entered");

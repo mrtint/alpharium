@@ -1,10 +1,10 @@
 import { parseIosLayer2Args } from "../../scripts/layer2-ios/run";
 
 /**
- * 095 — iOS 층 2 명령줄 인자. 잘못 쓴 인자가 모든 흐름을 돌리지 않는다(리뷰 11).
+ * 097 — iOS 층 2 명령줄 인자. 잘못 쓴 인자가 모든 흐름을 돌리지 않는다(리뷰 11).
  */
 
-describe("iOS 층 2 인자 (095)", () => {
+describe("iOS 층 2 인자 (097)", () => {
   it("인자가 없으면 모든 흐름이다", () => {
     expect(parseIosLayer2Args([])).toEqual({
       flowIds: [],

@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { iosPhoneDevice, type Ctl } from "../../scripts/layer2-ios/device";
 
 /**
- * 095 — iPhone 실기기 장치 (`devicectl` 기반). `devicectl`은 대역이고, 실측 JSON(`fixtures/devicectl-*.json`)을 돌려준다.
+ * 097 — iPhone 실기기 장치 (`devicectl` 기반). `devicectl`은 대역이고, 실측 JSON(`fixtures/devicectl-*.json`)을 돌려준다.
  *
- * 계약: specs/095-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-1·L2-3, I-1), data-model 「IosDeviceTarget」
+ * 계약: specs/097-ios-e2e-suite/contracts/ios-layer2-runner.md (L2-1·L2-3, I-1), data-model 「IosDeviceTarget」
  *
  * 실측(research R2): `devicectl`에는 파일 삭제 명령이 없고 `--remove-existing-content true`는 대상 디렉터리의 **부모**를 비운다 —
  * 그래서 파일 하나씩 올리고, 지우기는 앱 안에서(lldb) 한다.
@@ -64,7 +64,7 @@ function setup(options: { files?: unknown; processes?: unknown } = {}) {
 
 const kind = (call: Call) => call.slice(0, 3).join(" ");
 
-describe("iPhone 장치 (095)", () => {
+describe("iPhone 장치 (097)", () => {
   it("listDevices — 페어링된 실기기 iPhone만 준다 (시뮬레이터 제외)", () => {
     expect(setup().device.listDevices()).toEqual([UDID]);
   });

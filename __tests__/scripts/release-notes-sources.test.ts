@@ -34,6 +34,8 @@ function outputCalls(text: string): string[] {
 describe("릴리스 노트·TestFlight 스크립트 소스 계약", () => {
   it("스크립트가 존재한다", () => {
     expect(FILES.map(([, f]) => f).sort()).toEqual([
+      "build-number-check.mts",
+      "build-number-check.ts",
       "check.mts",
       "notes.ts",
       "testflight-notes.mts",
@@ -79,12 +81,31 @@ describe("릴리스 노트·TestFlight 스크립트 소스 계약", () => {
     }
   });
 
-  it("notes.ts·testflight-notes.ts는 순수 모듈이다 — process.env·파일·최상단 부수 효과가 없다", () => {
-    for (const file of ["notes.ts", "testflight-notes.ts"]) {
+  it("notes.ts·testflight-notes.ts·build-number-check.ts는 순수 모듈이다 — process.env·파일·최상단 부수 효과가 없다", () => {
+    for (const file of ["notes.ts", "testflight-notes.ts", "build-number-check.ts"]) {
       const dir = file === "notes.ts" ? NOTES_DIR : IOS_DIR;
       const text = read(dir, file);
       expect(text).not.toMatch(/process\./);
       expect(text).not.toMatch(/readFileSync|writeFileSync|node:fs/);
     }
+  });
+
+  it("096 번호 점검 진입점은 API 키를 환경변수로만 받고 app.json 하나만 읽는다", () => {
+    const entry = read(IOS_DIR, "build-number-check.mts");
+    for (const name of ["ASC_API_KEY_P8", "ASC_KEY_ID", "ASC_ISSUER_ID"]) {
+      expect(entry).toMatch(new RegExp(`process\\.env\\.${name}`));
+    }
+    expect(entry).not.toMatch(/option\("(?:key|p8|secret|token|issuer)/);
+    expect(entry.match(/readFileSync\(/g)).toHaveLength(1);
+    expect(entry).toMatch(/readFileSync\(appJsonPath, "utf8"\)/);
+  });
+
+  it("096 번호 조회(listBuildNumbers)는 GET만 부르고 API 호스트 밖으로 나가지 않는다", () => {
+    const text = read(IOS_DIR, "testflight-notes.ts");
+    const start = text.indexOf("export async function listBuildNumbers");
+    expect(start).toBeGreaterThan(-1);
+    const body = text.slice(start);
+    expect(body).not.toMatch(/"(POST|PATCH|PUT|DELETE)"/);
+    expect(body).toMatch(/startsWith\(API_ORIGIN\)/);
   });
 });
