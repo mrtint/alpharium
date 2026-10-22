@@ -117,6 +117,17 @@ describe("096 version-check.mts (안드로이드)", () => {
     expect(r.err).toMatch(/^::error::versionCode 12 .*이미 있다.*13 이상/);
   });
 
+  it("스토어 사유에 줄바꿈이 있어도 ::error:: 한 줄로 나온다 (워크플로 명령 주입 방지)", () => {
+    const evil = `
+globalThis.fetch = async (url) => {
+  if (String(url).includes("oauth2")) return new Response(JSON.stringify({ access_token: "t" }));
+  return new Response(JSON.stringify({ error: { message: "x\\n::set-output name=a::b" } }), { status: 500 });
+};`;
+    const r = run(ANDROID, args(app(13)), env, stub(evil));
+    expect(r.code).toBe(1);
+    expect(r.err.trim().split("\n")).toHaveLength(1);
+  });
+
   it("스토어가 403이면 읽지 못한 이유로 실패한다 (건너뛰지 않는다)", () => {
     const denied = `
 globalThis.fetch = async (url, init) => {

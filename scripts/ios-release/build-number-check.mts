@@ -13,7 +13,8 @@ import { decideBuildNumber, describeBuildNumber } from "./build-number-check.ts"
 import { listBuildNumbers } from "./testflight-notes.ts";
 
 function fail(message: string): never {
-  console.error(`::error::${message}`);
+  // 스토어가 준 사유에 줄바꿈이 섞여도 워크플로 명령(::…::)으로 읽히지 않게 한 줄로 만든다
+  console.error(`::error::${message.replace(/[\r\n]+/g, " ")}`);
   process.exit(1);
 }
 
