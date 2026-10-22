@@ -85,7 +85,7 @@ appId: com.a810labs.pocketlog
       # 다음 단계로 넘어가 있을 수 있다 — 그래도 "쓰고 있다"만 계속 보이는
       # 것은 FR-001 위반이 아니라 User Story 2가 다루는 정상 범위다).
       - extendedWaitUntil:
-          notVisible: "쓰고 있다"
+          notVisible: "쓰고 있어요"
           timeout: 5000
 
       # FR-013·014 — 사진 장 전환에서 문구가 계속 갱신된다. "사진을 들여다

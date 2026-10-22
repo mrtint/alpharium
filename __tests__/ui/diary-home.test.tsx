@@ -139,17 +139,17 @@ async function renderHome(
 async function startWriting(pipeline: Pipeline, stop?: () => Promise<void>) {
   await renderHome({ pipeline, stop });
   await userEvent.press(await screen.findByText("일기 쓰기"));
-  await screen.findByText("쓰고 있다");
+  await screen.findByText("쓰고 있어요");
 }
 
 describe("쓰는 중 화면 (007 contracts/screens.md §1)", () => {
-  it("1. 「쓰는 중」 상태 줄과 첫 신호 전의 「쓰고 있다」가 보인다(FR-010, 054 — 회전 표시는 없다)", async () => {
+  it("1. 「쓰는 중」 상태 줄과 첫 신호 전의 「쓰고 있어요」가 보인다(FR-010, 054 — 회전 표시는 없다)", async () => {
     await startWriting(hangingPipeline());
 
     // 054 — 쓰는 중이 홈 안의 상태가 됐다. 회전 표시(`ActivityIndicator`)는 없고 헤더 상태 줄이 말한다.
     expect(screen.getByTestId("home-day-state")).toHaveTextContent("쓰는 중");
-    expect(screen.getByText("쓰고 있다")).toBeTruthy();
-    expect(screen.queryByLabelText("쓰고 있다")).toBeNull();
+    expect(screen.getByText("쓰고 있어요")).toBeTruthy();
+    expect(screen.queryByLabelText("쓰고 있어요")).toBeNull();
   });
 
   it("2. 「그만두기」를 누를 수 있다(FR-013)", async () => {
@@ -240,7 +240,7 @@ describe("그만두기 (007 contracts/screens.md §2)", () => {
     const store = await renderHome({ pipeline, stop: async () => {} });
 
     await userEvent.press(await screen.findByText("일기 쓰기"));
-    await screen.findByText("쓰고 있다");
+    await screen.findByText("쓰고 있어요");
     await userEvent.press(screen.getByText("그만두기"));
 
     await waitFor(() => expect(screen.getByText("일기 쓰기")).toBeTruthy());
@@ -329,8 +329,8 @@ describe("고른 것이 없으면 쓰지 않는다 (007 FR-006)", () => {
     await userEvent.press(await screen.findByText("일기 쓰기"));
 
     // 029 — 자동 판정이 no-ready-character면 생성하지 않고 설정 탭으로 안내한다.
-    expect(await screen.findByText(/준비/)).toBeTruthy();
-    expect(screen.queryByText("쓰고 있다")).toBeNull();
+    expect(await screen.findByText("일기 작성자를 준비해야 해요")).toBeTruthy();
+    expect(screen.queryByText("쓰고 있어요")).toBeNull();
   });
 });
 
@@ -718,7 +718,7 @@ describe("015 — 쓰는 중 독백", () => {
    * 054 — 독백은 페이드 교체다(타자기 없음). 줄이 바뀌면 이전 줄이 나가는 겹으로 잠시 남으므로 「지금 줄」은
    * `writing-monologue-text` testID로 찾는다(글자로 찾으면 두 겹이 함께 잡힌다).
    */
-  it("onProgress('vision')이 오면 「쓰고 있다」에서 다른 문구로 바뀐다", async () => {
+  it("onProgress('vision')이 오면 「쓰고 있어요」에서 다른 문구로 바뀐다", async () => {
     const pipeline = progressPipeline();
     await startWriting(pipeline);
 
@@ -764,10 +764,10 @@ describe("015 — 쓰는 중 독백", () => {
     }
   });
 
-  it("첫 신호가 오기 전에는 기존 「쓰고 있다」문구만 보인다 (FR-011)", async () => {
+  it("첫 신호가 오기 전에는 기존 「쓰고 있어요」문구만 보인다 (FR-011)", async () => {
     await startWriting(hangingPipeline());
 
-    expect(screen.getByText("쓰고 있다")).toBeTruthy();
+    expect(screen.getByText("쓰고 있어요")).toBeTruthy();
   });
 
   it("onProgress가 한 번도 안 불려도(즉시 완료) 오류 없이 완료 상태로 전환된다", async () => {
@@ -777,7 +777,7 @@ describe("015 — 쓰는 중 독백", () => {
     await act(async () => pipeline.finish({ ok: true, entry, overwrote: false }));
 
     // 051 — 결과 화면 없이 홈으로 돌아온다(본문은 저장소에서 다시 읽는다 — written-day-home GEN1).
-    await waitFor(() => expect(screen.queryByText("쓰고 있다")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("쓰고 있어요")).toBeNull());
     expect(screen.getByTestId("home-day-number")).toBeTruthy();
   });
 
@@ -1004,7 +1004,7 @@ describe("018 — prepare()/release() 트리거", () => {
 
     await userEvent.press(await screen.findByText("일기 쓰기"));
     // 051 — 성공하면 홈으로 돌아온다(죽지 않는다).
-    await waitFor(() => expect(screen.queryByText("쓰고 있다")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("쓰고 있어요")).toBeNull());
     expect(screen.getByTestId("home-day-number")).toBeTruthy();
   });
 
@@ -1066,7 +1066,7 @@ describe("018 — prepare()/release() 트리거", () => {
     );
 
     await userEvent.press(await screen.findByText("일기 쓰기"));
-    await screen.findByText("쓰고 있다");
+    await screen.findByText("쓰고 있어요");
 
     const handler = addListenerSpy.mock.calls
       .filter(([event]) => event === "change")

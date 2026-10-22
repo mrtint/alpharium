@@ -142,6 +142,8 @@ const ADDED_AFTER_GOLDEN: readonly string[] = [
   "${}${} ${}월 ${}일 일기를 쓰고 있어요",
   "사진을 보는 중",
   "글을 쓰는 중",
+  // 098 — 홈 장소 값 줄의 접근성 라벨(새 항목 `home.material.placesA11y`)
+  "사진이 찍힌 자리 ${}곳",
 ];
 
 /**
@@ -157,6 +159,87 @@ type GoldenChange = {
 };
 
 const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
+  // 098 — 화면 문구를 사실대로(UX-13·15·16·20·21). 옛 값은 골든 json에 그대로 있다
+  {
+    spec: "098",
+    literal: { from: "잠들기 전에 도착해요", to: "열면 바로 그날 일기를 써요" },
+  },
+  {
+    spec: "098",
+    literal: {
+      from: "하루가 끝나갈 무렵, 오늘의 이야기가 조용히 완성돼 있어요.",
+      to: "자동으로 쓰기를 켜 두면 쓸 차례에 알림이 오고, 먼저 써 두기도 해요.",
+    },
+  },
+  {
+    spec: "098",
+    literal: {
+      from: "위치 권한이 있으면 이름으로, 없으면 비워 둬요",
+      to: "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요",
+    },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "placeAutoDesc",
+        from: "위치 권한이 있으면 이름으로, 없으면 비워 둬요",
+        to: "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요",
+      },
+    ],
+  },
+  {
+    spec: "098",
+    literal: {
+      from: "다닌 자리를 숫자 대신 이름으로 보여줘요",
+      to: "일기를 쓸 때 다닌 자리의 이름을 참고해요",
+    },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "placeOnDesc",
+        from: "다닌 자리를 숫자 대신 이름으로 보여줘요",
+        to: "일기를 쓸 때 다닌 자리의 이름을 참고해요",
+      },
+    ],
+  },
+  {
+    spec: "098",
+    literal: {
+      from: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
+      to: "다 쓰면 지금 일기가 새 글로 바뀌어요. 바뀐 뒤에는 되돌릴 수 없어요.",
+    },
+    outputs: [
+      {
+        key: "OVERWRITE_CONFIRM",
+        path: "body",
+        from: "다 쓰면 지금 일기가 새 글로 바뀌어요.",
+        to: "다 쓰면 지금 일기가 새 글로 바뀌어요. 바뀐 뒤에는 되돌릴 수 없어요.",
+      },
+    ],
+  },
+  {
+    spec: "098",
+    literal: {
+      from: "되돌릴 수 없어요. 이름과 설정은 남아요.",
+      to: "되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.",
+    },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "wipeBody",
+        from: "되돌릴 수 없어요. 이름과 설정은 남아요.",
+        to: "되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.",
+      },
+    ],
+  },
+  {
+    spec: "098",
+    literal: { from: "쓰고 있다", to: "쓰고 있어요" },
+    outputs: [{ key: "WRITING_TEXT", path: "fallback", from: "쓰고 있다", to: "쓰고 있어요" }],
+  },
+  {
+    spec: "098",
+    literal: { from: "일기 작성자를 준비해야 한다", to: "일기 작성자를 준비해야 해요" },
+  },
   {
     spec: "085",
     literal: {

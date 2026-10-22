@@ -11,6 +11,8 @@
  * - 관측된 0 — 회색 `0` + 단위(숫자만 회색, 단위는 본색).
  * - 셀 수 없음 — 「모름」(0이 아니다). 사진 권한이 없어서일 때는 빨간 「권한이 없어요 ›」(아래).
  *
+ * **장소 값 줄만 화면 낭독 라벨을 가진다**(098) — 숫자가 보이는 두 갈래에만 달고 모름·읽는 중·권한 없음에는 달지 않는다. 칸 컨테이너에 달면 「장소」 라벨과 값이 한 노드로 섞인다.
+ *
  * **화면은 `DaySignals`를 모른다**(009 이후 경계) — 개수로 좁혀진 `DayPreview`만 받는다. 문구 글자는
  * `home-text.ts`에서만 온다(C4). 색은 토큰만 쓴다(C5).
  * ─────────────────────────────────────────────────────────────────────────────
@@ -76,6 +78,7 @@ export function MaterialGrid({ preview, onRequestPhoto }: MaterialGridProps) {
           label={MATERIAL_TEXT.places}
           onRequest={onRequestPhoto}
           second
+          a11yLabel={MATERIAL_TEXT.placesA11y}
           testID="signal-places"
           unit={MATERIAL_TEXT.unitPlace}
         />
@@ -114,6 +117,7 @@ function Cell({
   testID,
   second,
   onRequest,
+  a11yLabel,
 }: {
   display: Display;
   label: string;
@@ -121,6 +125,8 @@ function Cell({
   testID: string;
   second?: boolean;
   onRequest?: () => void;
+  /** 숫자가 보이는 두 갈래(1곳 이상·관측된 0)의 화면 낭독. 없으면 라벨을 달지 않는다(098) */
+  a11yLabel?: (n: number) => string;
 }) {
   const scale = useFontScale();
   return (
@@ -133,6 +139,12 @@ function Cell({
       </AppText>
       {/* testID는 값에 둔다 — 라벨과 값을 한 노드로 맞추면 「사진…」처럼 섞여 읽힌다 */}
       <View
+        {...(a11yLabel !== undefined && (display.kind === "count" || display.kind === "zero")
+          ? {
+              accessible: true,
+              accessibilityLabel: a11yLabel(display.kind === "count" ? display.count : 0),
+            }
+          : {})}
         style={[VALUE_ROW, { minHeight: MATERIAL_GRID.number.lineHeight * scale }]}
         testID={testID}
       >
