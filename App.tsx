@@ -11,7 +11,7 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { expoSelectionPort, loadSelection, saveSelection } from "./src/app/selection-store";
 import { resolveGenerationParams } from "./src/app/resolve-generation";
 import { openInBrowser } from "./src/app/browser-port";
-import { PRIVACY_URL, SUPPORT_URL } from "./src/app/policy-links";
+import { LICENSES_URL, PRIVACY_URL, SUPPORT_URL } from "./src/app/policy-links";
 import { routeFromNotification } from "./src/app/notification-routing";
 import type { DayDate } from "./src/config/day-boundary";
 import {
@@ -2537,6 +2537,13 @@ function SettingsSection({
       if (alive.current) setLinkFailed(opened ? null : kind);
     });
   };
+  // 101 — 「오픈소스 라이선스」 행. 방침·지원의 `linkFailed`와 따로 둔다(그 유니온은 086 A1이 소스로 잠근다).
+  const [licensesFailed, setLicensesFailed] = useState(false);
+  const openLicenses = () => {
+    void openInBrowser(LICENSES_URL).then((opened) => {
+      if (alive.current) setLicensesFailed(!opened);
+    });
+  };
   useEffect(() => {
     alive.current = true;
     void readModuleBytes(expoModelPorts().files)
@@ -2609,6 +2616,10 @@ function SettingsSection({
         onOpenFontLicense={onOpenFontLicense}
         onOpenPrivacy={() => openLink("privacy", PRIVACY_URL)}
         onOpenSupport={() => openLink("support", SUPPORT_URL)}
+        onOpenLicenses={openLicenses}
+        {...(licensesFailed
+          ? { licensesFailedText: POLICY_LINKS_TEXT.openFailed(LICENSES_URL) }
+          : {})}
         {...(linkFailed === "privacy"
           ? { privacyFailedText: POLICY_LINKS_TEXT.openFailed(PRIVACY_URL) }
           : {})}
