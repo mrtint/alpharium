@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<!-- 생성물 — design/icon.json에서 scripts/design/build-icons.mts가 만든다. 손으로 고치지 않는다. -->
+<rect width="1024" height="1024" fill="#ec3013"/>
+<path transform="translate(512 512) scale(2.3)" fill="#f3f2f2" fill-rule="evenodd" d="M-92.5 -125H-42.5V125H-92.5ZM-42.5 -125H7.5A85 85 0 0 1 7.5 45H-42.5ZM-42.5 -80H4.5A40 40 0 0 1 4.5 0H-42.5Z"/>
+</svg>

@@ -94,6 +94,13 @@
 - **설정 행(앱)**: 행 높이·여백·꼬리표는 `src/ui/SettingsScreen.tsx`와 `SETTINGS`(`src/ui/theme/tokens.ts`)가 정본이다. 라벨은 `body`, 값·꼬리표는 `caption`+`textMuted`, 누를 수 있는 행은 `›`로 알린다. 새 행도 같은 묶음 구조를 따른다.
 - **대화상자(앱)**: `src/ui/components/Dialog.tsx`의 `ConfirmDialog`·`DismissibleDialog`를 쓴다. 되돌릴 수 없는 동작의 버튼만 `danger`, 나머지는 accent다. 면은 직선, 버튼만 `RADIUS.control`.
 
+## 아이콘
+
+앱 아이콘은 **빨강 면(`accent`) 위 기하 「P」 마크(`accentForeground`) 하나**다(102). 모양과 플랫폼별 배율의 정본은 `design/icon.json`이고 PNG·스토어 에셋·SVG 미리보기는 `scripts/design/build-icons.mts`가 거기서 만든다(`npm run build:icons`, 끝에 `--check`를 주면 쓰지 않고 어긋남만 본다). **생성된 PNG를 손으로 고치지 않는다** — `__tests__/design/icons.test.ts`가 정본과 픽셀까지 대조한다. 색은 토큰 이름으로만 가리키며 16진수를 적지 않는다.
+
+- iOS 아이콘은 알파 채널이 없다(PNG 색 유형 RGB). 안드로이드는 108dp 캔버스 중 가운데 72dp만 보이므로 foreground·monochrome 마크는 iOS보다 작게(배율 1.6) 잡는다 — 갤럭시 런처 실측(foreground만 봤다, monochrome 테마 아이콘과 iOS 런처는 못 봤다).
+- 아이콘 PNG를 바꾸면 안드로이드·iOS `expo prebuild --clean`을 다시 돌려야 런처에 반영된다.
+
 ## 하지 않는 것
 
 - 색 16진수·서체 이름·반경 숫자를 화면·페이지에 직접 쓰지 않는다(웹은 `<style>`·`style=`·`site.css` 안 리터럴을 테스트가 막고, 앱 서체는 083의 규칙 테스트가 막는다).

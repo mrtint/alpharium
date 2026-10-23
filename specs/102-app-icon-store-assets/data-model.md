@@ -24,8 +24,8 @@
 | `assets/android-icon-background.png` | 1024² | 단색 accent |
 | `assets/android-icon-monochrome.png` | 1024² | 투명 바탕 검정 마크 |
 | `assets/favicon.png` | 48² | 전면 빨강 + 마크 |
-| `store/ko/store-icon-512.png` | 512² | iOS 아이콘과 같은 그림, 알파 없음 |
-| `store/ko/feature-graphic-1024x500.png` | 1024×500 | 마크 하나, 글자 없음 |
+| `store/ko/store-icon-512.png` | 512² | iOS 아이콘과 같은 그림. Play 형식(32비트 PNG, RGBA) |
+| `store/ko/feature-graphic-1024x500.png` | 1024×500 | 마크 하나, 글자 없음. 24비트 PNG(알파 없음) |
 | `design/icon.svg` | — | 미리보기(생성물) |
 
 ## Listing (`store/ko/*.txt`)
