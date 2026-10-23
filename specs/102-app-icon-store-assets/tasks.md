@@ -78,7 +78,7 @@
 - [x] T022 `git diff --stat origin/main`로 `src/`·`modules/`·`site/`·`src/i18n/catalogs/ko/`가 바뀌지 않았음을 확인한다(FR-014, I9). 바뀐 파일이 있으면 되돌린다.
 - [x] T023 `npm test`·`npm run lint`를 실제로 실행해 통과를 확인한다(`prettier`가 `design/icon.json`·`store/` 텍스트를 어떻게 다루는지 확인하고, `.prettierignore`에 `store/`가 필요한지 판단해 반영한다. 사이트 HTML은 포맷하지 않는다).
 - [x] T024 `AGENTS.md`를 고친다 — 「저장소의 현재 상태」에 아이콘·등록 에셋 한 줄(정본 `design/icon.json`→`build-icons.mts`→`assets/`, 등록 에셋 `store/ko/`, iPhone 전용 `supportsTablet:false`)과, 「지금도 유효한 실측 규칙」에 아이콘 PNG를 바꾸면 prebuild를 다시 돌려야 런처에 반영되고 안드로이드 adaptive는 보이는 영역이 108dp 중 72dp라 글리프 배율이 다르다는 실측 두 줄(R2·R3), 「코드를 어디에 두는가」 트리에 `store/` 한 줄을 더한다. 기존 서술을 주석으로 덧대지 않는다.
-- [ ] T025 로드맵 「진행 예정 과제」에서 이 과제를 빼 「완료 이력」에 한 줄 옮긴다(스펙 102) — kickoff 3차 커밋(완료 처리)에서 한다. 남은 위험(iPhone 규격 업로드 거부 여부는 제출 때 확인, iPad 호환 깨짐 후속 과제 유무)을 한 줄 적는다.
+- [x] T025 로드맵 「진행 예정 과제」에서 이 과제를 빼 「완료 이력」에 한 줄 옮긴다(스펙 102) — kickoff 3차 커밋(완료 처리)에서 한다. 남은 위험(iPhone 규격 업로드 거부 여부는 제출 때 확인, iPad 호환 깨짐 후속 과제 유무)을 한 줄 적는다.
 
 ## Dependencies & Execution Order
 
