@@ -1,7 +1,7 @@
 /**
  * 092 CW3·FR-007 — 이어 쓰기 세션. 신청·단계·박동 → 막대 값, 한 번만 닫기, 만료.
  *
- * 막대는 단계 몫(준비 0–5%, 사진 5–45%, 글 45–95%) 안에서 박동마다 남은 몫의 1/4(사진)·1/16(조각)·1/400(토큰)만큼 오른다(research R3) —
+ * 막대는 단계 몫(준비 0–5%, 사진 5–45%, 글 45–95%) 안에서 박동 무게 합 w에 대해 시작 + 몫 × w/(w+k)로 오른다(103) —
  * 박동 없이는 오르지 않고(타이머 없음, FR-003), 끝나기 전에 95%를 넘지 않는다.
  */
 
@@ -83,7 +83,7 @@ describe("092 CW3 — 신청", () => {
 });
 
 describe("092 CW3 — 막대", () => {
-  it("단계 몫의 시작으로 오르고, 박동마다 남은 몫의 일부만큼 오른다", async () => {
+  it("단계 몫의 시작으로 오르고, 박동 무게 합에 대해 쌍곡선으로 오른다", async () => {
     const h = harness();
     const session = await h.continued.start(WRITE, () => {});
     session.progress("signals");
@@ -96,11 +96,22 @@ describe("092 CW3 — 막대", () => {
     expect(h.reports()).toEqual([
       ["report", "준비하는 중", 0, PROGRESS_TOTAL],
       ["report", "사진을 보는 중", 50_000, PROGRESS_TOTAL],
-      ["report", "사진을 보는 중", 150_000, PROGRESS_TOTAL],
-      ["report", "사진을 보는 중", 225_000, PROGRESS_TOTAL],
+      ["report", "사진을 보는 중", 183_333, PROGRESS_TOTAL],
+      ["report", "사진을 보는 중", 250_000, PROGRESS_TOTAL],
       ["report", "글을 쓰는 중", 450_000, PROGRESS_TOTAL],
-      ["report", "글을 쓰는 중", 481_250, PROGRESS_TOTAL],
+      ["report", "글을 쓰는 중", 451_992, PROGRESS_TOTAL],
     ]);
+  });
+
+  it("103 PB2 — 단계가 바뀌면 박동 무게 합이 0으로 돌아간다 — 사진 8장 뒤 글 단계 첫 토큰은 글 몫 시작에서 한 걸음이다", async () => {
+    const h = harness();
+    const session = await h.continued.start(WRITE, () => {});
+    session.progress("vision");
+    for (let i = 0; i < 8; i += 1) h.beat("photo");
+    session.progress("generation");
+    h.beat("token");
+    // 글 단계 w = 1 → 450,000 + 500,000 × 1/1001 (사진 단계의 w = 8이 남아 있었다면 이보다 위다)
+    expect(h.reports().at(-1)?.[2]).toBe(450_500);
   });
 
   it("박동 없이는 오르지 않는다 — 같은 단계·뒤로 가는 단계는 보고하지 않는다", async () => {
@@ -133,7 +144,7 @@ describe("092 CW3 — 막대", () => {
     // 몫 끝에 닿은 뒤에도 보고마다 한 칸은 오른다(아래 「보고마다 막대 값이 오른다」) — 넘는 것은 보고 수만큼이다
     expect(photos).toBeLessThanOrEqual(450_000 + h.reports().length);
     session.progress("generation");
-    for (let i = 0; i < 500; i += 1) h.beat("chunk");
+    for (let i = 0; i < 100_000; i += 1) h.beat("chunk");
     const last = h.reports().at(-1)?.[2] as number;
     expect(last).toBeLessThanOrEqual(950_000 + h.reports().length);
     expect(last).toBeGreaterThan(900_000);
@@ -258,6 +269,57 @@ describe("092 — 토큰 박동과 보고 간격", () => {
     expect((a.calls.at(-1)?.[1] as number) - 450_000).toBeLessThan(
       (b.calls.at(-1)?.[1] as number) - 450_000,
     );
+  });
+
+  // 103 PB3·PB4 — 글 단계는 쌍곡선(시작 + 몫 × w/(w+k))이라 끝에서도 오른다. 옛 공식(남은 몫의 1/16 조각·1/400 토큰)은 이 테스트
+  // 안에서 따로 계산한다(소스 상수를 읽지 않는다).
+  const WRITING_START = 450_000;
+  const WRITING_SPAN = 500_000;
+
+  const oldPosition = (tokens: number, chunks: number) =>
+    WRITING_START +
+    WRITING_SPAN * (1 - Math.pow(1 - 1 / 400, tokens) * Math.pow(1 - 1 / 16, chunks));
+
+  /** 글 단계에서 조각 `chunks`개 뒤 토큰 `tokens`개가 온 막대 위치와 마지막 토큰 한 개의 걸음 */
+  async function writingAfter(tokens: number, chunks: number) {
+    const h = tight();
+    const session = await h.continued.start(WRITE, () => {});
+    session.progress("generation");
+    let at = 0;
+    for (let i = 0; i < chunks; i += 1) h.beat("chunk", (at += 3_000));
+    for (let i = 0; i < tokens; i += 1) h.beat("token", (at += 3_000));
+    const completed = h.calls.map((c) => c[1] as number);
+    return { position: completed.at(-1) as number, step: completed.at(-1)! - completed.at(-2)! };
+  }
+
+  it("103 PB3 — 토큰 3000개·조각 100개 시점에 옛 공식보다 아래이고, 박동 하나의 걸음은 10배 이상이다", async () => {
+    const now = await writingAfter(3_000, 100);
+    expect(now.position).toBeLessThan(oldPosition(3_000, 100));
+    const oldStep = oldPosition(3_000, 100) - oldPosition(2_999, 100);
+    expect(now.step).toBeGreaterThanOrEqual(10 * oldStep);
+    // 눈에 띄는 걸음 — 토큰 하나가 몫의 수천 분의 일 이상이다
+    expect(now.step).toBeGreaterThan(5);
+  });
+
+  it("103 PB3 — 토큰 수가 1500~6000으로 달라도 끝이 95%에 붙지 않고 남는 몫이 있다", async () => {
+    for (const tokens of [1_500, 3_000, 6_000]) {
+      const { position } = await writingAfter(tokens, tokens / 30);
+      expect(position).toBeLessThan(900_000);
+      expect(position).toBeGreaterThan(700_000);
+    }
+  });
+
+  it("103 PB4 — 박동 종류를 섞어도 위치는 줄지 않고 보고마다 오른다", async () => {
+    const h = tight();
+    const session = await h.continued.start(WRITE, () => {});
+    session.progress("generation");
+    let at = 0;
+    for (let i = 0; i < 4_000; i += 1) h.beat(i % 33 === 0 ? "chunk" : "token", (at += 3_000));
+    const completed = h.calls.map((c) => c[1] as number);
+    for (let i = 1; i < completed.length; i += 1) {
+      expect(completed[i]).toBeGreaterThan(completed[i - 1]);
+    }
+    expect(completed.at(-1)).toBeLessThanOrEqual(950_000);
   });
 
   it("보고마다 막대 값이 오른다 — 시스템은 값이 오르지 않는 공백을 멈춤으로 본다 (2026-10-21 run I: 947에서 36초 → 만료)", async () => {
