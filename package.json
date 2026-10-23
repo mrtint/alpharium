@@ -52,6 +52,7 @@
     "jest": "~29.7.0",
     "jest-expo": "~57.0.6",
     "patch-package": "^8.0.1",
+    "pngjs": "^3.4.0",
     "prettier": "^3.9.6",
     "typescript": "~6.0.3"
   },
@@ -70,6 +71,7 @@
     "lint": "eslint . && tsc --noEmit && npm run check:constitution && npm run format:check",
     "format": "prettier --write \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\" \"__tests__/**/*.{ts,tsx}\" \"*.{ts,tsx}\"",
+    "build:icons": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/design/build-icons.mts",
     "check:constitution": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/check-constitution.mts",
     "seed:day": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-day.mts",
     "seed:list": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/seed-list.mts",

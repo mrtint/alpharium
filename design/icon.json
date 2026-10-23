@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "note": "앱 아이콘 정본(102). 마크 모양과 플랫폼별 배율만 정한다 — 색은 design/tokens.json의 역할 이름으로만 가리킨다. PNG·SVG는 scripts/design/build-icons.mts가 여기서 만든다(손으로 고치지 않는다).",
+  "colors": {
+    "background": "accent",
+    "mark": "accentForeground"
+  },
+  "mark": {
+    "note": "기하 「P」(시안 B). 좌표는 글리프 상자 중심이 (0, 0)이고 높이가 250인 단위계다. y는 아래로 늘어난다. 칠하는 도형(add)에서 구멍(sub)을 뺀다. rect는 x0~x1 × y0~y1 사각형이고, d-shape는 x0~cx × y0~y1 사각형의 오른쪽에 지름 y1-y0인 반원을 붙인 모양이다.",
+    "height": 250,
+    "svgNote": "design/icon.svg는 evenodd로 칠한다. 칠하는 도형(add)끼리 겹치면 evenodd는 겹친 자리에 구멍을 내지만 PNG 생성기는 채운다 — 지금은 add 도형이 변에서만 맞닿아 같게 그려진다. 겹치게 고치면 SVG 생성을 먼저 바꾼다.",
+    "shapes": [
+      { "op": "add", "kind": "rect", "x0": -92.5, "y0": -125, "x1": -42.5, "y1": 125 },
+      { "op": "add", "kind": "d-shape", "x0": -42.5, "y0": -125, "cx": 7.5, "y1": 45 },
+      { "op": "sub", "kind": "d-shape", "x0": -42.5, "y0": -80, "cx": 4.5, "y1": 0 }
+    ]
+  },
+  "scale": {
+    "note": "단위당 1024 캔버스 픽셀(기능 그래픽은 1024×500 캔버스). 안드로이드는 108dp 캔버스 중 가운데 72dp만 보여서 iOS보다 작다 — 갤럭시 SM-S901N 런처 실측(2.3은 보이는 영역의 약 83%라 너무 컸다). iOS 값은 iPhone 런처를 보기 전의 임시값이다.",
+    "ios": 2.3,
+    "androidForeground": 1.6,
+    "featureGraphic": 1.2
+  },
+  "safeZone": {
+    "note": "안드로이드 adaptive icon의 안전 영역 — 108dp 중 가운데 66dp",
+    "numerator": 66,
+    "denominator": 108
+  }
+}

@@ -26,5 +26,5 @@ npm test && npm run lint
 
 1. 소유자가 스크린샷용 사진 목록을 눈으로 확인한다(본인 사진, 얼굴·주소·번호판·타인 사진 없음, 집·직장과 무관한 장소). 확인을 `device-check.md`에 먼저 적는다.
 2. 그 사진으로 실기기(iPhone 14·갤럭시)에서 실제 일기를 쓴다. 장면 5개를 캡처한다.
-3. iPhone 캡처는 `sips -z 2778 1284 <in> --out <out>`로 확대해 `store/ko/screenshots/ios-6.5/`에, 갤럭시 캡처는 원본으로 `play-phone/`에 둔다.
+3. iPhone 캡처는 `scripts/store/prepare-screenshot.mts <in> <out> --size 1284x2778`로 `store/ko/screenshots/ios-6.5/`에, 갤럭시 캡처는 `... --crop-height 2160`으로 `play-phone/`에 둔다(Play 2:1 한도·알파 제거는 두 경우 모두).
 4. 두 콘솔 도움말의 현재 규격을 열어 대조하고 날짜와 결과를 적는다.

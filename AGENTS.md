@@ -20,6 +20,7 @@
   - 목표 시각마다 앞으로 7일치(쓴 날 제외) 「쓸 차례」 예약 알림(`diary-reminder`, DEFAULT)을 걸고, 누르면 `rearmAutoWrite()`로 앱 열기 자동 쓰기를 다시 연다(085). 백그라운드가 먼저 쓰면 알림을 거두고 완성 알림(`diary-completed`, HIGH)을 띄운다.
   - 개발자·진단 화면 하단에 「최근 자동 쓰기 시도」(경로 3 × 결과 14, 최근 20건, 078·080)와 「최근 실패」(갈래 11개: `module`·`photos`·`empty`·`echo`·`language`·`unfinished`·`timed-out`·`interrupted`·`error`·`save`·`unwritten`, 최근 10건, 060·081)를 남긴다.
 - **설정·개발자·진단**: 홈 위의 `StackLayer`다(055~060·064). 이름 바꾸기, 자동 쓰기·시각·장소 이름 대화상자, 권한 꼬리표, 이 휴대폰(모듈 용량 1000 기준·일기 모두 지우기), 정보(버전 7번 탭으로 개발자 메뉴 활성화·서체 라이선스·개인정보처리방침·도움말), 개발자 메뉴, 진단 화면(개발 환경 전용).
+- **아이콘·스토어 등록 에셋(102)**: 앱 아이콘은 빨강 면 + 기하 「P」이고 정본은 `design/icon.json` 하나다 — `npm run build:icons`(`scripts/design/build-icons.mts`)가 `assets/`의 PNG와 `store/ko/`의 스토어 아이콘·기능 그래픽·`design/icon.svg`를 만들고 `__tests__/design/icons.test.ts`가 정본과 픽셀까지 대조한다(손으로 PNG를 고치지 않는다). 등록 에셋(한국어 한 벌, 출시 국가 한국)은 `store/ko/`(설명문 5개·스크린샷), 앱은 iPhone 전용(`ios.supportsTablet: false`, D5)이다. 기록은 `specs/102-app-icon-store-assets/device-check.md`·`ipad-compat.md`.
 - **다국어·디자인·웹**: 화면 한글은 `src/i18n/catalogs/ko/`에만 둔다(062). 서체는 정적 Pretendard v1.3.9 OTF 5종(400~800)이다(083). 디자인 토큰 정본은 `design/tokens.json` 하나이고 앱(`src/ui/theme/tokens.ts`)과 웹(`site/assets/tokens.css`)이 함께 쓴다(089). 개인정보처리방침·지원은 `site/`에서 배포하며 `__tests__/privacy/`가 잠근다(086).
 - **검증·배포**: 안드로이드(SM-S901N·SM-G986N)와 iOS 실기기(iPhone 14, iOS 27.0.1, 087)에서 검증 중이다. Play 내부 테스트(076)와 TestFlight(075) 업로드는 GitHub Actions 수동 워크플로로 한다.
 
@@ -27,6 +28,7 @@
 
 ### 안드로이드·iOS·Expo·네이티브
 
+- **아이콘 PNG를 바꾸면 `expo prebuild --clean`을 다시 돌려야 런처에 반영된다**(102 실측 — 안 하면 이전 아이콘이 남는다). 안드로이드 adaptive icon은 108dp 캔버스 중 가운데 72dp만 보여서 foreground 마크 배율이 iOS(2.3)보다 작은 1.6이다(갤럭시 SM-S901N 런처 실측: 2.3은 보이는 영역의 약 83%를 채워 너무 컸다). iOS 배율은 iPhone 런처를 보기 전의 임시값이고 안드로이드 테마 아이콘(monochrome)은 기기에서 보지 않았다(`specs/102-app-icon-store-assets/device-check.md`).
 - **Android 걸음 수**: `expo-sensors`의 `getStepCountAsync`는 iOS 전용이라 Android 걸음 수는 `unknown`이 정상이다.
 - **`expo-media-library`와 장소 권한**: `ACCESS_MEDIA_LOCATION` 조회 API가 없어 `getLocation()`을 감싸 호출해야 안다. 그래서 **「장소」 권한은 사진 권한에 묶인다.** `Asset.getUri()`는 `file://` 경로를 준다. Android 14+ 부분 허용(`limited`)은 `describePhotoAccessLimit`가 `"partial"`을 준다.
 - **`reverseGeocodeAsync` 좌표 외부 전송**(086): 안드로이드는 위치 권한이 없으면 예외를 던지고(`geocoding-port.ts`가 삼킴), **iOS는 위치 권한을 보지 않고 좌표를 보낸다** — 설정 「켬」은 권한과 무관하게 보내고, 기본값 「자동」에서만 위치 권한 거부가 전송을 막는다. 백그라운드는 지오코딩하지 않는다.
@@ -96,6 +98,8 @@ src/
 └── ui/           화면 (components/ 공용 부품, rnr/ 대화상자 프리미티브, theme/tokens.ts)
 
 design/           디자인 토큰 정본(tokens.json)과 디자인 시스템 규칙 문서(DESIGN.md, 089)
+design/icon.json  아이콘 정본(102) — scripts/design/build-icons.mts가 assets/·store/ko/에 쓴다
+store/ko/         스토어 등록 에셋(설명문·스크린샷·기능 그래픽·스토어 아이콘, 102) — 앱 번들에 들어가지 않는다
 site/             개인정보처리방침·지원·소개 정적 웹페이지 (GitHub Pages, 086·089)
 plugins/          Expo config plugin (android/·ios/는 gitignore된 생성물)
 scripts/          헌법 검사, 층 1·층 2 e2e 실행기, 30일 표본(e2e-sample/), 시딩(seed*, ios-seed/), 토큰 생성기

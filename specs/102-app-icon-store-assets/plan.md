@@ -12,7 +12,7 @@
 
 **Language/Version**: TypeScript(Node `--experimental-strip-types`로 `.mts` 실행 — `scripts/design/`과 같은 방식), JSON, 텍스트
 
-**Primary Dependencies**: `pngjs`(PNG 읽기·쓰기)를 devDependency로 올린다. 지금은 다른 패키지의 간접 의존(3.4.0)으로만 있어 최상위로 명시한다. SVG 렌더러는 들이지 않는다 — 마크가 직선·반원뿐이라 해석적 도형 판정으로 직접 그린다(research R1)
+**Primary Dependencies**: `pngjs`(PNG 읽기·쓰기) `^3.4.0`을 devDependency로 올린다(이미 간접 의존으로 깔려 있는 같은 버전이라 공유 `node_modules`를 바꾸지 않는다 — 워크트리가 메인 저장소의 `node_modules`를 심볼릭 링크로 쓴다). 타입 패키지는 들이지 않고 쓰는 부분만 `scripts/design/pngjs.d.ts`에 선언한다. SVG 렌더러는 들이지 않는다 — 마크가 직선·반원뿐이라 해석적 도형 판정으로 직접 그린다(research R1)
 
 **Storage**: 파일(`assets/`, `store/ko/`, `design/icon.json`)
 
@@ -66,7 +66,11 @@ design/
 └── DESIGN.md                        # 「아이콘」 절 추가(한 단락)
 scripts/design/
 ├── icon-build.ts                    # 신규: 순수 코어(도형 판정·래스터화·SVG 문자열)
-└── build-icons.mts                  # 신규: 정본→assets/·store/ko/·design/icon.svg 쓰기, --check
+├── build-icons.mts                  # 신규: 정본→assets/·store/ko/·design/icon.svg 쓰기, --check
+└── pngjs.d.ts                       # 신규: pngjs 타입 선언(쓰는 부분만)
+scripts/store/
+├── screenshot-prep.ts               # 신규: 스크린샷 알파 제거·위에서 자르기 순수 코어
+└── prepare-screenshot.mts           # 신규: 캡처 → 스토어 규격(--size, --crop-height)
 assets/
 ├── icon.png, android-icon-{foreground,background,monochrome}.png, favicon.png   # 생성물로 교체
 design/icon.svg                      # 신규: 생성물(미리보기)
@@ -80,7 +84,7 @@ AGENTS.md                            # 아이콘·등록 에셋 한 줄과 실�
 docs/roadmap/README.md               # 완료 처리(T025)
 __tests__/design/icons.test.ts       # 신규
 __tests__/config/ios-tablet.test.ts  # 신규
-__tests__/store/{listing,assets}.test.ts   # 신규
+__tests__/store/{listing,assets}.test.ts   # 신규(assets는 스크린샷 후처리 코어 테스트도 포함)
 specs/102-app-icon-store-assets/ipad-compat.md   # 구현 중 생성: iPad 시뮬레이터 점검 기록
 specs/102-app-icon-store-assets/device-check.md  # 구현 중 생성: 실기기 확인·콘솔 규격 대조·사진 확인 기록
 ```
