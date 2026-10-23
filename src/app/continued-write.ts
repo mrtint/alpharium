@@ -8,8 +8,8 @@
  * 보조 줄·막대로 옮기며, 쓰기가 끝나면 한 번 닫는다(`finish`). 시스템이 끝내면(만료) 홈에 쓰기를 끊으라고 알린다.
  *
  * **막대는 실제 일이 끝날 때만 움직인다**(FR-003, 원칙 V) — 단계가 바뀌거나 박동(사진 한 장·글 한 조각)이 올 때뿐이고 타이머가 없다.
- * 장 수·조각 수를 미리 모르므로(박동은 종류뿐, FR-004) 단계 몫 안에서 박동마다 남은 몫의 일부만큼 다가간다. 끝나기 전에는 가득 차지
- * 않는다 — 끝은 `finish`가 닫는다. 몫과 비율은 사람이 정한 값이다(research R3). 이 값은 밖으로 나가 표시에만 쓰인다 — 저장하지 않는다.
+ * 장 수·조각 수를 미리 모르므로(박동은 종류뿐, FR-004) 단계 몫 안에서 박동 무게 합 `w`에 대해 `시작 + 몫 × w/(w+k)`로 다가간다(103). 끝나기 전에는 가득 차지
+ * 않는다 — 끝은 `finish`가 닫는다. 몫·무게·반몫은 사람이 정한 값이다(092 research R3, 103 research R6·R7). 이 값은 밖으로 나가 표시에만 쓰인다 — 저장하지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -39,10 +39,24 @@ const SPANS: Readonly<Record<ContinuedStage, readonly [number, number]>> = {
 const ORDER: readonly ContinuedStage[] = ["prepare", "photos", "writing"];
 
 /**
- * 박동 하나가 단계의 남은 몫 중 채우는 비율 — 사진은 많아야 8장(023), 조각은 본문·제목 합쳐 열 개 남짓, 토큰은 수백 개다(짐작, 사람이
- * 정한 값). 토큰과 조각이 함께 오므로 둘 다 작게 둔다.
+ * 박동 하나가 단계 안 무게 합 `w`에 더하는 무게 — 사진은 많아야 8장(023), 조각은 본문·제목 합쳐 열 개 남짓(프롬프트 토막 약 11개 포함,
+ * 1회차 실측 약 105개), 토큰은 수천 개다(103 research R6, 추정). 조각 하나는 토큰 32개분의 일이지만 초반에 몰려 오므로 무게를 4로
+ * 낮췄다(사람이 정한 값).
  */
-const BEAT_SHARE: Readonly<Record<Beat, number>> = { photo: 1 / 4, chunk: 1 / 16, token: 1 / 400 };
+const BEAT_WEIGHT: Readonly<Record<Beat, number>> = { photo: 1, chunk: 4, token: 1 };
+
+/**
+ * 단계의 반몫 무게 `k` — 무게 합 `w`가 이만큼 쌓이면 단계 몫의 절반에 닿는다. 위치는 `시작 + 몫 × w/(w+k)`다(103).
+ *
+ * 쌍곡선은 걸음이 `1/w`로만 줄어 끝에서도 눈에 띄게 오르고, 총 토큰 수가 1500~6000개로 달라도 글 단계 끝이 77~89%에 든다(모의 k=1000:
+ * `specs/103-iphone-continued-write-look/research.md` R3·R7). 앱은 총량을 모르므로(FR-004) 이 값들은 실측이 아니라 사람이 정한 값이다
+ * (원칙 V). 준비 단계는 박동이 없다.
+ */
+const HALF_WEIGHT: Readonly<Record<ContinuedStage, number>> = {
+  prepare: 1,
+  photos: 2,
+  writing: 1000,
+};
 
 /**
  * 092 — 박동에 따른 보고의 최소 간격(ms). 토큰 박동은 1초에 여러 번 올 수 있다 — 막대는 박동마다 앞으로 가되 네이티브 보고는 이 간격으로
@@ -100,6 +114,7 @@ export function createContinuedWrite(
 
       let closed = false;
       let fraction = SPANS.prepare[0];
+      let weight = 0;
       let lastSent = Number.NEGATIVE_INFINITY;
       let lastCompleted = -1;
       const send = () => {
@@ -120,8 +135,12 @@ export function createContinuedWrite(
 
       const offBeat = subscribe((kind) => {
         if (closed) return;
-        const end = SPANS[stage][1];
-        fraction += (end - fraction) * BEAT_SHARE[kind];
+        weight += BEAT_WEIGHT[kind];
+        const [start, end] = SPANS[stage];
+        fraction = Math.max(
+          fraction,
+          start + ((end - start) * weight) / (weight + HALF_WEIGHT[stage]),
+        );
         if (clock() - lastSent >= MIN_REPORT_MS) send();
       });
       const offExpired = port.onExpired(() => {
@@ -139,6 +158,7 @@ export function createContinuedWrite(
           const mapped = continuedStageOf(next);
           if (ORDER.indexOf(mapped) <= ORDER.indexOf(stage)) return;
           stage = mapped;
+          weight = 0;
           fraction = Math.max(fraction, SPANS[stage][0]);
           send();
         },
