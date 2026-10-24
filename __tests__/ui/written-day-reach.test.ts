@@ -120,8 +120,10 @@ describe("★ 051 DEL — 없어지는 것이 정말 없다", () => {
     // 059 — `expo-network`를 직접 의존성으로 올렸다(모듈 다시 받기 확인의 「모바일 데이터로」 — Clarification Q2, 새 네이티브 모듈 하나).
     // 062 — `expo-localization`을 더했다(기기 언어 감지 — research R1, 새 네이티브 모듈 하나. dev 실기기에서 매니페스트 확인).
     // 094 — `expo-build-properties`를 더했다(iOS UIScene 채택 `enableSceneSupport` — 빌드 시 config plugin뿐, 앱에 새 네이티브 코드가 실리지 않는다).
+    // 104 — `expo-battery`를 더했다(배터리 예외 상태 읽기 — 새 네이티브 모듈 하나, AndroidManifest에 권한이 없다. 읽는 곳은 `battery-exception-port.ts` 하나).
     const known = new Set([
       "expo-application",
+      "expo-battery",
       "expo-network",
       "expo-localization",
       "expo-build-properties",

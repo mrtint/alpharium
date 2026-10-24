@@ -4,7 +4,7 @@
 
 ## RP — 계획 (`src/schedule/reminder-plan.ts`, 순수)
 
-`planReminders({ now, settings, writtenDays, name }): ReminderPlanEntry[]`
+`planReminders({ now, settings, writtenDays, name, delayMinutes }): ReminderPlanEntry[]` — `delayMinutes`(0 이상 60 미만 정수)는 울릴 시각 `at`만 정각 뒤로 늦춘다(배터리 예외가 확인된 때만 30, 그 밖 0 — 104)
 
 - **RP1** `settings.enabled === false`이면 `[]`.
 - **RP2** 오후 목표(예: 22)에서 `now`가 오늘 21:00이면 첫 항목은 `day = 오늘`, `at = 오늘 22:00`이다. `now`가 오늘 22:00이거나 그 뒤면 첫 항목은 내일이다.
@@ -17,7 +17,7 @@
 
 ## RC — 맞추기 (`src/schedule/reminders.ts`)
 
-`reconcileReminders(deps): Promise<void>`. deps는 `{ port: ReminderPort, now: () => Date, prepare: () => Promise<void>, loadSettings: () => Promise<AutoDiarySettings>, listDiaryDays: () => Promise<readonly DayDate[]>, loadName: () => Promise<string | null> }`다. `loadSettings`·`listDiaryDays`·`loadName`은 읽지 못하면 던진다(research R18).
+`reconcileReminders(deps): Promise<void>`. deps는 `{ port: ReminderPort, now: () => Date, prepare: () => Promise<void>, loadSettings: () => Promise<AutoDiarySettings>, listDiaryDays: () => Promise<readonly DayDate[]>, loadName: () => Promise<string | null>, loadBatteryStatus: () => Promise<BatteryExceptionStatus> }`다. `loadSettings`·`listDiaryDays`·`loadName`은 읽지 못하면 던진다(research R18). `loadBatteryStatus`는 던져도 `unknown`(정각)으로 본다 — 맞추기를 멈추지 않는다.
 
 - **RC1** 차이만 고친다(research R16).
   1. `prepare()`

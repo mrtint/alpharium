@@ -1,7 +1,10 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import type { BatteryExceptionPort } from "../../src/schedule/battery-exception-port";
+import {
+  expoBatteryExceptionPort,
+  type BatteryExceptionPort,
+} from "../../src/schedule/battery-exception-port";
 
 /**
  * 배터리 최적화 예외 통로의 계약 테스트.
@@ -21,11 +24,95 @@ const SOURCE = readFileSync(
 const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
 describe("E1 — 인터페이스 시그니처", () => {
-  it("openSettingsList 하나만 갖는다", () => {
+  // 104 — 예외 상태를 읽는 `readStatus`가 더해졌다. 그 밖의 통로는 없다.
+  it("openSettingsList와 readStatus 둘만 갖는다", () => {
     const port: BatteryExceptionPort = {
       openSettingsList: async () => {},
+      readStatus: async () => "unknown",
     };
-    expect(Object.keys(port)).toEqual(["openSettingsList"]);
+    expect(Object.keys(port)).toEqual(["openSettingsList", "readStatus"]);
+    expect(Object.keys(expoBatteryExceptionPort()).sort()).toEqual([
+      "openSettingsList",
+      "readStatus",
+    ]);
+  });
+});
+
+describe("104 BE1~BE4 — 예외 상태 읽기", () => {
+  const battery = (answer: unknown | (() => never)) => ({
+    isBatteryOptimizationEnabledAsync: jest.fn(async () => {
+      if (typeof answer === "function") return (answer as () => never)();
+      return answer as boolean;
+    }),
+  });
+
+  it("BE2: 안드로이드에서 최적화가 켜져 있으면 restricted, 꺼져 있으면 exempt", async () => {
+    const on = battery(true);
+    const off = battery(false);
+    const restricted = expoBatteryExceptionPort({
+      platform: () => "android",
+      loadBattery: async () => on,
+    });
+    const exempt = expoBatteryExceptionPort({
+      platform: () => "android",
+      loadBattery: async () => off,
+    });
+    await expect(restricted.readStatus()).resolves.toBe("restricted");
+    await expect(exempt.readStatus()).resolves.toBe("exempt");
+    expect(on.isBatteryOptimizationEnabledAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("BE3: 호출이 던지거나 모듈을 못 불러오거나 boolean이 아니면 unknown이고 던지지 않는다", async () => {
+    const throwing = battery(() => {
+      throw new Error("native");
+    });
+    await expect(
+      expoBatteryExceptionPort({
+        platform: () => "android",
+        loadBattery: async () => throwing,
+      }).readStatus(),
+    ).resolves.toBe("unknown");
+    await expect(
+      expoBatteryExceptionPort({
+        platform: () => "android",
+        loadBattery: async () => {
+          throw new Error("no module");
+        },
+      }).readStatus(),
+    ).resolves.toBe("unknown");
+    await expect(
+      expoBatteryExceptionPort({
+        platform: () => "android",
+        loadBattery: async () => battery("yes"),
+      }).readStatus(),
+    ).resolves.toBe("unknown");
+    await expect(
+      expoBatteryExceptionPort({
+        platform: () => {
+          throw new Error("no react-native");
+        },
+        loadBattery: async () => battery(true),
+      }).readStatus(),
+    ).resolves.toBe("unknown");
+  });
+
+  it("BE4: iOS에서는 expo-battery를 부르지 않고 unknown", async () => {
+    const loadBattery = jest.fn(async () => battery(true));
+    const port = expoBatteryExceptionPort({ platform: () => "ios", loadBattery });
+    await expect(port.readStatus()).resolves.toBe("unknown");
+    expect(loadBattery).not.toHaveBeenCalled();
+  });
+});
+
+describe("104 BE5 — expo-battery는 호출 시점에만 불러오고 상태 외에는 남기지 않는다", () => {
+  it("expo-battery를 메서드 안에서 await import한다 (정적 import 없음)", () => {
+    expect(CODE).toMatch(/import\(["']expo-battery["']\)/);
+    expect(CODE).not.toMatch(/^import .* from ["']expo-battery["']/m);
+  });
+
+  it("배터리 잔량·충전 상태 같은 다른 값을 읽지 않는다 (원칙 IV)", () => {
+    expect(CODE).not.toMatch(/getBatteryLevelAsync|getBatteryStateAsync|getPowerStateAsync/);
+    expect(CODE).toMatch(/isBatteryOptimizationEnabledAsync/);
   });
 });
 

@@ -194,7 +194,9 @@ export function SettingsScreen({
           label={SETTINGS_TEXT.permBattery}
           onPress={onOpenAppSettings}
           testID="settings-perm-battery"
-          trailing={<Chevron />}
+          trailing={
+            <PermissionTrailing tag={permissionTags.battery} testID="settings-tag-battery" />
+          }
         />
       </Group>
 

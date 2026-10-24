@@ -66,6 +66,8 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 104 — 홈 배터리 안내 한 줄(`home.batteryNotice.body`, 소유자 승인 2026-10-24). 버튼 「설정 열기」·「닫기」는 기존 문구와 같다
+  "배터리 사용 제한을 풀어 두면 화면이 꺼진 채로도 일기를 써드릴 수 있어요",
   // 101 — 설정 「정보」의 「오픈소스 라이선스」 행(새 영역 licenseLinks). 고지는 앱 밖 페이지라 모델 이름이 앱에 없다
   "오픈소스 라이선스",
   // 100 — 제목 구간 혼잣말 풀(`monologue.title`, 사람이 쓴 열 문장)

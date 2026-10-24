@@ -30,7 +30,12 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onOpenRename: jest.fn(),
     autoWriteEnabled: true,
     onToggleAutoWrite: jest.fn(),
-    permissionTags: { photos: "allowed", location: "denied", notifications: "partial" },
+    permissionTags: {
+      photos: "allowed",
+      location: "denied",
+      notifications: "partial",
+      battery: "unread",
+    },
     onOpenAppSettings: jest.fn(),
     batteryHint: "배터리 사용 · 제한 없음으로 두면 제때 써요",
     versionText: "1.0.0 (9)",

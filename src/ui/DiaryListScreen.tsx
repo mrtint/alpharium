@@ -160,6 +160,11 @@ export type DiaryListScreenProps = {
    * 화면이 스스로 건다(FR-003·004).
    */
   writing?: { line?: string; name?: string; leaveNote?: string };
+  /**
+   * 배터리 안내 (104) — 예외가 없는 안드로이드에서 앱 열기 자동 쓰기가 저장된 뒤 한 줄 + [설정 열기]·[닫기]. 있으면 쓰는 중이 아닐 때만
+   * 스트립 아래에 그린다. **문구는 카탈로그에서 읽고, 보일지·닫기·설정 열기는 부르는 쪽이 정한다** — 화면은 예외 상태를 모른다.
+   */
+  batteryNotice?: { onOpenSettings: () => void; onDismiss: () => void };
   /** 「그만두기」 (054) */
   onStop?: () => void;
   /**
@@ -191,6 +196,7 @@ export function DiaryListScreen({
   canSwipeNext,
   movedNotice,
   deniedNotices,
+  batteryNotice,
   preview,
   onRequestPhoto,
   onPressDate,
@@ -268,6 +274,7 @@ export function DiaryListScreen({
           onSwipe={onSwipe}
         />
         <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
+        {batteryNotice !== undefined && <BatteryNoticeLine notice={batteryNotice} />}
       </>
     );
 
@@ -769,6 +776,40 @@ function Notices({
           ))}
         </View>
       )}
+    </View>
+  );
+}
+
+/**
+ * 배터리 안내 한 줄 (104) — 설명 캡션 아래에 글자 버튼 둘. 강조 글자는 `danger`(밝은 면 위 작은 글자, 088), 누름 영역은 44 이상.
+ */
+function BatteryNoticeLine({
+  notice,
+}: {
+  notice: { onOpenSettings: () => void; onDismiss: () => void };
+}) {
+  const t = text().home.batteryNotice;
+  const action = (label: string, onPress: () => void, testID: string) => (
+    <Pressable
+      accessibilityLabel={label}
+      accessibilityRole="button"
+      onPress={onPress}
+      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+      style={{ minHeight: 24, justifyContent: "center" }}
+      testID={testID}
+    >
+      <AppText style={{ color: COLORS.danger, fontWeight: "600" }} variant="caption">
+        {label}
+      </AppText>
+    </Pressable>
+  );
+  return (
+    <View style={{ marginTop: 8 }} testID="home-battery-notice">
+      <AppText variant="caption">{t.body}</AppText>
+      <View style={{ flexDirection: "row", gap: 16 }}>
+        {action(t.open, notice.onOpenSettings, "home-battery-notice-open")}
+        {action(t.dismiss, notice.onDismiss, "home-battery-notice-dismiss")}
+      </View>
     </View>
   );
 }

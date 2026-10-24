@@ -8,6 +8,9 @@
  * ⚠️ RNTL 14의 `render`·`rerender`는 Promise다 — await한다. `AppState` 스파이는 복원하지 않는다(AGENTS).
  */
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { act, render } from "@testing-library/react-native";
 import { AppState } from "react-native";
 
@@ -159,5 +162,27 @@ describe("실패는 삼킨다", () => {
     await render(<Harness {...props} />);
     await flush();
     expect(props.reconcile).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("104 — 예외 상태를 바꾼 뒤 돌아와도 새 호출 시점이 필요 없다", () => {
+  it("앞으로 돌아오면 맞추기가 다시 불린다 (설정 목록에서 돌아온 경우도 같은 경로)", async () => {
+    const props = setup();
+    await render(<Harness {...props} />);
+    await flush();
+    props.reconcile.mockClear();
+    await act(async () => {
+      [...handlers].forEach((h) => h("background"));
+      [...handlers].forEach((h) => h("active"));
+    });
+    expect(props.reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it("훅은 예외 상태를 직접 읽지 않는다 — 읽기는 맞추기의 기본 조립(expoReminderDeps) 한 곳이다", () => {
+    const source = readFileSync(join(__dirname, "../../src/app/use-reminder-sync.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).not.toMatch(/expo-battery|readStatus|BatteryException/);
+    expect(source).toMatch(/expoReminderDeps/);
   });
 });

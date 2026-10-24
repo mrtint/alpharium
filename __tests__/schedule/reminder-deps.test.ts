@@ -154,3 +154,15 @@ describe("RC7·FX3 — reminder-deps.ts 몫", () => {
     expect(source).not.toMatch(/getPermission|getPermissionsAsync/);
   });
 });
+
+describe("104 RD6 — 예외 상태는 예외 통로에서 읽는다", () => {
+  it("batteryPort.readStatus의 값을 그대로 돌려준다", async () => {
+    for (const status of ["exempt", "restricted", "unknown"] as const) {
+      const deps = expoReminderDeps({
+        reminderPort: port,
+        batteryPort: { readStatus: async () => status },
+      });
+      await expect(deps.loadBatteryStatus()).resolves.toBe(status);
+    }
+  });
+});

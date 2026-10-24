@@ -10,6 +10,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import type { BatteryExceptionStatus } from "../../src/schedule/battery-exception-port";
 import { planReminders, type ReminderPlanEntry } from "../../src/schedule/reminder-plan";
 import type {
   PresentedReminder,
@@ -77,12 +78,13 @@ function deps(
     loadSettings: async () => over.settings ?? ON,
     listDiaryDays: async () => over.written ?? [],
     loadName: async () => "은동",
+    loadBatteryStatus: async () => "unknown",
     ...over,
   };
 }
 
 const planFor = (settings = ON, written: string[] = []) =>
-  planReminders({ now: NOW, settings, writtenDays: written, name: "은동" });
+  planReminders({ now: NOW, settings, writtenDays: written, name: "은동", delayMinutes: 0 });
 
 describe("RC1 — 차이만 고친다", () => {
   it("같은 것은 두고, at이 다른 것·계획에 없는 것만 취소하고, 빠진 것만 건다", async () => {
@@ -376,3 +378,251 @@ describe("RC8 — 시각이 지났지만 아직 전달되지 않은 예약을 �
     expect(calls).not.toContain(`cancel:${pending.id}`);
   });
 });
+
+/* ───────────────────────── 104 — 배터리 예외 상태가 알림 시각을 정한다 ───────────────────────── */
+
+const MIN = 60_000;
+
+/** 예약이 들고 있는 상태를 흉내 낸다 — 같은 id를 다시 걸면 바꿔 끼운다 */
+function statefulPort(initial: ReminderPlanEntry[] = []) {
+  const state = new Map<string, ScheduledReminder>(initial.map((e) => [e.id, asScheduled(e)]));
+  const ops: string[] = [];
+  const port: ReminderPort = {
+    async scheduled() {
+      return [...state.values()];
+    },
+    async schedule(entry) {
+      ops.push(`schedule:${entry.day}`);
+      state.set(entry.id, asScheduled(entry));
+    },
+    async cancel(id) {
+      ops.push(`cancel:${id}`);
+      state.delete(id);
+    },
+    async presented() {
+      return [];
+    },
+    async dismiss() {},
+  };
+  return { port, state, ops };
+}
+
+const planWith = (delayMinutes: number, written: string[] = []) =>
+  planReminders({ now: NOW, settings: ON, writtenDays: written, name: "은동", delayMinutes });
+
+const withStatus = (status: BatteryExceptionStatus | (() => Promise<BatteryExceptionStatus>)) => ({
+  loadBatteryStatus: typeof status === "function" ? status : async () => status,
+});
+
+describe("RC9·RC10 — 예외 상태가 계획의 지연을 정한다", () => {
+  it("exempt면 모든 발화가 정각 + 30분", async () => {
+    const { port, state } = statefulPort();
+    await reconcileReminders(deps(port, [], withStatus("exempt")));
+    expect([...state.values()].map((s) => s.at).sort()).toEqual(
+      planWith(30)
+        .map((e) => e.at)
+        .sort(),
+    );
+    expect([...state.values()].map((s) => s.at).sort()).toEqual(
+      planWith(0)
+        .map((e) => e.at + 30 * MIN)
+        .sort(),
+    );
+  });
+
+  it.each(["restricted", "unknown"] as const)(
+    "%s면 모든 발화가 정각이다 (SC-003)",
+    async (status) => {
+      const { port, state } = statefulPort();
+      await reconcileReminders(deps(port, [], withStatus(status)));
+      expect([...state.values()].map((s) => s.at).sort()).toEqual(
+        planWith(0)
+          .map((e) => e.at)
+          .sort(),
+      );
+    },
+  );
+
+  it("상태를 읽다 던져도(SC-007) 맞추기를 멈추지 않고 정각으로 7개를 건다", async () => {
+    const { port, state } = statefulPort();
+    await reconcileReminders(
+      deps(
+        port,
+        [],
+        withStatus(async () => {
+          throw new Error("native");
+        }),
+      ),
+    );
+    expect(state.size).toBe(7);
+    expect([...state.values()].map((s) => s.at).sort()).toEqual(
+      planWith(0)
+        .map((e) => e.at)
+        .sort(),
+    );
+  });
+
+  it("상태 읽기가 동기로 던져도 마찬가지다", async () => {
+    const { port, state } = statefulPort();
+    await reconcileReminders(
+      deps(port, [], {
+        loadBatteryStatus: () => {
+          throw new Error("sync");
+        },
+      }),
+    );
+    expect(state.size).toBe(7);
+  });
+
+  it("자동 쓰기가 꺼져 있으면 상태를 읽지 않는다", async () => {
+    const { port } = statefulPort();
+    const loadBatteryStatus = jest.fn(async () => "exempt" as const);
+    await reconcileReminders(deps(port, [], { settings: OFF, loadBatteryStatus }));
+    expect(loadBatteryStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("RC11 — 상태가 바뀌면 걸린 예약이 새 시각으로 바뀐다", () => {
+  it("정각으로 걸린 7개가 exempt가 되면 +30분으로 다시 걸린다", async () => {
+    const { port, state, ops } = statefulPort(planWith(0));
+    await reconcileReminders(deps(port, [], withStatus("exempt")));
+    expect(ops.filter((o) => o.startsWith("schedule:"))).toHaveLength(7);
+    expect([...state.values()].map((s) => s.at).sort()).toEqual(
+      planWith(30)
+        .map((e) => e.at)
+        .sort(),
+    );
+    expect(state.size).toBe(7);
+  });
+
+  it("exempt → restricted → exempt를 오가도 같은 id의 예약은 하나씩이다", async () => {
+    const { port, state } = statefulPort();
+    let status: BatteryExceptionStatus = "exempt";
+    const d = deps(port, [], { loadBatteryStatus: async () => status });
+    const first = planWith(30)[0]!;
+
+    await reconcileReminders(d);
+    expect(state.get(first.id)!.at).toBe(first.at);
+    status = "restricted";
+    await reconcileReminders(d);
+    expect(state.get(first.id)!.at).toBe(first.at - 30 * MIN);
+    status = "exempt";
+    await reconcileReminders(d);
+    expect(state.get(first.id)!.at).toBe(first.at);
+    expect(state.size).toBe(7);
+  });
+
+  it("이미 새 시각으로 걸려 있으면 취소도 예약도 없다", async () => {
+    const { port, ops } = statefulPort(planWith(30));
+    await reconcileReminders(deps(port, [], withStatus("exempt")));
+    expect(ops).toEqual([]);
+  });
+});
+
+describe("RC12 — 안전장치: 일기 파일이 생긴 날의 예약만 거둔다", () => {
+  it.each(["exempt", "restricted", "unknown"] as const)(
+    "%s — 파일이 없는 날의 예약은 취소되지 않고 시각만 맞춰진다",
+    async (status) => {
+      const { port, state } = statefulPort(planWith(status === "exempt" ? 0 : 30));
+      await reconcileReminders(deps(port, [], withStatus(status)));
+      expect([...state.keys()].sort()).toEqual(
+        planWith(0)
+          .map((e) => e.id)
+          .sort(),
+      );
+      expect(state.has("diary-reminder-2026-10-15")).toBe(true);
+    },
+  );
+
+  it("지연으로 걸어 둔 예약은 일기가 없는 동안 그대로 남는다 (쓰기 도중에도 맞추기는 거두지 않는다)", async () => {
+    const { port, state, ops } = statefulPort(planWith(30));
+    // 쓰기가 시작됐다고 해서 목록(일기 파일)에는 아무것도 생기지 않는다 — 몇 번을 맞춰도 그대로다.
+    await reconcileReminders(deps(port, [], withStatus("exempt")));
+    await reconcileReminders(deps(port, [], withStatus("exempt")));
+    expect(ops).toEqual([]);
+    expect(state.size).toBe(7);
+  });
+});
+
+describe("RC13 — 조립: 저장되면 지연된 예약이 알림 전에 거둬진다", () => {
+  it("저장 전에는 남고, 저장(목록에 날 생김) 뒤 맞추기에서 그 날만 거둬진다", async () => {
+    const { port, state } = statefulPort(planWith(30));
+    let written: string[] = [];
+    const d = deps(port, [], {
+      ...withStatus("exempt"),
+      listDiaryDays: async () => written,
+    });
+
+    await reconcileReminders(d);
+    expect(state.has("diary-reminder-2026-10-15")).toBe(true);
+
+    written = ["2026-10-15"];
+    await reconcileReminders(d);
+    expect(state.has("diary-reminder-2026-10-15")).toBe(false);
+    expect(state.size).toBe(6);
+    expect(state.has("diary-reminder-2026-10-16")).toBe(true);
+  });
+});
+
+describe("RC12 — 리뷰 회귀: 정각~정각+30분 사이에 상태가 바뀌거나 읽기가 실패해도 일기 없는 날의 예약은 남는다", () => {
+  // 22시 목표 · 지금 22:10 — 정각은 지났고 exempt로 걸어 둔 22:30은 아직 오지 않았다
+  const LATE = new Date(2026, 9, 15, 22, 10);
+  const planLate = (delay: number) =>
+    planReminders({
+      now: new Date(2026, 9, 15, 21, 0),
+      settings: ON,
+      writtenDays: [],
+      name: "은동",
+      delayMinutes: delay,
+    });
+
+  it.each(["unknown", "restricted"] as const)(
+    "%s로 읽혀도 오늘 22:30 예약은 취소되지 않는다",
+    async (status) => {
+      const { port, state } = statefulPort(planLate(30));
+      await reconcileReminders(deps(port, [], { ...withStatus(status), now: () => LATE }));
+      expect(state.get("diary-reminder-2026-10-15")?.at).toBe(at2(2026, 10, 15, 22, 30));
+    },
+  );
+
+  it("읽기가 던져도 마찬가지다", async () => {
+    const { port, state } = statefulPort(planLate(30));
+    await reconcileReminders(
+      deps(port, [], {
+        now: () => LATE,
+        loadBatteryStatus: async () => {
+          throw new Error("headless");
+        },
+      }),
+    );
+    expect(state.has("diary-reminder-2026-10-15")).toBe(true);
+  });
+
+  it("일기가 저장됐으면 그 날 예약은 거둬진다", async () => {
+    const { port, state } = statefulPort(planLate(30));
+    await reconcileReminders(
+      deps(port, [], {
+        ...withStatus("unknown"),
+        now: () => LATE,
+        listDiaryDays: async () => ["2026-10-15"],
+      }),
+    );
+    expect(state.has("diary-reminder-2026-10-15")).toBe(false);
+  });
+
+  it("목표 시각을 바꿔서 계획에 없는 옛 예약(+30분이 아닌 시각)은 거둬진다", async () => {
+    // 22시로 걸린 오늘 22:30 예약, 목표를 18시로 바꾼 뒤(지금 22:10) — 18:30은 지났고 22:30은 새 목표의 지연 시각이 아니다
+    const { port, state } = statefulPort(planLate(30));
+    await reconcileReminders(
+      deps(port, [], {
+        ...withStatus("exempt"),
+        now: () => LATE,
+        settings: { enabled: true, targetHour: 18 },
+      }),
+    );
+    expect(state.get("diary-reminder-2026-10-15")).toBeUndefined();
+  });
+});
+
+const at2 = (y: number, m: number, d: number, h: number, min: number) =>
+  new Date(y, m - 1, d, h, min).getTime();

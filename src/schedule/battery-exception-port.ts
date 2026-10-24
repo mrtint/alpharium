@@ -18,8 +18,17 @@
  * 설정 목록만 연다. 반환값이 없다(원칙 IV) — 사용자가 무엇을 했는지 재지 않는다.
  *
  * 지연 import: `expo-intent-launcher`를 메서드 안에서 `await import`한다.
+ *
+ * **예외 상태를 읽는다**(`readStatus`, 104). 쓸 차례 알림을 늦출지(`reminder-plan.ts`)·설정 꼬리표·홈 안내가 모두 이 값 하나로 정해진다. `expo-battery`를 부르는 곳은 이 파일뿐이다
+ * (`__tests__/config/promise-copy.test.ts` FX1). 읽는 것은 「최적화가 켜져 있는가」 한 가지이고 결과 외에 아무것도 남기지 않는다
+ * (원칙 IV). 읽지 못한 것(던짐·iOS·모듈 없음)은 `unknown`이다 — 「예외 있음」으로 채우지 않는다(원칙 V).
  * ─────────────────────────────────────────────────────────────────────────────
  */
+
+import { appPlatform, type AppPlatform } from "../app/platform";
+
+/** 읽은 순간의 예외 상태. 저장하지 않는다 */
+export type BatteryExceptionStatus = "exempt" | "restricted" | "unknown";
 
 export interface BatteryExceptionPort {
   /**
@@ -27,13 +36,41 @@ export interface BatteryExceptionPort {
    * 이걸 부른다. 인텐트가 실패해도 예외를 밖으로 던지지 않는다.
    */
   openSettingsList(): Promise<void>;
+  /**
+   * 배터리 사용 「제한 없음」 여부를 읽는다 (104). 안드로이드의 최적화 예외가 켜져 있지 않으면 `restricted`, 있으면 `exempt`.
+   * 던지지 않는다 — 읽지 못하면 `unknown`이다.
+   */
+  readStatus(): Promise<BatteryExceptionStatus>;
 }
+
+/** 통로를 덮는 자리 — 테스트가 기기 없이 갈아 끼운다 */
+export type BatteryExceptionDeps = {
+  /** 플랫폼. 던지면 읽지 못한 것으로 본다 */
+  platform?: () => AppPlatform;
+  /** `expo-battery`를 불러온다 */
+  loadBattery?: () => Promise<{ isBatteryOptimizationEnabledAsync(): Promise<boolean> }>;
+};
 
 /**
  * 기기의 배터리 예외 통로.
  */
-export function expoBatteryExceptionPort(): BatteryExceptionPort {
+export function expoBatteryExceptionPort(deps: BatteryExceptionDeps = {}): BatteryExceptionPort {
+  const platform = deps.platform ?? runtimePlatform;
+  const loadBattery = deps.loadBattery ?? (() => import("expo-battery"));
   return {
+    async readStatus() {
+      try {
+        if (platform() === "ios") return "unknown";
+        const battery = await loadBattery();
+        const optimized = await battery.isBatteryOptimizationEnabledAsync();
+        if (optimized === true) return "restricted";
+        if (optimized === false) return "exempt";
+        return "unknown";
+      } catch {
+        return "unknown";
+      }
+    },
+
     async openSettingsList() {
       try {
         const IntentLauncher = await import("expo-intent-launcher");
@@ -57,4 +94,11 @@ async function openAppSettingsFallback(): Promise<void> {
   } catch {
     // 여기서도 실패하면 할 수 있는 게 없다 — 조용히 넘어간다.
   }
+}
+
+/** 호출 시점에 읽는다 — `await import("react-native")`가 아니다(066, iOS에서 앱이 죽는다) */
+function runtimePlatform(): AppPlatform {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { Platform } = require("react-native") as { Platform: { OS: string } };
+  return appPlatform(Platform.OS);
 }

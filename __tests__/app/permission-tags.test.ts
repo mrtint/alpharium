@@ -15,6 +15,7 @@ const base: PermissionFacts = {
   photoLocation: "ok",
   location: "granted",
   notifications: "granted",
+  battery: "exempt",
 };
 
 describe("055 사진 — 사진 읽기 + 사진의 위치 정보", () => {
@@ -58,9 +59,30 @@ describe("055 위치·알림", () => {
       photoLocation: "unknown",
       location: "unknown",
       notifications: "unknown",
+      battery: "unknown",
     };
-    for (const key of ["photos", "location", "notifications"] as const) {
+    for (const key of ["photos", "location", "notifications", "battery"] as const) {
       expect(permissionTagFor(key, unknownAll)).toBe("unread");
+    }
+  });
+});
+
+// 104 PT1 — 배터리 행의 꼬리표. 예외 상태는 읽은 순간의 값이다.
+describe("104 PT1 — 배터리", () => {
+  it.each([
+    ["exempt", "allowed"],
+    ["restricted", "denied"],
+    ["unknown", "unread"],
+  ] as const)("%s → %s", (battery, expected) => {
+    expect(permissionTagFor("battery", { ...base, battery })).toBe(expected);
+  });
+
+  it("PT7 — 배터리 상태가 다른 세 행의 판정을 바꾸지 않는다", () => {
+    for (const battery of ["exempt", "restricted", "unknown"] as const) {
+      const facts = { ...base, battery };
+      expect(permissionTagFor("photos", facts)).toBe("allowed");
+      expect(permissionTagFor("location", facts)).toBe("allowed");
+      expect(permissionTagFor("notifications", facts)).toBe("allowed");
     }
   });
 });
