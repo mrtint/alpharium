@@ -794,25 +794,39 @@ function BatteryNoticeLine({
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
-      hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
-      style={{ minHeight: 24, justifyContent: "center" }}
+      hitSlop={{ top: 2, bottom: 2, left: 12, right: 8 }}
+      style={{ minHeight: 32, justifyContent: "center", alignItems: "flex-end" }}
       testID={testID}
     >
-      <AppText style={{ color: COLORS.danger, fontWeight: "600" }} variant="caption">
+      <AppText
+        maxFontSizeMultiplier={NOTICE_FONT_CAP}
+        style={{ color: COLORS.danger, fontWeight: "600" }}
+        variant="caption"
+      >
         {label}
       </AppText>
     </Pressable>
   );
+  // 한 덩어리 — 설명 왼쪽, 버튼 둘은 오른쪽에 세로로. 글꼴 배율이 커도 이 줄은 `NOTICE_FONT_CAP`까지만 커진다(큰 글꼴에서 첫 화면의
+  // 본문을 밀어내지 않게, 실측 2.0배에서 본문 0줄이었다 — 100·104).
   return (
-    <View style={{ marginTop: 8 }} testID="home-battery-notice">
-      <AppText variant="caption">{t.body}</AppText>
-      <View style={{ flexDirection: "row", gap: 16 }}>
+    <View
+      style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}
+      testID="home-battery-notice"
+    >
+      <AppText maxFontSizeMultiplier={NOTICE_FONT_CAP} style={{ flex: 1 }} variant="caption">
+        {t.body}
+      </AppText>
+      <View style={{ alignItems: "flex-end" }}>
         {action(t.open, notice.onOpenSettings, "home-battery-notice-open")}
         {action(t.dismiss, notice.onDismiss, "home-battery-notice-dismiss")}
       </View>
     </View>
   );
 }
+
+/** 배터리 안내 줄의 글꼴 배율 상한 — 사람이 정한 값(실측 2.0배에서 본문 0줄) */
+const NOTICE_FONT_CAP = 1.2;
 
 /* ═══════════════════════════════ 하단 바 ═══════════════════════════════ */
 
