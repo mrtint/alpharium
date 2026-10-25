@@ -91,7 +91,7 @@
 - [X] T035 [P] 소스 계약 테스트를 더한다(`__tests__/app/battery-notice-source.test.ts`, 주석을 걷어낸 뒤 소스를 읽는다) — 새 화면 한글(`DiaryListScreen`의 안내)은 카탈로그에만(062), `task.ts`와 `use-reminder-sync.ts`가 같은 `expoReminderDeps`를 쓴다(FR-008), `App.tsx`가 `useBatteryNotice`를 배선한다. `expo-battery` 호출 한 곳·권한 부재는 T003이 맡는다. 또 FR-014·FR-016·FR-017 회귀로 기존 `__tests__/onboarding/` 테스트(온보딩 배터리 카드 불변)와 `__tests__/config/promise-copy.test.ts` ST3~ST6(시각 미리보기·배터리 행 보조 줄)과 `notify`·`task-reminder` 테스트가 변경 없이 통과함을 확인한다
 - [X] T036 `npm test`와 `npm run lint`(eslint + tsc + 헌법 검사 + prettier)를 실제로 돌려 통과를 확인한다. `tsc` 0이 완료 조건이다. 같은 규칙의 복제가 다른 파일에 있는지 소스를 센다(예: 배터리 행 꼬리표·`TaggedPermission` 소비처)
 - [X] T037 (기기 미연결 — `dumpsys` 대신 prebuild 뒤 `gradlew :app:processDebugMainManifest`의 병합 매니페스트에서 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 부재와 `expo-battery`가 권한을 더하지 않음을 확인; 기기 쪽 `dumpsys`·설치는 T038에서) `npx expo prebuild --platform android --clean` 뒤 `adb shell dumpsys package com.a810labs.pocketlog`에서 `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` 부재를 확인한다(SC-006). debug APK를 지우지 않고 설치한다(모델 ~2GB 보존)
-- [ ] T038 quickstart.md의 실기기 Q1~Q5를 SM-S901N dev에서 수행하고 본 것·못 본 것을 `quickstart.md` 아래에 적는다 — 특히 Q3(헤드리스 읽기 가정). 기기가 없으면 완료로 치지 않고 보고에 못 봤다고 적는다(원칙 V)
+- [X] T038 quickstart.md의 실기기 확인을 SM-S901N dev에서 수행하고 기록했다(2026-10-25·26) — Q1·Q2·Q3(강제 잡, 화면 켜진 채)·Q5·Q6 확인, Q4는 예약(22:30)까지만 확인(소유자가 받아들임). 못 본 것: 22:30 실제 발화·화면 끈 채 헤드리스·하룻밤 소크·작은 화면 — 로드맵 4번 3번(소크)에 남긴다
 
 ## Dependencies & Execution Order
 
