@@ -80,7 +80,12 @@ function Harness({
       onOpenWipe={jest.fn()}
       onPressVersion={onPressVersion}
       onToggleAutoWrite={jest.fn()}
-      permissionTags={{ photos: "allowed", location: "allowed", notifications: "allowed" }}
+      permissionTags={{
+        photos: "allowed",
+        location: "allowed",
+        notifications: "allowed",
+        battery: "unread",
+      }}
       placeNamesText="자동"
       targetHourText="오후 10시쯤"
       versionText="1.0.0 (24)"

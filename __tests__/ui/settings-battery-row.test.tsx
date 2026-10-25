@@ -8,7 +8,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { fireEvent, render, screen } from "@testing-library/react-native";
+import { fireEvent, render, screen, within } from "@testing-library/react-native";
 
 import { SettingsScreen, type SettingsScreenProps } from "../../src/ui/SettingsScreen";
 
@@ -26,7 +26,12 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onOpenRename: jest.fn(),
     autoWriteEnabled: true,
     onToggleAutoWrite: jest.fn(),
-    permissionTags: { photos: "allowed", location: "allowed", notifications: "allowed" },
+    permissionTags: {
+      photos: "allowed",
+      location: "allowed",
+      notifications: "allowed",
+      battery: "unread",
+    },
     onOpenAppSettings: jest.fn(),
     batteryHint: "문구 주입 확인",
     versionText: "1.0.0 (1)",
@@ -56,6 +61,51 @@ describe("068 C2 — 배터리 행", () => {
   it("행을 누르면 onOpenAppSettings를 부른다", async () => {
     const onOpenAppSettings = jest.fn();
     await render(<SettingsScreen {...props({ onOpenAppSettings })} />);
+    await fireEvent.press(screen.getByTestId("settings-perm-battery"));
+    expect(onOpenAppSettings).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("104 PT4~PT6 — 배터리 꼬리표", () => {
+  const permissionTags = (battery: "allowed" | "denied" | "unread") => ({
+    photos: "allowed" as const,
+    location: "allowed" as const,
+    notifications: "allowed" as const,
+    battery,
+  });
+
+  it("allowed → 「허용됨」, denied → 「허용 안 함」", async () => {
+    const { rerender } = await render(
+      <SettingsScreen {...props({ permissionTags: permissionTags("allowed") })} />,
+    );
+    expect(within(screen.getByTestId("settings-tag-battery")).getByText("허용됨")).toBeTruthy();
+    await rerender(<SettingsScreen {...props({ permissionTags: permissionTags("denied") })} />);
+    expect(within(screen.getByTestId("settings-tag-battery")).getByText("허용 안 함")).toBeTruthy();
+  });
+
+  it("unread(모름·iOS)면 꼬리표 없이 화살표만 — 보조 줄과 누름은 그대로", async () => {
+    const onOpenAppSettings = jest.fn();
+    await render(
+      <SettingsScreen
+        {...props({ permissionTags: permissionTags("unread"), onOpenAppSettings })}
+      />,
+    );
+    expect(screen.queryByTestId("settings-tag-battery")).toBeNull();
+    expect(
+      within(screen.getByTestId("settings-perm-battery")).getByTestId("settings-chevron"),
+    ).toBeTruthy();
+    expect(screen.getByText("문구 주입 확인")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("settings-perm-battery"));
+    expect(onOpenAppSettings).toHaveBeenCalledTimes(1);
+  });
+
+  it("꼬리표가 있어도 행을 누르면 앱 설정이 열린다", async () => {
+    const onOpenAppSettings = jest.fn();
+    await render(
+      <SettingsScreen
+        {...props({ permissionTags: permissionTags("denied"), onOpenAppSettings })}
+      />,
+    );
     await fireEvent.press(screen.getByTestId("settings-perm-battery"));
     expect(onOpenAppSettings).toHaveBeenCalledTimes(1);
   });

@@ -33,7 +33,12 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onOpenRename: jest.fn(),
     autoWriteEnabled: true,
     onToggleAutoWrite: jest.fn(),
-    permissionTags: { photos: "allowed", location: "denied", notifications: "partial" },
+    permissionTags: {
+      photos: "allowed",
+      location: "denied",
+      notifications: "partial",
+      battery: "unread",
+    },
     onOpenAppSettings: jest.fn(),
     batteryHint: "제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요",
     versionText: "1.0.0 (9)",
@@ -366,7 +371,12 @@ describe("055 C4·C5·C6 — 권한 네 행", () => {
     await render(
       <SettingsScreen
         {...props({
-          permissionTags: { photos: "unread", location: "unread", notifications: "unread" },
+          permissionTags: {
+            photos: "unread",
+            location: "unread",
+            notifications: "unread",
+            battery: "unread",
+          },
         })}
       />,
     );
@@ -376,7 +386,7 @@ describe("055 C4·C5·C6 — 권한 네 행", () => {
     expect(screen.queryByText(/허용/)).toBeNull();
   });
 
-  it("C4 — 배터리는 꼬리표 없이 보조 줄과 › 만", async () => {
+  it("C4 — 예외 상태를 읽지 못한 배터리(unread)는 꼬리표 없이 보조 줄과 › 만", async () => {
     await render(<SettingsScreen {...props()} />);
     const battery = screen.getByTestId("settings-perm-battery");
     expect(within(battery).queryByText(/허용/)).toBeNull();
@@ -406,7 +416,12 @@ describe("057 SL2·SL4 — 사진 권한 건너뜀 보조 줄 (보드 `6g`)", ()
     await render(
       <SettingsScreen
         {...props({
-          permissionTags: { photos: "denied", location: "allowed", notifications: "allowed" },
+          permissionTags: {
+            photos: "denied",
+            location: "allowed",
+            notifications: "allowed",
+            battery: "unread",
+          },
           photoSkipText: "어제 자동 쓰기를 건너뛰었어요",
         })}
       />,
@@ -448,7 +463,12 @@ describe("055 C8 — 버전", () => {
 describe("★ 055 C7 — 권한은 마운트 때와 전경 복귀 때 다시 읽는다", () => {
   function Probe({ read }: { read: () => Promise<PermissionFacts> }) {
     const tags = usePermissionTags(read);
-    return <Text testID="probe">{`${tags.photos}/${tags.location}/${tags.notifications}`}</Text>;
+    return (
+      <>
+        <Text testID="probe">{`${tags.photos}/${tags.location}/${tags.notifications}`}</Text>
+        <Text testID="probe-battery">{tags.battery}</Text>
+      </>
+    );
   }
 
   it("마운트 때 1회, active로 돌아올 때 다시", async () => {
@@ -466,23 +486,29 @@ describe("★ 055 C7 — 권한은 마운트 때와 전경 복귀 때 다시 읽
       photoLocation: "ok",
       location: "denied",
       notifications: "granted",
+      battery: "restricted",
     };
     const read = jest.fn(async () => facts);
     await render(<Probe read={read} />);
     expect(await screen.findByText("allowed/denied/allowed")).toBeTruthy();
     expect(read).toHaveBeenCalledTimes(1);
+    // 104 PT2 — 배터리도 같은 읽기에서 나오고, 전경 복귀 때 다시 읽는다
+    expect(screen.getByTestId("probe-battery").props.children).toBe("denied");
 
     facts.location = "granted";
+    facts.battery = "exempt";
     await act(async () => listener?.("background"));
     expect(read).toHaveBeenCalledTimes(1);
     await act(async () => listener?.("active"));
     expect(read).toHaveBeenCalledTimes(2);
     expect(await screen.findByText("allowed/allowed/allowed")).toBeTruthy();
+    expect(screen.getByTestId("probe-battery").props.children).toBe("allowed");
   });
 
   it("읽기 전·읽기 실패는 전부 unread다", async () => {
     await render(<Probe read={() => Promise.reject(new Error("x"))} />);
     expect(await screen.findByText("unread/unread/unread")).toBeTruthy();
+    expect(screen.getByTestId("probe-battery").props.children).toBe("unread");
   });
 });
 

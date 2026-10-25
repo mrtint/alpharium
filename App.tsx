@@ -146,6 +146,8 @@ import { reminderSummaryLine } from "./src/app/reminder-summary";
 import { useReminderSync } from "./src/app/use-reminder-sync";
 import { expoReminderPort } from "./src/schedule/reminder-port";
 import { useAutoWriteHandoff } from "./src/app/use-auto-write-handoff";
+import { expoBatteryNoticeStorePort } from "./src/app/battery-notice-store";
+import { useBatteryNotice } from "./src/app/use-battery-notice";
 import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
 import {
   attemptLines,
@@ -2246,6 +2248,18 @@ function DiarySection({
   });
 
   /**
+   * 104 — 홈 배터리 안내. 앱 열기 자동 쓰기가 **저장된 뒤**(`onAutoWriteSaved`) 안드로이드에서 예외가 없고 7일 안에 닫지 않았을 때만 한 줄을 보인다.
+   * 판정은 순수 함수(`shouldShowBatteryNotice`)가, 상태 읽기·설정 목록 열기는 배터리 예외 통로가, 닫은 시각은 새 기록 파일 하나가 맡는다.
+   */
+  const batteryExceptionPort = useMemo(() => expoBatteryExceptionPort(), []);
+  const batteryNoticeStore = useMemo(() => expoBatteryNoticeStorePort(), []);
+  const { notice: batteryNotice, onAutoWriteSaved } = useBatteryNotice({
+    platform: appPlatform(Platform.OS),
+    port: batteryExceptionPort,
+    store: batteryNoticeStore,
+  });
+
+  /**
    * ★ 092 — iPhone 이어 쓰기(`BGContinuedProcessingTask`). **iOS에서만 준다** — 안드로이드는 홈이 종전대로 앞을 벗어날 때 끊는다(FR-011).
    * 홈은 네이티브에 닿지 않는다 — 세션을 여기서 만들어 넘긴다(모듈이 없거나 iOS 26 미만이면 신청이 거절되어 종전과 같다).
    */
@@ -2303,6 +2317,8 @@ function DiarySection({
       photoAccessPort={photoAccessPort}
       // 057 — 앱을 열 때의 자동 쓰기. 판정은 위에서 했고 홈은 그 날을 쓴다.
       autoWriteDay={autoWriteDay}
+      onAutoWriteSaved={onAutoWriteSaved}
+      batteryNotice={batteryNotice ?? undefined}
       claimAutoWrite={claimAutoWrite}
       liveWrites={liveWrites}
       // 058 — 홈이 늘 그려진다(조립이 실패해도 `DiaryHomeScreen`이 실패 화면을 그린다) — 요청은 언제나 홈이 받는다.
@@ -2492,16 +2508,20 @@ function SettingsSection({
   /* ── 055 — 권한 꼬리표. 재료는 021의 통로 + 사진 한 장의 좌표 읽기(R6) ─── */
   // 좌표 읽기에는 021 온보딩 통로가 주지 않는 `photosBetween`·`locationOf`가 필요하다 — 004의 사진 통로를 쓴다.
   const photoPort = useMemo(() => expoPhotoPort(), []);
+  // 104 — 배터리 예외 상태를 읽는 통로(온보딩의 `battery`는 설정 목록을 여는 데만 쓴다)
+  const batteryPort = useMemo(() => expoBatteryExceptionPort(), []);
   const readPermissions = useCallback(async (): Promise<PermissionFacts> => {
     const unknown = () => "unknown" as const;
-    const [photos, photoLocation, location, notifications] = await Promise.all([
+    const [photos, photoLocation, location, notifications, battery] = await Promise.all([
       onboardingPorts.photo.photoPermission().catch(unknown),
       photoLocationProbe(photoPort, Date.now()),
       onboardingPorts.location.status().catch(unknown),
       onboardingPorts.notification.getPermission().catch(unknown),
+      // 104 — 배터리 예외 상태. 읽지 못하면 `unknown`(꼬리표 없음)
+      batteryPort.readStatus().catch(unknown),
     ]);
-    return { photos, photoLocation, location, notifications };
-  }, [onboardingPorts, photoPort]);
+    return { photos, photoLocation, location, notifications, battery };
+  }, [onboardingPorts, photoPort, batteryPort]);
   const permissionTags = usePermissionTags(readPermissions);
   // 085 FR-015 — 자동 쓰기가 켜져 있고 알림이 「허용 안 함」이면 알림 행 아래 한 줄(쓸 차례 알림이 보이지 않는다).
   const notificationOffText = notificationOffLine(

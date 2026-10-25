@@ -8,7 +8,12 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { planReminders, REMINDER_ID_PREFIX } from "../../src/schedule/reminder-plan";
+import {
+  planReminders,
+  REMINDER_DELAY_MINUTES,
+  REMINDER_ID_PREFIX,
+  reminderDelayFor,
+} from "../../src/schedule/reminder-plan";
 import { reminderTitle } from "../../src/schedule/notification-text";
 import type { AutoDiarySettings } from "../../src/schedule/settings";
 
@@ -20,7 +25,8 @@ const plan = (
   settings: AutoDiarySettings,
   writtenDays: string[] = [],
   name: string | null = "은동",
-) => planReminders({ now, settings, writtenDays, name });
+  delayMinutes = 0,
+) => planReminders({ now, settings, writtenDays, name, delayMinutes });
 
 const at = (y: number, m: number, d: number, h: number) => new Date(y, m - 1, d, h).getTime();
 
@@ -141,5 +147,83 @@ describe("RP4 — 쓴 날은 빠진다", () => {
     const result = plan(new Date(2026, 9, 15, 6, 0), ON7, ["2026-10-14"]);
     expect(result.map((r) => r.at)).not.toContain(at(2026, 10, 15, 7));
     expect(result).toHaveLength(6);
+  });
+});
+
+/* ───────────────────────── 104 — 배터리 예외가 있으면 쓸 차례 알림을 늦춘다 ───────────────────────── */
+
+const min = (n: number) => n * 60_000;
+
+describe("RD1 — 예외 상태에서 지연이 정해진다", () => {
+  it("exempt만 30분, 그 밖은 0", () => {
+    expect(REMINDER_DELAY_MINUTES).toBe(30);
+    expect(reminderDelayFor("exempt")).toBe(30);
+    expect(reminderDelayFor("restricted")).toBe(0);
+    expect(reminderDelayFor("unknown")).toBe(0);
+  });
+});
+
+describe("RD2·RD3 — 지연은 at에만 더해지고 id·day·title은 정각 기준 그대로다", () => {
+  it("오후 목표", () => {
+    const now = new Date(2026, 9, 15, 21, 0);
+    const base = plan(now, ON22);
+    const delayed = plan(now, ON22, [], "은동", 30);
+    expect(delayed).toHaveLength(base.length);
+    delayed.forEach((entry, i) => {
+      expect(entry.at).toBe(base[i]!.at + min(30));
+      expect(entry.id).toBe(base[i]!.id);
+      expect(entry.day).toBe(base[i]!.day);
+      expect(entry.title).toBe(base[i]!.title);
+    });
+  });
+
+  it("오전 목표의 그날/어제 매핑은 정각 기준이다", () => {
+    const now = new Date(2026, 9, 15, 6, 0);
+    const delayed = plan(now, ON7, [], "은동", 45);
+    expect(delayed[0]).toMatchObject({ day: "2026-10-14", at: at(2026, 10, 15, 7) + min(45) });
+    expect(delayed[6]).toMatchObject({ day: "2026-10-20", at: at(2026, 10, 21, 7) + min(45) });
+  });
+
+  it("23시 목표 + 59분도 같은 날에 머문다", () => {
+    const now = new Date(2026, 9, 15, 20, 0);
+    const [first] = plan(now, { enabled: true, targetHour: 23 }, [], "은동", 59);
+    expect(first).toMatchObject({ day: "2026-10-15", at: at(2026, 10, 15, 23) + min(59) });
+  });
+
+  it("범위 밖 지연(음수·60 이상·소수·NaN)은 RangeError", () => {
+    const now = new Date(2026, 9, 15, 21, 0);
+    for (const bad of [-1, 60, 61, 0.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(() => plan(now, ON22, [], "은동", bad)).toThrow(RangeError);
+    }
+  });
+});
+
+describe("RD4 — 지연 0은 이 변경 전 계획과 같다", () => {
+  it("at이 정각이다", () => {
+    const result = plan(new Date(2026, 9, 15, 21, 0), ON22, [], "은동", 0);
+    expect(result[0]!.at).toBe(at(2026, 10, 15, 22));
+  });
+});
+
+describe("RD5 — 정각은 지났지만 정각+지연 전이면 오늘 발화가 계획에 든다", () => {
+  it("22:10, 지연 30분이면 오늘 22:30", () => {
+    const result = plan(new Date(2026, 9, 15, 22, 10), ON22, [], "은동", 30);
+    expect(result[0]).toMatchObject({ day: "2026-10-15", at: at(2026, 10, 15, 22) + min(30) });
+    expect(result).toHaveLength(7);
+  });
+
+  it("22:30 정각이면 오늘 발화는 지났고 내일부터(지연 30분)", () => {
+    const result = plan(new Date(2026, 9, 15, 22, 30), ON22, [], "은동", 30);
+    expect(result[0]).toMatchObject({ day: "2026-10-16" });
+  });
+
+  it("같은 시각에 지연 0이면 내일부터다(종전)", () => {
+    const result = plan(new Date(2026, 9, 15, 22, 10), ON22, [], "은동", 0);
+    expect(result[0]).toMatchObject({ day: "2026-10-16" });
+  });
+
+  it("쓴 날은 지연이 있어도 빠진다", () => {
+    const result = plan(new Date(2026, 9, 15, 22, 10), ON22, ["2026-10-15"], "은동", 30);
+    expect(result[0]).toMatchObject({ day: "2026-10-16" });
   });
 });

@@ -214,6 +214,15 @@ export type DiaryHomeScreenProps = {
    */
   autoWriteDay?: DayDate | null;
   /**
+   * 104 — 앱 열기 자동 쓰기(057·085 알림 누름)가 **저장됐을 때만** 부른다. 사람이 누른 「쓰기」·진단 실행·실패·그만두기·이미 쓰는 중에는 부르지
+   * 않는다. 홈은 이 신호로 무엇을 하는지(배터리 안내) 모른다 — 조립부가 정한다.
+   */
+  onAutoWriteSaved?: (day: DayDate) => void;
+  /**
+   * 104 — 홈 배터리 안내. 있으면 쓰는 중이 아닐 때 스트립 아래에 한 줄을 그린다. 보일지·닫기는 조립부(`useBatteryNotice`)가 정한다.
+   */
+  batteryNotice?: { onOpenSettings: () => void; onDismiss: () => void };
+  /**
    * 057 — 실제로 시작하는 순간에만 부른다. 거짓이면 이번 실행에서 이미 시작했거나 첫 실행 자동 첫 일기가 돌았다
    * (FR-017·FR-020). 시작하지 않은 판정은 부르지 않는다 — 「한 번」을 소모하지 않는다.
    */
@@ -347,6 +356,8 @@ export function DiaryHomeScreen({
   photoAccessPort,
   canPrepare,
   autoWriteDay,
+  onAutoWriteSaved,
+  batteryNotice,
   claimAutoWrite,
   liveWrites,
   wipeRequest,
@@ -1033,6 +1044,8 @@ export function DiaryHomeScreen({
         // 029 — 생성이 성공했으면 실제로 쓴 캐릭터를 기록한다(FR-008a). 옮겨졌으면
         // 옮겨진 쪽(params.character). 실패면 부르지 않는다(원칙 I).
         if (result.ok) onGenerated?.(params.character);
+        // 104 — 앱 열기 자동 쓰기가 **저장됐다**. 사람이 누른 「쓰기」(auto 아님)·실패·`already-running`에는 알리지 않는다.
+        if (result.ok && options.auto === true) onAutoWriteSaved?.(params.day);
 
         // 051 — 성공이면 결과 화면 없이 홈의 그 날로(목록을 다시 읽으면 그 날의 새 일기도 다시
         // 읽힌다). 054 — 실패도 결과 화면 없이 쓰기 전 상태의 홈이다(저장 실패도 — 글은 버려진다).
@@ -1078,6 +1091,7 @@ export function DiaryHomeScreen({
       liveWrites,
       continuedWrite,
       onContinuedSaved,
+      onAutoWriteSaved,
       stop,
     ],
   );
@@ -1486,6 +1500,7 @@ export function DiaryHomeScreen({
               canSwipeNext={canSwipeNext(prompt.day, now())}
               cells={weekCellsFor(items, prompt, now())}
               deniedNotices={deniedNotices}
+              batteryNotice={batteryNotice}
               items={items}
               movedNotice={movedNotice}
               // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.

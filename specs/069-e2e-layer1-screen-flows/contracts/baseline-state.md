@@ -12,6 +12,7 @@
 | `simulation.json` | delete | — |
 | `auto-write-skipped.json` | delete | — |
 | `notified.json` | delete | — |
+| `battery-notice-dismissed.json` | delete | — |
 | `write-failures.json` | delete | — |
 | `character-names.json` | delete | — |
 | `geocoding-setting.json` | delete | — |

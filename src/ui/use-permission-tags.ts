@@ -20,7 +20,12 @@ import {
 
 export type PermissionTags = Record<TaggedPermission, PermissionTag>;
 
-const UNREAD: PermissionTags = { photos: "unread", location: "unread", notifications: "unread" };
+const UNREAD: PermissionTags = {
+  photos: "unread",
+  location: "unread",
+  notifications: "unread",
+  battery: "unread",
+};
 
 export function usePermissionTags(read: () => Promise<PermissionFacts>): PermissionTags {
   const [tags, setTags] = useState<PermissionTags>(UNREAD);
@@ -40,6 +45,7 @@ export function usePermissionTags(read: () => Promise<PermissionFacts>): Permiss
             photos: permissionTagFor("photos", facts),
             location: permissionTagFor("location", facts),
             notifications: permissionTagFor("notifications", facts),
+            battery: permissionTagFor("battery", facts),
           });
         })
         .catch(() => {

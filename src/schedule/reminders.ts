@@ -12,6 +12,9 @@
  * **설정이나 일기 목록을 읽지 못하면 아무것도 바꾸지 않는다**(RC6, 원칙 V) — 모르는 것을 「꺼짐」·「안 쓴 날」로 단정하면 일시적
  * 실패 한 번에 예약을 모두 지운다. 어떤 통로가 던져도 밖으로 던지지 않는다(RC3, 020 N8 — 알림 실패가 쓰기를 되돌리지 않는다).
  *
+ * **지우는 규칙은 하나다**(104에서도 같다) — 그 날 일기 파일이 생긴 날(`writtenDays`)의 예약만 계획에서 빠져 거둬진다. 쓰기 시작·도중에는
+ * 거두지 않는다: 쓰기가 실패하거나 프로세스가 죽거나 얼어도 예약(OS 알람)은 남아 뜬다. 배터리 예외가 있으면 울릴 시각만 뒤로 간다.
+ *
  * **한 줄로 선다**(RC4) — 앱의 훅·태스크·등록부의 끝이 거의 함께 부를 수 있다. 모듈 하나의 순서 줄이 앞 맞추기가 끝난 뒤
  * 다음을 시작한다(078 시도 기록의 `inOrder`와 같은 꼴). 이 파일은 `AppState`·`../app/`을 모른다(OP7) — 기본 조립은
  * `reminder-deps.ts`다.
@@ -19,7 +22,14 @@
  */
 
 import { dayOf, selectableDays, type DayDate } from "../config/day-boundary";
-import { planReminders, REMINDER_ID_PREFIX, type ReminderPlanEntry } from "./reminder-plan";
+import type { BatteryExceptionStatus } from "./battery-exception-port";
+import {
+  planReminders,
+  REMINDER_DELAY_MINUTES,
+  REMINDER_ID_PREFIX,
+  reminderDelayFor,
+  type ReminderPlanEntry,
+} from "./reminder-plan";
 import type { ReminderPort, ScheduledReminder } from "./reminder-port";
 import type { AutoDiarySettings } from "./settings";
 
@@ -37,6 +47,11 @@ export type ReminderDeps = {
    * (research R8) — `null`은 순수 계획의 방어(RP8)로만 남는다. 던지면 아무것도 바꾸지 않는다(RC6).
    */
   loadName: () => Promise<string | null>;
+  /**
+   * 배터리 예외 상태 (104). 예외가 확인된 때만 알림을 늦춘다(`reminderDelayFor`). 던지면 `unknown`(정각)으로 보고 맞추기를 이어 간다 —
+   * 상태는 정보이지 판단의 근거가 아니라서, 설정·일기 목록을 못 읽을 때(RC6)처럼 멈추지 않는다.
+   */
+  loadBatteryStatus: () => Promise<BatteryExceptionStatus>;
 };
 
 let tail: Promise<void> = Promise.resolve();
@@ -62,6 +77,15 @@ function reachableIds(now: Date): { id: string; day: DayDate }[] {
 const same = (entry: ReminderPlanEntry, scheduled: ScheduledReminder) =>
   scheduled.id === entry.id && scheduled.at === entry.at && scheduled.title === entry.title;
 
+/** 던지지 않는다 — 읽지 못하면 `unknown`이다(104) */
+async function readBatteryStatus(deps: ReminderDeps): Promise<BatteryExceptionStatus> {
+  try {
+    return await deps.loadBatteryStatus();
+  } catch {
+    return "unknown";
+  }
+}
+
 async function reconcileOnce(deps: ReminderDeps): Promise<void> {
   let settings: AutoDiarySettings;
   let writtenDays: readonly DayDate[];
@@ -75,7 +99,14 @@ async function reconcileOnce(deps: ReminderDeps): Promise<void> {
   }
 
   const now = deps.now();
-  const plan = planReminders({ now, settings, writtenDays, name });
+  const batteryStatus = settings.enabled ? await readBatteryStatus(deps) : "unknown";
+  const plan = planReminders({
+    now,
+    settings,
+    writtenDays,
+    name,
+    delayMinutes: reminderDelayFor(batteryStatus),
+  });
   const written = new Set(writtenDays);
   const window = new Set(selectableDays(now));
   /**
@@ -85,6 +116,25 @@ async function reconcileOnce(deps: ReminderDeps): Promise<void> {
    */
   const stillDue = (day: DayDate | null) =>
     settings.enabled && day !== null && !written.has(day) && window.has(day);
+  /**
+   * 104 — 정각은 지났지만 정각+지연이 아직 오지 않은 때, 지금 상태가 `exempt`가 아니면(상태가 바뀌었거나 헤드리스에서 못 읽었다) 계획은 그 날의
+   * 발화를 정각 기준으로 보고 건너뛴다. 그러면 `exempt`일 때 걸어 둔 지연 예약이 「계획에 없는 예약」으로 취소돼, 일기가 없는데도 그 날 알림이
+   * 사라진다(안전장치 위반). 그 날 몫의 **지연 예약**(= `exempt` 계획의 같은 id·같은 시각)은 아직 울릴 차례이므로 거두지 않는다. 상태가 정말
+   * `restricted`였다면 알림이 정각 뒤 30분에 뜰 뿐 잃지 않는다. 목표 시각을 바꾼 옛 예약은 이 계획과 시각이 달라 그대로 거둔다.
+   */
+  const delayedPlan = planReminders({
+    now,
+    settings,
+    writtenDays,
+    name,
+    delayMinutes: REMINDER_DELAY_MINUTES,
+  });
+  const keepDelayed = (s: ScheduledReminder) =>
+    s.at !== null &&
+    s.at > now.getTime() &&
+    stillDue(s.day) &&
+    !plan.some((entry) => entry.id === s.id) &&
+    delayedPlan.some((entry) => entry.id === s.id && entry.at === s.at);
 
   await deps.prepare().catch(() => {});
 
@@ -100,6 +150,7 @@ async function reconcileOnce(deps: ReminderDeps): Promise<void> {
       if (plan.some((entry) => same(entry, s))) continue;
       const passed = s.at !== null && s.at <= now.getTime();
       if (passed && stillDue(s.day)) continue; // RC8
+      if (keepDelayed(s)) continue; // 104
       await deps.port.cancel(s.id).catch(() => {});
     }
   } else {

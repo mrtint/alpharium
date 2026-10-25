@@ -402,3 +402,51 @@ describe("★ 화면에 없어야 하는 것 (006 SC-019·020 유지)", () => {
     }
   });
 });
+
+/* ───────────────────────── 104 HS2 — 배터리 안내 한 줄 ───────────────────────── */
+
+describe("104 HS2 — 배터리 안내", () => {
+  const notice = () => ({ onOpenSettings: jest.fn(), onDismiss: jest.fn() });
+
+  it("batteryNotice가 있으면 문구와 [설정 열기]·[닫기]를 그린다", async () => {
+    const batteryNotice = notice();
+    await renderHome({ items: [readable("2026-09-20")], batteryNotice });
+    expect(screen.getByTestId("home-battery-notice")).toBeTruthy();
+    expect(
+      screen.getByText("배터리 사용 제한을 풀어 두면 화면이 꺼진 채로도 일기를 써드릴 수 있어요"),
+    ).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("home-battery-notice-open"));
+    expect(batteryNotice.onOpenSettings).toHaveBeenCalledTimes(1);
+    await fireEvent.press(screen.getByTestId("home-battery-notice-dismiss"));
+    expect(batteryNotice.onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it("버튼은 접근성 역할과 라벨을 가진다", async () => {
+    await renderHome({ items: [], batteryNotice: notice() });
+    for (const [id, label] of [
+      ["home-battery-notice-open", "설정 열기"],
+      ["home-battery-notice-dismiss", "닫기"],
+    ] as const) {
+      const button = screen.getByTestId(id);
+      expect(button.props.accessibilityRole).toBe("button");
+      expect(button.props.accessibilityLabel).toBe(label);
+    }
+  });
+
+  it("batteryNotice가 없으면 그리지 않는다", async () => {
+    await renderHome({ items: [readable("2026-09-20")] });
+    expect(screen.queryByTestId("home-battery-notice")).toBeNull();
+  });
+
+  it("쓰는 중에는 그리지 않는다", async () => {
+    const items = [readable("2026-09-20")];
+    const write = writePromptFor(items, MORNING, null);
+    await renderHome({
+      items,
+      write,
+      batteryNotice: notice(),
+      writing: { line: "쓰는 중…", name: "금동이" },
+    });
+    expect(screen.queryByTestId("home-battery-notice")).toBeNull();
+  });
+});

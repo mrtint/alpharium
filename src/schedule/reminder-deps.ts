@@ -28,6 +28,7 @@ import {
   loadCustomNames,
   type CharacterNamesPort,
 } from "../welcome/names-port";
+import { expoBatteryExceptionPort, type BatteryExceptionPort } from "./battery-exception-port";
 import { expoNotificationPort, type NotificationPort } from "./notification-port";
 import { expoReminderPort, type ReminderPort } from "./reminder-port";
 import type { ReminderDeps } from "./reminders";
@@ -47,6 +48,8 @@ export type ReminderDepsOverrides = {
   selectionPort?: SelectionPort;
   namesPort?: CharacterNamesPort;
   notificationPort?: Pick<NotificationPort, "ensureChannel">;
+  /** 104 — 배터리 예외 상태 통로. 안 주면 기기 통로 */
+  batteryPort?: Pick<BatteryExceptionPort, "readStatus">;
 };
 
 export function expoReminderDeps(overrides: ReminderDepsOverrides = {}): ReminderDeps {
@@ -59,6 +62,7 @@ export function expoReminderDeps(overrides: ReminderDepsOverrides = {}): Reminde
       return raw === null ? { ...DEFAULT_AUTO_DIARY_SETTINGS } : parseAutoDiarySettings(raw);
     },
     listDiaryDays: () => (overrides.store ?? fileStore(expoFileSystemPort("diary"))).listDays(),
+    loadBatteryStatus: () => (overrides.batteryPort ?? expoBatteryExceptionPort()).readStatus(),
     async loadName() {
       const character =
         (await loadSelection(overrides.selectionPort ?? expoSelectionPort())) ??
