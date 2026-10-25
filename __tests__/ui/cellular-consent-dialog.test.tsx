@@ -27,8 +27,8 @@ describe("CG12 — 선택지 둘", () => {
     );
     expect(screen.getByTestId("download-consent-cellular-confirm")).toBeTruthy();
     expect(screen.getByTestId("download-consent-defer")).toBeTruthy();
-    expect(screen.getByText("모바일 데이터로 받기")).toBeTruthy();
-    expect(screen.getByText("나중에 받기")).toBeTruthy();
+    expect(screen.getByText("모바일 데이터로 다운로드")).toBeTruthy();
+    expect(screen.getByText("나중에 다운로드")).toBeTruthy();
   });
 
   it("각 버튼은 자기 콜백을 한 번 부르고 다른 콜백은 부르지 않는다", async () => {

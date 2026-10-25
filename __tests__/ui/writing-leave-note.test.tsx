@@ -28,7 +28,7 @@ describe("093 — WritingPaper 안내 줄", () => {
     await render(<WritingPaper line="줄" name="금동이" />);
     expect(screen.queryByTestId("writing-leave-note")).toBeNull();
     expect(screen.getByTestId("writing-byline")).toHaveTextContent(
-      /^금동이가 쓰고 있어요\. 진행률은 세지 않아요\.$/,
+      /^금동이가 쓰고 있어요\. 시간이 다소 걸릴 수 있어요\.$/,
     );
   });
 });

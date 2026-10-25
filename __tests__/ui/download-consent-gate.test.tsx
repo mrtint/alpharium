@@ -40,15 +40,15 @@ const ui = (p: ReturnType<typeof setup>) => (
 
 describe("표준 갈래 (074 FR-002, 095 DS10) — wifi·other·unknown", () => {
   it.each(["wifi", "other", "unknown"] as const)(
-    "%s이면 [받을게요] 하나에 받을 양이 실린다",
+    "%s이면 [다운로드] 하나에 받을 양이 실린다",
     async (c) => {
       const p = setup(c, "2.0GB");
       await renderWithPortal(ui(p));
       await screen.findByTestId("download-consent-confirm");
-      expect(screen.getByText("받을게요")).toBeTruthy();
+      expect(screen.getByText("다운로드")).toBeTruthy();
       expect(screen.queryByTestId("download-consent-defer")).toBeNull();
       expect(screen.queryByTestId("cellular-consent-dialog")).toBeNull();
-      expect(screen.getByText(/모델을 약 2\.0GB 내려받아야 해요/)).toBeTruthy();
+      expect(screen.getByText(/AI 모듈을 약 2\.0GB 다운로드해야 해요/)).toBeTruthy();
       expect(screen.queryByText(/모바일/)).toBeNull();
       expect(p.readSizeLabel).toHaveBeenCalledTimes(1);
       await fireEvent.press(screen.getByTestId("download-consent-confirm"));
@@ -65,7 +65,7 @@ describe("표준 갈래 (074 FR-002, 095 DS10) — wifi·other·unknown", () => 
     await screen.findByTestId("download-consent-confirm");
     expect(
       screen.getByText(
-        "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+        "일기를 쓰려면 사진을 읽는 AI 모듈과 글을 쓰는 AI 모듈을 다운로드해야 해요. 한 번만 다운로드하면 이후로는 필요 없어요.",
       ),
     ).toBeTruthy();
     expect(screen.queryByText(/GB|MB|약 /)).toBeNull();

@@ -47,7 +47,7 @@ describe("DV4 — 구성", () => {
     expect(within(writing).getByText(DEVELOPER_TEXT.writeModule)).toBeTruthy();
     expect(within(writing).getByText("loaded · 1.5GB")).toBeTruthy();
     expect(
-      within(screen.getByTestId("developer-redownload")).getByText("모듈 다시 받기"),
+      within(screen.getByTestId("developer-redownload")).getByText("AI 모듈 다시 다운로드"),
     ).toBeTruthy();
     expect(screen.getByText(DEVELOPER_TEXT.groupReplay)).toBeTruthy();
     expect(

@@ -15,10 +15,10 @@ describe("TX — 보드 KO 원문", () => {
   it("dev.* 와 about.developer 가 글자 단위로 같다", () => {
     expect(SETTINGS_TEXT.developer).toBe("개발자");
     expect(DEVELOPER_TEXT.title).toBe("개발자");
-    expect(DEVELOPER_TEXT.groupModules).toBe("모듈");
-    expect(DEVELOPER_TEXT.readModule).toBe("읽는 모듈");
-    expect(DEVELOPER_TEXT.writeModule).toBe("쓰는 모듈");
-    expect(DEVELOPER_TEXT.redownload).toBe("모듈 다시 받기");
+    expect(DEVELOPER_TEXT.groupModules).toBe("AI 모듈");
+    expect(DEVELOPER_TEXT.readModule).toBe("읽는 AI");
+    expect(DEVELOPER_TEXT.writeModule).toBe("쓰는 AI");
+    expect(DEVELOPER_TEXT.redownload).toBe("AI 모듈 다시 다운로드");
     expect(DEVELOPER_TEXT.groupDiag).toBe("진단");
     expect(DEVELOPER_TEXT.diag).toBe("진단");
     expect(DEVELOPER_TEXT.devOnly).toBe("개발 빌드만");
@@ -39,10 +39,14 @@ describe("TX — 보드 KO 원문", () => {
 describe("TX — 보드 밖 문구", () => {
   it("글자 단위로 잠근다", () => {
     expect(DEVELOPER_TEXT.allReady).toBe("이미 모두 준비돼 있어요");
-    expect(DEVELOPER_TEXT.redownloadTitle).toBe("모듈을 다시 받을까요?");
-    expect(DEVELOPER_TEXT.redownloadCellular("1.2GB")).toBe("모바일 데이터로 1.2GB를 받아요.");
-    expect(DEVELOPER_TEXT.redownloadBody).toBe("빠진 모듈을 받아요. 이미 받은 것은 그대로 둬요.");
-    expect(DEVELOPER_TEXT.redownloadConfirm).toBe("받기");
+    expect(DEVELOPER_TEXT.redownloadTitle).toBe("AI 모듈을 다시 다운로드할까요?");
+    expect(DEVELOPER_TEXT.redownloadCellular("1.2GB")).toBe(
+      "모바일 데이터로 1.2GB를 다운로드해요.",
+    );
+    expect(DEVELOPER_TEXT.redownloadBody).toBe(
+      "빠진 AI 모듈을 다운로드해요. 이미 다운로드한 것은 그대로 둬요.",
+    );
+    expect(DEVELOPER_TEXT.redownloadConfirm).toBe("다운로드");
     expect(DEVELOPER_TEXT.redownloadCancel).toBe("취소");
     expect(DEVELOPER_TEXT.diagBack).toBe("개발자");
   });

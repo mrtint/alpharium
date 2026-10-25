@@ -50,7 +50,7 @@ export const settings = {
   /** 설정 위에 쌓인 화면의 뒤로 — 앞에 ‹ 를 따로 그린다 */
   backToSettings: "설정",
   /** 쓰기 시작 전 「작성자를 준비해야 한다」 안내의 버튼 */
-  redownload: "모듈 다시 받기",
+  redownload: "AI 모듈 다시 다운로드",
   /** 개발자 겹의 제목(보드 `dev.title`) */
   developerTitle: "개발자",
   /* ── 056 — 매일 쓰는 시각·장소 이름 (보드 `6c` ③·`6f`·`6l`) ── */
@@ -74,7 +74,7 @@ export const settings = {
   photoSkippedOn: skippedLine.on,
   /* ── 058 — 이 휴대폰 (보드 `6c` ⑥) ── */
   groupDevice: "이 휴대폰",
-  deviceModules: "쓰는 모듈",
+  deviceModules: "AI 모듈",
   deviceWipe: "일기 모두 지우기",
   wipeBody: "되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.",
   wipeConfirm: "지우기",

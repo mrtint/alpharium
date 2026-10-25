@@ -71,7 +71,7 @@ describe("055 FR-031 — 보드 KO 원문", () => {
       entryLabel: "설정",
       save: "저장",
       backToSettings: "설정",
-      redownload: "모듈 다시 받기",
+      redownload: "AI 모듈 다시 다운로드",
     });
   });
 
@@ -440,7 +440,7 @@ describe("055 C8 — 버전", () => {
 
   it("읽지 못했으면 값이 비어 있다(지어내지 않는다)", async () => {
     await render(<SettingsScreen {...props({ versionText: null })} />);
-    // 058 — 「쓰는 모듈」 값(「2.0GB」)도 숫자라 버전 행 안에서만 본다.
+    // 058 — 「AI 모듈」 값(「2.0GB」)도 숫자라 버전 행 안에서만 본다.
     expect(within(screen.getByTestId("settings-version")).queryByText(/\d+\.\d+/)).toBeNull();
   });
 });

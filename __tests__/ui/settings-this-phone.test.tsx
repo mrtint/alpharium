@@ -70,7 +70,7 @@ describe("TX — 보드 KO 원문", () => {
   it("TX1 — 묶음·행·대화상자 문구가 보드 표 그대로다", () => {
     expect(SETTINGS_TEXT).toMatchObject({
       groupDevice: "이 휴대폰",
-      deviceModules: "쓰는 모듈",
+      deviceModules: "AI 모듈",
       deviceWipe: "일기 모두 지우기",
       wipeBody: "되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.",
       wipeConfirm: "지우기",
@@ -105,19 +105,19 @@ describe("UI1 — 묶음 자리와 행 순서", () => {
     expect(screen.getByTestId("settings-group-device-label")).toHaveTextContent("이 휴대폰");
   });
 
-  it("행은 「쓰는 모듈」 → 「일기 모두 지우기」 순서다", async () => {
+  it("행은 「AI 모듈」 → 「일기 모두 지우기」 순서다", async () => {
     await render(<SettingsScreen {...props()} />);
     const group = screen.getByTestId("settings-group-device");
     const ids = within(group)
       .getAllByTestId(/^settings-(device-modules|wipe)$/)
       .map((n) => n.props.testID as string);
     expect(ids).toEqual(["settings-device-modules", "settings-wipe"]);
-    expect(within(group).getByText("쓰는 모듈")).toBeTruthy();
+    expect(within(group).getByText("AI 모듈")).toBeTruthy();
     expect(within(group).getByText("일기 모두 지우기")).toBeTruthy();
   });
 });
 
-describe("UI2·MS3 — 「쓰는 모듈」", () => {
+describe("UI2·MS3 — 「AI 모듈」", () => {
   it("값은 넘겨받은 문자열이고, 누를 수 없고 ›가 없다", async () => {
     await render(<SettingsScreen {...props({ moduleSizeText: "2.0GB" })} />);
     const row = screen.getByTestId("settings-device-modules");

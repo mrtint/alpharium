@@ -22,7 +22,7 @@ describe("본문", () => {
       <RedownloadConfirmDialog cellularSize="1.2GB" onCancel={jest.fn()} onConfirm={jest.fn()} />,
     );
     expect(screen.getByText(DEVELOPER_TEXT.redownloadTitle)).toBeTruthy();
-    expect(screen.getByText("모바일 데이터로 1.2GB를 받아요.")).toBeTruthy();
+    expect(screen.getByText("모바일 데이터로 1.2GB를 다운로드해요.")).toBeTruthy();
     expect(screen.queryByText(DEVELOPER_TEXT.redownloadBody)).toBeNull();
   });
 

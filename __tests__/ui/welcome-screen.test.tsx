@@ -342,15 +342,15 @@ describe("047 — 작명 화면이 디자인 보드 1a와 같다 (contracts/welc
   it("A3 — 문구가 1a KO 문자열과 글자 단위로 같다", async () => {
     await setup();
     for (const text of [
-      "깨어났어요. 처음 뵙겠습니다.",
-      "이제부터 제가 주인님의 하루를 사진과 다닌 자리로 읽고, 일기로 적을게요. 모든 일은 이 휴대폰 안에서만 일어나요.",
-      "제 이름을 지어주세요.",
+      "안녕하세요. 저는 누구일까요?",
+      "이제부터 제가 주인님의 하루를 살펴보고, 일기로 적을게요. 잘 기록하도록 해볼게요.",
+      "제 이름을 지어 주실래요?",
       "12자까지. 나중에 설정에서 바꿀 수 있어요.",
-      "나중에 할래요",
+      "나중에",
     ]) {
       expect(screen.getByText(text)).toBeTruthy();
     }
-    expect(screen.getByText(/^이 이름으로 할래요/)).toBeTruthy();
+    expect(screen.getByText(/^확정/)).toBeTruthy();
   });
 
   it("A7 — welcome에는 하단 캐릭터 이름이 없고 failed에는 있다", async () => {
@@ -365,7 +365,7 @@ describe("047 — 작명 화면이 디자인 보드 1a와 같다 (contracts/welc
 
   it("A8 — 확정 버튼 라벨에 화살표가 붙는다", async () => {
     await setup();
-    expect(screen.getByText(/이 이름으로 할래요\s*→/)).toBeTruthy();
+    expect(screen.getByText(/확정\s*→/)).toBeTruthy();
   });
 
   it("A9 — 가운데 묶음이 세로 중앙이다", () => {

@@ -73,7 +73,7 @@ describe("DS8 — 본문에 받을 양 (095 FR-001·FR-002)", () => {
     );
     expect(
       screen.getByText(
-        "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 약 2.0GB 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+        "일기를 쓰려면 사진을 읽는 AI 모듈과 글을 쓰는 AI 모듈을 약 2.0GB 다운로드해야 해요. 한 번만 다운로드하면 이후로는 필요 없어요.",
       ),
     ).toBeTruthy();
   });
@@ -84,7 +84,7 @@ describe("DS8 — 본문에 받을 양 (095 FR-001·FR-002)", () => {
     );
     expect(
       screen.getByText(
-        "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.",
+        "일기를 쓰려면 사진을 읽는 AI 모듈과 글을 쓰는 AI 모듈을 다운로드해야 해요. 한 번만 다운로드하면 이후로는 필요 없어요.",
       ),
     ).toBeTruthy();
   });
@@ -150,7 +150,7 @@ describe("★ 050 MIG1 — 덮개·뒤로 가기로 닫히지 않는다 (045 「
     await renderWithPortal(
       <DownloadConsentDialog onConfirm={jest.fn()} sizeLabel={null} visible />,
     );
-    expect(screen.getByText("받을 것이 있어요")).toBeTruthy();
-    expect(screen.getByText("받을게요")).toBeTruthy();
+    expect(screen.getByText("AI를 위한 다운로드가 필요해요")).toBeTruthy();
+    expect(screen.getByText("다운로드")).toBeTruthy();
   });
 });

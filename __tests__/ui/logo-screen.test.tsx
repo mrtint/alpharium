@@ -45,9 +45,9 @@ describe("LogoScreen — 렌더 (FR-001~FR-004)", () => {
     expect(style.lineHeight).toBeGreaterThanOrEqual(style.fontSize * 1.2);
   });
 
-  it("하단 안내 문구 '휴대폰 안에서만'이 보인다", async () => {
+  it("하단 안내 문구 '하루를 정리하는 AI'가 보인다", async () => {
     await render(<LogoScreen onDone={() => {}} />);
-    expect(screen.getByText(/휴대폰 안에서만/i)).toBeTruthy();
+    expect(screen.getByText(/하루를 정리하는 AI/i)).toBeTruthy();
   });
 
   it("로딩 점 3개가 렌더된다", async () => {
