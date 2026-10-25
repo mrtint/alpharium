@@ -151,7 +151,7 @@ describe("US4/FR-011~013 — 실패해도 레이아웃 유지(contracts D6·D7)"
     expect(screen.queryByTestId("download-progress-failed")).toBeNull();
   });
 
-  it("실패 시 안내 문구만 바뀐다(받다가 멈췄어요)", async () => {
+  it("실패 시 안내 문구만 바뀐다(다운로드 실패)", async () => {
     await render(
       <DownloadProgressScreen
         downloadReady={false}
@@ -160,8 +160,8 @@ describe("US4/FR-011~013 — 실패해도 레이아웃 유지(contracts D6·D7)"
         onProceed={jest.fn()}
       />,
     );
-    expect(screen.queryByText("받다가 멈췄어요")).not.toBeNull();
-    expect(screen.queryByText("받는 중이에요")).toBeNull();
+    expect(screen.queryByText("다운로드 실패")).not.toBeNull();
+    expect(screen.queryByText("다운로드 중이에요")).toBeNull();
   });
 
   it("정상 진행 중에는 실패 문구가 없다", async () => {
@@ -173,8 +173,8 @@ describe("US4/FR-011~013 — 실패해도 레이아웃 유지(contracts D6·D7)"
         onProceed={jest.fn()}
       />,
     );
-    expect(screen.queryByText("받는 중이에요")).not.toBeNull();
-    expect(screen.queryByText("받다가 멈췄어요")).toBeNull();
+    expect(screen.queryByText("다운로드 중이에요")).not.toBeNull();
+    expect(screen.queryByText("다운로드 실패")).toBeNull();
   });
 
   it("실패 뷰에 오류 원문·모델 식별자가 없다(원칙 III)", () => {

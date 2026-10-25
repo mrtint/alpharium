@@ -35,7 +35,7 @@ describe("SC-006 — 감지한 것과 고른 것", () => {
     expect(JSON.stringify(current.text())).toBe(JSON.stringify(ko));
     expect(current.text().home.dayState.today).toBe("오늘 일기를 쓸 수 있어요");
     expect(current.text().home.writing.byline("금동이")).toBe(
-      "금동이가 쓰고 있어요. 진행률은 세지 않아요.",
+      "금동이가 쓰고 있어요. 시간이 다소 걸릴 수 있어요.",
     );
   });
 });

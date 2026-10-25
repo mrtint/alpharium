@@ -61,9 +61,9 @@ export const home = {
     stop: "그만두기",
     /** 첫 진행 신호가 오기 전의 자리 문구(039) */
     fallback: "쓰고 있어요",
-    /** 「{이름}{이/가} 쓰고 있어요. 진행률은 세지 않아요.」 — 진행률·시간을 말하지 않는다는 안내 */
+    /** 「{이름}{이/가} 쓰고 있어요. 시간이 다소 걸릴 수 있어요.」 — 진행률·시간을 숫자로 말하지 않는다는 안내 */
     byline: (name: string): string =>
-      `${name}${particleFor(name)} 쓰고 있어요. 진행률은 세지 않아요.`,
+      `${name}${particleFor(name)} 쓰고 있어요. 시간이 다소 걸릴 수 있어요.`,
   },
 
   /** 쓸 재료 (053, 보드 `1d` ④·`2l`·`2m`·`2e`·`2f`). `confirmTitleUnseen`·`madeUpDay`는 사람이 정한 문장 */
@@ -97,7 +97,7 @@ export const home = {
   writeButton: "일기 쓰기",
 
   /** 쓰기 시작 전 — 준비된 작성자가 없다(029·055). 이 문구가 보이면 「모듈 다시 받기」 버튼이 함께 보인다 */
-  needsAuthor: "일기 작성자를 준비해야 해요",
+  needsAuthor: "AI 모듈을 준비해야 해요",
 
   /** 고른 캐릭터를 쓸 수 없어 다른 캐릭터로 옮겼다(007·029 FR-014). 조사는 「을(를)」·「(으)로」 그대로다 */
   movedNotice: (from: string, to: string): string =>

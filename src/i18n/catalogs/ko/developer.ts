@@ -7,10 +7,10 @@
 
 export const developer = {
   title: "개발자",
-  groupModules: "모듈",
-  readModule: "읽는 모듈",
-  writeModule: "쓰는 모듈",
-  redownload: "모듈 다시 받기",
+  groupModules: "AI 모듈",
+  readModule: "읽는 AI",
+  writeModule: "쓰는 AI",
+  redownload: "AI 모듈 다시 다운로드",
   groupDiag: "진단",
   diag: "진단",
   devOnly: "개발 빌드만",
@@ -29,12 +29,12 @@ export const developer = {
   /** 보드 밖 — 받을 것이 없을 때 대화상자 대신 보이는 한 줄(research R3) */
   allReady: "이미 모두 준비돼 있어요",
   /** 보드 밖 — 모듈 다시 받기 확인(research R3) */
-  redownloadTitle: "모듈을 다시 받을까요?",
+  redownloadTitle: "AI 모듈을 다시 다운로드할까요?",
   /** 보드 밖 — 본문(모바일 데이터로 받을 때, 보드 `dev.redownload.cellular` 「모바일 데이터로 {size}」를 문장으로 이은 것) */
-  redownloadCellular: (size: string): string => `모바일 데이터로 ${size}를 받아요.`,
+  redownloadCellular: (size: string): string => `모바일 데이터로 ${size}를 다운로드해요.`,
   /** 보드 밖 — 본문 */
-  redownloadBody: "빠진 모듈을 받아요. 이미 받은 것은 그대로 둬요.",
-  redownloadConfirm: "받기",
+  redownloadBody: "빠진 AI 모듈을 다운로드해요. 이미 다운로드한 것은 그대로 둬요.",
+  redownloadConfirm: "다운로드",
   redownloadCancel: "취소",
   /** 보드 밖 — 진단 겹의 뒤로 */
   diagBack: "개발자",

@@ -1,5 +1,5 @@
 /**
- * 058 — 「쓰는 모듈」 용량 (`src/app/module-size.ts`).
+ * 058 — 「AI 모듈」 용량 (`src/app/module-size.ts`).
  *
  * 계약: specs/058-settings-this-phone/contracts/this-phone.md MS1·MS2, spec FR-004(1000 기준)
  */

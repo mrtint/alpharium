@@ -228,7 +228,7 @@ describe("FR-024 — 쓰기 시작 전 no-ready-character는 그대로다", () =
     );
     await press();
 
-    expect(await screen.findByText("모듈 다시 받기")).toBeTruthy();
+    expect(await screen.findByText("AI 모듈 다시 다운로드")).toBeTruthy();
     expect(screen.queryByText(/설정에서 작성자 준비하기/)).toBeNull();
     expect(screen.queryByTestId("stop-button")).toBeNull();
     expect(screen.queryByTestId("failure-toast")).toBeNull();

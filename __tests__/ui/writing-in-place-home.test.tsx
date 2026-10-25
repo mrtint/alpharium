@@ -83,7 +83,7 @@ describe("SC-001 — 홈을 떠나지 않는다", () => {
     await startWriting();
     // 기본 이름(`personaOf`) — 「금동이」
     expect(screen.getByTestId("writing-byline")).toHaveTextContent(
-      /^금동이가 쓰고 있어요\. 진행률은 세지 않아요\.$/,
+      /^금동이가 쓰고 있어요\. 시간이 다소 걸릴 수 있어요\.$/,
     );
   });
 });

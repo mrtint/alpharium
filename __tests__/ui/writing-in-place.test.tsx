@@ -64,7 +64,7 @@ describe("W2 — KO 원문 (보드 2b)", () => {
     expect(screen.getByTestId("home-day-state")).toHaveTextContent(/^쓰는 중$/);
     expect(screen.getAllByText("쓰는 중")).toHaveLength(2); // 헤더 상태 줄 + 머리말
     expect(screen.getByTestId("writing-byline")).toHaveTextContent(
-      /^금동이가 쓰고 있어요\. 진행률은 세지 않아요\.$/,
+      /^금동이가 쓰고 있어요\. 시간이 다소 걸릴 수 있어요\.$/,
     );
     expect(screen.getByTestId("stop-button")).toHaveTextContent(/^그만두기$/);
   });
@@ -74,12 +74,12 @@ describe("W2 — KO 원문 (보드 2b)", () => {
       <DiaryListScreen {...props({ writing: { line: "줄", name: "루이" } })} />,
     );
     expect(screen.getByTestId("writing-byline")).toHaveTextContent(
-      /^루이가 쓰고 있어요\. 진행률은 세지 않아요\.$/,
+      /^루이가 쓰고 있어요\. 시간이 다소 걸릴 수 있어요\.$/,
     );
 
     await rerender(<DiaryListScreen {...props({ writing: { line: "줄", name: "밤" } })} />);
     expect(screen.getByTestId("writing-byline")).toHaveTextContent(
-      /^밤이 쓰고 있어요\. 진행률은 세지 않아요\.$/,
+      /^밤이 쓰고 있어요\. 시간이 다소 걸릴 수 있어요\.$/,
     );
   });
 

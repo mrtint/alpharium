@@ -21,14 +21,14 @@ describe("CG13 — 대기 화면", () => {
     const onRecheck = jest.fn();
     await render(<DownloadDeferredScreen onRecheck={onRecheck} />);
     expect(screen.getByTestId("download-deferred")).toBeTruthy();
-    expect(screen.getByText("Wi-Fi에서 받는 게 좋아요")).toBeTruthy();
+    expect(screen.getByText("Wi-Fi에서 다운로드하는 게 좋아요")).toBeTruthy();
     await fireEvent.press(screen.getByTestId("download-deferred-recheck"));
     expect(onRecheck).toHaveBeenCalledTimes(1);
   });
 
   it("★ 아무것도 받지 않았다고 알린다 — 진행률·바이트·모델 어휘가 없다", async () => {
     await render(<DownloadDeferredScreen onRecheck={jest.fn()} />);
-    expect(screen.getByText(/아무것도 받지 않았어요/)).toBeTruthy();
+    expect(screen.getByText(/아무것도 다운로드하지 않았어요/)).toBeTruthy();
     expect(screen.queryByText(/%|GB|MB|진행/)).toBeNull();
   });
 

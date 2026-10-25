@@ -9,7 +9,7 @@
 import { ko } from "../../src/i18n/catalogs/ko";
 
 const ORIGINAL =
-  "일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.";
+  "일기를 쓰려면 사진을 읽는 AI 모듈과 글을 쓰는 AI 모듈을 다운로드해야 해요. 한 번만 다운로드하면 이후로는 필요 없어요.";
 
 describe("DS1 — download.consent.body(size)", () => {
   it("null이면 원래 문장과 바이트 동일하다", () => {
@@ -18,7 +18,7 @@ describe("DS1 — download.consent.body(size)", () => {
 
   it.each(["2.0GB", "350MB"])("%s면 「약 %s」를 싣는다", (size) => {
     expect(ko.download.consent.body(size)).toBe(
-      `일기를 쓰려면 사진을 읽는 모델과 글을 쓰는 모델을 약 ${size} 내려받아야 해요. 한 번만 받으면 이후로는 필요 없어요.`,
+      `일기를 쓰려면 사진을 읽는 AI 모듈과 글을 쓰는 AI 모듈을 약 ${size} 다운로드해야 해요. 한 번만 다운로드하면 이후로는 필요 없어요.`,
     );
   });
 
