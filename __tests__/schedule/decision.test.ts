@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { includesTodayAtHour } from "../../src/config/day-boundary";
-import { decideSchedule, isInTargetWindow } from "../../src/schedule/decision";
+import { decideSchedule } from "../../src/schedule/decision";
 import type { AutoDiarySettings } from "../../src/schedule/settings";
+import { fastCycleTiming, productionTiming } from "../../src/schedule/timing";
 
 /**
  * 스케줄 판정의 계약 테스트.
@@ -209,7 +210,7 @@ describe("D2-2 — 오전 목표의 어제는 오늘 목표 시각에 차례가 
 
 describe("창 안인가 (078 리뷰 I2 — 따라잡기 상한이 묻는다)", () => {
   it("목표 7시: 7·8·9시는 창 안, 6·10시는 창 밖", () => {
-    expect([6, 7, 8, 9, 10].map((h) => isInTargetWindow(ENABLED, at(h)))).toEqual([
+    expect([6, 7, 8, 9, 10].map((h) => productionTiming(ENABLED).inWindow(at(h)))).toEqual([
       false,
       true,
       true,
@@ -220,7 +221,7 @@ describe("창 안인가 (078 리뷰 I2 — 따라잡기 상한이 묻는다)", (
 
   it("목표 23시: 23·0·1시는 창 안(자정 wrap), 22·2시는 창 밖", () => {
     const late = { enabled: true, targetHour: 23 };
-    expect([22, 23, 0, 1, 2].map((h) => isInTargetWindow(late, at(h)))).toEqual([
+    expect([22, 23, 0, 1, 2].map((h) => productionTiming(late).inWindow(at(h)))).toEqual([
       false,
       true,
       true,
@@ -324,9 +325,14 @@ describe("소스 검사 — D3·D4·D7", () => {
     expect(CODE).not.toMatch(/new Date\(\)/);
   });
 
-  it("D3 — WINDOW_HOURS를 export하지 않는다", () => {
-    expect(CODE).not.toMatch(/export\s+(const|let|function)\s+WINDOW_HOURS/);
-    expect(CODE).toMatch(/\bWINDOW_HOURS\b/);
+  it("D3 — 창 크기(WINDOW_HOURS)는 timing.ts 안에만 있고 export하지 않는다 (106 — 판정은 시(時)를 읽지 않는다)", () => {
+    const timingCode = readFileSync(join(__dirname, "../../src/schedule/timing.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(CODE).not.toMatch(/\bWINDOW_HOURS\b/);
+    expect(CODE).not.toMatch(/getHours\(\)/);
+    expect(timingCode).not.toMatch(/export\s+(const|let|function)\s+WINDOW_HOURS/);
+    expect(timingCode).toMatch(/\bWINDOW_HOURS\b/);
   });
 
   it("D7 — 파이프라인·알림·등록부를 부르지 않는다 (순수 판정)", () => {
@@ -383,5 +389,74 @@ describe("105 — 후보 날 전부(days)를 최근→과거로 싣는다", () =
       existingDiaryDays: [],
     });
     expect(r).toEqual({ act: true, day: "2026-08-26", days: ["2026-08-26", "2026-08-25"] });
+  });
+});
+
+/* ───────────── 106 — 빠른 주기 (FC4·FC5) ───────────── */
+
+describe("106 FC4·FC5 — 빠른 주기는 창 안에서만 오늘 하나를 쓴다", () => {
+  const timing = fastCycleTiming(30);
+  /** 2026-08-28 hh:mm — 30분 주기 격자: 10:00~10:30, 창은 10:00~10:15 */
+  const when = (hour: number, minute: number) => new Date(2026, 7, 28, hour, minute, 0, 0);
+  const fast = (input: {
+    now: Date;
+    selectableDays?: readonly string[];
+    existingDiaryDays?: readonly string[];
+  }) =>
+    decideSchedule({
+      settings: ENABLED,
+      today: TODAY,
+      targetDay: timing.targetDay,
+      selectableDays: input.selectableDays ?? PAST_ONLY,
+      existingDiaryDays: input.existingDiaryDays ?? [],
+      now: input.now,
+      timing,
+    });
+
+  it("창 안: 선택 가능한 날에 오늘이 없어도 오늘을 쓰기로 정한다", () => {
+    expect(fast({ now: when(10, 5) })).toEqual({ act: true, day: TODAY, days: [TODAY] });
+  });
+
+  it("창 밖: 오늘을 쓰지 않는다 — not-near-target (차례를 기다리는 중)", () => {
+    expect(fast({ now: when(10, 20) })).toEqual({ act: false, reason: "not-near-target" });
+  });
+
+  it("후보는 오늘 하나다 — 지난 날이 안 쓴 채여도 쓰지 않는다 (창 안·밖 모두)", () => {
+    const r = fast({ now: when(10, 5), existingDiaryDays: [] });
+    expect(r).toMatchObject({ act: true, days: [TODAY] });
+    expect(fast({ now: when(10, 20), existingDiaryDays: [] })).toEqual({
+      act: false,
+      reason: "not-near-target",
+    });
+  });
+
+  it("오늘이 이미 있으면 all-written — 창 안에서도", () => {
+    expect(fast({ now: when(10, 5), existingDiaryDays: [TODAY] })).toEqual({
+      act: false,
+      reason: "all-written",
+    });
+  });
+
+  it("꺼져 있으면 disabled", () => {
+    expect(
+      decideSchedule({
+        settings: { ...ENABLED, enabled: false },
+        today: TODAY,
+        targetDay: "today",
+        now: when(10, 5),
+        selectableDays: WITH_TODAY,
+        existingDiaryDays: [],
+        timing,
+      }),
+    ).toEqual({ act: false, reason: "disabled" });
+  });
+
+  it("timing을 주지 않으면 배포 규칙이다 (기본값)", () => {
+    expect(
+      decide({ settings: ENABLED, now: at(7), selectableDays: PAST_ONLY, existingDiaryDays: [] }),
+    ).toMatchObject({
+      act: true,
+      day: "2026-08-27",
+    });
   });
 });

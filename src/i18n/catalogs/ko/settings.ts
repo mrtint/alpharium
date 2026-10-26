@@ -79,7 +79,7 @@ export const settings = {
   wipeBody: "되돌릴 수 없어요. 휴대폰의 사진과 이름·설정은 남아요.",
   wipeConfirm: "지우기",
   wipeCancel: "취소",
-  wipeBlocked: "지금 자동으로 쓰는 중이라 지우지 못했어요.",
+  wipeBlocked: "지금 다른 작업이 끝나는 중이라 지우지 못했어요. 잠시 뒤에 다시 해 주세요.",
 
   /** 058 — 보드 `wipe.title`. 편수는 숫자 그대로(천 단위 구분 없음, FR-010) */
   wipeTitle: (n: number): string => `일기 ${n}편을 모두 지울까요?`,

@@ -108,8 +108,6 @@ type Over = {
   onChooseDay?: (day: string) => void;
   store?: DiaryStore;
   stop?: () => Promise<void>;
-  prepare?: () => Promise<void>;
-  captionDay?: jest.Mock;
   recordFailure?: jest.Mock;
   writeBlocked?: boolean;
   resolve?: (day: string) => ResolveOutcome;
@@ -140,8 +138,6 @@ function home(over: Over) {
       covered={over.covered}
       onChooseDay={over.onChooseDay}
       stop={over.stop}
-      prepare={over.prepare}
-      captionDay={over.captionDay}
       recordFailure={over.recordFailure}
       writeBlocked={over.writeBlocked}
       barLockMs={0}
@@ -273,13 +269,11 @@ describe("H5 — 합류한 쓰기가 저장까지 끝나면 그 날의 쓴 날 �
   });
 });
 
-describe("H8 — 남의 쓰기가 사는 동안 홈은 쓰기도 미리 준비도 시작하지 않는다", () => {
-  it("★ 자동 쓰기의 「한 번」을 소모하지 않고, 모델을 미리 열지 않는다", async () => {
+describe("H8 — 남의 쓰기가 사는 동안 홈은 쓰기를 시작하지 않는다", () => {
+  it("★ 자동 쓰기의 「한 번」을 소모하지 않는다", async () => {
     const registry = createLiveWrites();
     foreignWrite(registry);
     const claim = jest.fn(() => true);
-    const prepare = jest.fn(async () => {});
-    const captionDay = jest.fn(async () => ({ kind: "no-photos" as const }));
     const { pipeline, run } = pendingPipeline();
 
     await renderHome({
@@ -287,57 +281,11 @@ describe("H8 — 남의 쓰기가 사는 동안 홈은 쓰기도 미리 준비�
       liveWrites: registry,
       autoWriteDay: TODAY,
       claimAutoWrite: claim,
-      prepare,
-      captionDay,
     });
     await screen.findByTestId("writing-paper");
 
     expect(claim).not.toHaveBeenCalled();
     expect(run).not.toHaveBeenCalled();
-    expect(prepare).not.toHaveBeenCalled();
-    expect(captionDay).not.toHaveBeenCalled();
-  });
-
-  it("덮여서 합류하지 못한 동안에도 미리 준비를 시작하지 않는다", async () => {
-    const registry = createLiveWrites();
-    foreignWrite(registry);
-    const prepare = jest.fn(async () => {});
-    const captionDay = jest.fn(async () => ({ kind: "no-photos" as const }));
-
-    await renderHome({ liveWrites: registry, covered: true, prepare, captionDay });
-    await screen.findByTestId("write-button", { includeHiddenElements: true });
-
-    expect(prepare).not.toHaveBeenCalled();
-    expect(captionDay).not.toHaveBeenCalled();
-  });
-
-  // 사진 없는 날의 갈래 — 본문 모델을 미리 연다(018 1단계). 사진 미리 읽기와 따로 막아야 한다.
-  it("사진 없는 날에도 본문 모델을 미리 열지 않는다", async () => {
-    const registry = createLiveWrites();
-    foreignWrite(registry);
-    const prepare = jest.fn(async () => {});
-    const noPhotos = (day: string): ResolveOutcome => ({
-      kind: "resolved",
-      params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
-    });
-
-    await renderHome({ liveWrites: registry, covered: true, prepare, resolve: noPhotos });
-    await screen.findByTestId("write-button", { includeHiddenElements: true });
-
-    expect(prepare).not.toHaveBeenCalled();
-  });
-
-  it("대조 — 남의 쓰기가 없으면 사진 없는 날의 본문 모델을 종전대로 미리 연다", async () => {
-    const prepare = jest.fn(async () => {});
-    const noPhotos = (day: string): ResolveOutcome => ({
-      kind: "resolved",
-      params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
-    });
-
-    await renderHome({ liveWrites: createLiveWrites(), prepare, resolve: noPhotos });
-    await screen.findByTestId("write-button");
-
-    await waitFor(() => expect(prepare).toHaveBeenCalled());
   });
 
   // 코드 리뷰에서 잡힘 — 진단 「지금 한 번 써 보기」(060)의 요청이 남의 쓰기와 겹치면, 합류한 직후 요청의 쓰기가 막혀 돌아오며
@@ -359,16 +307,6 @@ describe("H8 — 남의 쓰기가 사는 동안 홈은 쓰기도 미리 준비�
     await waitFor(() => expect(onWriteRequestHandled).toHaveBeenCalledWith(7));
     expect(run).not.toHaveBeenCalled();
     expect(screen.getByTestId("stop-button")).toBeTruthy();
-  });
-
-  it("대조 — 남의 쓰기가 없으면 종전대로 사진을 미리 읽는다", async () => {
-    const registry = createLiveWrites();
-    const captionDay = jest.fn(async () => ({ kind: "no-photos" as const }));
-
-    await renderHome({ liveWrites: registry, captionDay });
-    await screen.findByTestId("write-button");
-
-    await waitFor(() => expect(captionDay).toHaveBeenCalled());
   });
 });
 

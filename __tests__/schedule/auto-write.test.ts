@@ -5,6 +5,7 @@ import type { CountHint, DayPreview, PhotoAccess } from "../../src/app/state";
 import { decideAutoWrite, resolveAutoWrite } from "../../src/schedule/auto-write";
 import type { ScheduleDecision } from "../../src/schedule/decision";
 import type { SkipStorePort } from "../../src/schedule/skip-store";
+import { fastCycleTiming } from "../../src/schedule/timing";
 
 /**
  * 자동 쓰기 판정 (057).
@@ -353,6 +354,39 @@ describe("105 SW — 재료 없는 최근 날에 막히지 않는다", () => {
     const result = await sweep(previewDay, undefined, [], morning);
     expect(called).not.toContain(DAY);
     expect(result).toEqual({ kind: "skip", day: YESTERDAY, because: "no-material" });
+  });
+});
+
+describe("106 FC4·FC5 — 빠른 주기 timing", () => {
+  it("창 안에서 오늘 미리보기만 부르고 오늘을 쓴다 — 지난 날은 보지 않는다", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: { photos: known(4) },
+      [YESTERDAY]: { photos: known(2) },
+    });
+    const result = await resolveAutoWrite({
+      settings: SETTINGS,
+      now: new Date(2026, 8, 14, 10, 5),
+      listDiaryDays: async () => [],
+      previewDay,
+      skipPort: memorySkipPort().port,
+      timing: fastCycleTiming(30),
+    });
+    expect(result).toEqual({ kind: "write", day: DAY });
+    expect(called).toEqual([DAY]);
+  });
+
+  it("창 밖이면 미리보기를 읽지 않고 idle(not-near-target)", async () => {
+    const previewDay = jest.fn();
+    const result = await resolveAutoWrite({
+      settings: SETTINGS,
+      now: new Date(2026, 8, 14, 10, 20),
+      listDiaryDays: async () => [],
+      previewDay,
+      skipPort: memorySkipPort().port,
+      timing: fastCycleTiming(30),
+    });
+    expect(result).toEqual({ kind: "idle", reason: "not-near-target" });
+    expect(previewDay).not.toHaveBeenCalled();
   });
 });
 

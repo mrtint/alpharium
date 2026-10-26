@@ -29,7 +29,7 @@
 | `targetAhead(now)` | `getHours() < 목표 시` | `false` |
 | `targetDay` | `includesTodayAtHour(목표 시)` | `"today"` |
 | `candidateDays(selectable, today)` | `selectable` | `[today]` |
-| `reminderDelayCap` | 30 | min(30, ⌊N/2⌋) |
+| `reminderDelayCap` | 30 | min(30, ⌊⌊N/2⌋ / 2⌋) — 창의 절반 |
 | `nextCycleStart(now)` | — | 현재 `endMs` |
 
 ## 변경되는 기존 구조
@@ -47,6 +47,7 @@
 off ──켜기(확인)──▶ on{N, resetCycle = 켠 순간의 주기}
 on  ──주기 바뀜 + 판정──▶ [칸 차지 성공] 오늘 일기·기록 삭제 ▶ resetCycle = 현재 주기
                         [칸 못 차지]   변화 없음(다음 판정이 다시)
-on  ──주기 값 변경──▶ on{N', resetCycle 유지}  (현재 주기 id가 달라지므로 다음 판정이 리셋)
+on  ──주기 값 변경(다른 값)──▶ 켜기와 같은 길: [오늘 일기가 있으면 확인] → 오늘 일기·기록 삭제 → on{N', resetCycle = 새 주기의 현재 번호}
+on  ──주기 값 변경(같은 값)──▶ 아무 일도 없다
 on  ──끄기 / 개발자 메뉴 끄기──▶ off (파일 삭제)
 ```

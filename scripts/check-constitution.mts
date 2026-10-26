@@ -26,6 +26,7 @@ import {
   checkSeedFile,
   checkSegmentedFile,
   checkSimulationFile,
+  checkFastCycleFile,
   checkSourceFile,
   checkVisionFile,
   checkWelcomeFile,
@@ -90,6 +91,8 @@ function checkSourceFiles(root: string, relative = "src"): Violation[] {
       violations.push(...checkFirstRunFile(child, contents));
       // 064 — 상태 흉내 값이 생성 경로에 닿지 못하게. checkSimulationFile이 경로로 대상을 정한다.
       violations.push(...checkSimulationFile(child, contents));
+      // 106 — 빠른 주기(개발 빌드 전용, 일기를 지운다)의 읽기·지우기 위치. checkFastCycleFile이 경로로 대상을 정한다.
+      violations.push(...checkFastCycleFile(child, contents));
       // 062 — 화면 문구는 카탈로그에만, 카탈로그는 판정 계층을 모르고, 모델 입력은 화면 언어를 모른다.
       violations.push(...checkI18nFile(child, contents));
     }

@@ -52,7 +52,7 @@ describe("DB11 — 하루 기준을 옮기는 시(時) 계산은 경계 파일 �
   const ALLOWED = new Set([
     "src/config/day-boundary.ts",
     "src/diary/prompt.ts", // 사진 시각 표시
-    "src/schedule/decision.ts", // 목표 시각 창
+    "src/schedule/timing.ts", // 106 목표 시각 창 — 배포 규칙(`productionTiming`)이 decision.ts의 시 단위 창 논리를 그대로 옮겨 왔다
     "src/schedule/manual.ts", // 060 진단 「지금 실행」 — 목표 시각을 지금 시로(하루 기준 계산이 아니다)
     "src/app/reminder-summary.ts", // 085 개발자 화면 예약 줄의 표시용 시(하루 기준 계산이 아니다 — research R15)
     "src/vision/select.ts", // 자정 기준 하루 안의 분
@@ -71,10 +71,10 @@ describe("DB13 — FR-021 사흘 범위의 소비처", () => {
     expect(read("src/schedule/auto-write.ts")).toMatch(/selectableDays\(deps\.now\)/);
   });
 
-  it("App의 사진 있는 날 탐색과 canPrepare가 selectableDays를 부른다", () => {
+  it("App의 사진 있는 날 탐색이 selectableDays를 부른다", () => {
+    // 106 — canPrepare(018 미리 준비의 범위)는 미리 준비와 함께 걷었다.
     const app = read("App.tsx");
-    expect(app.match(/selectableDays\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
-    expect(app).toMatch(/canPrepare=\{/);
+    expect(app.match(/selectableDays\(/g)?.length ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   it("화면 상태(state.ts)는 selectableDays를 부르지 않는다 — 화면 범위와 분리", () => {

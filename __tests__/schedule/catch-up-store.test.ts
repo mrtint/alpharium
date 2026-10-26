@@ -6,6 +6,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  clearCatchUpDay,
   loadCatchUpDay,
   saveCatchUpDay,
   type CatchUpStorePort,
@@ -19,6 +20,9 @@ function memoryPort(initial: string | null = null): CatchUpStorePort & { content
     },
     async write(serialized: string) {
       port.content = serialized;
+    },
+    async remove() {
+      port.content = null;
     },
   };
   return port;
@@ -55,6 +59,7 @@ describe("CU2 — 못 읽으면 「쓴 적 없음」이다 (막지 않는 쪽으
     const broken: CatchUpStorePort = {
       read: () => Promise.reject(new Error("io")),
       write: async () => {},
+      remove: async () => {},
     };
     expect(await loadCatchUpDay(broken)).toBeNull();
   });
@@ -74,5 +79,19 @@ describe("CU3 — 소스 계약", () => {
 
   it("횟수·시각을 세지 않는다 — 날짜 하나뿐이다 (원칙 IV)", () => {
     expect(SRC).not.toMatch(/count|elapsed|duration|toISOString|Date\.now/i);
+  });
+});
+
+describe("CU5 — 지우기 (106 빠른 주기 리셋)", () => {
+  it("기록을 지우면 읽기는 null이다", async () => {
+    const port = memoryPort();
+    await saveCatchUpDay(port, "2026-10-26");
+    await clearCatchUpDay(port);
+    expect(port.content).toBeNull();
+    expect(await loadCatchUpDay(port)).toBeNull();
+  });
+
+  it("기록이 없어도 던지지 않는다", async () => {
+    await expect(clearCatchUpDay(memoryPort())).resolves.toBeUndefined();
   });
 });

@@ -31,6 +31,7 @@ import { AppState } from "react-native";
 import type { DayDate } from "../config/day-boundary";
 import { resolveAutoWrite } from "../schedule/auto-write";
 import type { AutoDiarySettings } from "../schedule/settings";
+import type { ScheduleTiming } from "../schedule/timing";
 import type { SkipStorePort } from "../schedule/skip-store";
 import {
   attemptDayOf,
@@ -60,6 +61,15 @@ export type AutoWriteHandoffDeps = {
   platform?: AppPlatform | undefined;
   /** 090 — 마운트 순간 앱이 앞에 있는가. 테스트가 갈아 끼운다 */
   launchState?: (() => LaunchState | undefined) | undefined;
+  /**
+   * 106 — 판정 직전의 빠른 주기 리셋(`createFastCycleResetter`로 조립부가 만든 클로저). 훅은 저장소·포트·환경을 모른다. 자동 쓰기가 켜져
+   * 있을 때만 부른다. 던지면 삼키고 판정을 잇는다. 안정된 참조여야 한다
+   */
+  resetFastCycle?: ((now: Date) => Promise<{ reset: boolean }>) | undefined;
+  /** 106 — 리셋이 일어났을 때 한 번. 조립부가 `rearmAutoWrite`(앱 열기 「한 번」 다시 열기)에 잇는다. 안정된 참조여야 한다 */
+  onCycleReset?: (() => void) | undefined;
+  /** 106 — 시간 규칙을 읽는다(개발 환경 가드는 조립부의 클로저 안). 던지거나 없으면 배포 규칙. 안정된 참조여야 한다 */
+  loadTiming?: ((settings: AutoDiarySettings, now: Date) => Promise<ScheduleTiming>) | undefined;
 };
 
 const systemNow = () => new Date();
@@ -77,6 +87,9 @@ export function useAutoWriteHandoff({
   now = systemNow,
   platform,
   launchState = readLaunchState,
+  resetFastCycle,
+  onCycleReset,
+  loadTiming,
 }: AutoWriteHandoffDeps): DayDate | null {
   const [handed, setHanded] = useState<Handed | null>(null);
   useEffect(() => {
@@ -84,16 +97,36 @@ export function useAutoWriteHandoff({
     let alive = true;
     // 이 effect 안에서 시작한 판정의 차례. 전경 복귀가 잇달아 오면 판정이 겹친다 — 가장 늦게 시작한 것만 반영한다(HO7).
     let latest = 0;
-    const check = () => {
-      const mine = ++latest;
-      const at = now();
-      void resolveAutoWrite({
+    // ★ 106 — 리셋(빠른 주기) → 시간 규칙 읽기 → 판정. 리셋과 규칙 읽기의 실패는 판정을 막지 않는다(배포 규칙으로 잇는다).
+    const judge = async (at: Date) => {
+      if (resetFastCycle !== undefined && settings.enabled) {
+        try {
+          if ((await resetFastCycle(at)).reset) onCycleReset?.();
+        } catch {
+          /* 리셋 실패가 쓰기를 막지 않는다 */
+        }
+      }
+      let timing: ScheduleTiming | undefined;
+      if (loadTiming !== undefined) {
+        try {
+          timing = await loadTiming(settings, at);
+        } catch {
+          /* 배포 규칙 */
+        }
+      }
+      return resolveAutoWrite({
         settings,
         now: at,
         listDiaryDays,
         previewDay,
         skipPort,
-      })
+        ...(timing === undefined ? {} : { timing }),
+      });
+    };
+    const check = () => {
+      const mine = ++latest;
+      const at = now();
+      void judge(at)
         .then((decision) => {
           // 078 — 판정에 들어갔다는 사실을 남긴다. 화면이 닫힌 뒤여도 판정은 일어났으므로 `alive`와 무관하게 쓴다.
           if (attemptPort)
@@ -140,6 +173,9 @@ export function useAutoWriteHandoff({
     now,
     platform,
     launchState,
+    resetFastCycle,
+    onCycleReset,
+    loadTiming,
   ]);
 
   // ★ 지금 설정으로 한 판정의 결과만 준다(HO5). 설정이 바뀐 그 렌더부터 새 판정이 반영될 때까지는 없음이다.

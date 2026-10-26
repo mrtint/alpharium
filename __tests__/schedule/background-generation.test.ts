@@ -61,6 +61,9 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
     async write(serialized: string) {
       catchUp.content = serialized;
     },
+    async remove() {
+      catchUp.content = null;
+    },
   };
 
   return {
@@ -785,6 +788,7 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
     const broken = {
       read: () => Promise.reject(new Error("io")),
       write: () => Promise.reject(new Error("io")),
+      remove: () => Promise.reject(new Error("io")),
     };
     const made = baseDeps({
       now: at(15),

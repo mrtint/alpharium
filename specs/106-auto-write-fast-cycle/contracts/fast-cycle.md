@@ -1,7 +1,7 @@
 # Contract: 빠른 주기 해석 (FC)
 
 - **FC1** 배포 동치: `productionTiming(settings)`로 낸 `decideSchedule`·`resolveAutoWrite`·`planReminders` 결과는 이 기능 이전과 같다. 기존 테스트는 입력 모양(`timing` 인자)만 맞추고 기대값은 바꾸지 않는다.
-- **FC2** `loadScheduleTiming({ devEnvironment: false })`는 기록 통로를 부르지 않고 배포 timing을 돌려준다. 환경을 판정하지 못한 경우(`resolution.ok === false`)는 `showsOnScreen`이 참이므로 개발 환경으로 본다 — 기존 규칙을 따르며 이 모듈이 따로 정하지 않는다.
+- **FC2** `loadScheduleTiming({ devEnvironment: false })`는 기록 통로를 부르지 않고 배포 timing을 돌려준다. 환경을 판정하지 못한 경우(`resolution.ok === false`)도 읽지 않는다 — 호출부가 `allowsFastCycle(resolution)`(판정에 성공한 local·dev만 참)을 `devEnvironment`로 넘긴다. 화면을 드러내는 `showsOnScreen`(판정 실패 시 참)과 달리 이 기능은 일기를 지우므로 더 엄격하다(원칙 V).
 - **FC2a** `loadFastCycleRecord({ devEnvironment, port })`도 같은 가드다: `devEnvironment`가 거짓이면 통로를 부르지 않고 `null`, 참이면 유효한 기록 또는 `null`.
 - **FC3** `devEnvironment: true`이고 기록이 유효하면 빠른 주기 timing, 기록이 없거나 읽기가 던지거나 모양이 틀리면 배포 timing(꺼짐).
 - **FC4** 빠른 주기 `inWindow(now)`는 `[startMs, windowEndMs)`에서만 참이다. 창 밖은 `decideSchedule`이 `not-near-target`(오늘이 안 쓴 날이고 후보에 들었을 때) 또는 `all-written`을 낸다 — 창 밖 후보는 오늘 하나라 `dueOutsideWindow`가 오늘을 뺀 빈 목록을 만들고 `waiting`은 `pickRetryDays(selectableDays, …)`로 가른다. 계획 단계에서 `waiting` 계산이 `timing.candidateDays`를 쓰도록 맞춘다.

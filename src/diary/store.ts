@@ -43,6 +43,11 @@ export interface DiaryStore {
    * 다른 이름은 건드리지 않는다(research R4). 하나가 실패해도 나머지를 지우고 끝에 첫 오류를 던진다 — 실패를 삼키지 않는다(불변식 4).
    */
   removeAll(): Promise<void>;
+  /**
+   * 106 — 한 날의 일기를 지운다(빠른 주기 리셋). 그 날의 일기 파일과 임시 파일(`.writing`)만 — 다른 날·같은 자리의 다른 이름은 건드리지 않는다.
+   * 없는 날은 조용히 넘어간다. 하나가 실패해도 나머지를 지우고 끝에 첫 오류를 던진다 — 실패를 삼키지 않는다(불변식 4).
+   */
+  removeDay(day: DayDate): Promise<void>;
 }
 
 /* ────────────────────────────── 직렬화 ────────────────────────────── */
@@ -257,6 +262,10 @@ export function memoryStore(options: MemoryStoreOptions = {}): MemoryStore {
       entries.clear();
     },
 
+    async removeDay(day) {
+      entries.delete(day);
+    },
+
     failNextWith(reason) {
       failNext = reason;
     },
@@ -367,6 +376,20 @@ export function fileStore(fs: FileSystemPort): DiaryStore {
 
     async removeAll() {
       const names = (await fs.list()).filter(isDiaryFileName);
+      let first: unknown;
+      for (const name of names) {
+        try {
+          await fs.remove(name);
+        } catch (error) {
+          first ??= error;
+        }
+      }
+      if (first !== undefined) throw first;
+    },
+
+    async removeDay(day) {
+      const targets = new Set([fileNameFor(day), `${fileNameFor(day)}.writing`]);
+      const names = (await fs.list()).filter((name) => targets.has(name));
       let first: unknown;
       for (const name of names) {
         try {

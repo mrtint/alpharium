@@ -76,7 +76,8 @@ describe("AF4 — 자동 쓰기 판정은 흉내 미리보기를 보지 않는�
     expect(auto).toMatch(/previewDay: previewForAuto/);
     expect(auto).not.toMatch(/simulat/i);
     // 훅은 받은 통로를 그대로 판정에 넘기고 흉내를 모른다(HO12).
-    expect(block(HANDOFF, /void resolveAutoWrite\(/)).toMatch(/\bpreviewDay,/);
+    // 106 — 판정은 리셋·시간 규칙 읽기 뒤라 `judge` 안의 `return resolveAutoWrite(`다.
+    expect(block(HANDOFF, /return resolveAutoWrite\(/)).toMatch(/\bpreviewDay,/);
     expect(HANDOFF).not.toMatch(/simulat/i);
   });
 

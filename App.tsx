@@ -26,6 +26,12 @@ import {
 } from "./src/schedule/background-port";
 import { expoBatteryExceptionPort } from "./src/schedule/battery-exception-port";
 import { expoNotificationPort } from "./src/schedule/notification-port";
+import { createFastCycleResetter, startFastCycle } from "./src/app/fast-cycle-reset";
+import { useFastCycle } from "./src/app/use-fast-cycle";
+import { expoCatchUpStorePort } from "./src/schedule/catch-up-store";
+import { expoFastCyclePort } from "./src/schedule/fast-cycle-store";
+import { fastCycleTiming, parsePeriodMinutes, type ScheduleTiming } from "./src/schedule/timing";
+import { allowsFastCycle, loadScheduleTiming } from "./src/schedule/timing-source";
 import { acknowledgeNotified, expoNotifiedStorePort } from "./src/schedule/notified-store";
 import {
   clearSkippedDay,
@@ -114,6 +120,7 @@ import { skippedLineText } from "./src/app/skipped-line";
 import { formatModuleBytes, readModuleBytes, remainingSizeLabel } from "./src/app/module-size";
 import { wipeDiaries, type WipeOutcome } from "./src/app/wipe-diaries";
 import { clearPhotoCopies } from "./src/app/wipe-port";
+import { FastCycleConfirmDialog } from "./src/ui/FastCycleConfirmDialog";
 import { WipeConfirmDialog } from "./src/ui/WipeConfirmDialog";
 import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./src/ui/settings-text";
 import { StackLayer } from "./src/ui/StackLayer";
@@ -1217,6 +1224,92 @@ function AppFrame() {
   });
 
   /**
+   * ★ 106 — 빠른 주기(개발 빌드 전용): 「하루」를 N분 주기로 줄여 자동 쓰기를 하루에 여러 번 확인한다. **일기를 지우는 기능이라 판정에 성공한
+   * 개발 환경(local·dev)에서만 읽고 쓴다**(`allowsFastCycle` — 환경을 판정하지 못한 경우도 읽지 않는다). 판정 자리 둘(백그라운드 `task.ts`,
+   * 앱 열기 훅)이 같은 리셋 절차를 부르고, 이 컴포넌트는 그 절차를 묶어 훅에 넘기는 조립부다(FL3 — `createFastCycleResetter`는 여기서만).
+   * 켜기·끄기·주기 변경 뒤에는 잡 주기 타이머를 다시 시작하고, 쓸 차례 알림을 다시 맞추고, 앱 열기 「한 번」을 다시 연다(FR-014·FR-009c).
+   */
+  const fastCycleAllowed = allowsFastCycle(environment);
+  const fastCyclePort = useMemo(() => expoFastCyclePort(), []);
+  const fastCycleStore = useMemo(() => fileStore(expoFileSystemPort("diary")), []);
+  const catchUpPort = useMemo(() => expoCatchUpStorePort(), []);
+  const fastCycleResetBase = useMemo(
+    () => ({
+      devEnvironment: fastCycleAllowed,
+      fastCyclePort,
+      store: fastCycleStore,
+      notifiedPort: expoNotifiedStorePort(),
+      skipPort,
+      catchUpPort,
+      dismiss: (id: string) => expoNotificationPort().dismiss(id),
+      liveWrites,
+    }),
+    [fastCycleAllowed, fastCyclePort, fastCycleStore, skipPort, catchUpPort],
+  );
+  const resetFastCycle = useMemo(
+    () => createFastCycleResetter(fastCycleResetBase),
+    [fastCycleResetBase],
+  );
+  const loadFastCycleTiming = useCallback(
+    (settings: AutoDiarySettings) =>
+      loadScheduleTiming({ settings, devEnvironment: fastCycleAllowed, port: fastCyclePort }).then(
+        (r) => r.timing,
+      ),
+    [fastCycleAllowed, fastCyclePort],
+  );
+  const hasTodayDiary = useCallback(() => fastCycleStore.has(dayOf(new Date())), [fastCycleStore]);
+  const startFastCycleNow = useCallback(
+    (args: { periodMinutes: number; now: Date }) =>
+      startFastCycle({ ...fastCycleResetBase, ...args }),
+    [fastCycleResetBase],
+  );
+  const autoDiaryForFastCycle = settingsValues?.autoDiary ?? null;
+  const onFastCycleChanged = useCallback(() => {
+    if (autoDiaryForFastCycle?.enabled === true) void backgroundPort.reschedule().catch(() => {});
+    void reconcileReminders(expoReminderDeps({ names: namesLoaded ? customNames : undefined }));
+    rearmAutoWriteRef.current();
+  }, [autoDiaryForFastCycle, backgroundPort, namesLoaded, customNames]);
+  const fastCycle = useFastCycle({
+    devEnvironment: fastCycleAllowed,
+    port: fastCyclePort,
+    now: () => new Date(),
+    hasTodayDiary,
+    start: startFastCycleNow,
+    onChanged: onFastCycleChanged,
+  });
+  // 렌더마다 계산한다 — 지금 주기·다음 시작이 시각을 따르게(useMemo로 `new Date()`를 고정하면 열린 화면에 낡은 값이 보인다).
+  const fastCycleSection = (() => {
+    if (!fastCycleAllowed) return undefined;
+    const record = fastCycle.record;
+    const timing = record === null ? null : fastCycleTiming(record.periodMinutes);
+    const now = new Date();
+    const next = timing === null ? null : timing.nextCycleStart(now);
+    const choose = (minutes: number) =>
+      record === null ? void fastCycle.enable(minutes) : void fastCycle.setPeriod(minutes);
+    return {
+      on: record !== null,
+      periodMinutes: record?.periodMinutes ?? null,
+      cycleId: timing === null ? null : timing.cycle(now).id,
+      nextStartText: next === null ? null : next.toTimeString().slice(0, 5),
+      autoWriteEnabled: autoDiaryForFastCycle?.enabled === true,
+      startFailed: fastCycle.startFailed,
+      onToggle: () => (record === null ? void fastCycle.enable(30) : void fastCycle.disable()),
+      onSelectPreset: choose,
+      onSubmitCustom: (text: string) => {
+        const minutes = parsePeriodMinutes(text);
+        if (minutes === null) return false;
+        choose(minutes);
+        return true;
+      },
+    };
+  })();
+  const fastCycleDisable = fastCycle.disable;
+  const fastCycleLine =
+    fastCycle.record === null
+      ? undefined
+      : text().fastCycle.diagLine(fastCycle.record.periodMinutes);
+
+  /**
    * ★ 058 — 일기 모두 지우기 (설정 「이 휴대폰」, research R1·R2·R11).
    *
    * 1. 요청 토큰(`wipeRequest`)을 올려 홈에 알린다. 홈은 쓰는 중이면 054 그만두기처럼 멈추고 **그 생성이 끝난 뒤에**
@@ -1462,10 +1555,12 @@ function AppFrame() {
     developer.disable();
     // 064 — 끄면 상태 흉내도 모두 꺼진다(보드 `6e` ⑤, AF2). 날짜 흉내가 있었으면 홈을 실제 오늘로 되돌린다.
     simulationClear();
+    // 106 — 빠른 주기도 함께 꺼진다(FR-013a) — 화면이 닿지 않는 곳에서 일기를 지우는 모드가 남지 않게
+    void fastCycleDisable();
     setChosenDay(dayOf(new Date()));
     setDiagnosing(false);
     setRoute("settings");
-  }, [developer, simulationClear]);
+  }, [developer, simulationClear, fastCycleDisable]);
 
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
@@ -1627,6 +1722,11 @@ function AppFrame() {
           // 057 — 앱을 열 때의 자동 쓰기. 설정 값을 아직 못 읽었으면 판정하지 않는다.
           autoDiarySettings={settingsValues?.autoDiary ?? null}
           claimAutoWrite={claimAutoWrite}
+          // 106 — 빠른 주기: 앱 열기 판정 직전의 리셋·시간 규칙 읽기, 리셋 때 「한 번」 다시 열기, 합류한 쓰기가 실패하면 한 번 다시 열기
+          resetFastCycle={resetFastCycle}
+          loadFastCycleTiming={loadFastCycleTiming}
+          onCycleReset={rearmAutoWrite}
+          onJoinedWriteFailed={rearmAutoWrite}
           onSkipped={onSkipped}
           skipPort={skipPort}
           attemptPort={attemptPort}
@@ -1726,6 +1826,7 @@ function AppFrame() {
               onOpenDiagnostics={showsDiagnostics ? openDiagnostics : undefined}
               onRedownload={() => void onRequestRedownload()}
               onReplayOnboarding={() => void onReplayOnboarding()}
+              fastCycle={fastCycleSection}
               showsDiagnostics={showsDiagnostics}
               simulation={
                 showsDiagnostics
@@ -1753,6 +1854,7 @@ function AppFrame() {
               <DiagnosticsLayer
                 buildLabel={buildLabelFor({ devEnvironment: showsDiagnostics, versionText })}
                 characterNames={customNames}
+                fastCycleLine={fastCycleLine}
                 onTryOnce={onDiagnosticsTryOnce}
                 writeBlocked={writeBlocked}
               />
@@ -1768,6 +1870,13 @@ function AppFrame() {
             onOff={() => setSimulationDate(null)}
             onPick={(day) => setSimulationDate(day)}
             open={simulationDateOpen}
+          />
+        )}
+        {/* 106 — 빠른 주기 켜기 확인(오늘 일기가 있을 때). 개발 환경에서만 상태가 선다 */}
+        {fastCycle.pendingEnable !== null && (
+          <FastCycleConfirmDialog
+            onCancel={fastCycle.cancelEnable}
+            onConfirm={() => void fastCycle.confirmEnable()}
           />
         )}
         {redownloadDialog !== null && (
@@ -1810,11 +1919,14 @@ const PREVIEW_CHARACTER: Character = "quiet";
 function DiagnosticsLayer({
   buildLabel,
   characterNames,
+  fastCycleLine,
   onTryOnce,
   writeBlocked,
 }: {
   buildLabel: string;
   characterNames: CustomNames;
+  /** 106 — 빠른 주기가 켜져 있을 때만 있는 머리 한 줄 */
+  fastCycleLine?: string | undefined;
   onTryOnce: () => void;
   /** 064 — 상태 흉내가 켜져 있으면 두 쓰기 버튼을 누를 수 없다 */
   writeBlocked: boolean;
@@ -1911,6 +2023,7 @@ function DiagnosticsLayer({
       autoResult={autoResult}
       autoRunning={autoRunning}
       canRequestPhoto={photo !== null && canRequestPhoto(photo.permission)}
+      {...(fastCycleLine !== undefined ? { fastCycleLine } : {})}
       environment={
         report === null
           ? null
@@ -1978,6 +2091,10 @@ function DiarySection({
   onChooseDay,
   autoDiarySettings,
   claimAutoWrite,
+  resetFastCycle,
+  loadFastCycleTiming,
+  onCycleReset,
+  onJoinedWriteFailed,
   onSkipped,
   skipPort,
   attemptPort,
@@ -2011,6 +2128,14 @@ function DiarySection({
   autoDiarySettings?: AutoDiarySettings | null;
   /** 057 — 홈이 자동 쓰기를 실제로 시작하는 순간 부른다(한 실행에 한 번) */
   claimAutoWrite?: () => boolean;
+  /** 106 — 앱 열기 판정 직전의 빠른 주기 리셋(`createFastCycleResetter`로 `AppFrame`이 만든 클로저). 안정된 참조여야 한다 */
+  resetFastCycle?: (now: Date) => Promise<{ reset: boolean }>;
+  /** 106 — 시간 규칙 읽기(개발 환경에서만 빠른 주기). 안정된 참조여야 한다 */
+  loadFastCycleTiming?: (settings: AutoDiarySettings) => Promise<ScheduleTiming>;
+  /** 106 — 리셋이 일어났을 때 앱 열기 「한 번」을 다시 연다 */
+  onCycleReset?: () => void;
+  /** 106 — 홈이 합류한 남의 쓰기가 실패로 끝났다 → 「한 번」을 한 번 다시 연다(080 잔여 ④) */
+  onJoinedWriteFailed?: () => void;
   /** 057 — 앱 열기 판정이 사진 권한 때문에 건너뛰었다 — 설정의 보조 줄을 바로 갱신한다 */
   onSkipped?: (day: DayDate) => void;
   /** 057 — 사진 권한 건너뜀 기록 통로 */
@@ -2245,6 +2370,9 @@ function DiarySection({
     onSkipped,
     // 090 — iOS 백그라운드 실행에서는 앞으로 올 때까지 판정하지 않는다(HO13)
     platform: appPlatform(Platform.OS),
+    resetFastCycle,
+    onCycleReset,
+    loadTiming: loadFastCycleTiming,
   });
 
   /**
@@ -2307,9 +2435,6 @@ function DiarySection({
       onInitialDayApplied={onInitialDayApplied}
       chosenDay={chosenDay}
       onChooseDay={onChooseDay}
-      // ★ 049 R5 — 미리 준비(018)는 사진 유무를 훑은 날(사흘, `photoDays`와 같은 함수)에서만.
-      //   사흘 밖의 날에 캐릭터 모델을 미리 열면 쓰기 때 VLM과 겹쳐 기기가 죽는다(FR-020a).
-      canPrepare={(day) => selectableDays(new Date()).includes(day)}
       // 048 US3 — 신호 줄. 파이프라인과 같은 신호 통로에서 개수로 좁혀 온다.
       // 064 — 상태 흉내(재료 0·권한 없음)가 있으면 그 미리보기를 **홈에만** 넘긴다(AF4).
       previewDay={homePreviewDay ?? (wiring.ok ? wiring.previewDay : undefined)}
@@ -2320,6 +2445,7 @@ function DiarySection({
       onAutoWriteSaved={onAutoWriteSaved}
       batteryNotice={batteryNotice ?? undefined}
       claimAutoWrite={claimAutoWrite}
+      onJoinedWriteFailed={onJoinedWriteFailed}
       liveWrites={liveWrites}
       // 058 — 홈이 늘 그려진다(조립이 실패해도 `DiaryHomeScreen`이 실패 화면을 그린다) — 요청은 언제나 홈이 받는다.
       wipeRequest={wipeRequest}

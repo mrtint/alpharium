@@ -259,47 +259,66 @@ export function createLlamaEngine(
    */
   let releasing: Promise<void> | null = null;
 
-  return {
-    async load(character: Character): Promise<LoadResult> {
+  /**
+   * `load()` 호출의 대기열 (106, 080 잔여 ①). 호출은 **도착 순서대로 하나씩** 본문을 돈다.
+   *
+   * 전에는 둘이 거의 동시에 오면 둘 다 `context === null`을 보고 네이티브 적재를 둘 다 불러, GB 단위 모델이 둘 열렸다(E1 위반) — 앱 열기
+   * 쓰기·백그라운드·진단 수동 실행이 겹칠 수 있다. 직렬화하면 같은 캐릭터는 앞 호출이 연 것을 재사용하고(`warm: true`), 다른 캐릭터는 앞의
+   * 적재가 끝난 뒤 닫고 연다. 앞 호출이 어떻게 끝나든(실패 포함) 대기열은 이어진다 — 뒤 호출은 앞의 실패를 물려받지 않고 새로 시도한다.
+   * `unload()`·`prewarm()`·`run()`은 대기열을 거치지 않는다(U6의 `releasing`과 얽히지 않게 — 변경을 `load()`에 가둔다).
+   */
+  let loadQueue: Promise<unknown> = Promise.resolve();
+
+  /** `load()`의 본문 — 대기열이 한 번에 하나만 돌린다 */
+  async function loadNow(character: Character): Promise<LoadResult> {
+    // 같은 캐릭터가 이미 열려 있으면 재사용한다. 닫았다 여는 것은 느리고, 같은 것이
+    // 열려 있는 것은 E1을 어기지 않는다.
+    //
+    // 016 — 이 분기가 "핫 스타트"의 정확한 정의다: loader()(네이티브 적재, 비용이
+    // 드는 호출)를 아예 부르지 않는다(research.md §1). warm은 새로 재는 값이 아니라
+    // 이 판정을 반환값에 실을 뿐이다.
+    if (context !== null && openFor === character) return { ok: true, warm: true };
+
+    // **다른 것이 열려 있으면 먼저 닫는다**(E1). 두 모델이 동시에 열리면 GB 둘이
+    // 되어 기기가 죽는다.
+    if (context !== null) await engine.unload();
+    // 079 — 다른 호출이 시작한 정리가 아직 도는 생성을 기다리는 중이면 그것도 기다린다(U6).
+    // 앞 컨텍스트가 놓이기 전에 새로 열지 않는다.
+    if (releasing !== null) await releasing;
+
+    let path: string;
+    try {
+      path = await resolvePath(character);
+    } catch {
+      return { ok: false, reason: "not-found" };
+    }
+
+    try {
+      context = await loader(path);
+      openFor = character;
+      return { ok: true, warm: false };
+    } catch (error) {
+      context = null;
+      openFor = null;
+
+      // 파일이 없는 것과 있는데 못 여는 것을 가른다 — 사용자가 할 일이 다르다
+      // (FR-017d). **오류 문구를 밖으로 내보내지 않는다** — 경로가 들어 있고,
+      // 경로에는 자산키가 들어 있다(원칙 III).
+      const message = error instanceof Error ? error.message : String(error);
+      const missing = /no such file|not found|enoent|does not exist/i.test(message);
+      return { ok: false, reason: missing ? "not-found" : "load-failed" };
+    }
+  }
+
+  const engine: GenerationEngine = {
+    load(character: Character): Promise<LoadResult> {
       // 092 FR-010 — 쓰기 하나가 여기서 시작한다. 지난 쓰기의 멈춤을 비운다(조각 생성만 본다).
+      // 106 — **호출 시점에 동기로 비운다**(대기열 본문이 아니라). 앞 적재를 기다리는 동안 온 `stop()`은 이 쓰기를 그만두려는 것이라, 본문이 시작할 때
+      // 지우면 취소가 사라진다(종전에도 호출 순간에 비웠다 — contracts/engine-load.md LD6).
       stopRequested = false;
-      // 같은 캐릭터가 이미 열려 있으면 재사용한다. 닫았다 여는 것은 느리고, 같은 것이
-      // 열려 있는 것은 E1을 어기지 않는다.
-      //
-      // 016 — 이 분기가 "핫 스타트"의 정확한 정의다: loader()(네이티브 적재, 비용이
-      // 드는 호출)를 아예 부르지 않는다(research.md §1). warm은 새로 재는 값이 아니라
-      // 이 판정을 반환값에 실을 뿐이다.
-      if (context !== null && openFor === character) return { ok: true, warm: true };
-
-      // **다른 것이 열려 있으면 먼저 닫는다**(E1). 두 모델이 동시에 열리면 GB 둘이
-      // 되어 기기가 죽는다.
-      if (context !== null) await this.unload();
-      // 079 — 다른 호출이 시작한 정리가 아직 도는 생성을 기다리는 중이면 그것도 기다린다(U6).
-      // 앞 컨텍스트가 놓이기 전에 새로 열지 않는다.
-      if (releasing !== null) await releasing;
-
-      let path: string;
-      try {
-        path = await resolvePath(character);
-      } catch {
-        return { ok: false, reason: "not-found" };
-      }
-
-      try {
-        context = await loader(path);
-        openFor = character;
-        return { ok: true, warm: false };
-      } catch (error) {
-        context = null;
-        openFor = null;
-
-        // 파일이 없는 것과 있는데 못 여는 것을 가른다 — 사용자가 할 일이 다르다
-        // (FR-017d). **오류 문구를 밖으로 내보내지 않는다** — 경로가 들어 있고,
-        // 경로에는 자산키가 들어 있다(원칙 III).
-        const message = error instanceof Error ? error.message : String(error);
-        const missing = /no such file|not found|enoent|does not exist/i.test(message);
-        return { ok: false, reason: missing ? "not-found" : "load-failed" };
-      }
+      const run = loadQueue.then(() => loadNow(character));
+      loadQueue = run.catch(() => undefined);
+      return run;
     },
 
     /**
@@ -444,6 +463,8 @@ export function createLlamaEngine(
       if (releasing === done) releasing = null;
     },
   };
+
+  return engine;
 }
 
 /** `completion()`에 넘기는 대화 한 줄 */

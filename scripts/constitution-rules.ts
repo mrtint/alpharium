@@ -626,6 +626,90 @@ export function checkSimulationFile(fileName: string, contents: string): Violati
 }
 
 /**
+ * 빠른 주기(개발 빌드 전용, 일기를 지운다)의 읽기·지우기 위치 (106 FL1~FL3, 원칙 V).
+ *
+ * 이 기능은 개발 환경에서만 효력이 있고 오늘의 일기를 지운다. 가드가 우회되면 배포 사용자의 일기를 지울 수 있으므로 읽는 자리와 지우는 자리를
+ * 소스로 좁힌다. 파일 단위로 보며 주석은 걷어낸 뒤 읽는다(대괄호가 줄에 걸친 import도 잡도록 파일 전체에 정규식을 쓴다).
+ *
+ *  - **FL1** 가드 없는 기록 읽기 `loadFastCycle`을 `src/schedule/timing-source.ts` 밖에서 import한다 — 다른 곳은 가드가 있는 `loadFastCycleRecord`
+ *  - **FL2** `timing-source.ts`가 `process.env`를 읽거나, `devEnvironment` 가드 없이 기록을 읽는다
+ *  - **FL3** `resetFastCycleIfDue(`를 `task.ts`·`fast-cycle-reset.ts` 밖에서 부르거나, `createFastCycleResetter(`를 `fast-cycle-reset.ts` 밖의
+ *    `src/`에서 부른다(조립부 `App.tsx`만 부른다), 앱 열기 판정 훅이 리셋·기록 모듈을 import한다
+ */
+const FAST_CYCLE_UNGUARDED_IMPORT =
+  /import\s*(?:type\s*)?\{[^}]*\bloadFastCycle\b(?!Record)[^}]*\}\s*from\s*["'][^"']*fast-cycle-store["']/;
+const FAST_CYCLE_GUARD_BEFORE_READ =
+  /if\s*\(\s*!devEnvironment\s*\)\s*return\s+null\s*;[\s\S]*\bloadFastCycle\(/;
+const FAST_CYCLE_TIMING_SOURCE = "src/schedule/timing-source.ts";
+const FAST_CYCLE_RESET_FILE = "src/app/fast-cycle-reset.ts";
+const FAST_CYCLE_RESET_CALLERS = new Set(["src/schedule/task.ts", FAST_CYCLE_RESET_FILE]);
+const FAST_CYCLE_HOOK_FILE = "src/app/use-auto-write-handoff.ts";
+
+export function checkFastCycleFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  // 주석은 규칙을 설명하는 자리다 — 설명이 위반으로 잡히면 아무도 설명을 쓰지 않는다.
+  const code = contents.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const at = (key: string) => ({ file: normalized, key });
+  const violations: Violation[] = [];
+
+  if (normalized !== FAST_CYCLE_TIMING_SOURCE && FAST_CYCLE_UNGUARDED_IMPORT.test(code)) {
+    violations.push({
+      ...at("loadFastCycle"),
+      rule: "가드 없는 빠른 주기 기록 읽기(loadFastCycle)를 timing-source 밖에서 import한다 — loadFastCycleRecord를 쓴다 (106 FL1, 원칙 V)",
+    });
+  }
+
+  if (normalized === FAST_CYCLE_TIMING_SOURCE) {
+    if (/process\.env/.test(code)) {
+      violations.push({
+        ...at("process.env"),
+        rule: "timing-source가 환경 변수를 직접 읽는다 — 환경 판정은 config/environment.ts에서만 (106 FL2)",
+      });
+    }
+    if (!FAST_CYCLE_GUARD_BEFORE_READ.test(code)) {
+      violations.push({
+        ...at("devEnvironment"),
+        rule: "timing-source가 개발 환경 가드(if (!devEnvironment) return null) 없이 빠른 주기 기록을 읽는다 (106 FL2, 원칙 V)",
+      });
+    }
+  }
+
+  if (
+    normalized !== FAST_CYCLE_RESET_FILE &&
+    !FAST_CYCLE_RESET_CALLERS.has(normalized) &&
+    /(?<!function\s)\bresetFastCycleIfDue\s*\(/.test(code)
+  ) {
+    violations.push({
+      ...at("resetFastCycleIfDue"),
+      rule: "빠른 주기 리셋을 task.ts·fast-cycle-reset.ts 밖에서 부른다 — 판정 자리는 둘뿐이다 (106 FL3)",
+    });
+  }
+
+  if (
+    normalized.startsWith("src/") &&
+    normalized !== FAST_CYCLE_RESET_FILE &&
+    /(?<!function\s)\bcreateFastCycleResetter\s*\(/.test(code)
+  ) {
+    violations.push({
+      ...at("createFastCycleResetter"),
+      rule: "리셋 클로저는 조립부(App.tsx)만 만든다 — src/에서 만들지 않는다 (106 FL3)",
+    });
+  }
+
+  if (
+    normalized === FAST_CYCLE_HOOK_FILE &&
+    /\bfrom\s+["'][^"']*(?:fast-cycle-reset|fast-cycle-store|timing-source)["']/.test(code)
+  ) {
+    violations.push({
+      ...at("use-auto-write-handoff"),
+      rule: "앱 열기 판정 훅이 빠른 주기 리셋·기록 모듈을 import한다 — 주입된 클로저만 부른다 (106 FL3)",
+    });
+  }
+
+  return violations;
+}
+
+/**
  * 스케줄·알림·잠금의 순수 판정 코드가 제품 계층에 직접 닿는 것을 잡는다
  * (020, contracts/background-generation.md B3·B8, 원칙 III·IV).
  *

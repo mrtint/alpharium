@@ -34,6 +34,9 @@ function make(byDay: Record<string, Hint>, opts: { spentToday?: boolean } = {}) 
         catchUp.writes.push(s);
         catchUp.content = s;
       },
+      remove: async () => {
+        catchUp.content = null;
+      },
     },
     reconcileReminders: async () => {},
     attemptPort: {

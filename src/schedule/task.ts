@@ -29,6 +29,7 @@
  */
 
 import { dayOf, type DayDate } from "../config/day-boundary";
+import { liveWrites as appLiveWrites, type LiveWrites } from "../diary/live-write";
 import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { effectiveSimulation, simulationBlocksWriting } from "../app/simulation";
@@ -51,6 +52,7 @@ import {
 } from "../app/auto-write-attempts";
 import { readWakeKind, subscribeBackgroundExpiry } from "../app/bg-expiry-port";
 import { readLaunchState } from "../app/launch-state-port";
+import { resetFastCycleIfDue } from "../app/fast-cycle-reset";
 import { createAppPipeline } from "../app/wiring";
 import { showsOnScreen } from "../diagnostics/sink";
 import {
@@ -69,7 +71,6 @@ import {
   saveCatchUpDay,
   type CatchUpStorePort,
 } from "./catch-up-store";
-import { isInTargetWindow } from "./decision";
 import { manualSettings } from "./manual";
 import { decideNotify } from "./notify";
 import {
@@ -89,6 +90,9 @@ import {
   type AutoDiarySettingsPort,
 } from "./settings";
 import { expoSkipStorePort, type SkipStorePort } from "./skip-store";
+import type { FastCyclePort } from "./fast-cycle-store";
+import { productionTiming } from "./timing";
+import { allowsFastCycle, loadScheduleTiming } from "./timing-source";
 
 /** `TaskManager.defineTask()`에 등록하는 이름. `background-port.ts`도 이 값을 쓴다. */
 export const AUTO_DIARY_TASK_NAME = "pocketlog-auto-diary";
@@ -126,6 +130,10 @@ export type AutoDiaryTaskDeps = {
   attemptPort?: AutoWriteAttemptPort;
   /** 078 — 창 밖 따라잡기 기록 통로. 주지 않으면 `preferences/auto-write-catch-up.json` */
   catchUpPort?: CatchUpStorePort;
+  /** 106 — 빠른 주기 기록 통로(개발 환경에서만 읽는다). 주지 않으면 `preferences/dev-fast-cycle.json` */
+  fastCyclePort?: FastCyclePort;
+  /** 106 — 주기 리셋이 차지하는 쓰기 등록부(080). 주지 않으면 앱의 그 하나 */
+  liveWrites?: Pick<LiveWrites, "beginWipe">;
   /**
    * 085 — 쓸 차례 알림 맞추기. 주지 않으면 기기 통로(`reconcileReminders(expoReminderDeps())`). 태스크가 **끝날 때마다** 한 번
    * 부른다 — 저장에 성공했으면 완성 알림 **전에**(그 날의 「쓸 차례」를 거둔 뒤 「다 썼어요」가 선다, FR-011), 그 밖이면 끝에서
@@ -263,6 +271,29 @@ async function runBody(
       return FAILED;
     }
 
+    // ★ 106 — 빠른 주기(개발 빌드 전용). 수동 실행(진단 「지금 실행」)은 설정 입력만 덮는 평소 동작이라 빠른 주기를 읽지도 리셋하지도
+    // 않는다(FR-009d). 자동 쓰기가 꺼져 있으면 리셋하지 않는다 — 다시 쓰지 않을 일기를 지우지 않는다. 리셋은 일기 목록을 읽기 **전**이다.
+    // 배포 환경이면 `devEnvironment`가 거짓이라 기록 통로를 부르지도 않고 `timing`은 배포 규칙이다.
+    const devEnvironment = allowsFastCycle(resolution);
+    const fastCyclePort = deps.fastCyclePort;
+    let timing = productionTiming(settings);
+    if (deps.manual !== true) {
+      if (settings.enabled) {
+        await resetFastCycleIfDue({
+          devEnvironment,
+          fastCyclePort,
+          now,
+          store: app.store,
+          notifiedPort: deps.notifiedPort ?? expoNotifiedStorePort(),
+          skipPort: deps.skipPort ?? expoSkipStorePort(),
+          catchUpPort: deps.catchUpPort ?? expoCatchUpStorePort(),
+          dismiss: (id) => (deps.notificationPort ?? expoNotificationPort()).dismiss(id),
+          liveWrites: deps.liveWrites ?? appLiveWrites,
+        });
+      }
+      timing = (await loadScheduleTiming({ settings, devEnvironment, port: fastCyclePort })).timing;
+    }
+
     // 저장된 일기 날짜. 주입이 없으면 pipeline이 쓰는 store에서 읽는다
     // (wiring.ts가 store를 함께 내보낸다 — store를 만드는 자리는 여기 하나).
     const existingDiaryDays = deps.listDiaryDays
@@ -276,7 +307,7 @@ async function runBody(
     // 밖에서도 쓰게 하면서 그 상한이 사라졌다 — 계속 실패하는 지난 날을 15분마다 온종일 다시 돌리지 않게 한다(헤드리스 한 번이
     // 18분 걸리는 기기도 있다). 오늘 몫을 이미 썼으면 신호도 읽지 않는다. 창 안은 종전대로이고, 수동 실행은 목표 시각이 지금이라
     // 늘 창 안이다. 못 읽으면 「쓴 적 없음」이다(막지 않는 쪽).
-    const catchingUp = settings.enabled && !isInTargetWindow(settings, now);
+    const catchingUp = settings.enabled && !timing.inWindow(now);
     const catchUpPort = deps.catchUpPort ?? expoCatchUpStorePort();
     const today = dayOf(now);
     if (catchingUp && (await loadCatchUpDay(catchUpPort)) === today) {
@@ -289,6 +320,7 @@ async function runBody(
       listDiaryDays: async () => existingDiaryDays,
       previewDay: app.previewDay,
       skipPort: deps.skipPort ?? expoSkipStorePort(),
+      timing,
     });
     if (decision.kind !== "write") {
       return skipped(attemptOutcomeOf(decision));

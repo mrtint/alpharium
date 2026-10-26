@@ -13,14 +13,16 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { useState } from "react";
 import { View } from "react-native";
 
+import { NameField } from "./components/NameField";
 import { AppText } from "./components/Text";
 import type { AttemptLine, FailureLine } from "../app/diagnostics-view";
 import type { SimulationState } from "../app/simulation";
 import { AttemptsGroup } from "./AttemptsGroup";
 import { FailuresGroup } from "./FailuresGroup";
-import { DEVELOPER_TEXT, SIMULATION_TEXT } from "./developer-text";
+import { DEVELOPER_TEXT, FAST_CYCLE_TEXT, SIMULATION_TEXT } from "./developer-text";
 import { Chevron, Group, Row, Toggle, Value } from "./SettingsScreen";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
@@ -57,7 +59,34 @@ export type DeveloperScreenProps = {
     onPressDate: () => void;
     onToggle: (key: SimulationToggle) => void;
   };
+  /**
+   * 106 — 「빠른 주기」 묶음(개발 빌드 전용). **개발 환경일 때만 조립부가 넘긴다** — 없으면 묶음 자체가 없다. 화면은 상태를 그리고 누름을 알릴
+   * 뿐이다(저장·효력·검증은 `use-fast-cycle.ts`·조립부). 켜기 확인창(오늘 일기가 있을 때)도 조립부가 이 화면 옆에 둔다.
+   */
+  fastCycle?: FastCycleSection;
 };
+
+/** 106 — 「빠른 주기」 묶음이 그리는 것 */
+export type FastCycleSection = {
+  on: boolean;
+  /** 켜져 있을 때 주기 분 */
+  periodMinutes: number | null;
+  /** 지금 주기 식별자(`YYYY-MM-DD#순번`) — 꺼져 있으면 `null` */
+  cycleId: string | null;
+  /** 다음 주기 시작 시각의 표시 문자열(`HH:MM`) — 꺼져 있으면 `null` */
+  nextStartText: string | null;
+  /** 「자동으로 쓰기」가 켜져 있는가 — 꺼져 있으면 켜 두어도 쓰지 않는다는 안내를 보인다 */
+  autoWriteEnabled: boolean;
+  /** 켜기를 시도했으나 실패했다(쓰기가 칸을 쥐고 있었다 등) */
+  startFailed: boolean;
+  onToggle: () => void;
+  onSelectPreset: (minutes: number) => void;
+  /** 직접 입력을 적용한다. 받아들였으면 참 — 거절이면 화면이 입력 오류를 보인다(검증은 조립부) */
+  onSubmitCustom: (text: string) => boolean;
+};
+
+/** 프리셋(분) — 스펙 FR-004 */
+const FAST_CYCLE_PRESETS = [10, 30, 60] as const;
 
 /** 토글로 켜고 끄는 흉내 셋(날짜는 대화상자로 고른다) */
 export type SimulationToggle = "failToast" | "noMaterial" | "noPhoto";
@@ -73,6 +102,7 @@ export function DeveloperScreen({
   failures,
   reminderLine,
   simulation,
+  fastCycle,
 }: DeveloperScreenProps) {
   return (
     <View testID="developer-screen">
@@ -145,6 +175,8 @@ export function DeveloperScreen({
         </Group>
       )}
 
+      {fastCycle !== undefined && <FastCycleGroup section={fastCycle} />}
+
       <Group label={DEVELOPER_TEXT.groupReplay} testID="developer-group-replay">
         <Row
           label={DEVELOPER_TEXT.replayOnboarding}
@@ -198,6 +230,108 @@ function DevOnlyAside({ testID }: { testID?: string }) {
     >
       {DEVELOPER_TEXT.devOnly}
     </AppText>
+  );
+}
+
+/** 106 — 「빠른 주기」 묶음 */
+function FastCycleGroup({ section }: { section: FastCycleSection }) {
+  const [custom, setCustom] = useState("");
+  const [invalid, setInvalid] = useState(false);
+  const apply = () => {
+    const accepted = section.onSubmitCustom(custom);
+    setInvalid(!accepted);
+    if (accepted) setCustom("");
+  };
+  return (
+    <Group
+      aside={<DevOnlyAside />}
+      label={FAST_CYCLE_TEXT.group}
+      testID="developer-group-fast-cycle"
+    >
+      <Row
+        label={FAST_CYCLE_TEXT.toggle}
+        testID="fast-cycle-toggle-row"
+        trailing={
+          <Toggle
+            accessibilityLabel={FAST_CYCLE_TEXT.toggle}
+            on={section.on}
+            onChange={() => section.onToggle()}
+            testID="fast-cycle-toggle"
+          />
+        }
+      />
+      {FAST_CYCLE_PRESETS.map((minutes) => (
+        <Row
+          key={minutes}
+          label={FAST_CYCLE_TEXT.preset(minutes)}
+          onPress={() => section.onSelectPreset(minutes)}
+          testID={`fast-cycle-preset-${minutes}`}
+          trailing={
+            section.on && section.periodMinutes === minutes ? (
+              <Value mono text={FAST_CYCLE_TEXT.selected} />
+            ) : undefined
+          }
+        />
+      ))}
+      <Row
+        label={FAST_CYCLE_TEXT.custom}
+        onPress={apply}
+        testID="fast-cycle-custom-row"
+        trailing={
+          <AppText
+            accessibilityRole="button"
+            style={{ color: COLORS.danger, fontWeight: "600" }}
+            testID="fast-cycle-custom-apply"
+          >
+            {FAST_CYCLE_TEXT.customApply}
+          </AppText>
+        }
+      />
+      <View style={{ paddingVertical: 4 }}>
+        <NameField
+          compact
+          counterTestID="fast-cycle-custom-counter"
+          inputTestID="fast-cycle-custom-input"
+          keyboardType="number-pad"
+          maxLength={3}
+          onChangeText={(next) => {
+            setCustom(next);
+            setInvalid(false);
+          }}
+          onSubmitEditing={apply}
+          placeholder={FAST_CYCLE_TEXT.customPlaceholder}
+          value={custom}
+        />
+      </View>
+      {invalid && (
+        <Row
+          label={FAST_CYCLE_TEXT.customInvalid}
+          labelTone="danger"
+          testID="fast-cycle-custom-error"
+        />
+      )}
+      <Row
+        label={FAST_CYCLE_TEXT.currentCycle}
+        testID="fast-cycle-current"
+        trailing={<Value mono text={section.cycleId ?? ""} />}
+      />
+      <Row
+        label={FAST_CYCLE_TEXT.nextStart}
+        testID="fast-cycle-next"
+        trailing={<Value mono text={section.nextStartText ?? ""} />}
+      />
+      {section.on && !section.autoWriteEnabled && (
+        <Row label={FAST_CYCLE_TEXT.autoWriteOff} labelTone="muted" testID="fast-cycle-auto-off" />
+      )}
+      {section.startFailed && (
+        <Row
+          label={FAST_CYCLE_TEXT.startFailed}
+          labelTone="danger"
+          testID="fast-cycle-start-failed"
+        />
+      )}
+      <Row label={FAST_CYCLE_TEXT.limits} labelTone="muted" testID="fast-cycle-limits" />
+    </Group>
   );
 }
 

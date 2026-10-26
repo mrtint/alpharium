@@ -1,6 +1,7 @@
 # Contract: 주기 리셋 (CR)
 
 - **CR1** 개발 환경이 아니거나 빠른 주기 기록이 없으면(`loadFastCycleRecord`가 `null`) 일기·기록을 읽거나 지우지 않고 `{ reset: false }`. 배포 환경은 기록 통로도 부르지 않는다.
+- **CR1a** 호출 자리(`task.ts`·앱 열기 훅)는 `settings.enabled`일 때만 리셋을 부른다(FR-006a). `resetFastCycleIfDue` 자체는 설정을 모른다.
 - **CR2** 현재 주기 id가 기록의 `resetCycle`과 같으면 `{ reset: false }`.
 - **CR3** 다르면 `liveWrites.beginWipe()`를 시도한다. `null`이면 `{ reset: false }`이고 쓰기를 끊지 않는다.
 - **CR4** 칸을 차지했으면 `finally`에서 반드시 `end()`한다.

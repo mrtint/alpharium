@@ -9,7 +9,7 @@
   - `targetAhead(now)`: 목표 시각이 아직 안 온 오전 목표인가(`yesterdayStillAhead`의 조건 절반).
   - `targetDay`: `"today" | "yesterday"`(창이 겨냥하는 날).
   - `candidateDays(selectable, today)`: 후보 날. 배포는 입력 그대로, 빠른 주기는 `[today]`.
-  - `reminderDelayCap`: 배터리 예외 알림 지연 상한(배포 30 = `REMINDER_DELAY_MINUTES`, 빠른 주기 min(30, 창 분)).
+  - `reminderDelayCap`: 배터리 예외 알림 지연 상한(배포 30 = `REMINDER_DELAY_MINUTES`, 빠른 주기 min(30, ⌊창 분 / 2⌋) — 창의 절반, 코드 리뷰 I1: 창 끝에 닿으면 알림을 눌러도 앱 열기 판정이 창 밖)).
   - `kind`: `"production" | "fast-cycle"`(알림 계획과 진단이 갈래를 본다).
 - **배포 동치**: `productionTiming(settings)`는 지금의 `isNearTarget`(시 단위, 3시간, 자정 wrap)·`yesterdayStillAhead`(`getHours() < targetHour`)·`includesTodayAtHour(targetHour)`를 **그대로 옮긴** 구현이다. 로직을 새로 짜지 않으므로 기존 `decision`·`auto-write`·`reminder-plan` 테스트가 수정 없이 통과해야 한다(SC-002). `isInTargetWindow(settings, now)`(task.ts가 부름)는 `timing.inWindow(now)`로 대체하고 옛 export는 얇게 남기지 않고 호출부를 고친다(AGENTS: 복제를 남기지 않는다).
 - **Rationale**: `targetHour`를 읽는 곳은 decision.ts(3곳)·reminder-plan.ts(2곳)·auto-write.ts(1곳)·manual.ts(1곳)·settings-effects.ts·UI 문구뿐이다. 한 인터페이스 뒤로 넣으면 변경이 판정 입력에 한정된다.

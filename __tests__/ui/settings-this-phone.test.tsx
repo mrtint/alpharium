@@ -84,7 +84,9 @@ describe("TX — 보드 KO 원문", () => {
   });
 
   it("TX2 — 보드 밖 문구(잠금에 막힘)는 해요체 한 줄이다", () => {
-    expect(SETTINGS_TEXT.wipeBlocked).toBe("지금 자동으로 쓰는 중이라 지우지 못했어요.");
+    expect(SETTINGS_TEXT.wipeBlocked).toBe(
+      "지금 다른 작업이 끝나는 중이라 지우지 못했어요. 잠시 뒤에 다시 해 주세요.",
+    );
   });
 
   it("TX3 — 제목은 편수를 그대로 넣는다(천 단위 구분 없음)", () => {
@@ -182,7 +184,9 @@ describe("UI3·UI4 — 「일기 모두 지우기」", () => {
   it("UI4 — 막힘 줄이 있으면 지우기 행 안에 danger로 그린다", async () => {
     await render(<SettingsScreen {...props({ wipeBlockedText: SETTINGS_TEXT.wipeBlocked })} />);
     const row = screen.getByTestId("settings-wipe");
-    const line = within(row).getByText("지금 자동으로 쓰는 중이라 지우지 못했어요.");
+    const line = within(row).getByText(
+      "지금 다른 작업이 끝나는 중이라 지우지 못했어요. 잠시 뒤에 다시 해 주세요.",
+    );
     expect(flat(line).color).toBe(COLORS.danger);
   });
 

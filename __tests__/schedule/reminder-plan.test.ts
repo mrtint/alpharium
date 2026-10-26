@@ -16,6 +16,7 @@ import {
 } from "../../src/schedule/reminder-plan";
 import { reminderTitle } from "../../src/schedule/notification-text";
 import type { AutoDiarySettings } from "../../src/schedule/settings";
+import { fastCycleTiming, productionTiming } from "../../src/schedule/timing";
 
 const ON22: AutoDiarySettings = { enabled: true, targetHour: 22 };
 const ON7: AutoDiarySettings = { enabled: true, targetHour: 7 };
@@ -225,5 +226,70 @@ describe("RD5 — 정각은 지났지만 정각+지연 전이면 오늘 발화�
   it("쓴 날은 지연이 있어도 빠진다", () => {
     const result = plan(new Date(2026, 9, 15, 22, 10), ON22, ["2026-10-15"], "은동", 30);
     expect(result[0]).toMatchObject({ day: "2026-10-16" });
+  });
+});
+
+describe("106 FC6 — 빠른 주기: 다음 주기 시작의 알림 하나", () => {
+  const T30 = fastCycleTiming(30);
+  const NOW = new Date(2026, 9, 26, 10, 20); // 순번 20 (10:00~10:30) → 다음 주기 시작 10:30
+
+  const fast = (over: Partial<Parameters<typeof planReminders>[0]> = {}) =>
+    planReminders({
+      now: NOW,
+      settings: { enabled: true, targetHour: 22 },
+      writtenDays: [],
+      name: "은동",
+      delayMinutes: 0,
+      timing: T30,
+      ...over,
+    });
+
+  it("정확히 한 개 — at은 다음 주기 시작, id는 그 날 기준", () => {
+    const result = fast();
+    expect(result).toEqual([
+      {
+        id: `${REMINDER_ID_PREFIX}2026-10-26`,
+        day: "2026-10-26",
+        at: new Date(2026, 9, 26, 10, 30).getTime(),
+        title: reminderTitle("은동", "2026-10-26"),
+      },
+    ]);
+  });
+
+  it("지연이 더해진다 (배터리 예외 — 상한은 reminders.ts가 정한다)", () => {
+    expect(fast({ delayMinutes: 15 })[0]!.at).toBe(new Date(2026, 9, 26, 10, 45).getTime());
+  });
+
+  it("written을 보지 않는다 — 오늘 일기가 있어도 다음 주기 시작 알림은 걸린다 (그때 리셋으로 지워진다)", () => {
+    expect(fast({ writtenDays: ["2026-10-26"] })).toHaveLength(1);
+  });
+
+  it("하루의 마지막 주기면 다음 날 자정이 다음 주기 시작이고 id도 그 날이다", () => {
+    const result = fast({ now: new Date(2026, 9, 26, 23, 50) });
+    expect(result[0]).toMatchObject({
+      day: "2026-10-27",
+      id: `${REMINDER_ID_PREFIX}2026-10-27`,
+      at: new Date(2026, 9, 27, 0, 0).getTime(),
+    });
+  });
+
+  it("꺼져 있으면 비어 있다", () => {
+    expect(fast({ settings: { enabled: false, targetHour: 22 } })).toEqual([]);
+  });
+
+  it("이름이 없으면 비어 있다 (RP8)", () => {
+    expect(fast({ name: null })).toEqual([]);
+  });
+
+  it("지연은 여전히 [0, 60) 정수여야 한다", () => {
+    expect(() => fast({ delayMinutes: 60 })).toThrow(RangeError);
+  });
+
+  it("timing이 production이거나 없으면 종전 7일치다", () => {
+    const base = { now: NOW, settings: ON22, writtenDays: [], name: "은동", delayMinutes: 0 };
+    const without = planReminders(base);
+    const prod = planReminders({ ...base, timing: productionTiming(ON22) });
+    expect(without).toHaveLength(7);
+    expect(prod).toEqual(without);
   });
 });

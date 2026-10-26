@@ -20,6 +20,7 @@ import { developer } from "./developer";
 import { diagnostics, diagnosticsLanguage } from "./diagnostics";
 import { download } from "./download";
 import { failures } from "./failures";
+import { fastCycle } from "./fast-cycle";
 import { fontLicense } from "./font-license";
 import { home } from "./home";
 import { lossNotice } from "./loss-notice";
@@ -53,6 +54,7 @@ export const ko = {
   lossNotice,
   licenseLinks,
   simulation,
+  fastCycle,
   welcome,
   download,
   consentGate,
