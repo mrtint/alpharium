@@ -150,7 +150,7 @@ export type AutoDiaryTaskDeps = {
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
-type BodyOutcome = { result: AutoDiaryTaskResult; outcome: AttemptOutcome };
+type BodyOutcome = { result: AutoDiaryTaskResult; outcome: AttemptOutcome; day?: DayDate };
 const skipped = (outcome: AttemptOutcome): BodyOutcome => ({ result: "skipped", outcome });
 const FAILED: BodyOutcome = { result: "failed", outcome: "failed" };
 
@@ -184,8 +184,8 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
   } finally {
     stopListening();
   }
-  const { result, outcome } = ended;
-  await recordAttemptEnd(attemptPort, path, now, outcome);
+  const { result, outcome, day } = ended;
+  await recordAttemptEnd(attemptPort, path, now, outcome, day);
   // 085 — 성공이면 본체가 완성 알림 전에 이미 맞췄다(한 번만).
   if (result !== "ran") await reconcileAfterTask(deps);
   return result;
@@ -229,6 +229,10 @@ async function runBody(
   now: Date,
   wake: WakeKind | undefined,
 ): Promise<BodyOutcome> {
+  // 105 — 쓰기로 정해진 날. 그 뒤의 끝(썼음·실패·그만둠·진행 중·캐릭터 없음)은 시도 기록에 이 날을 싣는다.
+  let chosen: DayDate | undefined;
+  const withDay = (outcome: BodyOutcome): BodyOutcome =>
+    chosen === undefined ? outcome : { ...outcome, day: chosen };
   try {
     const settingsPort = deps.settingsPort ?? expoAutoDiarySettingsPort();
     const loaded = await loadAutoDiarySettings(settingsPort);
@@ -289,6 +293,7 @@ async function runBody(
     if (decision.kind !== "write") {
       return skipped(attemptOutcomeOf(decision));
     }
+    chosen = decision.day;
 
     // 007이 저장한 캐릭터를 읽기만 한다(제품 상태를 쓰지 않는다).
     const character = deps.loadCharacter
@@ -296,7 +301,7 @@ async function runBody(
       : await loadSelection(expoSelectionPort());
     if (!character) {
       // 고른 캐릭터 없이 자동 생성하지 않는다.
-      return skipped("no-character");
+      return withDay(skipped("no-character"));
     }
 
     // ★ 042 — **백그라운드도 사진을 본다.**
@@ -331,7 +336,7 @@ async function runBody(
       // 085 FR-011 — 저장 → 맞추기(그 날의 쓸 차례 알림을 거둠) → 완성 알림.
       await reconcileAfterTask(deps);
       await sendCompletionNotification(decision.day, character, deps);
-      return { result: "ran", outcome: "ran" };
+      return withDay({ result: "ran", outcome: "ran" });
     }
 
     // ★ 080 T2 — **사용자가 그만둔 쓰기는 실패가 아니다.** 앱을 연 홈이 이 쓰기에 합류해 「그만두기」를 눌렀거나 「일기 모두
@@ -339,7 +344,7 @@ async function runBody(
     // 사실을 적는다 — 갈래가 없으면 그 줄이 「시작한 뒤 끝나지 않음」으로 남아 「프로세스가 죽었다」로 읽힌다. 문구가 아니라
     // 값으로 가른다.
     if (result.cancelled === true) {
-      return skipped("cancelled");
+      return withDay(skipped("cancelled"));
     }
 
     // 060 — 쓰기 실패를 기록한다(진단 「최근 실패」). `already-running`은 기록하지 않는다(다른 쪽이 쓰는 중이다) —
@@ -348,9 +353,9 @@ async function runBody(
 
     // B2-9 — 그 밖의 사유로 실패했으면 알림을 보내지 않는다(FR-005, SC-006).
     if (result.stage === "already-running") {
-      return skipped("already-running");
+      return withDay(skipped("already-running"));
     }
-    return FAILED;
+    return withDay(FAILED);
   } catch {
     // 060 — 예상 못 한 예외도 쓰기 실패다(`unwritten`). 던지지 않는다.
     await recordWriteFailure(
@@ -358,7 +363,7 @@ async function runBody(
       { ok: false, stage: "unexpected", reason: "" },
       now,
     );
-    return FAILED;
+    return withDay(FAILED);
   }
 }
 

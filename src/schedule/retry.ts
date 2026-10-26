@@ -19,20 +19,29 @@
 import type { DayDate } from "../config/day-boundary";
 
 /**
- * `selectableDays` 중 일기가 없는 **가장 최근** 하루 1개를 돌려준다.
- * 전부 있으면 `null`.
+ * `selectableDays` 중 일기가 없는 하루 **전부**를 가장 최근부터 돌려준다 (105).
+ * 훑기(`resolveAutoWrite`)가 재료 있는 첫 날을 찾으려고 순서대로 본다. 전부 있으면 빈 배열.
  *
- * `YYYY-MM-DD`는 사전순이 곧 시간순이므로 "가장 최근" = 사전순 최대다.
- * 결과는 **항상 `selectableDays`의 원소이거나 `null`**이다.
+ * `YYYY-MM-DD`는 사전순이 곧 시간순이므로 「가장 최근 먼저」 = 사전순 내림차순이다.
+ * 결과는 **항상 `selectableDays`의 부분집합**이다(후보를 넓히지 않는다).
+ */
+export function pickRetryDays(
+  selectableDays: readonly DayDate[],
+  existingDiaryDays: readonly DayDate[],
+): DayDate[] {
+  const existing = new Set(existingDiaryDays);
+  return selectableDays
+    .filter((day) => !existing.has(day))
+    .sort((a, b) => (a < b ? 1 : a > b ? -1 : 0));
+}
+
+/**
+ * `selectableDays` 중 일기가 없는 **가장 최근** 하루 1개를 돌려준다.
+ * 전부 있으면 `null`. `pickRetryDays`의 첫 원소다.
  */
 export function pickRetryDay(
   selectableDays: readonly DayDate[],
   existingDiaryDays: readonly DayDate[],
 ): DayDate | null {
-  const existing = new Set(existingDiaryDays);
-  const missing = selectableDays.filter((day) => !existing.has(day));
-  if (missing.length === 0) return null;
-
-  // 사전순 최대 = 가장 최근.
-  return missing.reduce((latest, day) => (day > latest ? day : latest));
+  return pickRetryDays(selectableDays, existingDiaryDays)[0] ?? null;
 }

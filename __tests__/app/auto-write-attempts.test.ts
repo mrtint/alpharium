@@ -9,6 +9,7 @@ import {
   ATTEMPT_OUTCOMES,
   ATTEMPT_PATHS,
   MAX_AUTO_WRITE_ATTEMPTS,
+  attemptDayOf,
   attemptOutcomeOf,
   loadAutoWriteAttempts,
   recordAttemptEnd,
@@ -345,5 +346,76 @@ describe("091 WK2 — 깬 요청(wake)", () => {
     expect(await loadAutoWriteAttempts(odd)).toEqual([
       { at: AT, path: "background", outcome: "ran" },
     ]);
+  });
+});
+
+describe("105 AT-day — 쓰기로 정해진 시도 줄이 고른 날을 싣는다", () => {
+  const DAY = "2026-10-24";
+
+  it("끝 줄에 날을 싣고 읽으면 돌아온다", async () => {
+    const port = memoryPort();
+    await recordAttemptEnd(port, "app-open", AT, "write", DAY);
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: AT, path: "app-open", outcome: "write", day: DAY },
+    ]);
+  });
+
+  it("시작 줄이 있으면 끝으로 바뀌어도 날이 붙는다 (백그라운드)", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT);
+    await recordAttemptEnd(port, "background", AT, "ran", DAY);
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: AT, path: "background", outcome: "ran", day: DAY },
+    ]);
+  });
+
+  it("날을 주지 않으면 필드가 없다 (옛 모양 그대로)", async () => {
+    const port = memoryPort();
+    await recordAttemptEnd(port, "app-open", AT, "no-material");
+    expect(JSON.parse(port.content ?? "{}").items[0]).not.toHaveProperty("day");
+  });
+
+  it("날 필드가 없는 옛 파일·형식이 틀린 날은 날 없이 읽는다 (줄은 산다)", async () => {
+    const port = memoryPort(
+      JSON.stringify({
+        items: [
+          { at: AT.toISOString(), path: "app-open", outcome: "write" },
+          { at: AT.toISOString(), path: "app-open", outcome: "write", day: "어제" },
+          { at: AT.toISOString(), path: "app-open", outcome: "write", day: 20261024 },
+        ],
+      }),
+    );
+    const items = await loadAutoWriteAttempts(port);
+    expect(items).toHaveLength(3);
+    for (const item of items) expect(item).not.toHaveProperty("day");
+  });
+
+  it("바로 앞 줄과 경로·결과가 같아도 날이 다르면 합치지 않는다", async () => {
+    const port = memoryPort();
+    await recordAttemptEnd(port, "app-open", AT, "write", "2026-10-24");
+    await recordAttemptEnd(port, "app-open", LATER, "write", "2026-10-23");
+    expect((await loadAutoWriteAttempts(port)).map((i) => i.day)).toEqual([
+      "2026-10-23",
+      "2026-10-24",
+    ]);
+  });
+
+  it("날까지 같으면 시각만 갱신한다", async () => {
+    const port = memoryPort();
+    await recordAttemptEnd(port, "app-open", AT, "write", DAY);
+    await recordAttemptEnd(port, "app-open", LATER, "write", DAY);
+    expect(await loadAutoWriteAttempts(port)).toEqual([
+      { at: LATER, path: "app-open", outcome: "write", day: DAY },
+    ]);
+  });
+
+  it("attemptDayOf — 쓰기 판정만 날을 준다", () => {
+    expect(attemptDayOf({ kind: "write", day: DAY })).toBe(DAY);
+    expect(attemptDayOf({ kind: "skip", day: DAY, because: "no-material" })).toBeUndefined();
+    expect(attemptDayOf({ kind: "idle", reason: "disabled" })).toBeUndefined();
+  });
+
+  it("결과 갈래는 늘지 않는다", () => {
+    expect(ATTEMPT_OUTCOMES).toHaveLength(15);
   });
 });

@@ -363,3 +363,16 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
     expect(new Set(texts).size).toBe(outcomes.length);
   });
 });
+
+describe("DV105 — 고른 날 꼬리", () => {
+  it("날이 있으면 결과 뒤 「· M월 d일」, 상태 꼬리는 그 뒤", () => {
+    const at = new Date(2026, 9, 25, 22, 20);
+    expect(
+      attemptLines([
+        { path: "app-open", outcome: "write", at, day: "2026-10-24" },
+        { path: "background", outcome: "ran", at, day: "2026-10-03", launch: "background" },
+        { path: "app-open", outcome: "no-material", at },
+      ]).map((l) => l.outcomeText),
+    ).toEqual(["홈에 넘김 · 10월 24일", "썼음 · 10월 3일 · 뒤에서", "재료 없음"]);
+  });
+});

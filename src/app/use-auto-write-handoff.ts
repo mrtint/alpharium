@@ -33,6 +33,7 @@ import { resolveAutoWrite } from "../schedule/auto-write";
 import type { AutoDiarySettings } from "../schedule/settings";
 import type { SkipStorePort } from "../schedule/skip-store";
 import {
+  attemptDayOf,
   attemptOutcomeOf,
   recordAttemptEnd,
   type AutoWriteAttemptPort,
@@ -96,7 +97,13 @@ export function useAutoWriteHandoff({
         .then((decision) => {
           // 078 — 판정에 들어갔다는 사실을 남긴다. 화면이 닫힌 뒤여도 판정은 일어났으므로 `alive`와 무관하게 쓴다.
           if (attemptPort)
-            void recordAttemptEnd(attemptPort, "app-open", at, attemptOutcomeOf(decision));
+            void recordAttemptEnd(
+              attemptPort,
+              "app-open",
+              at,
+              attemptOutcomeOf(decision),
+              attemptDayOf(decision),
+            );
           if (!alive) return;
           // 건너뜀 알림은 차례(`mine`)를 보지 않는다 — 기록은 이미 디스크에 있고, 설정의 보조 줄은 그것을 따른다(057 그대로).
           if (decision.kind === "skip" && decision.because === "no-photo-access") {

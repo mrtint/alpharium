@@ -21,12 +21,13 @@
  */
 
 import type { DayDate } from "../config/day-boundary";
-import { pickRetryDay } from "./retry";
+import { pickRetryDays } from "./retry";
 import type { AutoDiarySettings } from "./settings";
 
 export type ScheduleDecision =
   | { act: false; reason: "disabled" | "not-near-target" | "all-written" }
-  | { act: true; day: DayDate };
+  /** `days`는 쓸 수 있는 후보 날 전부(최근→과거, 105). `day`는 그 첫 원소 — 훑기가 첫 후보부터 본다. */
+  | { act: true; day: DayDate; days: readonly DayDate[] };
 
 /**
  * 목표 시각으로부터 이 시간 안에 들면 "근방"으로 본다.
@@ -67,7 +68,7 @@ export function isInTargetWindow(settings: AutoDiarySettings, now: Date): boolea
  *     겨냥하는데(`targetDay === "yesterday"`, 오전 목표) 오늘의 목표 시각이 아직 안 왔으면 어제도 뺀다
  *     (어제의 차례는 오늘 목표 시각에 온다 — 자정 직후에 쓰면 고른 시각이 무의미해진다).
  *     078: iOS `BGTaskScheduler`는 창 안에 깨운다는 보장이 없어, 놓친 날을 다음 기회에 쓴다.
- *  3. `pickRetryDay(후보, existingDiaryDays)`가 날을 주면 → `{ act: true, day }`.
+ *  3. `pickRetryDays(후보, existingDiaryDays)`가 날을 주면 → `{ act: true, day: 첫 원소, days }`(105 — 훑기가 `days`를 본다).
  *  4. `null`이면: 사흘 중 안 쓴 날이 남아 있으면(차례를 기다리는 중) `not-near-target`, 없으면 `all-written`.
  *
  * `today`·`targetDay`는 주입이다 — 이 파일은 하루 경계도 정오도 계산하지 않는다(FR-021a).
@@ -88,12 +89,13 @@ export function decideSchedule(input: {
   }
 
   const near = isNearTarget(now.getHours(), settings.targetHour);
-  const day = pickRetryDay(near ? selectableDays : dueOutsideWindow(input), existingDiaryDays);
-  if (day !== null) {
-    return { act: true, day };
+  const days = pickRetryDays(near ? selectableDays : dueOutsideWindow(input), existingDiaryDays);
+  const [day] = days;
+  if (day !== undefined) {
+    return { act: true, day, days };
   }
 
-  const waiting = !near && pickRetryDay(selectableDays, existingDiaryDays) !== null;
+  const waiting = !near && pickRetryDays(selectableDays, existingDiaryDays).length > 0;
   return { act: false, reason: waiting ? "not-near-target" : "all-written" };
 }
 
