@@ -67,7 +67,7 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
-    expect(r).toEqual({ act: true, day: TODAY });
+    expect(r).toMatchObject({ act: true, day: TODAY });
   });
 
   it("창의 마지막 시(16시)도 창 안", () => {
@@ -77,7 +77,7 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
-    expect(r).toEqual({ act: true, day: TODAY });
+    expect(r).toMatchObject({ act: true, day: TODAY });
   });
 
   it("창의 끝(17시)이면 오늘은 안 쓴다 — 오늘만 비어 있으면 not-near-target", () => {
@@ -107,7 +107,7 @@ describe("D2-2 — 오늘은 창 안에서만 (목표 14시, 창 [14, 17))", () 
       selectableDays: WITH_TODAY,
       existingDiaryDays: [],
     });
-    expect(r).toEqual({ act: true, day: TODAY });
+    expect(r).toMatchObject({ act: true, day: TODAY });
   });
 });
 
@@ -119,7 +119,7 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 
   it("창 밖(17시)이고 오늘·어제가 비어 있으면 오늘을 건너 어제", () => {
@@ -129,7 +129,7 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
       selectableDays: WITH_TODAY,
       existingDiaryDays: [],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 
   it("창 밖이고 어제는 써 있고 그제가 비어 있으면 그제", () => {
@@ -139,7 +139,7 @@ describe("D2-2 — 지난 날은 창과 무관하게 (078)", () => {
       selectableDays: PAST_ONLY,
       existingDiaryDays: ["2026-08-27"],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-26" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-26" });
   });
 
   it("창 밖(6시)이고 지난 날이 다 써 있으면(오늘은 정오 전이라 후보 아님) all-written", () => {
@@ -163,7 +163,7 @@ describe("D2-2 — 오전 목표의 어제는 오늘 목표 시각에 차례가 
       existingDiaryDays: [],
     });
     // 그제·그끄제는 이미 차례가 지났으므로 쓴다 — 어제만 기다린다
-    expect(r).toEqual({ act: true, day: "2026-08-26" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-26" });
   });
 
   it("목표 7시 전이고 어제만 비어 있으면 not-near-target (all-written이 아니다 — 어제가 기다리는 중이다)", () => {
@@ -183,7 +183,7 @@ describe("D2-2 — 오전 목표의 어제는 오늘 목표 시각에 차례가 
       selectableDays: PAST_ONLY,
       existingDiaryDays: ["2026-08-26", "2026-08-25"],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 
   it.each([10, 15, 23])("창이 지난 %i시에는 어제를 쓴다 (놓친 날)", (hour) => {
@@ -193,7 +193,7 @@ describe("D2-2 — 오전 목표의 어제는 오늘 목표 시각에 차례가 
       selectableDays: hour >= 12 ? WITH_TODAY : PAST_ONLY,
       existingDiaryDays: hour >= 12 ? [TODAY, "2026-08-26"] : ["2026-08-26", "2026-08-25"],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 
   it("오후 목표(22시)는 새벽 3시에도 어제를 쓴다 — 어제의 창은 어제 22시에 이미 열렸다 (iOS가 밤에 깨우는 경우)", () => {
@@ -203,7 +203,7 @@ describe("D2-2 — 오전 목표의 어제는 오늘 목표 시각에 차례가 
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 });
 
@@ -240,7 +240,7 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
       selectableDays: WITH_TODAY,
       existingDiaryDays: PAST_WRITTEN,
     });
-    expect(r).toEqual({ act: true, day: TODAY });
+    expect(r).toMatchObject({ act: true, day: TODAY });
   });
 
   it("자정 넘어 0시면 창 안 — 새 날은 정오 전이라 후보에 없고 어제(그날)를 쓴다", () => {
@@ -250,7 +250,7 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 
   it("1시도 창 안 — 어제", () => {
@@ -260,7 +260,7 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
       selectableDays: PAST_ONLY,
       existingDiaryDays: [],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 
   it("22시(창 시작 직전)면 오늘은 안 쓴다 — 오늘만 비어 있으면 not-near-target", () => {
@@ -280,7 +280,7 @@ describe("D2-2 — 자정 wrap (목표 23시, 창 [23, 26) → 23·0·1)", () =>
       selectableDays: WITH_TODAY,
       existingDiaryDays: [TODAY, "2026-08-26"],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-27" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-27" });
   });
 });
 
@@ -312,7 +312,7 @@ describe("D2-3 — 대상 하루 선정 (retry.ts 재사용)", () => {
       selectableDays: PAST_ONLY,
       existingDiaryDays: ["2026-08-27"],
     });
-    expect(r).toEqual({ act: true, day: "2026-08-26" });
+    expect(r).toMatchObject({ act: true, day: "2026-08-26" });
   });
 });
 
@@ -341,5 +341,47 @@ describe("소스 검사 — D3·D4·D7", () => {
   it("078 — 하루 경계를 계산하지 않는다 (dayOf·getDate를 import·호출하지 않고 today를 주입받는다)", () => {
     expect(CODE).not.toMatch(/\bdayOf\b|getDate\(/);
     expect(CODE).toMatch(/today/);
+  });
+});
+
+describe("105 — 후보 날 전부(days)를 최근→과거로 싣는다", () => {
+  it("창 안: 오늘 포함 비어 있는 사흘 전부, 첫 원소가 day", () => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(7),
+      selectableDays: WITH_TODAY,
+      existingDiaryDays: [],
+    });
+    expect(r).toEqual({ act: true, day: TODAY, days: [TODAY, "2026-08-27", "2026-08-26"] });
+  });
+
+  it("쓴 날은 빠진다", () => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(7),
+      selectableDays: WITH_TODAY,
+      existingDiaryDays: ["2026-08-27"],
+    });
+    expect(r).toEqual({ act: true, day: TODAY, days: [TODAY, "2026-08-26"] });
+  });
+
+  it("창 밖(17시, 목표 7시): 오늘은 후보가 아니다", () => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(17),
+      selectableDays: WITH_TODAY,
+      existingDiaryDays: [],
+    });
+    expect(r).toEqual({ act: true, day: "2026-08-27", days: ["2026-08-27", "2026-08-26"] });
+  });
+
+  it("오전 목표 시각 전(5시, 목표 7시): 어제도 후보가 아니다", () => {
+    const r = decide({
+      settings: ENABLED,
+      now: at(5),
+      selectableDays: PAST_ONLY,
+      existingDiaryDays: [],
+    });
+    expect(r).toEqual({ act: true, day: "2026-08-26", days: ["2026-08-26", "2026-08-25"] });
   });
 });

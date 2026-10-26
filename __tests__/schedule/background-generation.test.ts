@@ -328,7 +328,12 @@ describe("080 T2 — 사용자가 그만둔 쓰기는 실패도 완주도 아니
     expect(failurePort.content).toBeNull();
     // 시작(`started`)과 같은 시각으로 짝이 맞아 한 줄이다 — 「시작한 뒤 끝나지 않음」으로 남지 않는다.
     expect(lines(attempts)).toEqual([
-      { at: at(7).toISOString(), path: "background", outcome: "cancelled" },
+      {
+        at: at(7).toISOString(),
+        path: "background",
+        outcome: "cancelled",
+        day: expect.any(String),
+      },
     ]);
   });
 
@@ -552,7 +557,7 @@ describe("078 AT — 자동 쓰기 시도 기록", () => {
     const { deps, attempts } = baseDeps();
     await runAutoDiaryTask(deps);
     expect(lines(attempts)).toEqual([
-      { path: "background", outcome: "ran", at: at(7).toISOString() },
+      { path: "background", outcome: "ran", at: at(7).toISOString(), day: expect.any(String) },
     ]);
   });
 
@@ -700,7 +705,8 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
 
     photos = { kind: "known", count: 4 };
     expect(await runAutoDiaryTask({ ...made.deps, now: at(23) })).toBe("ran");
-    expect(preview).toHaveBeenCalledTimes(2);
+    // 105 — 첫 깨움은 후보 둘(어제·그제)을 모두 훑고, 둘째 깨움은 첫 후보에서 쓴다
+    expect(preview).toHaveBeenCalledTimes(3);
     expect(run).toHaveBeenCalledTimes(1);
     expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
   });

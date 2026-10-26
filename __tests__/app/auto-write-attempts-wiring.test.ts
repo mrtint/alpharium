@@ -28,7 +28,7 @@ describe("앱 열기 경로", () => {
     expect(HANDOFF).toMatch(/const at = now\(\);/);
     expect(HANDOFF).toMatch(/resolveAutoWrite\(\{\s*settings,\s*now: at,/);
     expect(HANDOFF).toMatch(
-      /recordAttemptEnd\(attemptPort, "app-open", at, attemptOutcomeOf\(decision\)\)/,
+      /recordAttemptEnd\(\s*attemptPort,\s*"app-open",\s*at,\s*attemptOutcomeOf\(decision\),\s*attemptDayOf\(decision\),?\s*\)/,
     );
     // 기본 「지금」은 기기의 시계다.
     expect(HANDOFF).toMatch(/const systemNow = \(\) => new Date\(\);/);

@@ -16,7 +16,7 @@ import type { SkipStorePort } from "../../src/schedule/skip-store";
  */
 
 const DAY = "2026-09-14";
-const ACT: ScheduleDecision = { act: true, day: DAY };
+const ACT: ScheduleDecision = { act: true, day: DAY, days: [DAY] };
 
 function preview(
   photos: CountHint,
@@ -182,6 +182,177 @@ describe("AW6 — resolveAutoWrite: 조합과 기록", () => {
     });
     expect(result).toEqual({ kind: "idle", reason: "all-written" });
     expect(previewDay).not.toHaveBeenCalled();
+  });
+});
+
+/* ───────────── 105 — 후보 훑기 ───────────── */
+
+const YESTERDAY = "2026-09-13";
+const TWO_AGO = "2026-09-12";
+
+/** 날마다 미리보기를 정해 주는 대역 — 부른 날 순서를 남긴다 */
+function previewsBy(
+  byDay: Record<
+    string,
+    { photos: CountHint; places?: CountHint; photoAccess?: PhotoAccess } | "throw"
+  >,
+) {
+  const called: string[] = [];
+  const previewDay = async (day: string): Promise<DayPreview> => {
+    called.push(day);
+    const entry = byDay[day];
+    if (entry === "throw" || entry === undefined) throw new Error("preview");
+    return {
+      day,
+      photos: entry.photos,
+      places: entry.places ?? UNKNOWN,
+      photoAccess: entry.photoAccess ?? "ok",
+    };
+  };
+  return { previewDay, called };
+}
+
+function sweep(
+  previewDay: (day: string) => Promise<DayPreview>,
+  skipPort = memorySkipPort().port,
+  existing: string[] = [],
+  now = NOW,
+) {
+  return resolveAutoWrite({
+    settings: SETTINGS,
+    now,
+    listDiaryDays: async () => existing,
+    previewDay,
+    skipPort,
+  });
+}
+
+describe("105 SW — 재료 없는 최근 날에 막히지 않는다", () => {
+  it("SW1·SW3 재현: 오늘 재료 없음·어제 재료 있음 → 어제를 쓴다 (최근→과거로 본다)", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: { photos: NONE, places: NONE },
+      [YESTERDAY]: { photos: known(3) },
+      [TWO_AGO]: { photos: known(9) },
+    });
+    expect(await sweep(previewDay)).toEqual({ kind: "write", day: YESTERDAY });
+    expect(called).toEqual([DAY, YESTERDAY]);
+  });
+
+  it("가장 오래된 날만 재료가 있으면 그 날", async () => {
+    const { previewDay } = previewsBy({
+      [DAY]: { photos: NONE, places: NONE },
+      [YESTERDAY]: { photos: known(0), places: known(0) },
+      [TWO_AGO]: { photos: known(2) },
+    });
+    expect(await sweep(previewDay)).toEqual({ kind: "write", day: TWO_AGO });
+  });
+
+  it("재료 있는 날이 둘이면 더 최근 날, 오래된 날은 읽지 않는다", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: { photos: known(1) },
+      [YESTERDAY]: { photos: known(5) },
+      [TWO_AGO]: { photos: known(5) },
+    });
+    expect(await sweep(previewDay)).toEqual({ kind: "write", day: DAY });
+    expect(called).toEqual([DAY]);
+  });
+
+  it("SW5·SW7 전부 재료 없음 → no-material(첫 후보), 아무것도 기억하지 않는다", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: { photos: NONE, places: NONE },
+      [YESTERDAY]: { photos: known(0), places: known(0) },
+      [TWO_AGO]: { photos: UNKNOWN },
+    });
+    const { port, saved } = memorySkipPort();
+    expect(await sweep(previewDay, port)).toEqual({
+      kind: "skip",
+      day: DAY,
+      because: "no-material",
+    });
+    expect(called).toEqual([DAY, YESTERDAY, TWO_AGO]);
+    expect(saved).toHaveLength(0);
+  });
+
+  it("SW6 후보가 하나면 종전과 같다", async () => {
+    const existing = [TWO_AGO, YESTERDAY];
+    const none = previewsBy({ [DAY]: { photos: NONE, places: NONE } });
+    expect(await sweep(none.previewDay, undefined, existing)).toEqual({
+      kind: "skip",
+      day: DAY,
+      because: "no-material",
+    });
+    const has = previewsBy({ [DAY]: { photos: known(2) } });
+    expect(await sweep(has.previewDay, undefined, existing)).toEqual({ kind: "write", day: DAY });
+  });
+
+  it("SW6 후보가 하나인데 미리보기가 예외면 종전처럼 던진다", async () => {
+    const previewDay = jest.fn().mockRejectedValue(new Error("single"));
+    await expect(sweep(previewDay, undefined, [TWO_AGO, YESTERDAY])).rejects.toThrow("single");
+  });
+
+  it("SW2 첫 후보에서 사진 권한 거부 → 그 날을 기억하고 더 훑지 않는다", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: { photos: UNKNOWN, places: UNKNOWN, photoAccess: "denied" },
+      [YESTERDAY]: { photos: known(3) },
+    });
+    const { port, saved } = memorySkipPort();
+    expect(await sweep(previewDay, port)).toEqual({
+      kind: "skip",
+      day: DAY,
+      because: "no-photo-access",
+    });
+    expect(called).toEqual([DAY]);
+    expect(saved.map((s) => JSON.parse(s))).toEqual([{ day: DAY }]);
+  });
+
+  it("SW2 재료 없는 날 뒤에서 권한 거부가 나오면 그 날을 기억하고 멈춘다", async () => {
+    const { previewDay } = previewsBy({
+      [DAY]: { photos: NONE, places: NONE },
+      [YESTERDAY]: { photos: UNKNOWN, places: UNKNOWN, photoAccess: "blocked" },
+    });
+    const { port, saved } = memorySkipPort();
+    expect(await sweep(previewDay, port)).toEqual({
+      kind: "skip",
+      day: YESTERDAY,
+      because: "no-photo-access",
+    });
+    expect(saved.map((s) => JSON.parse(s))).toEqual([{ day: YESTERDAY }]);
+  });
+
+  it("SW4 미리보기가 예외인 날은 건너뛰고 더 오래된 날을 본다 (재료 있음으로 단정하지 않는다)", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: "throw",
+      [YESTERDAY]: { photos: known(2) },
+    });
+    expect(await sweep(previewDay)).toEqual({ kind: "write", day: YESTERDAY });
+    expect(called).toEqual([DAY, YESTERDAY]);
+  });
+
+  it("SW4 예외 뒤 읽힌 날이 재료 없음뿐이면 no-material (첫 후보)", async () => {
+    const { previewDay } = previewsBy({
+      [DAY]: "throw",
+      [YESTERDAY]: { photos: NONE, places: NONE },
+      [TWO_AGO]: "throw",
+    });
+    expect(await sweep(previewDay)).toEqual({ kind: "skip", day: DAY, because: "no-material" });
+  });
+
+  it("SW4 모든 후보가 예외면 단정하지 않고 첫 예외를 던진다", async () => {
+    const previewDay = jest.fn().mockRejectedValue(new Error("boom"));
+    await expect(sweep(previewDay)).rejects.toThrow("boom");
+    expect(previewDay).toHaveBeenCalledTimes(3);
+  });
+
+  it("FR-002 창 밖(목표 21시, 새벽 6시)에서는 오늘을 훑지 않는다", async () => {
+    const { previewDay, called } = previewsBy({
+      [DAY]: { photos: known(4) },
+      [YESTERDAY]: { photos: NONE, places: NONE },
+      [TWO_AGO]: { photos: NONE, places: NONE },
+    });
+    const morning = new Date(2026, 8, 14, 15, 0);
+    const result = await sweep(previewDay, undefined, [], morning);
+    expect(called).not.toContain(DAY);
+    expect(result).toEqual({ kind: "skip", day: YESTERDAY, because: "no-material" });
   });
 });
 

@@ -227,8 +227,12 @@ describe("078 AT — manual은 경로가 manual이다", () => {
     const { deps, attempts } = make({ manual: true });
     await runAutoDiaryTask(deps);
     const items = (
-      JSON.parse(attempts.content ?? "") as { items: { path: string; outcome: string }[] }
+      JSON.parse(attempts.content ?? "") as {
+        items: { path: string; outcome: string; day?: string }[];
+      }
     ).items;
-    expect(items).toEqual([{ path: "manual", outcome: "ran", at: expect.any(String) }]);
+    expect(items).toEqual([
+      { path: "manual", outcome: "ran", at: expect.any(String), day: "2026-08-28" },
+    ]);
   });
 });

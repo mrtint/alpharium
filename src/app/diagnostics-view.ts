@@ -238,6 +238,14 @@ function attemptOutcomeText(outcome: AttemptOutcome): string {
   return byOutcome[outcome];
 }
 
+/** 105 — 결과 문구 뒤에 고른 날(`YYYY-MM-DD` → 「M월 d일」). 날이 없으면 결과 그대로 */
+function attemptOutcomeWithDay(item: AutoWriteAttempt): string {
+  const text = attemptOutcomeText(item.outcome);
+  if (item.day === undefined) return text;
+  const [, month, day] = item.day.split("-");
+  return A.withDay(text, Number(month), Number(day));
+}
+
 function attemptTails(item: AutoWriteAttempt): string[] {
   const tails: string[] = [];
   if (item.launch !== undefined)
@@ -256,7 +264,7 @@ export function attemptLines(items: readonly AutoWriteAttempt[]): AttemptLine[] 
     // 090 — 시작 줄의 깨운 상태, 091 — 깨운 요청이 있으면 꼬리로(옛 줄·만료 줄은 없다)
     outcomeText: attemptTails(item).reduce(
       (text, tail) => A.withLaunch(text, tail),
-      attemptOutcomeText(item.outcome),
+      attemptOutcomeWithDay(item),
     ),
   }));
 }

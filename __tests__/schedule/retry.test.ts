@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { pickRetryDay } from "../../src/schedule/retry";
+import { pickRetryDay, pickRetryDays } from "../../src/schedule/retry";
 
 /**
  * 재시도 대상 선정의 계약 테스트.
@@ -93,5 +93,26 @@ describe("소스 검사 — 04:00·3일을 다시 계산하지 않는다 (D5, FR
 
   it("new Date()·setDate·setHours를 쓰지 않는다 — 날짜 산술 없음", () => {
     expect(CODE).not.toMatch(/new Date\(|setDate|setHours|getHours/);
+  });
+});
+
+describe("pickRetryDays — 일기 없는 후보 전부, 최근→과거 (105)", () => {
+  const THREE = ["2026-08-25", "2026-08-27", "2026-08-26"];
+
+  it("전부 비었으면 사전순 내림차순", () => {
+    expect(pickRetryDays(THREE, [])).toEqual(["2026-08-27", "2026-08-26", "2026-08-25"]);
+  });
+
+  it("쓴 날은 빠진다", () => {
+    expect(pickRetryDays(THREE, ["2026-08-27"])).toEqual(["2026-08-26", "2026-08-25"]);
+  });
+
+  it("전부 있으면 빈 배열, 후보에 없는 날은 만들지 않는다", () => {
+    expect(pickRetryDays(THREE, THREE)).toEqual([]);
+    expect(pickRetryDays(["2026-08-26"], ["2026-01-01"])).toEqual(["2026-08-26"]);
+  });
+
+  it("첫 원소는 pickRetryDay와 같다", () => {
+    expect(pickRetryDays(THREE, ["2026-08-27"])[0]).toBe(pickRetryDay(THREE, ["2026-08-27"]));
   });
 });

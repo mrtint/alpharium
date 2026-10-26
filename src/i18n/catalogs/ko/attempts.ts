@@ -38,5 +38,8 @@ export const attempts = {
   /** 091 — 깨운 요청(충전 요청·배터리 요청) 꼬리 */
   wakePower: "충전",
   wakeBattery: "배터리",
+  /** 105 — 쓰기로 정해진 시도가 고른 날 꼬리 — 「홈에 넘김 · 10월 24일」 */
+  withDay: (outcome: string, month: number, day: number): string =>
+    `${outcome} · ${month}월 ${day}일`,
   withLaunch: (outcome: string, launch: string): string => `${outcome} · ${launch}`,
 };

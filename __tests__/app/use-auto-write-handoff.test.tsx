@@ -117,7 +117,7 @@ async function decided(port: { write: jest.Mock }, n: number) {
 const lastOutcome = (port: { write: jest.Mock }) => {
   const calls = port.write.mock.calls;
   const items = (JSON.parse(calls[calls.length - 1]![0] as string) as { items: unknown[] }).items;
-  return (items[0] as { outcome: string; path: string; at: string }) ?? null;
+  return (items[0] as { outcome: string; path: string; at: string; day?: string }) ?? null;
 };
 
 async function fireActive(spy: jest.SpyInstance) {
@@ -152,6 +152,16 @@ describe("HO2·HO3 — 같은 판정으로, 마운트와 전경 복귀 때", () 
     await decided(attemptPort, 1);
     expect(handed()).toBe(YESTERDAY);
     expect(lastOutcome(attemptPort).outcome).toBe("write");
+    expect(lastOutcome(attemptPort).day).toBe(YESTERDAY);
+  });
+
+  it("105 — 가장 최근 날에 재료가 없으면 재료 있는 더 오래된 날을 준다, 기록에 그 날이 남는다", async () => {
+    const onlyTwoAgo = async (day: string) => (day === TWO_AGO ? withPhotos(day) : noMaterial(day));
+    const { props, attemptPort } = setup({ previewDay: onlyTwoAgo });
+    await render(<Harness {...props} />);
+    await decided(attemptPort, 1);
+    expect(handed()).toBe(TWO_AGO);
+    expect(lastOutcome(attemptPort)).toMatchObject({ outcome: "write", day: TWO_AGO });
   });
 
   it("꺼져 있으면 없음이다", async () => {
@@ -242,6 +252,7 @@ describe("HO8·HO11 — 시도 기록", () => {
       at: NOW.toISOString(),
       path: "app-open",
       outcome: "write",
+      day: YESTERDAY,
     });
   });
 

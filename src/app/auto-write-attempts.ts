@@ -16,6 +16,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import type { DayDate } from "../config/day-boundary";
 import type { AutoWriteDecision } from "../schedule/auto-write";
 
 export type AttemptPath = "background" | "app-open" | "manual";
@@ -82,6 +83,11 @@ export type AutoWriteAttempt = {
   launch?: LaunchState;
   /** 091 — 백그라운드 시작 줄에만. 옛 줄·두 값 밖은 없다 */
   wake?: WakeKind;
+  /**
+   * 105 — 쓰기로 정해진 시도의 끝 줄에만. 판정이 고른 날(`YYYY-MM-DD`)이다. 시간·횟수가 아니라 사람이 읽는 사실이다(원칙 IV).
+   * 옛 줄·형식이 틀린 값은 없다.
+   */
+  day?: DayDate;
 };
 
 /** 최근 몇 건을 남기는가 — 사람이 정한 값 */
@@ -97,6 +103,16 @@ export function attemptOutcomeOf(decision: AutoWriteDecision): AttemptOutcome {
   if (decision.kind === "idle") return decision.reason;
   if (decision.kind === "skip") return decision.because;
   return "write";
+}
+
+/** 105 — 쓰기로 정해진 판정의 날. 그 밖은 없다 */
+export function attemptDayOf(decision: AutoWriteDecision): DayDate | undefined {
+  return decision.kind === "write" ? decision.day : undefined;
+}
+
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+function isDay(value: unknown): value is DayDate {
+  return typeof value === "string" && DAY_PATTERN.test(value);
 }
 
 function isPath(value: unknown): value is AttemptPath {
@@ -129,12 +145,13 @@ export async function loadAutoWriteAttempts(
     const out: AutoWriteAttempt[] = [];
     for (const item of items) {
       if (typeof item !== "object" || item === null) continue;
-      const { at, path, outcome, launch, wake } = item as {
+      const { at, path, outcome, launch, wake, day } = item as {
         at?: unknown;
         path?: unknown;
         outcome?: unknown;
         launch?: unknown;
         wake?: unknown;
+        day?: unknown;
       };
       if (typeof at !== "string" || !isPath(path) || !isOutcome(outcome)) continue;
       const date = new Date(at);
@@ -145,6 +162,7 @@ export async function loadAutoWriteAttempts(
         outcome,
         ...(isLaunch(launch) ? { launch } : {}),
         ...(isWake(wake) ? { wake } : {}),
+        ...(isDay(day) ? { day } : {}),
       });
     }
     return out.slice(0, MAX_AUTO_WRITE_ATTEMPTS);
@@ -162,6 +180,7 @@ async function save(port: AutoWriteAttemptPort, items: readonly AutoWriteAttempt
         outcome: item.outcome,
         ...(item.launch !== undefined ? { launch: item.launch } : {}),
         ...(item.wake !== undefined ? { wake: item.wake } : {}),
+        ...(item.day !== undefined ? { day: item.day } : {}),
       })),
     }),
   );
@@ -212,6 +231,7 @@ export function recordAttemptEnd(
   path: AttemptPath,
   at: Date,
   outcome: AttemptOutcome,
+  day?: DayDate,
 ): Promise<void> {
   return inOrder(async () => {
     try {
@@ -223,16 +243,24 @@ export function recordAttemptEnd(
       if (index >= 0) {
         await save(
           port,
-          previous.map((item, n) => (n === index ? { ...item, outcome } : item)),
+          previous.map((item, n) =>
+            n === index ? { ...item, outcome, ...(day !== undefined ? { day } : {}) } : item,
+          ),
         );
         return;
       }
       const head = previous[0];
-      if (head !== undefined && head.path === path && head.outcome === outcome) {
+      // 105 — 날까지 같을 때만 합친다. 다른 날을 같은 줄로 덮으면 어느 날을 골랐는지가 사라진다.
+      if (
+        head !== undefined &&
+        head.path === path &&
+        head.outcome === outcome &&
+        head.day === day
+      ) {
         await save(port, [{ ...head, at }, ...previous.slice(1)]);
         return;
       }
-      await save(port, [{ at, path, outcome }, ...previous]);
+      await save(port, [{ at, path, outcome, ...(day !== undefined ? { day } : {}) }, ...previous]);
     } catch {
       // 기록이 자동 쓰기를 막지 않는다.
     }
