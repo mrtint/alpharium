@@ -51,7 +51,7 @@
 
 ### 자동 쓰기가 재료 없는 최근 날에 막혀 오래된 날을 못 쓴다 — 안드로이드에서 재현됨
 
-> **착수: 스펙 105** (`specs/105-auto-write-sweep-no-material/`, 설계 `docs/superpowers/specs/2026-10-26-auto-write-sweep-no-material-design.md`) — 후보를 최근→과거로 훑는 방향(b)으로 소유자가 정했다.
+> **착수: 스펙 105** (`specs/105-auto-write-sweep-no-material/`, 설계 `docs/superpowers/specs/2026-10-26-auto-write-sweep-no-material-design.md`) — 후보를 최근→과거로 훑는 방향(b)으로 소유자가 정했다. **구현·기기 불필요 테스트는 끝났다(코드 리뷰 반영). SM-S901N 실기기 확인이 남아 이력으로 옮기지 않았다** — `specs/105-auto-write-sweep-no-material/device-check.md`.
 
 103의 `all-written` 의문을 닫다가 본 것이다. `pickRetryDay`(`src/schedule/retry.ts`)는 후보 중 **가장 최근 미작성일 하나**만 고르고, 그 날이 `no-material`(사진·장소 재료 없음)이면 건너뛰되 기억하지 않는다(사진 권한 거부만 `saveSkippedDay`로 기억). 그래서 가장 최근 후보 날에 재료가 없으면 더 오래된 날(재료가 있는)이 따라잡히지 않을 수 있다.
 
