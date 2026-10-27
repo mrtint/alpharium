@@ -19,6 +19,7 @@ import type {
 } from "../../src/schedule/reminder-port";
 import { reconcileReminders, type ReminderDeps } from "../../src/schedule/reminders";
 import type { AutoDiarySettings } from "../../src/schedule/settings";
+import { fastCycleTiming, productionTiming } from "../../src/schedule/timing";
 
 const NOW = new Date(2026, 9, 15, 21, 0);
 const ON: AutoDiarySettings = { enabled: true, targetHour: 22 };
@@ -626,3 +627,102 @@ describe("RC12 — 리뷰 회귀: 정각~정각+30분 사이에 상태가 바뀌
 
 const at2 = (y: number, m: number, d: number, h: number, min: number) =>
   new Date(y, m - 1, d, h, min).getTime();
+
+describe("106 FC6 — 빠른 주기: loadTiming이 주는 시간 규칙", () => {
+  const FAST_NOW = new Date(2026, 9, 26, 10, 20); // 30분 주기 순번 20 → 다음 주기 시작 10:30
+  const fastDeps = (
+    port: ReminderPort,
+    calls: string[],
+    over: Partial<ReminderDeps> & { written?: string[] } = {},
+  ) =>
+    deps(port, calls, {
+      now: () => FAST_NOW,
+      loadTiming: async () => fastCycleTiming(30),
+      ...over,
+    });
+
+  it("다음 주기 시작의 예약 하나만 건다 (7일치가 아니다)", async () => {
+    const { port, calls } = fakePort();
+    await reconcileReminders(fastDeps(port, calls));
+    expect(calls.filter((c) => c.startsWith("schedule:"))).toEqual(["schedule:2026-10-26"]);
+  });
+
+  it("배터리 예외 exempt면 지연은 min(30, ⌊창 분/2⌋) = 7분이다 — 10:37", async () => {
+    const scheduled: number[] = [];
+    const { port, calls } = fakePort();
+    const original = port.schedule;
+    port.schedule = async (entry) => {
+      scheduled.push(entry.at);
+      return original(entry);
+    };
+    await reconcileReminders(fastDeps(port, calls, { loadBatteryStatus: async () => "exempt" }));
+    expect(scheduled).toEqual([new Date(2026, 9, 26, 10, 37).getTime()]);
+  });
+
+  it("배터리 예외가 없거나 모르면 정각(10:30)이다", async () => {
+    const scheduled: number[] = [];
+    const { port, calls } = fakePort();
+    const original = port.schedule;
+    port.schedule = async (entry) => {
+      scheduled.push(entry.at);
+      return original(entry);
+    };
+    await reconcileReminders(
+      fastDeps(port, calls, { loadBatteryStatus: async () => "restricted" }),
+    );
+    expect(scheduled).toEqual([new Date(2026, 9, 26, 10, 30).getTime()]);
+  });
+
+  it("오전에도 오늘의 트레이 알림을 사흘 밖으로 보지 않는다 — 쓴 날만 거둔다", async () => {
+    // 배포 규칙이면 정오 전 사흘에 오늘이 없어 오늘 알림이 「사흘 밖」으로 거둬진다. 빠른 주기의 후보는 오늘이다.
+    const { port, calls } = fakePort({
+      presented: [{ id: "diary-reminder-2026-10-26", day: "2026-10-26" }],
+    });
+    await reconcileReminders(fastDeps(port, calls));
+    expect(calls).not.toContain("dismiss:diary-reminder-2026-10-26");
+  });
+
+  it("오늘 일기가 저장되면 트레이의 쓸 차례 알림이 거둬진다 (SC-005의 코드 쪽)", async () => {
+    const { port, calls } = fakePort({
+      presented: [{ id: "diary-reminder-2026-10-26", day: "2026-10-26" }],
+    });
+    await reconcileReminders(fastDeps(port, calls, { listDiaryDays: async () => ["2026-10-26"] }));
+    expect(calls).toContain("dismiss:diary-reminder-2026-10-26");
+  });
+
+  it("같은 날의 다음 주기는 같은 id로 앞 예약을 바꿔 낀다 — 지난 예약을 지우지 않고 한 번 건다 (코드 리뷰 M5)", async () => {
+    // 10:30 주기 시작 알림이 이미 지났다(전달됐거나 곧 전달) — 지금은 10:40, 오늘 일기는 아직 없다
+    const passed = {
+      id: "diary-reminder-2026-10-26",
+      day: "2026-10-26",
+      at: new Date(2026, 9, 26, 10, 30).getTime(),
+      title: "은동이 10월 26일 일기를 쓸 차례예요",
+    };
+    const { port, calls } = fakePort({ scheduled: [passed] });
+    await reconcileReminders(fastDeps(port, calls, { now: () => new Date(2026, 9, 26, 10, 40) }));
+    expect(calls.filter((c) => c.startsWith("cancel:"))).toEqual([]);
+    expect(calls.filter((c) => c.startsWith("schedule:"))).toEqual(["schedule:2026-10-26"]);
+  });
+
+  it("loadTiming이 던지면 배포 계획이다 (7일치)", async () => {
+    const { port, calls } = fakePort();
+    await reconcileReminders(
+      deps(port, calls, {
+        loadTiming: async () => {
+          throw new Error("io");
+        },
+      }),
+    );
+    expect(calls.filter((c) => c.startsWith("schedule:"))).toHaveLength(7);
+  });
+
+  it("loadTiming이 production을 주거나 없으면 종전과 같다", async () => {
+    const a = fakePort();
+    await reconcileReminders(deps(a.port, a.calls));
+    const b = fakePort();
+    await reconcileReminders(
+      deps(b.port, b.calls, { loadTiming: async () => productionTiming(ON) }),
+    );
+    expect(b.calls).toEqual(a.calls);
+  });
+});

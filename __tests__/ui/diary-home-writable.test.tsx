@@ -140,46 +140,6 @@ describe("049 HS — 자정 전환과 미리 준비의 범위", () => {
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("25");
     // 복원하지 않는다 — jest-expo의 AppState 목은 복원하면 구독 반환값을 잃는다(diary-home.test와 같다).
   });
-
-  it("★ HS3 — 사흘 밖의 날(canPrepare 거짓)에서는 미리 준비하지 않고 놓아준다 (FR-020a)", async () => {
-    const prepare = jest.fn(async () => {});
-    const release = jest.fn(async () => {});
-    const captionDay = jest.fn(async () => ({ kind: "no-photos" as const }));
-    const c = clock("2026-09-24T09:00:00");
-    const canPrepare = (day: string) => day >= "2026-09-22";
-
-    await renderAt(c, { prepare, release, canPrepare });
-    await waitFor(() => expect(prepare).toHaveBeenCalledWith("quiet"));
-
-    // 사흘 밖의 날로 옮긴다 — 준비해 둔 것을 놓아주고 다시 준비하지 않는다.
-    prepare.mockClear();
-    await fireEvent.press(screen.getByTestId("day-2026-09-20"));
-    await waitFor(() => expect(release).toHaveBeenCalled());
-    expect(prepare).not.toHaveBeenCalled();
-
-    // 사진이 있다고 판정되는 경로에서도 사진을 미리 읽지 않는다.
-    await render(
-      <DiaryHomeScreen
-        canPrepare={canPrepare}
-        captionDay={captionDay as never}
-        chosenDay="2026-09-20"
-        now={c.now}
-        onChooseDay={() => {}}
-        pipeline={neverPipeline()}
-        resolution={resolved}
-        resolve={resolveQuiet(true)}
-        store={memoryStore()}
-      />,
-    );
-    await screen.findByTestId("day-strip");
-    expect(captionDay).not.toHaveBeenCalled();
-  });
-
-  it("HS3 — canPrepare가 참인 날에서는 기존대로 준비가 시작된다", async () => {
-    const prepare = jest.fn(async () => {});
-    await renderAt(clock("2026-09-24T09:00:00"), { prepare, canPrepare: () => true });
-    await waitFor(() => expect(prepare).toHaveBeenCalledWith("quiet"));
-  });
 });
 
 describe("048 G7·G8 — 신호 미리보기", () => {

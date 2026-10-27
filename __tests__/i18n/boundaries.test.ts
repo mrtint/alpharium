@@ -133,6 +133,8 @@ describe("B6 — 저장된 데이터에 화면 문구가 없다 (research R13)",
       // 104 — 홈 배터리 안내를 닫은 시각(시각 하나, 화면 문구 없음)
       "battery-notice-dismissed.json",
       "character-names.json",
+      // 106 — 빠른 주기 기록(주기 분·마지막 리셋 주기 id, 개발 빌드 전용, 화면 문구 없음)
+      "dev-fast-cycle.json",
       "developer-menu.json",
       "geocoding-setting.json",
       "notified.json",

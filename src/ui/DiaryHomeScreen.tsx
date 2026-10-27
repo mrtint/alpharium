@@ -19,8 +19,9 @@
  * 밖(`App.tsx`)에서 들고 있을 수 있다(Q4).
  *
  * **049 — 날 고르기.** 스트립을 넘기면 `swipeWeek()`로 다음 날을 정하고, 다음 자정에 한 번 다시
- * 그려 오늘 밑줄만 옮긴다(FR-019). 고른 날은 언제나 쓸 수 있다(정오 제한 폐지). 사흘 밖의 날은
- * 미리 준비하지 않는다(`canPrepare`, FR-020a — 두 모델 동시 적재 방지).
+ * 그려 오늘 밑줄만 옮긴다(FR-019). 고른 날은 언제나 쓸 수 있다(정오 제한 폐지).
+ * 106 — 018 미리 준비(`prepare`·`release`·`captionDay`·`canPrepare`)는 앱이 한 번도 연결하지 않아 걷었다(두 모델 동시 적재 방지는 파이프라인이
+ * 적재를 한 번에 하나만 하는 데 있다).
  *
  * **051 — 홈이 곧 상세다.** 목록 카드 → 상세 화면 전이가 사라졌다. 고른 날에 일기가 있으면 그 날의
  * 파일을 읽어 `paperFor()`로 지면 상태를 만들고 `DiaryListScreen`에 넘긴다(늦게 온 결과는 버린다).
@@ -69,10 +70,9 @@ import { PERSONA_NAMES } from "../diary/persona";
 import type { Pipeline } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
-import type { Character, VisionSetting } from "../diary/types";
+import type { Character } from "../diary/types";
 import { text } from "../i18n/current";
 import type { MonologueBranch, ProgressStage } from "../inference/types";
-import type { VisionOutcome } from "../vision/types";
 import { BuildErrorScreen } from "./BuildErrorScreen";
 import { DateJumpDialog } from "./DateJumpDialog";
 import { DiaryListScreen, type PreviewState } from "./DiaryListScreen";
@@ -115,19 +115,6 @@ export type DiaryHomeScreenProps = {
   deniedNotices?: readonly string[];
   /** 생성을 끊는 통로(005 FR-014b). 앱이 앞을 벗어날 때 쓴다 */
   stop?: () => Promise<void>;
-  /**
-   * 캐릭터·날짜가 정해지면 미리 준비를 시작하는 통로 (018). **읽을 사진이 없는 날에만**
-   * 부른다 (FR-005). 옵셔널 — 배선이 끊겨도 "느릴 뿐" 정상 동작한다(FR-007).
-   */
-  prepare?: (character: Character) => Promise<void>;
-  /** 준비해 둔 것을 놓아준다 (018, FR-008). */
-  release?: () => Promise<void>;
-  /** 사진만 미리 읽는 통로 (018 2단계, FR-006). */
-  captionDay?: (
-    day: DayDate,
-    character: Character,
-    vision: VisionSetting,
-  ) => Promise<VisionOutcome>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
   now?: () => Date;
   /**
@@ -196,16 +183,6 @@ export type DiaryHomeScreenProps = {
    */
   photoAccessPort?: PhotoAccessPort;
   /**
-   * 이 날에 미리 준비(018)를 해도 되는가 (049 FR-020a, research R5).
-   *
-   * **조립부가 「사진 유무를 미리 훑은 날인가」를 넘긴다**(`selectableDays` — 사흘). 사흘 밖의
-   * 날은 사진 유무를 모르므로 `resolve()`가 사진 없음으로 떨어지고, 그대로 두면 캐릭터 모델을
-   * 미리 연 뒤 쓰기 때 사진 읽기(VLM)가 이어져 **두 모델이 동시에 열린다**(E1·E15 — 기기가
-   * 죽는다). 거짓이면 미리 준비를 하지 않고 준비해 둔 것을 놓아준다 — 느려질 뿐 틀리지 않는다.
-   * 주지 않으면 언제나 참(옛 호출자·테스트).
-   */
-  canPrepare?: (day: DayDate) => boolean;
-  /**
    * 057 — 목표 시각이 지난 뒤 앱을 열었을 때 자동으로 쓸 날 (보드 `6c` ③, FR-014).
    *
    * **판정은 조립부가 한다**(`resolveAutoWrite` — 백그라운드와 같은 판정). 이 화면은 그 날을 고르고 054의 제자리 쓰기로
@@ -227,6 +204,12 @@ export type DiaryHomeScreenProps = {
    * (FR-017·FR-020). 시작하지 않은 판정은 부르지 않는다 — 「한 번」을 소모하지 않는다.
    */
   claimAutoWrite?: () => boolean;
+  /**
+   * 106 — 홈이 합류한 남의 쓰기가 **실패로 끝났다**(사용자가 그만둔 것·지우기가 끊은 것은 실패가 아니다). 조립부가 앱 열기 「한 번」을 한 번
+   * 다시 연다(`rearmAutoWrite`) — 프로세스가 오래 살아 「한 번」을 이미 쓴 실행(iOS)에서도 057 판정이 이어서 한 번 새로 쓴다(080 잔여 ④).
+   * 이어 쓴 쓰기가 실패해도 그 claim이 세대를 소모해 더 이어 쓰지 않는다. 주지 않으면 종전과 같다.
+   */
+  onJoinedWriteFailed?: () => void;
   /**
    * 080 — 살아 있는 쓰기 등록부 (specs/080-live-write-registry/contracts/live-write.md H1~H12).
    *
@@ -339,9 +322,6 @@ export function DiaryHomeScreen({
   onGenerated,
   deniedNotices,
   stop,
-  prepare,
-  release,
-  captionDay,
   now = () => new Date(),
   onRedownload,
   onOpenSettings,
@@ -354,11 +334,11 @@ export function DiaryHomeScreen({
   onChooseDay,
   previewDay,
   photoAccessPort,
-  canPrepare,
   autoWriteDay,
   onAutoWriteSaved,
   batteryNotice,
   claimAutoWrite,
+  onJoinedWriteFailed,
   liveWrites,
   wipeRequest,
   onWipeReady,
@@ -541,6 +521,11 @@ export function DiaryHomeScreen({
   useEffect(() => {
     claimRef.current = claimAutoWrite;
   }, [claimAutoWrite]);
+  /** 106 — 합류한 쓰기가 실패로 끝났을 때 부르는 지금의 콜백(같은 이유로 ref) */
+  const joinedFailedRef = useRef(onJoinedWriteFailed);
+  useEffect(() => {
+    joinedFailedRef.current = onJoinedWriteFailed;
+  }, [onJoinedWriteFailed]);
 
   /** 080 — 이 홈이 아직 화면에 있는가. 사라진 뒤에 온 합류의 끝은 버린다(H10) */
   const mounted = useRef(true);
@@ -621,18 +606,14 @@ export function DiaryHomeScreen({
   }, [initialDay, setChosenDay, onInitialDayApplied]);
 
   /**
-   * 앱이 앞을 벗어나면 끊는다 (005 FR-014b) / 준비를 놓아준다 (018 FR-008).
+   * 앱이 앞을 벗어나면 끊는다 (005 FR-014b).
    */
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") {
         // 080 H3 — `running`은 **홈이 시작한 쓰기**만 가리킨다. 합류한 남의 쓰기는 여기서 끊기지 않는다 — 뒤에서 계속 돈다.
         // 092 FR-001 — 시스템이 이어 하기를 받아 준 쓰기는 끊지 않는다(iOS가 앱 밖에서 이어 돌린다).
-        if (running.current) {
-          if (continued.current === null) void stop?.().catch(() => {});
-        } else {
-          void release?.().catch(() => {});
-        }
+        if (running.current && continued.current === null) void stop?.().catch(() => {});
       } else {
         // 잠든 동안 자정 타이머가 밀렸을 수 있다. 돌아오면 다시 판정한다(049 FR-019).
         setTick((t) => t + 1);
@@ -644,109 +625,7 @@ export function DiaryHomeScreen({
       }
     });
     return () => subscription.remove();
-  }, [stop, release, refresh]);
-
-  /**
-   * 캐릭터·날짜가 정해지면 미리 준비를 시작한다 (018, FR-005).
-   *
-   * 029 — 목록 화면에 있을 때, 고른 하루에 사진 신호가 없으면 자동 판정 캐릭터로
-   * 준비를 데운다. `resolve(day)`가 `no-ready-character`면 준비할 것이 없다.
-   *
-   * **같은 (캐릭터+하루)에 대해 두 번 부르지 않는다** — `resolve`가 매 렌더 새
-   * 클로저일 수 있으므로(테스트·설정 변경) `preparedFor` 표식으로 막는다.
-   */
-  const preparedFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (screen.kind !== "list") return;
-    if (captionDay !== undefined) return; // 사진 있는 날 경로(아래)가 담당
-    // 080 H8 — 남의 쓰기가 살아 있는 동안에는 모델을 미리 열지 않는다. 열면 그 쓰기의 모델과 함께 둘이 열린다(E1).
-    if (foreignWrite() !== null) return;
-
-    const { day } = writePromptFor(screen.items, now(), chosenDay);
-    // ★ 049 R5 — 사진 유무를 미리 훑지 않은 날은 미리 준비하지 않는다(FR-020a).
-    if (canPrepare !== undefined && !canPrepare(day)) {
-      if (preparedFor.current !== null) void release?.().catch(() => {});
-      preparedFor.current = null;
-      return;
-    }
-    const outcome = resolve(day);
-    if (outcome.kind !== "resolved") return;
-    // 042 — 판별자가 「사진 설정이 none인가」에서 「이 하루에 사진이 있는가」로 바뀌었다.
-    // 설정이 사라져도 **두 갈래는 그대로 갈려야 한다**(FR-011) — 합쳐지면 사진을 미리
-    // 읽지 않거나(느려질 뿐 오류 없음), 캡션 전에 모델을 열어 018 E1이 깨진다.
-    if (outcome.params.hasPhotos) return;
-
-    const key = `${outcome.params.character}@${day}`;
-    if (preparedFor.current === key) return;
-    preparedFor.current = key;
-
-    void prepare?.(outcome.params.character).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- screen.items는 매 렌더 새 배열이라 넣으면 무한 루프. day 판정 입력만 의존성으로.
-  }, [
-    screen.kind,
-    chosenDay,
-    prepare,
-    release,
-    resolve,
-    now,
-    captionDay,
-    canPrepare,
-    tick,
-    foreignWrite,
-    liveTick,
-  ]);
-
-  /**
-   * 사진이 있는 날의 미리 읽기 (018 2단계, FR-006).
-   */
-  const captionRef = useRef<{ day: DayDate; promise: Promise<VisionOutcome> } | null>(null);
-
-  useEffect(() => {
-    if (screen.kind !== "list") return;
-    if (captionDay === undefined) return;
-    // 080 H8 — 위와 같다. 사진 미리 읽기는 사진 모델을 연다.
-    if (foreignWrite() !== null) return;
-
-    const { day } = writePromptFor(screen.items, now(), chosenDay);
-    // ★ 049 R5 — 사흘 밖의 날은 미리 읽지 않는다(FR-020a). 준비해 둔 캐릭터 모델도 놓아준다 —
-    // 쓰기 때 `generate()`가 VLM을 열기 전에 두 모델이 겹치지 않게.
-    if (canPrepare !== undefined && !canPrepare(day)) {
-      if (captionRef.current !== null || preparedFor.current !== null) {
-        void release?.().catch(() => {});
-      }
-      captionRef.current = null;
-      return;
-    }
-    const outcome = resolve(day);
-    if (outcome.kind !== "resolved") return;
-    // 042 — 위 1단계와 정확히 반대 갈래다(FR-011·FR-012).
-    if (!outcome.params.hasPhotos) return;
-    if (captionRef.current?.day === day) return;
-
-    const character = outcome.params.character;
-    const promise = captionDay(day, character, "quick");
-    captionRef.current = { day, promise };
-
-    void promise
-      .then(() => {
-        if (captionRef.current?.day !== day) return;
-        return prepare?.(character);
-      })
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 위와 같은 이유.
-  }, [
-    screen.kind,
-    chosenDay,
-    captionDay,
-    prepare,
-    release,
-    resolve,
-    now,
-    canPrepare,
-    tick,
-    foreignWrite,
-    liveTick,
-  ]);
+  }, [stop, refresh]);
 
   /**
    * 자정 전환 (049 FR-019·HS2, 048의 정오 전환 타이머를 대체).
@@ -999,12 +878,6 @@ export function DiaryHomeScreen({
 
         const at = now();
 
-        let seen: VisionOutcome | undefined;
-        if (captionRef.current?.day === params.day) {
-          seen = await captionRef.current.promise.catch(() => undefined);
-        }
-        const seenVision = seen?.kind === "seen" ? seen.vision : undefined;
-
         const result = await pipeline.run(
           {
             day: params.day,
@@ -1012,7 +885,6 @@ export function DiaryHomeScreen({
             character: params.character,
             // 042 — 값이 하나뿐이다. 사진을 볼지는 파이프라인이 그 하루의 신호로 정한다.
             vision: "quick",
-            ...(seenVision !== undefined ? { seen: seenVision } : {}),
             // 035 — 프롬프트의 호칭 줄과 저장될 작성자 이름이 같은 값에서 나온다
             // ("두 개의 진실" 금지). 없으면 코드 안 기본 이름이 쓰인다.
             ...(characterNames !== undefined ? { customNames: characterNames } : {}),
@@ -1277,6 +1149,9 @@ export function DiaryHomeScreen({
         // 소모한다. **목록 상태로 돌아가기 전에** 소모한다 — 뒤에 하면 057 effect가 먼저 시작한다. 실패로 끝난 쓰기(H6)는
         // 소모하지 않는다 — 그 뒤는 057 판정이 이어서 쓴다.
         if (end.cancelled) claimRef.current?.();
+        // 106 ④ — 실패로 끝난 쓰기는 조립부가 「한 번」을 한 번 다시 연다(사용자가 그만둔 쓰기는 위에서 소모했다 — 이어 쓰지 않는다).
+        // 소모하지 않은 실행에서는 057 판정이 어차피 이어 쓴다 — 다시 열어도 해가 없고, 소모한 실행(iOS)에서는 이것이 이어 쓰기를 가능하게 한다.
+        if (!end.ok && !end.cancelled) joinedFailedRef.current?.();
 
         // 칸이 빈 뒤에 시작한 읽기다 — 반영하면 목록은 낡지 않았다(H12).
         const next = await refresh();

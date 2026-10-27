@@ -33,12 +33,13 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { dayOf, includesTodayAtHour, selectableDays, type DayDate } from "../config/day-boundary";
+import { dayOf, selectableDays, type DayDate } from "../config/day-boundary";
 import { decideMaterial, fromCountHint } from "../app/material";
 import type { DayPreview } from "../app/state";
 import { decideSchedule, type ScheduleDecision } from "./decision";
 import type { AutoDiarySettings } from "./settings";
 import { saveSkippedDay, type SkipStorePort } from "./skip-store";
+import { productionTiming, type ScheduleTiming } from "./timing";
 
 export type AutoWriteDecision =
   | { kind: "idle"; reason: Extract<ScheduleDecision, { act: false }>["reason"] }
@@ -74,14 +75,18 @@ export async function resolveAutoWrite(deps: {
   listDiaryDays: () => Promise<readonly DayDate[]>;
   previewDay: (day: DayDate) => Promise<DayPreview>;
   skipPort: SkipStorePort;
+  /** 106 — 시간 규칙. 주지 않으면 배포 규칙(`productionTiming`)이다. 빠른 주기는 호출부가 `timing-source`로 읽어 넘긴다 */
+  timing?: ScheduleTiming;
 }): Promise<AutoWriteDecision> {
+  const timing = deps.timing ?? productionTiming(deps.settings);
   const schedule = decideSchedule({
     settings: deps.settings,
     now: deps.now,
     today: dayOf(deps.now),
-    targetDay: includesTodayAtHour(deps.settings.targetHour) ? "today" : "yesterday",
+    targetDay: timing.targetDay,
     selectableDays: selectableDays(deps.now),
     existingDiaryDays: await deps.listDiaryDays(),
+    timing,
   });
   if (!schedule.act) return { kind: "idle", reason: schedule.reason };
 

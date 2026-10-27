@@ -29,8 +29,11 @@ import {
   type CharacterNamesPort,
 } from "../welcome/names-port";
 import { expoBatteryExceptionPort, type BatteryExceptionPort } from "./battery-exception-port";
+import { currentEnvironment } from "../config/environment";
+import type { FastCyclePort } from "./fast-cycle-store";
 import { expoNotificationPort, type NotificationPort } from "./notification-port";
 import { expoReminderPort, type ReminderPort } from "./reminder-port";
+import { allowsFastCycle, loadScheduleTiming } from "./timing-source";
 import type { ReminderDeps } from "./reminders";
 import {
   DEFAULT_AUTO_DIARY_SETTINGS,
@@ -50,6 +53,8 @@ export type ReminderDepsOverrides = {
   notificationPort?: Pick<NotificationPort, "ensureChannel">;
   /** 104 — 배터리 예외 상태 통로. 안 주면 기기 통로 */
   batteryPort?: Pick<BatteryExceptionPort, "readStatus">;
+  /** 106 — 빠른 주기 기록 통로. 안 주면 기기 통로(개발 환경에서만 읽는다) */
+  fastCyclePort?: FastCyclePort;
 };
 
 export function expoReminderDeps(overrides: ReminderDepsOverrides = {}): ReminderDeps {
@@ -63,6 +68,15 @@ export function expoReminderDeps(overrides: ReminderDepsOverrides = {}): Reminde
     },
     listDiaryDays: () => (overrides.store ?? fileStore(expoFileSystemPort("diary"))).listDays(),
     loadBatteryStatus: () => (overrides.batteryPort ?? expoBatteryExceptionPort()).readStatus(),
+    // 106 — 개발 환경에서만 빠른 주기를 읽는다(판정에 성공한 local·dev). 환경 판정은 config/environment.ts의 진입점이 한다.
+    loadTiming: async (settings) =>
+      (
+        await loadScheduleTiming({
+          settings,
+          devEnvironment: allowsFastCycle(currentEnvironment()),
+          port: overrides.fastCyclePort,
+        })
+      ).timing,
     async loadName() {
       const character =
         (await loadSelection(overrides.selectionPort ?? expoSelectionPort())) ??

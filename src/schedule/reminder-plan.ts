@@ -16,6 +16,10 @@
  * 「쓸 차례」가 뜨고 곧 「다 썼어요」가 오는 일을 없앤다. 늦추는 만큼만 `at`이 뒤로 가고 겨냥하는 날(`day`)과 `id`는 목표 시각 기준 그대로다
  * (하루 경계를 건드리지 않는다). 예약을 거두는 규칙은 여기 없다 — 맞추기(`reminders.ts`)가 그 날 일기 파일이 생긴 뒤에만 거둔다.
  *
+ * **빠른 주기(106, 개발 빌드 전용)**: `timing`이 빠른 주기면 7일치가 아니라 **다음 주기 시작 시각의 알림 하나**다(`id`는 그 날 기준). 일기 파일이
+ * 있는 날(`writtenDays`)을 보지 않는다 — 오늘 일기는 주기가 바뀔 때 리셋으로 지워지므로 다음 주기 시작 알림은 미리 걸려 있어야 한다. 쓰기가
+ * 저장되면 맞추기(`reminders.ts`)가 트레이에 남은 알림을 거둔다. 지연 상한은 호출부(`reminders.ts`)가 `timing.reminderDelayCap`으로 정한다.
+ *
  * 이름이 없으면(`name === null`) 알리지 않는다 — 순수 계획의 방어다. 기본 조립(`reminder-deps.ts`)은 홈의 쓰기와 같이 고른 캐릭터가
  * 없으면 첫 실행 기본 캐릭터의 이름을 주므로 앱에서는 `null`이 오지 않는다(research R8 — 구현 중 실기기에서 바뀜).
  * ─────────────────────────────────────────────────────────────────────────────
@@ -25,6 +29,7 @@ import { dayOf, includesTodayAtHour, type DayDate } from "../config/day-boundary
 import type { BatteryExceptionStatus } from "./battery-exception-port";
 import { reminderTitle } from "./notification-text";
 import type { AutoDiarySettings } from "./settings";
+import { isFastCycleTiming, type ScheduleTiming } from "./timing";
 
 /** 이 기능이 건 예약·알림을 가르는 유일한 규칙(data-model) */
 export const REMINDER_ID_PREFIX = "diary-reminder-";
@@ -61,12 +66,29 @@ export function planReminders(input: {
   name: string | null;
   /** 정각 뒤로 늦추는 분(0 이상 60 미만의 정수). 시를 넘기면 그 날 몫 계산이 어긋나 거부한다 */
   delayMinutes: number;
+  /** 106 — 시간 규칙. 주지 않으면 배포 규칙(7일치)이다 */
+  timing?: ScheduleTiming;
 }): ReminderPlanEntry[] {
   const { now, settings, name, delayMinutes } = input;
   if (!Number.isInteger(delayMinutes) || delayMinutes < 0 || delayMinutes >= 60) {
     throw new RangeError(`delayMinutes must be an integer in [0, 60): ${delayMinutes}`);
   }
   if (!settings.enabled || name === null) return [];
+
+  if (input.timing !== undefined && isFastCycleTiming(input.timing)) {
+    const start = input.timing.nextCycleStart(now);
+    const day = dayOf(start);
+    // `id`는 시작 시각이 속한 **날** 기준이라 같은 날의 주기들이 한 id를 이어 쓴다 — 다음 주기의 알림은 같은 id로 앞 예약을 바꿔 낀다
+    // (`reminders.ts`: 지났지만 아직 전달 전일 수 있는 앞 예약은 RC8이 지우지 않고, 같은 id 예약은 `schedule`이 바꿔 낀다 · 코드 리뷰 M5).
+    return [
+      {
+        id: `${REMINDER_ID_PREFIX}${day}`,
+        day,
+        at: start.getTime() + delayMinutes * 60_000,
+        title: reminderTitle(name, day),
+      },
+    ];
+  }
 
   const [year, month, date] = dayOf(now).split("-").map(Number);
   const sameDay = includesTodayAtHour(settings.targetHour);

@@ -69,6 +69,11 @@ export type DiagnosticsScreenProps = {
    * 차단 문구를 보인다. 홈·백그라운드도 각각 막는다 — 이 화면은 첫 방어다.
    */
   writeBlocked?: boolean;
+  /**
+   * 106 — 빠른 주기가 켜져 있을 때만 조립부가 넘기는 한 줄(「빠른 주기 켜짐 · 주기 N분」). 시도 기록이 평소와 다른 까닭을 읽을 수 있게 환경 묶음
+   * 맨 위에 그린다. 없으면 그리지 않는다.
+   */
+  fastCycleLine?: string;
 };
 
 /** 보드 `6h`는 권한 값을 고정폭 글자로만 적는다(꼬리표 모양이 아니다) — 말은 설정과 같은 한국어 */
@@ -117,12 +122,16 @@ export function DiagnosticsScreen({
   failures,
   attempts,
   writeBlocked = false,
+  fastCycleLine,
 }: DiagnosticsScreenProps) {
   const autoValue = autoRunning ? T.autoRunning : autoResult === null ? "" : autoText(autoResult);
 
   return (
     <View testID="diagnostics-screen">
       <Group first label={T.env} testID="diagnostics-group-env">
+        {fastCycleLine !== undefined && (
+          <Row label={fastCycleLine} labelTone="danger" testID="diagnostics-fast-cycle" />
+        )}
         <Row
           label={T.build}
           testID="diagnostics-build"

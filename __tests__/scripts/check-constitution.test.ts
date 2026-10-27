@@ -8,6 +8,7 @@ import {
   checkPhotoPortFile,
   checkSeedFile,
   checkSimulationFile,
+  checkFastCycleFile,
   checkSourceFile,
   checkVisionFile,
   formatViolations,
@@ -900,5 +901,120 @@ describe("checkSimulationFile — 상태 흉내의 경계 (064 LK1~LK3)", () => 
     ]) {
       expect(checkSimulationFile(file, readFileSync(join(root, file), "utf8"))).toEqual([]);
     }
+  });
+});
+
+/**
+ * 106 — 빠른 주기(개발 빌드 전용, 일기를 지운다)의 읽기·지우기 위치 (FL1~FL3).
+ */
+describe("checkFastCycleFile — 빠른 주기의 읽기·지우기 위치 (106 FL1~FL3)", () => {
+  const GUARDED = [
+    "export async function loadFastCycleRecord({ devEnvironment, port }) {",
+    "  if (!devEnvironment) return null;",
+    "  return loadFastCycle(port);",
+    "}",
+  ].join("\n");
+
+  it("FL1 가드 없는 읽기(loadFastCycle)를 timing-source 밖에서 import하면 잡는다 — 한 줄·여러 줄 모두", () => {
+    const one = 'import { loadFastCycle } from "../schedule/fast-cycle-store";';
+    const many =
+      'import {\n  clearFastCycle,\n  loadFastCycle,\n} from "../schedule/fast-cycle-store";';
+    for (const line of [one, many]) {
+      for (const file of ["src/ui/DeveloperScreen.tsx", "src/app/use-fast-cycle.ts"]) {
+        const v = checkFastCycleFile(file, line);
+        expect(v).toHaveLength(1);
+        expect(v[0].rule).toContain("FL1");
+      }
+    }
+  });
+
+  it("FL1 가드가 있는 loadFastCycleRecord와 timing-source의 import는 통과한다", () => {
+    expect(
+      checkFastCycleFile(
+        "src/app/use-fast-cycle.ts",
+        'import { loadFastCycleRecord } from "../schedule/timing-source";',
+      ),
+    ).toEqual([]);
+    expect(
+      checkFastCycleFile(
+        "src/schedule/timing-source.ts",
+        `import { loadFastCycle } from "./fast-cycle-store";\n${GUARDED}`,
+      ),
+    ).toEqual([]);
+  });
+
+  it("FL2 timing-source가 process.env를 읽으면 잡는다", () => {
+    const v = checkFastCycleFile(
+      "src/schedule/timing-source.ts",
+      `${GUARDED}\nconst x = process.env.EXPO_PUBLIC_APP_ENV;`,
+    );
+    expect(v.map((x) => x.rule).join("|")).toContain("FL2");
+  });
+
+  it("FL2 개발 환경 가드를 빼면 잡는다", () => {
+    const v = checkFastCycleFile(
+      "src/schedule/timing-source.ts",
+      "export async function loadFastCycleRecord({ port }) { return loadFastCycle(port); }",
+    );
+    expect(v).toHaveLength(1);
+    expect(v[0].rule).toContain("FL2");
+  });
+
+  it("FL3 resetFastCycleIfDue 호출은 task.ts·fast-cycle-reset.ts 밖에서 잡는다", () => {
+    const line = "await resetFastCycleIfDue({ devEnvironment, now });";
+    expect(checkFastCycleFile("src/schedule/task.ts", line)).toEqual([]);
+    expect(checkFastCycleFile("src/app/fast-cycle-reset.ts", line)).toEqual([]);
+    for (const file of ["src/app/use-auto-write-handoff.ts", "src/ui/DiaryHomeScreen.tsx"]) {
+      expect(
+        checkFastCycleFile(file, line)
+          .map((x) => x.rule)
+          .join("|"),
+      ).toContain("FL3");
+    }
+  });
+
+  it("FL3 선언(function resetFastCycleIfDue()은 호출이 아니다", () => {
+    expect(
+      checkFastCycleFile(
+        "src/app/fast-cycle-reset.ts",
+        "export async function resetFastCycleIfDue(deps) {}",
+      ),
+    ).toEqual([]);
+  });
+
+  it("FL3 createFastCycleResetter는 src/ 어디서도(공장 파일 밖) 부르면 잡는다 — 조립부 App.tsx만", () => {
+    const line = "const reset = createFastCycleResetter(base);";
+    expect(checkFastCycleFile("src/app/fast-cycle-reset.ts", line)).toEqual([]);
+    for (const file of ["src/ui/DeveloperScreen.tsx", "src/app/use-auto-write-handoff.ts"]) {
+      expect(
+        checkFastCycleFile(file, line)
+          .map((x) => x.rule)
+          .join("|"),
+      ).toContain("FL3");
+    }
+    expect(checkFastCycleFile("App.tsx", line)).toEqual([]);
+  });
+
+  it("FL3 앱 열기 판정 훅이 리셋·기록 모듈을 import하면 잡는다", () => {
+    for (const mod of [
+      "./fast-cycle-reset",
+      "../schedule/fast-cycle-store",
+      "../schedule/timing-source",
+    ]) {
+      const v = checkFastCycleFile(
+        "src/app/use-auto-write-handoff.ts",
+        `import { x } from "${mod}";`,
+      );
+      expect(v.map((i) => i.rule).join("|")).toContain("FL3");
+    }
+  });
+
+  it("주석은 위반이 아니다", () => {
+    expect(
+      checkFastCycleFile(
+        "src/ui/DeveloperScreen.tsx",
+        '// import { loadFastCycle } from "../schedule/fast-cycle-store";\n/* resetFastCycleIfDue( */',
+      ),
+    ).toEqual([]);
   });
 });

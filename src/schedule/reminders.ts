@@ -32,6 +32,7 @@ import {
 } from "./reminder-plan";
 import type { ReminderPort, ScheduledReminder } from "./reminder-port";
 import type { AutoDiarySettings } from "./settings";
+import { productionTiming, type ScheduleTiming } from "./timing";
 
 export type ReminderDeps = {
   port: ReminderPort;
@@ -52,6 +53,11 @@ export type ReminderDeps = {
    * 상태는 정보이지 판단의 근거가 아니라서, 설정·일기 목록을 못 읽을 때(RC6)처럼 멈추지 않는다.
    */
   loadBatteryStatus: () => Promise<BatteryExceptionStatus>;
+  /**
+   * 106 — 시간 규칙(빠른 주기는 개발 환경에서만, `timing-source`). 없거나 던지면 배포 규칙이다 — 알림 계획이 시간 규칙을 읽지 못한다고 멈추지
+   * 않는다(배포 7일치가 안전한 쪽).
+   */
+  loadTiming?: (settings: AutoDiarySettings) => Promise<ScheduleTiming>;
 };
 
 let tail: Promise<void> = Promise.resolve();
@@ -86,6 +92,19 @@ async function readBatteryStatus(deps: ReminderDeps): Promise<BatteryExceptionSt
   }
 }
 
+/** 던지지 않는다 — 읽지 못하면 배포 규칙이다(106) */
+async function readTiming(
+  deps: ReminderDeps,
+  settings: AutoDiarySettings,
+): Promise<ScheduleTiming> {
+  if (deps.loadTiming === undefined) return productionTiming(settings);
+  try {
+    return await deps.loadTiming(settings);
+  } catch {
+    return productionTiming(settings);
+  }
+}
+
 async function reconcileOnce(deps: ReminderDeps): Promise<void> {
   let settings: AutoDiarySettings;
   let writtenDays: readonly DayDate[];
@@ -100,15 +119,19 @@ async function reconcileOnce(deps: ReminderDeps): Promise<void> {
 
   const now = deps.now();
   const batteryStatus = settings.enabled ? await readBatteryStatus(deps) : "unknown";
+  const timing = await readTiming(deps, settings);
+  // 106 — 지연은 시간 규칙의 상한을 넘지 않는다(배포 30분 = 종전, 빠른 주기는 창 분).
   const plan = planReminders({
     now,
     settings,
     writtenDays,
     name,
-    delayMinutes: reminderDelayFor(batteryStatus),
+    delayMinutes: Math.min(reminderDelayFor(batteryStatus), timing.reminderDelayCap),
+    timing,
   });
   const written = new Set(writtenDays);
-  const window = new Set(selectableDays(now));
+  // 106 — 자동 쓰기가 다룰 날(배포는 사흘, 빠른 주기는 오늘 하나 — 오전에도 오늘이 든다)
+  const window = new Set(timing.candidateDays(selectableDays(now), dayOf(now)));
   /**
    * RC8 — 시각이 지났지만 아직 전달되지 않았을 수 있는 그 날의 예약을 둔다. 부정확 알람(최대 +1시간)·삼성 얼림 동안은 목표 시각이 지나도
    * 예약이 남아 있고, 계획에는 그 발화가 없다(지난 시각은 다시 걸 수 없다). 켜져 있고 그 날을 아직 안 썼고 자동 쓰기가 다룰 사흘 안이면 —
@@ -127,7 +150,8 @@ async function reconcileOnce(deps: ReminderDeps): Promise<void> {
     settings,
     writtenDays,
     name,
-    delayMinutes: REMINDER_DELAY_MINUTES,
+    delayMinutes: Math.min(REMINDER_DELAY_MINUTES, timing.reminderDelayCap),
+    timing,
   });
   const keepDelayed = (s: ScheduledReminder) =>
     s.at !== null &&

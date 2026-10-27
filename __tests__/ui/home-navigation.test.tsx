@@ -75,10 +75,7 @@ describe("★ 048 — App.tsx 조립 (소스 검사)", () => {
     const section = functionBody("DiarySection");
     expect(section).toMatch(/chosenDay=\{chosenDay\}/);
     expect(section).toMatch(/onChooseDay=\{onChooseDay\}/);
-    // 049 AF2 — 미리 준비의 범위(사흘)를 홈 화면에 넘긴다(FR-020a, R5).
-    expect(section).toMatch(
-      /canPrepare=\{\(day\) => selectableDays\(new Date\(\)\)\.includes\(day\)\}/,
-    );
+    // 106 — 049 AF2의 canPrepare(미리 준비의 범위)는 018 미리 준비와 함께 걷었다(`home-no-prewarm-props.test.ts`).
   });
 
   it("055·059 — 설정·개발자는 홈 위의 StackLayer 겹이다 (설정은 닫으면 홈, 개발자는 설정, 그 위에 이름 바꾸기·서체 라이선스(083)·진단)", () => {

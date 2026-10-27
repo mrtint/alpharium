@@ -17,6 +17,8 @@ import type { DayDate } from "../config/day-boundary";
 export interface CatchUpStorePort {
   read(): Promise<string | null>;
   write(serialized: string): Promise<void>;
+  /** 106 — 기록을 지운다. 없어도 던지지 않는다 */
+  remove(): Promise<void>;
 }
 
 const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -37,6 +39,11 @@ export async function loadCatchUpDay(port: CatchUpStorePort): Promise<DayDate | 
 
 export async function saveCatchUpDay(port: CatchUpStorePort, on: DayDate): Promise<void> {
   await port.write(JSON.stringify({ on }));
+}
+
+/** 106 — 기록을 지운다(빠른 주기 리셋: 새 주기에는 창 밖 몫도 새로 시작한다). */
+export async function clearCatchUpDay(port: CatchUpStorePort): Promise<void> {
+  await port.remove();
 }
 
 /* ────────────────────────── 기기 통로 ────────────────────────── */
@@ -68,6 +75,11 @@ export function expoCatchUpStorePort(): CatchUpStorePort {
       const target = new File(dir, CATCH_UP_FILE);
       if (target.exists) target.delete();
       temporary.moveSync(target);
+    },
+    async remove() {
+      const { dir, File } = await openDirectory();
+      const file = new File(dir, CATCH_UP_FILE);
+      if (file.exists) file.delete();
     },
   };
 }
