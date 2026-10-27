@@ -15,6 +15,11 @@
  * **지우는 규칙은 하나다**(104에서도 같다) — 그 날 일기 파일이 생긴 날(`writtenDays`)의 예약만 계획에서 빠져 거둬진다. 쓰기 시작·도중에는
  * 거두지 않는다: 쓰기가 실패하거나 프로세스가 죽거나 얼어도 예약(OS 알람)은 남아 뜬다. 배터리 예외가 있으면 울릴 시각만 뒤로 간다.
  *
+ * **프로세스의 첫 맞추기는 계획 전부를 다시 건다**(107) — 앱은 OS 알람이 살아 있는지 읽지 못한다. 안드로이드 강제 중지는 알람을 지우고 expo의
+ * 예약 저장은 남겨 위 비교가 「이미 걸림」으로 본다(최대 7일 끊김). 강제 중지·재부팅·앱 업데이트는 모두 새 프로세스를 만들므로, 프로세스 안의
+ * 첫 맞추기(`RearmGate`)를 보수적 신호로 쓴다. 같은 `id`의 `schedule`은 바꿔 끼므로 중복이 없고, 그 뒤 같은 프로세스의 맞추기는 차이만 고친다(R16).
+ * 설정을 못 읽은 맞추기(RC6)·꺼짐·빈 계획·`schedule` 실패는 첫 맞추기를 소비하지 않는다 — 확인하지 못한 것을 한 것으로 치지 않는다.
+ *
  * **한 줄로 선다**(RC4) — 앱의 훅·태스크·등록부의 끝이 거의 함께 부를 수 있다. 모듈 하나의 순서 줄이 앞 맞추기가 끝난 뒤
  * 다음을 시작한다(078 시도 기록의 `inOrder`와 같은 꼴). 이 파일은 `AppState`·`../app/`을 모른다(OP7) — 기본 조립은
  * `reminder-deps.ts`다.
@@ -33,6 +38,22 @@ import {
 import type { ReminderPort, ScheduledReminder } from "./reminder-port";
 import type { AutoDiarySettings } from "./settings";
 import { productionTiming, type ScheduleTiming } from "./timing";
+
+/** 107 — 「이 프로세스에서 아직 다시 걸지 않았다」를 들고 있는 칸. 기본 조립(`reminder-deps.ts`)이 프로세스당 하나를 둔다 */
+export type RearmGate = {
+  pending(): boolean;
+  done(): void;
+};
+
+export function createRearmGate(): RearmGate {
+  let pending = true;
+  return {
+    pending: () => pending,
+    done: () => {
+      pending = false;
+    },
+  };
+}
 
 export type ReminderDeps = {
   port: ReminderPort;
@@ -58,6 +79,8 @@ export type ReminderDeps = {
    * 않는다(배포 7일치가 안전한 쪽).
    */
   loadTiming?: (settings: AutoDiarySettings) => Promise<ScheduleTiming>;
+  /** 107 — 프로세스의 첫 맞추기에서 계획 전부를 다시 건다. 없으면 다시 걸지 않는다(종전 동작) */
+  rearm?: RearmGate;
 };
 
 let tail: Promise<void> = Promise.resolve();
@@ -186,10 +209,16 @@ async function reconcileOnce(deps: ReminderDeps): Promise<void> {
       await deps.port.cancel(id).catch(() => {});
     }
   }
+  // 107 — 이 프로세스에서 아직 다시 걸지 않았고 걸 것이 있으면 이미 걸린 것도 믿지 않고 다시 건다.
+  const rearm = plan.length > 0 && deps.rearm?.pending() === true;
+  let scheduleFailed = false;
   for (const entry of plan) {
-    if (scheduled !== null && scheduled.some((s) => same(entry, s))) continue;
-    await deps.port.schedule(entry).catch(() => {});
+    if (!rearm && scheduled !== null && scheduled.some((s) => same(entry, s))) continue;
+    await deps.port.schedule(entry).catch(() => {
+      scheduleFailed = true;
+    });
   }
+  if (rearm && !scheduleFailed) deps.rearm?.done();
 
   let presented;
   try {
