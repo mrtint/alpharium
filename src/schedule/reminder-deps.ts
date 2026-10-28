@@ -34,7 +34,7 @@ import type { FastCyclePort } from "./fast-cycle-store";
 import { expoNotificationPort, type NotificationPort } from "./notification-port";
 import { expoReminderPort, type ReminderPort } from "./reminder-port";
 import { allowsFastCycle, loadScheduleTiming } from "./timing-source";
-import type { ReminderDeps } from "./reminders";
+import { createRearmGate, type RearmGate, type ReminderDeps } from "./reminders";
 import {
   DEFAULT_AUTO_DIARY_SETTINGS,
   expoAutoDiarySettingsPort,
@@ -42,7 +42,15 @@ import {
   type AutoDiarySettingsPort,
 } from "./settings";
 
+/**
+ * 107 — 프로세스당 하나. 강제 중지·재부팅·앱 업데이트 뒤 새 프로세스의 첫 맞추기가 계획 전부를 다시 건다(`reminders.ts`).
+ * 앱 훅과 헤드리스 태스크가 같은 프로세스에서 돌면 같은 문을 쓴다.
+ */
+const processRearmGate = createRearmGate();
+
 export type ReminderDepsOverrides = {
+  /** 107 — 다시 걸기 문. 안 주면 프로세스 문 */
+  rearmGate?: RearmGate;
   /** 화면이 들고 있는 이름. `undefined`면 파일을 읽는다 */
   names?: CustomNames;
   reminderPort?: ReminderPort;
@@ -61,6 +69,7 @@ export function expoReminderDeps(overrides: ReminderDepsOverrides = {}): Reminde
   return {
     port: overrides.reminderPort ?? expoReminderPort(),
     now: () => new Date(),
+    rearm: overrides.rearmGate ?? processRearmGate,
     prepare: () => (overrides.notificationPort ?? expoNotificationPort()).ensureChannel(),
     async loadSettings() {
       const raw = await (overrides.settingsPort ?? expoAutoDiarySettingsPort()).read();
