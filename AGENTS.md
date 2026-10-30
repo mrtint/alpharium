@@ -32,6 +32,7 @@
 ### 안드로이드·iOS·Expo·네이티브
 
 - **아이콘 PNG를 바꾸면 `expo prebuild --clean`을 다시 돌려야 런처에 반영된다**(102 실측 — 안 하면 이전 아이콘이 남는다). 안드로이드 adaptive icon은 108dp 캔버스 중 가운데 72dp만 보여서 foreground 마크 배율이 iOS(2.3)보다 작은 1.6이다(갤럭시 SM-S901N 런처 실측: 2.3은 보이는 영역의 약 83%를 채워 너무 컸다). iOS 배율은 iPhone 런처를 보기 전의 임시값이고 안드로이드 테마 아이콘(monochrome)은 기기에서 보지 않았다(`specs/102-app-icon-store-assets/device-check.md`).
+- **★ 안드로이드에서 expo 모듈을 `patch-package`로 고치면 그 모듈을 `package.json` `expo.autolinking.android.buildFromSource`에 넣어야 빌드에 닿는다**(2026-10-29 실측 — 미리 컴파일된 꾸러미(gradle 로그의 📦)로 링크되면 소스 패치가 무시된다). 지금은 `expo-background-task`의 잡 네트워크 제약을 `NOT_REQUIRED`로 바꾼 패치가 이 경우다(`__tests__/config/bg-task-request-patch.test.ts`) — 화면이 꺼진 채 `CONNECTIVITY`에 49분 넘게 막히던 잡이 풀렸다. **이미 걸려 있던 잡은 옛 제약을 들고 있어** 새 APK를 깔아도 한 번 돈 뒤(강제 잡 `cmd jobscheduler run -f` 등) 이어 걸린 잡부터 바뀐다 — `dumpsys jobscheduler`로 확인한다. 릴리스 변형도 소스 빌드되는 것을 로컬 `assembleRelease`의 dex로 확인했다(기기 미확인).
 - **Android 걸음 수**: `expo-sensors`의 `getStepCountAsync`는 iOS 전용이라 Android 걸음 수는 `unknown`이 정상이다.
 - **`expo-media-library`와 장소 권한**: `ACCESS_MEDIA_LOCATION` 조회 API가 없어 `getLocation()`을 감싸 호출해야 안다. 그래서 **「장소」 권한은 사진 권한에 묶인다.** `Asset.getUri()`는 `file://` 경로를 준다. Android 14+ 부분 허용(`limited`)은 `describePhotoAccessLimit`가 `"partial"`을 준다.
 - **`reverseGeocodeAsync` 좌표 외부 전송**(086): 안드로이드는 위치 권한이 없으면 예외를 던지고(`geocoding-port.ts`가 삼킴), **iOS는 위치 권한을 보지 않고 좌표를 보낸다** — 설정 「켬」은 권한과 무관하게 보내고, 기본값 「자동」에서만 위치 권한 거부가 전송을 막는다. 백그라운드는 지오코딩하지 않는다.
