@@ -67,7 +67,7 @@ const CASES: [GenerationFailure, WriteFailureReason][] = [
   [{ kind: "interrupted" }, "interrupted"],
   [{ kind: "generation-failed", reason: "Context is busy: rejected: echo" }, "error"],
   [{ kind: "vision-failed", reason: "cancelled" }, "interrupted"],
-  [{ kind: "vision-failed", reason: "failed" }, "photos"],
+  [{ kind: "vision-failed", reason: "failed" }, "vision"],
   [{ kind: "vision-failed", reason: "not-ready" }, "module"],
   [{ kind: "model-load-failed", reason: "not-found" }, "module"],
   [{ kind: "model-load-failed", reason: "load-failed" }, "module"],
@@ -80,6 +80,23 @@ describe("081 F8 — 어댑터의 실패가 파이프라인을 지나 갈래로 
     const result = await runFailing(failure);
 
     expect(writeFailureReasonFor(result)).toBe(expected);
+  });
+
+  it("110 — 신호를 못 가져온 쓰기(`loadSignals`가 null)는 `signals`로 선다(사진 캡션 실패 `vision`과 다르다)", async () => {
+    const pipeline = createPipeline({
+      backend: backendFailing({ kind: "timed-out" }),
+      store: memoryStore(),
+      loadSignals: async () => null,
+    });
+    const result = await pipeline.run({
+      day: DAY,
+      now: AFTER_CLOSE,
+      character: "quiet" as Character,
+      vision: "quick" as VisionSetting,
+    });
+    if (result.ok) throw new Error("신호가 없는데 쓰기가 성공했다");
+
+    expect(writeFailureReasonFor(result)).toBe("signals");
   });
 
   it("판정의 갈래 넷이 빠짐없이 각자의 기록 갈래로 선다", async () => {

@@ -28,12 +28,17 @@
  *
  * - `echo`·`language`·`unfinished` — 판정 거부(빈 글은 보드의 `empty`)
  * - `timed-out` — 생성 시간 한도. **멈춰 있다 돌아와 한도가 지난 것도 이 갈래다**(079) — 가르려면 시간을 기록해야 해서 가르지 않는다
+ * - `photos` — **옛 기록을 읽기 위한 갈래다. 새 실패는 이 갈래로 서지 않는다**(110). 신호 수집 실패와 사진 캡션 실패를 한 이름으로 뭉쳐 둘을 가를 수 없었다
+ * - `signals` — 하루의 신호(사진·장소 목록)를 가져오지 못했다. 생성 전에 멈춘다
+ * - `vision` — 사진 캡션 단계가 실패했다(엔진 시작·전량 캡션 실패·예외). 사진 해석 모델이 없는 것(`module`)과 읽다 끊긴 것(`interrupted`)은 아니다
  * - `interrupted` — 사용자가 그만둔 것이 아닌데 끊겼다(앱이 앞을 벗어남, OS 중단). 그만둔 쓰기는 기록되지 않는다
  * - `error` — 생성 중 예외. 오류 문구는 읽지도 담지도 않는다
  */
 const REASONS = [
   "module",
   "photos",
+  "signals",
+  "vision",
   "empty",
   "save",
   "echo",
@@ -105,12 +110,12 @@ export function writeFailureReasonFor(result: {
     case "model-not-ready":
       return "module";
     case "signals":
-      return "photos";
+      return "signals";
     case "vision":
       if (detail === "not-ready") return "module";
       // 사진을 못 읽은 것이 아니라 읽는 도중 끊긴 것이다 — 본문 도중의 끊김과 같은 갈래다(081 F3)
       if (detail === "cancelled") return "interrupted";
-      return "photos";
+      return "vision";
     case "generation":
       switch (kind) {
         case "model-load-failed":
