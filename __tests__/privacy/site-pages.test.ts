@@ -36,7 +36,10 @@ const POLICY_SECTIONS = [
   "third-party",
   "retention",
   "permissions",
+  "rights",
+  "safety",
   "contact",
+  "remedy",
   "changes",
 ];
 
@@ -64,7 +67,7 @@ describe("086 site — 사이트 원문", () => {
     expect(html).not.toMatch(/\bsrc="https?:\/\//);
   });
 
-  it("S4 — 방침의 절 여덟이 순서대로 있다", () => {
+  it("S4 — 방침의 절 열하나가 순서대로 있다", () => {
     const ids = sectionIds(readSite("privacy/index.html")).filter((id) =>
       POLICY_SECTIONS.includes(id),
     );
@@ -97,13 +100,53 @@ describe("086 site — 사이트 원문", () => {
     expect(unknown).toEqual([]);
   });
 
-  it("S7 — 문의 절: 메일 자리와 「처리가 끝나면 지체 없이 지웁니다」", () => {
-    const contact = stripHtmlComments(
-      sectionBy(readSite("privacy/index.html"), "id", "contact") ?? "",
-    );
+  // 108 — 소유자 결정(2026-10-30): 「지체 없이」 대신 끝나는 기준(마지막 답장 뒤 30일)·파기 방법·법령상 보존·법정 요청을 적는다.
+  const policyText = (id: string) =>
+    stripHtmlComments(sectionBy(readSite("privacy/index.html"), "id", id) ?? "");
+
+  it("S7 — 문의 절: 메일 자리·책임자·끝나는 기준(30일)·파기 방법·열람 삭제 요청", () => {
+    const contact = policyText("contact");
     expect(contact).toMatch(/\{SUPPORT_EMAIL\}|[\w.+-]+@[\w-]+\.[\w.]+/);
     expect(contact).toMatch(/\{OPERATOR\}|책임자/);
-    expect(contact).toContain("문의 처리가 끝나면 지체 없이 지웁니다");
+    expect(contact).toContain(
+      "운영자가 마지막으로 답장한 날부터 30일 동안 같은 문의가 이어지지 않으면 그 문의는 끝난 것으로 봅니다.",
+    );
+    expect(contact).toContain("휴지통까지 비웁니다");
+    expect(contact).toContain("열람이나 삭제");
+    expect(contact).not.toContain("지체 없이");
+  });
+
+  it("S7b — 보존 절: 법령상 따로 보존하는 것 없음(결제 없음)과 보존 요청을 받은 때", () => {
+    const retention = policyText("retention");
+    expect(retention).toContain("포켓로그에는 결제가 없어");
+    expect(retention).toContain("법령에 따라 보존을 요구받은 메일은");
+  });
+
+  it("S11 — 제3자 절: 제공 없음, 문의 메일 보관 위탁(Google LLC, 미국)과 국외 이전 항목", () => {
+    const third = policyText("third-party");
+    expect(third).toContain("제3자에게 제공하지 않습니다");
+    expect(third).not.toContain("처리를 맡기지 않습니다");
+    for (const item of ["Google LLC", "미국", "Gmail", "보낸 메일 주소", "메일 내용"])
+      expect(third).toContain(item);
+    // 법정 요청과, 휴대폰이 직접 요청하는 외부 전송은 운영자의 제공·위탁이 아니라는 구분
+    expect(third).toContain("법령에 정한 절차");
+    expect(third).toContain("운영자가 제공하거나 맡기는 것이 아닙니다");
+  });
+
+  it("S12 — 모듈 내려받기 절: 받는 곳·나라·항목을 「등」 없이 밝힌다", () => {
+    const body = stripHtmlComments(
+      sectionBy(readSite("privacy/index.html"), "data-outbound", "model-download") ?? "",
+    );
+    for (const item of ["Hugging Face, Inc.", "미국", "IP 주소", "요청 시각", "받는 파일의 주소"])
+      expect(body).toContain(item);
+    expect(body).not.toContain("IP 주소 등");
+  });
+
+  it("S13 — 권리·안전·구제 절이 있고 구제 기관 넷의 연락처를 적는다", () => {
+    expect(policyText("rights")).toContain("10일 안에");
+    expect(policyText("safety")).toContain("운영자의 서버가 없습니다");
+    const remedy = policyText("remedy");
+    for (const contact of ["1833-6972", "118", "1301", "182"]) expect(remedy).toContain(contact);
   });
 
   it("S8 — 변경 이력: 시행일 자리·이력 목록·저장소 기록 링크", () => {
