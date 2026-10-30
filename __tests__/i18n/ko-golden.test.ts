@@ -66,6 +66,10 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 108 — 홈 제약 띠(새 항목 `home.constraintBand`, 보드 밖 초안 — 소유자 확인 대기). 버튼 「설정 열기」는 골든에 이미 있다
+  "사진 권한이 없어 사진 없이 써요",
+  "권한 허용",
+  "배터리 제한을 풀면 화면이 꺼져도 써 둬요",
   // 106 — 빠른 주기(개발 빌드 전용, `catalogs/ko/fast-cycle.ts`) — 보드 밖 초안, 소유자가 확정한다
   "${}분마다",
   "5~180 사이의 정수를 적어 주세요.",
@@ -85,8 +89,6 @@ const ADDED_AFTER_GOLDEN: readonly string[] = [
   "직접 입력 (5~180분)",
   // 105 — 진단 「최근 자동 쓰기 시도」 줄의 고른 날 꼬리(`attempts.withDay`) — 「홈에 넘김 · 10월 24일」
   "${} · ${}월 ${}일",
-  // 104 — 홈 배터리 안내 한 줄(`home.batteryNotice.body`, 소유자 승인 2026-10-24). 버튼 「설정 열기」·「닫기」는 기존 문구와 같다
-  "배터리 사용 제한을 풀어 두면 화면이 꺼진 채로도 일기를 써드릴 수 있어요",
   // 101 — 설정 「정보」의 「오픈소스 라이선스」 행(새 영역 licenseLinks). 고지는 앱 밖 페이지라 모델 이름이 앱에 없다
   "오픈소스 라이선스",
   // 100 — 제목 구간 혼잣말 풀(`monologue.title`, 사람이 쓴 열 문장)

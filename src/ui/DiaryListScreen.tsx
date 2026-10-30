@@ -70,6 +70,7 @@ import type { PaperState } from "../app/written-day";
 import type { DayDate } from "../config/day-boundary";
 import { useFontScale } from "./font-scale";
 import { AppText } from "./components/Text";
+import { ConstraintBand } from "./components/ConstraintBand";
 import { FadeLayer } from "./components/FadeLayer";
 import { DayPicker } from "./DayPicker";
 import {
@@ -122,10 +123,6 @@ export type DiaryListScreenProps = {
   onSwipe?: (direction: SwipeDirection) => void;
   /** 다음 주로 넘길 수 있는가 (049) — 거짓이면 스트립이 튕긴다 */
   canSwipeNext?: boolean;
-  /** 자동 판정이 캐릭터를 옮겼을 때의 안내 문구 (029 FR-014). 부모가 만든 문장만 그린다 */
-  movedNotice?: string;
-  /** 거부된 권한으로 제한되는 기능의 정직한 안내 (021 FR-014). */
-  deniedNotices?: readonly string[];
   /**
    * 신호 줄의 사진·다닌 자리 (048 US3). 없으면(통로 없음) 두 칸 「모름」.
    *
@@ -161,10 +158,11 @@ export type DiaryListScreenProps = {
    */
   writing?: { line?: string; name?: string; leaveNote?: string };
   /**
-   * 배터리 안내 (104) — 예외가 없는 안드로이드에서 앱 열기 자동 쓰기가 저장된 뒤 한 줄 + [설정 열기]·[닫기]. 있으면 쓰는 중이 아닐 때만
-   * 스트립 아래에 그린다. **문구는 카탈로그에서 읽고, 보일지·닫기·설정 열기는 부르는 쪽이 정한다** — 화면은 예외 상태를 모른다.
+   * 제약 띠 (108) — 일기를 쓰기 전에 막힌 조건(사진 권한 거부·배터리 제한)을 알리는 쓰기 바 위의 한 줄과 버튼 하나. 있으면 쓰는 중이
+   * 아닐 때만 그린다. **닫기가 없다** — 조건이 풀리면 부르는 쪽이 이 prop을 걷는다. 문구·누름 동작은 부르는 쪽이 정하고 화면은 권한·
+   * 배터리 상태를 모른다. 토스트가 있는 동안, 그리고 쓴 날에 다시 쓰기 바가 내려가 있는 동안은 가려진다.
    */
-  batteryNotice?: { onOpenSettings: () => void; onDismiss: () => void };
+  constraint?: { text: string; action: string; onAction: () => void };
   /** 「그만두기」 (054) */
   onStop?: () => void;
   /**
@@ -194,9 +192,7 @@ export function DiaryListScreen({
   onSelectDay,
   onSwipe,
   canSwipeNext,
-  movedNotice,
-  deniedNotices,
-  batteryNotice,
+  constraint,
   preview,
   onRequestPhoto,
   onPressDate,
@@ -248,34 +244,46 @@ export function DiaryListScreen({
       />
     ) : null;
 
+  // 108 — 제약 띠. 바 바로 위에 한 줄로 붙고(바닥에서 바의 잰 높이만큼), 쓰는 중에는 없다. 높이를 재서 지면 아래 여백에 더한다 —
+  // 마지막 줄이 띠에 가리지 않게. 토스트가 뜨는 동안과(토스트가 띠 자리를 쓴다) 쓴 날에 바가 내려가 있는 동안은 가린다(높이는 유지).
+  const [bandHeight, setBandHeight] = useState<number>(CONSTRAINT_BAND_HEIGHT);
+  const bandInset = constraint !== undefined ? bandHeight : 0;
+  const bandNode =
+    constraint !== undefined ? (
+      <View
+        onLayout={(e) => setBandHeight(e.nativeEvent.layout.height)}
+        pointerEvents="box-none"
+        style={{ position: "absolute", left: 0, right: 0, bottom: barHeight }}
+      >
+        <ConstraintBand
+          action={constraint.action}
+          hidden={toast !== undefined || (written !== undefined && !atEnd)}
+          onAction={constraint.onAction}
+          text={constraint.text}
+        />
+      </View>
+    ) : null;
+
   // 스트립과 안내 캡션 — 안 쓴 날에는 헤더 안에 그대로, 쓴 날에는 지면 위에 덮는 판 안에 놓인다(052).
   const stripBlock =
     write === undefined ? null : writing !== undefined ? (
-      // 054 — 쓰는 중: 스트립만 35%로 흐리고 누름·스와이프·접근성에서 뺀다(보드 `2b`). 안내 캡션(옮김·거부
-      // 권한)은 정직한 정보라 흐리게 하지 않는다(research R2).
-      <>
-        <View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          pointerEvents="none"
-          style={{ opacity: WRITING.stripLockedOpacity }}
-          testID="home-strip-lock"
-        >
-          <DayPicker canSwipeNext={false} cells={cells ?? []} onSelect={() => {}} />
-        </View>
-        <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
-      </>
+      // 054 — 쓰는 중: 스트립만 35%로 흐리고 누름·스와이프·접근성에서 뺀다(보드 `2b`).
+      <View
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+        pointerEvents="none"
+        style={{ opacity: WRITING.stripLockedOpacity }}
+        testID="home-strip-lock"
+      >
+        <DayPicker canSwipeNext={false} cells={cells ?? []} onSelect={() => {}} />
+      </View>
     ) : (
-      <>
-        <DayPicker
-          canSwipeNext={canSwipeNext}
-          cells={cells ?? []}
-          onSelect={onSelectDay ?? (() => {})}
-          onSwipe={onSwipe}
-        />
-        <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
-        {batteryNotice !== undefined && <BatteryNoticeLine notice={batteryNotice} />}
-      </>
+      <DayPicker
+        canSwipeNext={canSwipeNext}
+        cells={cells ?? []}
+        onSelect={onSelectDay ?? (() => {})}
+        onSwipe={onSwipe}
+      />
     );
 
   const header =
@@ -336,6 +344,7 @@ export function DiaryListScreen({
               });
               if (next !== collapsed) setFoldState({ day: write.day, collapsed: next });
             }}
+            bottomInset={bandInset}
             paper={written}
             topSpacer={<FoldSpacer motion={motion} />}
           />
@@ -357,6 +366,7 @@ export function DiaryListScreen({
           visible={atEnd}
           writtenAt={writtenAt}
         />
+        {bandNode}
         {toastNode}
       </View>
     );
@@ -372,7 +382,13 @@ export function DiaryListScreen({
           style={{ flex: 1, backgroundColor: COLORS.bg }}
         >
           <View style={FIXED_HEADER}>{header}</View>
-          <View style={MATERIAL_PAPER} testID="material-paper">
+          <View
+            style={[
+              MATERIAL_PAPER,
+              { paddingBottom: MATERIAL_GRID.paperPadding.bottom + bandInset },
+            ]}
+            testID="material-paper"
+          >
             <MaterialGrid onRequestPhoto={onRequestPhoto} preview={preview} />
           </View>
         </ScrollView>
@@ -383,6 +399,7 @@ export function DiaryListScreen({
         >
           <WriteBar locked={barLocked} onWrite={onWrite} simulated={simulation !== undefined} />
         </View>
+        {bandNode}
         {toastNode}
       </View>
     );
@@ -393,10 +410,8 @@ export function DiaryListScreen({
       <ScrollView
         contentContainerStyle={SCROLL_CONTENT}
         style={{ flex: 1, backgroundColor: COLORS.bg }}
-      >
-        {/* 헤더가 없는 옛 호출에서도 거부 안내는 보인다(021) */}
-        <Notices deniedNotices={deniedNotices} movedNotice={movedNotice} />
-      </ScrollView>
+      ></ScrollView>
+      {bandNode}
     </View>
   );
 }
@@ -748,86 +763,6 @@ function DayFace({ day, part, testIDs }: { day: DayDate; part: DayPart; testIDs?
   );
 }
 
-/**
- * 안내 캡션 — 캐릭터 옮김(029)·거부 권한(021). 있을 때만.
- *
- * 049 — 되돌림(009) 캡션을 걷어냈다(FR-022a). 지난 날을 모두 고를 수 있어 고른 날이 범위 밖으로
- * 밀려나는 일이 없다 — 도달할 수 없는 갈래다.
- */
-function Notices({
-  movedNotice,
-  deniedNotices,
-}: {
-  movedNotice?: string;
-  deniedNotices?: readonly string[];
-}) {
-  const denied = deniedNotices ?? [];
-  if (movedNotice === undefined && denied.length === 0) return null;
-
-  return (
-    <View style={{ gap: 4, marginTop: 12 }}>
-      {movedNotice !== undefined && <AppText variant="caption">{movedNotice}</AppText>}
-      {denied.length > 0 && (
-        <View style={{ gap: 4 }} testID="denied-notices">
-          {denied.map((notice) => (
-            <AppText key={notice} variant="caption">
-              {notice}
-            </AppText>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-}
-
-/**
- * 배터리 안내 한 줄 (104) — 설명 캡션 아래에 글자 버튼 둘. 강조 글자는 `danger`(밝은 면 위 작은 글자, 088), 누름 영역은 44 이상.
- */
-function BatteryNoticeLine({
-  notice,
-}: {
-  notice: { onOpenSettings: () => void; onDismiss: () => void };
-}) {
-  const t = text().home.batteryNotice;
-  const action = (label: string, onPress: () => void, testID: string) => (
-    <Pressable
-      accessibilityLabel={label}
-      accessibilityRole="button"
-      onPress={onPress}
-      hitSlop={{ top: 2, bottom: 2, left: 12, right: 8 }}
-      style={{ minHeight: 32, justifyContent: "center", alignItems: "flex-end" }}
-      testID={testID}
-    >
-      <AppText
-        maxFontSizeMultiplier={NOTICE_FONT_CAP}
-        style={{ color: COLORS.danger, fontWeight: "600" }}
-        variant="caption"
-      >
-        {label}
-      </AppText>
-    </Pressable>
-  );
-  // 한 덩어리 — 설명 왼쪽, 버튼 둘은 오른쪽에 세로로. 글꼴 배율이 커도 이 줄은 `NOTICE_FONT_CAP`까지만 커진다(큰 글꼴에서 첫 화면의
-  // 본문을 밀어내지 않게, 실측 2.0배에서 본문 0줄이었다 — 100·104).
-  return (
-    <View
-      style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 8 }}
-      testID="home-battery-notice"
-    >
-      <AppText maxFontSizeMultiplier={NOTICE_FONT_CAP} style={{ flex: 1 }} variant="caption">
-        {t.body}
-      </AppText>
-      <View style={{ alignItems: "flex-end" }}>
-        {action(t.open, notice.onOpenSettings, "home-battery-notice-open")}
-        {action(t.dismiss, notice.onDismiss, "home-battery-notice-dismiss")}
-      </View>
-    </View>
-  );
-}
-
-/** 배터리 안내 줄의 글꼴 배율 상한 — 사람이 정한 값(실측 2.0배에서 본문 0줄) */
-const NOTICE_FONT_CAP = 1.2;
-
 /* ═══════════════════════════════ 하단 바 ═══════════════════════════════ */
 
 /**
@@ -1144,6 +1079,9 @@ const DEV_BADGE_TEXT: TextStyle = {
   lineHeight: 10,
   fontWeight: "700",
 };
+
+/** 제약 띠의 높이를 재기 전 첫 프레임 값 — 버튼 44 + 위아래 여백 8·8 + 위 테두리 1. 재고 나면 잰 값을 쓴다 */
+const CONSTRAINT_BAND_HEIGHT = 61;
 
 /** 쓴 날의 바 자리 — 지면 위에 겹쳐 화면 바닥에 붙는다 */
 const REWRITE_SLOT: ViewStyle = { position: "absolute", left: 0, right: 0, bottom: 0 };

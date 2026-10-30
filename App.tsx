@@ -153,8 +153,7 @@ import { reminderSummaryLine } from "./src/app/reminder-summary";
 import { useReminderSync } from "./src/app/use-reminder-sync";
 import { expoReminderPort } from "./src/schedule/reminder-port";
 import { useAutoWriteHandoff } from "./src/app/use-auto-write-handoff";
-import { expoBatteryNoticeStorePort } from "./src/app/battery-notice-store";
-import { useBatteryNotice } from "./src/app/use-battery-notice";
+import { useConstraintBand } from "./src/app/use-constraint-band";
 import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
 import {
   attemptLines,
@@ -861,24 +860,27 @@ function AppFrame() {
   const platform = appPlatform(Platform.OS);
 
   /**
-   * 021 — 거부된 권한으로 제한되는 기능의 정직한 안내 (FR-014, SC-004).
+   * 108 — 사진 권한이 거부됐는가(제약 띠 `photos`의 입력). 021의 거부 안내 줄글을 걷고 쓰기 바 위 제약 띠로 옮겼다.
    *
-   * 사진·위치 권한 상태를 읽어 `PERMISSION_REQUIREMENTS[...].ifDenied`를 모은다.
-   * 문구 정의는 `requirements.ts` 한 곳뿐 — 화면은 계산하지 않는다. 포그라운드
-   * 복귀 시 다시 읽는다.
+   * `denied`·`blocked`만 참이다 — 부분 허용(`limited`)은 사진을 읽을 수 있으므로 제약이 아니다. 읽기 전·읽기 실패는 `undefined`/거짓이라
+   * 띠가 없다(원칙 V). 포그라운드 복귀 시 다시 읽는다 — 설정에서 허용하고 돌아오면 띠가 사라진다.
    */
-  const [deniedNotices, setDeniedNotices] = useState<readonly string[]>([]);
+  const [photoDenied, setPhotoDenied] = useState<boolean | undefined>(undefined);
+  /** 읽다가 던지면 `null` — 지금 값을 그대로 둔다. 읽지 못한 것으로 이미 선 띠를 지우지도, 새 띠를 세우지도 않는다(원칙 V) */
+  const readPhotoDenied = useCallback(async (): Promise<boolean | null> => {
+    const photo = await onboardingPorts.photo.photoPermission().catch(() => null);
+    return photo === null ? null : photo === "denied" || photo === "blocked";
+  }, [onboardingPorts]);
+  /** 사진 권한 요청이 끝난 뒤 홈이 부른다 — 앱 안에서 뜬 OS 창은 앱 복귀 신호를 내지 않을 수 있다 */
+  const refreshPhotoDenied = useCallback(async () => {
+    const denied = await readPhotoDenied();
+    if (denied !== null) setPhotoDenied(denied);
+  }, [readPhotoDenied]);
   useEffect(() => {
     let live = true;
     async function compute() {
-      // 031 — photo-location 단계 제거로 좌표 권한 안내는 여기서 다루지 않는다.
-      // (원래도 `location`(FINE_LOCATION) 거부 안내는 push하지 않았다.)
-      const photo = await onboardingPorts.photo.photoPermission().catch(() => "unknown" as const);
-      const notices: string[] = [];
-      const isDenied = (s: string) => s === "denied" || s === "blocked";
-      const req = (key: string) => PERMISSION_REQUIREMENTS.find((r) => r.key === key);
-      if (isDenied(photo)) notices.push(req("photos")?.ifDenied ?? "");
-      if (live) setDeniedNotices(notices.filter(Boolean));
+      const denied = await readPhotoDenied();
+      if (live && denied !== null) setPhotoDenied(denied);
     }
     void compute();
     const sub = AppState.addEventListener("change", (s) => {
@@ -888,7 +890,7 @@ function AppFrame() {
       live = false;
       sub.remove();
     };
-  }, [onboardingPorts]);
+  }, [readPhotoDenied]);
 
   const onOnboardingComplete = useCallback(
     (flag: OnboardingFlag) => {
@@ -1714,7 +1716,8 @@ function AppFrame() {
           onInitialDayApplied={() => setPendingRoute(null)}
           onAcknowledge={onAcknowledge}
           // 021 — 거부된 권한으로 제한되는 기능의 정직한 안내(FR-014).
-          deniedNotices={deniedNotices}
+          photoDenied={photoDenied}
+          onPhotoAccessAsked={refreshPhotoDenied}
           // 035 — 사용자가 지은 이름. 화면은 문자열만 받는다(FR-018).
           characterNames={customNames}
           chosenDay={chosenDay}
@@ -2085,7 +2088,8 @@ function DiarySection({
   initialDay,
   onInitialDayApplied,
   onAcknowledge,
-  deniedNotices,
+  photoDenied,
+  onPhotoAccessAsked,
   characterNames,
   chosenDay,
   onChooseDay,
@@ -2157,8 +2161,10 @@ function DiarySection({
   onInitialDayApplied?: () => void;
   /** 020 — 읽을 수 있는 일기가 보인 날의 알림을 확인 처리 (FR-007 (2), 051 FR-028·029) */
   onAcknowledge?: (day: DayDate) => void;
-  /** 021 — 거부된 권한 안내 (FR-014). 부모가 계산 */
-  deniedNotices?: readonly string[];
+  /** 108 — 사진 권한이 거부됐는가(제약 띠 `photos`). 부모가 읽어 넘긴다. 아직 못 읽었으면 `undefined` */
+  photoDenied?: boolean;
+  /** 108 — 사진 권한 요청이 끝났다(허용이든 거부든) — 부모가 권한을 다시 읽어 띠를 갱신한다. 앱 안에서 뜬 OS 창은 앱 복귀 신호를 내지 않을 수 있다 */
+  onPhotoAccessAsked?: () => void;
   /** 035 — 캐릭터 → 지금 부르는 이름. 조립부가 만든 문자열만 (FR-018) */
   characterNames?: CustomNames;
 }) {
@@ -2376,15 +2382,16 @@ function DiarySection({
   });
 
   /**
-   * 104 — 홈 배터리 안내. 앱 열기 자동 쓰기가 **저장된 뒤**(`onAutoWriteSaved`) 안드로이드에서 예외가 없고 7일 안에 닫지 않았을 때만 한 줄을 보인다.
-   * 판정은 순수 함수(`shouldShowBatteryNotice`)가, 상태 읽기·설정 목록 열기는 배터리 예외 통로가, 닫은 시각은 새 기록 파일 하나가 맡는다.
+   * 108 — 홈 제약 띠. 사진 권한 거부(부모가 읽어 넘긴다)와 안드로이드 배터리 제한(이 훅이 읽는다)을 쓰기 바 위의 한 줄로 알린다. 104의
+   * 홈 배터리 안내(스트립 아래·닫기 7일·앱 열기 자동 쓰기 저장 뒤)를 대신한다. 판정은 순수 함수(`constraintBandFor`)가, 상태 읽기·설정 목록
+   * 열기는 배터리 예외 통로가 맡는다 — 닫은 시각 같은 기록은 없다.
    */
   const batteryExceptionPort = useMemo(() => expoBatteryExceptionPort(), []);
-  const batteryNoticeStore = useMemo(() => expoBatteryNoticeStorePort(), []);
-  const { notice: batteryNotice, onAutoWriteSaved } = useBatteryNotice({
+  const { kind: constraintKind, onOpenBattery } = useConstraintBand({
     platform: appPlatform(Platform.OS),
     port: batteryExceptionPort,
-    store: batteryNoticeStore,
+    photoDenied,
+    autoWriteEnabled: autoDiarySettings?.enabled,
   });
 
   /**
@@ -2424,7 +2431,9 @@ function DiarySection({
       stop={wiring.stop}
       resolve={resolveWrite}
       onGenerated={onGenerated}
-      deniedNotices={deniedNotices}
+      constraintKind={constraintKind}
+      onPhotoAccessAsked={onPhotoAccessAsked}
+      onOpenBatteryConstraint={onOpenBattery}
       onRedownload={onRedownload}
       onOpenSettings={onOpenSettings}
       covered={covered}
@@ -2442,8 +2451,6 @@ function DiarySection({
       photoAccessPort={photoAccessPort}
       // 057 — 앱을 열 때의 자동 쓰기. 판정은 위에서 했고 홈은 그 날을 쓴다.
       autoWriteDay={autoWriteDay}
-      onAutoWriteSaved={onAutoWriteSaved}
-      batteryNotice={batteryNotice ?? undefined}
       claimAutoWrite={claimAutoWrite}
       onJoinedWriteFailed={onJoinedWriteFailed}
       liveWrites={liveWrites}
