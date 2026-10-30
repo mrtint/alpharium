@@ -70,8 +70,8 @@ describe("094 — UIScene 대응 설정", () => {
     expect(agents).not.toMatch(/커밋 없이 넣고 했다/);
   });
 
-  it("C7: 이 기능은 빌드 번호를 올리지 않는다", () => {
-    expect(app.expo.ios.buildNumber).toBe("13");
-    expect(app.expo.android.versionCode).toBe(13);
+  it("C7: 이 기능은 빌드 번호를 올리지 않는다 — 번호 올림은 릴리스 커밋이 하므로 094 시점(13) 아래로 내려가지 않는지만 본다", () => {
+    expect(Number(app.expo.ios.buildNumber)).toBeGreaterThanOrEqual(13);
+    expect(app.expo.android.versionCode).toBeGreaterThanOrEqual(13);
   });
 });
