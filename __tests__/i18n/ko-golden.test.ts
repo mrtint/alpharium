@@ -66,6 +66,9 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 110 — 「최근 실패」의 옛 `photos`(「사진을 읽지 못함」)를 가른 두 갈래(`catalogs/ko/failures.ts`) — 소유자가 갈래를 가르자고 했다(2026-10-30)
+  "하루의 신호를 가져오지 못함",
+  "사진을 보지 못함",
   // 106 — 빠른 주기(개발 빌드 전용, `catalogs/ko/fast-cycle.ts`) — 보드 밖 초안, 소유자가 확정한다
   "${}분마다",
   "5~180 사이의 정수를 적어 주세요.",

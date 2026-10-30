@@ -176,6 +176,9 @@ function reasonText(reason: WriteFailureReason): string {
   const byReason: Readonly<Record<WriteFailureReason, string>> = {
     module: T.failModule,
     photos: T.failPhotos,
+    // 110 — 옛 `photos`를 신호 수집과 사진 캡션으로 가른다
+    signals: F.signals,
+    vision: F.vision,
     empty: T.failEmpty,
     save: T.failSave,
     // 081 — 새 여섯은 새 영역에서 온다(옛 영역의 키 짝은 골든이 잠근다)

@@ -43,6 +43,8 @@ describe("081 F1~F4·F6 — 갈래 판정 (060 WF1을 대체)", () => {
     expect([...list.matchAll(/"([^"]+)"/g)].map((m) => m[1])).toEqual([
       "module",
       "photos",
+      "signals",
+      "vision",
       "empty",
       "save",
       "echo",
@@ -61,9 +63,10 @@ describe("081 F1~F4·F6 — 갈래 판정 (060 WF1을 대체)", () => {
     ["storage", "디스크 가득", "save"],
     ["request-build", "캐릭터가 정해지지 않아 요청을 만들지 못했다", "module"],
     ["model-not-ready", "고른 캐릭터의 모델이 아직 기기에 없다", "module"],
-    ["signals", "2026-10-05의 신호를 가져오지 못했다", "photos"],
+    // 110 — 옛 `photos`는 신호 수집과 사진 캡션을 한 갈래로 뭉쳤다(2026-10-29 갤럭시 `photos` 실패 둘의 어느 쪽인지 가를 수 없었다)
+    ["signals", "2026-10-05의 신호를 가져오지 못했다", "signals"],
     ["vision", "vision-failed: not-ready", "module"],
-    ["vision", "vision-failed: failed", "photos"],
+    ["vision", "vision-failed: failed", "vision"],
     // F3 — 사진을 못 읽은 것이 아니라 읽는 도중 끊긴 것이다(060은 photos였다)
     ["vision", "vision-failed: cancelled", "interrupted"],
     ["generation", "model-load-failed: not-found", "module"],
@@ -88,7 +91,7 @@ describe("081 F1~F4·F6 — 갈래 판정 (060 WF1을 대체)", () => {
     ["어떤-새-단계", "뭔가", "unwritten"],
     ["generation", "처음 보는 reason", "unwritten"],
     // 단계가 다르면 같은 낱말도 그 갈래가 아니다
-    ["signals", "timed-out", "photos"],
+    ["signals", "timed-out", "signals"],
     ["storage", "rejected: echo", "save"],
   ])("%s / %s → %s", (stage, reason, expected) => {
     expect(writeFailureReasonFor({ stage, reason })).toBe(expected);

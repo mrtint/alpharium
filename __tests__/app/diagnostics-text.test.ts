@@ -157,7 +157,7 @@ describe("081 — 쓰기 실패의 새 갈래 문구 (contracts/write-failure-re
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
 
-  it("T1 — 여섯 문구가 글자 단위로 같다", () => {
+  it("T1 — 여섯 문구(081)와 신호·사진 둘(110)이 글자 단위로 같다", () => {
     expect({ ...F }).toEqual({
       echo: "지시문을 되뱉음",
       language: "다른 언어로 씀",
@@ -165,6 +165,8 @@ describe("081 — 쓰기 실패의 새 갈래 문구 (contracts/write-failure-re
       timedOut: "시간 초과",
       interrupted: "도중에 끊김",
       error: "생성 중 오류",
+      signals: "하루의 신호를 가져오지 못함",
+      vision: "사진을 보지 못함",
     });
   });
 
