@@ -522,6 +522,7 @@ const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
   },
   // 108 — 안내 규칙 G1(docs/user-guidance-rules.md D2-b·D6). 문구는 소유자가 정했다(2026-10-31).
   // 캡션과 슬라이드 1 제목은 같은 문자열이라 리터럴 집합에서는 하나로 합쳐진다.
+  // 105 항목 뒤에 와야 한다 — 아래 `from` 몇은 105가 얹은 값이다.
   { spec: "108", literal: { from: "하루를 정리하는 AI", to: "AI가 쓰는 일기" } },
   { spec: "108", literal: { from: "포켓로그, 하루를 정리하는 AI", to: "AI가 쓰는 일기" } },
   {
