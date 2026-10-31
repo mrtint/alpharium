@@ -40,6 +40,7 @@ import { createVisionEngine, type VisionEngine } from "../vision/vision-port";
 import {
   judgeLiveness,
   LIVENESS_INPUT,
+  LIVENESS_MAX_TOKENS,
   LIVENESS_TIMEOUT_MS,
   type LivenessOutcome,
 } from "../welcome/liveness";
@@ -150,6 +151,8 @@ async function runWithTimeout(
   engine: GenerationEngine,
   prompt: string,
   timeoutMs: number,
+  /** 108 — 이번 호출만의 생성 상한. 정상 동작 확인만 준다 — 일기 본문은 주지 않는다(`SAMPLING.n_predict`) */
+  maxTokens?: number,
 ): Promise<{ timedOut: false; run: RunResult } | { timedOut: true }> {
   let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -168,7 +171,9 @@ async function runWithTimeout(
 
   try {
     return await Promise.race([
-      engine.run(prompt, { timeoutMs }).then((run) => ({ timedOut: false as const, run })),
+      engine
+        .run(prompt, maxTokens === undefined ? { timeoutMs } : { timeoutMs, maxTokens })
+        .then((run) => ({ timedOut: false as const, run })),
       timeout,
     ]);
   } finally {
@@ -487,7 +492,13 @@ export function createOnDeviceBackend(
 
         // **상한은 engine.run() 구간만 잰다**(L14) — 위 load()는 포함하지 않는다.
         // 023이 확립한 runWithTimeout()의 관례와 같다.
-        const outcome = await runWithTimeout(engine, LIVENESS_INPUT, LIVENESS_TIMEOUT_MS);
+        // 108 — 답을 확인 전용 상한(`LIVENESS_MAX_TOKENS`)에서 끊는다. 묻는 것은 「답이 오기 시작했는가」뿐이다.
+        const outcome = await runWithTimeout(
+          engine,
+          LIVENESS_INPUT,
+          LIVENESS_TIMEOUT_MS,
+          LIVENESS_MAX_TOKENS,
+        );
         if (outcome.timedOut) {
           return judgeLiveness({ loaded: true, text: "", ending: { kind: "timeout" } });
         }

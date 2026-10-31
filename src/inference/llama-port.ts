@@ -200,13 +200,26 @@ export function createLlamaEngine(
    */
   let stopRequested = false;
 
-  /** 대화 하나를 보낸다 — 조각 생성(pacing이 있을 때), 아니면 종전 `complete()` */
-  function send(open: LlamaLike, messages: ChatMessage[]): Promise<RunResult> {
+  /**
+   * 대화 하나를 보낸다 — 조각 생성(pacing이 있을 때), 아니면 종전 `complete()`.
+   *
+   * 108 — `maxTokens`는 **이 호출만의** 생성 상한이다(`RunLimits.maxTokens`). 엔진 상태에 남기지 않는다 — 다음 호출은 다시
+   * `SAMPLING.n_predict`다.
+   */
+  function send(open: LlamaLike, messages: ChatMessage[], requested?: number): Promise<RunResult> {
+    // 양의 정수가 아니면 상한이 없는 것으로 본다 — 음수 `n_predict`는 llama.cpp에서 「끝없이」라 짧게 끊으려던 값이 무한 생성이
+    // 된다(코드 리뷰). 두 경로가 같은 값을 받게 여기 한 곳에서 정한다.
+    const maxTokens =
+      requested !== undefined && Number.isInteger(requested) && requested > 0
+        ? requested
+        : SAMPLING.n_predict;
     const pacing = options.pacing;
-    if (pacing === undefined || open.formatChat === undefined) return complete(open, messages);
+    if (pacing === undefined || open.formatChat === undefined)
+      return complete(open, messages, maxTokens);
     return completePaced(
       open,
       messages,
+      maxTokens,
       pacing,
       () => stopRequested,
       options.clock,
@@ -357,7 +370,7 @@ export function createLlamaEngine(
       }
     },
 
-    async run(prompt: string, _limits: RunLimits): Promise<RunResult> {
+    async run(prompt: string, limits: RunLimits): Promise<RunResult> {
       if (context === null) {
         // 부르는 쪽이 load()를 건너뛴 것이다. 던지지 않는다(E5).
         return { text: "", ending: { kind: "length" } };
@@ -382,7 +395,7 @@ export function createLlamaEngine(
       // 같은 문자열을 보낸다. 모델마다 템플릿이 다르지만 **우리가 넣는 것은 하나**이며,
       // 그 동일성이 테스트로 검증된다.
       // ─────────────────────────────────────────────────────────────────────
-      return tracked(send(context, [{ role: "user", content: prompt }]));
+      return tracked(send(context, [{ role: "user", content: prompt }], limits.maxTokens));
     },
 
     /**
@@ -396,15 +409,19 @@ export function createLlamaEngine(
       prompt: string,
       body: string,
       question: string,
-      _limits: RunLimits,
+      limits: RunLimits,
     ): Promise<RunResult> {
       if (context === null) return { text: "", ending: { kind: "length" } };
       return tracked(
-        send(context, [
-          { role: "user", content: prompt },
-          { role: "assistant", content: body },
-          { role: "user", content: question },
-        ]),
+        send(
+          context,
+          [
+            { role: "user", content: prompt },
+            { role: "assistant", content: body },
+            { role: "user", content: question },
+          ],
+          limits.maxTokens,
+        ),
       );
     },
 
@@ -475,14 +492,19 @@ type ChatMessage = { role: "user" | "assistant"; content: string };
  *
  * **토큰 콜백(두 번째 인자)을 넘기지 않는다**(E3, FR-028b).
  */
-async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<RunResult> {
+async function complete(
+  context: LlamaLike,
+  messages: ChatMessage[],
+  maxTokens: number,
+): Promise<RunResult> {
   const result = await context.completion({
     messages,
     jinja: true,
     temperature: SAMPLING.temperature,
     top_p: SAMPLING.top_p,
     top_k: SAMPLING.top_k,
-    n_predict: SAMPLING.n_predict,
+    // 108 — 이번 호출의 상한. 부르는 쪽이 주지 않으면 `send()`가 `SAMPLING.n_predict`를 채운다
+    n_predict: maxTokens,
     // 077 — 본문·제목 모두 로마자를 내지 못한다. jinja 서식 결과가 문법을 줄 때만(도구·
     // `response_format`) llama.rn이 이 값을 덮어쓴다 — 우리 호출은 둘 다 안 쓴다.
     grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
@@ -516,7 +538,7 @@ async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<Ru
  * 사이에 그 조각 시간 × 비율만큼 쉰다. 같은 컨텍스트에서 앞 프롬프트와 공통 접두사의 KV가 재사용되므로(018의 원리) 조각마다 새로
  * 읽는 것은 직전 조각뿐이다.
  *
- * - 끝: 조각이 `eos`면 `eos`. 조각이 길이로 끝나면 이어 가고, 조각 수 × `chunkTokens`가 `SAMPLING.n_predict`에 닿으면 `length`.
+ * - 끝: 조각이 `eos`면 `eos`. 조각이 길이로 끝나면 이어 가고, 조각들에 요청한 크기의 합이 상한(`maxTokens`, 기본 `SAMPLING.n_predict`)에 닿으면 `length`.
  *   `interrupted`·`context`는 그대로 돌려준다. 빈 조각은 `length`로 끝낸다(무한히 돌지 않는다).
  * - 멈춤: 조각 경계에서 `stopped()`를 본다 — 서 있으면 다음 조각·쉼 없이 `interrupted`(도는 조각은 `stop()`의 `stopCompletion`이 끊는다).
  * - 텍스트는 조각 원문(`text`)을 잇는다 — 다음 조각의 프롬프트가 되므로 걸러낸 `content`가 아니라 원문이어야 한다.
@@ -530,6 +552,7 @@ async function complete(context: LlamaLike, messages: ChatMessage[]): Promise<Ru
 async function completePaced(
   context: LlamaLike,
   messages: ChatMessage[],
+  maxTokens: number,
   pacing: EnginePacing,
   stopped: () => boolean,
   clock?: Clock,
@@ -540,9 +563,11 @@ async function completePaced(
 ): Promise<RunResult> {
   const formatted = await (context.formatChat as NonNullable<LlamaLike["formatChat"]>)(messages);
   // 서식 프롬프트를 못 얻었으면 빈 프롬프트로 생성하지 않고 종전 경로로(코드 리뷰)
-  if (formatted.prompt === "") return complete(context, messages);
+  if (formatted.prompt === "") return complete(context, messages, maxTokens);
   const base = formatted.prompt;
-  const maxChunks = Math.max(1, Math.ceil(SAMPLING.n_predict / pacing.chunkTokens));
+  // 108 — 상한(`maxTokens`, 주지 않으면 `SAMPLING.n_predict`)까지 조각을 나눈다. 마지막 조각은 남은 만큼만 받는다 — 상한이 조각보다
+  // 작으면(정상 동작 확인) 그 크기의 조각 하나다.
+  const maxChunks = Math.max(1, Math.ceil(maxTokens / pacing.chunkTokens));
   let written = "";
   const now = clock ?? systemClock;
   // 092 CW8 — 앞 조각 뒤의 쉼. 다음 조각을 부르기 **직전**에 쉰다 — 마지막 조각 뒤에는 쉬지 않는다(091은 조각마다 끝나고 쉬어 마지막 쉼이
@@ -589,7 +614,7 @@ async function completePaced(
       temperature: SAMPLING.temperature,
       top_p: SAMPLING.top_p,
       top_k: SAMPLING.top_k,
-      n_predict: pacing.chunkTokens,
+      n_predict: Math.min(pacing.chunkTokens, maxTokens - chunk * pacing.chunkTokens),
       grammar: ROMAN_LETTER_BLOCK_GRAMMAR,
       ...(formatted.stops.length > 0 ? { stop: formatted.stops } : {}),
     };
