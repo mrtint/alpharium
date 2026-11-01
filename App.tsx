@@ -143,7 +143,7 @@ import type { DiagnosticReport } from "./src/diagnostics/types";
 import { languageResolution, text } from "./src/i18n/current";
 import {
   expoAutoWriteAttemptPort,
-  loadAutoWriteAttempts,
+  loadAttemptSummaries,
   type AutoWriteAttemptPort,
 } from "./src/app/auto-write-attempts";
 import { useAutoWriteClaim } from "./src/app/use-auto-write-claim";
@@ -156,7 +156,7 @@ import { useAutoWriteHandoff } from "./src/app/use-auto-write-handoff";
 import { useConstraintBand } from "./src/app/use-constraint-band";
 import { DIAGNOSTICS_TEXT } from "./src/app/diagnostics-text";
 import {
-  attemptLines,
+  ledgerLines,
   canRequestPhoto,
   environmentLines,
   languageLine,
@@ -701,7 +701,7 @@ function AppFrame() {
   // 078 — 자동 쓰기 시도 기록 통로. 앱 열기 판정이 한 줄씩 남긴다.
   const attemptPort = useMemo(() => expoAutoWriteAttemptPort(), []);
   /**
-   * 078 — 개발자 화면의 「최근 자동 쓰기 시도」. 겹이 열릴 때 읽는다(059 모듈 줄과 같은 방식). **배포 빌드에서 이 기록을 보는 유일한
+   * 078 — 개발자 화면의 「날짜별 백그라운드」(109 장부). 겹이 열릴 때 읽는다(059 모듈 줄과 같은 방식). **배포 빌드에서 이 기록을 보는 유일한
    * 자리다** — 진단 화면은 개발 환경에서만 열린다.
    */
   const [developerAttempts, setDeveloperAttempts] = useState<AttemptLine[]>([]);
@@ -729,8 +729,8 @@ function AppFrame() {
           if (alive) setDeveloperReminderLine(undefined);
         },
       );
-    void loadAutoWriteAttempts(attemptPort).then((items) => {
-      if (alive) setDeveloperAttempts(attemptLines(items));
+    void loadAttemptSummaries(attemptPort, new Date()).then((items) => {
+      if (alive) setDeveloperAttempts(ledgerLines(items));
     });
     void loadWriteFailures(failurePort).then((items) => {
       if (alive) setDeveloperFailures(failureLines(items));
@@ -1993,11 +1993,11 @@ function DiagnosticsLayer({
   const readFailures = useCallback(async () => {
     const [items, tries] = await Promise.all([
       loadWriteFailures(failurePort),
-      loadAutoWriteAttempts(attemptPort),
+      loadAttemptSummaries(attemptPort, new Date()),
     ]);
     // DS11 — 상태를 바꾸는 자리마다 alive 검사가 바로 앞선다(소스 계약이 setter마다 본다)
     if (alive.current) setFailures(failureLines(items));
-    if (alive.current) setAttempts(attemptLines(tries));
+    if (alive.current) setAttempts(ledgerLines(tries));
   }, [failurePort, attemptPort]);
   useEffect(() => {
     void readFailures();

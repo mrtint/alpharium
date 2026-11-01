@@ -36,7 +36,7 @@ export type DeveloperScreenProps = {
   onDisable?: () => void;
   onOpenDiagnostics?: () => void;
   /**
-   * 078 — 최근 자동 쓰기 시도(최신이 위). **배포 빌드에서도 그린다** — 진단 화면은 개발 환경 전용이라, 실제 iPhone(TestFlight)에서
+   * 078 → 109 — 날짜별 백그라운드 요약(최근 날이 위). **배포 빌드에서도 그린다** — 진단 화면은 개발 환경 전용이라, 실제 iPhone(TestFlight)에서
    * 「자동 쓰기가 왜 안 돌았는가」를 읽을 자리는 이 화면뿐이다. 보드 `6e`·`6j`에 없는 묶음이다(소유자 확인 대상).
    */
   attempts: readonly AttemptLine[];

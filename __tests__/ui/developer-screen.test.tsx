@@ -93,7 +93,7 @@ describe("DV5 — 진단 그룹은 개발 환경에서만", () => {
       DEVELOPER_TEXT.groupDiag,
       DEVELOPER_TEXT.groupReplay,
       // 078 — 보드 밖: 「끄기」 아래의 자동 쓰기 시도 묶음
-      "최근 자동 쓰기 시도",
+      "날짜별 백그라운드",
       // 081 — 보드 밖: 그 아래의 실패 묶음(새 맨 아래)
       "최근 실패",
     ]);
@@ -250,34 +250,34 @@ describe("064 DV2 — 오늘 날짜 행", () => {
   });
 });
 
-/* ═══════════════════ 078 — 최근 자동 쓰기 시도 (배포 빌드에서도 보인다) ═══════════════════ */
+/* ═══════════════════ 078 — 날짜별 백그라운드 (배포 빌드에서도 보인다) ═══════════════════ */
 
-describe("078 — 최근 자동 쓰기 시도 묶음", () => {
-  it("배포 환경 props(진단 없음)에도 묶음이 있고, 비어 있으면 「아직 시도가 없어요」", async () => {
+describe("078 — 날짜별 백그라운드 묶음", () => {
+  it("배포 환경 props(진단 없음)에도 묶음이 있고, 비어 있으면 「아직 기록이 없어요」", async () => {
     await render(<DeveloperScreen {...props({ showsDiagnostics: false })} />);
     expect(screen.queryByTestId("developer-group-diag")).toBeNull();
     expect(screen.getByTestId("developer-group-attempts")).toBeTruthy();
-    expect(screen.getByText("최근 자동 쓰기 시도")).toBeTruthy();
+    expect(screen.getByText("날짜별 백그라운드")).toBeTruthy();
     expect(screen.getByTestId("developer-attempts-empty")).toBeTruthy();
-    expect(screen.getByText("아직 시도가 없어요")).toBeTruthy();
+    expect(screen.getByText("아직 기록이 없어요")).toBeTruthy();
   });
 
-  it("줄마다 머리(경로 · 시각)와 결과를 그린다", async () => {
+  it("줄마다 머리(날짜)와 요약를 그린다", async () => {
     await render(
       <DeveloperScreen
         {...props({
           attempts: [
-            { headText: "백그라운드 · 10월 13일 22:05", outcomeText: "시작한 뒤 끝나지 않음" },
-            { headText: "앱 열기 · 10월 14일 08:00", outcomeText: "홈에 넘김" },
+            { headText: "10월 13일", outcomeText: "깨움 1번 · 22:05 · 시작한 뒤 끝나지 않음 1" },
+            { headText: "10월 12일", outcomeText: "깨움 0번" },
           ],
         })}
       />,
     );
     expect(screen.queryByTestId("developer-attempts-empty")).toBeNull();
     const first = screen.getByTestId("developer-attempt-0");
-    expect(within(first).getByText("백그라운드 · 10월 13일 22:05")).toBeTruthy();
-    expect(within(first).getByText("시작한 뒤 끝나지 않음")).toBeTruthy();
-    expect(within(screen.getByTestId("developer-attempt-1")).getByText("홈에 넘김")).toBeTruthy();
+    expect(within(first).getByText("10월 13일")).toBeTruthy();
+    expect(within(first).getByText("깨움 1번 · 22:05 · 시작한 뒤 끝나지 않음 1")).toBeTruthy();
+    expect(within(screen.getByTestId("developer-attempt-1")).getByText("깨움 0번")).toBeTruthy();
   });
 
   it("맨 아래다 — 「끄기」 아래에 있어 기존 행의 자리가 바뀌지 않는다", async () => {

@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runAutoDiaryTask } from "../../src/schedule/task";
+import { ledgerPort } from "./attempt-ledger-fixture";
 
 /** 목표 시각 7시, 지금은 15시 30분 — 창 밖. 후보는 어제(08-27)·그제(08-26)·그끄제(08-25) */
 const NOW = new Date(2026, 7, 28, 15, 30, 0, 0);
@@ -23,7 +24,7 @@ function make(byDay: Record<string, Hint>, opts: { spentToday?: boolean } = {}) 
     reads: 0,
     writes: [] as string[],
   };
-  const attempts = { content: null as string | null };
+  const attempts = ledgerPort();
   const deps = {
     catchUpPort: {
       read: async () => {
@@ -39,12 +40,7 @@ function make(byDay: Record<string, Hint>, opts: { spentToday?: boolean } = {}) 
       },
     },
     reconcileReminders: async () => {},
-    attemptPort: {
-      read: async () => attempts.content,
-      write: async (s: string) => {
-        attempts.content = s;
-      },
-    },
+    attemptPort: attempts,
     failurePort: { read: async () => null, write: async () => {} },
     skipPort: { read: async () => null, write: async () => {}, remove: async () => {} },
     now: NOW,

@@ -20,7 +20,7 @@ import { text } from "../i18n/current";
 import type { Language } from "../i18n/languages";
 import type { LanguageResolution } from "../i18n/resolve";
 import type { PhotoLocationReading } from "./permission-tags";
-import type { AttemptOutcome, AttemptPath, AutoWriteAttempt } from "./auto-write-attempts";
+import { ATTEMPT_OUTCOMES, type AttemptOutcome, type DaySummary } from "./auto-write-attempts";
 import type { WriteFailure, WriteFailureReason } from "./write-failures";
 
 /* ─────────────────────────────── 환경 ─────────────────────────────── */
@@ -206,19 +206,9 @@ export function failureLines(items: readonly WriteFailure[]): FailureLine[] {
   }));
 }
 
-/* ─────────────────────── 최근 자동 쓰기 시도 (078) ─────────────────────── */
+/* ─────────────────────── 날짜별 백그라운드 (078 → 109) ─────────────────────── */
 
 export type AttemptLine = { headText: string; outcomeText: string };
-
-/** 062 C4 — 문구 표는 함수 안에서 만든다. `Record<AttemptPath, …>`라 갈래가 늘면 tsc가 짚는다 */
-function attemptPathText(path: AttemptPath): string {
-  const byPath: Readonly<Record<AttemptPath, string>> = {
-    background: A.pathBackground,
-    "app-open": A.pathAppOpen,
-    manual: A.pathManual,
-  };
-  return byPath[path];
-}
 
 function attemptOutcomeText(outcome: AttemptOutcome): string {
   const byOutcome: Readonly<Record<AttemptOutcome, string>> = {
@@ -241,35 +231,28 @@ function attemptOutcomeText(outcome: AttemptOutcome): string {
   return byOutcome[outcome];
 }
 
-/** 105 — 결과 문구 뒤에 고른 날(`YYYY-MM-DD` → 「M월 d일」). 날이 없으면 결과 그대로 */
-function attemptOutcomeWithDay(item: AutoWriteAttempt): string {
-  const text = attemptOutcomeText(item.outcome);
-  if (item.day === undefined) return text;
-  const [, month, day] = item.day.split("-");
-  return A.withDay(text, Number(month), Number(day));
+/** 현지 「HH:mm」 — 실패 줄과 같은 방식(`getHours()`를 쓰지 않는다 — 하루 기준 계산과 섞이지 않게) */
+function hhmm(at: Date): string {
+  return at.toTimeString().slice(0, 5);
 }
 
-function attemptTails(item: AutoWriteAttempt): string[] {
-  const tails: string[] = [];
-  if (item.launch !== undefined)
-    tails.push(item.launch === "active" ? A.launchActive : A.launchBackground);
-  if (item.wake !== undefined) tails.push(item.wake === "power" ? A.wakePower : A.wakeBattery);
-  return tails;
-}
-
-/** 기록 순서 그대로(최신이 위). 머리는 「경로 · M월 d일 HH:mm」(시각 형식은 실패 줄과 같다), 값은 결과 문구다. */
-export function attemptLines(items: readonly AutoWriteAttempt[]): AttemptLine[] {
-  return items.map((item) => ({
-    headText: A.line(
-      attemptPathText(item.path),
-      T.failureTime(item.at.getMonth() + 1, item.at.getDate(), item.at.toTimeString().slice(0, 5)),
-    ),
-    // 090 — 시작 줄의 깨운 상태, 091 — 깨운 요청이 있으면 꼬리로(옛 줄·만료 줄은 없다)
-    outcomeText: attemptTails(item).reduce(
-      (text, tail) => A.withLaunch(text, tail),
-      attemptOutcomeWithDay(item),
-    ),
-  }));
+/**
+ * 날짜별 요약을 줄로 — 순서 그대로(최근 날이 위). 머리는 「M월 d일」, 값은 「깨움 N번 · 첫~마지막 · 결과별 횟수 · 끝나지 않음 N」.
+ * 깨움이 없는 날은 「깨움 0번」뿐이다(시각·결과를 지어내지 않는다).
+ */
+export function ledgerLines(summaries: readonly DaySummary[]): AttemptLine[] {
+  return summaries.map((summary) => {
+    const [, month, date] = summary.day.split("-");
+    const parts: string[] = [A.wakes(summary.wakes)];
+    if (summary.firstAt !== undefined && summary.lastAt !== undefined)
+      parts.push(A.range(hhmm(summary.firstAt), hhmm(summary.lastAt)));
+    for (const outcome of ATTEMPT_OUTCOMES) {
+      const count = summary.byOutcome[outcome];
+      if (count !== undefined && count > 0) parts.push(A.count(attemptOutcomeText(outcome), count));
+    }
+    if (summary.unfinished > 0) parts.push(A.count(A.started, summary.unfinished));
+    return { headText: A.dayHead(Number(month), Number(date)), outcomeText: parts.join(" · ") };
+  });
 }
 
 /* ───────────────────────────── 저장 점검 ───────────────────────────── */

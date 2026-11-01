@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runAutoDiaryTask, AUTO_DIARY_TASK_NAME } from "../../src/schedule/task";
+import { ledgerPort } from "./attempt-ledger-fixture";
 import type { AutoDiarySettings } from "../../src/schedule/settings";
 
 /**
@@ -44,15 +45,7 @@ function baseDeps(overrides: Record<string, unknown> = {}) {
   const dismiss = jest.fn().mockResolvedValue(undefined);
   const notifiedWrite = jest.fn().mockResolvedValue(undefined);
   const skipWrite = jest.fn().mockResolvedValue(undefined);
-  const attempts = {
-    content: null as string | null,
-    async read() {
-      return attempts.content;
-    },
-    async write(serialized: string) {
-      attempts.content = serialized;
-    },
-  };
+  const attempts = ledgerPort();
 
   const catchUp = {
     content: null as string | null,
@@ -674,6 +667,7 @@ describe("078 AT — 자동 쓰기 시도 기록", () => {
     const broken = {
       read: () => Promise.reject(new Error("io")),
       write: () => Promise.reject(new Error("io")),
+      days: () => Promise.reject(new Error("io")),
     };
     const { deps, pipelineRun } = baseDeps({ attemptPort: broken });
     expect(await runAutoDiaryTask(deps)).toBe("ran");

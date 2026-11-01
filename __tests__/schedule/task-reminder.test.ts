@@ -8,6 +8,7 @@
  */
 
 import { runAutoDiaryTask } from "../../src/schedule/task";
+import { ledgerPort } from "./attempt-ledger-fixture";
 
 /** 목표 7시, 지금 15시 30분 */
 const NOW = new Date(2026, 7, 28, 15, 30, 0, 0);
@@ -45,7 +46,7 @@ function make(
     manual: over.manual,
     now: NOW,
     catchUpPort: { read: async () => null, write: async () => {}, remove: async () => {} },
-    attemptPort: memory(),
+    attemptPort: ledgerPort(),
     failurePort: memory(),
     skipPort: { read: async () => null, write: async () => {}, remove: async () => {} },
     resolution: { ok: true, environment: "dev" } as never,

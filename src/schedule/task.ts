@@ -128,7 +128,7 @@ export type AutoDiaryTaskDeps = {
   failurePort?: WriteFailurePort;
   /** 064 — 상태 흉내 기록 통로. 주지 않으면 `preferences/simulation.json` */
   simulationPort?: SimulationStorePort;
-  /** 078 — 자동 쓰기 시도 기록 통로. 주지 않으면 `preferences/auto-write-attempts.json` */
+  /** 078 → 109 — 자동 쓰기 시도 기록 통로. 주지 않으면 날짜별 장부 `attempt-ledger/` */
   attemptPort?: AutoWriteAttemptPort;
   /** 078 — 창 밖 따라잡기 기록 통로. 주지 않으면 `preferences/auto-write-catch-up.json` */
   catchUpPort?: CatchUpStorePort;

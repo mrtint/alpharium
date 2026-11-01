@@ -1,5 +1,5 @@
 /**
- * 099 — 안드로이드 Auto Backup에서 모델(`files/models/`)만 뺀다 (C4).
+ * 099 — 안드로이드 Auto Backup에서 모델(`files/models/`)을 뺀다 (C4). 109 — 시도 기록 장부(`files/attempt-ledger/`)도 뺀다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **왜 규칙 파일을 직접 만들지 않는가**: `/android`는 gitignore된 생성물이라 `prebuild --clean`에 지워진다
@@ -8,6 +8,8 @@
  * **무엇을 빼는가**: 도메인 `file`(= 앱의 `files/` = `Paths.document`)의 `models/` 하나. 다시 받을 수 있는 약 2GB이고
  * Auto Backup 한도(앱당 25MB)를 넘는다. **`<include>`를 쓰지 않는다** — include를 하나라도 쓰면 나머지(일기·설정·일기의
  * 사진 사본 `vision-cache/`)가 백업에서 빠진다. 일기·설정은 OS 기본 동작 그대로 둔다(D4 — 소유자 결정 A, 2026-10-22).
+ * 109: 장부(`attempt-ledger/`)는 날마다 파일이 쌓여 한도(앱당 25MB)를 갉아먹을 수 있는 복원 가치 없는 진단 기록이라 뺀다 — 한도를 넘으면
+ * 패키지 전체가 거부돼(099 실측) 일기 백업을 위협한다.
  * `android:allowBackup`도 건드리지 않는다.
  *
  * 규칙 형식이 둘이다: API 30 이하는 `fullBackupContent`, API 31+는 `dataExtractionRules`(클라우드 백업·기기 간 이전).
@@ -21,10 +23,13 @@ const path = require("node:path");
 
 const BACKUP_RULES_NAME = "pocketlog_backup_rules";
 const DATA_EXTRACTION_RULES_NAME = "pocketlog_data_extraction_rules";
-/** 도메인 `file` 기준 상대 경로. `src/models/expo-port.ts`의 `DIRECTORY`("models")와 같아야 한다 */
-const EXCLUDED_PATH = "models/";
+/**
+ * 도메인 `file` 기준 상대 경로. `models/`는 `src/models/expo-port.ts`의 `DIRECTORY`("models")와, `attempt-ledger/`는
+ * `src/app/auto-write-attempts.ts`의 `LEDGER_DIRECTORY`와 같아야 한다(테스트가 잠근다).
+ */
+const EXCLUDED_PATHS = ["models/", "attempt-ledger/"];
 
-const EXCLUDE = `<exclude domain="file" path="${EXCLUDED_PATH}"/>`;
+const EXCLUDE = EXCLUDED_PATHS.map((p) => `<exclude domain="file" path="${p}"/>`).join("\n  ");
 
 function fullBackupContentXml() {
   return `<?xml version="1.0" encoding="utf-8"?>\n<full-backup-content>\n  ${EXCLUDE}\n</full-backup-content>\n`;
@@ -78,7 +83,7 @@ module.exports = function withBackupRules(config) {
 // 테스트가 순수 함수만 검증할 수 있도록 함께 내보낸다(기기·prebuild 없이 돈다).
 module.exports.BACKUP_RULES_NAME = BACKUP_RULES_NAME;
 module.exports.DATA_EXTRACTION_RULES_NAME = DATA_EXTRACTION_RULES_NAME;
-module.exports.EXCLUDED_PATH = EXCLUDED_PATH;
+module.exports.EXCLUDED_PATHS = EXCLUDED_PATHS;
 module.exports.fullBackupContentXml = fullBackupContentXml;
 module.exports.dataExtractionRulesXml = dataExtractionRulesXml;
 module.exports.applyBackupAttributes = applyBackupAttributes;
