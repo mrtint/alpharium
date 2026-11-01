@@ -26,7 +26,8 @@ export const attempts = {
   allWritten: "모두 써 있음",
   noPhotoAccess: "사진 권한 없음",
   noMaterial: "재료 없음",
-  noCharacter: "캐릭터 없음",
+  /** 로스터에 캐릭터가 둘 이상인데 고른 것이 없을 때만 선다 — 하나뿐이면 그 하나로 쓴다(`characterToWrite`, 226) */
+  noCharacter: "고른 캐릭터 없음",
   write: "홈에 넘김",
   alreadyRunning: "다른 쓰기가 진행 중",
   /** 080 — 합류한 홈에서 그만두었거나 「일기 모두 지우기」가 그 쓰기를 멈췄다 */
