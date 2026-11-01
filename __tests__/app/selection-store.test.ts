@@ -8,7 +8,12 @@
  * 하나뿐이며 그것은 Maestro가 본다.
  */
 
-import { loadSelection, saveSelection, type SelectionPort } from "../../src/app/selection-store";
+import {
+  ensureSelection,
+  loadSelection,
+  saveSelection,
+  type SelectionPort,
+} from "../../src/app/selection-store";
 import { FUTURE_CHARACTER } from "../future-character";
 import { CHARACTERS } from "../../src/diary/types";
 
@@ -120,5 +125,42 @@ describe("037 C3 — 로스터 밖 캐릭터가 저장돼 있을 때", () => {
     // 007 `resolveSelection`이 null을 "고른 적 없음"으로 다룬다 — 그 갈래는
     // selection.test.ts가 검사한다. 여기서는 **값이 새지 않는 것**만 본다.
     expect(loaded).not.toBe("chinese");
+  });
+});
+
+/**
+ * 새로 설치한 앱은 `selected-character.json`이 없다. 파일은 홈이 일기를 **저장했을 때만** 쓰이는데(029 FR-008a),
+ * 첫 실행의 자동 첫 일기(040)는 홈을 거치지 않고 파이프라인을 직접 불러 저장하지 않는다. 백그라운드 자동 쓰기는 이 파일이
+ * 없으면 `no-character`로 건너뛴다 — 2026-11-01 갤럭시(Play 릴리스 14)에서 백그라운드 시도 10건이 모두 그랬다.
+ * `ensureSelection`은 「아직 고른 것이 없을 때만」 기본 캐릭터를 담는다.
+ */
+describe("ensureSelection", () => {
+  const DEFAULT = CHARACTERS[0] as (typeof CHARACTERS)[number];
+
+  it("E1. 담긴 것이 없으면 그 캐릭터를 담는다", async () => {
+    const port = fakePort(null);
+
+    await ensureSelection(port, DEFAULT);
+
+    expect(await loadSelection(port)).toBe(DEFAULT);
+  });
+
+  it("E2. 이미 고른 것이 있으면 다시 쓰지 않는다", async () => {
+    const port = fakePort(JSON.stringify({ character: DEFAULT }));
+    const write = jest.spyOn(port, "write");
+
+    await ensureSelection(port, DEFAULT);
+
+    expect(write).not.toHaveBeenCalled();
+  });
+
+  it("E3. 파일이 깨졌거나 로스터 밖 이름이면 고른 것이 없는 것이므로 담는다", async () => {
+    const broken = fakePort("{ 이것은 JSON이 아니다");
+    await ensureSelection(broken, DEFAULT);
+    expect(await loadSelection(broken)).toBe(DEFAULT);
+
+    const outside = fakePort(JSON.stringify({ character: FUTURE_CHARACTER }));
+    await ensureSelection(outside, DEFAULT);
+    expect(await loadSelection(outside)).toBe(DEFAULT);
   });
 });

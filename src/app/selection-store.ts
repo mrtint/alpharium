@@ -69,6 +69,19 @@ export async function saveSelection(port: SelectionPort, character: Character): 
   await port.write(JSON.stringify({ character }));
 }
 
+/**
+ * 아직 고른 캐릭터가 없을 때만 이 캐릭터를 담는다.
+ *
+ * 파일은 홈이 일기를 **저장했을 때만** 쓰이는데(029 FR-008a), 첫 실행의 자동 첫 일기(040)는 홈을 거치지 않고 파이프라인을 직접
+ * 불러 저장하지 않는다. 백그라운드 자동 쓰기는 이 파일이 없으면 `no-character`로 건너뛰므로(`schedule/task.ts`), 새로 설치한 앱은
+ * 사용자가 홈에서 한 번 쓰기 전까지 백그라운드가 영영 쓰지 못한다(2026-11-01 갤럭시 Play 릴리스 14에서 백그라운드 시도 10건이 모두
+ * 그랬다). 이미 고른 것이 있으면 건드리지 않고, 읽지 못한 파일(깨짐·로스터 밖)은 고른 것이 없는 것이다.
+ */
+export async function ensureSelection(port: SelectionPort, character: Character): Promise<void> {
+  if ((await loadSelection(port)) !== null) return;
+  await saveSelection(port, character);
+}
+
 /* ────────────────────────── 기기 통로 ────────────────────────── */
 
 /**
