@@ -80,7 +80,7 @@ describe("PF1 — 세기·시간은 토큰 한 곳의 상수다", () => {
 });
 
 describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
-  it("★ src/ui/components/의 파일이 8개다(033 7개 + 050 Dialog + 054 FadeLayer + 055 NameField − 059가 지운 ListRow·SelectRow — 038 TypewriterText는 054에서 지웠다)", () => {
+  it("★ src/ui/components/의 파일이 9개다(033 7개 + 050 Dialog + 054 FadeLayer + 055 NameField − 059가 지운 ListRow·SelectRow + 108 ConstraintBand — 038 TypewriterText는 054에서 지웠다)", () => {
     // 032가 만들고 안 쓴 컴포넌트 4개를 남긴 것이 이 스펙의 존재 이유다.
     // 같은 실패(쓸 자리 없는 추상을 먼저 만듦)를 되풀이하지 않는다.
     //
@@ -97,7 +97,9 @@ describe("PF2 — 새 컴포넌트를 만들지 않는다", () => {
     // 곳이 실제로 쓴다(보드 `6c` ② 「이름 짓기(1a)와 같은 입력 화면」).
     //
     // 059 — `ListRow.tsx`·`SelectRow.tsx`를 지웠다(설정에서 걷은 캐릭터 목록·작성자 고르기·옛 선택기만 쓰던 부품).
-    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(8);
+    //
+    // 108 — `ConstraintBand.tsx`가 추가됐다(쓰기 바 위의 제약 띠). 홈의 사진 권한·배터리 두 띠가 같은 부품을 쓴다.
+    expect(readdirSync(COMPONENTS_DIR).filter((f) => /\.tsx?$/.test(f))).toHaveLength(9);
   });
 });
 

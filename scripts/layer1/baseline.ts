@@ -49,11 +49,6 @@ export const BASELINE: readonly BaselineEntry[] = [
   { file: "auto-write-skipped.json", action: "delete", reason: "사진 권한 건너뜀 기록(057)" },
   { file: "notified.json", action: "delete", reason: "완성 알림 확인 기록(020)" },
   {
-    file: "battery-notice-dismissed.json",
-    action: "delete",
-    reason: "홈 배터리 안내를 닫은 시각 기록(104) — 지난 실행의 「7일 숨김」이 남지 않게",
-  },
-  {
     file: "write-failures.json",
     action: "delete",
     reason: "쓰기 실패 기록(060) — 진단이 비어 시작",
