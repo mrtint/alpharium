@@ -2,81 +2,85 @@
 
 **주인의 휴대폰이 화자가 되어 하루를 일기로 쓰는 앱이다.** 사람이 쓰는 일기가 아니다.
 
-휴대폰은 그날 찍힌 사진과 사진에 담긴 장소만으로 주인의 하루를 짐작해 쓴다. 글은 전부
-기기 안에서 만들어진다 — 사진도 일기도 기기 밖으로 나가지 않는다.
+휴대폰은 그날 찍힌 사진과 사진에 담긴 장소로 주인의 하루를 짐작해 쓴다. 글은 전부 기기 안의
+모델이 만든다 — 사진도 일기도 기기 밖으로 나가지 않는다. 그 밖에 기기가 외부와 주고받는 것은
+[개인정보처리방침](https://mrtint.github.io/alpharium/privacy/)이 정본이다.
 
-- 무엇을 지켜야 하는가: [.specify/memory/constitution.md](.specify/memory/constitution.md) (헌법)
-- 실무 사실과 실측 규칙: [AGENTS.md](AGENTS.md)
-- 디자인 시스템과 토큰 규칙: [design/DESIGN.md](design/DESIGN.md)
-- 완료된 과제 이력: [docs/roadmap/README.md](docs/roadmap/README.md), 과제별 상세는 `specs/NNN-*/`
+> 이 문서에는 오래 유지되는 것만 둔다 — 버전·수치·기기·검증 상태·실측 조건·과제 번호처럼 금방 낡는
+> 정보는 적지 않고, 그것을 담는 문서로 연결한다.
+
+| 알고 싶은 것                         | 문서                                                                                 |
+| ------------------------------------ | ------------------------------------------------------------------------------------ |
+| 무엇을 지켜야 하는가 (헌법)          | [.specify/memory/constitution.md](.specify/memory/constitution.md)                   |
+| 지금 상태·실측 규칙·도구 사용법      | [AGENTS.md](AGENTS.md)                                                               |
+| 자동 쓰기가 언제 되고 안 되는가      | [docs/background-write-conditions.md](docs/background-write-conditions.md)           |
+| 진행 예정 과제와 완료 이력           | [docs/roadmap/README.md](docs/roadmap/README.md) — 과제별 상세는 `specs/NNN-*/`      |
+| 디자인 시스템과 토큰                 | [design/DESIGN.md](design/DESIGN.md)                                                 |
+| 의존성·버전·실행 환경                | [package.json](package.json), [app.json](app.json)                                   |
 
 저장소 이름(`alpharium`)만 옛 이름이다. 앱 이름은 Pocketlog, 패키지는 `com.a810labs.pocketlog`다.
 
-## 지금 되는 것
+## 무엇을 하는 앱인가
 
-- **온디바이스 일기 생성** — 그날 사진을 시각 모델이 먼저 읽고, 그 기록으로 일기를 쓴다.
-- **백그라운드 자동 쓰기와 알림** — 목표 시각의 쓸 차례 알림과 완성 알림, 또는 앱을 열 때 자동 쓰기.
-- **첫 실행 흐름** — 권한 → 모듈 내려받기(약 2GB, 모바일 데이터 동의 분기) → 이름 짓기 → 첫 일기.
-- **홈** — 주간 스트립·달력으로 날을 고르고, 쓴 날은 그 자리에서 사진 캐러셀(탭 확대)·본문을 읽는다.
+- **온디바이스 일기 생성** — 사진을 시각 모델이 먼저 읽고, 그 기록으로 글 모델이 일기와 제목을 쓴다. 판정을 통과하지 못한 글은 저장하지 않는다.
+- **자동 쓰기** — 설정에서 켜면 목표 시각 무렵 OS가 앱을 깨울 때 쓰고, 놓친 날은 앱을 열 때 따라잡는다. 쓸 차례·완성 알림이 따른다. OS가 언제 깨우는지는 플랫폼과 기기 상태에 달려 있다 — 조건표를 본다.
+- **첫 실행** — 권한 요청 → 모델 내려받기 동의 → 이름 짓기 → 첫 일기.
+- **홈** — 날을 골라 안 쓴 날은 쓰고, 쓴 날은 그 자리에서 사진과 본문을 읽는다.
 - **설정·개발자·진단 화면.**
-
-지원 언어는 한국어 하나다(`src/i18n/`). Android(Google Play 내부 테스트)와 iOS(TestFlight·실기기, 087) 모두 실기기에서 검증 중이며, 릴리스 빌드·업로드는 GitHub Actions 수동 워크플로(075·076)로 수행한다.
-
-## 기술 구성
-
-- **Core:** Expo SDK 57, React Native 0.86, React 19, TypeScript 6
-- **추론:** `llama.rn` (GGUF, 기기 CPU)
-- **UI:** NativeWind, react-native-reanimated, gesture-handler, Pretendard (정적 OTF 5종 번들)
-- **Runtime:** Node.js `20.19` 이상
-- **CI / 배포:** GitHub Actions ([.github/workflows/ci.yml](.github/workflows/ci.yml), `android-release.yml`, `ios-release.yml`, `pages.yml`)
-
-**Expo Go로는 실행할 수 없다** — `llama.rn`이 네이티브 모듈이라 development build가 필요하다.
 
 ## 시작하기
 
+**Expo Go로는 실행할 수 없다** — 추론 라이브러리(`llama.rn`)가 네이티브 모듈이라 development build가 필요하다.
+
 ```bash
 npm install
+```
+
+```bash
 git config core.hooksPath .githooks   # main 직접 커밋·push를 막는 훅 (clone 뒤 한 번)
 ```
 
-Android 실기기에서 개발 빌드로 돌린다:
+Android 실기기 개발 빌드:
 
 ```bash
 npx expo prebuild --platform android --clean
-npx expo run:android
-adb reverse tcp:8081 tcp:8081
-EXPO_PUBLIC_APP_ENV=dev npx expo start --dev-client
 ```
 
-환경은 `local`(시뮬레이터, 데스크톱 추론 서버)·`dev`(실기기 개발 빌드)·`prod`(배포 빌드) 셋이며
-실행 시점에 `EXPO_PUBLIC_APP_ENV`로 정해진다(macOS에서는 `.env.development.local`에 `EXPO_PUBLIC_APP_ENV=dev`를 둔다). 연결·빌드에서 자주 걸리는 함정은
-[AGENTS.md](AGENTS.md)의 「도구 사용법」에 있다.
+```bash
+npx expo run:android
+```
+
+환경은 `local`·`dev`·`prod` 셋이고 `EXPO_PUBLIC_APP_ENV`로 정해진다. 기기 연결·iOS 빌드·환경 설정의
+함정은 [AGENTS.md](AGENTS.md)의 「환경은 셋이다」·「도구 사용법」에 있다.
 
 ## 테스트
 
-| 명령                  | 무엇                                            | 기기             |
-| --------------------- | ----------------------------------------------- | ---------------- |
-| `npm test`            | 기기 불필요 테스트 전부                         | 필요 없음        |
-| `npm run test:logic`  | 순수 로직만 — 개발 중 기본                      | 필요 없음        |
-| `npm run test:ui`     | 화면만                                          | 필요 없음        |
-| `npm run test:layer1` | 실기기 화면 흐름 e2e (기준 상태·30일 표본 보장) | 전용 테스트 기기 |
-| `npm run test:layer2` | 실기기 실제 모델 생성 스모크 4종                | 전용 테스트 기기 |
-| `npm run lint`        | eslint + tsc + 헌법 검사 + 포맷 검사            | 필요 없음        |
+```bash
+npm test        # 기기 불필요 테스트 전부
+```
 
-**건너뛴 실기기 테스트는 통과가 아니다.** 기능이 끝났다고 말하려면 최소 한 번은 실기기에서
-돌아야 한다(헌법 원칙 V).
+```bash
+npm run lint    # eslint + tsc + 헌법 검사 + 포맷 검사
+```
+
+실기기·시뮬레이터 e2e 명령은 [AGENTS.md](AGENTS.md)의 「테스트」에 있다. **건너뛴 실기기 테스트는
+통과가 아니다** — 기능이 끝났다고 말하려면 실기기에서 한 번은 돌아야 한다(헌법 원칙 V).
 
 ## 코드를 어디에 두는가
 
 ```text
 src/        제품 코드 — 자리별 책임은 AGENTS.md 「코드를 어디에 두는가」
-design/     디자인 토큰 정본(tokens.json)과 디자인 시스템 규칙(DESIGN.md)
-site/       개인정보처리방침·지원·소개 정적 웹페이지 (GitHub Pages)
-plugins/    Expo config plugin (android/·ios/는 생성물이라 커밋하지 않는다)
-scripts/    헌법 검사, 층 1·층 2 e2e 실행기, 합성 하루·30일 표본 심기, 토큰 생성기
 __tests__/  기기 불필요 테스트
 .maestro/   실기기·시뮬레이터 e2e 흐름
 specs/      기능별 스펙·계약·실측 기록
+docs/       로드맵, 자동 쓰기 조건표, e2e 문서 등
+design/     디자인 정본(토큰·아이콘)과 디자인 시스템 규칙
+site/       개인정보처리방침·지원 등 정적 웹페이지 (GitHub Pages)
+store/      스토어 등록 에셋 — 앱 번들에 들어가지 않는다
+modules/    로컬 Expo 네이티브 모듈
+plugins/    Expo config plugin (android/·ios/는 생성물이라 커밋하지 않는다)
+patches/    patch-package 패치 (npm install 때 적용)
+scripts/    헌법 검사, e2e 실행기, 표본 심기, 생성기, 릴리스 점검
 ```
 
 ## 작업 방식
@@ -88,5 +92,5 @@ specs/      기능별 스펙·계약·실측 기록
 
 ## 배포
 
-Android(Google Play)와 iOS(TestFlight) 릴리스 빌드·서명·업로드 절차는 [AGENTS.md](AGENTS.md)에
-있다. 기본 작업 흐름이 아니며 저장소 소유자가 요청했을 때만 탄다.
+Android(Google Play)와 iOS(TestFlight) 릴리스는 GitHub Actions 수동 워크플로로 한다. 절차와 올리기 전
+할 일은 [AGENTS.md](AGENTS.md)에 있다. 기본 작업 흐름이 아니며 저장소 소유자가 요청했을 때만 탄다.

@@ -60,7 +60,7 @@ import {
   recordWriteFailure,
   type WriteFailurePort,
 } from "../app/write-failures";
-import { loadSelection, expoSelectionPort } from "../app/selection-store";
+import { characterToWrite, loadSelection, expoSelectionPort } from "../app/selection-store";
 import { displayNameOf } from "../diary/character-name";
 import type { Character, CustomNames } from "../diary/types";
 import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
@@ -110,6 +110,8 @@ export type AutoDiaryTaskDeps = {
   /** 저장된 일기 날짜들. 주지 않으면 `createAppPipeline`의 store에서 읽는다 */
   listDiaryDays?: () => Promise<readonly DayDate[]>;
   loadCharacter?: () => Promise<Character | null>;
+  /** 로스터. 주지 않으면 지금의 `CHARACTERS` — 고른 것이 없을 때 하나뿐이면 그 캐릭터로 쓴다(`characterToWrite`) */
+  roster?: readonly Character[];
   /** 057 — 사용자가 지은 이름(035). 주지 않으면 `preferences/`의 이름 파일에서 읽는다 */
   loadNames?: () => Promise<CustomNames>;
   /** 파이프라인 조립. 주지 않으면 `createAppPipeline(resolution)` */
@@ -328,11 +330,12 @@ async function runBody(
     chosen = decision.day;
 
     // 007이 저장한 캐릭터를 읽기만 한다(제품 상태를 쓰지 않는다).
-    const character = deps.loadCharacter
+    const saved = deps.loadCharacter
       ? await deps.loadCharacter()
       : await loadSelection(expoSelectionPort());
+    const character = characterToWrite(saved, deps.roster);
     if (!character) {
-      // 고른 캐릭터 없이 자동 생성하지 않는다.
+      // 고른 것이 없고 로스터가 둘 이상이면 하나를 지어내 자동 생성하지 않는다(`characterToWrite`).
       return withDay(skipped("no-character"));
     }
 

@@ -154,3 +154,31 @@ describe("091 C1 — 함께 깬 BGTask는 한 무리로", () => {
     expect(DELEGATE).toMatch(/final class BackgroundTaskGroup[\s\S]*NSLock/);
   });
 });
+
+/**
+ * 안드로이드 잡의 네트워크 제약 — 실기기(SM-S901N, 2026-10-29): 화면이 꺼진 채 15분 체인 잡이 `CONNECTIVITY` 미충족으로 40분 넘게
+ * 걸려 있었다(Wi-Fi는 검증됨). 온디바이스 추론은 네트워크가 필요 없다. expo-background-task는 안드로이드에서 미리 컴파일된
+ * 꾸러미(📦)로 링크되어 소스 패치가 빌드에 닿지 않으므로, 소스에서 빌드하도록 autolinking 설정도 함께 잠근다.
+ */
+describe("안드로이드 잡 — 네트워크 제약 제거", () => {
+  it("설치된 expo-background-task 안드로이드 소스가 네트워크를 요구하지 않는다", () => {
+    const kt = strip(
+      readFileSync(
+        join(
+          ROOT,
+          "node_modules/expo-background-task/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt",
+        ),
+        "utf8",
+      ),
+    );
+    expect(kt).toMatch(/setRequiredNetworkType\(NetworkType\.NOT_REQUIRED\)/);
+    expect(kt).not.toMatch(/NetworkType\.CONNECTED/);
+  });
+
+  it("autolinking이 expo-background-task를 소스에서 빌드한다(미리 컴파일된 꾸러미는 패치를 무시한다)", () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as {
+      expo?: { autolinking?: { android?: { buildFromSource?: string[] } } };
+    };
+    expect(pkg.expo?.autolinking?.android?.buildFromSource).toContain("expo-background-task");
+  });
+});

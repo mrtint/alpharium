@@ -1,3 +1,4 @@
+import { FUTURE_CHARACTER } from "../future-character";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -191,10 +192,20 @@ describe("B2 — 판정 순서", () => {
     expect(pipelineRun).not.toHaveBeenCalled();
   });
 
-  it("고른 캐릭터가 없으면 'skipped'", async () => {
-    const { deps, pipelineRun } = baseDeps({ loadCharacter: async () => null });
+  it("고른 캐릭터가 없고 로스터가 둘 이상이면 'skipped'", async () => {
+    const { deps, pipelineRun } = baseDeps({
+      loadCharacter: async () => null,
+      roster: ["quiet", FUTURE_CHARACTER],
+    });
     expect(await runAutoDiaryTask(deps)).toBe("skipped");
     expect(pipelineRun).not.toHaveBeenCalled();
+  });
+
+  it("고른 캐릭터가 없어도 로스터가 하나뿐이면 그 캐릭터로 쓴다 — 새로 설치한 앱(첫 일기만 거친 앱)도 백그라운드가 쓴다", async () => {
+    const { deps, pipelineRun } = baseDeps({ loadCharacter: async () => null, roster: ["quiet"] });
+    expect(await runAutoDiaryTask(deps)).toBe("ran");
+    expect(pipelineRun).toHaveBeenCalledTimes(1);
+    expect(pipelineRun.mock.calls[0]?.[0]).toMatchObject({ character: "quiet" });
   });
 
   it("파이프라인 조립이 실패하면 'failed'", async () => {
@@ -579,7 +590,7 @@ describe("078 AT — 자동 쓰기 시도 기록", () => {
       { now: at(15), listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"] },
     ],
     ["all-written", { listDiaryDays: async () => ["2026-08-27", "2026-08-26", "2026-08-25"] }],
-    ["no-character", { loadCharacter: async () => null }],
+    ["no-character", { loadCharacter: async () => null, roster: ["quiet", FUTURE_CHARACTER] }],
   ] as const)("%s", async (outcome, over) => {
     const { deps, attempts } = baseDeps({ ...over });
     await runAutoDiaryTask(deps);
@@ -729,6 +740,7 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
     const made = baseDeps({
       now: at(15),
       loadCharacter: async () => null,
+      roster: ["quiet", FUTURE_CHARACTER],
       makePipeline: pipelineWith(WITH_PHOTOS, run),
     });
     expect(await runAutoDiaryTask(made.deps)).toBe("skipped");

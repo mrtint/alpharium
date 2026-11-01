@@ -69,6 +69,22 @@ export async function saveSelection(port: SelectionPort, character: Character): 
   await port.write(JSON.stringify({ character }));
 }
 
+/**
+ * 이번에 쓸 캐릭터. 고른 것이 있으면 그것이고, 없어도 **로스터에 캐릭터가 하나뿐이면 그 하나다.**
+ *
+ * 고를 것이 없으면 「고른 것」은 따로 없다 — 모델을 받는 순간 이미 하나로 정해진 것이나 다름없다(헌법 「로스터」). 선택 파일은 홈이
+ * 일기를 저장했을 때만 쓰여서(029 FR-008a) 첫 실행의 자동 첫 일기(040)만 거친 앱에는 없는데, 백그라운드는 이 파일이 없으면
+ * `no-character`로 건너뛰어 새로 설치한 앱이 영영 쓰지 못했다(2026-11-01 갤럭시 Play 릴리스 14에서 백그라운드 시도 10건이 모두 그랬다).
+ * 로스터가 둘 이상이면 고른 것이 없을 때 하나를 지어내지 않는다(원칙 V) — 그때는 다시 모른다.
+ */
+export function characterToWrite(
+  saved: Character | null,
+  roster: readonly Character[] = CHARACTERS,
+): Character | null {
+  if (saved !== null) return saved;
+  return roster.length === 1 ? (roster[0] ?? null) : null;
+}
+
 /* ────────────────────────── 기기 통로 ────────────────────────── */
 
 /**

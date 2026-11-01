@@ -1,3 +1,18 @@
+diff --git a/node_modules/expo-background-task/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt b/node_modules/expo-background-task/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
+index 74c5719..1cdeb2b 100644
+--- a/node_modules/expo-background-task/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
++++ b/node_modules/expo-background-task/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt
+@@ -105,7 +105,9 @@ object BackgroundTaskScheduler {
+       .putString("appScopeKey", appScopeKey)
+       .build()
+     val constraints = Constraints.Builder()
+-      .setRequiredNetworkType(NetworkType.CONNECTED)
++      // Pocketlog (patches/): on-device inference needs no network. With the screen off the job sat on an
++      // unsatisfied CONNECTIVITY constraint for 40+ minutes while Wi-Fi was validated (Galaxy SM-S901N, 2026-10-29).
++      .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+       .build()
+ 
+     // Get Work manager
 diff --git a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
 index 98d87f8..33c3097 100644
 --- a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
