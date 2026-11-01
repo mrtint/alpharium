@@ -85,6 +85,12 @@ export type LoadResult =
 export type RunLimits = {
   /** 이 시간을 넘으면 끊고 `timeout`으로 끝낸다 (FR-021) */
   timeoutMs: number;
+  /**
+   * 108 — **이번 호출만의** 생성 상한(토큰). 주지 않으면 `SAMPLING.n_predict`다 — 일기 본문·제목은 주지 않는다(원칙 I:
+   * 일기는 같은 샘플링). 지금 주는 곳은 정상 동작 확인(`checkLiveness()`) 하나다. 조각 생성에서는 조각 수와 마지막 조각
+   * 크기를 이 값으로 정한다.
+   */
+  maxTokens?: number;
 };
 
 /**
