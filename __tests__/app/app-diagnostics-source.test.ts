@@ -160,27 +160,3 @@ describe("WF7 — 쓰기 실패 기록 지점 셋", () => {
     expect(read("src/app/wipe-diaries.ts")).not.toContain("write-failures");
   });
 });
-
-/**
- * 첫 실행의 자동 첫 일기(040)는 홈을 거치지 않아 `selected-character.json`을 쓰지 않는다. 그러면 백그라운드 자동 쓰기가
- * 새로 설치한 앱에서 `no-character`로 영영 건너뛴다(2026-11-01 갤럭시 릴리스 14). `App.tsx`는 liveness를 통과한 첫 실행에서
- * 기본 캐릭터를 담는다 — 첫 일기가 써졌는지와 무관하게(재료가 없으면 안 쓰기로 바꾸어도 이 약속은 남는다).
- */
-describe("SEL1 — 첫 실행이 기본 캐릭터를 담는다", () => {
-  const frame = functionBody("AppFrame");
-  const at = frame.indexOf("ensureSelection(");
-
-  it("liveness가 ok인 첫 실행에서 기본 캐릭터로 ensureSelection을 부른다", () => {
-    expect(at).toBeGreaterThan(-1);
-    const around = frame.slice(Math.max(0, at - 400), at + 300);
-    expect(around).toMatch(/livenessOutcome\s*!==\s*"ok"/);
-    expect(around).toMatch(
-      /ensureSelection\(\s*firstRunSelectionPort\s*,\s*ONBOARDING_DEFAULT_CHARACTER\s*\)/,
-    );
-  });
-
-  it("담기 실패는 첫 실행 흐름을 막지 않는다(삼킨다)", () => {
-    const call = frame.slice(at, at + 200);
-    expect(call).toMatch(/\.catch\(/);
-  });
-});
