@@ -16,7 +16,7 @@
  * 종료 코드가 성공과 실패를 가른다.
  * ─────────────────────────────────────────────────────────────────────────────
  *
- * 쓰는 법: `npm run seed:day -- <모양> <YYYY-MM-DD>`
+ * 쓰는 법: `npm run seed:day -- [--around N] <모양> <YYYY-MM-DD>` (`--around N`: 고를 수 있는 하루를 요청 당일 앞뒤 N일로 넓힌다 — 미래 날짜 시험용)
  *          `npm run seed:day -- --bursts '<BurstSpec[] JSON>' <YYYY-MM-DD>`  (023)
  */
 
@@ -25,7 +25,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { patchDate, patchLocation } from "./seed/exif.ts";
-import { parseSeedArgs, planFromBursts, planSeeding } from "./seed/plan.ts";
+import { aroundDays, parseSeedArgs, planFromBursts, planSeeding, takeAround } from "./seed/plan.ts";
 import { pickNoGpsSample, pickWithGpsSample } from "./seed/samples.ts";
 import { shapeNames } from "./seed/shapes.ts";
 import { recordSeeding, type SeededPhoto } from "./seed/ledger.ts";
@@ -81,7 +81,8 @@ function cleanup(pushed: string[]): boolean {
 
 async function main(): Promise<never> {
   // ── 0단계: 인자 해석 (순수, plan.ts). `--bursts <json> <날짜>` 또는 `<모양> <날짜>` ──
-  const parsed = parseSeedArgs(process.argv.slice(2));
+  const { around, rest } = takeAround(process.argv.slice(2));
+  const parsed = parseSeedArgs(rest);
   if (!parsed.ok) {
     // **되묻지 않는다**(FR-018). 에이전트가 부르므로 대화형 자리를 두지 않는다.
     finish(
@@ -114,9 +115,10 @@ async function main(): Promise<never> {
     );
   }
 
+  const window = around === undefined ? undefined : aroundDays(new Date(), around);
   const planned = parsed.usingBursts
-    ? planFromBursts(parsed.burstsJson, day, new Date())
-    : planSeeding(shapeName, day, new Date());
+    ? planFromBursts(parsed.burstsJson, day, new Date(), window)
+    : planSeeding(shapeName, day, new Date(), window);
   if (!planned.ok) finish(failure(planned.reason, planned.detail), EXIT_FAILED);
 
   // ── 1단계: 이미 있는 것 세기 (FR-011b) ────────────────────────────────────

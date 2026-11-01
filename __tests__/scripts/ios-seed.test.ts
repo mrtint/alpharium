@@ -6,7 +6,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { buildLldbScript, buildPlan, parseArgs } from "../../scripts/ios-seed/plan";
+import {
+  buildLldbScript,
+  buildPlan,
+  buildRangePlan,
+  daysAround,
+  parseArgs,
+} from "../../scripts/ios-seed/plan";
 
 const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
@@ -122,7 +128,115 @@ describe("buildPlan", () => {
   });
 });
 
+describe("daysAround — 요청 당일 앞뒤 N일", () => {
+  it("기준일 포함 2N+1일을 오래된 날부터 준다", () => {
+    const days = daysAround(new Date(2026, 10, 2, 15, 0), 15);
+    expect(days).toHaveLength(31);
+    expect(days[0]).toBe("2026-10-18");
+    expect(days[15]).toBe("2026-11-02");
+    expect(days[30]).toBe("2026-11-17");
+  });
+
+  it("달·해 경계를 넘어도 기기 로컬 날짜로 센다", () => {
+    expect(daysAround(new Date(2026, 11, 31, 23, 59), 1)).toEqual([
+      "2026-12-30",
+      "2026-12-31",
+      "2027-01-01",
+    ]);
+  });
+
+  it("N이 0이면 오늘 하루, 음수·소수는 거부한다", () => {
+    expect(daysAround(new Date(2026, 10, 2), 0)).toEqual(["2026-11-02"]);
+    expect(() => daysAround(new Date(2026, 10, 2), -1)).toThrow(/range/);
+    expect(() => daysAround(new Date(2026, 10, 2), 1.5)).toThrow(/range/);
+  });
+});
+
+describe("buildRangePlan", () => {
+  const photos = ["/p/a.jpg", "/p/b.jpg", "/p/c.jpg"];
+  const days = ["2026-11-01", "2026-11-02", "2026-11-03"];
+
+  it("날마다 count장을 한 계획에 담고 올리는 이름이 하나도 겹치지 않는다", () => {
+    const { plan, uploads } = buildRangePlan({
+      runId: "r1",
+      days,
+      count: 2,
+      photos,
+      tz: "+09:00",
+      gps: true,
+    });
+    expect(plan.assets).toHaveLength(6);
+    expect(new Set(plan.assets.map((a) => a.path)).size).toBe(6);
+    expect(plan.assets.map((a) => a.takenAt.slice(0, 10))).toEqual([
+      "2026-11-01",
+      "2026-11-01",
+      "2026-11-02",
+      "2026-11-02",
+      "2026-11-03",
+      "2026-11-03",
+    ]);
+    expect(uploads.map((u) => u.to)).toEqual(plan.assets.map((a) => a.path));
+  });
+
+  it("원본 사진은 날을 넘어 이어서 돌려 써 날마다 다른 사진이 나온다", () => {
+    const { uploads } = buildRangePlan({
+      runId: "r1",
+      days,
+      count: 2,
+      photos,
+      tz: "+09:00",
+      gps: false,
+    });
+    expect(uploads.map((u) => u.from)).toEqual([
+      "/p/a.jpg",
+      "/p/b.jpg",
+      "/p/c.jpg",
+      "/p/a.jpg",
+      "/p/b.jpg",
+      "/p/c.jpg",
+    ]);
+  });
+
+  it("날 하나짜리는 buildPlan과 같은 자산을 만든다", () => {
+    const one = buildPlan({
+      runId: "r1",
+      day: "2026-11-02",
+      count: 3,
+      photos,
+      tz: "+09:00",
+      gps: true,
+    });
+    const range = buildRangePlan({
+      runId: "r1",
+      days: ["2026-11-02"],
+      count: 3,
+      photos,
+      tz: "+09:00",
+      gps: true,
+    });
+    expect(range.plan.assets.map(({ takenAt, lat, lon }) => ({ takenAt, lat, lon }))).toEqual(
+      one.plan.assets.map(({ takenAt, lat, lon }) => ({ takenAt, lat, lon })),
+    );
+  });
+
+  it("날이 없거나 모양이 틀리면 거부한다", () => {
+    const base = { runId: "r1", count: 1, photos, tz: "+09:00", gps: false };
+    expect(() => buildRangePlan({ ...base, days: [] })).toThrow(/days/);
+    expect(() => buildRangePlan({ ...base, days: ["11/02"] })).toThrow(/YYYY-MM-DD/);
+  });
+});
+
 describe("parseArgs", () => {
+  it("--range N은 --day 없이 쓰고 둘을 함께 주면 거부한다", () => {
+    const a = parseArgs(["--range", "15", "--count", "4", "--photos", "/x"]);
+    expect(a.range).toBe(15);
+    expect(a.day).toBeUndefined();
+    expect(() => parseArgs(["--range", "15", "--day", "2026-11-02", "--count", "4"])).toThrow(
+      /함께/,
+    );
+    expect(() => parseArgs(["--range", "x", "--count", "4"])).toThrow(/range/);
+  });
+
   it("값 옵션과 불리언 옵션을 읽는다", () => {
     expect(
       parseArgs(["--day", "2026-10-17", "--count", "5", "--photos", "/x", "--no-gps"]),

@@ -6,7 +6,9 @@
 npm run ios:seed -- --day 2026-10-17 --count 8 --photos <JPEG 폴더> [--no-gps] [--device <UDID>]
 ```
 
-마지막 줄은 항상 JSON이다: `{"ok":true,"day":…,"requested":8,"seeded":8,"runDir":…,"errors":[]}`. 종료 코드 0/1.
+여러 날은 `--range N`(요청 당일 앞뒤 N일, 오늘 포함 2N+1일, `--day`와 함께 쓰지 않는다)로 한 번에 심는다 — 앱을 한 번만 띄우고 lldb도 한 번만 붙는다. 예: `npm run ios:seed -- --range 15 --count 4 --photos scripts/e2e-sample/.cache --device <UDID>`.
+
+마지막 줄은 항상 JSON이다: `{"ok":true,"days":…,"requested":8,"seeded":8,"runDir":…,"errors":[]}`. 종료 코드 0/1.
 
 ## 왜 이렇게 하는가
 
