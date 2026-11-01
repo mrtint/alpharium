@@ -3,6 +3,7 @@
  * 실제 iPhone의 사진 보관함에 합성 하루의 사진을 심는다 (087). 안드로이드 `npm run seed:day`(010)의 iOS 짝.
  *
  * 쓰는 법: `npm run ios:seed -- --day 2026-10-17 --count 8 --photos <JPEG 폴더> [--no-gps] [--device <UDID>]`
+ *          `npm run ios:seed -- --range 15 --count 4 --photos <JPEG 폴더>` — 요청 당일 앞뒤 15일(오늘 포함 31일) 날마다 4장
  *
  * 흐름: PocketSeed.dylib 빌드·서명 → 사진·계획·dylib을 앱 컨테이너(`Documents/seed-ios/`)에 `devicectl`로 올림 → 앱을 새로 띄움 →
  *       lldb가 앱 프로세스에 붙어 dylib을 `dlopen`하고 `PocketSeedStart`를 부름 → 상태 파일을 읽어 끝을 기다림.
@@ -25,7 +26,15 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildLldbScript, buildPlan, DYLIB_PATH, parseArgs, planPathOf, runDir } from "./plan.ts";
+import {
+  buildLldbScript,
+  buildRangePlan,
+  daysAround,
+  DYLIB_PATH,
+  parseArgs,
+  planPathOf,
+  runDir,
+} from "./plan.ts";
 
 const BUNDLE_ID = "com.a810labs.pocketlog";
 /** dylib은 앱과 같은 팀의 인증서로 서명해야 `dlopen`된다 */
@@ -170,9 +179,11 @@ const device = pickDevice(args.device);
 const runId = `r${Date.now()}`;
 const tzMin = -new Date().getTimezoneOffset();
 const tz = `${tzMin >= 0 ? "+" : "-"}${String(Math.floor(Math.abs(tzMin) / 60)).padStart(2, "0")}:${String(Math.abs(tzMin) % 60).padStart(2, "0")}`;
-const { plan, uploads } = buildPlan({
+const days = args.range !== undefined ? daysAround(new Date(), args.range) : [args.day as string];
+const total = days.length * args.count;
+const { plan, uploads } = buildRangePlan({
   runId,
-  day: args.day,
+  days,
   count: args.count,
   photos,
   tz,
@@ -257,12 +268,12 @@ const results = status.results ?? [];
 const seeded = results.filter((r) => r.ok).length;
 console.log(
   JSON.stringify({
-    ok: seeded === args.count,
-    day: args.day,
-    requested: args.count,
+    ok: seeded === total,
+    days: days.length === 1 ? days[0] : `${days[0]}..${days[days.length - 1]}`,
+    requested: total,
     seeded,
     runDir: runDir(runId),
     errors: results.filter((r) => !r.ok).map((r) => r.error),
   }),
 );
-process.exit(seeded === args.count ? 0 : 1);
+process.exit(seeded === total ? 0 : 1);

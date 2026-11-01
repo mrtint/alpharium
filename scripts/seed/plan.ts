@@ -38,6 +38,29 @@ export type SyntheticDay = {
  * **검증하지 않는다** — 값이 유효한지(모양이 있는지, 날짜가 범위 안인지)는
  * `planSeeding`/`planFromBursts`의 몫이다. 여기서는 인자를 자리별로 뽑기만 한다.
  */
+/** 요청 당일 앞뒤 `n`일(기준일 포함)을 `YYYY-MM-DD`로 — `--around`가 고를 수 있는 하루를 넓힐 때 쓴다 */
+export function aroundDays(now: Date, n: number): DayDate[] {
+  const pad = (v: number) => String(v).padStart(2, "0");
+  const days: DayDate[] = [];
+  for (let offset = -n; offset <= n; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12);
+    days.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  }
+  return days;
+}
+
+/** argv에서 `--around N`을 떼어 낸다 — 나머지는 `parseSeedArgs`가 해석한다 */
+export function takeAround(argv: readonly string[]): {
+  around: number | undefined;
+  rest: string[];
+} {
+  const i = argv.indexOf("--around");
+  if (i === -1) return { around: undefined, rest: [...argv] };
+  const n = Number(argv[i + 1]);
+  if (!Number.isInteger(n) || n < 0) throw new Error("--around N은 0 이상의 정수여야 한다");
+  return { around: n, rest: [...argv.slice(0, i), ...argv.slice(i + 2)] };
+}
+
 export type ParsedArgs =
   | { ok: true; usingBursts: false; shapeName: string; day: string }
   | { ok: true; usingBursts: true; burstsJson: string; day: string }
@@ -82,7 +105,12 @@ export type PlanResult =
  * **"지금"을 인자로 받는다** — 안에서 `new Date()`를 부르면 하루 경계를 테스트할 수
  * 없다. `day-boundary.ts`가 같은 이유로 같은 모양이다.
  */
-export function planSeeding(shapeName: string, day: DayDate, now: Date): PlanResult {
+export function planSeeding(
+  shapeName: string,
+  day: DayDate,
+  now: Date,
+  window?: readonly DayDate[],
+): PlanResult {
   const shape = shapeNamed(shapeName);
   if (shape === null) {
     return {
@@ -92,7 +120,7 @@ export function planSeeding(shapeName: string, day: DayDate, now: Date): PlanRes
     };
   }
 
-  const usable = selectableDays(now);
+  const usable = window ?? selectableDays(now);
   if (!usable.includes(day)) {
     // **까닭이 에이전트가 다음을 정할 수 있을 만큼 구체적이어야 한다**(FR-019).
     // 「범위 밖」만 말하면 에이전트가 다시 물어야 한다.
@@ -115,7 +143,12 @@ export function planSeeding(shapeName: string, day: DayDate, now: Date): PlanRes
  *
  * **잘못된 JSON은 되묻지 않고 `unknown-shape`로 거부한다**(FR-018).
  */
-export function planFromBursts(burstsJson: string, day: DayDate, now: Date): PlanResult {
+export function planFromBursts(
+  burstsJson: string,
+  day: DayDate,
+  now: Date,
+  window?: readonly DayDate[],
+): PlanResult {
   let specs: BurstSpec[];
   try {
     const parsed = JSON.parse(burstsJson);
@@ -129,7 +162,7 @@ export function planFromBursts(burstsJson: string, day: DayDate, now: Date): Pla
     };
   }
 
-  const usable = selectableDays(now);
+  const usable = window ?? selectableDays(now);
   if (!usable.includes(day)) {
     return {
       ok: false,
