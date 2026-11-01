@@ -60,9 +60,9 @@
 - [X] T018 [P] 문서: `AGENTS.md`의 「개발자·진단 화면 하단에 「최근 자동 쓰기 시도」…」 문장들을 장부로 고친다(옛 서술을 덧대지 않고 고친다 — 뒤의 기능이 앞의 결정을 뒤집을 때의 규칙). `docs/background-write-conditions.md` 7행의 기록 위치를 장부로, `src/app/README.md` 12행의 설명을 고친다. `docs/e2e/feature-flow-map.md`·`.maestro/settings-developer-sweep.yml`의 「최근 자동 쓰기 시도」 문구를 새 묶음 이름으로 고친다(Maestro가 문구를 보는지 확인).
 - [X] T019 위반 주입으로 방어 검증: ① 소스에 `auto-write-attempts.json` 문자열을 다시 넣으면 T015 테스트가 실패한다 ② `recordAttemptEnd`의 짝 교체를 빼면 T004가 실패한다 ③ 백업 규칙에서 `attempt-ledger/`를 빼면 T016이 실패한다 ④ 직렬화에 필드(`reason` 등)를 더하면 T015가 실패한다. 각각 치환이 적용됐는지 먼저 단언하고 실패를 확인한 뒤 되돌린다(AGENTS 「위반 주입으로 방어를 검증한다」).
 - [X] T020 `npm test`·`npm run lint`(eslint + tsc + 헌법 검사 + prettier)를 실제로 실행해 통과를 확인한다. tsc 0과 같은 규칙의 복제가 다른 파일에 남지 않았는지 `grep`으로 센다(`loadAutoWriteAttempts`·`attemptLines`·`MAX_AUTO_WRITE_ATTEMPTS`·`AutoWriteAttemptPort`의 옛 `read()`/`write(serialized)` 사용처 0).
-- [ ] T021 실기기 확인(SM-S901N dev 빌드, Metro 번들만 — `pm clear`·재설치 금지): `quickstart.md`의 실기기 절차 1~3. 개발자 화면 맨 아래 「날짜별 백그라운드」, 강제 잡 한 번 뒤 구역과 `run-as … cat files/attempt-ledger/<오늘>.json`의 `background` 줄을 확인한다. 못 본 것은 그대로 적는다. 관측 기준선 시각을 메모리 `project-bg-attempts-passive-measure`에 추가한다.
+- [ ] T021 (2026-11-01 갤럭시 잠금(PIN)으로 막힘 — 새 번들을 못 붙여 미확인, 로드맵 과제 3번에 이어서 적었다) 실기기 확인(SM-S901N dev 빌드, Metro 번들만 — `pm clear`·재설치 금지): `quickstart.md`의 실기기 절차 1~3. 개발자 화면 맨 아래 「날짜별 백그라운드」, 강제 잡 한 번 뒤 구역과 `run-as … cat files/attempt-ledger/<오늘>.json`의 `background` 줄을 확인한다. 못 본 것은 그대로 적는다. 관측 기준선 시각을 메모리 `project-bg-attempts-passive-measure`에 추가한다.
 
-- [ ] T022 로드맵 갱신은 완료 처리에서 한다: 「백그라운드 자동 쓰기가 완주하지 못한다」 과제는 관측(며칠 뒤 장부 읽기, SC-002)이 끝나지 않았으므로 진행 예정에 **남기고**, 할 일 3번을 장부 도입 완료·읽기 대기로 고쳐 쓴다. 109는 완료 이력 표에 한 줄로 올린다(관측 결과는 읽은 뒤 이 과제에 반영).
+- [X] T022 로드맵 갱신은 완료 처리에서 한다: 「백그라운드 자동 쓰기가 완주하지 못한다」 과제는 관측(며칠 뒤 장부 읽기, SC-002)이 끝나지 않았으므로 진행 예정에 **남기고**, 할 일 3번을 장부 도입 완료·읽기 대기로 고쳐 쓴다. 109는 완료 이력 표에 한 줄로 올린다(관측 결과는 읽은 뒤 이 과제에 반영).
 
 ## Dependencies & Execution Order
 
