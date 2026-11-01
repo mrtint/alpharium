@@ -12,12 +12,11 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { fireEvent, screen, waitFor } from "@testing-library/react-native";
+import { screen, waitFor } from "@testing-library/react-native";
 
 import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { Pipeline, PipelineResult } from "../../src/diary/pipeline";
-import type { DiaryEntry } from "../../src/diary/types";
 import { memoryStore, type DiaryStore } from "../../src/diary/store";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 import { renderWithPortal } from "./render-with-portal";
@@ -62,7 +61,6 @@ async function renderHome(over: {
   resolve?: (day: string) => ResolveOutcome;
   onChooseDay?: (day: string) => void;
   store?: DiaryStore;
-  onAutoWriteSaved?: (day: string) => void;
 }) {
   const previewDay = jest.fn(async (day: string) => ({
     day,
@@ -83,7 +81,6 @@ async function renderHome(over: {
       covered={over.covered}
       onChooseDay={over.onChooseDay}
       chosenDay={TODAY}
-      onAutoWriteSaved={over.onAutoWriteSaved}
     />,
   );
 }
@@ -198,73 +195,5 @@ describe("OP5 — 백그라운드가 쥐고 있으면 조용히", () => {
     });
     await renderHome({ pipeline, autoWriteDay: TODAY, claimAutoWrite: once() });
     expect(await screen.findByTestId("failure-toast")).toBeTruthy();
-  });
-});
-
-/* ───────────────────────── 104 HS1 — 앱 열기 자동 쓰기가 저장된 뒤에만 배터리 안내 신호를 보낸다 ───────────────────────── */
-
-const SAVED: PipelineResult = {
-  ok: true,
-  overwrote: false,
-  entry: {
-    date: TODAY,
-    title: "제목",
-    text: "본문이다.",
-    character: "quiet",
-    signalsUsed: {
-      date: TODAY,
-      photos: { kind: "none" },
-      places: { kind: "none" },
-      steps: { kind: "unknown", reason: "x" },
-      battery: { kind: "unknown", reason: "x" },
-      connectivity: { kind: "unknown", reason: "x" },
-    },
-    createdAt: NOW,
-  } as DiaryEntry,
-};
-
-describe("104 HS1 — onAutoWriteSaved", () => {
-  it("앱 열기 자동 쓰기가 저장되면 그 날로 한 번 부른다", async () => {
-    const { pipeline, run } = resultPipeline(SAVED);
-    const onAutoWriteSaved = jest.fn();
-    await renderHome({ pipeline, autoWriteDay: TODAY, claimAutoWrite: once(), onAutoWriteSaved });
-    await waitFor(() => expect(run).toHaveBeenCalled());
-    await waitFor(() => expect(onAutoWriteSaved).toHaveBeenCalledTimes(1));
-    expect(onAutoWriteSaved).toHaveBeenCalledWith(TODAY);
-  });
-
-  it("쓰기 도중에는 부르지 않는다", async () => {
-    const { pipeline } = pendingPipeline();
-    const onAutoWriteSaved = jest.fn();
-    await renderHome({ pipeline, autoWriteDay: TODAY, claimAutoWrite: once(), onAutoWriteSaved });
-    expect(await screen.findByTestId("writing-paper")).toBeTruthy();
-    expect(onAutoWriteSaved).not.toHaveBeenCalled();
-  });
-
-  it.each([
-    ["실패", { ok: false, stage: "generation", reason: "rejected: echo" } as PipelineResult],
-    [
-      "already-running",
-      { ok: false, stage: "already-running", reason: "다른 곳에서 생성 중이다" } as PipelineResult,
-    ],
-  ])("%s이면 부르지 않는다", async (_label, result) => {
-    const { pipeline, run } = resultPipeline(result);
-    const onAutoWriteSaved = jest.fn();
-    await renderHome({ pipeline, autoWriteDay: TODAY, claimAutoWrite: once(), onAutoWriteSaved });
-    await waitFor(() => expect(run).toHaveBeenCalled());
-    await screen.findByTestId("write-button");
-    expect(onAutoWriteSaved).not.toHaveBeenCalled();
-  });
-
-  it("사람이 누른 「쓰기」는 저장돼도 부르지 않는다 (auto가 아니다)", async () => {
-    const { pipeline, run } = resultPipeline(SAVED);
-    const onAutoWriteSaved = jest.fn();
-    await renderHome({ pipeline, autoWriteDay: null, onAutoWriteSaved });
-    await fireEvent.press(await screen.findByTestId("write-button"));
-    const confirm = screen.queryByTestId("material-confirm-yes");
-    if (confirm !== null) await fireEvent.press(confirm);
-    await waitFor(() => expect(run).toHaveBeenCalled());
-    await screen.findByTestId("write-button");
-    expect(onAutoWriteSaved).not.toHaveBeenCalled();
   });
 });

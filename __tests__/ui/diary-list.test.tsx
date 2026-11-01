@@ -165,7 +165,8 @@ describe("048 H — 1d 구조와 헤더", () => {
       code.indexOf("function DayHeading"),
       code.indexOf("function DayFace"),
     );
-    const face = code.slice(code.indexOf("function DayFace"), code.indexOf("function Notices"));
+    const faceStart = code.indexOf("function DayFace");
+    const face = code.slice(faceStart, code.indexOf("function ", faceStart + 1));
     for (const part of [heading, face]) {
       expect(part).not.toContain("Pressable");
       expect(part).not.toContain("onPress");
@@ -239,17 +240,17 @@ describe("048 H — 1d 구조와 헤더", () => {
     expect(screen.queryByText(/바꿨어요/)).toBeNull();
   });
 
-  it("H5 — 캐릭터 옮김 안내는 부모가 준 문장을 그대로 보인다", async () => {
-    await renderHome({ movedNotice: "루이을(를) 쓸 수 없어 금동이(으)로 바꿨어요" });
+  it("H6 — 거부 권한 안내는 스트립 아래 줄이 아니라 제약 띠다(108)", async () => {
+    await renderHome({
+      constraint: {
+        text: "사진 권한이 없어 사진 없이 써요",
+        action: "권한 허용",
+        onAction: jest.fn(),
+      },
+    });
 
-    expect(screen.getByText("루이을(를) 쓸 수 없어 금동이(으)로 바꿨어요")).toBeTruthy();
-  });
-
-  it("H6 — 거부 권한 안내가 보인다", async () => {
-    await renderHome({ deniedNotices: ["사진을 볼 수 없어서 일기는 사진 없이 써요."] });
-
-    expect(screen.getByTestId("denied-notices")).toBeTruthy();
-    expect(screen.getByText("사진을 볼 수 없어서 일기는 사진 없이 써요.")).toBeTruthy();
+    expect(screen.queryByTestId("denied-notices")).toBeNull();
+    expect(screen.getByTestId("constraint-band")).toBeTruthy();
   });
 
   it("옛 쓰기 자리 문구가 없다", async () => {
@@ -403,50 +404,63 @@ describe("★ 화면에 없어야 하는 것 (006 SC-019·020 유지)", () => {
   });
 });
 
-/* ───────────────────────── 104 HS2 — 배터리 안내 한 줄 ───────────────────────── */
+/* ───────────────────────── 108 HP — 제약 띠 ───────────────────────── */
 
-describe("104 HS2 — 배터리 안내", () => {
-  const notice = () => ({ onOpenSettings: jest.fn(), onDismiss: jest.fn() });
-
-  it("batteryNotice가 있으면 문구와 [설정 열기]·[닫기]를 그린다", async () => {
-    const batteryNotice = notice();
-    await renderHome({ items: [readable("2026-09-20")], batteryNotice });
-    expect(screen.getByTestId("home-battery-notice")).toBeTruthy();
-    expect(
-      screen.getByText("배터리 사용 제한을 풀어 두면 화면이 꺼진 채로도 일기를 써드릴 수 있어요"),
-    ).toBeTruthy();
-    await fireEvent.press(screen.getByTestId("home-battery-notice-open"));
-    expect(batteryNotice.onOpenSettings).toHaveBeenCalledTimes(1);
-    await fireEvent.press(screen.getByTestId("home-battery-notice-dismiss"));
-    expect(batteryNotice.onDismiss).toHaveBeenCalledTimes(1);
+describe("108 HP — 제약 띠", () => {
+  const constraint = () => ({
+    text: "사진 권한이 없어 사진 없이 써요",
+    action: "권한 허용",
+    onAction: jest.fn(),
   });
 
-  it("버튼은 접근성 역할과 라벨을 가진다", async () => {
-    await renderHome({ items: [], batteryNotice: notice() });
-    for (const [id, label] of [
-      ["home-battery-notice-open", "설정 열기"],
-      ["home-battery-notice-dismiss", "닫기"],
-    ] as const) {
-      const button = screen.getByTestId(id);
-      expect(button.props.accessibilityRole).toBe("button");
-      expect(button.props.accessibilityLabel).toBe(label);
-    }
+  it("HP1 — 안 쓴 날에 띠가 쓰기 바 옆(스크롤 밖)에 한 줄로 있고, 버튼을 누르면 onAction", async () => {
+    const c = constraint();
+    await renderHome({ items: [readable("2026-09-20")], constraint: c });
+    const band = screen.getByTestId("constraint-band");
+    expect(insideScrollView(band as never)).toBe(false);
+    expect(screen.getByText(c.text).props.numberOfLines).toBe(1);
+    await fireEvent.press(screen.getByTestId("constraint-band-action"));
+    expect(c.onAction).toHaveBeenCalledTimes(1);
   });
 
-  it("batteryNotice가 없으면 그리지 않는다", async () => {
+  it("HP1 — constraint가 없으면 띠가 없다", async () => {
     await renderHome({ items: [readable("2026-09-20")] });
-    expect(screen.queryByTestId("home-battery-notice")).toBeNull();
+    expect(screen.queryByTestId("constraint-band")).toBeNull();
   });
 
-  it("쓰는 중에는 그리지 않는다", async () => {
+  it("HP4·SC-001 — 스트립 아래에는 안내 줄이 없다(옛 거부 줄·배터리 줄이 사라졌다)", async () => {
+    await renderHome({ items: [readable("2026-09-20")], constraint: constraint() });
+    expect(screen.queryByTestId("denied-notices")).toBeNull();
+    expect(screen.queryByTestId("home-battery-notice")).toBeNull();
+    // 띠는 헤더·스트립을 담은 스크롤 안이 아니라 밖에 있어 그 위치에 영향이 없다
+    expect(insideScrollView(screen.getByTestId("day-strip") as never)).toBe(true);
+    expect(insideScrollView(screen.getByTestId("constraint-band") as never)).toBe(false);
+  });
+
+  it("HP1 — 쓰는 중에는 그리지 않는다", async () => {
     const items = [readable("2026-09-20")];
     const write = writePromptFor(items, MORNING, null);
     await renderHome({
       items,
       write,
-      batteryNotice: notice(),
+      constraint: constraint(),
       writing: { line: "쓰는 중…", name: "금동이" },
     });
-    expect(screen.queryByTestId("home-battery-notice")).toBeNull();
+    expect(screen.queryByTestId("constraint-band")).toBeNull();
+  });
+
+  it("HP3 — 토스트가 있는 동안 띠는 가려지고(높이는 유지), 없으면 보인다", async () => {
+    const view = { items: [readable("2026-09-20")], constraint: constraint() };
+    await renderHome({ ...view, toast: { id: 1, text: "일기를 쓰지 못했어요." } });
+    const hidden = screen.getByTestId("constraint-band", { includeHiddenElements: true });
+    expect(hidden.props.style).toEqual(expect.objectContaining({ opacity: 0 }));
+    expect(hidden.props.pointerEvents).toBe("none");
+  });
+
+  it("HP3 — 토스트가 없으면 보인다", async () => {
+    await renderHome({ items: [readable("2026-09-20")], constraint: constraint() });
+    expect(screen.getByTestId("constraint-band").props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
   });
 });

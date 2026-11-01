@@ -114,19 +114,71 @@ describe("052 RS — 접힘 배선", () => {
     expect(folded()).toBe(true);
   });
 
-  it("RS4 — 안내 캡션(거부 권한·캐릭터 옮김)이 접힘 판 안에 있어 함께 접힌다(FR-017)", async () => {
+  it("RS4 — 제약 띠는 스크롤하는 지면 밖에 있어 스트립과 함께 접히지 않는다(108)", async () => {
     await render(
       <DiaryListScreen
-        {...props(DAY, { deniedNotices: ["사진 권한이 없어요."], movedNotice: "옮겼어요." })}
+        {...props(DAY, {
+          constraint: {
+            text: "사진 권한이 없어 사진 없이 써요",
+            action: "권한 허용",
+            onAction: jest.fn(),
+          },
+        })}
       />,
     );
-    expect(screen.getByTestId("denied-notices")).toBeTruthy();
-    expect(screen.getByText("옮겼어요.")).toBeTruthy();
+    await reachPaperEnd();
+    expect(screen.getByTestId("constraint-band")).toBeTruthy();
 
     await scrollPaper(20);
 
+    expect(screen.getByTestId("constraint-band", { includeHiddenElements: true })).toBeTruthy();
     expect(screen.queryByTestId("denied-notices")).toBeNull();
-    expect(screen.queryByText("옮겼어요.")).toBeNull();
+  });
+
+  it("RS4b — 쓴 날은 바와 한 짝이다: 끝에 닿기 전에는 띠가 가려지고 닿으면 보인다(FR-008)", async () => {
+    await render(
+      <DiaryListScreen
+        {...props(DAY, {
+          constraint: {
+            text: "사진 권한이 없어 사진 없이 써요",
+            action: "권한 허용",
+            onAction: jest.fn(),
+          },
+        })}
+      />,
+    );
+    await scrollPaper(20);
+    const before = screen.getByTestId("constraint-band", { includeHiddenElements: true });
+    expect(before.props.style).toEqual(expect.objectContaining({ opacity: 0 }));
+    await scrollPaper(1200);
+    expect(screen.getByTestId("constraint-band").props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
+  });
+
+  it("RS4c — 끝에서 읽는 중에 띠가 새로 생겨 내용이 띠 높이만큼 늘어도 바와 띠는 내려가지 않는다(108)", async () => {
+    const { rerender } = await render(<DiaryListScreen {...props(DAY)} />);
+    await scrollPaper(1200); // 보이는 800 + 1200 = 내용 2000 → 끝
+    expect(screen.queryByTestId("constraint-band")).toBeNull();
+
+    await rerender(
+      <DiaryListScreen
+        {...props(DAY, {
+          constraint: {
+            text: "사진 권한이 없어 사진 없이 써요",
+            action: "권한 허용",
+            onAction: jest.fn(),
+          },
+        })}
+      />,
+    );
+    // 띠 높이(기본 61)만큼 늘어난 내용 크기가 온다
+    const paper = screen.getByTestId("written-paper");
+    await fireEvent(paper, "contentSizeChange", 400, 2061);
+
+    expect(screen.getByTestId("constraint-band").props.style).toEqual(
+      expect.objectContaining({ opacity: 1 }),
+    );
   });
 
   it("RS5 — 접힌 채 다른 쓴 날로 바뀌면 펼친 상태, 같은 날 리렌더면 접힌 채다(FR-015)", async () => {

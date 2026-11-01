@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { DayPreview } from "../../src/app/state";
+import { ledgerPort } from "../schedule/attempt-ledger-fixture";
 import {
   useAutoWriteHandoff,
   type AutoWriteHandoffDeps,
@@ -95,7 +96,7 @@ const handed = () => screen.getByTestId("day").props.children as string;
 
 function setup(over: Partial<Props> = {}) {
   const written: string[] = [];
-  const attemptPort = memoryPort();
+  const attemptPort = ledgerPort();
   const props: Props = {
     settings: ON,
     previewDay: onlyYesterday,
@@ -114,9 +115,8 @@ async function decided(port: { write: jest.Mock }, n: number) {
   await act(async () => {});
 }
 
-const lastOutcome = (port: { write: jest.Mock }) => {
-  const calls = port.write.mock.calls;
-  const items = (JSON.parse(calls[calls.length - 1]![0] as string) as { items: unknown[] }).items;
+const lastOutcome = (port: { content: string | null }) => {
+  const items = (JSON.parse(port.content ?? "") as { items: unknown[] }).items;
   return (items[0] as { outcome: string; path: string; at: string; day?: string }) ?? null;
 };
 

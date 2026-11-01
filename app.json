@@ -10,7 +10,7 @@
       "supportsTablet": false,
       "appleTeamId": "PGNGG84B39",
       "bundleIdentifier": "com.a810labs.pocketlog",
-      "buildNumber": "14",
+      "buildNumber": "15",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       },
@@ -25,7 +25,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "versionCode": 14,
+      "versionCode": 15,
       "predictiveBackGestureEnabled": false,
       "package": "com.a810labs.pocketlog",
       "permissions": [

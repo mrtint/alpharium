@@ -60,8 +60,9 @@ import {
 } from "../app/state";
 import type { ContinuedSession, ContinuedWrite } from "../app/continued-write";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
-import { TOAST_TEXT, type PipelineFailure, type ToastKind } from "../app/failure-toast";
+import { TOAST_TEXT, type PipelineFailure } from "../app/failure-toast";
 import { paperFor, type LoadedEntry } from "../app/written-day";
+import type { ConstraintKind } from "../app/constraint-band";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { LiveWrite, LiveWrites } from "../diary/live-write";
@@ -111,8 +112,15 @@ export type DiaryHomeScreenProps = {
    * 옮겨졌으면 옮겨진 쪽(`params.character`). 실패 경로에서는 부르지 않는다(원칙 I).
    */
   onGenerated?: (character: Character) => void;
-  /** 거부된 권한으로 제한되는 기능의 정직한 안내 (021 FR-014). 부모가 계산해 넘긴다 */
-  deniedNotices?: readonly string[];
+  /**
+   * 108 — 지금 쓰기 바 위에 보일 제약 띠의 종류(`constraintBandFor`). 없으면 띠가 없다. 판정은 조립부가 한다 — 홈은 사진 권한·배터리
+   * 상태를 모른다. `photos`의 버튼은 이 화면의 사진 권한 요청(053)을, `battery`의 버튼은 `onOpenBatteryConstraint`를 부른다.
+   */
+  constraintKind?: ConstraintKind | null;
+  /** 108 — 배터리 띠의 버튼: 배터리 예외 설정 목록을 연다. 던지지 않는다 */
+  onOpenBatteryConstraint?: () => void;
+  /** 108 — 사진 권한 요청(053)이 끝났다. 조립부가 권한을 다시 읽어 제약 띠를 갱신한다 */
+  onPhotoAccessAsked?: () => void;
   /** 생성을 끊는 통로(005 FR-014b). 앱이 앞을 벗어날 때 쓴다 */
   stop?: () => Promise<void>;
   /** "지금". 밖에서 받아야 경계값을 테스트할 수 있다(002 FR-018a) */
@@ -190,15 +198,6 @@ export type DiaryHomeScreenProps = {
    * 시작하지 않는다(FR-018).
    */
   autoWriteDay?: DayDate | null;
-  /**
-   * 104 — 앱 열기 자동 쓰기(057·085 알림 누름)가 **저장됐을 때만** 부른다. 사람이 누른 「쓰기」·진단 실행·실패·그만두기·이미 쓰는 중에는 부르지
-   * 않는다. 홈은 이 신호로 무엇을 하는지(배터리 안내) 모른다 — 조립부가 정한다.
-   */
-  onAutoWriteSaved?: (day: DayDate) => void;
-  /**
-   * 104 — 홈 배터리 안내. 있으면 쓰는 중이 아닐 때 스트립 아래에 한 줄을 그린다. 보일지·닫기는 조립부(`useBatteryNotice`)가 정한다.
-   */
-  batteryNotice?: { onOpenSettings: () => void; onDismiss: () => void };
   /**
    * 057 — 실제로 시작하는 순간에만 부른다. 거짓이면 이번 실행에서 이미 시작했거나 첫 실행 자동 첫 일기가 돌았다
    * (FR-017·FR-020). 시작하지 않은 판정은 부르지 않는다 — 「한 번」을 소모하지 않는다.
@@ -320,7 +319,9 @@ export function DiaryHomeScreen({
   store,
   resolve,
   onGenerated,
-  deniedNotices,
+  constraintKind,
+  onOpenBatteryConstraint,
+  onPhotoAccessAsked,
   stop,
   now = () => new Date(),
   onRedownload,
@@ -335,8 +336,6 @@ export function DiaryHomeScreen({
   previewDay,
   photoAccessPort,
   autoWriteDay,
-  onAutoWriteSaved,
-  batteryNotice,
   claimAutoWrite,
   onJoinedWriteFailed,
   liveWrites,
@@ -361,7 +360,7 @@ export function DiaryHomeScreen({
    * 없다(SC-005). 화면 로컬이며 파일에 남기지 않는다(FR-012). `id`는 실패마다 올라 같은 갈래가 연달아 나도 새로
    * 뜬다. 새 쓰기·날 바꿈에서 즉시 비운다(FR-018).
    */
-  const [toast, setToast] = useState<{ id: number; kind: ToastKind } | null>(null);
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   /**
    * 하단 바의 잠깐 잠금 — 쓰기를 시작한 직후의 「그만두기」, 그만둔 직후의 「일기 쓰기」가 `WRITING.barLockMs` 동안
    * 눌리지 않는다(연달아 눌러 쓰기·멈춤이 되풀이되지 않게). 화면 버튼만 막는다 — 자동 쓰기·진단 쓰기 요청·지우기는
@@ -392,7 +391,7 @@ export function DiaryHomeScreen({
    */
   useEffect(() => {
     if (!simulatedFailToast || covered) return;
-    void Promise.resolve().then(() => setToast({ id: ++toastId.current, kind: "plain" }));
+    void Promise.resolve().then(() => setToast({ id: ++toastId.current, text: TOAST_TEXT.plain }));
   }, [simulatedFailToast, covered]);
 
   /**
@@ -464,9 +463,6 @@ export function DiaryHomeScreen({
 
   /** 쓰는 중 안내 줄에 쓰는 이름 — 생성이 정한 캐릭터의 지금 이름 (054, 035 `nameOf`) */
   const [writingName, setWritingName] = useState<string | undefined>(undefined);
-
-  /** 방금 생성에서 캐릭터가 옮겨졌으면 그 안내 문구 (029 FR-014). */
-  const [movedNotice, setMovedNotice] = useState<string | undefined>(undefined);
 
   /**
    * 「날짜로 이동」 달력이 열려 있는가 (050, 보드 `2j`). 화면 로컬 — 파일에 남기지 않는다(FR-020).
@@ -725,7 +721,8 @@ export function DiaryHomeScreen({
       // 요청이 실패해도 다시 센다 — 상태는 미리보기가 정직하게 말한다.
     }
     setPreviewTick((t) => t + 1);
-  }, [photoAccessPort]);
+    onPhotoAccessAsked?.();
+  }, [photoAccessPort, onPhotoAccessAsked]);
 
   /**
    * 고른 날의 일기 (051 US1, FR-016).
@@ -839,7 +836,19 @@ export function DiaryHomeScreen({
         settle = resolve;
       });
 
-      setToast(null);
+      // 029 — 캐릭터가 옮겨졌으면 쓰기를 시작하며 토스트로 알린다(FR-014, 108 — 스트립 아래 줄글을 걷었다). persona 이름으로 문장을 만든다.
+      // 이름이 없으면(로스터 밖) 옛 템플릿 문자열처럼 그대로 「undefined」가 된다 — 062는 문구를 바꾸지 않는다.
+      setToast(
+        params.movedFrom !== undefined
+          ? {
+              id: ++toastId.current,
+              text: text().home.movedNotice(
+                String(nameOf(params.movedFrom, characterNames)),
+                String(nameOf(params.character, characterNames)),
+              ),
+            }
+          : null,
+      );
       setWritingItems(items);
       setWritingName(nameOf(params.character, characterNames));
       setScreen({ kind: "writing" });
@@ -916,8 +925,6 @@ export function DiaryHomeScreen({
         // 029 — 생성이 성공했으면 실제로 쓴 캐릭터를 기록한다(FR-008a). 옮겨졌으면
         // 옮겨진 쪽(params.character). 실패면 부르지 않는다(원칙 I).
         if (result.ok) onGenerated?.(params.character);
-        // 104 — 앱 열기 자동 쓰기가 **저장됐다**. 사람이 누른 「쓰기」(auto 아님)·실패·`already-running`에는 알리지 않는다.
-        if (result.ok && options.auto === true) onAutoWriteSaved?.(params.day);
 
         // 051 — 성공이면 결과 화면 없이 홈의 그 날로(목록을 다시 읽으면 그 날의 새 일기도 다시
         // 읽힌다). 054 — 실패도 결과 화면 없이 쓰기 전 상태의 홈이다(저장 실패도 — 글은 버려진다).
@@ -935,7 +942,7 @@ export function DiaryHomeScreen({
           (options.auto === true && !result.ok && result.stage === "already-running") ||
           blockedByWrite;
         if (next.kind === "toast" && !busyElsewhere) {
-          setToast({ id: ++toastId.current, kind: next.toast });
+          setToast({ id: ++toastId.current, text: TOAST_TEXT[next.toast] });
         }
       } finally {
         // 092 FR-007 — 이어 하기를 닫는다(받지 않았으면 세션이 아무 일도 하지 않는다).
@@ -963,7 +970,6 @@ export function DiaryHomeScreen({
       liveWrites,
       continuedWrite,
       onContinuedSaved,
-      onAutoWriteSaved,
       stop,
     ],
   );
@@ -994,17 +1000,6 @@ export function DiaryHomeScreen({
       setScreen(toFailed(text().home.needsAuthor));
       return;
     }
-
-    // 029 — 캐릭터가 옮겨졌으면 화면에 알린다(FR-014). persona 이름으로 문장을 만든다.
-    setMovedNotice(
-      outcome.params.movedFrom !== undefined
-        ? text().home.movedNotice(
-            // 이름이 없으면(로스터 밖) 옛 템플릿 문자열처럼 그대로 「undefined」가 된다 — 062는 문구를 바꾸지 않는다
-            String(nameOf(outcome.params.movedFrom, characterNames)),
-            String(nameOf(outcome.params.character, characterNames)),
-          )
-        : undefined,
-    );
 
     // 053 — 이미 쓴 날의 「다시 쓰기」가 아닐 때, 셀 수 있는 재료가 하나라도 있으면 바로 쓰고 없으면 한 번 더
     // 묻는다(보드 `2e`·`2f`). 다시 쓰기는 050의 덮어쓰기 확인이 이미 있다. 미리보기가 아직 안 왔으면 누른 순간
@@ -1044,17 +1039,7 @@ export function DiaryHomeScreen({
     }
 
     await generate({ ...outcome.params, day: prompt.day }, items);
-  }, [
-    screen,
-    now,
-    chosenDay,
-    resolve,
-    generate,
-    characterNames,
-    previewDay,
-    writeBlocked,
-    onWriteBlocked,
-  ]);
+  }, [screen, now, chosenDay, resolve, generate, previewDay, writeBlocked, onWriteBlocked]);
 
   /**
    * 057 — 앱을 열 때의 자동 쓰기 (FR-014~FR-019, contracts OP2~OP5).
@@ -1345,6 +1330,18 @@ export function DiaryHomeScreen({
     return () => subscription.remove();
   }, [screen.kind, goHome, covered]);
 
+  // 108 — 제약 띠. 종류는 조립부가 정하고(`constraintBandFor`), 문구는 카탈로그, 누름 동작은 종류마다 하나다.
+  function constraintFor(kind: ConstraintKind | null) {
+    if (kind === null) return undefined;
+    const t = text().home.constraintBand[kind];
+    return {
+      text: t.text,
+      action: t.action,
+      onAction: kind === "photos" ? () => void requestPhoto() : () => onOpenBatteryConstraint?.(),
+    };
+  }
+  const constraint = constraintFor(constraintKind ?? null);
+
   const body = renderBody();
   // 055 — 덮인 동안 스크린리더(안드로이드·iOS 각각의 속성)와 누름에서 뺀다(R3). 감싸는 겹은 레이아웃을 바꾸지 않는다.
   return (
@@ -1374,10 +1371,8 @@ export function DiaryHomeScreen({
             <DiaryListScreen
               canSwipeNext={canSwipeNext(prompt.day, now())}
               cells={weekCellsFor(items, prompt, now())}
-              deniedNotices={deniedNotices}
-              batteryNotice={batteryNotice}
+              constraint={constraint}
               items={items}
-              movedNotice={movedNotice}
               // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
               onPressDate={screen.kind === "list" ? () => setCalendarOpen(true) : undefined}
               onOpenSettings={onOpenSettings}
@@ -1391,7 +1386,7 @@ export function DiaryHomeScreen({
               simulation={simulation}
               paper={paper}
               preview={shownPreview}
-              toast={toast === null ? undefined : { id: toast.id, text: TOAST_TEXT[toast.kind] }}
+              toast={toast === null ? undefined : toast}
               write={prompt}
               writing={
                 screen.kind === "writing"

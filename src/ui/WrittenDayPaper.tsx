@@ -53,6 +53,10 @@ export type WrittenDayPaperProps = {
    * 하는 스페이서. 지면(스크롤 뷰)의 프레임은 움직이지 않는다(아래 「프레임을 고정한다」).
    */
   topSpacer?: ReactNode;
+  /**
+   * 지면 맨 아래에 더하는 여백 (108) — 쓰기 바 위의 제약 띠가 마지막 문단을 가리지 않게 띠 높이를 더한다. 띠가 없으면 0이다.
+   */
+  bottomInset?: number;
   onScrollSample?: (sample: {
     y: number;
     previousY: number;
@@ -68,6 +72,7 @@ export function WrittenDayPaper({
   onReachEndChange,
   onScrollSample,
   topSpacer,
+  bottomInset = 0,
 }: WrittenDayPaperProps) {
   // 슬라이드 폭 = 지면 폭 − 좌우 여백. 지면을 잰 값을 쓰고, 재기 전 첫 프레임만 창 폭으로 둔다 —
   // 지면은 화면 끝까지 닿으므로(아래 PAPER) 둘은 같아야 한다. 캐러셀이 늦게 튀어나오지 않게.
@@ -78,6 +83,8 @@ export function WrittenDayPaper({
   // 끝 판정에 쓰는 세 값 — 렌더와 무관하므로 ref에 둔다. 바뀐 결과만 알린다.
   const metrics = useRef({ y: 0, viewport: 0, content: 0 });
   const previousY = useRef(0);
+  // 마지막으로 내용 크기를 받았을 때의 `bottomInset` — 내용이 띠 높이만큼만 달라졌는지 알아보는 데 쓴다
+  const contentInset = useRef(bottomInset);
   const reported = useRef<boolean | undefined>(undefined);
   const report = () => {
     const { y, viewport, content } = metrics.current;
@@ -91,13 +98,20 @@ export function WrittenDayPaper({
 
   return (
     <ScrollView
-      contentContainerStyle={{ flexGrow: 1 }}
+      contentContainerStyle={{ flexGrow: 1, paddingBottom: bottomInset }}
       onContentSizeChange={(_, height) => {
         // 052 — 같은 높이로 다시 온 사건은 무시한다. 스트립이 접히고 펴져 지면 높이가 바뀔 때 안드로이드가
         // 내용 크기 사건을 부동소수 오차(773.9999 ↔ 774.0001)로 되풀이하는데, 그것으로 끝 판정을 다시
         // 돌리면 바가 내려간다(실기기 관측). 1px 미만의 차이는 같은 높이로 본다.
         if (Math.abs(height - metrics.current.content) < 1) return;
+        // 108 — 제약 띠가 생기거나 사라져 `bottomInset`만큼만 내용이 늘거나 줄었으면 끝 판정을 다시 돌리지 않는다. 다시 돌리면 끝에서
+        // 읽던 사람의 바와 띠가 갑자기 내려간다(띠 높이만큼 더 내려야 돌아온다). 스크롤 사건에서는 새 높이로 평소처럼 판정한다.
+        const insetDelta = bottomInset - contentInset.current;
+        contentInset.current = bottomInset;
+        const grewByInset =
+          insetDelta !== 0 && Math.abs(height - metrics.current.content - insetDelta) < 1;
         metrics.current.content = height;
+        if (grewByInset) return;
         report();
       }}
       onLayout={(e) => {

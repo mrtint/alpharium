@@ -19,7 +19,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { dayOf, selectableDays } from "../../src/config/day-boundary";
-import { parseSeedArgs, planFromBursts, planSeeding } from "../../scripts/seed/plan";
+import {
+  aroundDays,
+  parseSeedArgs,
+  planFromBursts,
+  planSeeding,
+  takeAround,
+} from "../../scripts/seed/plan";
 
 const sourceOf = (...parts: string[]) => readFileSync(join(process.cwd(), ...parts), "utf8");
 
@@ -229,5 +235,39 @@ describe("parseSeedArgs — CLI 인자 해석 (023)", () => {
       burstsJson: "[{}]",
       day: "2026-08-20",
     });
+  });
+});
+
+/**
+ * 백그라운드 시험은 미래 날짜의 사진도 필요하다 — `--around N`이 요청 당일 앞뒤 N일을 고를 수 있는 하루로 연다(기본 3일 창은 그대로).
+ */
+describe("--around — 고를 수 있는 하루를 앞뒤 N일로 넓힌다", () => {
+  const now = new Date(2026, 10, 2, 15, 0);
+
+  it("기본은 지난 사흘이라 내일은 거부한다", () => {
+    const planned = planSeeding("rich", "2026-11-03", now);
+    expect(planned.ok).toBe(false);
+  });
+
+  it("넓힌 창 안이면 미래도 심을 수 있고 창 밖은 여전히 거부한다", () => {
+    const window = aroundDays(now, 15);
+    expect(window).toHaveLength(31);
+    expect(planSeeding("rich", "2026-11-17", now, window).ok).toBe(true);
+    expect(planSeeding("rich", "2026-10-18", now, window).ok).toBe(true);
+    const out = planSeeding("rich", "2026-11-18", now, window);
+    expect(out.ok).toBe(false);
+    expect(planFromBursts("[]", "2026-12-25", now, window).ok).toBe(false);
+  });
+
+  it("seed-day는 --around를 떼어 낸 뒤 인자를 해석한다", () => {
+    expect(takeAround(["--around", "15", "rich", "2026-11-03"])).toEqual({
+      around: 15,
+      rest: ["rich", "2026-11-03"],
+    });
+    expect(takeAround(["rich", "2026-11-03"])).toEqual({
+      around: undefined,
+      rest: ["rich", "2026-11-03"],
+    });
+    expect(() => takeAround(["--around", "x", "rich", "2026-11-03"])).toThrow(/around/);
   });
 });

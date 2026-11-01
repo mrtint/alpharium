@@ -209,7 +209,7 @@ appId: com.a810labs.pocketlog
       id: "developer-off"
 - assertVisible:
     id: "developer-off"
-# 078 — 「끄기」 아래의 「최근 자동 쓰기 시도」 묶음. 배포 빌드에서 자동 쓰기 기록을 보는 유일한 자리다.
+# 078 → 109 — 「끄기」 아래의 「날짜별 백그라운드」 묶음. 배포 빌드에서 자동 쓰기 기록을 보는 유일한 자리다.
 - scrollUntilVisible:
     element:
       id: "developer-group-attempts"
