@@ -8,7 +8,12 @@
  * 하나뿐이며 그것은 Maestro가 본다.
  */
 
-import { loadSelection, saveSelection, type SelectionPort } from "../../src/app/selection-store";
+import {
+  characterToWrite,
+  loadSelection,
+  saveSelection,
+  type SelectionPort,
+} from "../../src/app/selection-store";
 import { FUTURE_CHARACTER } from "../future-character";
 import { CHARACTERS } from "../../src/diary/types";
 
@@ -120,5 +125,33 @@ describe("037 C3 — 로스터 밖 캐릭터가 저장돼 있을 때", () => {
     // 007 `resolveSelection`이 null을 "고른 적 없음"으로 다룬다 — 그 갈래는
     // selection.test.ts가 검사한다. 여기서는 **값이 새지 않는 것**만 본다.
     expect(loaded).not.toBe("chinese");
+  });
+});
+
+/**
+ * 로스터에 캐릭터가 하나뿐이면 「고른 것」이 따로 없다 — 모델을 받는 순간 이미 하나로 정해진 것이나 다름없다. 그런데 백그라운드는
+ * `selected-character.json`이 없으면 `no-character`로 건너뛰었고, 이 파일은 홈이 일기를 저장했을 때만 쓰여서(029 FR-008a) 첫 실행의
+ * 자동 첫 일기(040)만 거친 앱은 영영 쓰지 못했다(2026-11-01 갤럭시 Play 릴리스 14에서 백그라운드 시도 10건이 모두 그랬다).
+ */
+describe("characterToWrite", () => {
+  it("W1. 고른 것이 있으면 그것이다", () => {
+    expect(characterToWrite("quiet", ["quiet"])).toBe("quiet");
+    expect(characterToWrite("quiet", ["quiet", FUTURE_CHARACTER])).toBe("quiet");
+  });
+
+  it("W2. 고른 것이 없어도 로스터가 하나뿐이면 그 하나다", () => {
+    expect(characterToWrite(null, ["quiet"])).toBe("quiet");
+  });
+
+  it("W3. 고른 것이 없고 로스터가 둘 이상이면 모른다 — 지어내지 않는다(원칙 V)", () => {
+    expect(characterToWrite(null, ["quiet", FUTURE_CHARACTER])).toBeNull();
+  });
+
+  it("W4. 로스터가 비면 모른다", () => {
+    expect(characterToWrite(null, [])).toBeNull();
+  });
+
+  it("W5. 쓰는 로스터의 기본값은 지금의 CHARACTERS다", () => {
+    expect(characterToWrite(null)).toBe(CHARACTERS.length === 1 ? CHARACTERS[0] : null);
   });
 });
