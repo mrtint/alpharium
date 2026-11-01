@@ -9,6 +9,7 @@ import { memoryStore } from "../../src/diary/store";
 import type { DiaryEntry } from "../../src/diary/types";
 import { serializeFastCycle } from "../../src/schedule/fast-cycle-store";
 import { emptyDay } from "../../src/signals/fake";
+import { ledgerPort } from "./attempt-ledger-fixture";
 
 /** 2026-10-26 10:05 — 30분 주기 순번 20(10:00~10:30), 창 [10:00, 10:15) 안 */
 export const IN_WINDOW = new Date(2026, 9, 26, 10, 5, 0, 0);
@@ -50,7 +51,7 @@ export function make(
   };
   const run = jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false });
   let reconciles = 0;
-  const attempts = { content: null as string | null };
+  const attempts = ledgerPort();
   const deps = {
     manual: over.manual,
     now: over.now ?? IN_WINDOW,
@@ -73,12 +74,7 @@ export function make(
     reconcileReminders: async () => {
       reconciles += 1;
     },
-    attemptPort: {
-      read: async () => attempts.content,
-      write: async (s: string) => {
-        attempts.content = s;
-      },
-    },
+    attemptPort: attempts,
     failurePort: { read: async () => null, write: async () => {} },
     settingsPort: {
       read: async () =>

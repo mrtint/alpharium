@@ -119,7 +119,7 @@ export async function deleteInApp(
     };
   }
 
-  // **멈춘 채 띄운다** — 그냥 띄우면 lldb가 붙기 전에 앱이 돌아 시도 기록(`auto-write-attempts.json`) 같은 파일을 다시 만든다(097 실기기 실측)
+  // **멈춘 채 띄운다** — 그냥 띄우면 lldb가 붙기 전에 앱이 돌아 시도 기록 장부(`attempt-ledger/`) 같은 파일을 다시 만든다(097 실기기 실측)
   const launched = ctl([
     "device",
     "process",

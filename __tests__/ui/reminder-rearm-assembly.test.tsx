@@ -30,6 +30,7 @@ import type { AutoDiarySettings } from "../../src/schedule/settings";
 import { partiallyUnknownDay } from "../../src/signals/fake";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 import { renderWithPortal } from "./render-with-portal";
+import { ledgerPort } from "../schedule/attempt-ledger-fixture";
 
 jest.setTimeout(30000);
 
@@ -105,7 +106,7 @@ type World = {
   pipeline: Pipeline;
   generate: jest.Mock;
   beginWrite: jest.SpyInstance;
-  attemptPort: ReturnType<typeof memoryPort>;
+  attemptPort: ReturnType<typeof ledgerPort>;
   skipPort: ReturnType<typeof memoryPort>;
   /** 040 — 첫 실행의 자동 첫 일기를 시도한 실행인가 */
   firstRunTried: { current: boolean };
@@ -148,7 +149,7 @@ function world(): World {
     pipeline,
     generate,
     beginWrite,
-    attemptPort: memoryPort(),
+    attemptPort: ledgerPort(),
     skipPort: memoryPort(),
     firstRunTried: { current: false },
     material,

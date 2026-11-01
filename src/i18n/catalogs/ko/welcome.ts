@@ -28,7 +28,7 @@ export const welcome = {
   goHome: "그냥 시작하기",
 
   /** 로고 화면 아래 한 줄 (043) */
-  logoCaption: "하루를 정리하는 AI",
+  logoCaption: "AI가 쓰는 일기",
 
   /** 환경을 판정하지 못한 빌드 (001 — 사람에게 알리는 화면) */
   buildErrorTitle: "이 빌드는 잘못 만들어졌다",

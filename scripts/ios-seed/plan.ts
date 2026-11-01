@@ -76,8 +76,46 @@ export function buildPlan(input: PlanInput): { plan: SeedPlan; uploads: Upload[]
   return { plan: { statusPath: statusPathOf(input.runId), assets }, uploads };
 }
 
+/** 기준일 앞뒤 `range`일(기준일 포함 2×range+1일)을 오래된 날부터 `YYYY-MM-DD`로 준다 — 기기 로컬 날짜 */
+export function daysAround(now: Date, range: number): string[] {
+  if (!Number.isInteger(range) || range < 0)
+    throw new Error(`range는 0 이상의 정수여야 한다: ${range}`);
+  const days: string[] = [];
+  for (let offset = -range; offset <= range; offset++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12);
+    days.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+  }
+  return days;
+}
+
+export type RangePlanInput = Omit<PlanInput, "day"> & { days: readonly string[] };
+
+/**
+ * 여러 날을 한 계획에 담는다 — lldb attach가 한 번이면 된다(날마다 앱을 새로 띄우면 기기당 한 시간이 넘는다).
+ * 원본 사진은 날을 넘어 이어서 돌려 써 날마다 다른 사진이 나오고, 올리는 이름은 전체에서 겹치지 않는다.
+ */
+export function buildRangePlan(input: RangePlanInput): { plan: SeedPlan; uploads: Upload[] } {
+  if (input.days.length === 0) throw new Error("days가 비었다 — 심을 날이 없다");
+  const assets: PlanAsset[] = [];
+  const uploads: Upload[] = [];
+  let used = 0;
+  for (const day of input.days) {
+    const one = buildPlan({ ...input, day, photos: input.photos });
+    one.plan.assets.forEach((asset) => {
+      used += 1;
+      const to = `${runDir(input.runId)}/photos/${pad(used)}.jpg`;
+      assets.push({ ...asset, path: to });
+      uploads.push({ from: input.photos[(used - 1) % input.photos.length], to });
+    });
+  }
+  return { plan: { statusPath: statusPathOf(input.runId), assets }, uploads };
+}
+
 export type Args = {
-  day: string;
+  /** `--range`와 함께 줄 수 없다 */
+  day: string | undefined;
+  /** 기준일 앞뒤 N일 — 요청 당일 기준(오늘 포함 2N+1일) */
+  range: number | undefined;
   count: number;
   photos: string | undefined;
   device: string | undefined;
@@ -85,21 +123,40 @@ export type Args = {
 };
 
 export function parseArgs(argv: readonly string[]): Args {
-  const out: { day?: string; count?: number; photos?: string; device?: string; gps: boolean } = {
+  const out: {
+    day?: string;
+    range?: number;
+    count?: number;
+    photos?: string;
+    device?: string;
+    gps: boolean;
+  } = {
     gps: true,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--no-gps") out.gps = false;
     else if (a === "--day") out.day = argv[++i];
+    else if (a === "--range") out.range = Number(argv[++i]);
     else if (a === "--count") out.count = Number(argv[++i]);
     else if (a === "--photos") out.photos = argv[++i];
     else if (a === "--device") out.device = argv[++i];
     else throw new Error(`모르는 옵션: ${a}`);
   }
-  if (!out.day) throw new Error("--day YYYY-MM-DD가 필요하다");
+  if (out.range !== undefined) {
+    if (out.day) throw new Error("--range와 --day는 함께 쓰지 않는다");
+    if (!Number.isInteger(out.range) || out.range < 0)
+      throw new Error("--range N은 0 이상의 정수여야 한다");
+  } else if (!out.day) throw new Error("--day YYYY-MM-DD가 필요하다");
   if (out.count === undefined || Number.isNaN(out.count)) throw new Error("--count N이 필요하다");
-  return { day: out.day, count: out.count, photos: out.photos, device: out.device, gps: out.gps };
+  return {
+    day: out.day,
+    range: out.range,
+    count: out.count,
+    photos: out.photos,
+    device: out.device,
+    gps: out.gps,
+  };
 }
 
 export type LldbInput = {

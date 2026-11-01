@@ -4,6 +4,7 @@
  */
 
 import { download } from "../../src/i18n/catalogs/ko/download";
+import { welcome } from "../../src/i18n/catalogs/ko/welcome";
 
 describe("098 CP1 — 슬라이드 3", () => {
   const slide = download.slides[2]!;
@@ -30,5 +31,22 @@ describe("098 CP1 — 슬라이드 3", () => {
     for (const s of download.slides) {
       expect(`${s.title} ${s.body}`).not.toMatch(/\d|%|[MG]B|분|초|시간/);
     }
+  });
+});
+
+describe("108 — 앱 소개(D2-b)·슬라이드 4(D6)", () => {
+  it("스플래시 캡션과 슬라이드 1 제목은 같은 문자열이다 — 앱을 소개하는 두 자리가 따로 놀지 않는다", () => {
+    expect(welcome.logoCaption).toBe(download.slides[0]!.title);
+  });
+
+  it("슬라이드 1·4는 소유자가 정한 문구다", () => {
+    expect(download.slides[0]).toEqual({
+      title: "AI가 쓰는 일기",
+      body: "주인님의 하루를 글로 남겨요. 실수할 때도 있지만요",
+    });
+    expect(download.slides[3]).toEqual({
+      title: "사진과 일기는 서버로 보내지 않아요",
+      body: "일기를 쓰는 AI는 이 휴대폰 안에서 돌아요.",
+    });
   });
 });

@@ -6,10 +6,10 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
-  attemptLines,
   canRequestPhoto,
   environmentLines,
   failureLines,
+  ledgerLines,
   photoPermissionLines,
   probeCells,
   storageValue,
@@ -284,45 +284,61 @@ describe("소스 계약 — DV7·DV8", () => {
   });
 });
 
-describe("DV10 — 090 깨운 상태 꼬리", () => {
-  it("시작 줄에 앱 상태가 있으면 결과 뒤에 「· 앞에서」/「· 뒤에서」, 없으면 그대로", () => {
-    const at = new Date(2026, 9, 18, 3, 0);
-    expect(
-      attemptLines([
-        { path: "background", outcome: "ran", at, launch: "background" },
-        { path: "manual", outcome: "started", at, launch: "active" },
-        { path: "background", outcome: "expired", at },
-      ]).map((l) => l.outcomeText),
-    ).toEqual(["썼음 · 뒤에서", "시작한 뒤 끝나지 않음 · 앞에서", "시간 예산이 끝남"]);
-  });
-});
+describe("DV9 — 109 날짜별 백그라운드 줄", () => {
+  const at = (day: number, h: number, m: number) => new Date(2026, 9, day, h, m);
 
-describe("DV11 — 091 깬 요청 꼬리", () => {
-  it("깬 상태 꼬리 뒤에 「· 충전」/「· 배터리」", () => {
-    const at = new Date(2026, 9, 18, 3, 0);
-    expect(
-      attemptLines([
-        { path: "background", outcome: "ran", at, launch: "background", wake: "battery" },
-        { path: "background", outcome: "ran", at, launch: "background", wake: "power" },
-        { path: "background", outcome: "started", at, wake: "battery" },
-      ]).map((l) => l.outcomeText),
-    ).toEqual(["썼음 · 뒤에서 · 배터리", "썼음 · 뒤에서 · 충전", "시작한 뒤 끝나지 않음 · 배터리"]);
-  });
-});
-
-describe("DV9 — 078 자동 쓰기 시도 줄", () => {
-  it("경로 · 시각이 머리, 결과가 값", () => {
-    const lines = attemptLines([
-      { path: "background", outcome: "started", at: new Date(2026, 9, 13, 22, 5) },
-      { path: "app-open", outcome: "write", at: new Date(2026, 9, 14, 8, 0) },
-      { path: "manual", outcome: "ran", at: new Date(2026, 9, 14, 9, 30) },
+  it("머리는 날짜, 값은 「깨움 N번 · 첫~마지막 · 결과별 · 끝나지 않음」 — 최근 날 순서 그대로", () => {
+    const lines = ledgerLines([
+      {
+        day: "2026-10-13",
+        wakes: 4,
+        firstAt: at(13, 2, 22),
+        lastAt: at(13, 9, 0),
+        unfinished: 1,
+        byOutcome: { "no-material": 2, ran: 1 },
+      },
+      { day: "2026-10-12", wakes: 0, unfinished: 0, byOutcome: {} },
     ]);
     expect(lines).toEqual([
-      { headText: "백그라운드 · 10월 13일 22:05", outcomeText: "시작한 뒤 끝나지 않음" },
-      { headText: "앱 열기 · 10월 14일 08:00", outcomeText: "홈에 넘김" },
-      { headText: "지금 실행 · 10월 14일 09:30", outcomeText: "썼음" },
+      {
+        headText: "10월 13일",
+        outcomeText: "깨움 4번 · 02:22~09:00 · 재료 없음 2 · 썼음 1 · 시작한 뒤 끝나지 않음 1",
+      },
+      { headText: "10월 12일", outcomeText: "깨움 0번" },
     ]);
     for (const line of lines) expect(Object.keys(line).sort()).toEqual(["headText", "outcomeText"]);
+  });
+
+  it("깨움이 한 번이면 시각 하나만 (첫=마지막)", () => {
+    expect(
+      ledgerLines([
+        {
+          day: "2026-10-13",
+          wakes: 1,
+          firstAt: at(13, 22, 5),
+          lastAt: at(13, 22, 5),
+          unfinished: 0,
+          byOutcome: { ran: 1 },
+        },
+      ])[0]?.outcomeText,
+    ).toBe("깨움 1번 · 22:05 · 썼음 1");
+  });
+
+  it("결과는 ATTEMPT_OUTCOMES 순서로 놓인다", () => {
+    expect(
+      ledgerLines([
+        {
+          day: "2026-10-13",
+          wakes: 3,
+          firstAt: at(13, 1, 0),
+          lastAt: at(13, 2, 0),
+          unfinished: 0,
+          byOutcome: { ran: 1, "catch-up-spent": 1, "not-near-target": 1 },
+        },
+      ])[0]?.outcomeText,
+    ).toBe(
+      "깨움 3번 · 01:00~02:00 · 쓰는 시각이 아님 1 · 오늘 창 밖에서 이미 한 번 시도함 1 · 썼음 1",
+    );
   });
 
   it("열다섯 갈래 문구가 모두 있고 서로 다르다 (080: 사용자가 그만둠, 090: 시간 예산이 끝남)", () => {
@@ -343,40 +359,44 @@ describe("DV9 — 078 자동 쓰기 시도 줄", () => {
       "failed",
       "expired",
     ] as const;
-    const texts = outcomes.map(
-      (outcome) =>
-        attemptLines([{ path: "background", outcome, at: new Date(2026, 0, 1) }])[0]?.outcomeText,
-    );
-    expect(texts).toEqual([
-      "시작한 뒤 끝나지 않음",
-      "상태 흉내가 막음",
-      "자동 쓰기 꺼짐",
-      "쓰는 시각이 아님",
-      "오늘 창 밖에서 이미 한 번 시도함",
-      "모두 써 있음",
-      "사진 권한 없음",
-      "재료 없음",
-      "캐릭터 없음",
-      "홈에 넘김",
-      "다른 쓰기가 진행 중",
-      "사용자가 그만둠",
-      "썼음",
-      "실패",
-      "시간 예산이 끝남",
+    const texts = outcomes
+      .filter((outcome) => outcome !== "started" && outcome !== "expired")
+      .map(
+        (outcome) =>
+          ledgerLines([
+            {
+              day: "2026-10-13",
+              wakes: 1,
+              firstAt: at(13, 1, 0),
+              lastAt: at(13, 1, 0),
+              unfinished: 0,
+              byOutcome: { [outcome]: 1 },
+            },
+          ])[0]?.outcomeText,
+      );
+    expect(texts.map((t) => t?.split(" · ")[2])).toEqual([
+      "상태 흉내가 막음 1",
+      "자동 쓰기 꺼짐 1",
+      "쓰는 시각이 아님 1",
+      "오늘 창 밖에서 이미 한 번 시도함 1",
+      "모두 써 있음 1",
+      "사진 권한 없음 1",
+      "재료 없음 1",
+      "고른 캐릭터 없음 1",
+      "홈에 넘김 1",
+      "다른 쓰기가 진행 중 1",
+      "사용자가 그만둠 1",
+      "썼음 1",
+      "실패 1",
     ]);
-    expect(new Set(texts).size).toBe(outcomes.length);
+    expect(new Set(texts).size).toBe(texts.length);
   });
-});
 
-describe("DV105 — 고른 날 꼬리", () => {
-  it("날이 있으면 결과 뒤 「· M월 d일」, 상태 꼬리는 그 뒤", () => {
-    const at = new Date(2026, 9, 25, 22, 20);
-    expect(
-      attemptLines([
-        { path: "app-open", outcome: "write", at, day: "2026-10-24" },
-        { path: "background", outcome: "ran", at, day: "2026-10-03", launch: "background" },
-        { path: "app-open", outcome: "no-material", at },
-      ]).map((l) => l.outcomeText),
-    ).toEqual(["홈에 넘김 · 10월 24일", "썼음 · 10월 3일 · 뒤에서", "재료 없음"]);
+  it("20건 변환과 옛 꼬리 문구는 없다", () => {
+    const src = readFileSync(join(__dirname, "../../src/app/diagnostics-view.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(src).not.toContain("attemptLines");
+    expect(src).not.toContain("attemptTails");
   });
 });

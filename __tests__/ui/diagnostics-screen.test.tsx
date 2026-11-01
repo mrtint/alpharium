@@ -64,7 +64,7 @@ const GROUP_IDS = [
 ];
 
 describe("DS1 — 일곱 묶음이 보드 순서로 있고 그 뒤에 078 시도 묶음이 있다", () => {
-  it("환경 → 저장 점검 → 사진 권한 → 신호 프로브 · 오늘 → 입력 프롬프트 미리보기 → 생성 → 최근 실패 → 최근 자동 쓰기 시도", async () => {
+  it("환경 → 저장 점검 → 사진 권한 → 신호 프로브 · 오늘 → 입력 프롬프트 미리보기 → 생성 → 최근 실패 → 날짜별 백그라운드", async () => {
     await render(<DiagnosticsScreen {...props()} />);
     const tree = JSON.stringify(screen.toJSON());
     const order = GROUP_IDS.map((id) => tree.indexOf(`"testID":"${id}"`));
@@ -78,7 +78,7 @@ describe("DS1 — 일곱 묶음이 보드 순서로 있고 그 뒤에 078 시도
       "입력 프롬프트 미리보기",
       "생성",
       "최근 실패",
-      "최근 자동 쓰기 시도",
+      "날짜별 백그라운드",
     ]) {
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     }
@@ -395,31 +395,31 @@ describe("DS10 — 측정 어휘가 없다 (FR-021, 원칙 IV)", () => {
   });
 });
 
-/* ═══════════════════ 078 — 최근 자동 쓰기 시도 ═══════════════════ */
+/* ═══════════════════ 078 — 날짜별 백그라운드 ═══════════════════ */
 
-describe("078 — 최근 자동 쓰기 시도 묶음", () => {
-  it("비어 있으면 「아직 시도가 없어요」 한 줄", async () => {
+describe("078 — 날짜별 백그라운드 묶음", () => {
+  it("비어 있으면 「아직 기록이 없어요」 한 줄", async () => {
     await render(<DiagnosticsScreen {...props()} />);
     expect(screen.getByTestId("diagnostics-attempts-empty")).toBeTruthy();
-    expect(screen.getByText("아직 시도가 없어요")).toBeTruthy();
+    expect(screen.getByText("아직 기록이 없어요")).toBeTruthy();
   });
 
-  it("줄마다 머리(경로 · 시각)와 결과를 그 순서로 그린다", async () => {
+  it("줄마다 머리(날짜)와 요약를 그 순서로 그린다", async () => {
     await render(
       <DiagnosticsScreen
         {...props({
           attempts: [
-            { headText: "백그라운드 · 10월 13일 22:05", outcomeText: "시작한 뒤 끝나지 않음" },
-            { headText: "앱 열기 · 10월 14일 08:00", outcomeText: "홈에 넘김" },
+            { headText: "10월 13일", outcomeText: "깨움 1번 · 22:05 · 시작한 뒤 끝나지 않음 1" },
+            { headText: "10월 12일", outcomeText: "깨움 0번" },
           ],
         })}
       />,
     );
     expect(screen.queryByTestId("diagnostics-attempts-empty")).toBeNull();
     const first = screen.getByTestId("diagnostics-attempt-0");
-    expect(within(first).getByText("백그라운드 · 10월 13일 22:05")).toBeTruthy();
-    expect(within(first).getByText("시작한 뒤 끝나지 않음")).toBeTruthy();
-    expect(within(screen.getByTestId("diagnostics-attempt-1")).getByText("홈에 넘김")).toBeTruthy();
+    expect(within(first).getByText("10월 13일")).toBeTruthy();
+    expect(within(first).getByText("깨움 1번 · 22:05 · 시작한 뒤 끝나지 않음 1")).toBeTruthy();
+    expect(within(screen.getByTestId("diagnostics-attempt-1")).getByText("깨움 0번")).toBeTruthy();
   });
 });
 

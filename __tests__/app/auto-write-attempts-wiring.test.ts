@@ -1,5 +1,5 @@
 /**
- * 078 — 시도 기록의 조립부 배선 (소스 계약). App.tsx를 렌더하지 않는다(074 `AppFrame.firstrun.test.tsx`와 같은 방식).
+ * 078 → 109 — 시도 기록(날짜별 장부)의 조립부 배선 (소스 계약). App.tsx를 렌더하지 않는다(074 `AppFrame.firstrun.test.tsx`와 같은 방식).
  */
 
 import { readFileSync } from "node:fs";
@@ -51,8 +51,8 @@ describe("앱 열기 경로", () => {
 describe("진단 화면", () => {
   it("DiagnosticsLayer가 실패 기록과 같은 시점에 읽어 attempts로 넘긴다", () => {
     const layer = functionBody("DiagnosticsLayer");
-    expect(layer).toMatch(/loadAutoWriteAttempts\(attemptPort\)/);
-    expect(layer).toMatch(/setAttempts\(attemptLines\(/);
+    expect(layer).toMatch(/loadAttemptSummaries\(attemptPort, new Date\(\)\)/);
+    expect(layer).toMatch(/setAttempts\(ledgerLines\(/);
     expect(layer).toMatch(/attempts=\{attempts\}/);
   });
 });
@@ -60,8 +60,8 @@ describe("진단 화면", () => {
 describe("개발자 화면 (배포 빌드에서 보는 자리)", () => {
   it("AppFrame이 개발자 겹이 열릴 때 읽어 DeveloperScreen에 attempts로 넘긴다", () => {
     const frame = functionBody("AppFrame");
-    expect(frame).toMatch(/loadAutoWriteAttempts\(attemptPort\)/);
-    expect(frame).toMatch(/setDeveloperAttempts\(attemptLines\(/);
+    expect(frame).toMatch(/loadAttemptSummaries\(attemptPort, new Date\(\)\)/);
+    expect(frame).toMatch(/setDeveloperAttempts\(ledgerLines\(/);
     expect(frame).toMatch(/attempts=\{developerAttempts\}/);
   });
 
@@ -84,11 +84,11 @@ describe("081 — 개발자 화면이 실패 기록을 함께 읽는다", () => 
   it("A1 — 시도 기록과 같은 effect에서 읽는다(개발자 겹이 열릴 때만)", () => {
     const frame = functionBody("AppFrame");
     // 개발자 겹에 묶인 effect는 여럿이다(059 모듈 줄도 같은 조건이다) — 시도 기록을 읽는 것을 고른다
-    const read = frame.indexOf("loadAutoWriteAttempts(attemptPort)");
+    const read = frame.indexOf("loadAttemptSummaries(attemptPort");
     const start = frame.lastIndexOf('if (route !== "developer") return;', read);
     expect(start).toBeGreaterThan(-1);
     const body = frame.slice(start, frame.indexOf("}, [route", start));
-    expect(body).toMatch(/loadAutoWriteAttempts\(attemptPort\)/);
+    expect(body).toMatch(/loadAttemptSummaries\(attemptPort, new Date\(\)\)/);
     expect(body).toMatch(/loadWriteFailures\(failurePort\)/);
   });
 

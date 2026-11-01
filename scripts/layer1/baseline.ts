@@ -44,24 +44,15 @@ export const BASELINE: readonly BaselineEntry[] = [
   {
     file: "dev-fast-cycle.json",
     action: "delete",
-    reason: "빠른 주기 기록(106, 개발 빌드 전용) — 켜진 채 남으면 층 1 흐름 중 오늘 일기가 지워진다",
+    reason:
+      "빠른 주기 기록(106, 개발 빌드 전용) — 켜진 채 남으면 층 1 흐름 중 오늘 일기가 지워진다",
   },
   { file: "auto-write-skipped.json", action: "delete", reason: "사진 권한 건너뜀 기록(057)" },
   { file: "notified.json", action: "delete", reason: "완성 알림 확인 기록(020)" },
   {
-    file: "battery-notice-dismissed.json",
-    action: "delete",
-    reason: "홈 배터리 안내를 닫은 시각 기록(104) — 지난 실행의 「7일 숨김」이 남지 않게",
-  },
-  {
     file: "write-failures.json",
     action: "delete",
     reason: "쓰기 실패 기록(060) — 진단이 비어 시작",
-  },
-  {
-    file: "auto-write-attempts.json",
-    action: "delete",
-    reason: "자동 쓰기 시도 기록(078) — 진단이 비어 시작",
   },
   {
     file: "auto-write-catch-up.json",
