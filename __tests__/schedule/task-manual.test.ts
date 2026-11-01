@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runAutoDiaryTask } from "../../src/schedule/task";
+import { ledgerPort } from "./attempt-ledger-fixture";
 import type { WriteFailurePort } from "../../src/app/write-failures";
 
 /** 목표 시각 7시, 지금은 15시 30분 — 시도 창(7~9시) 밖이다 */
@@ -43,15 +44,7 @@ function make(over: {
 }) {
   const run = over.run ?? jest.fn().mockResolvedValue({ ok: true, entry: {}, overwrote: false });
   const failures = failurePort();
-  const attempts = {
-    content: null as string | null,
-    async read() {
-      return attempts.content;
-    },
-    async write(serialized: string) {
-      attempts.content = serialized;
-    },
-  };
+  const attempts = ledgerPort();
   const deps = {
     manual: over.manual,
     catchUpPort: { read: async () => null, write: async () => {}, remove: async () => {} },

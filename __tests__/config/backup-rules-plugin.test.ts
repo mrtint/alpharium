@@ -1,5 +1,5 @@
 /**
- * 099 BX4 — 안드로이드 백업 규칙. 모델(`models/`)만 빼고 일기·설정·일기의 사진 사본은 OS 기본대로 둔다(D4=A).
+ * 099 BX4 · 109 — 안드로이드 백업 규칙. 모델(`models/`)과 시도 기록 장부(`attempt-ledger/`)만 빼고 일기·설정·일기의 사진 사본은 OS 기본대로 둔다(D4=A).
  * 규칙을 잘못 쓰면 일기까지 빠져 기기를 바꾼 사용자의 일기가 조용히 사라진다 — 그래서 산출물을 글자 단위로 잠근다.
  */
 
@@ -10,7 +10,7 @@ import { join } from "node:path";
 const plugin = require("../../plugins/with-backup-rules") as {
   BACKUP_RULES_NAME: string;
   DATA_EXTRACTION_RULES_NAME: string;
-  EXCLUDED_PATH: string;
+  EXCLUDED_PATHS: string[];
   fullBackupContentXml(): string;
   dataExtractionRulesXml(): string;
   applyBackupAttributes(manifest: ManifestLike): ManifestLike;
@@ -25,19 +25,28 @@ const manifest = (): ManifestLike => ({
 const excludes = (xml: string) => [...xml.matchAll(/<exclude\b[^>]*>/g)].map((m) => m[0]);
 
 describe("BX4 — 안드로이드 백업 규칙 산출물", () => {
-  it("full-backup-content(API 30 이하)는 models/ 하나만 뺀다", () => {
+  it("full-backup-content(API 30 이하)는 models/와 attempt-ledger/ 둘만 뺀다", () => {
     const xml = plugin.fullBackupContentXml();
     expect(xml).toContain("<full-backup-content>");
-    expect(excludes(xml)).toEqual(['<exclude domain="file" path="models/"/>']);
+    expect(excludes(xml)).toEqual([
+      '<exclude domain="file" path="models/"/>',
+      '<exclude domain="file" path="attempt-ledger/"/>',
+    ]);
   });
 
-  it("data-extraction-rules(API 31+)는 클라우드 백업·기기 간 이전 두 섹션 모두에서 models/ 하나만 뺀다", () => {
+  it("data-extraction-rules(API 31+)는 클라우드 백업·기기 간 이전 두 섹션 모두에서 models/와 attempt-ledger/ 둘만 뺀다", () => {
     const xml = plugin.dataExtractionRulesXml();
     const cloud = xml.match(/<cloud-backup[^>]*>([\s\S]*?)<\/cloud-backup>/)?.[1] ?? "";
     const transfer = xml.match(/<device-transfer[^>]*>([\s\S]*?)<\/device-transfer>/)?.[1] ?? "";
-    expect(excludes(cloud)).toEqual(['<exclude domain="file" path="models/"/>']);
-    expect(excludes(transfer)).toEqual(['<exclude domain="file" path="models/"/>']);
-    expect(excludes(xml)).toHaveLength(2);
+    expect(excludes(cloud)).toEqual([
+      '<exclude domain="file" path="models/"/>',
+      '<exclude domain="file" path="attempt-ledger/"/>',
+    ]);
+    expect(excludes(transfer)).toEqual([
+      '<exclude domain="file" path="models/"/>',
+      '<exclude domain="file" path="attempt-ledger/"/>',
+    ]);
+    expect(excludes(xml)).toHaveLength(4);
   });
 
   it("일기·설정·일기의 사진 사본은 제외되지 않는다 — 두 파일 모두 include도 다른 경로도 없다", () => {
@@ -45,7 +54,10 @@ describe("BX4 — 안드로이드 백업 규칙 산출물", () => {
       expect(xml).not.toMatch(/<include\b/);
       for (const kept of ["preferences", "vision-cache", "diary"]) expect(xml).not.toContain(kept);
     }
-    expect(plugin.EXCLUDED_PATH).toBe("models/");
+    expect(plugin.EXCLUDED_PATHS).toEqual(["models/", "attempt-ledger/"]);
+    // 장부 디렉터리 이름은 소스와 같아야 한다 — 다르면 규칙이 헛돈다 (109 FR-012)
+    const src = readFileSync(join(ROOT, "src/app/auto-write-attempts.ts"), "utf8");
+    expect(src).toContain('const LEDGER_DIRECTORY = "attempt-ledger";');
   });
 
   it("매니페스트의 application에 두 속성을 걸고 allowBackup은 건드리지 않는다", () => {

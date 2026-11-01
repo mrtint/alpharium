@@ -22,6 +22,7 @@ import type { AutoDiarySettings } from "../../src/schedule/settings";
 import { runAutoDiaryTask } from "../../src/schedule/task";
 import { loadScheduleTiming } from "../../src/schedule/timing-source";
 import { emptyDay } from "../../src/signals/fake";
+import { ledgerPort } from "./attempt-ledger-fixture";
 
 /**
  * 106 — 빠른 주기의 한 바퀴를 실제 판정·리셋·기록으로 묶은 조립 테스트 (spec US1, SC-009의 코드 쪽).
@@ -98,7 +99,7 @@ describe("US1 — 백그라운드 자리: 리셋 → 쓰기 → 저장 → 같�
       await w.store.save(entry(day));
       return { ok: true, entry: entry(day), overwrote: false };
     });
-    const attempts = { content: null as string | null };
+    const attempts = ledgerPort();
     const deps = {
       resolution: { ok: true, environment: "dev" } as never,
       fastCyclePort: w.fast.port,
@@ -107,12 +108,7 @@ describe("US1 — 백그라운드 자리: 리셋 → 쓰기 → 저장 → 같�
       skipPort: w.skip.port,
       notifiedPort: w.notified.port,
       reconcileReminders: async () => {},
-      attemptPort: {
-        read: async () => attempts.content,
-        write: async (s: string) => {
-          attempts.content = s;
-        },
-      },
+      attemptPort: attempts,
       failurePort: { read: async () => null, write: async () => {} },
       settingsPort: {
         read: async () => JSON.stringify({ enabled: true, targetHour: 7 }),

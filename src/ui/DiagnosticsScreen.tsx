@@ -62,7 +62,7 @@ export type DiagnosticsScreenProps = {
   autoResult: AutoRunResult | null;
   /** 최신이 위 */
   failures: readonly FailureLine[];
-  /** 078 — 최근 자동 쓰기 시도, 최신이 위 */
+  /** 078 → 109 — 날짜별 백그라운드 요약, 최근 날이 위 */
   attempts: readonly AttemptLine[];
   /**
    * 064 — 상태 흉내가 켜져 있다(S8). 참이면 두 쓰기 버튼에 콜백을 넘기지 않고(058 — 누를 수 없는 것은 `onPress`도 없다) 흐리게 그리며 아래에

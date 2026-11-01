@@ -36,6 +36,7 @@ import type { AutoDiarySettings } from "../../src/schedule/settings";
 import { partiallyUnknownDay } from "../../src/signals/fake";
 import { DiaryHomeScreen } from "../../src/ui/DiaryHomeScreen";
 import { renderWithPortal, withPortal } from "./render-with-portal";
+import { ledgerPort } from "../schedule/attempt-ledger-fixture";
 
 jest.setTimeout(30000);
 
@@ -130,7 +131,7 @@ type World = {
   pipeline: Pipeline;
   generate: jest.Mock;
   beginWrite: jest.SpyInstance;
-  attemptPort: ReturnType<typeof memoryPort>;
+  attemptPort: ReturnType<typeof ledgerPort>;
   skipPort: ReturnType<typeof memoryPort>;
   /** 040 — 첫 실행의 자동 첫 일기를 시도한 실행인가 */
   firstRunTried: { current: boolean };
@@ -173,7 +174,7 @@ function world(): World {
     pipeline,
     generate,
     beginWrite,
-    attemptPort: memoryPort(),
+    attemptPort: ledgerPort(),
     skipPort: memoryPort(),
     firstRunTried: { current: false },
     material,
@@ -278,10 +279,7 @@ async function decided(w: World, n: number) {
 }
 
 const lastOutcome = (w: World) => {
-  const calls = w.attemptPort.write.mock.calls;
-  const items = (
-    JSON.parse(calls[calls.length - 1]![0] as string) as { items: { outcome: string }[] }
-  ).items;
+  const items = (JSON.parse(w.attemptPort.content ?? "") as { items: { outcome: string }[] }).items;
   return items[0]!.outcome;
 };
 

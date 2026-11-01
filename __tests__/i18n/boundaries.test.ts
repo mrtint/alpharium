@@ -46,7 +46,8 @@ describe("B2 — 모델 입력·생성 경로는 화면 언어를 모른다 (FR-
  * 개발 빌드 전용 화면이고 원문은 진단 계층(`prompt-preview.ts`)의 내부 값이다 — 번역 대상이 아님을 알고 둔다.
  */
 const READS_REASON: Readonly<Record<string, string>> = {
-  "src/app/auto-write-attempts.ts": "057 판정의 갈래(enum)를 시도 기록의 갈래로 옮긴다 (078)",
+  "src/app/auto-write-attempts.ts":
+    "057 판정의 갈래(enum)를 시도 기록의 갈래로 옮긴다 (078, 109 장부)",
   "src/app/diagnostics-view.ts": "쓰기 실패 기록의 갈래(enum) → 문구",
   "src/app/failure-toast.ts": "파이프라인 이유의 앞 토큰(kind)만 본다",
   "src/app/write-failures.ts": "파이프라인 이유의 앞 토큰을 갈래로 옮긴다",
@@ -125,8 +126,6 @@ describe("B6 — 저장된 데이터에 화면 문구가 없다 (research R13)",
     }
     expect([...names].sort()).toEqual([
       "auto-diary.json",
-      // 078 — 자동 쓰기 시도 기록(시각·경로·결과 갈래, 화면 문구 없음)
-      "auto-write-attempts.json",
       // 078 — 창 밖 따라잡기를 판정한 날(날짜 하나, 화면 문구 없음)
       "auto-write-catch-up.json",
       "auto-write-skipped.json",

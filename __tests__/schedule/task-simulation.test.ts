@@ -7,6 +7,7 @@
 import type { SimulationStorePort } from "../../src/app/simulation-store";
 import type { WriteFailurePort } from "../../src/app/write-failures";
 import { runAutoDiaryTask } from "../../src/schedule/task";
+import { ledgerPort } from "./attempt-ledger-fixture";
 
 /** 목표 시각 7시, 지금 7시 30분 — 시도 창 안. 흉내가 없으면 쓴다 */
 const IN_WINDOW = new Date(2026, 7, 28, 7, 30, 0, 0);
@@ -39,15 +40,7 @@ function make(environment: "dev" | "prod", simulation: SimulationStorePort) {
   const present = jest.fn(async () => "n");
   const failureWrites = jest.fn(async () => {});
   const failurePort: WriteFailurePort = { read: async () => null, write: failureWrites };
-  const attempts = {
-    content: null as string | null,
-    async read() {
-      return attempts.content;
-    },
-    async write(serialized: string) {
-      attempts.content = serialized;
-    },
-  };
+  const attempts = ledgerPort();
   const deps = {
     catchUpPort: { read: async () => null, write: async () => {}, remove: async () => {} },
     // 085 — 쓸 차례 알림 맞추기는 task-reminder.test.ts가 본다. 여기서는 기기 통로에 닿지 않게 비운다.

@@ -9,7 +9,7 @@
 
 - **`wiring.ts`** — 추론 어댑터(`inference/select.ts`), 일기 저장소(`diary/store.ts`), 살아 있는 쓰기 등록부(`diary/live-write.ts`), 신호 수집을 파이프라인과 첫 실행·미리보기 통로로 묶는 유일한 조립 지점이다.
 - **순수 화면 상태와 판정** — `state.ts`(홈 상태 전이), `day-preview.ts`·`material.ts`(쓸 재료 판정), `written-day.ts`·`reading-scroll.ts`(쓴 날 지면·접힘 판정), `calendar.ts`·`target-hour.ts`·`photo-viewer.ts`, `diagnostics-view.ts`(진단 화면 뷰 모델), `simulation.ts`(개발 환경 상태 흉내) 등 기기 없이 검증되는 순수 함수를 둔다.
-- **자동 쓰기·기록·동의 상태** — `use-auto-write-handoff.ts`·`use-auto-write-claim.ts`(앱 열기 자동 쓰기 판정·소모 훅), `auto-write-attempts.ts`(자동 쓰기 시도 기록), `write-failures.ts`(쓰기 실패 11갈래 기록), `wipe-diaries.ts`(일기 모두 지우기 순서 조합), `consent-gate.ts`·`use-consent-gate.ts`(모바일 데이터 동의 분기).
+- **자동 쓰기·기록·동의 상태** — `use-auto-write-handoff.ts`·`use-auto-write-claim.ts`(앱 열기 자동 쓰기 판정·소모 훅), `auto-write-attempts.ts`(자동 쓰기 시도 기록 — 날짜별 장부 `attempt-ledger/`, 109), `write-failures.ts`(쓰기 실패 11갈래 기록), `wipe-diaries.ts`(일기 모두 지우기 순서 조합), `consent-gate.ts`·`use-consent-gate.ts`(모바일 데이터 동의 분기).
 
 ## 여기에 두지 않을 것
 
