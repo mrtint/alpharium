@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+ <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#fffdf8"/><stop offset="1" stop-color="#f3e9df"/></linearGradient>
+ <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#6688c9"/><stop offset=".45" stop-color="#cb8eb2"/><stop offset=".8" stop-color="#ffb48e"/><stop offset="1" stop-color="#ffe0a2"/></linearGradient>
+ <linearGradient id="sea" x2="0" y2="1"><stop stop-color="#a88fba"/><stop offset=".35" stop-color="#758cc2"/><stop offset="1" stop-color="#24538f"/></linearGradient>
+ <linearGradient id="dot" x2="0" y2="1"><stop stop-color="#718cc7"/><stop offset="1" stop-color="#ffae91"/></linearGradient>
+ <clipPath id="p"><path d="M276 210 H535 C715 210 823 324 823 474 C823 624 716 724 565 724 H493 C450 724 422 750 422 796 V839 C422 887 389 921 344 921 C297 921 266 888 266 839 V290 C266 244 280 210 326 210 Z"/></clipPath>
+</defs>
+<rect width="1024" height="1024" fill="url(#bg)"/>
+
+</svg>
