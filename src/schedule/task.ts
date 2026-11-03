@@ -29,6 +29,7 @@
  */
 
 import { dayOf, type DayDate } from "../config/day-boundary";
+import type { ProgressStage } from "../inference/types";
 import { liveWrites as appLiveWrites, type LiveWrites } from "../diary/live-write";
 import { currentEnvironment } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
@@ -43,7 +44,9 @@ import {
   expoAutoWriteAttemptPort,
   recordAttemptEnd,
   recordAttemptExpired,
+  recordAttemptProgress,
   recordAttemptStart,
+  type AttemptDeviceState,
   type AttemptOutcome,
   type AttemptPath,
   type AutoWriteAttemptPort,
@@ -51,6 +54,7 @@ import {
   type WakeKind,
 } from "../app/auto-write-attempts";
 import { readWakeKind, subscribeBackgroundExpiry } from "../app/bg-expiry-port";
+import { readDeviceState } from "../app/device-state-port";
 import { readLaunchState } from "../app/launch-state-port";
 import { resetFastCycleIfDue } from "../app/fast-cycle-reset";
 import { createAppPipeline } from "../app/wiring";
@@ -158,6 +162,8 @@ export type AutoDiaryTaskDeps = {
    * 시작 줄에 남기고, 배터리면 조립이 느린 쓰기를 고른다.
    */
   wakeKind?: () => WakeKind | undefined;
+  /** 2026-11-03 — 시도 줄에 싣는 기기 상태. 주지 않으면 `device-state-port` */
+  readDeviceState?: () => Promise<AttemptDeviceState>;
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
@@ -188,10 +194,26 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
   // 091 — 깬 요청은 백그라운드 실행에만 있다(수동 실행은 요청이 깨운 것이 아니다)
   const wake = path === "background" ? safely(deps.wakeKind ?? readWakeKind) : undefined;
   await recordAttemptStart(attemptPort, path, now, launch, wake);
+  // 2026-11-03 — 단계마다 줄을 갱신한다. 기록은 기다리지 않는다 — 상태 읽기가 멈춰도 쓰기는 간다.
+  const observeDevice = () => {
+    void (deps.readDeviceState ?? readDeviceState)()
+      // 시각뿐이면 아는 것이 없다 — 싣지 않는다
+      .then((device) =>
+        Object.keys(device).length > 1
+          ? recordAttemptProgress(attemptPort, path, now, { device })
+          : undefined,
+      )
+      .catch(() => {});
+  };
+  const onStage = (stage: ProgressStage) => {
+    void recordAttemptProgress(attemptPort, path, now, { stage });
+    observeDevice();
+  };
+  observeDevice();
   const stopListening = path === "background" ? listenForExpiry(deps, attemptPort) : () => {};
   let ended: BodyOutcome;
   try {
-    ended = await runBody(deps, now, wake);
+    ended = await runBody(deps, now, wake, onStage);
   } finally {
     stopListening();
   }
@@ -239,6 +261,7 @@ async function runBody(
   deps: AutoDiaryTaskDeps,
   now: Date,
   wake: WakeKind | undefined,
+  onStage: (stage: ProgressStage) => void,
 ): Promise<BodyOutcome> {
   // 105 — 쓰기로 정해진 날. 그 뒤의 끝(썼음·실패·그만둠·진행 중·캐릭터 없음)은 시도 기록에 이 날을 싣는다.
   let chosen: DayDate | undefined;
@@ -361,12 +384,15 @@ async function runBody(
     // B2-7 — 등록부의 칸은 pipeline.run() 안에서 차지한다(wiring.ts가 "background"
     // owner로 배선). 못 차지한 already-running 결과는 "skipped"로
     // 매핑한다(다음 콜백 재시도, FR-013 경로와 합류).
-    const result = await app.pipeline.run({
-      day: decision.day,
-      now,
-      character,
-      vision: "quick",
-    });
+    const result = await app.pipeline.run(
+      {
+        day: decision.day,
+        now,
+        character,
+        vision: "quick",
+      },
+      (stage) => onStage(stage),
+    );
 
     if (result.ok) {
       // 085 FR-011 — 저장 → 맞추기(그 날의 쓸 차례 알림을 거둠) → 완성 알림.

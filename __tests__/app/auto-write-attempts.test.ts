@@ -16,6 +16,7 @@ import {
   loadDayAttempts,
   recordAttemptEnd,
   recordAttemptExpired,
+  recordAttemptProgress,
   recordAttemptStart,
   summarizeDay,
   summaryDays,
@@ -512,5 +513,88 @@ describe("AT9·T006·T015 — 소스 계약", () => {
       }
       expect(strip(text)).not.toMatch(/attempt-ledger/);
     }
+  });
+});
+
+/**
+ * 2026-11-03 소유자 결정 — 백그라운드 쓰기가 멈추면 장부만으로 어느 단계·어떤 기기 상태였는지 알 수 있어야 한다.
+ * 어젯밤 두 iPhone은 `started`만 남아 멈춘 자리를 가를 수 없었다.
+ */
+describe("시도 줄의 단계와 기기 상태", () => {
+  const AT = new Date("2026-11-02T11:08:45.000Z");
+  const lines = async (port: AutoWriteAttemptPort) => loadDayAttempts(port, dayOf(AT));
+
+  it("단계를 시작 줄에 갱신한다 — 멈추면 마지막 단계가 `started`와 함께 남는다", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT, "background", "power");
+    await recordAttemptProgress(port, "background", AT, { stage: "vision" });
+    await recordAttemptProgress(port, "background", AT, { stage: "generation" });
+    expect(await lines(port)).toEqual([
+      expect.objectContaining({ outcome: "started", wake: "power", stage: "generation" }),
+    ]);
+  });
+
+  it("첫 상태는 device, 그 뒤는 deviceLast에 — 시작과 멈춘 무렵을 비교한다", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT);
+    const first = { at: AT, battery: "charging", batteryLevel: 41, network: "wifi" } as const;
+    const later = { at: new Date(AT.getTime() + 60_000), battery: "unplugged" } as const;
+    await recordAttemptProgress(port, "background", AT, { device: first });
+    await recordAttemptProgress(port, "background", AT, { device: later });
+    const [line] = await lines(port);
+    expect(line.device).toEqual(first);
+    expect(line.deviceLast).toEqual(later);
+  });
+
+  it("끝 줄이 단계와 상태를 지우지 않는다", async () => {
+    const port = memoryPort();
+    await recordAttemptStart(port, "background", AT);
+    await recordAttemptProgress(port, "background", AT, {
+      stage: "title",
+      device: { at: AT, lowPower: true },
+    });
+    await recordAttemptEnd(port, "background", AT, "ran", "2026-11-02");
+    expect((await lines(port))[0]).toMatchObject({
+      outcome: "ran",
+      stage: "title",
+      device: { lowPower: true },
+    });
+  });
+
+  it("짝이 없으면 줄을 만들지 않는다", async () => {
+    const port = memoryPort();
+    await recordAttemptProgress(port, "background", AT, { stage: "vision" });
+    expect(await lines(port)).toEqual([]);
+  });
+
+  it("옛 줄과 깨진 값은 없는 것으로 읽는다", async () => {
+    const port = memoryPort({
+      "2026-11-02": JSON.stringify({
+        items: [
+          {
+            at: AT.toISOString(),
+            path: "background",
+            outcome: "started",
+            stage: "다른값",
+            device: {
+              at: AT.toISOString(),
+              battery: "이상함",
+              batteryLevel: "많음",
+              lowPower: "예",
+              network: 3,
+              thermal: "hot",
+              protectedData: 1,
+              availableMemoryMB: -1,
+              appState: "x",
+            },
+            deviceLast: { battery: "full" },
+          },
+        ],
+      }),
+    });
+    const [line] = await lines(port);
+    expect(line.stage).toBeUndefined();
+    expect(line.device).toEqual({ at: AT });
+    expect(line.deviceLast).toBeUndefined();
   });
 });

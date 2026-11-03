@@ -91,7 +91,10 @@ describe("105 — 백그라운드가 재료 없는 최근 날을 건너뛴다", 
     });
     expect(await runAutoDiaryTask(deps)).toBe("ran");
     expect(previewed).toEqual(["2026-08-27", "2026-08-26"]);
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-26" }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ day: "2026-08-26" }),
+      expect.any(Function),
+    );
     expect(catchUp.writes).toHaveLength(1);
     expect(lines()[0]).toMatchObject({ path: "background", outcome: "ran", day: "2026-08-26" });
   });

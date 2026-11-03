@@ -9,7 +9,7 @@
  * (`no-material` 등)이 하루를 밀어내 며칠 뒤 읽을 때 증거가 사라졌다. 109부터 **날짜별 파일 하나**(`attempt-ledger/YYYY-MM-DD.json`)에
  * 그 날의 줄을 모두 남기고 상한도 자동 삭제도 없다. 058 지우기·059 개발자 끄기·온보딩 다시는 이 장부를 건드리지 않는다.
  *
- * **갈래는 사람이 못 박은 상수다**(원칙 IV) — 시간·바이트·토큰·단계별 소요·이유 문자열은 싣지 않는다. 백그라운드·수동 실행은
+ * **갈래는 사람이 못 박은 상수다**(원칙 IV) — 바이트·토큰·단계별 소요·이유 문자열은 싣지 않는다. 지금 단계와 기기 상태는 싣는다(2026-11-03 소유자 결정 — 어젯밤 iPhone 두 대가 `started`만 남겨 멈춘 자리를 가르지 못했다). 백그라운드·수동 실행은
  * 시작(`started`)을 먼저 쓰고 끝에 같은 줄을 결과로 바꾼다 — 끝이 영영 안 오면 `started`가 남고 그것이 「프로세스가 도중에 정지됐다」의
  * 증거다. 시작과 끝은 **같은 `at`**(실행 시작 시각)으로 불려 같은 날 파일에서 짝을 찾으므로 자정을 넘는 실행도 시작 날에서 닫힌다.
  * 앱 열기 경로는 판정이 끊길 일이 없어 끝 한 줄만 쓰고, 그 날 파일의 마지막 줄과 경로·결과·날이 같으면 줄을 늘리지 않고 시각만 갱신한다
@@ -20,6 +20,7 @@
  */
 
 import { dayOf, type DayDate } from "../config/day-boundary";
+import type { ProgressStage } from "../inference/types";
 import type { AutoWriteDecision } from "../schedule/auto-write";
 
 export type AttemptPath = "background" | "app-open" | "manual";
@@ -78,6 +79,27 @@ const LAUNCH_STATES: readonly LaunchState[] = ["active", "background"];
 export type WakeKind = "power" | "battery";
 const WAKE_KINDS: readonly WakeKind[] = ["power", "battery"];
 
+/** 2026-11-03 — 파이프라인 단계. `inference/types.ts`의 `ProgressStage`와 같아야 한다(타입이 대조한다) */
+const STAGES: readonly ProgressStage[] = ["signals", "vision", "load", "generation", "title"];
+
+/**
+ * 2026-11-03 소유자 결정 — 그 순간의 기기 상태. 읽지 못한 값은 빠진다(원칙 V). 판정 입력이 아니라 기록 값이다.
+ * `thermal`·`protectedData`·`availableMemoryMB`는 iOS에서만 읽는다. `protectedData` 거짓은 잠금으로 파일 보호가 걸린 상태다.
+ */
+export type AttemptDeviceState = {
+  /** 읽은 시각 */
+  at: Date;
+  battery?: "charging" | "full" | "unplugged";
+  /** 잔량 0~100 */
+  batteryLevel?: number;
+  lowPower?: boolean;
+  network?: "wifi" | "cellular" | "other";
+  thermal?: "nominal" | "fair" | "serious" | "critical";
+  protectedData?: boolean;
+  availableMemoryMB?: number;
+  appState?: "active" | "background" | "inactive";
+};
+
 export type AutoWriteAttempt = {
   at: Date;
   path: AttemptPath;
@@ -91,6 +113,12 @@ export type AutoWriteAttempt = {
    * 옛 줄·형식이 틀린 값은 없다.
    */
   day?: DayDate;
+  /** 2026-11-03 — 마지막으로 들어간 단계. 끝나지 않은 줄에서는 멈춘 단계다 */
+  stage?: ProgressStage;
+  /** 2026-11-03 — 시작 무렵의 기기 상태 */
+  device?: AttemptDeviceState;
+  /** 2026-11-03 — 마지막 단계 무렵의 기기 상태 */
+  deviceLast?: AttemptDeviceState;
 };
 
 /** 장부 한 날의 파일을 읽고 쓰는 통로. 날 하나가 파일 하나다 */
@@ -134,6 +162,37 @@ function isOutcome(value: unknown): value is AttemptOutcome {
   return typeof value === "string" && (ATTEMPT_OUTCOMES as readonly string[]).includes(value);
 }
 
+function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T | undefined {
+  return typeof value === "string" && (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : undefined;
+}
+
+/** 깨진 값은 빠진다. 시각이 없으면 상태 전체를 버린다 */
+function parseDeviceState(value: unknown): AttemptDeviceState | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
+  const raw = value as Record<string, unknown>;
+  if (typeof raw.at !== "string") return undefined;
+  const at = new Date(raw.at);
+  if (Number.isNaN(at.getTime())) return undefined;
+  const battery = oneOf(raw.battery, ["charging", "full", "unplugged"] as const);
+  const network = oneOf(raw.network, ["wifi", "cellular", "other"] as const);
+  const thermal = oneOf(raw.thermal, ["nominal", "fair", "serious", "critical"] as const);
+  const appState = oneOf(raw.appState, ["active", "background", "inactive"] as const);
+  const count = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0;
+  return {
+    at,
+    ...(battery !== undefined ? { battery } : {}),
+    ...(count(raw.batteryLevel) ? { batteryLevel: raw.batteryLevel as number } : {}),
+    ...(typeof raw.lowPower === "boolean" ? { lowPower: raw.lowPower } : {}),
+    ...(network !== undefined ? { network } : {}),
+    ...(thermal !== undefined ? { thermal } : {}),
+    ...(typeof raw.protectedData === "boolean" ? { protectedData: raw.protectedData } : {}),
+    ...(count(raw.availableMemoryMB) ? { availableMemoryMB: raw.availableMemoryMB as number } : {}),
+    ...(appState !== undefined ? { appState } : {}),
+  };
+}
+
 /** 한 날의 줄(시간순, 오래된 줄이 앞). 못 읽거나 깨졌으면 빈 목록. 깨진 항목은 건너뛴다(060과 같다). */
 export async function loadDayAttempts(
   port: AutoWriteAttemptPort,
@@ -156,6 +215,9 @@ export async function loadDayAttempts(
         launch,
         wake,
         day: picked,
+        stage,
+        device,
+        deviceLast,
       } = item as {
         at?: unknown;
         path?: unknown;
@@ -163,10 +225,16 @@ export async function loadDayAttempts(
         launch?: unknown;
         wake?: unknown;
         day?: unknown;
+        stage?: unknown;
+        device?: unknown;
+        deviceLast?: unknown;
       };
       if (typeof at !== "string" || !isPath(path) || !isOutcome(outcome)) continue;
       const date = new Date(at);
       if (Number.isNaN(date.getTime())) continue;
+      const readStage = oneOf(stage, STAGES);
+      const first = parseDeviceState(device);
+      const last = parseDeviceState(deviceLast);
       out.push({
         at: date,
         path,
@@ -174,6 +242,9 @@ export async function loadDayAttempts(
         ...(isLaunch(launch) ? { launch } : {}),
         ...(isWake(wake) ? { wake } : {}),
         ...(isDay(picked) ? { day: picked } : {}),
+        ...(readStage !== undefined ? { stage: readStage } : {}),
+        ...(first !== undefined ? { device: first } : {}),
+        ...(last !== undefined ? { deviceLast: last } : {}),
       });
     }
     return out;
@@ -182,7 +253,11 @@ export async function loadDayAttempts(
   }
 }
 
-/** 장부에 싣는 필드는 이 여섯뿐이다(FR-005) — 일기 내용·장소·사진 정보·이유 문자열·소요 시간은 없다 */
+function storedDevice(state: AttemptDeviceState) {
+  return { ...state, at: state.at.toISOString() };
+}
+
+/** 장부에 싣는 필드는 이것뿐이다(FR-005) — 일기 내용·장소·사진 정보·이유 문자열·소요 시간은 없다 */
 function toStored(item: AutoWriteAttempt) {
   return {
     at: item.at.toISOString(),
@@ -191,6 +266,9 @@ function toStored(item: AutoWriteAttempt) {
     ...(item.launch !== undefined ? { launch: item.launch } : {}),
     ...(item.wake !== undefined ? { wake: item.wake } : {}),
     ...(item.day !== undefined ? { day: item.day } : {}),
+    ...(item.stage !== undefined ? { stage: item.stage } : {}),
+    ...(item.device !== undefined ? { device: storedDevice(item.device) } : {}),
+    ...(item.deviceLast !== undefined ? { deviceLast: storedDevice(item.deviceLast) } : {}),
   };
 }
 
@@ -247,6 +325,32 @@ export function recordAttemptStart(
       ...(wake !== undefined ? { wake } : {}),
     },
   ]);
+}
+
+/**
+ * 2026-11-03 — 도는 실행의 단계·기기 상태를 그 줄에 갱신한다. 첫 상태는 `device`, 그 뒤는 `deviceLast`. 짝이 없으면 아무 일도 없다. 실패는 삼킨다.
+ */
+export function recordAttemptProgress(
+  port: AutoWriteAttemptPort,
+  path: AttemptPath,
+  at: Date,
+  update: { stage?: ProgressStage; device?: AttemptDeviceState },
+): Promise<void> {
+  return updateDay(port, at, (items) => {
+    const key = at.toISOString();
+    return items.map((item) => {
+      if (item.path !== path || item.outcome === "expired" || item.at.toISOString() !== key) {
+        return item;
+      }
+      const next = { ...item };
+      if (update.stage !== undefined) next.stage = update.stage;
+      if (update.device !== undefined) {
+        if (next.device === undefined) next.device = update.device;
+        else next.deviceLast = update.device;
+      }
+      return next;
+    });
+  });
 }
 
 /**
