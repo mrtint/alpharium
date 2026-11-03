@@ -66,6 +66,7 @@ import type { Character, CustomNames } from "../diary/types";
 import { expoCharacterNamesPort, loadCustomNames } from "../welcome/names-port";
 import { resolveAutoWrite } from "./auto-write";
 import {
+  clearCatchUpDay,
   expoCatchUpStorePort,
   loadCatchUpDay,
   saveCatchUpDay,
@@ -388,6 +389,9 @@ async function runBody(
 
     // B2-9 — 그 밖의 사유로 실패했으면 알림을 보내지 않는다(FR-005, SC-006).
     if (result.stage === "already-running") {
+      // 칸을 못 차지했으면 모델을 열지 않았다 — 몫을 돌려준다(2026-11-03 실기기: 앱 열기 쓰기와 겹친 깨움이 몫을 없애, 그 쓰기가 실패한 뒤 다음 깨움이 쓰지 못했다).
+      // 파이프라인 전에 쓴 기록은 그대로 둔다 — 도중에 프로세스가 죽은 실행도 몫을 쓴 것이다.
+      if (catchingUp) await clearCatchUpDay(catchUpPort).catch(() => {});
       return withDay(skipped("already-running"));
     }
     return withDay(FAILED);
