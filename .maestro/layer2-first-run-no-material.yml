@@ -1,0 +1,67 @@
+# 111 — 층 2: 「첫 일기 분기, 재료 없음」(규칙 문서 D1) — 모델은 이미 받아져 있다. 안내 없이 쓰지 않는다. 안드로이드 전용(iOS는 시뮬레이터 확인).
+#
+# 전제(실행기가 만든다): 모델 있음, `onboarding.json`을 `completed:false`·`welcomeShown:false`로 되돌림(`downloadConsented:true`라 동의 화면은 건너뜀),
+# 지난 실행의 이름(`character-names.json`) 삭제, 오늘 일기 없음. 표본은 1~30일 전뿐이라 오늘의 재료가 없다(전용 기기 전제 — 오늘 찍은 진짜 사진이 있으면 이 흐름은 실패한다). 권한은 이미 부여된 기기라 권한 단계는 저절로 지나간다(OS 상태가 정한다).
+# **`clearState`를 쓰지 않는다** — 앱 데이터를 지우면 모델이 사라진다. 모델 내려받기·동의는 이 흐름의 대상이 아니다.
+#
+# 흐름: 로고 → (권한 자동) → 작명 → 정상 동작 확인(liveness) → 재료 읽기 → 확인창·쓰기 없이 안 쓴 날 홈.
+# 단언은 상태 전이까지다 — 본문은 사람이 읽는다(원칙 IV). 일기는 쓰이지 않으니 가져올 것이 없다(`writtenDay: null`).
+# 이름은 ASCII로 넣는다(adb 입력 경유 한글이 기기에 따라 깨진다).
+appId: com.a810labs.pocketlog
+---
+- launchApp
+
+# 권한 단계가 떠 있으면 건너뛴다 (이미 부여된 기기에서는 안 뜬다)
+- repeat:
+    times: 6
+    while:
+      visible:
+        id: "onboarding-skip"
+    commands:
+      - tapOn:
+          id: "onboarding-skip"
+
+# 배터리 단계가 남아 있으면 건너뛴다 (카드 + 설정 열기/건너뛰기)
+- runFlow:
+    when:
+      visible:
+        id: "onboarding-step-battery-exception"
+    commands:
+      - tapOn:
+          id: "onboarding-skip"
+
+- extendedWaitUntil:
+    visible:
+      id: "welcome-name-input"
+    timeout: 60000
+- tapOn:
+    id: "welcome-name-input"
+- inputText: "Dori"
+- tapOn:
+    id: "welcome-name-submit"
+
+# 모델 적재를 포함하는 정상 동작 확인을 기다린다. 실패 화면이면 여기서 한도로 실패한다.
+- extendedWaitUntil:
+    visible:
+      id: "home-settings"
+    timeout: 180000
+- assertNotVisible:
+    id: "first-diary-confirm-yes"
+- assertNotVisible:
+    id: "stop-button"
+- assertNotVisible:
+    id: "written-paper"
+- extendedWaitUntil:
+    visible:
+      id: "write-button"
+    timeout: 10000
+
+# 조용히 도는 쓰기가 되살아나면 쓰는 중 표시 없이 몇 분 뒤에 저장된다. 그래서 일정 시간 기다린 뒤에도 쓴 날 지면이 없는지 본다. 240초는 사람이 정한 값이다(측정 아님 — 쓰기 하나가 1~4분).
+# 나타나면 바로 뒤의 단언이 실패한다. 실행기는 끝난 뒤 일기 파일이 없는지도 본다.
+- extendedWaitUntil:
+    visible:
+      id: "written-paper"
+    timeout: 240000
+    optional: true
+- assertNotVisible:
+    id: "written-paper"

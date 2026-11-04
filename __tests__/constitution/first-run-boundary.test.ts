@@ -48,7 +48,7 @@ describe("G7 — 위반 주입: 제품 계층 직접 import를 잡는다 (원칙
 describe("G7 — 위반 주입: pipeline.run() 직접 호출을 잡는다", () => {
   it("firstrun/ 안에서 pipeline.run(...)을 직접 부르면 잡는다", () => {
     const violations = checkFirstRunFile(
-      "src/firstrun/auto-diary.ts",
+      "src/firstrun/first-diary.ts",
       "await pipeline.run({ day, now, character, vision });",
     );
     expect(violations.length).toBeGreaterThan(0);
@@ -57,7 +57,7 @@ describe("G7 — 위반 주입: pipeline.run() 직접 호출을 잡는다", () =
   it("타입 참조만 하는 것은 잡지 않는다", () => {
     expect(
       checkFirstRunFile(
-        "src/firstrun/auto-diary.ts",
+        "src/firstrun/first-diary.ts",
         'import type { Pipeline } from "../diary/pipeline";',
       ),
     ).toEqual([]);
@@ -77,7 +77,7 @@ describe("checkFirstRunFile — 지금 소스는 깨끗하다", () => {
   it.each([
     "src/firstrun/progress.ts",
     "src/firstrun/logo.ts",
-    "src/firstrun/auto-diary.ts",
+    "src/firstrun/first-diary.ts",
     "src/firstrun/consent.ts",
   ])("%s 위반 0건", (path) => {
     expect(checkFirstRunFile(path, readFileSync(join(root, path), "utf8"))).toEqual([]);

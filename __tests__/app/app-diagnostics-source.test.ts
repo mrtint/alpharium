@@ -54,7 +54,8 @@ describe("TO1 — 「지금 한 번 써 보기」는 세 겹을 닫고 홈에 �
     expect(frame).toMatch(/writeRequest=\{writeRequest\}/);
     expect(frame).toMatch(/onWriteRequestHandled=\{onWriteRequestHandled\}/);
     const section = functionBody("DiarySection");
-    expect(section).toMatch(/writeRequest=\{writeRequest\}/);
+    // 111 — 진단 요청은 그대로 넘기고 첫 일기 요청만 캐릭터 목록을 읽을 때까지 붙잡는다
+    expect(section).toMatch(/: writeRequest\}/);
     expect(section).toMatch(/onWriteRequestHandled=\{onWriteRequestHandled\}/);
   });
 });
@@ -117,10 +118,9 @@ describe("TO3 — 진단은 파이프라인을 만들지 않는다", () => {
   });
 });
 
-describe("WF7 — 쓰기 실패 기록 지점 셋", () => {
+describe("WF7 — 쓰기 실패 기록 지점", () => {
   const home = read("src/ui/DiaryHomeScreen.tsx");
   const task = read("src/schedule/task.ts");
-  const wiring = read("src/app/wiring.ts");
 
   it("홈 generate: 그만두기(시도별 isCancelled)를 거른 뒤에 recordFailure를 부른다 — 홈은 기록 통로를 모른다", () => {
     // 071 — 그만두었는가는 시도별 번호로 가린다(불리언 `cancelled` 하나가 아니다 — 새 시도가 되돌려 거짓 실패가 기록됐다, SE-2).
@@ -146,13 +146,6 @@ describe("WF7 — 쓰기 실패 기록 지점 셋", () => {
     expect(record).toBeGreaterThan(-1);
     expect(record).toBeLessThan(mapped);
     expect(task).toMatch(/stage: "unexpected"/);
-  });
-
-  it("첫 실행 자동 첫 일기: 결과를 받아 기록한다", () => {
-    const fn = wiring.slice(wiring.indexOf("export async function triggerFirstRunAutoDiary("));
-    expect(fn).toMatch(
-      /recordWriteFailure\(deps\.failurePort \?\? expoWriteFailurePort\(\), result, input\.now\)/,
-    );
   });
 
   it("WF9 — 파이프라인·일기 지우기는 이 모듈을 import하지 않는다", () => {

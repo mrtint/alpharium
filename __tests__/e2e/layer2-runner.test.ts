@@ -29,6 +29,9 @@ type Overrides = Partial<{
   /** 흐름 파일 → 결과들(재시도용으로 여러 개). 없으면 통과 */
   results: Record<string, MaestroResult[]>;
   pull: Outcome;
+  todayPhotoSeed: Outcome;
+  diaryFiles: string[];
+  diaryUnreadable: boolean;
 }>;
 
 function fakeDevice(over: Overrides = {}) {
@@ -39,9 +42,16 @@ function fakeDevice(over: Overrides = {}) {
     hasMaestro: () => over.maestro ?? true,
     probe: () => ok,
     listDir: (_s, relative) => {
+      if (
+        relative === "diary" &&
+        over.diaryUnreadable === true &&
+        calls.some((c) => c.startsWith("maestro:.maestro/layer2-first-run-no-material"))
+      ) {
+        return { ok: false, detail: "못 읽음" };
+      }
       const map: Record<string, string[]> = {
         models: over.models ?? ["a1.bin", "v1.bin", "v2.bin"],
-        diary: [],
+        diary: over.diaryFiles ?? [],
         "vision-cache": [],
       };
       return { ok: true, value: map[relative] ?? [] };
@@ -89,6 +99,16 @@ const run = (over: Overrides = {}) => {
     now: NOW,
     collectDirectory: "COLLECT",
     log: (l) => lines.push(l),
+    todayPhoto: {
+      seed: () => {
+        calls.push("today-photo:seed");
+        return over.todayPhotoSeed ?? ok;
+      },
+      remove: () => {
+        calls.push("today-photo:remove");
+        return ok;
+      },
+    },
   });
   return { result, calls, lines };
 };
@@ -233,18 +253,62 @@ describe("층 2 실행기 (073)", () => {
   it("T-6b — 흐름이 쓴 날의 일기를 수집 폴더로 가져온다", () => {
     const { calls, result } = run();
     const pulls = calls.filter((c) => c.startsWith("pull:"));
-    expect(pulls).toHaveLength(LAYER2_FLOWS.length);
-    for (const flow of LAYER2_FLOWS) {
+    const writing = LAYER2_FLOWS.filter((f) => f.writtenDay !== null);
+    expect(pulls).toHaveLength(writing.length);
+    for (const flow of writing) {
       const day = flow.writtenDay === "today" ? TODAY : YESTERDAY;
       expect(pulls.some((p) => p.startsWith(`pull:diary/${day}.json->COLLECT/`))).toBe(true);
     }
-    expect(result.perFlow.every((f) => f.collected !== undefined)).toBe(true);
+    // 111 — 일기를 쓰지 않는 흐름은 가져올 것이 없다
+    const collected = result.perFlow.filter((f) => f.collected !== undefined);
+    expect(collected).toHaveLength(writing.length);
+    expect(result.status).toBe("passed");
   });
 
   it("T-6c — 실패한 흐름은 일기를 가져오지 않는다", () => {
     const first = LAYER2_FLOWS[0].file;
     const { calls } = run({ results: { [first]: [{ status: 1, failed: [first] }] } });
-    expect(calls.filter((c) => c.startsWith("pull:"))).toHaveLength(LAYER2_FLOWS.length - 1);
+    expect(calls.filter((c) => c.startsWith("pull:"))).toHaveLength(
+      LAYER2_FLOWS.filter((f) => f.writtenDay !== null).length - 1,
+    );
+  });
+
+  it("111 SC-001 — 일기를 쓰지 않는 흐름에서 오늘 일기가 생기면 실패다", () => {
+    const { result } = run({ diaryFiles: [`${TODAY}.json`] });
+    const flow = LAYER2_FLOWS.find((f) => f.writtenDay === null);
+    expect(result.status).toBe("failed");
+    expect(result.perFlow.find((f) => f.file === flow?.file)?.status).toBe("failed");
+    expect(result.reason).toContain(TODAY);
+  });
+
+  it("111 SC-001 — 일기 폴더를 못 읽으면 통과로 치지 않는다", () => {
+    const { result } = run({ diaryUnreadable: true });
+    expect(result.status).toBe("failed");
+    expect(result.reason).toContain("못 읽음");
+  });
+
+  it("111 — 오늘 사진은 그 흐름의 maestro 바로 앞에 심고 바로 뒤에 지운다", () => {
+    const { calls } = run();
+    const flow = LAYER2_FLOWS.find((f) => f.seedsTodayPhoto === true);
+    expect(flow).toBeDefined();
+    const index = calls.findIndex((c) => c.startsWith(`maestro:${flow?.file}|`));
+    expect(calls[index - 1]).toBe("today-photo:seed");
+    expect(calls[index + 1]).toBe("today-photo:remove");
+    expect(calls.filter((c) => c === "today-photo:seed")).toHaveLength(1);
+  });
+
+  it("111 — 흐름이 실패해도 오늘 사진을 지운다", () => {
+    const file = LAYER2_FLOWS.find((f) => f.seedsTodayPhoto === true)?.file ?? "";
+    const { calls } = run({ results: { [file]: [{ status: 1, failed: [file] }] } });
+    expect(calls).toContain("today-photo:remove");
+  });
+
+  it("111 — 오늘 사진을 못 심으면 그 흐름을 돌리지 않고 중단한다", () => {
+    const { result, calls } = run({ todayPhotoSeed: { ok: false, detail: "캐시 없음" } });
+    expect(result.status).toBe("aborted");
+    expect(result.reason).toContain("캐시 없음");
+    const file = LAYER2_FLOWS.find((f) => f.seedsTodayPhoto === true)?.file;
+    expect(calls.some((c) => c.startsWith(`maestro:${file}|`))).toBe(false);
   });
 
   it("T-7 — 마지막 흐름 뒤 기준 상태를 한 번 더 만든다", () => {
@@ -275,7 +339,7 @@ describe("층 2 흐름 표 (073)", () => {
   it("F-2 — 흐름 표는 파일마다 하나이고 .maestro/layer2-*.yml이다", () => {
     const files = LAYER2_FLOWS.map((f) => f.file);
     expect(new Set(files).size).toBe(files.length);
-    expect(files).toHaveLength(4);
+    expect(files).toHaveLength(5);
     for (const f of files) expect(f).toMatch(/^\.maestro\/layer2-[a-z0-9-]+\.yml$/);
   });
 });

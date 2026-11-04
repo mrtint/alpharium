@@ -65,7 +65,7 @@ describe("CL1 — 흉내 기록을 읽기 전에는 판정하지 않는다", () 
 });
 
 describe("CL2 — 첫 실행이 이기고, 한 실행에 한 번이다", () => {
-  it("첫 실행 자동 첫 일기를 시도한 실행이면 거짓이다 (040)", async () => {
+  it("첫 일기 흐름에 들어간 실행이면 거짓이다 (111)", async () => {
     const props = base({ firstRunTried: { current: true } });
     await render(<Harness {...props} />);
     await claim();

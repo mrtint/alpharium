@@ -66,6 +66,10 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 111 — 첫 일기 확인(`home.firstDiary`, 규칙 문서 0-1 초안을 소유자가 확정했다 2026-11-04)
+  "오늘 사진으로 첫 일기를 써 볼까요?",
+  "사진과 다닌 곳으로 하루를 짐작해 써요. 몇 분 걸릴 수 있어요.",
+  "써 보기",
   // 108 — 홈 제약 띠(새 항목 `home.constraintBand`, 보드 밖 초안 — 소유자 확인 대기). 버튼 「설정 열기」는 골든에 이미 있다
   "사진 권한이 없어 사진 없이 써요",
   "권한 허용",

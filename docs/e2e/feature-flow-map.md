@@ -14,7 +14,7 @@
 
 | 기능 | 층 1 흐름 | 계약 테스트가 지킴 | 층 2 | 사람이 봄(이유) | iOS 층 1 | iOS 층 2 |
 | --- | --- | --- | --- | --- | --- | --- |
-| 첫 실행(로고·권한·동의·진행·작명·정상 동작 확인) | — | `__tests__/firstrun/progress.test.ts`(단계 판정 우선순위), `__tests__/ui/AppFrame.firstrun.test.tsx`(단계별 화면 배선), `__tests__/welcome/naming.test.ts`(작명 검증) | `.maestro/layer2-first-run-auto-diary.yml`(모델이 있는 채 로고 → 작명 → 정상 동작 확인 → 자동 첫 일기 → 쓴 날 홈; 내려받기는 제외) | 모델 내려받기 실제 동작·OS 권한 창 — `pm clear`·새 설치가 전제라 층 1이 만들 수 없다. 기존 흐름 `first-run-flow`·`download-consent-flow`·`unified-permission-onboarding`이 일반 실행(FLOWS)에서 본다 | — | `first-run-auto-diary` |
+| 첫 실행(로고·권한·동의·진행·작명·정상 동작 확인) | — | `__tests__/firstrun/progress.test.ts`(단계 판정 우선순위), `__tests__/ui/AppFrame.firstrun.test.tsx`(단계별 화면 배선), `__tests__/ui/first-diary-assembly.test.tsx`(첫 일기 실패 되돌림 — 기기에서는 사람이 본다), `__tests__/welcome/naming.test.ts`(작명 검증) | `.maestro/layer2-first-run-first-diary.yml`(모델이 있는 채 로고 → 작명 → 정상 동작 확인 → 확인창 → 쓰는 중 → 쓴 날 홈; 내려받기는 제외), `.maestro/layer2-first-run-no-material.yml`(재료 없음 → 안내 없이 안 쓴 날 홈) | 모델 내려받기 실제 동작·OS 권한 창 — `pm clear`·새 설치가 전제라 층 1이 만들 수 없다. 기존 흐름 `first-run-flow`·`download-consent-flow`·`unified-permission-onboarding`이 일반 실행(FLOWS)에서 본다 | — | `first-run-first-diary` |
 | 일기 쓰기·그만두기(제자리 쓰기) | — | `__tests__/ui/writing-in-place.test.tsx`(쓰는 중 홈 배선), `__tests__/ui/writing-in-place-stop.test.tsx`(그만두면 쓰기 전 상태) | `.maestro/layer2-write-and-read.yml`(어제를 골라 쓰기 → 쓰는 중 → 쓴 날 홈) | 실제 생성은 모델·50~240초라 층 1이 아니다. 일반 실행 `in-place-writing`·`generate-diary`가 일부 본다. 빠른 반복 시 부작용은 071에서 실기기로 검증·수정했다 | — | `write-and-read` |
 | 쓴 날 읽기(홈이 곧 상세) | `.maestro/restart-persistence.yml`, `.maestro/diary-body-screen.yml` | `__tests__/ui/written-day-home.test.tsx`, `__tests__/app/written-day.test.ts`, `__tests__/diary/store.test.ts`(직렬화 왕복) | — | — | 층 1과 같음 | — |
 | 강제 종료 후 재시작해도 읽힘 | `.maestro/restart-persistence.yml` | `__tests__/diary/expo-file-sync.test.ts`(비동기 `text()` 호출이 소스에 없음 — 소스만 센다) | — | — (GC가 끼는 확률 결함은 jest에 런타임이 없어 이 흐름이 유일한 방어) | 층 1과 같음 | — |
@@ -55,7 +55,8 @@
 | `.maestro/layer2-write-and-read.yml` | ○ | — | 일기 쓰기·그만두기, 쓴 날 읽기 | 실제 모델로 일기를 쓴다 — `--layer2`가 흐름마다 기준 상태를 만들고 따로 부른다(층 2) | ○ | — |
 | `.maestro/layer2-open-app-writes.yml` | ○ | — | 자동 쓰기(앱을 열면) | 실제 모델로 일기를 쓴다(층 2) — 자동 쓰기 켜짐이 전제 | ○ | — |
 | `.maestro/layer2-diagnostics-try-write.yml` | ○ | — | 진단 한 번 써 보기 | 실제 모델로 일기를 쓴다(층 2) | ○ | — |
-| `.maestro/layer2-first-run-auto-diary.yml` | ○ | — | 첫 실행 자동 첫 일기 | 실제 모델로 일기를 쓴다(층 2) — 온보딩 플래그를 되돌린 상태가 전제 | ○ | — |
+| `.maestro/layer2-first-run-first-diary.yml` | ○ | — | 첫 일기 분기, 재료 있음 | 실제 모델로 일기를 쓴다(층 2) — 온보딩 플래그를 되돌리고 오늘 사진을 심은 상태가 전제 | ○ | — |
+| `.maestro/layer2-first-run-no-material.yml` | ○ | — | 첫 일기 분기, 재료 없음 | 실제 모델로 정상 동작 확인을 돈다(층 2) — 온보딩 플래그를 되돌린 상태가 전제. 안드로이드 전용(iOS 층 2는 사진을 심는 전제라 시뮬레이터로 본다) | ○ | — |
 | `.maestro/_sample-probe.yml` | — | — | (보조) `sample-days`가 대표 날 하나로 이동해 사진·장소 칸을 단언 | 보조 흐름이다 — 단독으로 검증하는 기능이 없다(`DATE`·`BACK`·`PHOTOS`·`PLACES` env가 필요) | — | — |
 | `.maestro/skeleton.yml` | ○ | ○ | 앱이 뜬다·추론 위치(기기 · CPU)·저장 점검(N편 · 정상) | — (073이 060의 진단 개편에 맞게 고쳤다 — 옛 「모듈 상태」·「loaded」 줄은 사라졌고 실제 적재는 층 2가 본다. 기준 상태에서 통과, 위반 주입으로 실패 확인) | — | ○ |
 | `.maestro/prompt-preview.yml` | ○ | ○ | 진단의 프롬프트 미리보기 | — (073이 문안 글자 대신 구조(프리셋 둘·본문 상자·근사 크기 라벨)만 단언하게 고쳤다 — 문안은 prompt.ts에서 바뀌고 바이트 동일성은 기기 없는 테스트가 잠근다. 기준 상태에서 통과) | — | ○ |
@@ -87,7 +88,7 @@
 - **빈 칸**: 쓸 재료·읽기 스크롤·자동 쓰기·완성 알림은 층 1 흐름이 없다. 앞의 둘은 `-e` 변수나 권한 상태가 전제라 층 1 기준 상태와 맞지 않고, 뒤의 둘은 생성·OS가 깨우는 일이다.
 - **스펙 069 FR-022 판단**: 달력·스트립·권한 행·대화상자는 기존 흐름(`dialog-foundation`·`week-strip-swipe`·`diary-home-1d`)과 새 훑기가 이미 본다 — 새 흐름을 더하지 않았다. 남은 빈 칸(쓸 재료·읽기 스크롤·자동 쓰기·완성 알림)은 층 1 기준 상태와 맞지 않아 「사람이 봄」/층 2로 두었다.
 - **중복**: 설정 시각·장소는 `settings-developer-sweep`(열고 취소)과 `settings-time-place`(값이 바뀜)가 겹친다 — 뒤의 것이 토글을 켠 채 끝나 층 1에 못 들어온다.
-- **iOS 갈래의 결정**(097): 옛 iOS 훑기 흐름 셋은 정리했다 — 설정·개발자·진단 훑기 둘은 `settings-developer-sweep`이 iOS에서 같은 범위를 보게 되어 중복이고, `first-run-to-home`은 새 설치 전제(`clearState` + 모델 ~2GB 내려받기)가 층 1 기준 상태와 맞지 않아 보조 `_prepare-simulator`로 바꿨다 — 같은 경로(첫 실행 → 자동 첫 일기)는 층 2 `first-run-auto-diary`가 실제 모델로 본다. 등록하지 않은 흐름은 초록불인데 아무것도 검증하지 않으므로 `.maestro/ios/`에는 보조(`_` 접두)만 둔다(`flow-map.test.ts` M-iOS-3).
+- **iOS 갈래의 결정**(097): 옛 iOS 훑기 흐름 셋은 정리했다 — 설정·개발자·진단 훑기 둘은 `settings-developer-sweep`이 iOS에서 같은 범위를 보게 되어 중복이고, `first-run-to-home`은 새 설치 전제(`clearState` + 모델 ~2GB 내려받기)가 층 1 기준 상태와 맞지 않아 보조 `_prepare-simulator`로 바꿨다 — 같은 경로(첫 실행 → 첫 일기)는 층 2 `first-run-first-diary`가 실제 모델로 본다. 등록하지 않은 흐름은 초록불인데 아무것도 검증하지 않으므로 `.maestro/ios/`에는 보조(`_` 접두)만 둔다(`flow-map.test.ts` M-iOS-3).
 - **iOS에서 접근성 트리가 값을 가리는 곳**(097 실측): 날짜 버튼(큰 날짜 숫자)과 설정·진단 행(값 칸 「N편 · 정상」 등)은 한 접근성 요소로 합쳐져 자식 글자가 트리에 없다 — 화면에는 보인다. 흐름은 골라진 스트립 칸의 글자·행 라벨로 갈음하고, 값 자체는 사람이 본다. 제품의 접근성 라벨을 바꾸는 일은 UX-09(소유자 결정)이며 이 과제의 범위가 아니다.
 - **iOS 시뮬레이터 키체인 오류**: 시뮬레이터 빌드는 `expo-notifications`가 매 실행 `ERR_NOTIFICATIONS_KEYCHAIN_ACCESS`를 내 개발 클라이언트가 LogBox 토스트를 하단 쓰기 바 위에 띄운다 — `_dismiss-logbox`가 `launchApp` 뒤에 닫는다. 실기기에서는 나지 않는다.
 - **실행기 버그 하나를 고쳤다**: JUnit 보고서에서 실패한 흐름을 가리는 정규식이 통과한 흐름을 실패로 보고했다(`dialog-foundation`이 통과했는데 실패 목록에 올랐다). 자기 닫힘 `<testcase/>`를 건너뛰도록 고쳤다(`scripts/layer1/junit.ts`, 같은 규칙을 `run-device-tests.mjs`에도 넣었다).

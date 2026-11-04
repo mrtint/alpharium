@@ -67,7 +67,6 @@ import { validateCharacterName } from "./src/welcome/naming";
 import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/welcome/names-port";
 import { shouldShowLogo } from "./src/firstrun/logo";
 import { resolveFirstRunStage } from "./src/firstrun/progress";
-import { shouldAutoGenerate } from "./src/firstrun/auto-diary";
 import { LogoScreen } from "./src/ui/LogoScreen";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
 import { DownloadConsentGate } from "./src/ui/DownloadConsentGate";
@@ -122,6 +121,7 @@ import { wipeDiaries, type WipeOutcome } from "./src/app/wipe-diaries";
 import { clearPhotoCopies } from "./src/app/wipe-port";
 import { FastCycleConfirmDialog } from "./src/ui/FastCycleConfirmDialog";
 import { WipeConfirmDialog } from "./src/ui/WipeConfirmDialog";
+import { FirstDiaryConfirmDialog } from "./src/ui/MaterialDialogs";
 import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./src/ui/settings-text";
 import { StackLayer } from "./src/ui/StackLayer";
 import { AppText } from "./src/ui/components/Text";
@@ -133,8 +133,10 @@ import {
   type GeocodingPreference,
   type GeocodingSettingPort,
 } from "./src/app/geocoding-setting-store";
-import { dayBounds, dayOf, isDayWritable, selectableDays } from "./src/config/day-boundary";
-import { createAppPipeline, triggerFirstRunAutoDiary } from "./src/app/wiring";
+import { dayBounds, dayOf, selectableDays } from "./src/config/day-boundary";
+import { createAppPipeline } from "./src/app/wiring";
+import { readFirstDiaryMaterial, type FirstWriteSettled } from "./src/app/first-diary-material";
+import { useFirstDiaryFlow, type FirstDiaryRequestMark } from "./src/app/use-first-diary-flow";
 import { liveWrites } from "./src/diary/live-write";
 import { currentEnvironment } from "./src/config/environment";
 import { showsOnScreen } from "./src/diagnostics/sink";
@@ -331,7 +333,7 @@ function AppFrame() {
    * 홈이 054 제자리 쓰기로 시작한다 — 진단이 파이프라인을 따로 돌리지 않는다(042: 검증 경로가 제품과 다르면 검증이 아니다).
    * 요청은 번호표(`id`)다 — 홈이 시작하거나 거절하면 `onWriteRequestHandled`로 비운다.
    */
-  const [writeRequest, setWriteRequest] = useState<{ id: number; day: DayDate } | null>(null);
+  const [writeRequest, setWriteRequest] = useState<WriteRequest | null>(null);
   const writeRequestId = useRef(0);
   const showToast = toastLine.show;
   const onDiagnosticsTryOnce = useCallback(() => {
@@ -408,7 +410,7 @@ function AppFrame() {
   /**
    * 048 — 홈에서 고른 하루 (Clarification Q4, FR-005a).
    *
-   * 설정·개발자에 다녀오면 홈(`DiarySection`)이 언마운트되고, 040의 자동 첫 일기 후에도 다시
+   * 설정·개발자에 다녀오면 홈(`DiarySection`)이 언마운트되고, 첫 쓰기 실패의 되돌림(111) 뒤에도 다시
    * 마운트된다. 여기 들고 있어야 돌아왔을 때 같은 날이 골라져 있다. **파일에는 남기지 않는다**
    * (009).
    *
@@ -1051,8 +1053,7 @@ function AppFrame() {
    * 시작해, 045까지는 **재실행할 때마다** 모델을 적재하는 확인 화면을 지나야 홈에
    * 닿았다. 확인은 첫 만남 연출의 일부(035)이지 매 실행의 관문이 아니다.
    * `livenessOutcome` state를 `"ok"`로 덮어쓰지 않는다 — 판정 입력에서만 지나간
-   * 것으로 보므로, 040의 첫 일기 자동 생성(`livenessOutcome === "ok"` state를 봄)도
-   * 돌지 않는다.
+   * 것으로 보므로, 111의 첫 일기 흐름(확인이 실제로 돈 뒤에만 시작한다)도 돌지 않는다.
    */
   const livenessPassed = livenessSkipped || !namingDoneThisSession;
 
@@ -1074,9 +1075,51 @@ function AppFrame() {
         })
       : null;
 
+  const [retryToken, setRetryToken] = useState(0);
+
+  /** 사용자가 [다시 시도]를 눌렀다. **연출 완료 플래그를 쓰지 않는다**(W9). 첫 쓰기 실패의 되돌림(111 AS4)도 이 길이다. */
+  const retryLivenessCheck = useCallback(() => {
+    setLivenessOutcome(null);
+    setRetryToken((n) => n + 1);
+  }, []);
+
+  /**
+   * ★ 111 — 첫 일기 흐름 (규칙 문서 0장 D1·L2). 정상 동작 확인을 지나면 오늘의 재료를 읽고, 있을 때만 묻고, 고른 때만 홈이 쓴다.
+   * 파이프라인을 직접 돌리는 첫 실행 경로는 없다 — 쓰기는 홈에 올리는 요청이다(혼잣말·그만두기·이어 하기·실패 기록을 그대로 갖는다).
+   * 흐름의 끝은 `firstDiary.step === "done"` 하나로 읽는다(`use-first-diary-flow.ts`).
+   */
+  const readFirstMaterial = useCallback(async () => {
+    const wiring = createAppPipeline(environment);
+    return readFirstDiaryMaterial({
+      now: new Date(),
+      hasDiary: (day) => (wiring.ok ? wiring.store.has(day) : Promise.resolve(false)),
+      previewDay: wiring.ok ? wiring.previewDay : undefined,
+    });
+  }, [environment]);
+  const requestFirstWrite = useCallback((day: DayDate, firstDiary: FirstDiaryRequestMark) => {
+    writeRequestId.current += 1;
+    setWriteRequest({ id: writeRequestId.current, day, firstDiary });
+    return writeRequestId.current;
+  }, []);
+  // 쓰는 중에 설정을 열어 두었어도 홈으로 돌아온다 — 그 겹이 남으면 확인창이 설정 위에 뜨고 「써 보기」의 요청이 덮인 홈에 붙잡힌다
+  const rollBackFirstDiary = useCallback(() => {
+    goHome();
+    retryLivenessCheck();
+  }, [goHome, retryLivenessCheck]);
+  const firstDiary = useFirstDiaryFlow({
+    readMaterial: readFirstMaterial,
+    requestWrite: requestFirstWrite,
+    onRollBack: rollBackFirstDiary,
+  });
+  const firstDiaryLivenessPassed = firstDiary.livenessPassed;
+  const firstDiaryLivenessSkipped = firstDiary.livenessSkipped;
+  /** 재료를 읽는 동안은 확인 중 화면을 그대로 둔다 — 홈이 먼저 뜨면 그 사이 「일기 쓰기」를 눌러 확인창과 겹친다 */
+  const readingFirstMaterial = firstDiary.step === "reading";
+
   /** `resolveFirstRunStage`가 낸 단계를 035 `WelcomeScreen`의 `phase`로 옮긴다. */
-  const welcomePhase: WelcomePhase =
-    firstRunStage === "liveness"
+  const welcomePhase: WelcomePhase = readingFirstMaterial
+    ? "checking"
+    : firstRunStage === "liveness"
       ? livenessOutcome === "failed"
         ? "failed"
         : "checking"
@@ -1093,7 +1136,6 @@ function AppFrame() {
    * "liveness"`이고 아직 실패로 확정되지 않았을 때만, research.md #3,
    * contracts G5).
    */
-  const [retryToken, setRetryToken] = useState(0);
   const livenessShouldRun = firstRunStage === "liveness" && livenessOutcome !== "failed";
 
   useEffect(() => {
@@ -1114,7 +1156,10 @@ function AppFrame() {
 
     void check()
       .then((outcome) => {
-        if (alive) setLivenessOutcome(outcome);
+        if (!alive) return;
+        setLivenessOutcome(outcome);
+        // 111 AS1 — 같은 차례에 흐름으로 넘어가 홈이 한 프레임도 먼저 그려지지 않는다
+        if (outcome === "ok") firstDiaryLivenessPassed();
       })
       .catch(() => {
         if (alive) setLivenessOutcome("failed");
@@ -1125,88 +1170,20 @@ function AppFrame() {
     };
     // `retryToken`이 바뀌면 확인을 다시 돌린다(L12 — 자동 루프가 아니라
     // 사용자가 [다시 시도]를 누른 것이다).
-  }, [livenessShouldRun, environment, retryToken]);
-
-  /** 사용자가 [다시 시도]를 눌렀다. **연출 완료 플래그를 쓰지 않는다**(W9). */
-  const retryLivenessCheck = useCallback(() => {
-    setLivenessOutcome(null);
-    setRetryToken((n) => n + 1);
-  }, []);
-
-  /**
-   * ★ 040 US3 — liveness 통과 직후 그날 첫 일기를 자동 생성한다(FR-008·
-   * FR-008a·FR-009).
-   *
-   * ───────────────────────────────────────────────────────────────────────────
-   * `shouldAutoGenerate()`(순수 판정)가 `livenessOutcome === "ok" &&
-   * dayWritable`을 확인하고, 참이면 `triggerFirstRunAutoDiary()`(조립 계층,
-   * `pipeline.run()`을 직접 부르는 유일한 자리)를 1회 호출한다.
-   *
-   * **세션 스코프 `useRef`로 중복 호출을 막는다**(contracts G6) —
-   * `firstRunStage`가 리렌더마다 다시 `"done"`으로 계산돼도 생성은 1회만
-   * 시도된다. **이 플래그는 자동 트리거만 막는다** — 홈 화면의 기존 "일기
-   * 쓰기" 버튼이 부르는 수동 `pipeline.run()` 경로(`DiaryHomeScreen`의
-   * `generate()`)는 이 ref와 전혀 무관하다(FR-009 — 자동 생성이 실패·스킵돼도
-   * 수동 경로는 항상 동작해야 한다).
-   *
-   * **트리거 결과를 화면에 노출하지 않는다**(research.md #5) — 성공하면
-   * 일기가 저장돼 홈 화면에 보이고, 실패하면 조용히 아무 일도 없던 것처럼
-   * 남는다(SC-004, 새 실패 배너를 만들지 않는다).
-   * ───────────────────────────────────────────────────────────────────────────
-   */
-  /**
-   * 040 — 자동 첫 일기 생성이 끝났음을 홈 화면에 알리는 토큰(SC-003).
-   * 값이 바뀌면 `DiaryHomeScreen`이 새로 마운트되어 목록을 다시 읽는다.
-   * 값 자체에 의미는 없다(횟수를 세는 지표가 아니다 — 원칙 IV).
-   */
-  const [autoGeneratedToken, setAutoGeneratedToken] = useState(0);
-
-  const autoGenerateTried = useRef(false);
-  useEffect(() => {
-    if (firstRunStage !== "done") return;
-    if (livenessOutcome !== "ok") return;
-    if (autoGenerateTried.current) return;
-
-    const now = new Date();
-    const day = dayOf(now);
-    if (!shouldAutoGenerate({ livenessOutcome, dayWritable: isDayWritable(day, now) })) return;
-
-    autoGenerateTried.current = true;
-    void triggerFirstRunAutoDiary(environment, {
-      day,
-      now,
-      character: ONBOARDING_DEFAULT_CHARACTER,
-      // 사진 신호 유무를 여기서 미리 구하지 않는다 — 최초 실행은 아직 홈
-      // 화면에 진입한 적이 없어 photoDays 캐시가 없다. "quick"으로 고정해도
-      // 안전하다 — 011 "VLM 안 열기": 사진이 실제로 0장이면 파이프라인이
-      // 스스로 캡션 단계를 건너뛰고 "사진 없음"으로 정직하게 처리한다
-      // (원칙 V, 과장 없음). vision 설정을 "auto"로 미리 조회해 맞추는
-      // 대신 이 방식이 최초 실행 1회성 트리거를 단순하게 유지한다.
-      vision: "quick",
-    })
-      // ★ 생성이 끝나면 홈 화면을 다시 마운트해 목록을 읽게 한다(SC-003).
-      //   `DiaryHomeScreen`은 마운트·`AppState` 변화·자기가 돌린 생성에서만
-      //   `refresh()`를 부르는데, 이 트리거는 그 셋 중 어디에도 해당하지
-      //   않아 **파일에는 일기가 있는데 화면은 "아직 일기가 없다"로 남았다**
-      //   (2026-09-11 실기기 관측). 성공·실패 어느 쪽이든 한 번 다시 읽으면
-      //   되므로 `finally`에 둔다 — 실패 시에도 화면이 최신 목록을 보는 것이
-      //   맞다(FR-009, 새 실패 UI를 만들지 않는다).
-      .catch(() => {})
-      .finally(() => setAutoGeneratedToken((n) => n + 1));
-  }, [firstRunStage, livenessOutcome, environment]);
+  }, [livenessShouldRun, environment, retryToken, firstDiaryLivenessPassed]);
 
   /**
    * ★ 057 — 앱을 열 때의 자동 쓰기는 한 실행에 한 번이다 (FR-017·FR-020, research R5).
    *
    * 홈이 **실제로 시작하는 순간** 이것을 부른다. 거짓이면 시작하지 않는다 — 이번 실행에서 이미 시작했거나(그만두거나 실패해도
-   * 다시 저절로 시작하지 않는다), 첫 실행 흐름의 자동 첫 일기(040)를 시도한 실행이다(첫 실행이 이긴다, Clarification Q3).
+   * 다시 저절로 시작하지 않는다), 첫 일기 흐름(111)에 들어간 실행이다(첫 실행이 이긴다, Clarification Q3).
    * 첫 실행 흐름이 아직 끝나지 않았으면 홈(`DiarySection`)이 아예 그려지지 않으므로 그것은 따로 보지 않는다. 082 — 상태와
    * 064의 소모는 `useAutoWriteClaim`에 있다(테스트에서 돌릴 수 있게 뗐다).
    */
   const { claimAutoWrite, spendAutoWrite, rearmAutoWrite } = useAutoWriteClaim({
     simulationLoaded: simulation.loaded,
     writeBlocked,
-    firstRunTried: autoGenerateTried,
+    firstRunTried: firstDiary.entered,
   });
   useEffect(() => {
     rearmAutoWriteRef.current = rearmAutoWrite;
@@ -1324,8 +1301,8 @@ function AppFrame() {
    *    소모한다(`spendAutoWrite`): 다시 마운트된 판정은 방금 지운 어제를 「안 쓴 날」로 넘기므로, 소모하지 않으면 홈이 지운
    *    직후 그 날을 다시 쓴다. 뒤에 소모하면 새 홈의 057 effect가 먼저 시작한다.
    *
-   * 기다리는 동안 홈이 다른 이유로 다시 마운트되면 응답이 오지 않는다 — 그 다른 이유(`autoGeneratedToken`)는 첫 실행 단계에서만
-   * 오르고, 그동안은 설정에 닿을 수 없다(R1).
+   * 기다리는 동안 홈이 다른 이유로 다시 마운트되면 응답이 오지 않는다 — 그 다른 이유(첫 쓰기 실패의 되돌림, 111)는 첫 실행 단계에서만
+   * 일어나고, 쓰는 중에 지우기를 눌렀다면 그 쓰기는 그만둠으로 끝나 되돌리지 않는다(R1).
    */
   const [wipeRequest, setWipeRequest] = useState(0);
   const [diaryKey, setDiaryKey] = useState(0);
@@ -1432,7 +1409,8 @@ function AppFrame() {
   const onSkipLiveness = useCallback(() => {
     finishWelcome();
     setLivenessSkipped(true);
-  }, [finishWelcome]);
+    firstDiaryLivenessSkipped();
+  }, [finishWelcome, firstDiaryLivenessSkipped]);
 
   /**
    * 준비된 캐릭터의 이름을 바꾼다 (035 FR-022·FR-024·FR-025).
@@ -1669,7 +1647,7 @@ function AppFrame() {
     );
   }
 
-  if (firstRunStage === "naming" || firstRunStage === "liveness") {
+  if (firstRunStage === "naming" || firstRunStage === "liveness" || readingFirstMaterial) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
         <WelcomeScreen
@@ -1703,11 +1681,9 @@ function AppFrame() {
       */}
       <View style={styles.stack}>
         <DiarySection
-          // ★ 040 — 자동 첫 일기 생성이 끝나면 다시 마운트해 목록을 읽게
-          //   한다(SC-003, 위 `autoGeneratedToken` 주석 참조). 048 — 고른 날은 이 재마운트와
-          //   설정 왕복에도 남도록 `AppFrame`이 들고 있다(Q4).
-          // 058 — 일기를 모두 지운 뒤에도 다시 마운트한다(`diaryKey`).
-          key={`diary-${autoGeneratedToken}-${diaryKey}`}
+          // 048 — 고른 날은 재마운트와 설정 왕복에도 남도록 `AppFrame`이 들고 있다(Q4).
+          // 058 — 일기를 모두 지운 뒤에 다시 마운트한다(`diaryKey`).
+          key={`diary-${diaryKey}`}
           onRedownload={onRedownload}
           onOpenSettings={openSettings}
           covered={homeCovered}
@@ -1739,6 +1715,8 @@ function AppFrame() {
           // 060 — 진단 「지금 한 번 써 보기」가 홈에 올리는 쓰기 요청
           writeRequest={writeRequest}
           onWriteRequestHandled={onWriteRequestHandled}
+          // 111 — 첫 일기 쓰기 요청의 끝
+          onWriteRequestSettled={firstDiary.onWriteSettled}
           // 064 — 상태 흉내: 홈 표시(지금·미리보기·실패 토스트)와 쓰기 차단
           now={homeNow}
           homePreviewDay={homePreviewDay}
@@ -1874,6 +1852,10 @@ function AppFrame() {
             onPick={(day) => setSimulationDate(day)}
             open={simulationDateOpen}
           />
+        )}
+        {/* 111 — 재료가 있는 첫 실행에서 첫 일기를 쓸지 묻는다. 뒤로 가기는 「나중에」와 같다 */}
+        {firstDiary.step === "asking" && (
+          <FirstDiaryConfirmDialog onConfirm={firstDiary.confirm} onLater={firstDiary.later} />
         )}
         {/* 106 — 빠른 주기 켜기 확인(오늘 일기가 있을 때). 개발 환경에서만 상태가 선다 */}
         {fastCycle.pendingEnable !== null && (
@@ -2074,6 +2056,9 @@ const CONTINUED_SAVED_DEPS: ContinuedSavedDeps = {
     ),
 };
 
+/** 060 진단 「지금 한 번 써 보기」와 111 첫 일기가 홈에 올리는 쓰기 요청. `firstDiary`는 첫 일기 요청에만 있다 */
+type WriteRequest = { id: number; day: DayDate; firstDiary?: FirstDiaryRequestMark };
+
 /**
  * 일기 화면을 조립한다.
  *
@@ -2106,6 +2091,7 @@ function DiarySection({
   onWipeReady,
   writeRequest,
   onWriteRequestHandled,
+  onWriteRequestSettled,
   now,
   homePreviewDay,
   writeBlocked,
@@ -2123,8 +2109,10 @@ function DiarySection({
   simulation?: { onOpenDeveloper: () => void };
   simulatedFailToast?: boolean;
   /** 060 — 진단 「지금 한 번 써 보기」가 올린 쓰기 요청. 홈이 시작하거나 거절하면 `onWriteRequestHandled`로 비운다 */
-  writeRequest?: { id: number; day: DayDate } | null;
+  writeRequest?: WriteRequest | null;
   onWriteRequestHandled?: (id: number) => void;
+  /** 111 — 첫 일기 요청이 끝날 때 한 번 */
+  onWriteRequestSettled?: (id: number, settled: FirstWriteSettled) => void;
   /** 058 — 일기 모두 지우기 요청 토큰. 홈이 멈춘 뒤 `onWipeReady`로 응답한다 */
   wipeRequest?: number;
   onWipeReady?: (token: number) => void;
@@ -2191,6 +2179,7 @@ function DiarySection({
   /** 저장된 선택. 아직 읽지 않았으면 null이며 그것은 「고른 적 없음」과 다르다 */
   const [stored, setStored] = useState<Character | null>(null);
   const [ready, setReady] = useState<Character[]>([]);
+  const [selectionRead, setSelectionRead] = useState(false);
 
   const selectionPort = useMemo(() => expoSelectionPort(), []);
 
@@ -2314,11 +2303,16 @@ function DiarySection({
   useEffect(() => {
     let alive = true;
     const run = () =>
-      void refreshSelection().then(({ found, saved }) => {
-        if (!alive) return;
-        setReady(found);
-        setStored(saved);
-      });
+      void refreshSelection()
+        .then(({ found, saved }) => {
+          if (!alive) return;
+          setReady(found);
+          setStored(saved);
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (alive) setSelectionRead(true);
+        });
     run();
     const sub = AppState.addEventListener("change", (s) => {
       if (s === "active") run();
@@ -2458,8 +2452,10 @@ function DiarySection({
       wipeRequest={wipeRequest}
       onWipeReady={onWipeReady}
       // 060 — 진단의 쓰기 요청과 쓰기 실패 기록(홈은 통로를 모른다 — 조립부가 연결한다)
-      writeRequest={writeRequest}
+      // 111 — 첫 일기 요청은 캐릭터 목록을 읽은 뒤에 넘긴다. 읽기 전에 넘기면 「작성자 없음」으로 거절된다
+      writeRequest={writeRequest?.firstDiary !== undefined && !selectionRead ? null : writeRequest}
       onWriteRequestHandled={onWriteRequestHandled}
+      onWriteRequestSettled={onWriteRequestSettled}
       recordFailure={recordFailure}
       // 064 — 상태 흉내
       {...(now !== undefined ? { now } : {})}

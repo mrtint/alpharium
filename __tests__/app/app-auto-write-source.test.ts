@@ -42,9 +42,9 @@ describe("OP1 — 앱 열기 자동 쓰기의 문", () => {
     );
   });
 
-  it("조립부가 040의 autoGenerateTried를 첫 실행 표식으로 넘긴다", () => {
+  it("조립부가 111 첫 일기 흐름의 표식을 첫 실행 표식으로 넘긴다", () => {
     expect(APP).toMatch(
-      /useAutoWriteClaim\(\{\s*simulationLoaded: simulation\.loaded,\s*writeBlocked,\s*firstRunTried: autoGenerateTried,\s*\}\)/,
+      /useAutoWriteClaim\(\{\s*simulationLoaded: simulation\.loaded,\s*writeBlocked,\s*firstRunTried: firstDiary\.entered,\s*\}\)/,
     );
     expect(APP.match(/useAutoWriteClaim\(/g)).toHaveLength(1);
   });

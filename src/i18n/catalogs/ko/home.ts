@@ -66,6 +66,13 @@ export const home = {
       `${name}${particleFor(name)} 쓰고 있어요. 시간이 다소 걸릴 수 있어요.`,
   },
 
+  /** 첫 일기 확인 (111, 규칙 문서 0-1) — 소유자 확정 2026-11-04 */
+  firstDiary: {
+    title: "오늘 사진으로 첫 일기를 써 볼까요?",
+    body: "사진과 다닌 곳으로 하루를 짐작해 써요. 몇 분 걸릴 수 있어요.",
+    yes: "써 보기",
+    later: "나중에",
+  },
   /** 쓸 재료 (053, 보드 `1d` ④·`2l`·`2m`·`2e`·`2f`). `confirmTitleUnseen`·`madeUpDay`는 사람이 정한 문장 */
   material: {
     photos: "사진",

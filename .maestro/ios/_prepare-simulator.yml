@@ -93,3 +93,14 @@ appId: com.a810labs.pocketlog
           timeout: 2000
 - assertVisible:
     id: "home-settings"
+
+# 111 — 오늘 사진이 있는 보관함이면 첫 일기 확인창이 홈 위에 뜬다. 준비 흐름은 쓰지 않는다.
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    when:
+      visible:
+        id: "first-diary-confirm-later"
+    commands:
+      - tapOn:
+          id: "first-diary-confirm-later"

@@ -151,3 +151,6 @@ export function writtenAtText(createdAt: Date, now: Date): string {
  * ─────────────────────────────────────────────────────────────────────────────
  */
 export const MATERIAL_TEXT = lazyText((c) => c.home.material);
+
+/** 111 — 첫 일기 확인 문구 (규칙 문서 0-1) */
+export const FIRST_DIARY_TEXT = lazyText((c) => c.home.firstDiary);

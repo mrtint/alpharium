@@ -110,8 +110,8 @@ const FLOWS = [
   // 040 — 초기 권한 획득과 첫 실행 흐름 재설계. **새 설치에서 로고 →
   // 권한 스텝 자동 순차 → 작명 화면(다운로드 대기 없이)까지 크래시
   // 없이 도달하는가**를 본다.
-  // ⚠️ **핵심 검증(실제 ~2GB 다운로드 완주 → liveness → 자동 첫 일기
-  // 생성, SC-002 체감 시간, 정오 이전 시각, 재시작 이어가기, 기존
+  // ⚠️ **핵심 검증(실제 ~2GB 다운로드 완주 → liveness → 첫 일기 분기,
+  // SC-002 체감 시간, 정오 이전 시각, 재시작 이어가기, 기존
   // 사용자 비노출)은 여기 없다** — 실제 다운로드·온디바이스 추론·기기
   // 시각 조작·재실행 타이밍이 필요하다. quickstart.md 1~12번을 손으로
   // 확인한다. **건너뛴 것은 통과가 아니다**(원칙 V).
@@ -174,11 +174,12 @@ const FLOWS = [
   ".maestro/settings-developer-sweep.yml",
   // 070 — 30일치 표본(MediaStore 사진)을 전제한다. `--layer1`의 「표본 보장」 단계가 심고 대표 날 값을 `-e`로 넘긴다 — 일반 실행(`pm clear`)에서는 표본도 값도 없어 실패한다.
   ".maestro/sample-days.yml",
-  // 073 — 층 2(실제 모델로 쓰는 스모크) 넷. `--layer2`가 흐름마다 기준 상태를 만들고 따로 부른다 — 일반 실행(`pm clear` 뒤)에서는 돌지 않는다(`LAYER2_FLOWS`). 근거와 단언은 각 파일 머리, 기능별 대응은 docs/e2e/feature-flow-map.md.
+  // 073·111 — 층 2(실제 모델로 쓰는 스모크) 다섯. `--layer2`가 흐름마다 기준 상태를 만들고 따로 부른다 — 일반 실행(`pm clear` 뒤)에서는 돌지 않는다(`LAYER2_FLOWS`). 근거와 단언은 각 파일 머리, 기능별 대응은 docs/e2e/feature-flow-map.md.
   ".maestro/layer2-write-and-read.yml",
   ".maestro/layer2-open-app-writes.yml",
   ".maestro/layer2-diagnostics-try-write.yml",
-  ".maestro/layer2-first-run-auto-diary.yml",
+  ".maestro/layer2-first-run-first-diary.yml",
+  ".maestro/layer2-first-run-no-material.yml",
 ];
 
 /**
@@ -249,7 +250,8 @@ const LAYER2_FLOWS = [
   ".maestro/layer2-write-and-read.yml",
   ".maestro/layer2-open-app-writes.yml",
   ".maestro/layer2-diagnostics-try-write.yml",
-  ".maestro/layer2-first-run-auto-diary.yml",
+  ".maestro/layer2-first-run-first-diary.yml",
+  ".maestro/layer2-first-run-no-material.yml",
 ];
 
 /** 결과 상태. skipped는 passed가 아니다. */
@@ -303,7 +305,11 @@ async function runLayer2Mode() {
   const requested = process.argv.slice(2).filter((arg) => arg !== "--layer2");
   const flows = requested.length > 0 ? table.filter((f) => requested.includes(f.file)) : table;
   const log = (line) => console.log(line);
-  const result = await runLayer2WithSample({ device: adbDevice(), flows, log }, realSampleStep(log));
+  const { adbTodayPhoto } = await import("./e2e-sample/today-photo.ts");
+  const result = await runLayer2WithSample(
+    { device: adbDevice(), flows, log, todayPhoto: adbTodayPhoto() },
+    realSampleStep(log),
+  );
   const collected = result.perFlow.filter((f) => f.collected !== undefined);
   if (collected.length > 0) {
     console.log("");

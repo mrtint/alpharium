@@ -50,10 +50,14 @@ function sampleStep(result: EnsureResult) {
 }
 
 describe("runLayer2WithSample", () => {
-  it("표본 보장 → 흐름 넷 실행", async () => {
+  it("표본 보장 → 흐름 다섯 실행", async () => {
     const { device, calls } = fakeDevice();
     const { step, calls: sampleCalls } = sampleStep({ status: "skipped" });
-    const result = await runLayer2WithSample({ device }, step);
+    const todayPhoto = {
+      seed: () => ({ ok: true, value: undefined }) as const,
+      remove: () => ({ ok: true, value: undefined }) as const,
+    };
+    const result = await runLayer2WithSample({ device, todayPhoto }, step);
     expect(result.status).toBe("passed");
     expect(sampleCalls).toEqual(["ensure"]);
     expect(calls.filter((c) => c === "maestro")).toHaveLength(LAYER2_FLOWS.length);

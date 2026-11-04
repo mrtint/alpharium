@@ -133,7 +133,7 @@ type World = {
   beginWrite: jest.SpyInstance;
   attemptPort: ReturnType<typeof ledgerPort>;
   skipPort: ReturnType<typeof memoryPort>;
-  /** 040 — 첫 실행의 자동 첫 일기를 시도한 실행인가 */
+  /** 111 — 첫 일기 흐름에 들어간 실행인가 */
   firstRunTried: { current: boolean };
   /** 어제에 재료가 있는가 — 테스트가 도중에 바꾼다 */
   material: { yesterday: boolean };
