@@ -1,0 +1,24 @@
+diff --git a/node_modules/expo-file-system/ios/FileSystemFile.swift b/node_modules/expo-file-system/ios/FileSystemFile.swift
+index bd07716..2ac32c2 100644
+--- a/node_modules/expo-file-system/ios/FileSystemFile.swift
++++ b/node_modules/expo-file-system/ios/FileSystemFile.swift
+@@ -59,8 +59,17 @@ internal final class FileSystemFile: FileSystemPath {
+         defer { try? handle.close() }
+ 
+         var hasher = Insecure.MD5()
+-        while let chunk = try handle.read(upToCount: bufferSize), !chunk.isEmpty {
+-          hasher.update(data: chunk)
++        // Pocketlog (patches/): each read returns an autoreleased buffer. Without a pool per read the whole file stays
++        // resident until the call returns (macOS probe: about 1.3 GB for a 1.5 GB file, 2 MB with the pool).
++        var reading = true
++        while reading {
++          try autoreleasepool {
++            if let chunk = try handle.read(upToCount: bufferSize), !chunk.isEmpty {
++              hasher.update(data: chunk)
++            } else {
++              reading = false
++            }
++          }
+         }
+ 
+         let hash = hasher.finalize()

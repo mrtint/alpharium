@@ -29,12 +29,15 @@ type Options = {
   free?: number;
   outcome?: TransferOutcome;
   hash?: string | null;
+  /** 받기 전과 받은 뒤의 지문이 다를 때(깨진 파일을 다시 받는 경우). `hash`보다 먼저 쓴다 */
+  hashes?: Record<string, string>;
 };
 
 function makePorts(options: Options = {}) {
   const files = new Map<string, number>(Object.entries(options.present ?? {}));
   const removed: string[] = [];
   const started: string[] = [];
+  const hashed: string[] = [];
   let metadata: string | null = null;
 
   const ports: VisionAcquisitionPorts = {
@@ -52,6 +55,12 @@ function makePorts(options: Options = {}) {
        * 준다**(「지문이 다르면 거부한다」).
        */
       async contentHash(key) {
+        hashed.push(key);
+        const once = options.hashes?.[key];
+        if (once !== undefined) {
+          delete options.hashes?.[key];
+          return once;
+        }
         if (options.hash !== undefined) return options.hash;
         return key === ASSETS.base.key ? ASSETS.base.md5 : ASSETS.projector.md5;
       },
@@ -99,7 +108,7 @@ function makePorts(options: Options = {}) {
     },
   };
 
-  return { ports, files, removed, started, metadataOf: () => metadata };
+  return { ports, files, removed, started, hashed, metadataOf: () => metadata };
 }
 
 describe("준비 상태 — 둘을 하나로 접는다 (FR-026)", () => {
@@ -154,6 +163,96 @@ describe("받기 — 두 파일을 함께 (FR-027)", () => {
 
     await prepareVision(ports);
     expect(started).toEqual([]);
+  });
+
+  // 110 — 검증 기록 전에 앱이 죽으면 크기만으로 성공을 돌려줘 받지도 준비되지도 못하는 상태에 갇혔다.
+  it("★ 온전하고 기록이 없으면 받지 않고 ready가 된다 (110)", async () => {
+    const { ports, started } = makePorts({
+      present: {
+        [ASSETS.base.key]: ASSETS.base.expectedBytes,
+        [ASSETS.projector.key]: ASSETS.projector.expectedBytes,
+      },
+      free: 0,
+    });
+
+    expect((await visionReadiness(ports)).kind).not.toBe("ready");
+    const result = await prepareVision(ports);
+
+    expect(result).toEqual({ ok: true });
+    expect(started).toEqual([]);
+    expect((await visionReadiness(ports)).kind).toBe("ready");
+  });
+
+  it("이미 준비됐으면 지문을 다시 계산하지 않는다 (110)", async () => {
+    const { ports, hashed } = makePorts();
+    await prepareVision(ports);
+    hashed.length = 0;
+
+    await prepareVision(ports);
+
+    expect(hashed).toEqual([]);
+  });
+
+  it("★ 크기만 맞고 내용이 다르면 지우고 그 파일만 다시 받는다 (110)", async () => {
+    const { ports, started, removed } = makePorts({
+      present: {
+        [ASSETS.base.key]: ASSETS.base.expectedBytes,
+        [ASSETS.projector.key]: ASSETS.projector.expectedBytes,
+      },
+      hashes: { [ASSETS.base.key]: "중간이 빈 파일" },
+    });
+
+    const result = await prepareVision(ports);
+
+    expect(result).toEqual({ ok: true });
+    expect(removed).toEqual([ASSETS.base.key]);
+    expect(started).toEqual([ASSETS.base.key]);
+    expect((await visionReadiness(ports)).kind).toBe("ready");
+  });
+
+  it("받은 직후의 검증 기록을 쓰지 못하면 성공으로 돌려주지 않는다 (110)", async () => {
+    const { ports } = makePorts();
+    ports.metadata.writeAtomically = async () => {
+      throw new Error("쓰지 못했다");
+    };
+
+    await expect(prepareVision(ports)).rejects.toThrow("쓰지 못했다");
+  });
+
+  it("먼저 한 검증의 기록을 쓰지 못하면 성공으로 돌려주지 않는다 (110)", async () => {
+    const { ports } = makePorts({
+      present: { [ASSETS.base.key]: ASSETS.base.expectedBytes },
+    });
+    ports.metadata.writeAtomically = async () => {
+      throw new Error("쓰지 못했다");
+    };
+
+    await expect(prepareVision(ports)).rejects.toThrow("쓰지 못했다");
+  });
+
+  it("지문을 계산하지 못하면 통과시키지 않고 받는다 (110)", async () => {
+    const { ports, started, removed } = makePorts({
+      present: { [ASSETS.base.key]: ASSETS.base.expectedBytes },
+      hashes: {},
+      hash: null,
+    });
+
+    const result = await prepareVision(ports);
+
+    expect(removed).toContain(ASSETS.base.key);
+    expect(started).toContain(ASSETS.base.key);
+    expect(result.ok).toBe(false);
+  });
+
+  it("기준보다 큰 파일은 있다고 보지 않고 받는다 (110)", async () => {
+    const { ports, started, hashed } = makePorts({
+      present: { [ASSETS.base.key]: ASSETS.base.expectedBytes + 1 },
+    });
+
+    await prepareVision(ports);
+
+    expect(started).toContain(ASSETS.base.key);
+    expect(hashed.filter((key) => key === ASSETS.base.key)).toHaveLength(1);
   });
 
   it("공간이 모자라면 거부한다 — 크기를 말하지 않는다 (003 FR-019a)", async () => {

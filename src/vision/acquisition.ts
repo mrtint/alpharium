@@ -25,6 +25,7 @@ import { readinessOf } from "../models/readiness";
 import type { DiskSpacePort, DownloadPort, MetadataPort, ModelFilePort } from "../models/port";
 import { readState, verdictFor, withVerdict, writeState } from "../models/storage";
 import type { DownloadFailure, ModelReadiness } from "../models/types";
+import { settleExistingFile } from "../models/verification";
 import { foldVisionReadiness } from "./readiness";
 import { visionAssets, type VisionAsset } from "./roster";
 
@@ -117,9 +118,13 @@ async function fetchOne(
   asset: VisionAsset,
   onBytes: (bytes: number) => void,
 ): Promise<VisionAcquisitionResult> {
-  // 이미 있으면 다시 받지 않는다.
-  const facts = await ports.files.facts(asset.key);
-  if (facts.exists && (facts.bytes ?? 0) >= asset.expectedBytes) {
+  // 110 — 이미 온전히 있으면 받지 않는다. 크기만 보면 검증 기록 없는 파일이 받지도 준비되지도 못한 채 남는다.
+  const existing = await settleExistingFile(ports, {
+    assetKey: asset.key,
+    expectedBytes: asset.expectedBytes,
+    expectedMd5: asset.md5,
+  });
+  if (existing === "ready") {
     onBytes(asset.expectedBytes);
     return { ok: true };
   }
@@ -162,7 +167,7 @@ async function fetchOne(
       // 로스터의 빈 `md5`로 드러나 있다(원칙 V).
       passed: asset.md5 === "" || hash === asset.md5,
     }),
-  ).catch(() => {});
+  );
 
   return { ok: true };
 }
