@@ -182,3 +182,56 @@ describe("안드로이드 잡 — 네트워크 제약 제거", () => {
     expect(pkg.expo?.autolinking?.android?.buildFromSource).toContain("expo-background-task");
   });
 });
+
+/**
+ * 2026-11-09 — 다음 요청은 JS 일을 시작하기 **전에** 낸다.
+ *
+ * 실기기(iPhone 14 11-05 08:19, iPhone 13 mini 11-06 20:09): 쓰기가 `signals`에서 멈춘 채 300초 예산이 끝나자 dasd가 작업을
+ * COMPLETED로 닫았고, 그 뒤 앱을 직접 열 때까지(나흘·사흘) 새 요청(`SUBMITTED`)이 한 줄도 없었다 — 다음 요청은 일이 끝난 뒤
+ * 비동기로만 냈고, 만료 처리기에서도 그 자리까지 가지 못했다(`Marking task … complete`조차 없음). 일이 시작되기 전에 이미 걸린
+ * 요청이 있으면, 한 번 멈춘 쓰기가 사슬을 끊지 못한다.
+ */
+describe("다음 요청을 먼저 낸다", () => {
+  const read = (rel: string) => strip(readFileSync(join(ROOT, rel), "utf8"));
+  const SCHEDULER = read("node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift");
+  const DELEGATE = read("node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift");
+  const CONSTANTS = read("node_modules/expo-background-task/ios/BackgroundTaskConstants.swift");
+
+  it("처리기가 무리의 첫 작업에서 runTasks 전에, 동기로 다음 요청을 낸다", () => {
+    const guardAt = DELEGATE.indexOf("guard BackgroundTaskGroup.shared.join(task) else");
+    const submitAt = DELEGATE.indexOf("BackgroundTaskScheduler.submitNextRequestsNow()");
+    expect(submitAt).toBeGreaterThan(guardAt);
+    expect(submitAt).toBeLessThan(DELEGATE.indexOf("runTasks("));
+    // Task { … } 안에 넣으면 비동기라 다시 경주가 된다
+    expect(DELEGATE.slice(guardAt, submitAt)).not.toMatch(/Task\s*\{/);
+  });
+
+  it("즉시 제출은 동기이고, 예약과 같은 요청 생성기를 쓴다", () => {
+    const body = SCHEDULER.match(
+      /public static func submitNextRequestsNow\(\) \{([\s\S]*?)\n  \}/,
+    )?.[1];
+    expect(body).toBeDefined();
+    expect(body).toMatch(/BGTaskScheduler\.shared\.submit\(/);
+    expect(body).toMatch(/makeRequests\(intervalSeconds: interval\)/);
+    expect(body).not.toMatch(/\bawait\b|\bTask\s*\{|async/);
+    // 간격을 모르면(JS가 아직 한 번도 등록하지 않았다) 내지 않는다
+    expect(body).toMatch(/guard interval > 0 else \{ return \}/);
+    expect(SCHEDULER).toMatch(
+      /func scheduleWorker\(\) throws \{[\s\S]*?makeRequests\(intervalSeconds: intervalSeconds\)/,
+    );
+    expect(SCHEDULER.match(/BGProcessingTaskRequest\(identifier:/g)).toHaveLength(2);
+  });
+
+  it("간격은 등록 때 UserDefaults에 남기고, 마지막 등록이 풀리면 지운다", () => {
+    expect(CONSTANTS).toContain('IntervalDefaultsKey = "pocketlog.bgIntervalSeconds"');
+    expect(SCHEDULER).toMatch(
+      /func didRegisterTask\(minutes: Int\?\) -> Bool \{[\s\S]*?UserDefaults\.standard\.set\(intervalSeconds, forKey: BackgroundTaskConstants\.IntervalDefaultsKey\)/,
+    );
+    expect(SCHEDULER).toMatch(
+      /func didUnregisterTask\(\) -> Bool \{[\s\S]*?UserDefaults\.standard\.removeObject\(forKey: BackgroundTaskConstants\.IntervalDefaultsKey\)/,
+    );
+    expect(SCHEDULER).toMatch(
+      /UserDefaults\.standard\.double\(forKey: BackgroundTaskConstants\.IntervalDefaultsKey\)/,
+    );
+  });
+});
