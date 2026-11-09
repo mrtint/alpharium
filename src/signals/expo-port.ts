@@ -13,6 +13,7 @@
  */
 
 import type { LocationOutcome, PermissionState, PhotoFacts, PhotoPort } from "./port";
+import { readUriWithin } from "./uri-deadline";
 
 /**
  * 이 앱은 **사진만** 본다.
@@ -174,7 +175,8 @@ export function expoPhotoPort(): PhotoPort {
         photoIds.map(async (id): Promise<[string, string | undefined]> => {
           try {
             const asset = new lib.Asset(id);
-            const uri = await asset.getUri();
+            // 2026-11-09 — 콜백이 오지 않는 경우가 있어 한도 안에서만 기다린다(uri-deadline.ts)
+            const uri = await readUriWithin(() => asset.getUri());
             // 073 — await 완료 시점까지 JS 참조를 유지해 Hermes GC 조기 수거 방지
             if (asset.id === "") return [id, undefined];
             return [id, folderNameOf(uri)];
@@ -231,7 +233,8 @@ export function expoPhotoPort(): PhotoPort {
       try {
         const lib = await import("expo-media-library");
         const asset = new lib.Asset(photoId);
-        const uri = await asset.getUri();
+        // 2026-11-09 — 콜백이 오지 않는 경우가 있어 한도 안에서만 기다린다(uri-deadline.ts)
+        const uri = await readUriWithin(() => asset.getUri());
         // 073 — await 완료 시점까지 JS 참조를 유지해 Hermes GC 조기 수거 방지
         if (asset.id === "") return null;
 

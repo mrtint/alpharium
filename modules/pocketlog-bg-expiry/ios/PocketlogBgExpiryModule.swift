@@ -52,6 +52,14 @@ public class PocketlogBgExpiryModule: Module {
       ]
     }.runOnQueue(.main)
 
+    // 2026-11-09 — 사진 경로 요청이 막힌 백그라운드 프로세스를 내린다. 정지한 사이 사진 서비스(assetsd)가 바뀐 프로세스는
+    // requestContentEditingInput 콜백이 다시 오지 않았다. 다음 요청은 이미 걸려 있어 새 프로세스로 깨어난다. JS는 앱이 뒤에 있는
+    // 백그라운드 실행에서만 부른다(schedule/task.ts). 정리 코드를 돌리지 않는 _exit — 막힌 스레드를 기다리지 않는다.
+    Function("exitStalledProcess") { () -> Void in
+      NSLog("[pocketlog] photo service stalled — ending background process")
+      _exit(0)
+    }
+
     OnStartObserving("onExpired") {
       guard self.observer == nil else { return }
       self.observer = NotificationCenter.default.addObserver(

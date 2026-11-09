@@ -18,11 +18,15 @@ import type { WakeKind } from "./auto-write-attempts";
 export const BG_EXPIRY_MODULE_NAME = "PocketlogBgExpiry";
 /** Swift `Events(...)`와 같아야 한다 */
 export const BG_EXPIRY_EVENT = "onExpired";
+/** Swift `Function(...)`과 같아야 한다 */
+export const BG_EXIT_FUNCTION = "exitStalledProcess";
 
 type ExpiryModule = {
   addListener(event: string, listener: (payload: unknown) => void): { remove(): void };
   /** 091 — 마지막으로 깬 iOS 요청 */
   wakeKind?(): unknown;
+  /** 2026-11-09 — 사진 경로 요청이 막힌 프로세스를 내린다 */
+  exitStalledProcess?(): void;
 };
 
 function nativeModule(): ExpiryModule | null {
@@ -69,5 +73,20 @@ export function subscribeBackgroundExpiry(listener: (at: Date) => void): () => v
     return () => subscription.remove();
   } catch {
     return () => {};
+  }
+}
+
+/**
+ * 2026-11-09 — 사진 경로 요청이 막힌 백그라운드 프로세스를 내린다(`uri-deadline.ts`). 다음 요청은 이미 걸려 있어(expo 패치
+ * `submitNextRequestsNow`) 새 프로세스로 깨어난다. 불렀으면 참(돌아오지 않는 것이 정상이다), 모듈이 없거나(안드로이드·jest) 실패하면 거짓.
+ */
+export function endStalledProcess(load: () => ExpiryModule | null = nativeModule): boolean {
+  try {
+    const native = load();
+    if (native?.exitStalledProcess === undefined) return false;
+    native.exitStalledProcess();
+    return true;
+  } catch {
+    return false;
   }
 }
