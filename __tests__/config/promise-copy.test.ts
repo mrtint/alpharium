@@ -85,7 +85,7 @@ describe("FX1 — 들이지 않은 것 (FR-019)", () => {
   });
 
   // 104 — 085 FR-019의 「예외 여부를 읽는 통로를 들이지 않는다」를 뒤집었다(소유자 결정 2026-10-15). 대신 읽는 곳을 하나로 잠근다.
-  it("expo-battery는 예외 읽기 통로 한 파일에서만 부른다", () => {
+  it("expo-battery는 예외 읽기 통로와 시도 줄 전원 기록 두 파일에서만 부른다", () => {
     const callers: string[] = [];
     const walk = (dir: string) => {
       for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
@@ -95,6 +95,9 @@ describe("FX1 — 들이지 않은 것 (FR-019)", () => {
       }
     };
     walk("src");
-    expect(callers).toEqual(["src/schedule/battery-exception-port.ts"]);
+    expect(callers.sort()).toEqual([
+      "src/app/power-state-port.ts",
+      "src/schedule/battery-exception-port.ts",
+    ]);
   });
 });

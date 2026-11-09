@@ -8,7 +8,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
+  BG_EXIT_FUNCTION,
   BG_EXPIRY_EVENT,
+  endStalledProcess,
   BG_EXPIRY_MODULE_NAME,
   expiryTimeOf,
   readWakeKind,
@@ -95,5 +97,32 @@ describe("091 WK1 — 깬 요청 읽기", () => {
         throw new Error("x");
       }),
     ).toBeUndefined();
+  });
+});
+
+/**
+ * 2026-11-09 — 사진 경로 요청이 막힌 백그라운드 프로세스를 내리는 네이티브 함수. 이름이 어긋나면 조용히 아무 일도 없다.
+ */
+describe("막힌 프로세스 내리기 — 네이티브 이름 대조", () => {
+  it("Swift가 같은 이름으로 _exit(0)을 부른다", () => {
+    expect(SWIFT).toContain(`Function("${BG_EXIT_FUNCTION}")`);
+    expect(SWIFT).toMatch(/Function\("exitStalledProcess"\)[\s\S]*?_exit\(0\)/);
+  });
+
+  it("모듈이 있으면 부르고 참, 없거나 던지면 거짓 — 던지지 않는다", () => {
+    const exit = jest.fn();
+    expect(endStalledProcess(() => ({ exitStalledProcess: exit }) as never)).toBe(true);
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(endStalledProcess(() => null)).toBe(false);
+    expect(
+      endStalledProcess(
+        () =>
+          ({
+            exitStalledProcess: () => {
+              throw new Error("x");
+            },
+          }) as never,
+      ),
+    ).toBe(false);
   });
 });

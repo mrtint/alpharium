@@ -14,10 +14,10 @@ index 74c5719..1cdeb2b 100644
  
      // Get Work manager
 diff --git a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
-index 98d87f8..33c3097 100644
+index 98d87f8..2484a8e 100644
 --- a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
 +++ b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
-@@ -7,15 +7,32 @@ import ExpoModulesCore
+@@ -7,15 +7,34 @@ import ExpoModulesCore
  public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
    public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
      if BackgroundTaskScheduler.supportsBackgroundTasks() {
@@ -41,6 +41,8 @@ index 98d87f8..33c3097 100644
 +        // Pocketlog 091: which request woke us — read by the app before it decides how fast to write.
 +        // Written only by the first task of a group, so a joining task cannot overwrite it.
 +        UserDefaults.standard.set(task.identifier, forKey: BackgroundTaskConstants.WakeIdentifierDefaultsKey)
++        // Pocketlog (2026-11-09): the next requests go in before the JS work — see submitNextRequestsNow.
++        BackgroundTaskScheduler.submitNextRequestsNow()
  
          // Set up expiration handler
          task.expirationHandler = { ()
@@ -52,7 +54,7 @@ index 98d87f8..33c3097 100644
            self.reschedule()
          }
  
-@@ -23,14 +40,15 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+@@ -23,14 +42,15 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
          if let taskService = EXTaskServiceHelper.sharedTaskService() {
            taskService.runTasks(with: EXTaskLaunchReasonBackgroundTask, userInfo: nil, completionHandler: { _ in
              // Mark iOS task as finished - this is important so that we can continue calling it
@@ -70,7 +72,7 @@ index 98d87f8..33c3097 100644
  
        // Signal to the scheduler that we're done.
        BackgroundTaskScheduler.bgTaskSchedulerDidFinishRegister()
-@@ -51,3 +69,31 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+@@ -51,3 +71,31 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
      }
    }
  }
@@ -103,10 +105,10 @@ index 98d87f8..33c3097 100644
 +  }
 +}
 diff --git a/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift b/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift
-index 39478bb..457b202 100644
+index 39478bb..4d5b596 100644
 --- a/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift
 +++ b/node_modules/expo-background-task/ios/BackgroundTaskConstants.swift
-@@ -3,6 +3,10 @@ import Foundation
+@@ -3,6 +3,12 @@ import Foundation
  
  public struct BackgroundTaskConstants {
    public static let BackgroundWorkerIdentifier = "com.expo.modules.backgroundtask.processing"
@@ -114,38 +116,50 @@ index 39478bb..457b202 100644
 +  // iOS CPU monitor, so the app writes slowly when woken by it. The handler records which one woke us.
 +  public static let BatteryWorkerIdentifier = "com.expo.modules.backgroundtask.processing.battery"
 +  public static let WakeIdentifierDefaultsKey = "pocketlog.bgWakeIdentifier"
++  // Pocketlog (patches/, 2026-11-09): the registered interval, readable synchronously by the launch handler.
++  public static let IntervalDefaultsKey = "pocketlog.bgIntervalSeconds"
    public static let EVENT_PERFORM_WORK = "onPerformWork"
    public static let EVENT_WORK_DONE = "onWorkDone"
  
 diff --git a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
-index 906678b..ed37746 100644
+index 906678b..cf48140 100644
 --- a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
 +++ b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
-@@ -90,12 +90,21 @@ public class BackgroundTaskScheduler {
+@@ -67,6 +67,7 @@ public class BackgroundTaskScheduler {
+       if let minutes = minutes {
+         intervalSeconds = Double(minutes) * 60
+       }
++      UserDefaults.standard.set(intervalSeconds, forKey: BackgroundTaskConstants.IntervalDefaultsKey)
+       numberOfRegisteredTasksOfThisType += 1
+ 
+       return numberOfRegisteredTasksOfThisType == 1
+@@ -74,6 +75,9 @@ public class BackgroundTaskScheduler {
+ 
+     func didUnregisterTask() -> Bool {
+       numberOfRegisteredTasksOfThisType = max(0, numberOfRegisteredTasksOfThisType - 1)
++      if numberOfRegisteredTasksOfThisType == 0 {
++        UserDefaults.standard.removeObject(forKey: BackgroundTaskConstants.IntervalDefaultsKey)
++      }
+       return numberOfRegisteredTasksOfThisType == 0
+     }
+ 
+@@ -89,13 +93,11 @@ public class BackgroundTaskScheduler {
+ 
        stopWorkerOnce()
  
-       let request = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
+-      let request = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
 -      request.requiresNetworkConnectivity = true
 -      request.requiresExternalPower = false
-+      // Pocketlog 090 (patches/): on-device inference needs no network, and only a task that requires
-+      // external power is exempt from the iOS CPU monitor (cpu_resource_fatal, 80% over 60s, seen on device).
-+      request.requiresNetworkConnectivity = false
-+      request.requiresExternalPower = true
-       request.earliestBeginDate = Date().addingTimeInterval(intervalSeconds)
+-      request.earliestBeginDate = Date().addingTimeInterval(intervalSeconds)
++      let (request, batteryRequest) = BackgroundTaskScheduler.makeRequests(intervalSeconds: intervalSeconds)
  
-+      // Pocketlog 091 (patches/): the battery request — runs without power, under the CPU monitor.
-+      let batteryRequest = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BatteryWorkerIdentifier)
-+      batteryRequest.requiresNetworkConnectivity = false
-+      batteryRequest.requiresExternalPower = false
-+      batteryRequest.earliestBeginDate = request.earliestBeginDate
-+
        do {
          try scheduler.submit(request)
 +        try scheduler.submit(batteryRequest)
        } catch let error as BGTaskScheduler.Error {
          switch error.code {
          case .unavailable:
-@@ -133,6 +142,7 @@ public class BackgroundTaskScheduler {
+@@ -133,11 +135,48 @@ public class BackgroundTaskScheduler {
  
      private func stopWorkerOnce() {
        scheduler.cancel(taskRequestWithIdentifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
@@ -153,3 +167,44 @@ index 906678b..ed37746 100644
      }
    }
  
+   private static let schedulerState = SchedulerState()
+ 
++  /// The two requests, with the Pocketlog 090·091 conditions. One builder for the scheduled and the immediate path.
++  static func makeRequests(intervalSeconds: TimeInterval) -> (BGProcessingTaskRequest, BGProcessingTaskRequest) {
++    let request = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BackgroundWorkerIdentifier)
++    // Pocketlog 090 (patches/): on-device inference needs no network, and only a task that requires
++    // external power is exempt from the iOS CPU monitor (cpu_resource_fatal, 80% over 60s, seen on device).
++    request.requiresNetworkConnectivity = false
++    request.requiresExternalPower = true
++    request.earliestBeginDate = Date().addingTimeInterval(intervalSeconds)
++
++    // Pocketlog 091 (patches/): the battery request — runs without power, under the CPU monitor.
++    let batteryRequest = BGProcessingTaskRequest(identifier: BackgroundTaskConstants.BatteryWorkerIdentifier)
++    batteryRequest.requiresNetworkConnectivity = false
++    batteryRequest.requiresExternalPower = false
++    batteryRequest.earliestBeginDate = request.earliestBeginDate
++    return (request, batteryRequest)
++  }
++
++  /**
++   Pocketlog (patches/, 2026-11-09): submits the next pair of requests right away, synchronously, from the launch
++   handler — before the JS work starts. The reschedule after the work is async, and it never ran when a write hung
++   until the 300 s budget expired (iPhone 14 2026-11-05 08:19, iPhone 13 mini 11-06 20:09: dasd COMPLETED the task,
++   then no request until the app was opened days later). With a request already pending, one hung run cannot end
++   the chain. Skipped until JS has registered the task once (the interval is unknown then).
++   */
++  public static func submitNextRequestsNow() {
++    let interval = UserDefaults.standard.double(forKey: BackgroundTaskConstants.IntervalDefaultsKey)
++    guard interval > 0 else { return }
++    let (request, batteryRequest) = makeRequests(intervalSeconds: interval)
++    do {
++      try BGTaskScheduler.shared.submit(request)
++      try BGTaskScheduler.shared.submit(batteryRequest)
++    } catch {
++      print("Background Task: could not submit the next requests: \(error.localizedDescription)")
++    }
++  }
++
+   /**
+    Call from the BackgroundTaskAppDelegate after the call to BGTaskScheduler.shared.register has finished
+    so that we can hold back any tryScheduleWorker calls, especially the call to BGTaskScheduler.shared.submit
