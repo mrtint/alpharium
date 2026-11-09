@@ -719,6 +719,25 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
     expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
   });
 
+  /**
+   * 2026-11-03 실기기(iPhone 13 mini·iPhone 14) — 앱 열기 쓰기 도중 깬 태스크가 칸을 못 차지해 아무것도 쓰지 않았는데 몫이 사라졌다.
+   * mini는 그 앱 열기 쓰기가 실패한 뒤에도 다음 깨움이 catch-up-spent로 끝났다. 몫이 막는 비용은 이 실행이 여는 모델이고, 칸을 못 차지하면 열지 않았다.
+   */
+  it("칸을 못 차지한 실행(already-running)은 몫을 쓰지 않는다 — 같은 날 다음 깨움이 쓴다", async () => {
+    const run = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, stage: "already-running", reason: "" })
+      .mockResolvedValueOnce({ ok: true, entry: {}, overwrote: false });
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(WITH_PHOTOS, run) });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(lastOutcome(made.attempts)).toBe("already-running");
+    expect(made.catchUp.content).toBeNull();
+
+    expect(await runAutoDiaryTask({ ...made.deps, now: at(16) })).toBe("ran");
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
+  });
+
   it("090 CU2 — 사진 권한 없음도 몫을 쓰지 않는다", async () => {
     const made = baseDeps({
       now: at(15),
