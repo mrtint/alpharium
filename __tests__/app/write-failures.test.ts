@@ -159,16 +159,6 @@ describe("WF2 — 기록하지 않는 것", () => {
     // 081 — 그만둔 것이 아닌 끊김은 자기 갈래로 남는다(전에는 unwritten이었다)
     expect(await loadWriteFailures(port)).toEqual([{ reason: "interrupted", at: AT }]);
   });
-
-  // FR-016 — 첫 실행 자동 첫 일기에는 시도 기록도 알림도 없다. 그만둔 그 쓰기가 실패로 남지 않는 길은 이 한 곳이다.
-  it("첫 실행 자동 첫 일기는 결과를 그대로 이 함수에 넘긴다", () => {
-    const code = readFileSync(join(__dirname, "../../src/app/wiring.ts"), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "")
-      .replace(/\/\/.*$/gm, "");
-    const trigger = code.slice(code.indexOf("export async function triggerFirstRunAutoDiary"));
-
-    expect(trigger).toMatch(/\.then\(\(result\) =>\s*recordWriteFailure\([^,]+,\s*result,/);
-  });
 });
 
 describe("WF4 — 더하기와 상한", () => {

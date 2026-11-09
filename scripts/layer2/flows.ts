@@ -25,11 +25,28 @@ export type Layer2Flow = {
   deleteFiles: readonly string[];
   /** 일기 픽스처에서 뺄 날 — 흐름이 쓸 날은 비어 있어야 한다 */
   absentDays: readonly FixtureDayKey[];
-  /** 흐름이 쓰는 날 — 끝나고 그 날의 일기를 가져온다 */
-  writtenDay: "today" | "yesterday";
+  /** 흐름이 쓰는 날 — 끝나고 그 날의 일기를 가져온다. `null`은 일기를 쓰지 않는 흐름이다(111) */
+  writtenDay: "today" | "yesterday" | null;
+  /** 흐름 앞에 오늘 찍은 표본 사진 한 장을 심고 끝나면 지우는가(111 — 표본은 1~30일 전뿐이라 오늘의 재료가 없다) */
+  seedsTodayPhoto?: true;
 };
 
 const none = (): PreferenceWrite[] => [];
+
+/** 첫 실행 흐름의 출발 상태 — 온보딩을 되돌린다 */
+const firstRunOverrides = (): PreferenceWrite[] => [
+  {
+    file: "onboarding.json",
+    content: JSON.stringify({
+      completed: false,
+      batteryNoticeShown: true,
+      welcomeShown: false,
+      downloadConsented: true,
+    }),
+  },
+];
+/** 이름을 새로 짓는 단계가 돌도록 지난 실행의 이름을 지운다 */
+const FIRST_RUN_DELETE = ["character-names.json"];
 
 export const LAYER2_FLOWS: readonly Layer2Flow[] = [
   {
@@ -60,22 +77,20 @@ export const LAYER2_FLOWS: readonly Layer2Flow[] = [
     writtenDay: "today",
   },
   {
-    file: ".maestro/layer2-first-run-auto-diary.yml",
-    story: "첫 실행 자동 첫 일기 — 모델은 이미 있다 (040)",
-    preferenceOverrides: () => [
-      {
-        file: "onboarding.json",
-        content: JSON.stringify({
-          completed: false,
-          batteryNoticeShown: true,
-          welcomeShown: false,
-          downloadConsented: true,
-        }),
-      },
-    ],
-    // 이름을 새로 짓는 단계가 돌도록 지난 실행의 이름을 지운다
-    deleteFiles: ["character-names.json"],
+    file: ".maestro/layer2-first-run-first-diary.yml",
+    story: "첫 일기 분기, 재료 있음 — 확인창 → 쓰는 중 → 쓴 날 (111, 모델은 이미 있다)",
+    preferenceOverrides: firstRunOverrides,
+    deleteFiles: FIRST_RUN_DELETE,
     absentDays: ["today"],
     writtenDay: "today",
+    seedsTodayPhoto: true,
+  },
+  {
+    file: ".maestro/layer2-first-run-no-material.yml",
+    story: "첫 일기 분기, 재료 없음 — 안내 없이 안 쓴 날 (111, 안드로이드 전용)",
+    preferenceOverrides: firstRunOverrides,
+    deleteFiles: FIRST_RUN_DELETE,
+    absentDays: ["today"],
+    writtenDay: null,
   },
 ];

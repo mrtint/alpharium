@@ -20,7 +20,7 @@
  */
 
 import { dayBounds, dayOf, includesTodayAtHour, type DayDate } from "../config/day-boundary";
-import { REMINDER_DELAY_MINUTES } from "./reminder-plan";
+import { REMINDER_DELAY_MINUTES } from "./reminder-delay";
 import type { AutoDiarySettings } from "./settings";
 
 /** 목표 시각으로부터 이 시간 안에 들면 「시도 창」이다. 근사치(FR-002)라 넉넉하다. 배포 값이며 밖으로 내보내지 않는다. */

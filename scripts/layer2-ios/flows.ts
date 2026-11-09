@@ -10,13 +10,13 @@
 import { LAYER2_FLOWS as ANDROID_FLOWS, type Layer2Flow } from "../layer2/flows.ts";
 
 export type Layer2IosFlow = {
-  id: "write-and-read" | "open-app-writes" | "diagnostics-try-write" | "first-run-auto-diary";
+  id: "write-and-read" | "open-app-writes" | "diagnostics-try-write" | "first-run-first-diary";
   /** 안드로이드 `Layer2Flow`와 같은 출발 상태·쓴 날 (재사용) */
   story: Layer2Flow["story"];
   preferenceOverrides: Layer2Flow["preferenceOverrides"];
   deleteFiles: Layer2Flow["deleteFiles"];
   absentDays: Layer2Flow["absentDays"];
-  writtenDay: Layer2Flow["writtenDay"];
+  writtenDay: NonNullable<Layer2Flow["writtenDay"]>;
   /** `ios:seed`로 쓴 날에 사진을 심는가 */
   seedsPhotos: boolean;
   /** 사람이 할 조작 안내문(순서 있는 목록). 비어 있으면 완전 자동 */
@@ -41,6 +41,8 @@ function define(
   extra: { seedsPhotos: boolean; humanSteps: readonly string[] },
 ): Layer2IosFlow {
   const base = reuse(id);
+  // 일기를 쓰지 않는 흐름(재료 없음, 111)은 안드로이드 전용이다 — iOS 층 2는 사진을 심는 전제라 시뮬레이터로 본다
+  if (base.writtenDay === null) throw new Error(`${id}는 일기를 쓰지 않아 iOS 층 2에 없다`);
   return {
     id,
     story: base.story,
@@ -72,12 +74,13 @@ export const IOS_LAYER2_FLOWS: readonly Layer2IosFlow[] = [
       "쓰는 중 화면이 뜨면 앱을 앞에 두고 기다린다.",
     ],
   }),
-  define("first-run-auto-diary", {
-    seedsPhotos: false,
+  define("first-run-first-diary", {
+    seedsPhotos: true,
     humanSteps: [
       "권한 창(사진·위치·알림)이 뜨면 허용한다.",
       "작명 화면에서 이름을 입력하고 완료한다(키보드가 버튼을 가리면 키보드의 완료 키).",
-      "「정상 동작 확인」이 끝나고 홈이 뜨면 앱을 앞에 둔다. 실패 화면이면 「그냥 시작하기」를 누른다.",
+      "「정상 동작 확인」이 끝나면 「오늘 사진으로 첫 일기를 써 볼까요?」에서 「써 보기」를 누른다. 실패 화면이면 「다시 시도」를 누른다.",
+      "쓰는 중 화면이 뜨면 앱을 앞에 두고 기다린다.",
     ],
   }),
 ];

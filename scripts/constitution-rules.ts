@@ -1012,9 +1012,8 @@ export function checkPromptFile(fileName: string, contents: string): Violation[]
  *  - `models/roster`·`ModelAsset`·`assetFor`·`diary/prompt`(`buildPrompt`)·
  *    `diary/acceptance` — 이 계층은 캐릭터가 무슨 모델을 쓰는지, 일기가 어떻게
  *    조립되는지 몰라도 된다(원칙 III).
- *  - `diary/pipeline.run(` 직접 호출 — `resolveFirstRunStage`·`shouldAutoGenerate`는
- *    "시도해야 하는가"라는 불리언만 답한다. 실제 실행은 `app/wiring.ts`에만
- *    있어야 한다(research.md #4, G7) — 타입 참조(`import type`)는 허용한다.
+ *  - `diary/pipeline.run(` 직접 호출 — `resolveFirstRunStage`·`firstDiaryNext`는
+ *    "다음 단계가 무엇인가"만 답한다. 실제 쓰기는 홈이 한다(111, 옛 G7) — 타입 참조(`import type`)는 허용한다.
  *
  * **045에서 「시간·진행 지표 어휘 전면 금지」(옛 G8)를 뺐다**(저장소 소유자
  * 지시, 2026-09-19). 040은 SC-002의 "수 초 이내"라는 성능 임계값을 코드에

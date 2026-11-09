@@ -366,7 +366,7 @@ describe("iOS 층 2 실행기 (097)", () => {
   });
 
   it("리뷰 4 — 중간에 aborted로 끝나도 기준 상태로 되돌린다 (자동 쓰기 켜짐이 남지 않게)", async () => {
-    const { deps, events } = build({ enter: "no-tty" }, only("first-run-auto-diary"));
+    const { deps, events } = build({ enter: "no-tty" }, only("first-run-first-diary"));
     const result = await runLayer2Ios(deps);
     expect(result.status).toBe("aborted");
     const lastLaunch = events.lastIndexOf("launch");

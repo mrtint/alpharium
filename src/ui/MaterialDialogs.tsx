@@ -14,12 +14,13 @@
  *   「아무 기록도 없어요」(관측된 0)와 「기록을 볼 수 없어요」(전부 권한 없음)로 갈린다 — 기록이 없는지
  *   모르는 상태를 「없다」로 단정하지 않는다(원칙 V).
  * - `SettingsPromptDialog`(`2m` 이미 거부한 경우) — 앱이 다시 물을 수 없을 때 설정으로 안내한다.
+ * - `FirstDiaryConfirmDialog`(111, 규칙 문서 0-1) — 첫 실행에서 재료가 있을 때 첫 일기를 쓸지 묻는다. `AppFrame`이 홈 위에 그린다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import type { MaterialDecision } from "../app/material";
 import { ConfirmDialog, DialogActionButton, DialogCancelButton } from "./components/Dialog";
-import { MATERIAL_TEXT } from "./home-text";
+import { FIRST_DIARY_TEXT, MATERIAL_TEXT } from "./home-text";
 
 export type MaterialConfirmDialogProps = {
   because: Extract<MaterialDecision, { kind: "confirm" }>["because"];
@@ -75,6 +76,33 @@ export function SettingsPromptDialog({ onOpenSettings, onCancel }: SettingsPromp
       open
       testID="settings-prompt"
       title={MATERIAL_TEXT.settingsTitle}
+    />
+  );
+}
+
+export type FirstDiaryConfirmDialogProps = {
+  onConfirm: () => void;
+  onLater: () => void;
+};
+
+export function FirstDiaryConfirmDialog({ onConfirm, onLater }: FirstDiaryConfirmDialogProps) {
+  return (
+    <ConfirmDialog
+      actions={
+        <>
+          <DialogActionButton onPress={onConfirm} testID="first-diary-confirm-yes">
+            {FIRST_DIARY_TEXT.yes}
+          </DialogActionButton>
+          <DialogCancelButton onPress={onLater} testID="first-diary-confirm-later">
+            {FIRST_DIARY_TEXT.later}
+          </DialogCancelButton>
+        </>
+      }
+      description={FIRST_DIARY_TEXT.body}
+      onCancel={onLater}
+      open
+      testID="first-diary-confirm"
+      title={FIRST_DIARY_TEXT.title}
     />
   );
 }

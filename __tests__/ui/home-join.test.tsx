@@ -199,7 +199,7 @@ describe("H1·H2 — 남의 쓰기가 살아 있으면 그 날의 쓰는 중이 
     });
   });
 
-  it("화면이 조립한 남의 쓰기(첫 실행 자동 첫 일기)에도 합류한다 — 주체를 묻지 않는다", async () => {
+  it("화면이 조립한 남의 쓰기에도 합류한다 — 주체를 묻지 않는다", async () => {
     const registry = createLiveWrites();
     foreignWrite(registry, { owner: "screen" });
 

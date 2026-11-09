@@ -60,7 +60,8 @@ import {
 } from "../app/state";
 import type { ContinuedSession, ContinuedWrite } from "../app/continued-write";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
-import { TOAST_TEXT, type PipelineFailure } from "../app/failure-toast";
+import { TOAST_TEXT, toastKindFor, type PipelineFailure } from "../app/failure-toast";
+import type { FirstWriteSettled } from "../app/first-diary-material";
 import { paperFor, type LoadedEntry } from "../app/written-day";
 import type { ConstraintKind } from "../app/constraint-band";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
@@ -68,7 +69,7 @@ import type { EnvironmentResolution } from "../config/types";
 import type { LiveWrite, LiveWrites } from "../diary/live-write";
 import { pickMonologue } from "../diary/monologue";
 import { PERSONA_NAMES } from "../diary/persona";
-import type { Pipeline } from "../diary/pipeline";
+import type { Pipeline, PipelineResult } from "../diary/pipeline";
 import type { DiaryStore } from "../diary/store";
 import { listDiaries } from "../diary/store";
 import type { Character } from "../diary/types";
@@ -199,7 +200,7 @@ export type DiaryHomeScreenProps = {
    */
   autoWriteDay?: DayDate | null;
   /**
-   * 057 — 실제로 시작하는 순간에만 부른다. 거짓이면 이번 실행에서 이미 시작했거나 첫 실행 자동 첫 일기가 돌았다
+   * 057 — 실제로 시작하는 순간에만 부른다. 거짓이면 이번 실행에서 이미 시작했거나 첫 일기 흐름에 들어갔다
    * (FR-017·FR-020). 시작하지 않은 판정은 부르지 않는다 — 「한 번」을 소모하지 않는다.
    */
   claimAutoWrite?: () => boolean;
@@ -212,7 +213,7 @@ export type DiaryHomeScreenProps = {
   /**
    * 080 — 살아 있는 쓰기 등록부 (specs/080-live-write-registry/contracts/live-write.md H1~H12).
    *
-   * 홈이 스스로 시작하지 않은 쓰기(백그라운드 자동 쓰기·진단의 수동 실행·첫 실행 자동 첫 일기)가 살아 있으면 홈은 그 날의
+   * 홈이 스스로 시작하지 않은 쓰기(백그라운드 자동 쓰기 등)가 살아 있으면 홈은 그 날의
    * 「쓰는 중」으로 **합류한다** — 두 번째 쓰기를 시작하지 않고, 모델을 미리 열지도 않는다. 합류는 관찰이다: 앞을 벗어나도
    * 끊지 않고 「그만두기」만 그 쓰기를 끊는다. **조립부가 앱의 그 하나를 넘긴다** — 화면은 등록부를 만들지도 값으로
    * import하지도 않는다. 주지 않으면 합류가 없다(옛 호출자·테스트 무변경).
@@ -230,8 +231,18 @@ export type DiaryHomeScreenProps = {
    * 오늘 일기가 이미 있어도 덮어쓰기 확인(050)·재료 확인(053)을 거치지 않는다(보드 `6k`). 이미 쓰는 중이면 시작하지 않고 요청만 비운다.
    * 시작하거나 거절하면 `onWriteRequestHandled(id)`를 부른다. 같은 번호는 한 번만 처리한다.
    */
-  writeRequest?: { id: number; day: DayDate } | null;
+  writeRequest?: {
+    id: number;
+    day: DayDate;
+    /**
+     * 111 — 첫 일기 흐름의 요청이다. 이어 하기를 신청하고(진단과 다르다), 끝나면 `onWriteRequestSettled`로 알린다.
+     * `silencesFailure`가 참인 실패는 토스트를 올리지 않는다 — 흐름이 정상 동작 확인으로 되돌린다. 실패 기록은 그대로 남는다.
+     */
+    firstDiary?: { silencesFailure: (result: PipelineResult) => boolean };
+  } | null;
   onWriteRequestHandled?: (id: number) => void;
+  /** 111 — `firstDiary`가 있는 요청이 끝날 때 한 번 부른다(시작 거절 포함) */
+  onWriteRequestSettled?: (id: number, settled: FirstWriteSettled) => void;
   /**
    * 060 — 쓰기가 실패하면(그만두기는 제외) 그 결과로 부른다. **홈은 기록 통로를 모른다** — 조립부가 `recordWriteFailure`를 연결한다
    * (진단 「최근 실패」). 성공·그만두기에는 부르지 않는다.
@@ -279,6 +290,13 @@ const MIDNIGHT_TIMER_SLACK_MS = 1000;
  * 092 — 이어 쓰기 저장 뒤 완성 알림(맞추기 + 알림)을 기다리는 한도(ms). 사람이 정한 값 — 파일 몇 개와 알림 하나라 보통 1초 안이다(짐작).
  */
 const CONTINUED_SAVED_LIMIT_MS = 10_000;
+
+/** 111 — 첫 일기 쓰기가 결과 없이 던졌을 때 실패 기록·토스트·조용한 실패 판정이 보는 모양. 「생성 중 예외」 갈래다 */
+const THROWN_WRITE: PipelineFailure = {
+  ok: false,
+  stage: "generation",
+  reason: "generation-failed: threw",
+};
 
 /** `work`가 끝나거나 `ms`가 지나면 풀린다. 던지지 않는다 */
 async function withinLimit(work: Promise<unknown>, ms: number): Promise<void> {
@@ -343,6 +361,7 @@ export function DiaryHomeScreen({
   onWipeReady,
   writeRequest,
   onWriteRequestHandled,
+  onWriteRequestSettled,
   recordFailure,
   writeBlocked = false,
   onWriteBlocked,
@@ -819,9 +838,20 @@ export function DiaryHomeScreen({
       params: ResolvedParams,
       items: DiaryListItem[],
       // 092 — `continuable: false`는 이어 하기를 신청하지 않는다(진단의 수동 실행)
-      options: { auto?: boolean; continuable?: boolean } = {},
+      // 111 — `firstDiary`는 첫 일기 요청의 조용한 실패 판정과 끝 알림이다
+      options: {
+        auto?: boolean;
+        continuable?: boolean;
+        firstDiary?: {
+          silencesFailure: (result: PipelineResult) => boolean;
+          onSettled: (settled: FirstWriteSettled) => void;
+        };
+      } = {},
     ) => {
-      if (pipeline === undefined) return;
+      if (pipeline === undefined) {
+        options.firstDiary?.onSettled({ kind: "refused" });
+        return;
+      }
 
       // 071 — 이 시도의 번호. 그만두기·늦은 결과 처리·정리가 모두 이 번호로 가려진다(위 `attempt` 주석).
       const mine = ++attempt.current;
@@ -858,6 +888,8 @@ export function DiaryHomeScreen({
       // 092 — 이 쓰기의 이어 하기와 성패(닫을 때 넘긴다). 그만두기·실패·예외는 거짓으로 닫힌다(FR-007).
       let session: ContinuedSession | null = null;
       let succeeded = false;
+      // 111 — 중간에 빠져나가는 길은 모두 그만두기다. 결과를 받으면 아래에서 바꾼다.
+      let settled: FirstWriteSettled = { kind: "stopped" };
 
       try {
         if (previous !== null) {
@@ -909,6 +941,7 @@ export function DiaryHomeScreen({
 
         if (isCancelled()) return;
         succeeded = result.ok;
+        settled = { kind: "finished", result };
 
         // 092 FR-008 — 이어 하기를 받은 쓰기가 저장됐다(만료로 잃지 않았다). 앞에 없으면 조립부가 완성 알림을 띄운다 — 닫기(아래
         // `finally`) 전에 끝낸다. 걸려도 닫기를 붙잡지 않게 한도를 둔다(코드 리뷰 — 닫지 않으면 홈이 「쓰는 중」에 남는다).
@@ -941,8 +974,25 @@ export function DiaryHomeScreen({
         const busyElsewhere =
           (options.auto === true && !result.ok && result.stage === "already-running") ||
           blockedByWrite;
-        if (next.kind === "toast" && !busyElsewhere) {
+        if (
+          next.kind === "toast" &&
+          !busyElsewhere &&
+          !options.firstDiary?.silencesFailure(result)
+        ) {
           setToast({ id: ++toastId.current, text: TOAST_TEXT[next.toast] });
+        }
+      } catch (error) {
+        // 111 — 첫 일기 흐름은 예외도 실패로 받아 끝을 알린다(FO7). 그 밖의 쓰기는 종전대로 올린다.
+        if (options.firstDiary === undefined) throw error;
+        if (!isCancelled()) {
+          if (settled.kind !== "finished") {
+            settled = { kind: "threw" };
+            recordFailure?.(THROWN_WRITE);
+            if (!options.firstDiary.silencesFailure(THROWN_WRITE)) {
+              setToast({ id: ++toastId.current, text: TOAST_TEXT[toastKindFor(THROWN_WRITE)] });
+            }
+          }
+          setScreen(toList(items));
         }
       } finally {
         // 092 FR-007 — 이어 하기를 닫는다(받지 않았으면 세션이 아무 일도 하지 않는다).
@@ -954,6 +1004,7 @@ export function DiaryHomeScreen({
           inFlight.current = null;
         }
         settle();
+        options.firstDiary?.onSettled(settled);
       }
     },
     // 035 — `characterNames`가 빠지면 세션 중 이름을 바꿔도 옛 이름으로
@@ -1201,10 +1252,15 @@ export function DiaryHomeScreen({
     if (writeRequest == null || handledWriteRequest.current === writeRequest.id) return;
     if (covered) return;
     const id = writeRequest.id;
+    const { firstDiary } = writeRequest;
+    const refused = () => {
+      if (firstDiary !== undefined) onWriteRequestSettled?.(id, { kind: "refused" });
+    };
     // 064 — 흉내 중에는 시작하지 않고 요청만 비운다(HM2). 진단 행도 막히지만 홈이 마지막 방어다.
     if (writeBlocked || running.current || screen.kind === "writing") {
       handledWriteRequest.current = id;
       onWriteRequestHandled?.(id);
+      refused();
       return;
     }
     // 080 (코드 리뷰) — 남의 쓰기가 살아 있으면 「이미 쓰는 중」과 같다: 시작하지 않고 요청만 비운다. 그대로 두면 합류한 직후
@@ -1212,12 +1268,22 @@ export function DiaryHomeScreen({
     if (foreignWrite() !== null) {
       handledWriteRequest.current = id;
       onWriteRequestHandled?.(id);
+      refused();
       return;
     }
     if (!listRead.current || screen.kind !== "list") return;
     if (materialConfirm !== null || calendarOpen || settingsPromptOpen || deciding.current) return;
 
     const day = writeRequest.day;
+    // 111 — 확인창이 떠 있는 사이 그 날이 쓰였으면(백그라운드) 덮어쓰지 않는다. 진단 요청은 덮어쓰는 것이 계약이다(보드 `6k`).
+    // 목록이 낡았으면 다시 읽을 때까지 기다린다 — 다시 읽으면 화면 상태가 바뀌어 이 effect가 다시 돈다.
+    if (firstDiary !== undefined && listStale.current) return;
+    if (firstDiary !== undefined && screen.items.some((item) => item.day === day)) {
+      handledWriteRequest.current = id;
+      onWriteRequestHandled?.(id);
+      refused();
+      return;
+    }
     const outcome = resolve(day);
     handledWriteRequest.current = id;
     const items = screen.items;
@@ -1226,15 +1292,26 @@ export function DiaryHomeScreen({
       onWriteRequestHandled?.(id);
       if (outcome.kind === "no-ready-character") {
         setScreen(toFailed(text().home.needsAuthor));
+        refused();
         return undefined;
       }
       setChosenDay(day);
+      // 111 — 첫 일기는 쓰는 중 화면이 「앱을 나가도 계속 써요」라고 말하므로 이어 하기를 신청한다
+      if (firstDiary !== undefined) {
+        return generate({ ...outcome.params, day }, items, {
+          firstDiary: {
+            silencesFailure: firstDiary.silencesFailure,
+            onSettled: (settled) => onWriteRequestSettled?.(id, settled),
+          },
+        });
+      }
       // 092 — 진단의 수동 실행은 이어 하기를 신청하지 않는다(소유자 결정 — 홈이 시작한 쓰기만)
       return generate({ ...outcome.params, day }, items, { continuable: false });
     });
   }, [
     writeRequest,
     onWriteRequestHandled,
+    onWriteRequestSettled,
     writeBlocked,
     screen,
     covered,

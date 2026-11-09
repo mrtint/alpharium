@@ -33,6 +33,14 @@ export type Layer2Options = {
   log?: (line: string) => void;
   /** 흐름에 더해 넘길 `-e` 값(표본 대표 날 등) */
   env?: Readonly<Record<string, string>>;
+  /** 111 — `seedsTodayPhoto` 흐름이 쓴다. 없는데 그런 흐름을 돌리면 중단이다 */
+  todayPhoto?: TodayPhotoPort;
+};
+
+/** 오늘 찍은 사진 한 장을 기기 보관함에 심고 지우는 자리. 실제 구현은 `scripts/e2e-sample/today-photo.ts` */
+export type TodayPhotoPort = {
+  seed(now: Date): Outcome;
+  remove(): Outcome;
 };
 
 export const DEDICATED_DEVICE_NOTICE =
@@ -127,16 +135,40 @@ export function runLayer2(options: Layer2Options): Layer2Result {
       return { status: "aborted", reason: problem, perFlow };
     }
 
+    // 111 — 오늘의 재료. 표본 표에 없는 사진이라 흐름이 어떻게 끝나든 지운다
+    if (flow.seedsTodayPhoto === true) {
+      const seeded = options.todayPhoto?.seed(now) ?? { ok: false as const, detail: "통로가 없다" };
+      if (!seeded.ok) {
+        return { status: "aborted", reason: `오늘 사진을 심지 못했다: ${seeded.detail}`, perFlow };
+      }
+    }
+
     // L2-6 — 보고서에 실패한 흐름이 없는데 실패 코드면 기기 서버가 죽은 것이다. 한 번만 다시 돈다.
     let run = device.runMaestro([flow.file], env);
     if (run.status !== 0 && run.failed === null) {
       log("  Maestro가 보고서 없이 실패했다 — 기기 서버 문제일 수 있어 한 번 다시 돈다");
       const retried = prepare(flow);
-      if (retried !== null) return { status: "aborted", reason: retried, perFlow };
+      if (retried !== null) {
+        if (flow.seedsTodayPhoto === true) options.todayPhoto?.remove();
+        return { status: "aborted", reason: retried, perFlow };
+      }
       run = device.runMaestro([flow.file], env);
     }
 
-    if (run.status === 0) {
+    if (flow.seedsTodayPhoto === true) {
+      const removed = options.todayPhoto?.remove();
+      if (removed !== undefined && !removed.ok) log(`  오늘 사진을 지우지 못했다: ${removed.detail}`);
+    }
+
+    if (run.status === 0 && flow.writtenDay === null) {
+      // 111 SC-001 — 일기를 쓰지 않는 흐름은 오늘 일기 파일이 없어야 통과다. 못 읽으면 통과로 치지 않는다(원칙 V)
+      const diary = device.listDir(serial, "diary");
+      const clean = diary.ok && !diary.value.includes(`${today}.json`);
+      perFlow[index] = { file: flow.file, status: clean ? "passed" : "failed" };
+      if (!clean) {
+        failedNames.push(`${flow.file} (${diary.ok ? `일기 ${today}가 쓰였다` : diary.detail})`);
+      }
+    } else if (run.status === 0 && flow.writtenDay !== null) {
       perFlow[index] = { file: flow.file, status: "passed" };
       // L2-8 — 가져오기는 출력일 뿐이다. 실패해도 판정을 바꾸지 않는다.
       const day = dayOf[flow.writtenDay];

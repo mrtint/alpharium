@@ -15,7 +15,7 @@ describe("iOS 층 2 흐름 표 (097)", () => {
       "write-and-read",
       "open-app-writes",
       "diagnostics-try-write",
-      "first-run-auto-diary",
+      "first-run-first-diary",
     ]);
   });
 
@@ -48,8 +48,8 @@ describe("iOS 층 2 흐름 표 (097)", () => {
     }
   });
 
-  it("사진을 심는 흐름은 어제를 쓰는 둘뿐이다 (같은 날 재시딩 방지의 대상)", () => {
+  it("사진을 심는 흐름은 어제를 쓰는 둘과 오늘의 첫 일기다 (같은 날 재시딩 방지의 대상)", () => {
     const seeds = IOS_LAYER2_FLOWS.filter((f) => f.seedsPhotos).map((f) => f.id);
-    expect(seeds).toEqual(["write-and-read", "open-app-writes"]);
+    expect(seeds).toEqual(["write-and-read", "open-app-writes", "first-run-first-diary"]);
   });
 });
