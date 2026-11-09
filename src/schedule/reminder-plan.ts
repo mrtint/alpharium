@@ -29,18 +29,13 @@ import { dayOf, includesTodayAtHour, type DayDate } from "../config/day-boundary
 import type { BatteryExceptionStatus } from "./battery-exception-port";
 import { reminderTitle } from "./notification-text";
 import type { AutoDiarySettings } from "./settings";
+import { REMINDER_DELAY_MINUTES } from "./reminder-delay";
 import { isFastCycleTiming, type ScheduleTiming } from "./timing";
 
 /** 이 기능이 건 예약·알림을 가르는 유일한 규칙(data-model) */
 export const REMINDER_ID_PREFIX = "diary-reminder-";
 
-/**
- * 배터리 예외가 있을 때 쓸 차례 알림을 늦추는 분 (104).
- *
- * **사람이 정한 값이다 — 측정이 아니다**(원칙 V). 백그라운드 잡의 최소 반복 간격 15분(`background-port.ts`) + 백그라운드 쓰기 한도 600초(10분,
- * `assembly.ts`) = 최악 약 25분을 덮는다. 쓰기가 이 안에 저장되면 알림은 뜨기 전에 거둬지고 완성 알림만 온다.
- */
-export const REMINDER_DELAY_MINUTES = 30;
+export { REMINDER_DELAY_MINUTES };
 
 /** 예외 상태에서 알림 지연(분)을 정한다. 예외가 있다고 확인된 때만 늦춘다 — 모르는 것은 늦추지 않는다(원칙 V) */
 export function reminderDelayFor(status: BatteryExceptionStatus): number {
