@@ -37,7 +37,7 @@ import {
   writeState,
 } from "./storage";
 import type { DownloadFailure, DownloadProgress } from "./types";
-import { verifyDownloaded } from "./verification";
+import { settleExistingFile, verifyDownloaded } from "./verification";
 
 /**
  * 요구하는 공간 여유 배수.
@@ -127,6 +127,17 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
       running.set(character, slot);
       try {
         const asset = assetFor(character);
+        const target = {
+          assetKey: asset.key,
+          expectedBytes: asset.expectedBytes,
+          expectedMd5: asset.md5,
+        };
+
+        // 110 — 이미 온전히 있으면 받지 않는다. 공간 판정보다 먼저다: 받지 않을 파일에 공간을 요구하지 않는다.
+        if ((await settleExistingFile(ports, target)) === "ready") {
+          return { ok: true, verified: asset.md5 !== "" };
+        }
+
         const state = await readState(ports.metadata);
         const paused = pausedFor(state, asset.key);
         const segmented = segmentedFor(state, asset.key);
@@ -205,11 +216,7 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         }
 
         // 5. 다 받았다. **검증을 통과해야 쓸 수 있다**(FR-007, FR-021a).
-        const verdict = await verifyDownloaded(ports.files, {
-          assetKey: asset.key,
-          expectedBytes: asset.expectedBytes,
-          expectedMd5: asset.md5,
-        });
+        const verdict = await verifyDownloaded(ports.files, target);
 
         // 검증에 실패하면 기록을 남기되 **대체 자산으로 채우지 않는다**(FR-035, 원칙 I).
         // `withoutAsset`이 세그먼트 재개 상태도 함께 비운다 (026) — 다 받았으므로 유효하지 않다.

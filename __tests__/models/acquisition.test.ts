@@ -39,12 +39,17 @@ function harness(
     outcome?: TransferOutcome;
     available?: number;
     hash?: string | null;
+    /** 받기 전과 받은 뒤의 지문이 다를 때(깨진 파일을 다시 받는 경우). `hash`보다 먼저 쓴다 */
+    hashes?: (string | null)[];
+    hashThrows?: boolean;
     bytes?: number | null;
     progress?: TransferProgress[];
     metadata?: string | null;
   } = {},
 ) {
   const requested: Requested[] = [];
+  const removed: string[] = [];
+  const hashed: string[] = [];
   const created: string[] = [];
   let stored = options.metadata ?? null;
   let paused = false;
@@ -68,9 +73,16 @@ function harness(
       return { exists: bytes != null, bytes: bytes ?? null };
     },
     async contentHash(key) {
+      hashed.push(key);
+      if (options.hashThrows) throw new Error("읽지 못했다");
+      if (options.hashes !== undefined && options.hashes.length > 0) {
+        return options.hashes.shift() ?? null;
+      }
       return options.hash === undefined ? matchingHash(key) : options.hash;
     },
-    async remove() {},
+    async remove(key) {
+      removed.push(key);
+    },
     async bytesUsed() {
       return 0;
     },
@@ -118,6 +130,8 @@ function harness(
     ports: { files, metadata, disk, download },
     requested,
     created,
+    removed,
+    hashed,
     metadataPort: metadata,
     pauseNext: () => {
       paused = true;
@@ -197,9 +211,10 @@ describe("내려받기", () => {
     }
   }
 
+  // 110 — 파일이 없는 경우다. 기준 크기와 같은 파일이 있으면 받지 않고 검증만 한다.
   it("공간이 모자라면 요청하지 않고 거부한다", async () => {
     await withExpectedBytes(1000, async () => {
-      const h = harness({ available: 10 });
+      const h = harness({ available: 10, bytes: null });
 
       const result = await createAcquisition(h.ports).prepare("quiet");
 
@@ -212,7 +227,7 @@ describe("내려받기", () => {
   // A13 — 여유 0으로 받으면 방금 받은 모델이 지워질 수 있다 (FR-019b)
   it("남은 공간이 딱 맞으면 시작하지 않는다", async () => {
     await withExpectedBytes(1000, async () => {
-      const h = harness({ available: 1000 });
+      const h = harness({ available: 1000, bytes: null });
 
       const result = await createAcquisition(h.ports).prepare("quiet");
 
@@ -223,7 +238,7 @@ describe("내려받기", () => {
 
   it("여유까지 있으면 시작한다", async () => {
     await withExpectedBytes(1000, async () => {
-      const h = harness({ available: Math.ceil(1000 * SPACE_HEADROOM) + 1 });
+      const h = harness({ available: Math.ceil(1000 * SPACE_HEADROOM) + 1, bytes: null });
 
       await createAcquisition(h.ports).prepare("quiet");
 
@@ -551,5 +566,194 @@ describe("내려받기", () => {
       expect(json).not.toMatch(/http/i);
       expect(json).not.toContain("fallback");
     }
+  });
+});
+
+/**
+ * 110 — 받기 전에 먼저 검증한다.
+ *
+ * 받기가 끝난 뒤 검증 기록 전에 앱이 죽으면 온전한 파일이 기록 없이 남는다(iPhone 13 mini, 2026-11-01). 그 파일을 다시 받지 않되,
+ * 크기는 맞고 중간이 빈 파일을 통과시키지 않는다.
+ */
+describe("받기 전에 먼저 검증한다 (110)", () => {
+  const ASSET = assetFor("quiet");
+  const passedState = JSON.stringify({
+    verdicts: [
+      {
+        assetKey: ASSET.key,
+        verifiedMd5: ASSET.md5,
+        verifiedBytes: ASSET.expectedBytes,
+        passed: true,
+      },
+    ],
+  });
+
+  it("온전하고 기록이 없으면 받지 않고 검증 기록을 남긴다", async () => {
+    const { ports, requested, removed, metadataPort } = harness({ bytes: ASSET.expectedBytes });
+
+    const result = await createAcquisition(ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect(requested).toEqual([]);
+    expect(removed).toEqual([]);
+    const verdict = (await readState(metadataPort)).verdicts.find((v) => v.assetKey === ASSET.key);
+    expect(verdict?.passed).toBe(true);
+    expect(verdict?.verifiedBytes).toBe(ASSET.expectedBytes);
+  });
+
+  it("공간이 모자라도 온전한 파일은 거부하지 않는다", async () => {
+    const { ports, requested } = harness({ bytes: ASSET.expectedBytes, available: 0 });
+
+    const result = await createAcquisition(ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect(requested).toEqual([]);
+  });
+
+  it("이미 준비됐으면 받지도 지문을 계산하지도 않는다", async () => {
+    const { ports, requested, hashed } = harness({
+      bytes: ASSET.expectedBytes,
+      metadata: passedState,
+    });
+
+    const result = await createAcquisition(ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect(requested).toEqual([]);
+    expect(hashed).toEqual([]);
+  });
+
+  it("크기만 맞고 내용이 다르면 지우고 처음부터 받는다", async () => {
+    const { ports, requested, removed, metadataPort } = harness({
+      bytes: ASSET.expectedBytes,
+      hashes: ["중간이 빈 파일"],
+    });
+
+    const result = await createAcquisition(ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect(removed).toEqual([ASSET.key]);
+    expect(requested).toEqual([{ key: ASSET.key, url: ASSET.url, resumed: false }]);
+    const verdict = (await readState(metadataPort)).verdicts.find((v) => v.assetKey === ASSET.key);
+    expect(verdict?.passed).toBe(true);
+  });
+
+  it("깨진 파일을 지운 뒤 공간이 모자라면 받지 않고 거부한다", async () => {
+    const { ports, requested, removed } = harness({
+      bytes: ASSET.expectedBytes,
+      hashes: ["중간이 빈 파일"],
+      available: 0,
+    });
+
+    const result = await createAcquisition(ports).prepare("quiet");
+
+    expect(result).toEqual({ ok: false, failure: { kind: "insufficient-space" } });
+    expect(removed).toEqual([ASSET.key]);
+    expect(requested).toEqual([]);
+  });
+
+  it("옛 검증 실패 기록이 있어도 먼저 다시 검증한다", async () => {
+    const { ports, requested } = harness({
+      bytes: ASSET.expectedBytes,
+      metadata: JSON.stringify({
+        verdicts: [{ assetKey: ASSET.key, verifiedMd5: "x", verifiedBytes: 1, passed: false }],
+      }),
+    });
+
+    const result = await createAcquisition(ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect(requested).toEqual([]);
+  });
+
+  it("지문을 계산하지 못하면 통과시키지 않고 처음부터 받는다", async () => {
+    const { ports, requested, removed } = harness({
+      bytes: ASSET.expectedBytes,
+      hashes: [null],
+    });
+
+    await createAcquisition(ports).prepare("quiet");
+
+    expect(removed).toEqual([ASSET.key]);
+    expect(requested).toHaveLength(1);
+  });
+
+  it("지문 계산이 예외를 던져도 통과시키지 않고 처음부터 받는다", async () => {
+    const { ports, requested, removed, metadataPort } = harness({
+      bytes: ASSET.expectedBytes,
+      hashThrows: true,
+    });
+
+    // 받은 뒤의 검증도 던지므로 결과는 실패로 올라간다. 볼 것은 먼저 받으러 갔다는 것과 통과가 없다는 것이다.
+    await createAcquisition(ports)
+      .prepare("quiet")
+      .catch(() => {});
+
+    expect(removed).toEqual([ASSET.key]);
+    expect(requested).toHaveLength(1);
+    const verdict = (await readState(metadataPort)).verdicts.find((v) => v.assetKey === ASSET.key);
+    expect(verdict?.passed ?? false).toBe(false);
+  });
+
+  it("크기가 다르면 지문을 계산하지 않고 받는다", async () => {
+    const { ports, requested, hashed } = harness({ bytes: ASSET.expectedBytes - 1, hash: "x" });
+
+    await createAcquisition(ports).prepare("quiet");
+
+    expect(requested).toHaveLength(1);
+    // 받은 뒤의 검증 한 번뿐이다.
+    expect(hashed).toEqual([ASSET.key]);
+  });
+
+  it("파일과 어긋난 통과 기록은 받기 전에 지운다 — 받다 죽은 파일이 지문 없이 준비되지 않게", async () => {
+    const { ports, requested, metadataPort } = harness({
+      bytes: ASSET.expectedBytes - 1,
+      metadata: passedState,
+      outcome: { kind: "failed", reason: "끊겼다" },
+    });
+
+    await createAcquisition(ports).prepare("quiet");
+
+    expect(requested).toHaveLength(1);
+    expect((await readState(metadataPort)).verdicts).toEqual([]);
+  });
+
+  it("기준보다 큰 파일은 지우고 받는다 — 받아도 작아지지 않는다", async () => {
+    const { ports, requested, removed } = harness({ bytes: ASSET.expectedBytes + 1, hash: "x" });
+
+    await createAcquisition(ports).prepare("quiet");
+
+    expect(removed).toEqual([ASSET.key]);
+    expect(requested).toHaveLength(1);
+  });
+
+  it("이어받기 기록이 있으면 크기가 맞아도 먼저 검증하지 않고 이어받는다", async () => {
+    const { ports, requested, removed } = harness({
+      bytes: ASSET.expectedBytes,
+      metadata: JSON.stringify({
+        segmented: [
+          {
+            assetKey: ASSET.key,
+            totalBytes: ASSET.expectedBytes,
+            segmentCount: 4,
+            receivedBytes: [1, 2, 3, 4],
+          },
+        ],
+      }),
+    });
+
+    await createAcquisition(ports).prepare("quiet");
+
+    expect(removed).toEqual([]);
+    expect(requested).toEqual([{ key: ASSET.key, url: ASSET.url, resumed: true }]);
+  });
+
+  it("검증 기록을 쓰지 못하면 성공으로 돌려주지 않는다", async () => {
+    const { ports } = harness({ bytes: ASSET.expectedBytes });
+    ports.metadata.writeAtomically = async () => {
+      throw new Error("쓰지 못했다");
+    };
+
+    await expect(createAcquisition(ports).prepare("quiet")).rejects.toThrow("쓰지 못했다");
   });
 });
