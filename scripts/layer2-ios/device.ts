@@ -170,7 +170,7 @@ export function iosPhoneDevice(deps: Deps = {}): IosPhone {
           listed.json as {
             result?: {
               devices?: {
-                connectionProperties?: { pairingState?: string };
+                connectionProperties?: { pairingState?: string; tunnelState?: string };
                 hardwareProperties?: { deviceType?: string; reality?: string; udid?: string };
               }[];
             };
@@ -182,6 +182,8 @@ export function iosPhoneDevice(deps: Deps = {}): IosPhone {
             d.hardwareProperties?.reality === "physical" &&
             d.hardwareProperties?.deviceType === "iPhone" &&
             d.connectionProperties?.pairingState === "paired" &&
+            // 페어링만 남고 닿지 않는 기기(선을 뺀 iPhone)는 세지 않는다 — disconnected는 필요할 때 터널이 열린다
+            d.connectionProperties?.tunnelState !== "unavailable" &&
             typeof d.hardwareProperties?.udid === "string",
         )
         .map((d) => d.hardwareProperties!.udid!);

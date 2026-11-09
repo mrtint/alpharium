@@ -69,6 +69,22 @@ describe("iPhone 장치 (097)", () => {
     expect(setup().device.listDevices()).toEqual([UDID]);
   });
 
+  it("listDevices — 페어링만 남고 닿지 않는 iPhone(tunnelState unavailable)은 세지 않는다", () => {
+    // 2026-11-09 실기기: 선을 뺀 13 mini가 「unavailable」로 남아 「iPhone이 하나일 때만」에 막혔다
+    const base = listDevices as { result: { devices: Record<string, unknown>[] } };
+    const away = {
+      connectionProperties: { pairingState: "paired", tunnelState: "unavailable" },
+      hardwareProperties: {
+        deviceType: "iPhone",
+        reality: "physical",
+        udid: "00008110-00000000000000AA",
+      },
+    };
+    const json = { result: { devices: [...base.result.devices, away] } };
+    const device = iosPhoneDevice({ ctl: () => ({ ok: true, json }) });
+    expect(device.listDevices()).toEqual([UDID]);
+  });
+
   it("listDevices — devicectl을 못 부르면 null (건너뜀 이유)", () => {
     expect(
       iosPhoneDevice({ ctl: () => ({ ok: false, detail: "ENOENT" }) }).listDevices(),
