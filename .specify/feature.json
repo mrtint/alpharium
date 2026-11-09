@@ -1,1 +1,3 @@
-{"feature_directory":"specs/109-attempt-ledger"}
+{
+  "feature_directory": "specs/110-model-verify-before-redownload"
+}
