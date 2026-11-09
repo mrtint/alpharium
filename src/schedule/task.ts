@@ -53,7 +53,8 @@ import {
   type LaunchState,
   type WakeKind,
 } from "../app/auto-write-attempts";
-import { readWakeKind, subscribeBackgroundExpiry } from "../app/bg-expiry-port";
+import { endStalledProcess, readWakeKind, subscribeBackgroundExpiry } from "../app/bg-expiry-port";
+import { photoUriStalled } from "../signals/uri-deadline";
 import { readDeviceState } from "../app/device-state-port";
 import { readLaunchState } from "../app/launch-state-port";
 import { resetFastCycleIfDue } from "../app/fast-cycle-reset";
@@ -164,6 +165,10 @@ export type AutoDiaryTaskDeps = {
   wakeKind?: () => WakeKind | undefined;
   /** 2026-11-03 — 시도 줄에 싣는 기기 상태. 주지 않으면 `device-state-port` */
   readDeviceState?: () => Promise<AttemptDeviceState>;
+  /** 2026-11-09 — 이 프로세스의 사진 경로 요청이 막혔는가. 주지 않으면 `uri-deadline` */
+  photoStalled?: () => boolean;
+  /** 2026-11-09 — 막힌 프로세스를 내린다. 주지 않으면 `bg-expiry-port`(모듈이 없으면 아무 일도 없다) */
+  endProcess?: () => void;
 };
 
 /** 078 — 본체가 돌려주는 것: 태스크 결과와 시도 기록의 갈래 */
@@ -219,6 +224,16 @@ export async function runAutoDiaryTask(deps: AutoDiaryTaskDeps = {}): Promise<Au
   }
   const { result, outcome, day } = ended;
   await recordAttemptEnd(attemptPort, path, now, outcome, day);
+  // 2026-11-09 — 사진 경로 요청이 막힌 프로세스는 다음 깨움에서도 쓰지 못했다(uri-deadline.ts). 앱이 뒤에 있는 백그라운드 실행이면 끝을
+  // 남긴 뒤 내린다 — 다음 요청은 이미 걸려 있어 새 프로세스로 깨어난다. 막힌 프로세스에서는 알림 맞추기도 하지 않는다.
+  if (
+    path === "background" &&
+    (deps.photoStalled ?? photoUriStalled)() &&
+    safely(deps.launchState ?? readLaunchState) === "background"
+  ) {
+    (deps.endProcess ?? endStalledProcess)();
+    return result;
+  }
   // 085 — 성공이면 본체가 완성 알림 전에 이미 맞췄다(한 번만).
   if (result !== "ran") await reconcileAfterTask(deps);
   return result;
