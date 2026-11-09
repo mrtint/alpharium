@@ -146,7 +146,7 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 
 ## release 빌드·서명·Google Play — 요청받았을 때만 탄다
 
-> **⚠️ 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug) 빌드로만 하며, release 빌드·업로드는 저장소 소유자가 명시적으로 요청했을 때만 탄다.
+> **⚠️ 기본 작업 흐름이 아니다.** 실기기 검증은 dev(debug) 빌드로만 하며, release 빌드·업로드는 저장소 소유자가 명시적으로 요청했을 때만 탄다. **백그라운드 쓰기는 개발 빌드에서 기능 전체가 검증된 뒤에만 릴리스로 간다**(「작업 습관」 첫 항목).
 
 - **GitHub Actions 수동 워크플로**(076): `.github/workflows/android-release.yml`(`main`). 보호 환경 `android-release`의 secrets 넷(`ANDROID_KEYSTORE_BASE64`·`ANDROID_KEYSTORE_PASSWORD`·`ANDROID_KEY_PASSWORD`·`PLAY_SERVICE_ACCOUNT_JSON`)으로 `bundleRelease`(arm64-v8a) → 서명 지문(`scripts/android-release/upload-key.sha256`) 대조 → `scripts/android-release/play-upload.ts`로 Play 내부 테스트 업로드를 수행한다(`__tests__/ci/android-release-workflow.test.ts`).
 - **올리기 전에**: `app.json`의 `android.versionCode`를 Play의 마지막 번호보다 크게 올려 커밋한다 — 번호는 사람이 올리고, 워크플로의 「번호 점검」 단계(`version-check.mts`, 096)가 `npm ci` 앞에서 Play 번들 목록(`edits.bundles.list`, 편집은 열었다가 커밋 없이 버림 — 읽기 전용)을 읽어 같거나 작으면 이미 있는 번호와 올릴 값을 밝히며 실패하고, 못 읽어도(권한·네트워크) 건너뛰지 않고 실패한다. 통과하면 `버전 · versionCode · 커밋 · 스토어 마지막` 한 줄이 실행 요약에 남는다. **Play의 실제 응답과 서비스 계정의 목록 읽기 권한은 첫 실행에서 처음 본다**(테스트는 대역; 403이면 서비스 계정에 앱 정보 보기·릴리스 보기 권한). 실제 모델로 쓰는 경로를 [docs/e2e/layer2-release-checklist.md](docs/e2e/layer2-release-checklist.md)(`npm run test:layer2` + 일기 본문 읽기 + 사람이 보는 항목)로 확인한다. 제외 권한(`blockedPermissions`): `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`·`SYSTEM_ALERT_WINDOW`(065). **릴리스 노트(`release-notes/ko.txt`, 한국어 한 파일)를 이번 버전에 맞게 고쳐 같은 커밋에 넣는다** — Play 「출시 노하우」로 가고(`play-upload.mts --notes`, 500자 한도), 비었거나 넘으면 빌드 전에 설정 점검이 실패한다. 이 파일은 iOS와 같은 글이다.
@@ -180,6 +180,7 @@ __tests__/        기기 불필요 테스트 (항상 돈다)
 ## 작업 습관
 
 - 커밋 메시지는 한국어로 쓴다(헌법 「개발 방식」). 계약을 먼저 정하고 테스트를 먼저 쓴다.
+- **★ 백그라운드 쓰기는 개발 빌드에서 모든 기능을 완성해 검증한 뒤에만 릴리스 빌드로 간다**(소유자 결정, 2026-11-03). 릴리스 빌드(TestFlight·Play 내부 테스트)는 로그·디버거가 붙지 않아 멈춤의 원인을 못 본다 — 2026-11-02 밤 두 iPhone이 앱 열기 쓰기 도중 얼어 「그만두기」도 안 눌렸으나 TestFlight 설치본이라 막힌 줄을 못 봤다. **개발 서명 빌드(`get-task-allow`)에서 해당 기능이 끝나 통과하기 전에는 릴리스 빌드를 올리거나 기기에 깔지 않는다.** 시험 기기에는 개발 빌드만 둔다(`DEVELOPER_DIR=…/Xcode.app/Contents/Developer xcodebuild … CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE_SPECIFIER="Pocketlog Development" DEVELOPMENT_TEAM=PGNGG84B39 -destination id=<UDID>`로 CLI 빌드가 된다 — 프로필은 `~/Library/Developer/Xcode/UserData/Provisioning Profiles/`, 설치는 `devicectl device install app`, 로그는 `devicectl device process launch --console`).
 - **화면·페이지·문서 같은 디자인 산출물을 만들기 전에 [design/DESIGN.md](design/DESIGN.md)를 먼저 읽는다** — 토큰의 정본은 `design/tokens.json` 하나이고 앱·웹이 그것을 쓴다(089).
 - **`main`에서 직접 작업하지 않는다.** 기능마다 브랜치를 파고 PR로 머지한다. **작업을 시작하기 전에 `git branch --show-current`로 지금 브랜치를 눈으로 확인한다**(`.githooks/pre-commit`·`pre-push`).
 - **`README.md`에는 금방 낡는 정보를 두지 않는다**(소유자, 2026-10-30) — 버전·수치·기기·검증/출시 상태·실측 조건·스펙 번호·모델 이름·목록의 개수는 적지 않고 정본(`package.json`·이 문서·조건표·로드맵)으로 연결한다.
