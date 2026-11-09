@@ -139,6 +139,7 @@ describe("B2 — 판정 순서", () => {
     expect(pipelineRun).toHaveBeenCalledTimes(1);
     expect(pipelineRun).toHaveBeenCalledWith(
       expect.objectContaining({ day: "2026-08-27", character: "quiet", vision: "quick" }),
+      expect.any(Function),
     );
   });
 
@@ -165,7 +166,10 @@ describe("B2 — 판정 순서", () => {
   it("078 — 창이 지난 뒤(15시, 목표 7시)에도 어제가 비어 있으면 어제를 쓴다", async () => {
     const { deps, pipelineRun } = baseDeps({ now: at(15) });
     expect(await runAutoDiaryTask(deps)).toBe("ran");
-    expect(pipelineRun).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
+    expect(pipelineRun).toHaveBeenCalledWith(
+      expect.objectContaining({ day: "2026-08-27" }),
+      expect.any(Function),
+    );
   });
 
   it("078 — 오전 목표(7시)의 어제는 목표 시각 전(3시)에 쓰지 않는다", async () => {
@@ -980,5 +984,55 @@ describe("091 FR-003 — 깬 요청이 조립에 간다", () => {
       { lockOwner: "background", wake: "battery" },
       { lockOwner: "background" },
     ]);
+  });
+});
+
+/** 2026-11-03 — 멈추면 장부에 마지막 단계와 기기 상태가 남는다. 기록은 쓰기를 기다리게 하지 않는다. */
+describe("백그라운드 시도 줄의 단계와 기기 상태", () => {
+  const line = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: Record<string, unknown>[] }).items[0];
+  const AT = at(7);
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  it("파이프라인 단계가 시도 줄에 남고, 시작 때 읽은 상태가 함께 남는다", async () => {
+    let release: () => void = () => {};
+    const run = jest.fn(
+      (_input: unknown, onProgress?: (stage: string) => void) =>
+        new Promise((resolve) => {
+          onProgress?.("vision");
+          release = () => resolve({ ok: true, entry: {}, overwrote: false });
+        }),
+    );
+    const made = baseDeps({
+      makePipeline: pipelineWith(WITH_PHOTOS, run as never),
+      readDeviceState: async () => ({ at: AT, battery: "charging" }),
+    });
+    const running = runAutoDiaryTask(made.deps);
+    for (let i = 0; i < 20 && run.mock.calls.length === 0; i += 1) await flush();
+    await flush();
+    await flush();
+    expect(line(made.attempts)).toMatchObject({
+      outcome: "started",
+      stage: "vision",
+      device: { battery: "charging" },
+    });
+    release();
+    expect(await running).toBe("ran");
+    expect(line(made.attempts)).toMatchObject({ outcome: "ran", stage: "vision" });
+  });
+
+  it("상태 읽기가 안 돌아와도 쓰기는 끝난다", async () => {
+    const made = baseDeps({ readDeviceState: () => new Promise(() => {}) });
+    expect(await runAutoDiaryTask(made.deps)).toBe("ran");
+    expect(made.pipelineRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("상태 읽기가 던져도 쓰기는 끝난다", async () => {
+    const made = baseDeps({
+      readDeviceState: async () => {
+        throw new Error("x");
+      },
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("ran");
   });
 });
