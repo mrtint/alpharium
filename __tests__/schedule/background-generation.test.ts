@@ -139,6 +139,7 @@ describe("B2 — 판정 순서", () => {
     expect(pipelineRun).toHaveBeenCalledTimes(1);
     expect(pipelineRun).toHaveBeenCalledWith(
       expect.objectContaining({ day: "2026-08-27", character: "quiet", vision: "quick" }),
+      expect.any(Function),
     );
   });
 
@@ -165,7 +166,10 @@ describe("B2 — 판정 순서", () => {
   it("078 — 창이 지난 뒤(15시, 목표 7시)에도 어제가 비어 있으면 어제를 쓴다", async () => {
     const { deps, pipelineRun } = baseDeps({ now: at(15) });
     expect(await runAutoDiaryTask(deps)).toBe("ran");
-    expect(pipelineRun).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
+    expect(pipelineRun).toHaveBeenCalledWith(
+      expect.objectContaining({ day: "2026-08-27" }),
+      expect.any(Function),
+    );
   });
 
   it("078 — 오전 목표(7시)의 어제는 목표 시각 전(3시)에 쓰지 않는다", async () => {
@@ -719,6 +723,25 @@ describe("078 CU — 창 밖 따라잡기는 백그라운드에서 하루에 한
     expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
   });
 
+  /**
+   * 2026-11-03 실기기(iPhone 13 mini·iPhone 14) — 앱 열기 쓰기 도중 깬 태스크가 칸을 못 차지해 아무것도 쓰지 않았는데 몫이 사라졌다.
+   * mini는 그 앱 열기 쓰기가 실패한 뒤에도 다음 깨움이 catch-up-spent로 끝났다. 몫이 막는 비용은 이 실행이 여는 모델이고, 칸을 못 차지하면 열지 않았다.
+   */
+  it("칸을 못 차지한 실행(already-running)은 몫을 쓰지 않는다 — 같은 날 다음 깨움이 쓴다", async () => {
+    const run = jest
+      .fn()
+      .mockResolvedValueOnce({ ok: false, stage: "already-running", reason: "" })
+      .mockResolvedValueOnce({ ok: true, entry: {}, overwrote: false });
+    const made = baseDeps({ now: at(15), makePipeline: pipelineWith(WITH_PHOTOS, run) });
+    expect(await runAutoDiaryTask(made.deps)).toBe("skipped");
+    expect(lastOutcome(made.attempts)).toBe("already-running");
+    expect(made.catchUp.content).toBeNull();
+
+    expect(await runAutoDiaryTask({ ...made.deps, now: at(16) })).toBe("ran");
+    expect(run).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(made.catchUp.content ?? "")).toEqual({ on: "2026-08-28" });
+  });
+
   it("090 CU2 — 사진 권한 없음도 몫을 쓰지 않는다", async () => {
     const made = baseDeps({
       now: at(15),
@@ -908,6 +931,53 @@ describe("090 EX·LS — 시간 예산 만료와 깨운 상태", () => {
   });
 });
 
+/**
+ * 2026-11-09 — 사진 경로 요청이 막힌 프로세스는 백그라운드 실행의 끝을 기록한 뒤 스스로 내린다. 같은 프로세스의 다음 깨움도 쓰지 못했고
+ * (10:52 재현), 다음 요청은 이미 걸려 있어(expo 패치) 새 프로세스로 깨어난다. 앞에 있을 때·수동 실행은 내리지 않는다.
+ */
+describe("막힌 사진 서비스 — 백그라운드에서 프로세스를 내린다", () => {
+  const items = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: Record<string, string>[] }).items;
+  const failing = jest.fn().mockResolvedValue({ ok: false, stage: "vision", reason: "" });
+
+  it("뒤에서 막혔으면 끝 줄을 남긴 뒤 내리고, 알림 맞추기는 하지 않는다", async () => {
+    const order: string[] = [];
+    const reconcile = jest.fn(async () => {
+      order.push("reconcile");
+    });
+    const made = baseDeps({
+      launchState: () => "background",
+      subscribeExpiry: () => () => {},
+      makePipeline: pipelineWith(WITH_PHOTOS, failing),
+      reconcileReminders: reconcile,
+      photoStalled: () => true,
+      endProcess: () => {
+        order.push(`end:${items(made.attempts)[0]?.outcome}`);
+      },
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("failed");
+    expect(order).toEqual(["end:failed"]);
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ["앞에 있으면", { launchState: (): string => "active" }],
+    ["수동 실행이면", { manual: true, launchState: (): string => "background" }],
+    ["막히지 않았으면", { launchState: (): string => "background", photoStalled: () => false }],
+  ])("%s 내리지 않는다", async (_label, extra) => {
+    const endProcess = jest.fn();
+    const made = baseDeps({
+      subscribeExpiry: () => () => {},
+      makePipeline: pipelineWith(WITH_PHOTOS, failing),
+      photoStalled: () => true,
+      endProcess,
+      ...extra,
+    });
+    await runAutoDiaryTask(made.deps);
+    expect(endProcess).not.toHaveBeenCalled();
+  });
+});
+
 async function waitUntil(condition: () => boolean): Promise<void> {
   for (let i = 0; i < 100 && !condition(); i += 1) await new Promise((r) => setTimeout(r, 0));
 }
@@ -961,5 +1031,55 @@ describe("091 FR-003 — 깬 요청이 조립에 간다", () => {
       { lockOwner: "background", wake: "battery" },
       { lockOwner: "background" },
     ]);
+  });
+});
+
+/** 2026-11-03 — 멈추면 장부에 마지막 단계와 기기 상태가 남는다. 기록은 쓰기를 기다리게 하지 않는다. */
+describe("백그라운드 시도 줄의 단계와 기기 상태", () => {
+  const line = (port: { content: string | null }) =>
+    (JSON.parse(port.content ?? '{"items":[]}') as { items: Record<string, unknown>[] }).items[0];
+  const AT = at(7);
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  it("파이프라인 단계가 시도 줄에 남고, 시작 때 읽은 상태가 함께 남는다", async () => {
+    let release: () => void = () => {};
+    const run = jest.fn(
+      (_input: unknown, onProgress?: (stage: string) => void) =>
+        new Promise((resolve) => {
+          onProgress?.("vision");
+          release = () => resolve({ ok: true, entry: {}, overwrote: false });
+        }),
+    );
+    const made = baseDeps({
+      makePipeline: pipelineWith(WITH_PHOTOS, run as never),
+      readDeviceState: async () => ({ at: AT, battery: "charging" }),
+    });
+    const running = runAutoDiaryTask(made.deps);
+    for (let i = 0; i < 20 && run.mock.calls.length === 0; i += 1) await flush();
+    await flush();
+    await flush();
+    expect(line(made.attempts)).toMatchObject({
+      outcome: "started",
+      stage: "vision",
+      device: { battery: "charging" },
+    });
+    release();
+    expect(await running).toBe("ran");
+    expect(line(made.attempts)).toMatchObject({ outcome: "ran", stage: "vision" });
+  });
+
+  it("상태 읽기가 안 돌아와도 쓰기는 끝난다", async () => {
+    const made = baseDeps({ readDeviceState: () => new Promise(() => {}) });
+    expect(await runAutoDiaryTask(made.deps)).toBe("ran");
+    expect(made.pipelineRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("상태 읽기가 던져도 쓰기는 끝난다", async () => {
+    const made = baseDeps({
+      readDeviceState: async () => {
+        throw new Error("x");
+      },
+    });
+    expect(await runAutoDiaryTask(made.deps)).toBe("ran");
   });
 });

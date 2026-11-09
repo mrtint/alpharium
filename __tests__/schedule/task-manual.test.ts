@@ -144,7 +144,10 @@ describe("AR4 — manual이 아니면 기존 그대로", () => {
   it("078 — 켜져 있고 창 밖이어도 어제가 비어 있으면 어제를 쓴다", async () => {
     const { deps, run } = make({ enabled: true });
     expect(await runAutoDiaryTask(deps)).toBe("ran");
-    expect(run).toHaveBeenCalledWith(expect.objectContaining({ day: "2026-08-27" }));
+    expect(run).toHaveBeenCalledWith(
+      expect.objectContaining({ day: "2026-08-27" }),
+      expect.any(Function),
+    );
   });
 });
 

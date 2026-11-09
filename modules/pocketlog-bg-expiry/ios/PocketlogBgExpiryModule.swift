@@ -4,6 +4,8 @@
 // userInfo["url"] 가드로 버려 JS에 오지 않는다(node_modules/expo-background-task/ios/BackgroundTaskModule.swift). 같은 알림을 여기서
 // 직접 받아 이벤트 하나로 넘긴다 — 시도 기록에 「시간 예산이 끝남」을 남기기 위해서다(앱 동작 기록). 판정·재예약은 하지 않는다.
 import ExpoModulesCore
+import UIKit
+import os
 
 /// expo-background-task가 게시하는 이름과 같아야 한다 — __tests__/config/bg-expiry-module.test.ts가 대조한다
 private let expoTasksExpired = Notification.Name("onTasksExpired")
@@ -28,6 +30,34 @@ public class PocketlogBgExpiryModule: Module {
       case powerIdentifier: return "power"
       default: return nil
       }
+    }
+
+    // 2026-11-03 — 시도 줄에 싣는 기기 상태. isProtectedDataAvailable은 메인 스레드에서만 읽는다.
+    AsyncFunction("deviceState") { () -> [String: Any] in
+      let thermal: String
+      switch ProcessInfo.processInfo.thermalState {
+      case .nominal: thermal = "nominal"
+      case .fair: thermal = "fair"
+      case .serious: thermal = "serious"
+      case .critical: thermal = "critical"
+      @unknown default: return [
+        "protectedData": UIApplication.shared.isProtectedDataAvailable,
+        "availableMemoryMB": os_proc_available_memory() / 1_048_576,
+      ]
+      }
+      return [
+        "thermal": thermal,
+        "protectedData": UIApplication.shared.isProtectedDataAvailable,
+        "availableMemoryMB": os_proc_available_memory() / 1_048_576,
+      ]
+    }.runOnQueue(.main)
+
+    // 2026-11-09 — 사진 경로 요청이 막힌 백그라운드 프로세스를 내린다. 정지한 사이 사진 서비스(assetsd)가 바뀐 프로세스는
+    // requestContentEditingInput 콜백이 다시 오지 않았다. 다음 요청은 이미 걸려 있어 새 프로세스로 깨어난다. JS는 앱이 뒤에 있는
+    // 백그라운드 실행에서만 부른다(schedule/task.ts). 정리 코드를 돌리지 않는 _exit — 막힌 스레드를 기다리지 않는다.
+    Function("exitStalledProcess") { () -> Void in
+      NSLog("[pocketlog] photo service stalled — ending background process")
+      _exit(0)
     }
 
     OnStartObserving("onExpired") {

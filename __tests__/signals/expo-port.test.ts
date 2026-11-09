@@ -88,3 +88,22 @@ describe("Asset 참조 수명 보장 (073 SharedObject GC 레이스 방어)", ()
     expect(fn).toMatch(/asset\.id/);
   });
 });
+
+/**
+ * 2026-11-09 — `getUri()`는 기다림 한도(`readUriWithin`) 안에서만 부른다. 사진 서비스가 바뀐 뒤 깨어난 프로세스에서 콜백이 오지
+ * 않아 백그라운드 쓰기가 예산까지 멈췄다(`__tests__/signals/uri-deadline.test.ts`).
+ */
+describe("getUri는 기다림 한도 안에서만 부른다", () => {
+  const SOURCE = readFileSync(join(__dirname, "../../src/signals/expo-port.ts"), "utf8");
+  const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+
+  it.each(["filePathOf", "folderNamesFor"])("%s가 readUriWithin으로 getUri를 감싼다", (name) => {
+    const fn =
+      CODE.match(new RegExp(`async ${name}\\([^)]*\\)[^{]*\\{([\\s\\S]*?)\\n {4}\\}`))?.[1] ?? "";
+    expect(fn).toMatch(/await readUriWithin\(\(\) => asset\.getUri\(\)\)/);
+  });
+
+  it("맨 getUri 호출이 남아 있지 않다", () => {
+    expect(CODE).not.toMatch(/await\s+asset\.getUri\(\)/);
+  });
+});
