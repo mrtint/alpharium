@@ -59,8 +59,9 @@ const HALF_WEIGHT: Readonly<Record<ContinuedStage, number>> = {
 };
 
 /**
- * 092 — 박동에 따른 보고의 최소 간격(ms). 토큰 박동은 1초에 여러 번 올 수 있다 — 막대는 박동마다 앞으로 가되 네이티브 보고는 이 간격으로
- * 줄인다(사람이 정한 값). 단계가 바뀐 보고는 곧바로 보낸다. 시스템은 보고 간격을 익혀 그보다 크게 늦으면 멈춘 작업으로 끝내므로
+ * 092 — 토큰 박동에 따른 보고의 최소 간격(ms). 토큰 박동은 1초에 여러 번 올 수 있다 — 막대는 박동마다 앞으로 가되 네이티브 보고는 이 간격으로
+ * 줄인다(사람이 정한 값). 단계가 바뀐 보고와 사진·조각 박동은 곧바로 보낸다 — 드물게 오는 실제 일이라, 줄이면 버려진 박동 뒤로 다음 박동까지
+ * 막대가 선다(2026-11-10 iPhone 14: 직전 보고 1.2초 뒤의 사진 박동이 버려져 다음 사진까지 34초 공백). 시스템은 보고 간격을 익혀 그보다 크게 늦으면 멈춘 작업으로 끝내므로
  * (2026-10-21 실측, dasd `ProgressTracker`) 간격이 고르면 된다 — 줄이는 것은 그 간격을 망가뜨리지 않는다.
  */
 export const MIN_REPORT_MS = 2_000;
@@ -141,7 +142,7 @@ export function createContinuedWrite(
           fraction,
           start + ((end - start) * weight) / (weight + HALF_WEIGHT[stage]),
         );
-        if (clock() - lastSent >= MIN_REPORT_MS) send();
+        if (kind !== "token" || clock() - lastSent >= MIN_REPORT_MS) send();
       });
       const offExpired = port.onExpired(() => {
         if (closed) return;

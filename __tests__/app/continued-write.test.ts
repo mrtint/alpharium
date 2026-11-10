@@ -257,6 +257,28 @@ describe("092 — 토큰 박동과 보고 간격", () => {
     expect(completed[2]).toBeGreaterThan(completed[1]);
   });
 
+  // 2026-11-10 iPhone 14 실측 — 사진 박동이 직전 보고 1.2초 뒤에 와 버려졌고, 다음 사진(34초 뒤)까지 막대가 서 있었다.
+  // 앱 밖 사진 한 장은 24~39초라 그 공백이 시스템의 「멈춤」 판정(약 32~39초)을 넘는다. 사진·조각은 드물게 오는 실제 일이라 한도 없이 보낸다.
+  it("사진·조각 박동은 직전 보고 2초 안에 와도 곧바로 보낸다 — 2초 한도는 토큰 박동에만 걸린다", async () => {
+    const h = tight();
+    const session = await h.continued.start(WRITE, () => {});
+    h.at(0);
+    session.progress("vision");
+    h.beat("photo", 34_000);
+    h.beat("photo", 35_200);
+    expect(h.calls.map((c) => c[1])).toHaveLength(4);
+    expect(h.calls.at(-1)?.[1]).toBeGreaterThan(h.calls.at(-2)?.[1] as number);
+
+    const w = tight();
+    const writing = await w.continued.start(WRITE, () => {});
+    w.at(0);
+    writing.progress("generation");
+    w.beat("chunk", 500);
+    w.beat("chunk", 900);
+    // 첫 보고(준비) · 글 단계 · 조각 · 조각
+    expect(w.calls).toHaveLength(4);
+  });
+
   it("토큰 하나는 조각 하나보다 조금 오른다", async () => {
     const a = tight();
     const s1 = await a.continued.start(WRITE, () => {});
