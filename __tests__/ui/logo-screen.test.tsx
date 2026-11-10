@@ -45,6 +45,11 @@ describe("LogoScreen — 렌더 (FR-001~FR-004)", () => {
     expect(style.lineHeight).toBeGreaterThanOrEqual(style.fontSize * 1.2);
   });
 
+  it("108 — 브랜드 제목은 글꼴 배율 1.3배까지만 커진다(iPhone 약 1.9배에서 「Pocketl / og」로 끊겼다)", async () => {
+    await render(<LogoScreen onDone={() => {}} />);
+    expect(screen.getByTestId("splash-title").props.maxFontSizeMultiplier).toBe(1.3);
+  });
+
   it("하단 안내 문구 'AI가 쓰는 일기'가 보인다(108, D2-b)", async () => {
     await render(<LogoScreen onDone={() => {}} />);
     expect(screen.getByText("AI가 쓰는 일기")).toBeTruthy();

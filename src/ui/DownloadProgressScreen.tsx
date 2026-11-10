@@ -149,6 +149,12 @@ export function DownloadProgressScreen({
 }
 
 /**
+ * 카드 제목·본문의 글꼴 배율 상한 — 사람이 정한 값(108, 소유자 결정). 그림 자리와 글 영역의 높이가 고정이라, iPhone 14 「더 큰 접근성 크기」
+ * 약 1.9배에서 슬라이드 2~4의 본문이 진행 막대에 가려 잘렸다(슬라이드 4는 읽을 수 없었다, 2026-11-10 실기기). 제약 띠(`BAND_FONT_CAP`)와 같은 방식이다.
+ */
+const SLIDE_FONT_CAP = 1.3;
+
+/**
  * 캐러셀 카드 렌더러 — 모듈 스코프 함수라 매 렌더 새로 만들어지지 않는다
  * (`renderItem` prop이 안정적인 참조를 유지해야 `useAutoPlay`의 콜백 체인이
  * 리셋되지 않는다).
@@ -159,8 +165,12 @@ function renderSlide({ item }: { item: Slide }) {
       {/* 그림 자리 — 실제 이미지 에셋은 후속 스펙(045 research.md R6). */}
       <View style={IMAGE_SLOT} testID="download-progress-image-slot" />
       <View style={TEXT_BLOCK}>
-        <AppText variant="title">{item.title}</AppText>
-        <AppText variant="body">{item.body}</AppText>
+        <AppText variant="title" maxFontSizeMultiplier={SLIDE_FONT_CAP}>
+          {item.title}
+        </AppText>
+        <AppText variant="body" maxFontSizeMultiplier={SLIDE_FONT_CAP}>
+          {item.body}
+        </AppText>
       </View>
     </View>
   );

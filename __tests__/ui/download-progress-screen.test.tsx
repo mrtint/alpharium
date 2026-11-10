@@ -208,3 +208,29 @@ describe("D8 — props 시그니처에 재시도 콜백이 없다(재시도는 �
     expect(propsType).not.toMatch(/onRetry/);
   });
 });
+
+/**
+ * 108 G1 실기기(iPhone 14, 2026-11-10): 「더 큰 접근성 크기」 약 1.9배에서 슬라이드 2~4의 본문이 진행 막대에 가려 잘렸고, 슬라이드 4는 본문을
+ * 읽을 수 없었다. 그림 자리와 글 영역의 높이가 고정이라, 카드의 제목·본문 글꼴 배율에 상한을 둔다(소유자 결정 — 제약 띠와 같은 방식).
+ */
+describe("108 — 슬라이드 글꼴 배율 상한", () => {
+  it("모든 카드의 제목·본문이 같은 상한(SLIDE_FONT_CAP)을 쓴다", async () => {
+    await render(
+      <DownloadProgressScreen
+        downloadReady={false}
+        downloadFraction={0}
+        failed={false}
+        onProceed={jest.fn()}
+      />,
+    );
+    const title = screen.getByText("AI가 쓰는 일기");
+    const body = screen.getByText("주인님의 하루를 글로 남겨요. 실수할 때도 있지만요");
+    expect(title.props.maxFontSizeMultiplier).toBe(1.3);
+    expect(body.props.maxFontSizeMultiplier).toBe(1.3);
+  });
+
+  it("상한은 카드 렌더러 한 곳에서 제목·본문 둘에만 건다", () => {
+    expect(CODE).toMatch(/const SLIDE_FONT_CAP = 1\.3;/);
+    expect(CODE.match(/maxFontSizeMultiplier=\{SLIDE_FONT_CAP\}/g)?.length).toBe(2);
+  });
+});

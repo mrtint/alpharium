@@ -38,6 +38,11 @@ import { COLORS, RADIUS } from "./theme/tokens";
 /** 로고를 보여주는 고정 시간 (화면 계층 상수, 040 research.md #1과 같은 판단). */
 export const LOGO_DISPLAY_MS = 1500;
 
+/**
+ * 브랜드 제목의 글꼴 배율 상한 — 사람이 정한 값(108). iPhone 14 약 1.9배에서 「Pocketlog」가 낱말 가운데서 「Pocketl / og」로 끊겼다(2026-11-10 실기기).
+ */
+const TITLE_FONT_CAP = 1.3;
+
 /** 마크업 neutral-300 — COLORS 9개 역할에 없는 순수 장식색(DT1 보호). */
 const LOADING_DOT_INACTIVE = "#d7d3d3";
 
@@ -61,7 +66,7 @@ export function SplashView({ testID }: { testID?: string }) {
     <View style={styles.container} testID={testID}>
       <View style={styles.top}>
         <View style={styles.logoMark} testID="splash-logo-mark" />
-        <AppText style={styles.title} testID="splash-title">
+        <AppText style={styles.title} maxFontSizeMultiplier={TITLE_FONT_CAP} testID="splash-title">
           Pocketlog
         </AppText>
       </View>
