@@ -158,7 +158,9 @@ describe("load — 본체를 열고 mmproj를 붙인다", () => {
       }
     ).image_max_tokens;
 
-    expect(tokens).toBe(256);
+    // 2026-11-10 — 256에서 128로 줄였다. iPhone 14 앱 밖에서 그림 하나를 읽는 데 26~33초가 들어 이어 하기의 멈춤 판정(약 32~39초)에
+    // 걸렸고, 128이면 13~15초였다(`specs/112-continued-photo-stall/quickstart.md`).
+    expect(tokens).toBe(128);
   });
 
   it("두 번 열면 앞의 것을 먼저 닫는다 — 컨텍스트가 하나뿐이다", async () => {
