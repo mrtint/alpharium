@@ -25,7 +25,7 @@ import type {
 import { assetFor, CHARACTERS } from "../../src/models/roster";
 import { readState, segmentedFor } from "../../src/models/storage";
 
-function harness(metadata: string | null = null) {
+function harness(metadata: string | null = null, fileBytes = 1000) {
   const requested: { key: string; url: string; resumed: boolean; state: unknown }[] = [];
   let stored = metadata;
 
@@ -38,7 +38,7 @@ function harness(metadata: string | null = null) {
 
   const files: ModelFilePort = {
     async facts() {
-      return { exists: true, bytes: 1000 };
+      return { exists: true, bytes: fileBytes };
     },
     async contentHash(key) {
       return matchingHash(key);
@@ -108,34 +108,40 @@ it("A8 — await 사이에 같은 캐릭터를 다시 요청해도 두 번 시�
 
 it("A9 — segmentedFor가 non-null이면 그 값을 download.resume에 넘긴다", async () => {
   const key = assetFor("quiet").key;
+  const { expectedBytes } = assetFor("quiet");
   const resume = {
     assetKey: key,
-    totalBytes: 1000,
-    segmentCount: 4,
-    receivedBytes: [250, 250, 0, 0],
+    totalBytes: expectedBytes,
+    segmentCount: 16,
+    doneIndices: [0, 1],
   };
-  const h = harness(JSON.stringify({ verdicts: [], paused: [], segmented: [resume] }));
-
-  await createAcquisition(h.ports).prepare("quiet");
-
-  expect(h.requested[0].resumed).toBe(true);
-  expect(h.requested[0].state).toMatchObject({ segmentCount: 4, receivedBytes: [250, 250, 0, 0] });
-});
-
-it("A9 — resume에 로스터 url이 함께 넘어간다 (port.ts resume 시그니처 확장)", async () => {
-  const key = assetFor("quiet").key;
+  // 파일은 끝난 구간의 끝까지 닿아 있다 — 그렇지 않으면 기록을 믿지 않는다(113).
   const h = harness(
-    JSON.stringify({
-      verdicts: [],
-      paused: [],
-      segmented: [
-        { assetKey: key, totalBytes: 1000, segmentCount: 4, receivedBytes: [1, 0, 0, 0] },
-      ],
-    }),
+    JSON.stringify({ verdicts: [], paused: [], segmented: [resume] }),
+    Math.ceil(expectedBytes / 8),
   );
 
   await createAcquisition(h.ports).prepare("quiet");
 
+  expect(h.requested[0].resumed).toBe(true);
+  expect(h.requested[0].state).toMatchObject({ segmentCount: 16, doneIndices: [0, 1] });
+});
+
+it("A9 — resume에 로스터 url이 함께 넘어간다 (port.ts resume 시그니처 확장)", async () => {
+  const key = assetFor("quiet").key;
+  const { expectedBytes } = assetFor("quiet");
+  const h = harness(
+    JSON.stringify({
+      verdicts: [],
+      paused: [],
+      segmented: [{ assetKey: key, totalBytes: expectedBytes, segmentCount: 16, doneIndices: [0] }],
+    }),
+    Math.ceil(expectedBytes / 16),
+  );
+
+  await createAcquisition(h.ports).prepare("quiet");
+
+  expect(h.requested[0].resumed).toBe(true);
   expect(h.requested[0].url).toBe(assetFor("quiet").url);
 });
 
@@ -155,8 +161,8 @@ it("A10 — pause outcome이 SegmentedResume 모양이면 withSegmentedResume로
             state: {
               assetKey: key,
               totalBytes: 1000,
-              segmentCount: 4,
-              receivedBytes: [600, 100, 0, 0],
+              segmentCount: 16,
+              doneIndices: [0, 1],
             },
           };
         },
@@ -169,7 +175,7 @@ it("A10 — pause outcome이 SegmentedResume 모양이면 withSegmentedResume로
   await createAcquisition({ ...h.ports, download }).prepare("quiet");
 
   const state = await readState(h.metaPort);
-  expect(segmentedFor(state, key)?.receivedBytes).toEqual([600, 100, 0, 0]);
+  expect(segmentedFor(state, key)?.doneIndices).toEqual([0, 1]);
   expect(state.paused).toHaveLength(0);
 });
 

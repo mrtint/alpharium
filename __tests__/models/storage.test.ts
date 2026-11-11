@@ -22,6 +22,7 @@ import {
   withSegmentedResume,
   withVerdict,
   withoutAsset,
+  mutateState,
   writeState,
   type ModelState,
 } from "../../src/models/storage";
@@ -233,8 +234,8 @@ describe("보관과 삭제", () => {
 const RESUME: SegmentedResume = {
   assetKey: "a2",
   totalBytes: 1_644_918_272,
-  segmentCount: 4,
-  receivedBytes: [411_229_568, 411_229_568, 200_000_000, 0],
+  segmentCount: 16,
+  doneIndices: [0, 1, 5],
 };
 
 describe("세그먼트 재개 상태 (026)", () => {
@@ -264,10 +265,10 @@ describe("세그먼트 재개 상태 (026)", () => {
   it("withSegmentedResume는 한 자산에 하나만 둔다", () => {
     let state: ModelState = { verdicts: [], paused: [], segmented: [] };
     state = withSegmentedResume(state, RESUME);
-    state = withSegmentedResume(state, { ...RESUME, receivedBytes: [1, 2, 3, 4] });
+    state = withSegmentedResume(state, { ...RESUME, doneIndices: [0, 1, 2, 3] });
 
     expect(state.segmented).toHaveLength(1);
-    expect(segmentedFor(state, "a2")?.receivedBytes).toEqual([1, 2, 3, 4]);
+    expect(segmentedFor(state, "a2")?.doneIndices).toEqual([0, 1, 2, 3]);
   });
 
   it("withSegmentedResume는 같은 자산을 paused에서 제거한다 (상호배타)", () => {
@@ -324,5 +325,106 @@ describe("세그먼트 재개 상태 (026)", () => {
     await writeState(meta.port, state);
 
     expect(await readState(meta.port)).toEqual(state);
+  });
+});
+
+/* ─────────────────── 113 — 재개 기록 형태 검사와 직렬화 ─────────────────── */
+
+describe("재개 기록 읽기 (113)", () => {
+  const read = async (segmented: unknown) => {
+    const meta = metadataPort(JSON.stringify({ verdicts: [], paused: [], segmented }));
+    return (await readState(meta.port)).segmented;
+  };
+
+  it("옛 형식(receivedBytes)은 버린다 — 쓰인 적 없는 기록이라 처음부터 받는다", async () => {
+    const old = { assetKey: "a2", totalBytes: 1000, segmentCount: 4, receivedBytes: [1, 2, 3, 4] };
+    expect(await read([old])).toEqual([]);
+  });
+
+  it("형태가 맞는 항목은 남기고 맞지 않는 항목만 버린다", async () => {
+    const bad = [
+      { ...RESUME, assetKey: "b1", doneIndices: [1, 1] }, // 중복
+      { ...RESUME, assetKey: "b2", doneIndices: [2, 1] }, // 오름차순 아님
+      { ...RESUME, assetKey: "b3", doneIndices: [16] }, // 범위 밖
+      { ...RESUME, assetKey: "b4", doneIndices: [-1] }, // 음수
+      { ...RESUME, assetKey: "b5", doneIndices: [0.5] }, // 정수 아님
+      { ...RESUME, assetKey: "b6", totalBytes: 0 },
+      { ...RESUME, assetKey: "b7", segmentCount: 0 },
+      { ...RESUME, assetKey: "b8", segmentCount: 1.5 },
+      { ...RESUME, assetKey: "b9", doneIndices: "x" },
+      null,
+      "x",
+    ];
+    expect(await read([...bad, RESUME])).toEqual([RESUME]);
+  });
+
+  it("빈 doneIndices는 형태가 맞다 (기록은 첫 구간이 끝날 때 생기지만 읽기는 거르지 않는다)", async () => {
+    const empty = { ...RESUME, doneIndices: [] };
+    expect(await read([empty])).toEqual([empty]);
+  });
+});
+
+describe("mutateState — 읽기-바꾸기-쓰기를 한 줄로 세운다 (113, FR-005)", () => {
+  /** 읽기와 쓰기 사이에 양보해 겹침이 있으면 갱신이 사라지게 하는 대역 */
+  function slowMetadata() {
+    let stored: string | null = null;
+    const port: MetadataPort = {
+      async read() {
+        const snapshot = stored;
+        await new Promise((r) => setTimeout(r, 1));
+        return snapshot;
+      },
+      async writeAtomically(contents) {
+        await new Promise((r) => setTimeout(r, 1));
+        stored = contents;
+      },
+    };
+    return { port, current: () => stored };
+  }
+
+  const addDone = (index: number) => (state: ModelState) => {
+    const current = segmentedFor(state, "a2");
+    return withSegmentedResume(state, {
+      ...RESUME,
+      doneIndices: [...(current?.doneIndices ?? []), index].sort((a, b) => a - b),
+    });
+  };
+
+  it("동시에 끝난 구간 둘이 서로를 덮어쓰지 않는다", async () => {
+    const meta = slowMetadata();
+
+    await Promise.all([
+      mutateState(meta.port, addDone(2)),
+      mutateState(meta.port, addDone(7)),
+      mutateState(meta.port, addDone(3)),
+    ]);
+
+    const state = await readState(meta.port);
+    expect(segmentedFor(state, "a2")?.doneIndices).toEqual([2, 3, 7]);
+  });
+
+  it("앞 호출이 던져도 뒤 호출은 이어서 돈다", async () => {
+    const meta = slowMetadata();
+
+    const first = mutateState(meta.port, () => {
+      throw new Error("바꾸기 실패");
+    });
+    const second = mutateState(meta.port, addDone(4));
+
+    await expect(first).rejects.toThrow("바꾸기 실패");
+    await second;
+    expect(segmentedFor(await readState(meta.port), "a2")?.doneIndices).toEqual([4]);
+  });
+
+  it("다른 MetadataPort 사이는 서로 기다리지 않는다", async () => {
+    const a = slowMetadata();
+    const b = slowMetadata();
+    await Promise.all([mutateState(a.port, addDone(1)), mutateState(b.port, addDone(2))]);
+    expect(segmentedFor(await readState(a.port), "a2")?.doneIndices).toEqual([1]);
+    expect(segmentedFor(await readState(b.port), "a2")?.doneIndices).toEqual([2]);
+  });
+
+  it("storage.ts는 plan.ts를 import하지 않는다 (형태 검사만 한다)", () => {
+    expect(STORAGE_CODE).not.toMatch(/from\s+["']\.\/segmented\/plan["']/);
   });
 });

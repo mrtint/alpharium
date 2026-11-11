@@ -12,7 +12,7 @@
  * 놓았다.
  */
 
-import type { RangeSupport, Segment } from "./segmented/types";
+import type { RangeSupport, Segment, SegmentCheckpoint } from "./segmented/types";
 import type { AssetKey } from "./types";
 
 /* ──────────────────────────── 파일 ──────────────────────────── */
@@ -106,11 +106,17 @@ export interface TransferHandle {
 }
 
 export interface DownloadPort {
-  /** 처음부터 받는다 */
+  /**
+   * 처음부터 받는다.
+   *
+   * **113이 `checkpoint`를 더했다** — 구간 하나가 최종 파일에 놓인 직후 누적 재개 기록으로
+   * 불린다(contracts/checkpoint.md). 폴백(단일 스트림)에서는 부르지 않는다.
+   */
   start(
     key: AssetKey,
     url: string,
     onProgress: (progress: TransferProgress) => void,
+    checkpoint?: SegmentCheckpoint,
   ): TransferHandle;
 
   /**
@@ -124,13 +130,14 @@ export interface DownloadPort {
    *
    * `state`에는 003의 `DownloadPauseState`(직렬화된 불투명 값) 또는 026의
    * `SegmentedResume`가 담긴다 — 타입이 `unknown`이라 안 깨진다. `expo-port.ts`가
-   * `"segmentCount" in state`로 갈라 알맞은 경로를 탄다.
+   * `"segmentCount" in state`로 갈라 알맞은 경로를 탄다. 113 — `checkpoint`는 `start`와 같다.
    */
   resume(
     key: AssetKey,
     url: string,
     state: unknown,
     onProgress: (progress: TransferProgress) => void,
+    checkpoint?: SegmentCheckpoint,
   ): TransferHandle;
 }
 
@@ -169,8 +176,8 @@ export interface RangeFetchPort {
    * `onBytes(delta)`로 이 구간이 방금 받은 바이트 **증분**을 보고한다. `AbortSignal`로
    * 취소 가능(다른 구간 실패 시 호출자가 취소).
    *
-   * **부분 쓰기는 멱등이다** — 받은 만큼을 오프셋에 쓰고, 앱이 죽으면 이미 쓰인
-   * 바이트는 남는다. `receivedBytes`가 저장 안 됐으면 재개 시 다시 받아 덮어쓴다.
+   * **부분 쓰기는 멱등이다** — 받은 구간을 오프셋에 쓰고, 앱이 죽으면 이미 쓰인
+   * 바이트는 남는다. 끝난 구간으로 기록되지 않은 구간은 재개 시 구간 전체를 다시 받아 덮어쓴다.
    */
   fetchRange(
     key: AssetKey,

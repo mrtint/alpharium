@@ -55,11 +55,39 @@ export async function readState(metadata: MetadataPort): Promise<ModelState> {
       paused: Array.isArray(parsed.paused) ? parsed.paused : [],
       // **옛 `state.json`에 `segmented` 키가 없어도 안전** — 없거나 깨지면 빈 배열.
       // 003의 다른 필드와 동형이며 마이그레이션이 필요 없다(data-model.md).
-      segmented: Array.isArray(parsed.segmented) ? parsed.segmented : [],
+      // 113 — 형태가 맞지 않는 항목(옛 `receivedBytes` 형식 포함)은 버린다.
+      segmented: Array.isArray(parsed.segmented) ? parsed.segmented.filter(isSegmentedResume) : [],
     };
   } catch {
     return EMPTY;
   }
+}
+
+const isPositiveInteger = (n: unknown): n is number =>
+  typeof n === "number" && Number.isInteger(n) && n > 0;
+
+/**
+ * `segmented` 항목의 **형태**를 본다 (113, data-model.md).
+ *
+ * `totalBytes`·`segmentCount`는 양의 정수이고 `doneIndices`는 오름차순·중복 없는 정수로
+ * 각각 `0 <= i < segmentCount`다. **`planSegments`와 구간 수가 맞는지는 보지 않는다** —
+ * 이 파일은 `segmented/plan.ts`를 import하지 않는다(위 머리 주석). 그것은 재개 전에
+ * `resume.ts`가 본다.
+ */
+function isSegmentedResume(value: unknown): value is SegmentedResume {
+  if (typeof value !== "object" || value === null) return false;
+  const entry = value as Partial<SegmentedResume>;
+  if (typeof entry.assetKey !== "string") return false;
+  if (!isPositiveInteger(entry.totalBytes) || !isPositiveInteger(entry.segmentCount)) return false;
+  const { doneIndices, segmentCount } = entry;
+  if (!Array.isArray(doneIndices)) return false;
+  return doneIndices.every(
+    (index, position) =>
+      Number.isInteger(index) &&
+      index >= 0 &&
+      index < segmentCount &&
+      (position === 0 || index > doneIndices[position - 1]),
+  );
 }
 
 /**
@@ -71,6 +99,38 @@ export async function readState(metadata: MetadataPort): Promise<ModelState> {
  */
 export async function writeState(metadata: MetadataPort, state: ModelState): Promise<void> {
   await metadata.writeAtomically(JSON.stringify(state));
+}
+
+/** `MetadataPort`마다 하나씩 있는 쓰기 줄. 같은 포트로 가는 읽기-바꾸기-쓰기를 한 줄로 세운다. */
+const writeQueues = new WeakMap<MetadataPort, Promise<void>>();
+
+/**
+ * `state.json`을 **읽고 바꿔 쓴다** — 같은 `MetadataPort`에 대한 호출은 한 줄로 선다 (113, FR-005).
+ *
+ * 구간 둘이 거의 동시에 끝나면 `readState → 바꾸기 → writeState`가 겹쳐 한쪽 구간 기록이
+ * 지워진다. `state.json`을 쓰는 자리는 전부 이 함수를 지난다(받기·검증·사진 모델). 앞 호출이
+ * 던져도 줄은 이어진다 — 그 오류는 그 호출자에게만 간다.
+ *
+ * **같은 파일을 쓰는 `MetadataPort`는 프로세스에 하나여야 한다** — 줄이 포트 객체별이라 통로가 둘이면
+ * 보장이 사라진다(`expoMetadataPort()`가 하나를 돌려준다, `resumable-contract.test.ts`가 잠근다).
+ */
+export function mutateState(
+  metadata: MetadataPort,
+  change: (state: ModelState) => ModelState,
+): Promise<void> {
+  const previous = writeQueues.get(metadata) ?? Promise.resolve();
+  const run = previous.then(async () => {
+    await writeState(metadata, change(await readState(metadata)));
+  });
+  // 줄에는 성공·실패와 무관하게 「끝남」만 남긴다.
+  writeQueues.set(
+    metadata,
+    run.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
+  return run;
 }
 
 /** 이 자산의 검증 결과. 없으면 null */
@@ -167,6 +227,5 @@ export async function removeAsset(
   // 되어, 사용자가 지울 방법을 잃는다.
   await files.remove(key);
 
-  const state = await readState(metadata);
-  await writeState(metadata, withoutAsset(state, key));
+  await mutateState(metadata, (state) => withoutAsset(state, key));
 }

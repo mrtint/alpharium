@@ -29,7 +29,7 @@ import type {
   TransferProgress,
 } from "./port";
 import { runSegmented } from "./segmented/transfer";
-import type { RangeSupport, Segment, SegmentedResume } from "./segmented/types";
+import type { RangeSupport, Segment, SegmentCheckpoint, SegmentedResume } from "./segmented/types";
 import type { AssetKey } from "./types";
 
 /** 모델이 놓이는 디렉터리 이름. 002의 `diary/`와 나란한 자리다 */
@@ -95,10 +95,11 @@ function leftoverNamesFor(key: AssetKey): string[] {
 /**
  * 정리·합산이 훑는 구간 파일 개수의 상한.
  *
- * **사람이 정한 상수다**(원칙 V). `SEGMENT_COUNT`(현재 4)보다 넉넉히 잡아, 그 값이
- * 나중에 줄어도 예전에 만들어진 구간 파일이 지워지지 않고 남는 일이 없게 한다.
+ * **사람이 정한 상수다**(원칙 V). `SEGMENT_COUNT`(현재 16)의 두 배로 잡아, 그 값이
+ * 나중에 바뀌어도 예전에 만들어진 구간 파일이 지워지지 않고 남는 일이 없게 한다(113 —
+ * 4구간 때 16이던 것을 구간 수 16에 맞춰 32로 올렸다. `SEGMENT_COUNT` 이상이어야 한다).
  */
-const MAX_TRACKED_SEGMENTS = 16;
+const MAX_TRACKED_SEGMENTS = 32;
 
 async function openDirectory() {
   const { Directory, File, FileMode, Paths } = await import("expo-file-system");
@@ -164,7 +165,20 @@ export function expoModelFilePort(): ModelFilePort {
   };
 }
 
+/**
+ * `state.json`의 통로는 프로세스에 **하나**다 (113).
+ *
+ * `mutateState`가 `MetadataPort` 객체별로 쓰기를 한 줄로 세우므로, 같은 파일을 쓰는 통로가 둘이면
+ * 줄이 둘이 되어 구간 기록이 서로를 덮어쓸 수 있다. 그래서 호출마다 새 객체를 만들지 않는다.
+ */
+let sharedMetadataPort: MetadataPort | null = null;
+
 export function expoMetadataPort(): MetadataPort {
+  sharedMetadataPort ??= createExpoMetadataPort();
+  return sharedMetadataPort;
+}
+
+function createExpoMetadataPort(): MetadataPort {
   return {
     async read() {
       const { dir, File } = await openDirectory();
@@ -237,8 +251,8 @@ function forcedFallback(): boolean {
  * **`Character`를 모른다** — `AssetKey`만. `fileNameFor(key)`로 파일 이름을 만든다(003과 동일).
  *
  * **부분 쓰기는 멱등이다** — 받은 청크를 `segment.start` 오프셋부터 이어 쓰고, 앱이 죽으면
- * 이미 쓰인 바이트는 남는다. 재개 시 `receivedBytes`가 저장돼 있으면 그 지점부터, 없으면
- * 다시 받아 덮어쓴다.
+ * 이미 쓰인 바이트는 남는다. 구간이 끝나 최종 파일에 놓인 것만 `doneIndices`로 기록되고(113),
+ * 끝나지 않은 구간은 재개 때 구간 전체를 다시 받아 덮어쓴다.
  */
 export function expoRangeFetchPort(): RangeFetchPort {
   return {
@@ -450,6 +464,7 @@ export function expoDownloadPort(range: RangeFetchPort = expoRangeFetchPort()): 
     url: string,
     onProgress: (p: TransferProgress) => void,
     resume?: SegmentedResume,
+    checkpoint?: SegmentCheckpoint,
   ): TransferHandle => {
     let pending: Promise<TransferOutcome> | null = null;
     const pauseCtl = new AbortController();
@@ -472,6 +487,7 @@ export function expoDownloadPort(range: RangeFetchPort = expoRangeFetchPort()): 
         onSizeResolved: (t) => {
           total = t;
         },
+        onCheckpoint: checkpoint,
         pauseSignal: pauseCtl.signal,
         resume,
       });
@@ -514,15 +530,15 @@ export function expoDownloadPort(range: RangeFetchPort = expoRangeFetchPort()): 
     });
 
   return {
-    start(key, url, onProgress) {
-      return segmentedOrFallback(key, url, onProgress);
+    start(key, url, onProgress, checkpoint) {
+      return segmentedOrFallback(key, url, onProgress, undefined, checkpoint);
     },
 
-    resume(key, url, state, onProgress) {
+    resume(key, url, state, onProgress, checkpoint) {
       // 026 — 세그먼트 재개 상태면 세그먼트 경로로, 003의 불투명 값이면 단일 스트림
       // 이어받기로 (contracts/segmented-transfer.md 「resume」).
       if (isSegmentedResume(state)) {
-        return segmentedOrFallback(key, url, onProgress, state);
+        return segmentedOrFallback(key, url, onProgress, state, checkpoint);
       }
       return wrap(async () => {
         const { DownloadTask } = await import("expo-file-system");
@@ -542,8 +558,8 @@ function isSegmentedResume(state: unknown): state is SegmentedResume {
     typeof state === "object" &&
     state !== null &&
     "segmentCount" in state &&
-    "receivedBytes" in state &&
-    Array.isArray((state as { receivedBytes: unknown }).receivedBytes)
+    "doneIndices" in state &&
+    Array.isArray((state as { doneIndices: unknown }).doneIndices)
   );
 }
 

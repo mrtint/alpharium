@@ -23,9 +23,17 @@
 
 import { readinessOf } from "../models/readiness";
 import type { DiskSpacePort, DownloadPort, MetadataPort, ModelFilePort } from "../models/port";
-import { readState, verdictFor, withVerdict, writeState } from "../models/storage";
+import {
+  mutateState,
+  readState,
+  segmentedFor,
+  verdictFor,
+  withVerdict,
+  withoutAsset,
+} from "../models/storage";
+import { remainingSegmentBytes } from "../models/segmented/plan";
 import type { DownloadFailure, ModelReadiness } from "../models/types";
-import { settleExistingFile } from "../models/verification";
+import { segmentCheckpoint, settleExistingFile, settleResumeRecord } from "../models/verification";
 import { foldVisionReadiness } from "./readiness";
 import { visionAssets, type VisionAsset } from "./roster";
 
@@ -73,9 +81,10 @@ async function readinessOfAsset(
     expectedMd5: asset.md5,
     file,
     verdict: verdictFor(state, asset.key),
-    // **이어받기를 다루지 않는다** — 008이 캐릭터에서 푼 문제이고, 여기서 다시 열면
-    // 두 축이 엉킨다. 받다 만 것은 다시 받는다.
+    // 단일 스트림 이어받기(`paused`)는 다루지 않는다 — 008이 캐릭터에서 푼 문제이고, 여기서 다시 열면
+    // 두 축이 엉킨다. 113 — 구간 기록은 다룬다: 끝난 구간은 건너뛰고 이어 받는다.
     paused: null,
+    segmentedResume: segmentedFor(state, asset.key),
     hasPartialFile: false,
   });
 }
@@ -129,13 +138,23 @@ async function fetchOne(
     return { ok: true };
   }
 
-  // 공간을 본다. **크기를 밖으로 말하지 않는다**(003 FR-019a).
-  const free = await ports.disk.availableBytes();
-  if (free < asset.expectedBytes) return { ok: false, failure: { kind: "insufficient-space" } };
-
-  const handle = ports.download.start(asset.key, asset.url, (progress) => {
-    onBytes(progress.bytesWritten);
+  // 113 — 끝난 구간 기록이 파일과 맞으면 이어받고, 맞지 않으면 기록과 부분 파일을 지우고 처음부터 받는다.
+  const resume = await settleResumeRecord(ports, {
+    assetKey: asset.key,
+    expectedBytes: asset.expectedBytes,
   });
+
+  // 공간을 본다. **크기를 밖으로 말하지 않는다**(003 FR-019a). 이어받을 때는 아직 받아야 할 양만 요구한다(113, FR-011).
+  const free = await ports.disk.availableBytes();
+  const needed = resume !== null ? remainingSegmentBytes(resume) : asset.expectedBytes;
+  if (free < needed) return { ok: false, failure: { kind: "insufficient-space" } };
+
+  const onProgress = (progress: { bytesWritten: number }) => onBytes(progress.bytesWritten);
+  const checkpoint = segmentCheckpoint(ports.metadata);
+  const handle =
+    resume !== null
+      ? ports.download.resume(asset.key, asset.url, resume, onProgress, checkpoint)
+      : ports.download.start(asset.key, asset.url, onProgress, checkpoint);
 
   const outcome = await handle.wait();
   if (outcome.kind === "failed") {
@@ -152,14 +171,16 @@ async function fetchOne(
   if (asset.md5 !== "" && hash !== asset.md5) {
     // 온전하지 않은 파일을 남기지 않는다 — 남기면 다음에 「있다」로 읽힌다.
     await ports.files.remove(asset.key).catch(() => {});
+    // 113 — 파일과 함께 구간 기록도 지운다. 남기면 다음에 없는 파일의 구간을 건너뛴다.
+    await mutateState(ports.metadata, (state) => withoutAsset(state, asset.key)).catch(() => {});
     return { ok: false, failure: { kind: "verification-failed" } };
   }
 
   const bytes = (await ports.files.facts(asset.key)).bytes ?? 0;
-  const state = await readState(ports.metadata).catch(() => ({}) as never);
-  await writeState(
-    ports.metadata,
-    withVerdict(state, {
+  // 113 — 같은 `state.json`에 구간 기록도 쓰이므로 한 줄로 세워 쓴다(`mutateState`).
+  // 받기가 끝났으므로 구간 기록은 지운다 — `withoutAsset`이 기록을 함께 비운다.
+  await mutateState(ports.metadata, (state) =>
+    withVerdict(withoutAsset(state, asset.key), {
       assetKey: asset.key,
       verifiedMd5: hash,
       verifiedBytes: bytes,

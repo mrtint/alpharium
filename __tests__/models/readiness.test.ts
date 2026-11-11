@@ -53,7 +53,7 @@ describe("준비 상태 판정", () => {
         assetKey: "a1",
         totalBytes: 1000,
         segmentCount: 4,
-        receivedBytes: [250, 0, 0, 0],
+        doneIndices: [0],
       },
     });
     expect(state.kind).toBe("partial");
@@ -72,7 +72,7 @@ describe("준비 상태 판정", () => {
         assetKey: "a1",
         totalBytes: 1000,
         segmentCount: 4,
-        receivedBytes: [200, 200, 200, 0],
+        doneIndices: [0],
       },
     });
     expect(state.kind).toBe("partial");
