@@ -50,6 +50,10 @@ describe("소스 불변식", () => {
     expect(CODE).toContain("SPACE_HEADROOM");
   });
 
+  it("113 — 쓰는 쪽 준비 판정이 끝난 구간 재개 기록을 함께 읽는다 (이어받을 수 있는 「받다 말았음」)", () => {
+    expect(CODE).toMatch(/segmentedResume:\s*segmentedFor\(state,\s*asset\.key\)/);
+  });
+
   it("src/app/에 있다 — src/onboarding/이 아니다 (checkOnboardingFile 회피)", () => {
     // 이 테스트 파일 자체가 src/app/ 경로를 읽는 것으로 위치를 확인한다.
     expect(SOURCE.length).toBeGreaterThan(0);

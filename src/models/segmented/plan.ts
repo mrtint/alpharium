@@ -28,20 +28,28 @@ import type { Segment, SegmentPlan, SegmentedResume } from "./types";
  * 같은 방식으로 못박은 상수다. 코드가 파일 크기·네트워크 상태를 보고 개수를 정하면
  * 그것이 임계값이고 원칙 IV로 가는 길이다.
  *
- * **실기기 확인 (2026-08-31, SM-S901N / Galaxy S22, Android 16, WiFi 5GHz)**: 4구간
- * 병렬이 정상 동작했다 — `state.json`의 재개 상태에 `receivedBytes: [185M, 185M,
- * 185M, 185M]`처럼 4구간이 균등하게 채워졌고, HF CDN이 리다이렉트 후 Range·
- * Content-Length를 유지해(§2) 로스터 5개 모델 전부 세그먼트 경로를 탄다. 세그먼트
- * 병렬로 받은 파일의 md5가 로스터와 정확히 일치(a3). **상수를 바꿀 이유가 없어
- * 유지한다.** 켬/끔 벽시계 A/B 정밀 측정은 미실시(findings.md §3).
+ * **113이 4에서 16으로 늘렸다.** 구간 하나가 끝나 최종 파일에 놓이면 그 번호를 곧바로 기록
+ * 하므로(`SegmentedResume.doneIndices`), 구간이 잘아질수록 앱이 죽을 때 잃는 양이 준다 —
+ * 잃는 것은 죽는 순간 받고 있던 구간들(동시 `SEGMENT_CONCURRENCY`개)뿐이다. 1.5GB 파일이면
+ * 구간당 약 100MB다(4구간일 때 구간당 약 380MB, 동시에 넷이 모두 받던 중이라 사실상 전부).
+ * **16은 로드맵의 예시를 그대로 쓴 사람이 정한 값이고 측정이 아니다.** 32로 늘리면 잃는 양이
+ * 반이 되지만 요청·기록이 두 배라는 것만 안다.
  *
- * **왜 4인가** (research.md §3): 모바일 네트워크에서 4~8 병렬이 처리량 이득의 대부분을
- * 준다. 동시 다운로드 상한이 없으므로(FR-002) 6모델 × 4 = 24 커넥션이 실질 상한 —
- * 안드로이드/OkHttp 커넥션 풀(호스트당 5, 전체 64)과 CDN이 감당 가능한 범위. 8로
- * 올리면 48 커넥션이라 스로틀·소켓 고갈 위험.
+ * **동시 연결 수는 `SEGMENT_CONCURRENCY`(4)로 026의 4구간 병렬과 같다.** 실기기 확인
+ * (2026-08-31, SM-S901N): 4개 동시가 정상이었고 HF CDN이 리다이렉트 후 Range·
+ * Content-Length를 유지해 로스터 전부 세그먼트 경로를 탄다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-export const SEGMENT_COUNT = 4;
+export const SEGMENT_COUNT = 16;
+
+/**
+ * 동시에 받는 구간의 수 (113).
+ *
+ * **사람이 정한 값이다** (원칙 V). 026이 4구간을 모두 동시에 받던 연결 수를 그대로 유지한다 —
+ * 구간을 잘게 나눴어도 CDN·OkHttp 연결 풀에 주는 부담은 같다(6모델 × 4 = 24 연결 상한).
+ * `SEGMENT_COUNT` 이하여야 한다.
+ */
+export const SEGMENT_CONCURRENCY = 4;
 
 /**
  * 이보다 작은 구간은 만들지 않는다.
@@ -94,28 +102,42 @@ export function planSegments(totalBytes: number, count: number = SEGMENT_COUNT):
 }
 
 /**
- * 재개 시 각 구간의 남은 Range를 계산한다.
+ * 재개 시 아직 받아야 할 구간을 구한다.
  *
- * 저장된 `totalBytes`·`segmentCount`로 계획을 복원하고, 각 구간 i에 대해:
- *  - `receivedBytes[i] >= 구간 크기` → **제외** (완료)
- *  - 아니면 `start`를 `receivedBytes[i]`만큼 밀어 남은 Range를 만든다
+ * 저장된 `totalBytes`·`segmentCount`로 계획을 복원하고, **끝난 구간(`doneIndices`)을 뺀
+ * 나머지를 구간 전체 그대로** 돌려준다. 받던 구간의 일부를 믿고 start를 미루지 않는다 —
+ * 그 구간의 임시 파일은 지워졌고 쓰인 바이트 수를 믿을 근거가 없다(113).
  */
 export function remainingSegments(resume: SegmentedResume): Segment[] {
   const plan = planSegments(resume.totalBytes, resume.segmentCount);
+  const done = new Set(resume.doneIndices);
+  return plan.segments.filter((segment) => !done.has(segment.index));
+}
 
-  const remaining: Segment[] = [];
-  for (const segment of plan.segments) {
-    const size = segment.end - segment.start + 1;
-    const received = resume.receivedBytes[segment.index] ?? 0;
-    if (received >= size) continue; // 완료
-    remaining.push({
-      index: segment.index,
-      start: segment.start + received,
-      end: segment.end,
-    });
+/**
+ * 끝난 구간을 구간별 받은 바이트로 되돌린다 (113).
+ *
+ * 재개한 받기의 진행률 합산(`mergeProgress`)이 끝난 구간을 「이미 받음」으로 세는 시작점이다.
+ * 범위 밖 번호는 무시한다.
+ */
+export function receivedFromDone(plan: SegmentPlan, doneIndices: readonly number[]): number[] {
+  const received = plan.segments.map(() => 0);
+  for (const index of doneIndices) {
+    const segment = plan.segments[index];
+    if (segment === undefined) continue;
+    received[index] = segment.end - segment.start + 1;
   }
+  return received;
+}
 
-  return remaining;
+/**
+ * 재개 기록 기준으로 아직 받아야 하는 바이트 (113, FR-011).
+ *
+ * 이어받을 때의 공간 판정이 전체 크기 대신 이 값을 요구한다 — 최종 파일이 이미 자리를
+ * 차지하고 있어 전체를 다시 요구하면 이어받기가 불필요하게 거부된다. 밖으로 나가지 않는다.
+ */
+export function remainingSegmentBytes(resume: SegmentedResume): number {
+  return remainingSegments(resume).reduce((n, s) => n + (s.end - s.start + 1), 0);
 }
 
 /**

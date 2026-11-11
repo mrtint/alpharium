@@ -20,7 +20,7 @@ import {
   verdictFor,
   withVerdict,
   withoutAsset,
-  writeState,
+  mutateState,
 } from "./storage";
 import type { AssetKey, VerificationVerdict } from "./types";
 
@@ -114,21 +114,22 @@ export async function settleExistingFile(
     }
     // 남은 기록을 두면 받는 도중에 죽은 파일의 크기가 기준에 닿는 순간 지문 없이 「준비됨」이 된다.
     if (verdictFor(state, target.assetKey) !== null) {
-      await writeState(ports.metadata, withoutAsset(state, target.assetKey));
+      await mutateState(ports.metadata, (fresh) => withoutAsset(fresh, target.assetKey));
     }
     return "download";
   }
 
   // 지문 계산이 던져도 받으러 간다 — 깨진 파일이 있는 기기가 재시도마다 같은 자리에서 막히면 안 된다.
   const verdict = await verifyDownloaded(ports.files, target).catch(() => null);
-  const current = await readState(ports.metadata);
   if (verdict?.passed) {
-    await writeState(ports.metadata, withVerdict(withoutAsset(current, target.assetKey), verdict));
+    await mutateState(ports.metadata, (fresh) =>
+      withVerdict(withoutAsset(fresh, target.assetKey), verdict),
+    );
     return "ready";
   }
 
   await ports.files.remove(target.assetKey);
-  await writeState(ports.metadata, withoutAsset(current, target.assetKey));
+  await mutateState(ports.metadata, (fresh) => withoutAsset(fresh, target.assetKey));
   return "download";
 }
 

@@ -23,6 +23,8 @@ import type {
   TransferProgress,
 } from "../../src/models/port";
 import { assetFor, CHARACTERS } from "../../src/models/roster";
+import { planSegments } from "../../src/models/segmented/plan";
+import type { SegmentCheckpoint, SegmentedResume } from "../../src/models/segmented/types";
 import { readState } from "../../src/models/storage";
 import type { DownloadProgress } from "../../src/models/types";
 import { FUTURE_CHARACTER } from "../future-character";
@@ -45,6 +47,15 @@ function harness(
     bytes?: number | null;
     progress?: TransferProgress[];
     metadata?: string | null;
+    /** 113 — 받는 도중 일어나는 일을 흉내 낸다(체크포인트 호출 등). 값을 주면 그것이 결과다 */
+    scenario?: (ctx: {
+      checkpoint?: SegmentCheckpoint;
+      state: unknown;
+      resumed: boolean;
+    }) => Promise<TransferOutcome | void>;
+    /** 파일 상태가 바뀌는 흉내 — 받기 전·후 모양을 따로 줄 때 */
+    exists?: boolean;
+    availableSequence?: number[];
   } = {},
 ) {
   const requested: Requested[] = [];
@@ -70,7 +81,7 @@ function harness(
 
   const files: ModelFilePort = {
     async facts() {
-      return { exists: bytes != null, bytes: bytes ?? null };
+      return { exists: options.exists ?? bytes != null, bytes: bytes ?? null };
     },
     async contentHash(key) {
       hashed.push(key);
@@ -103,9 +114,16 @@ function harness(
     },
   };
 
-  const makeTask = (onProgress: (p: TransferProgress) => void) => ({
+  const makeTask = (
+    onProgress: (p: TransferProgress) => void,
+    checkpoint?: SegmentCheckpoint,
+    state: unknown = null,
+    resumed = false,
+  ) => ({
     async wait(): Promise<TransferOutcome> {
       for (const p of options.progress ?? []) onProgress(p);
+      const scripted = await options.scenario?.({ checkpoint, state, resumed });
+      if (scripted !== undefined) return scripted;
       if (paused) return { kind: "paused", state: { at: 1 } };
       return options.outcome ?? { kind: "completed" };
     },
@@ -115,14 +133,14 @@ function harness(
   });
 
   const download: DownloadPort = {
-    start(key, url, onProgress) {
+    start(key, url, onProgress, checkpoint) {
       requested.push({ key, url, resumed: false });
       created.push(key);
-      return makeTask(onProgress);
+      return makeTask(onProgress, checkpoint);
     },
-    resume(key, url, _state, onProgress) {
+    resume(key, url, state, onProgress, checkpoint) {
       requested.push({ key, url, resumed: true });
-      return makeTask(onProgress);
+      return makeTask(onProgress, checkpoint, state, true);
     },
   };
 
@@ -459,13 +477,15 @@ describe("내려받기", () => {
   // A9 — 026: 세그먼트 재개 상태가 있으면 그것을 resume에 넘긴다 (FR-022).
   it("세그먼트 재개 상태가 있으면 이어받으며 그 상태를 넘긴다", async () => {
     const key = assetFor("quiet").key;
+    const asset = assetFor("quiet");
     const resume = {
       assetKey: key,
-      totalBytes: 1000,
-      segmentCount: 4,
-      receivedBytes: [250, 0, 0, 0],
+      totalBytes: asset.expectedBytes,
+      segmentCount: planSegments(asset.expectedBytes).segments.length,
+      doneIndices: [0],
     };
     const h = harness({
+      bytes: asset.expectedBytes,
       metadata: JSON.stringify({ verdicts: [], paused: [], segmented: [resume] }),
     });
     const passed: unknown[] = [];
@@ -480,7 +500,7 @@ describe("내려받기", () => {
     await createAcquisition({ ...h.ports, download }).prepare("quiet");
 
     expect(h.requested[0].resumed).toBe(true);
-    expect(passed[0]).toMatchObject({ segmentCount: 4 });
+    expect(passed[0]).toMatchObject({ doneIndices: [0] });
   });
 
   // A7 — 멈추면 이어받을 수 있는 상태로 남는다 (FR-014)
@@ -513,8 +533,8 @@ describe("내려받기", () => {
               state: {
                 assetKey: key,
                 totalBytes: 1000,
-                segmentCount: 4,
-                receivedBytes: [500, 0, 0, 0],
+                segmentCount: 16,
+                doneIndices: [0, 3],
               },
             };
           },
@@ -735,8 +755,8 @@ describe("받기 전에 먼저 검증한다 (110)", () => {
           {
             assetKey: ASSET.key,
             totalBytes: ASSET.expectedBytes,
-            segmentCount: 4,
-            receivedBytes: [1, 2, 3, 4],
+            segmentCount: planSegments(ASSET.expectedBytes).segments.length,
+            doneIndices: [0, 1, 2],
           },
         ],
       }),
@@ -755,5 +775,224 @@ describe("받기 전에 먼저 검증한다 (110)", () => {
     };
 
     await expect(createAcquisition(ports).prepare("quiet")).rejects.toThrow("쓰지 못했다");
+  });
+});
+
+/* ───────────────────── 113 — 끝난 구간 기록과 이어받기 ───────────────────── */
+
+describe("끝난 구간을 기록하고 이어받는다 (113)", () => {
+  const ASSET = assetFor("quiet");
+  const PLAN = planSegments(ASSET.expectedBytes);
+  const COUNT = PLAN.segments.length;
+  const endOf = (i: number) => PLAN.segments[i].end;
+  const record = (doneIndices: number[], over: Partial<SegmentedResume> = {}) => ({
+    assetKey: ASSET.key,
+    totalBytes: ASSET.expectedBytes,
+    segmentCount: COUNT,
+    doneIndices,
+    ...over,
+  });
+  const meta = (resume: unknown) =>
+    JSON.stringify({ verdicts: [], paused: [], segmented: [resume] });
+
+  it("구간이 끝나는 즉시 state.json에 끝난 번호가 남는다 (FR-002)", async () => {
+    let snapshots: number[][] = [];
+    const h = harness({
+      scenario: async ({ checkpoint }) => {
+        await checkpoint?.(record([0]));
+        // 두 번째 체크포인트 직전에 기록을 읽는다 — 첫 구간이 이미 남아 있어야 한다.
+        snapshots.push(
+          (await readState(h.metadataPort)).segmented.find((s) => s.assetKey === ASSET.key)
+            ?.doneIndices ?? [],
+        );
+        await checkpoint?.(record([0, 4]));
+        snapshots.push(
+          (await readState(h.metadataPort)).segmented.find((s) => s.assetKey === ASSET.key)
+            ?.doneIndices ?? [],
+        );
+        // 앱이 여기서 죽었다고 보고 다 받지 못한 채 끊긴다.
+        return { kind: "failed", reason: "죽음" };
+      },
+    });
+
+    const result = await createAcquisition(h.ports).prepare("quiet");
+
+    expect(result.ok).toBe(false);
+    expect(snapshots).toEqual([[0], [0, 4]]);
+  });
+
+  it("동시에 끝난 구간의 기록이 서로를 덮어쓰지 않는다 (FR-005)", async () => {
+    const h = harness({
+      scenario: async ({ checkpoint }) => {
+        // 겹쳐 부른다 — 호출자는 줄을 세우지 않는다. 줄은 저장 쪽(`mutateState`)이 세운다.
+        await Promise.all([checkpoint?.(record([2])), checkpoint?.(record([2, 6]))]);
+        return { kind: "failed", reason: "끊김" };
+      },
+    });
+
+    await createAcquisition(h.ports).prepare("quiet");
+
+    const saved = (await readState(h.metadataPort)).segmented[0];
+    expect(saved.doneIndices).toEqual([2, 6]);
+  });
+
+  it("실패해도 끝난 구간 기록은 남고, 다시 받으면 그 기록으로 이어받는다 (US2)", async () => {
+    const first = harness({
+      bytes: endOf(1) + 1,
+      scenario: async ({ checkpoint }) => {
+        await checkpoint?.(record([0, 1]));
+        return { kind: "failed", reason: "끊김" };
+      },
+    });
+    await createAcquisition(first.ports).prepare("quiet");
+    const stored = (await readState(first.metadataPort)).segmented;
+    expect(stored).toEqual([record([0, 1])]);
+
+    const passed: unknown[] = [];
+    const second = harness({
+      bytes: endOf(1) + 1,
+      metadata: JSON.stringify({ verdicts: [], paused: [], segmented: stored }),
+      scenario: async ({ state }) => {
+        passed.push(state);
+      },
+    });
+    const result = await createAcquisition(second.ports).prepare("quiet");
+
+    expect(passed).toEqual([record([0, 1])]);
+    expect(second.requested[0].resumed).toBe(true);
+    expect(result.ok).toBe(true);
+  });
+
+  it("모든 구간이 끝났다는 기록이면 곧바로 검증으로 간다 (받지 않고 지문만)", async () => {
+    const all = PLAN.segments.map((s) => s.index);
+    const h = harness({ bytes: ASSET.expectedBytes, metadata: meta(record(all)) });
+
+    // 전송 쪽은 새 구간 없이 곧바로 completed를 돌려주는 것이 계약이다.
+    const result = await createAcquisition(h.ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect(h.hashed).toEqual([ASSET.key]);
+  });
+
+  it("받기가 성공하면 재개 기록이 지워진다 (FR-008)", async () => {
+    const h = harness({
+      bytes: endOf(0) + 1,
+      metadata: meta(record([0])),
+    });
+
+    const result = await createAcquisition(h.ports).prepare("quiet");
+
+    expect(result.ok).toBe(true);
+    expect((await readState(h.metadataPort)).segmented).toEqual([]);
+  });
+
+  it("지문 검증이 실패해도 재개 기록은 남지 않는다 — 처음부터 다시 받는다", async () => {
+    const h = harness({
+      bytes: endOf(0) + 1,
+      hash: "다른 지문",
+      metadata: meta(record([0])),
+    });
+
+    const result = await createAcquisition(h.ports).prepare("quiet");
+
+    expect(result).toEqual({ ok: false, failure: { kind: "verification-failed" } });
+    expect((await readState(h.metadataPort)).segmented).toEqual([]);
+  });
+
+  describe("이어받을 때의 공간 판정 (FR-011)", () => {
+    const withExpected = async <T>(run: () => Promise<T>) => run();
+
+    it("남은 양만 요구한다 — 남은 공간이 전체 × 1.15보다 작아도 남은 양 × 1.15보다 크면 이어받는다", async () => {
+      const done = PLAN.segments.slice(0, COUNT - 2).map((s) => s.index);
+      const remaining = PLAN.segments
+        .slice(COUNT - 2)
+        .reduce((n, s) => n + (s.end - s.start + 1), 0);
+      const h = harness({
+        bytes: ASSET.expectedBytes,
+        available: Math.ceil(remaining * SPACE_HEADROOM) + 1,
+        metadata: meta(record(done)),
+      });
+
+      const result = await withExpected(() => createAcquisition(h.ports).prepare("quiet"));
+
+      expect(result.ok).toBe(true);
+      expect(h.requested[0].resumed).toBe(true);
+    });
+
+    it("남은 양 × 1.15보다 작으면 거부한다", async () => {
+      const done = PLAN.segments.slice(0, COUNT - 2).map((s) => s.index);
+      const remaining = PLAN.segments
+        .slice(COUNT - 2)
+        .reduce((n, s) => n + (s.end - s.start + 1), 0);
+      const h = harness({
+        bytes: ASSET.expectedBytes - 1,
+        available: Math.floor(remaining * SPACE_HEADROOM) - 1,
+        metadata: meta(record(done)),
+      });
+
+      const result = await createAcquisition(h.ports).prepare("quiet");
+
+      expect(result).toEqual({ ok: false, failure: { kind: "insufficient-space" } });
+      expect(h.requested).toHaveLength(0);
+    });
+
+    it("기록이 없으면 지금처럼 전체를 요구한다", async () => {
+      const h = harness({ bytes: null, exists: false, available: Math.floor(ASSET.expectedBytes) });
+
+      const result = await createAcquisition(h.ports).prepare("quiet");
+
+      expect(result).toEqual({ ok: false, failure: { kind: "insufficient-space" } });
+    });
+  });
+
+  describe("어긋난 기록은 믿지 않고 처음부터 받는다 (US3, FR-006)", () => {
+    const expectRestart = async (h: ReturnType<typeof harness>, removesPartial = true) => {
+      await createAcquisition(h.ports).prepare("quiet");
+      expect(h.requested).toEqual([{ key: ASSET.key, url: ASSET.url, resumed: false }]);
+      // 부분 파일도 함께 지운다. (옛 형식은 읽을 때 이미 버려져 그 자리에서는 지울 것이 없다 —
+      // 구간은 전부 다시 받아 덮어쓴다.)
+      if (removesPartial) expect(h.removed).toContain(ASSET.key);
+    };
+
+    it("최종 파일이 없으면", async () => {
+      await expectRestart(harness({ bytes: null, exists: false, metadata: meta(record([0, 1])) }));
+    });
+
+    it("파일 크기가 끝난 구간의 끝에 못 미치면", async () => {
+      await expectRestart(harness({ bytes: endOf(3), metadata: meta(record([0, 3])) }));
+    });
+
+    it("기록의 전체 크기가 기준 크기와 다르면", async () => {
+      await expectRestart(
+        harness({
+          bytes: endOf(0) + 1,
+          metadata: meta(record([0], { totalBytes: ASSET.expectedBytes + 1 })),
+        }),
+      );
+    });
+
+    it("기록의 구간 수가 지금 계획과 다르면", async () => {
+      await expectRestart(
+        harness({ bytes: endOf(0) + 1, metadata: meta(record([0], { segmentCount: COUNT / 2 })) }),
+      );
+    });
+
+    it("옛 형식(receivedBytes) 기록이면", async () => {
+      const old = {
+        assetKey: ASSET.key,
+        totalBytes: ASSET.expectedBytes,
+        segmentCount: 4,
+        receivedBytes: [1, 2, 3, 4],
+      };
+      await expectRestart(harness({ bytes: endOf(0) + 1, metadata: meta(old) }), false);
+    });
+
+    it("버려진 기록은 state.json에서도 지워진다", async () => {
+      const h = harness({ bytes: null, exists: false, metadata: meta(record([0])) });
+
+      await createAcquisition(h.ports).prepare("quiet");
+
+      expect((await readState(h.metadataPort)).segmented).toEqual([]);
+    });
   });
 });

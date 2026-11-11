@@ -17,11 +17,14 @@ import { join } from "node:path";
 
 import {
   MIN_SEGMENT_BYTES,
+  SEGMENT_CONCURRENCY,
   SEGMENT_COUNT,
   isComplete,
   mergeProgress,
   planSegments,
+  receivedFromDone,
   remainingCapacity,
+  remainingSegmentBytes,
   remainingSegments,
 } from "../../src/models/segmented/plan";
 import type { SegmentedResume } from "../../src/models/segmented/types";
@@ -79,8 +82,8 @@ describe("planSegments — 작은 파일 (C2)", () => {
 
 describe("planSegments — 나머지 바이트 (C3)", () => {
   it("SEGMENT_COUNT로 나누어떨어지지 않으면 마지막 구간이 더 크다", () => {
-    // SEGMENT_COUNT=4 기준, 4로 나눈 나머지가 3
-    const totalBytes = MIN_SEGMENT_BYTES * 8 + 3;
+    // 구간 수로 나눈 나머지가 3
+    const totalBytes = MIN_SEGMENT_BYTES * 16 + 3;
     const plan = planSegments(totalBytes);
     const sizes = plan.segments.map((s) => s.end - s.start + 1);
     const last = sizes[sizes.length - 1];
@@ -90,46 +93,74 @@ describe("planSegments — 나머지 바이트 (C3)", () => {
   });
 });
 
-/* ───────────────────── C4·C5 — remainingSegments ───────────────────── */
+/* ───────────────────── C4·C5 — remainingSegments (113: 끝난 구간 번호 목록) ───────────────────── */
 
 describe("remainingSegments (C4·C5)", () => {
-  const totalBytes = MIN_SEGMENT_BYTES * 8; // 4구간, 구간당 MIN_SEGMENT_BYTES * 2
-  const segmentSize = MIN_SEGMENT_BYTES * 2;
+  const totalBytes = MIN_SEGMENT_BYTES * 16; // SEGMENT_COUNT(16)구간, 구간당 MIN_SEGMENT_BYTES
+  const plan = planSegments(totalBytes);
 
-  it("C4 — 완료 구간은 제외된다", () => {
+  it("C4 — 끝난 구간은 제외된다", () => {
     const resume: SegmentedResume = {
       assetKey: "a1",
       totalBytes,
-      segmentCount: 4,
-      receivedBytes: [segmentSize, segmentSize, 0, 0],
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: [0, 1, 5],
     };
     const remaining = remainingSegments(resume);
-    expect(remaining.map((s) => s.index)).toEqual([2, 3]);
+    expect(remaining.map((s) => s.index)).toEqual(
+      plan.segments.map((s) => s.index).filter((i) => ![0, 1, 5].includes(i)),
+    );
   });
 
-  it("C5 — 부분 구간의 start가 receivedBytes만큼 밀린다", () => {
-    const half = segmentSize / 2;
+  it("C5 — 남은 구간은 구간 전체를 다시 받는다 (start를 밀지 않는다 — 받던 구간은 처음부터)", () => {
     const resume: SegmentedResume = {
       assetKey: "a1",
       totalBytes,
-      segmentCount: 4,
-      receivedBytes: [segmentSize, half, 0, 0],
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: [0],
     };
     const remaining = remainingSegments(resume);
-    // 구간 0은 완료 → 제외. 구간 1은 half만큼 밀림.
-    expect(remaining[0].index).toBe(1);
-    expect(remaining[0].start).toBe(segmentSize + half);
-    expect(remaining[0].end).toBe(segmentSize * 2 - 1);
+    expect(remaining[0]).toEqual(plan.segments[1]);
+    expect(remaining).toHaveLength(SEGMENT_COUNT - 1);
   });
 
-  it("전부 완료면 빈 배열", () => {
+  it("전부 끝났으면 빈 배열", () => {
     const resume: SegmentedResume = {
       assetKey: "a1",
       totalBytes,
-      segmentCount: 4,
-      receivedBytes: [segmentSize, segmentSize, segmentSize, segmentSize],
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: plan.segments.map((s) => s.index),
     };
     expect(remainingSegments(resume)).toEqual([]);
+  });
+});
+
+describe("receivedFromDone·remainingSegmentBytes (113)", () => {
+  const totalBytes = MIN_SEGMENT_BYTES * 16 + 5; // 나머지 5바이트는 마지막 구간
+  const plan = planSegments(totalBytes);
+  const size = (i: number) => plan.segments[i].end - plan.segments[i].start + 1;
+
+  it("끝난 구간은 자기 크기만큼, 나머지는 0으로 센다 (진행률 합산의 시작점)", () => {
+    const received = receivedFromDone(plan, [0, SEGMENT_COUNT - 1]);
+    expect(received).toHaveLength(SEGMENT_COUNT);
+    expect(received[0]).toBe(size(0));
+    expect(received[SEGMENT_COUNT - 1]).toBe(size(SEGMENT_COUNT - 1));
+    expect(received[1]).toBe(0);
+  });
+
+  it("remainingSegmentBytes는 전체에서 끝난 구간 크기를 뺀다 (FR-011)", () => {
+    const resume: SegmentedResume = {
+      assetKey: "a1",
+      totalBytes,
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: [0, 1],
+    };
+    expect(remainingSegmentBytes(resume)).toBe(totalBytes - size(0) - size(1));
+  });
+
+  it("범위 밖 번호는 무시한다", () => {
+    const received = receivedFromDone(plan, [99, -1]);
+    expect(received.every((n) => n === 0)).toBe(true);
   });
 });
 
@@ -189,7 +220,13 @@ describe("상수는 사람이 못박은 readonly 리터럴이다 (C14·C15, FR-0
   const source = readFileSync(join(__dirname, "../../src/models/segmented/plan.ts"), "utf8");
 
   it("C14 — SEGMENT_COUNT가 리터럴로 선언된다", () => {
-    expect(source).toMatch(/export const SEGMENT_COUNT\s*=\s*4\b/);
+    expect(source).toMatch(/export const SEGMENT_COUNT\s*=\s*16\b/);
+  });
+
+  it("113 — SEGMENT_CONCURRENCY가 리터럴 4로 선언된다 (사람이 정한 값, 원칙 V)", () => {
+    expect(source).toMatch(/export const SEGMENT_CONCURRENCY\s*=\s*4\b/);
+    expect(SEGMENT_CONCURRENCY).toBe(4);
+    expect(SEGMENT_CONCURRENCY).toBeLessThanOrEqual(SEGMENT_COUNT);
   });
 
   it("C14 — MIN_SEGMENT_BYTES가 리터럴로 선언된다", () => {
@@ -200,7 +237,7 @@ describe("상수는 사람이 못박은 readonly 리터럴이다 (C14·C15, FR-0
   });
 
   it("C15 — 런타임 값이 소스 리터럴과 일치한다 (값 변경 시 실패)", () => {
-    expect(SEGMENT_COUNT).toBe(4);
+    expect(SEGMENT_COUNT).toBe(16);
     expect(MIN_SEGMENT_BYTES).toBe(8 * 1024 * 1024);
   });
 

@@ -17,9 +17,14 @@ import { join } from "node:path";
 
 import { checkSegmentedFile } from "../../scripts/constitution-rules";
 import { runSegmented } from "../../src/models/segmented/transfer";
-import { MIN_SEGMENT_BYTES } from "../../src/models/segmented/plan";
+import {
+  MIN_SEGMENT_BYTES,
+  SEGMENT_CONCURRENCY,
+  SEGMENT_COUNT,
+  planSegments,
+} from "../../src/models/segmented/plan";
 import type { RangeFetchPort, RangeOutcome } from "../../src/models/port";
-import type { Segment } from "../../src/models/segmented/types";
+import type { Segment, SegmentedResume } from "../../src/models/segmented/types";
 
 /** RangeFetchPort 대역. 각 구간의 fetch 호출을 기록하고 결과를 조작한다. */
 function fakeRange(
@@ -31,6 +36,8 @@ function fakeRange(
     /** 각 구간이 보고할 바이트 (기본: 구간 전체) */
     bytesFor?: (segment: Segment) => number;
     delayMs?: number;
+    /** 구간마다 결과를 늦추거나 정하는 훅. 값을 주면 그것이 결과다 */
+    gate?: (segment: Segment, signal?: AbortSignal) => Promise<RangeOutcome | void>;
   } = {},
 ): { port: RangeFetchPort; calls: Segment[]; concurrent: number } {
   const calls: Segment[] = [];
@@ -49,9 +56,11 @@ function fakeRange(
       inFlight++;
       maxConcurrent = Math.max(maxConcurrent, inFlight);
       if (opts.delayMs) await new Promise((r) => setTimeout(r, opts.delayMs));
+      const gated = opts.gate ? await opts.gate(segment, signal) : undefined;
       inFlight--;
 
-      const outcome = opts.outcomes?.[segment.index] ?? ({ kind: "completed" } as RangeOutcome);
+      const outcome =
+        gated ?? opts.outcomes?.[segment.index] ?? ({ kind: "completed" } as RangeOutcome);
       if (outcome.kind === "completed") {
         const bytes = opts.bytesFor ? opts.bytesFor(segment) : segment.end - segment.start + 1;
         onBytes(bytes);
@@ -103,12 +112,12 @@ it("C10 — 모든 구간 완료 → { completed } + onProgress(1)", async () =>
   });
   expect(result).toEqual({ kind: "completed" });
   expect(fractions[fractions.length - 1]).toBe(1);
-  expect(r.calls).toHaveLength(4); // SEGMENT_COUNT
+  expect(r.calls).toHaveLength(SEGMENT_COUNT);
 });
 
 /* ───────────────────── C11 — 한 구간 실패 → 나머지 abort ───────────────────── */
 
-it("C11 — 한 구간이 failed면 나머지 abort + { failed }", async () => {
+it("C11 — 한 구간이 failed면 나머지 abort + { failed } + 새 구간을 더 꺼내지 않는다", async () => {
   const seen: { index: number; aborted: boolean }[] = [];
   const r = fakeRange({
     support: "supported",
@@ -128,70 +137,247 @@ it("C11 — 한 구간이 failed면 나머지 abort + { failed }", async () => {
   // 실패 후 다른 구간들에 abort 신호가 갔다
   await new Promise((r) => setTimeout(r, 20));
   expect(seen.some((s) => s.index !== 1 && s.aborted)).toBe(true);
+  // 첫 묶음(동시 SEGMENT_CONCURRENCY개)을 넘어 새 구간을 시작하지 않았다.
+  expect(r.calls.length).toBeLessThanOrEqual(SEGMENT_CONCURRENCY * 2);
+  expect(r.calls.length).toBeLessThan(SEGMENT_COUNT);
 });
 
-/* ───────────────────── C12 — pause → { paused, resume } ───────────────────── */
+/* ───────────────────── C12 — pause → { paused, resume } (113: 끝난 번호만) ───────────────────── */
 
-it("C12 — pauseSignal 발동 → { paused, resume } with 정확한 receivedBytes", async () => {
+it("C12 — pauseSignal 발동 → { paused }이고 resume.doneIndices에는 끝난 구간만, 받던 구간은 없다", async () => {
   const pause = new AbortController();
   const total = MIN_SEGMENT_BYTES * 8;
+  // 구간 0·1은 곧바로 끝나고, 그 뒤 받는 구간들은 멈춤 신호를 기다렸다가 aborted로 끝난다.
   const r = fakeRange({
     support: "supported",
     totalBytes: total,
-    delayMs: 30,
-    // 각 구간은 절반만 받고 나서 aborted로 끝난다
-    bytesFor: (s) => Math.floor((s.end - s.start + 1) / 2),
-    outcomes: {
-      0: { kind: "aborted" },
-      1: { kind: "aborted" },
-      2: { kind: "aborted" },
-      3: { kind: "aborted" },
+    gate: async (segment, signal) => {
+      if (segment.index <= 1) return { kind: "completed" };
+      if (segment.index === 2) pause.abort();
+      await new Promise((res) => setTimeout(res, 5));
+      if (signal?.aborted || pause.signal.aborted) return { kind: "aborted" };
     },
   });
 
-  const p = runSegmented({ range: r.port }, "a1", "http://x", {
+  const result = await runSegmented({ range: r.port }, "a1", "http://x", {
     onProgress: () => {},
     pauseSignal: pause.signal,
   });
-  // 곧바로 멈춘다
-  setTimeout(() => pause.abort(), 5);
-  const result = await p;
 
   expect(result).toMatchObject({ kind: "paused" });
   if (result.kind === "paused") {
     expect(result.resume.assetKey).toBe("a1");
     expect(result.resume.totalBytes).toBe(total);
-    expect(result.resume.segmentCount).toBe(4);
-    // 각 구간이 절반 정도 받았다
-    expect(result.resume.receivedBytes).toHaveLength(4);
+    expect(result.resume.segmentCount).toBe(SEGMENT_COUNT);
+    expect(result.resume.doneIndices).toEqual([0, 1]);
   }
 });
 
-/* ───────────────────── C13 — 재개는 남은 구간만 fetch ───────────────────── */
+it("C12 — 멈춘 뒤에는 새 구간을 시작하지 않는다", async () => {
+  const pause = new AbortController();
+  const r = fakeRange({
+    support: "supported",
+    totalBytes: MIN_SEGMENT_BYTES * 8,
+    gate: async (segment) => {
+      if (segment.index === 0) pause.abort();
+      await new Promise((res) => setTimeout(res, 5));
+      if (pause.signal.aborted) return { kind: "aborted" };
+    },
+  });
 
-it("C13 — resume 주입 시 남은 구간만 fetchRange 호출", async () => {
+  await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: () => {},
+    pauseSignal: pause.signal,
+  });
+
+  expect(r.calls.length).toBeLessThanOrEqual(SEGMENT_CONCURRENCY);
+});
+
+/* ───────────────────── C13 — 재개는 끝나지 않은 구간만 fetch ───────────────────── */
+
+it("C13 — resume 주입 시 끝난 구간은 fetchRange를 부르지 않고 남은 구간은 전체를 받는다", async () => {
   const total = MIN_SEGMENT_BYTES * 8;
-  const segmentSize = total / 4;
+  const plan = planSegments(total);
   const r = fakeRange({ support: "supported", totalBytes: total });
+  const doneIndices = [0, 1, 5, 15];
 
   const result = await runSegmented({ range: r.port }, "a1", "http://x", {
     onProgress: () => {},
     pauseSignal: noAbort,
+    resume: { assetKey: "a1", totalBytes: total, segmentCount: SEGMENT_COUNT, doneIndices },
+  });
+
+  expect(result).toEqual({ kind: "completed" });
+  expect(r.calls.map((s) => s.index).sort((a, b) => a - b)).toEqual(
+    plan.segments.map((s) => s.index).filter((i) => !doneIndices.includes(i)),
+  );
+  // 남은 구간은 구간 시작부터 전체를 받는다 (받던 구간은 처음부터).
+  for (const call of r.calls) expect(call).toEqual(plan.segments[call.index]);
+});
+
+it("C13 — 모든 구간이 끝났다는 기록이면 요청 없이 completed + onProgress(1)", async () => {
+  const total = MIN_SEGMENT_BYTES * 8;
+  const r = fakeRange({ support: "supported", totalBytes: total });
+  const fractions: (number | null)[] = [];
+  const checkpoints: SegmentedResume[] = [];
+
+  const result = await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: (f) => fractions.push(f),
+    onCheckpoint: (c) => {
+      checkpoints.push(c);
+    },
+    pauseSignal: noAbort,
     resume: {
       assetKey: "a1",
       totalBytes: total,
-      segmentCount: 4,
-      // 구간 0·1 완료, 2는 절반, 3 미시작
-      receivedBytes: [segmentSize, segmentSize, segmentSize / 2, 0],
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: Array.from({ length: SEGMENT_COUNT }, (_, i) => i),
     },
   });
 
   expect(result).toEqual({ kind: "completed" });
-  // 완료된 0·1은 다시 안 받는다 — 2·3만
-  expect(r.calls.map((s) => s.index).sort()).toEqual([2, 3]);
-  // 구간 2는 이미 받은 지점부터
-  const seg2 = r.calls.find((s) => s.index === 2)!;
-  expect(seg2.start).toBe(segmentSize * 2 + segmentSize / 2);
+  expect(r.calls).toHaveLength(0);
+  expect(fractions[fractions.length - 1]).toBe(1);
+  expect(checkpoints).toEqual([]);
+});
+
+it("C13 — 재개한 받기의 진행률은 끝난 구간을 이미 받은 것으로 세어 거기서 시작한다 (FR-009)", async () => {
+  const total = MIN_SEGMENT_BYTES * 8;
+  const r = fakeRange({
+    support: "supported",
+    totalBytes: total,
+    // 남은 구간은 한 바이트도 보고하지 않는다 — 진행률은 끝난 구간 몫만 남는다.
+    bytesFor: () => 0,
+  });
+  const fractions: (number | null)[] = [];
+
+  await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: (f) => fractions.push(f),
+    pauseSignal: noAbort,
+    resume: {
+      assetKey: "a1",
+      totalBytes: total,
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: [0, 1, 2, 3],
+    },
+  });
+
+  // 16구간 중 4개가 끝났으므로 보고되는 첫 값은 4/16이다.
+  expect(fractions[0]).toBeCloseTo(0.25, 5);
+});
+
+/* ───────────────────── 113 — 체크포인트 (contracts/checkpoint.md) ───────────────────── */
+
+describe("onCheckpoint (113, FR-002·FR-005)", () => {
+  it("구간이 끝날 때마다 누적 doneIndices(오름차순)로 순서대로 불린다", async () => {
+    const total = MIN_SEGMENT_BYTES * 8;
+    const r = fakeRange({
+      support: "supported",
+      totalBytes: total,
+      // 번호가 큰 구간이 먼저 끝나게 섞는다.
+      gate: async (segment) => {
+        await new Promise((res) => setTimeout(res, (SEGMENT_COUNT - segment.index) % 5));
+      },
+    });
+    const seen: SegmentedResume[] = [];
+
+    const result = await runSegmented({ range: r.port }, "a1", "http://x", {
+      onProgress: () => {},
+      onCheckpoint: (c) => {
+        seen.push(structuredClone(c));
+      },
+      pauseSignal: noAbort,
+    });
+
+    expect(result).toEqual({ kind: "completed" });
+    expect(seen).toHaveLength(SEGMENT_COUNT);
+    seen.forEach((c, i) => {
+      expect(c.assetKey).toBe("a1");
+      expect(c.totalBytes).toBe(total);
+      expect(c.segmentCount).toBe(SEGMENT_COUNT);
+      expect(c.doneIndices).toHaveLength(i + 1);
+      expect([...c.doneIndices].sort((a, b) => a - b)).toEqual(c.doneIndices);
+    });
+    expect(seen[SEGMENT_COUNT - 1].doneIndices).toEqual(
+      Array.from({ length: SEGMENT_COUNT }, (_, i) => i),
+    );
+  });
+
+  it("호출은 겹치지 않는다 — 직전 호출이 끝난 뒤에 다음을 부른다", async () => {
+    const r = fakeRange({ support: "supported", totalBytes: MIN_SEGMENT_BYTES * 8 });
+    let running = 0;
+    let overlapped = false;
+
+    await runSegmented({ range: r.port }, "a1", "http://x", {
+      onProgress: () => {},
+      onCheckpoint: async () => {
+        running++;
+        if (running > 1) overlapped = true;
+        await new Promise((res) => setTimeout(res, 2));
+        running--;
+      },
+      pauseSignal: noAbort,
+    });
+
+    expect(overlapped).toBe(false);
+  });
+
+  it("체크포인트가 던져도 받기는 끝까지 간다 (최적화일 뿐이다)", async () => {
+    const r = fakeRange({ support: "supported", totalBytes: MIN_SEGMENT_BYTES * 8 });
+
+    const result = await runSegmented({ range: r.port }, "a1", "http://x", {
+      onProgress: () => {},
+      onCheckpoint: () => {
+        throw new Error("쓰기 실패");
+      },
+      pauseSignal: noAbort,
+    });
+
+    expect(result).toEqual({ kind: "completed" });
+    expect(r.calls).toHaveLength(SEGMENT_COUNT);
+  });
+
+  it("실패한 구간과 받던 구간은 체크포인트에 들어가지 않는다", async () => {
+    const r = fakeRange({
+      support: "supported",
+      totalBytes: MIN_SEGMENT_BYTES * 8,
+      gate: async (segment, signal) => {
+        if (segment.index === 1) return { kind: "failed", reason: "끊김" };
+        // 나머지는 실패가 알려질 때까지 기다리다 취소된다.
+        await new Promise((res) => setTimeout(res, 15));
+        if (signal?.aborted) return { kind: "aborted" };
+      },
+    });
+    const seen: number[][] = [];
+
+    const result = await runSegmented({ range: r.port }, "a1", "http://x", {
+      onProgress: () => {},
+      onCheckpoint: (c) => {
+        seen.push([...c.doneIndices]);
+      },
+      pauseSignal: noAbort,
+    });
+
+    expect(result).toMatchObject({ kind: "failed" });
+    for (const done of seen) expect(done).not.toContain(1);
+  });
+
+  it("폴백(지원 안 함·작은 파일)에서는 부르지 않는다", async () => {
+    const calls: SegmentedResume[] = [];
+    for (const r of [
+      fakeRange({ support: "unsupported" }),
+      fakeRange({ support: "supported", totalBytes: MIN_SEGMENT_BYTES }),
+    ]) {
+      await runSegmented({ range: r.port }, "a1", "http://x", {
+        onProgress: () => {},
+        onCheckpoint: (c) => {
+          calls.push(c);
+        },
+        pauseSignal: noAbort,
+      });
+    }
+    expect(calls).toEqual([]);
+  });
 });
 
 /* ───────────────────── onSizeResolved — 기기 통로가 total을 얻는다 (F1 fix) ───────────────────── */
@@ -222,8 +408,8 @@ it("onSizeResolved가 재개 시 저장된 totalBytes로 호출된다", async ()
     resume: {
       assetKey: "a1",
       totalBytes: total,
-      segmentCount: 4,
-      receivedBytes: [0, 0, 0, 0],
+      segmentCount: SEGMENT_COUNT,
+      doneIndices: [],
     },
   });
 
@@ -243,9 +429,9 @@ it("폴백일 때는 onSizeResolved가 호출되지 않는다", async () => {
   expect(sizes).toEqual([]);
 });
 
-/* ───────────────────── C24 — 병렬 수신 (US2) ───────────────────── */
+/* ───────────────────── C24 — 병렬 수신 (113: 동시 SEGMENT_CONCURRENCY개) ───────────────────── */
 
-it("C24 — 모든 구간을 동시에 fetch한다 (순차 아님)", async () => {
+it("C24 — 구간을 동시에 SEGMENT_CONCURRENCY개 받는다 (순차도 전부 동시도 아님)", async () => {
   const r = fakeRange({
     support: "supported",
     totalBytes: MIN_SEGMENT_BYTES * 8,
@@ -257,11 +443,11 @@ it("C24 — 모든 구간을 동시에 fetch한다 (순차 아님)", async () =>
     pauseSignal: noAbort,
   });
 
-  // 4구간이 동시에 in-flight였다 — 순차라면 concurrent가 1이다.
-  expect(r.concurrent).toBe(4);
+  // 순차라면 1, 전부 동시라면 SEGMENT_COUNT다.
+  expect(r.concurrent).toBe(SEGMENT_CONCURRENCY);
 });
 
-it("C24 — 동시 fetch 수가 SEGMENT_COUNT를 넘지 않는다", async () => {
+it("C24 — 동시 fetch 수가 SEGMENT_CONCURRENCY를 넘지 않는다", async () => {
   const r = fakeRange({
     support: "supported",
     totalBytes: MIN_SEGMENT_BYTES * 8,
@@ -273,7 +459,7 @@ it("C24 — 동시 fetch 수가 SEGMENT_COUNT를 넘지 않는다", async () => 
     pauseSignal: noAbort,
   });
 
-  expect(r.concurrent).toBeLessThanOrEqual(4);
+  expect(r.concurrent).toBeLessThanOrEqual(SEGMENT_CONCURRENCY);
 });
 
 /* ───────────────────── C25 — 원칙 III·IV: 구간 정보 미노출 (SC-008) ───────────────────── */

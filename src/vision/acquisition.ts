@@ -23,7 +23,7 @@
 
 import { readinessOf } from "../models/readiness";
 import type { DiskSpacePort, DownloadPort, MetadataPort, ModelFilePort } from "../models/port";
-import { readState, verdictFor, withVerdict, writeState } from "../models/storage";
+import { mutateState, readState, verdictFor, withVerdict } from "../models/storage";
 import type { DownloadFailure, ModelReadiness } from "../models/types";
 import { settleExistingFile } from "../models/verification";
 import { foldVisionReadiness } from "./readiness";
@@ -156,9 +156,8 @@ async function fetchOne(
   }
 
   const bytes = (await ports.files.facts(asset.key)).bytes ?? 0;
-  const state = await readState(ports.metadata).catch(() => ({}) as never);
-  await writeState(
-    ports.metadata,
+  // 113 — 같은 `state.json`에 구간 기록도 쓰이므로 한 줄로 세워 쓴다(`mutateState`).
+  await mutateState(ports.metadata, (state) =>
     withVerdict(state, {
       assetKey: asset.key,
       verifiedMd5: hash,

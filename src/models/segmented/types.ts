@@ -53,22 +53,36 @@ export type SegmentPlan = {
  * 003의 `PausedDownload`(단일 스트림 재개)와 **한 자산당 상호배타** — `withSegmentedResume`가
  * 같은 키를 `paused`에서 제거하고, `withPaused`가 `segmented`에서 제거한다.
  *
- * **저장하지 않는 것**: 구간 오프셋(`planSegments(totalBytes, segmentCount)`로 재구성).
- * 경과 시간·속도(원칙 IV). `url`(로스터가 준다).
+ * **113이 모양을 바꿨다.** 옛 `receivedBytes[]`(구간별 받은 바이트)는 구간의 임시 파일이
+ * 지워진 뒤에도 바이트를 「받음」으로 적어 빈 자리를 남길 수 있었고, 멈추기를 부르는 곳이
+ * 없어 실제로 쓰인 적도 없다. 이제는 **최종 파일에 놓인 구간의 번호만** 남긴다 — 받던
+ * 구간은 기록하지 않고 처음부터 다시 받는다.
  *
- * **`totalBytes`·`segmentCount`를 저장하는 이유**: 재개 시 로스터/서버 값이 바뀌었으면
- * 재개 계획이 어긋나므로, 저장 당시 값으로 계획을 복원하고 최종 지문 검증이 어긋남을
- * 잡는다(FR-024).
+ * 규칙(data-model.md):
+ *  - `totalBytes`·`segmentCount`는 양의 정수.
+ *  - `doneIndices`는 오름차순, 중복 없음, 각 `0 <= i < segmentCount`.
+ *  - `segmentCount`가 `planSegments(totalBytes)`의 구간 수와 같은지는 `resume.ts`가 재개 전에 본다.
+ *
+ * **저장하지 않는 것**: 구간 오프셋(`planSegments(totalBytes)`로 재구성). 경과 시간·속도(원칙 IV).
+ * `url`(로스터가 준다).
  */
 export type SegmentedResume = {
   assetKey: AssetKey;
   /** 재개 계획을 복원하는 데 필요 */
   totalBytes: number;
-  /** 저장 당시의 구간 수. `SEGMENT_COUNT`가 나중에 바뀌어도 재개는 이 값으로 */
+  /** 저장 당시의 구간 수 */
   segmentCount: number;
-  /** 길이 = `segmentCount`. `receivedBytes[i]` = 구간 i가 이미 받은 바이트 */
-  receivedBytes: number[];
+  /** 최종 파일에 놓인 구간의 번호. 오름차순·중복 없음 */
+  doneIndices: number[];
 };
+
+/**
+ * 구간 하나가 최종 파일에 놓인 **직후** 누적 재개 기록 전체로 불리는 콜백 (113, contracts/checkpoint.md).
+ *
+ * 호출은 순서대로이고 겹치지 않는다. 던지거나 거부해도 받기는 계속된다 — 체크포인트는
+ * 이어받기를 위한 최적화이고, 마지막 안전망은 최종 지문 검증이다.
+ */
+export type SegmentCheckpoint = (resume: SegmentedResume) => void | Promise<void>;
 
 /**
  * 서버가 구간 요청을 지원하는지 탐지한 결과. 밖으로 나가지 않는다.

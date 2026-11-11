@@ -22,7 +22,7 @@ import { createAcquisition, SPACE_HEADROOM } from "../models/acquisition";
 import { expoModelPorts } from "../models/expo-port";
 import { readinessOf } from "../models/readiness";
 import { assetFor } from "../models/roster";
-import { pausedFor, readState, verdictFor } from "../models/storage";
+import { pausedFor, readState, segmentedFor, verdictFor } from "../models/storage";
 import { prepareVision, visionReadiness, type VisionAcquisitionPorts } from "../vision/acquisition";
 import { essentialDownloadFraction } from "../onboarding/essential-assets";
 import { remainingBytes } from "./redownload-plan";
@@ -74,6 +74,8 @@ function kindReaders(modelPorts: ReturnType<typeof expoModelPorts>) {
         file: facts,
         verdict: verdictFor(state, asset.key),
         paused: pausedFor(state, asset.key),
+        // 113 — 끝난 구간 기록이 실제로 생기므로 받다 만 파일이 이어받을 수 있는 상태로 읽힌다.
+        segmentedResume: segmentedFor(state, asset.key),
         hasPartialFile: false,
       }).kind;
     } catch {

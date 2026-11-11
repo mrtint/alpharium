@@ -18,8 +18,14 @@
 
 import type { AssetKey } from "../types";
 import type { RangeFetchPort } from "../port";
-import { mergeProgress, planSegments, remainingSegments } from "./plan";
-import type { SegmentedResume } from "./types";
+import {
+  SEGMENT_CONCURRENCY,
+  mergeProgress,
+  planSegments,
+  receivedFromDone,
+  remainingSegments,
+} from "./plan";
+import type { Segment, SegmentCheckpoint, SegmentedResume } from "./types";
 
 export type SegmentedDeps = { range: RangeFetchPort };
 
@@ -45,6 +51,13 @@ export type SegmentedOptions = {
    * 않는다(호출자가 003 `createDownloadTask`의 진행 보고를 그대로 받는다).
    */
   onSizeResolved?: (totalBytes: number) => void;
+  /**
+   * 구간 하나가 끝나 최종 파일에 놓인 직후 누적 재개 기록으로 불린다 (113).
+   *
+   * **직렬이다** — 직전 호출이 끝난 뒤 다음을 부른다. 던져도 받기는 계속된다(최적화일 뿐).
+   * 폴백(단일 스트림)에서는 부르지 않는다.
+   */
+  onCheckpoint?: SegmentCheckpoint;
   /** 사용자 "멈추기" */
   pauseSignal: AbortSignal;
 };
@@ -61,29 +74,33 @@ export async function runSegmented(
   // 1~2. 계획을 정한다.
   let totalBytes: number;
   let segmentCount: number;
-  let segmentsToFetch: ReturnType<typeof planSegments>["segments"];
-  let receivedBytes: number[];
+  let plan: ReturnType<typeof planSegments>;
+  let segmentsToFetch: Segment[];
+  const doneIndices = new Set<number>();
 
   if (opts.resume) {
     totalBytes = opts.resume.totalBytes;
     segmentCount = opts.resume.segmentCount;
+    plan = planSegments(totalBytes, segmentCount);
     segmentsToFetch = remainingSegments(opts.resume);
-    receivedBytes = [...opts.resume.receivedBytes];
+    for (const index of opts.resume.doneIndices) doneIndices.add(index);
   } else {
     const support = await deps.range.probeRange(url);
     if (support.kind === "unsupported") {
       return { kind: "fallback" };
     }
     totalBytes = support.totalBytes;
-    const plan = planSegments(totalBytes);
+    plan = planSegments(totalBytes);
     // 파일이 작아 단일 구간이면 세그먼트 이득이 없다 — 폴백으로.
     if (plan.segments.length <= 1) {
       return { kind: "fallback" };
     }
     segmentCount = plan.segments.length;
     segmentsToFetch = plan.segments;
-    receivedBytes = plan.segments.map(() => 0);
   }
+
+  // 진행 합산은 끝난 구간을 이미 받은 것으로 세어 시작한다 (113, FR-009).
+  const receivedBytes = receivedFromDone(plan, [...doneIndices]);
 
   // 전체 크기가 정해졌다 — 기기 통로가 003 진행 보고 모양을 복원하는 데 쓴다.
   opts.onSizeResolved?.(totalBytes);
@@ -100,12 +117,40 @@ export async function runSegmented(
   opts.pauseSignal.addEventListener("abort", onPause, { once: true });
 
   const report = () => opts.onProgress(mergeProgress(receivedBytes, totalBytes));
+  if (opts.resume) report();
+
+  const snapshot = (): SegmentedResume => ({
+    assetKey: key,
+    totalBytes,
+    segmentCount,
+    doneIndices: [...doneIndices].sort((a, b) => a - b),
+  });
+
+  /** 체크포인트 호출을 한 줄로 세운다. 던져도 받기는 계속된다. */
+  let checkpointChain: Promise<void> = Promise.resolve();
+  const checkpoint = (): Promise<void> => {
+    const entry = snapshot();
+    checkpointChain = checkpointChain.then(async () => {
+      try {
+        await opts.onCheckpoint?.(entry);
+      } catch {
+        // 이어받기만 잃는다 — 최종 지문 검증이 안전망이다.
+      }
+    });
+    return checkpointChain;
+  };
 
   try {
-    // 4. 모든 남은 구간을 병렬로.
-    const results = await Promise.all(
-      segmentsToFetch.map((segment) =>
-        deps.range.fetchRange(
+    // 4. 남은 구간을 동시에 `SEGMENT_CONCURRENCY`개씩 받는다 (113 — 일꾼이 큐에서 하나씩 꺼낸다).
+    const queue = [...segmentsToFetch];
+    let failure: string | null = null;
+    let aborted = false;
+
+    const worker = async (): Promise<void> => {
+      while (!internal.signal.aborted) {
+        const segment = queue.shift();
+        if (segment === undefined) return;
+        const outcome = await deps.range.fetchRange(
           key,
           url,
           segment,
@@ -114,22 +159,40 @@ export async function runSegmented(
             report();
           },
           internal.signal,
-        ),
-      ),
+        );
+        if (outcome.kind === "completed") {
+          doneIndices.add(segment.index);
+          await checkpoint();
+          continue;
+        }
+        if (outcome.kind === "failed") {
+          failure ??= outcome.reason;
+        } else {
+          aborted = true;
+        }
+        // 실패든 취소든 새 구간을 꺼내지 않고 진행 중인 구간을 취소한다.
+        internal.abort();
+        return;
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(SEGMENT_CONCURRENCY, segmentsToFetch.length) }, worker),
     );
 
     // 5. 결과 취합.
-    const failed = results.find((r) => r.kind === "failed");
-    if (failed && failed.kind === "failed") {
-      internal.abort();
-      return { kind: "failed", reason: failed.reason };
+    if (failure !== null) {
+      return { kind: "failed", reason: failure };
     }
 
-    if (results.some((r) => r.kind === "aborted") || opts.pauseSignal.aborted) {
-      return {
-        kind: "paused",
-        resume: { assetKey: key, totalBytes, segmentCount, receivedBytes },
-      };
+    // 모두 끝났으면 멈춤 신호가 늦게 왔어도 끝난 것이다.
+    if (doneIndices.size >= plan.segments.length) {
+      opts.onProgress(1);
+      return { kind: "completed" };
+    }
+
+    if (aborted || opts.pauseSignal.aborted) {
+      return { kind: "paused", resume: snapshot() };
     }
 
     opts.onProgress(1);

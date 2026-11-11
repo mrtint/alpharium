@@ -23,10 +23,12 @@
  */
 
 import type { Character } from "../diary/types";
-import { remainingCapacity } from "./segmented/plan";
+import { isResumeConsistent } from "./resume";
+import { remainingCapacity, remainingSegmentBytes } from "./segmented/plan";
 import type { DownloadPort, DiskSpacePort, MetadataPort, ModelFilePort } from "./port";
 import { assetFor } from "./roster";
 import {
+  mutateState,
   pausedFor,
   readState,
   segmentedFor,
@@ -34,8 +36,9 @@ import {
   withSegmentedResume,
   withVerdict,
   withoutAsset,
-  writeState,
+  withoutSegmented,
 } from "./storage";
+import type { SegmentedResume } from "./segmented/types";
 import type { DownloadFailure, DownloadProgress } from "./types";
 import { settleExistingFile, verifyDownloaded } from "./verification";
 
@@ -140,7 +143,21 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
 
         const state = await readState(ports.metadata);
         const paused = pausedFor(state, asset.key);
-        const segmented = segmentedFor(state, asset.key);
+        let segmented = segmentedFor(state, asset.key);
+
+        // 1-b. 재개 기록이 파일과 맞는지 본다 (113, FR-006).
+        //
+        //      맞지 않으면(파일 없음·크기 부족·구간 수나 전체 크기가 지금과 다름) 그 기록을
+        //      믿지 않는다 — 없는 구간을 건너뛰면 깨진 파일이 된다. 기록과 부분 파일을 함께
+        //      지우고 처음부터 받는다. 마지막 안전망은 받은 뒤의 지문 검증이다.
+        if (segmented !== null) {
+          const file = await ports.files.facts(asset.key);
+          if (!isResumeConsistent(segmented, file, asset.expectedBytes)) {
+            await ports.files.remove(asset.key);
+            await mutateState(ports.metadata, (fresh) => withoutSegmented(fresh, asset.key));
+            segmented = null;
+          }
+        }
 
         // 2. 공간을 본다 (FR-019, 026 FR-007).
         //
@@ -152,14 +169,19 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         // (026 §6) — 시작 시점을 각자 통과한 여러 다운로드가 공간을 다 써 버리지
         // 않도록. 이 자산의 슬롯은 방금 만들었으므로 receivedBytes=0이라 스스로를
         // 빼도 무해하지만, 명시적으로 제외한다.
+        //
+        // **이어받을 때는 아직 받아야 할 양만 요구한다**(113, FR-011) — 최종 파일이 이미
+        // 자리를 차지하고 있어 전체를 다시 요구하면 이어받기가 불필요하게 거부된다.
         if (asset.expectedBytes > 0) {
+          const needed =
+            segmented !== null ? remainingSegmentBytes(segmented) : asset.expectedBytes;
           const available = await ports.disk.availableBytes();
           let inFlight = 0;
           for (const [c, entry] of running) {
             if (c === character) continue;
             inFlight += remainingCapacity(assetFor(c).expectedBytes, entry.receivedBytes);
           }
-          if (available - inFlight < asset.expectedBytes * SPACE_HEADROOM) {
+          if (available - inFlight < needed * SPACE_HEADROOM) {
             return { ok: false, failure: { kind: "insufficient-space" } };
           }
         }
@@ -176,17 +198,33 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         //
         //    세그먼트 재개 상태가 있으면 그것을, 단일 스트림 중단 상태가 있으면 그것을,
         //    둘 다 없으면 처음부터. 세그먼트와 단일 스트림 재개는 상호배타다.
+        //
+        //        113 — 구간이 하나 끝날 때마다 `checkpoint`가 그 사실을 `state.json`에 남긴다.
+        //        앱이 죽거나 연결이 끊겨도 끝난 구간은 다음 받기에서 건너뛴다.
+        const checkpoint = (entry: SegmentedResume) =>
+          mutateState(ports.metadata, (fresh) => withSegmentedResume(fresh, entry));
         const task =
           segmented !== null
-            ? ports.download.resume(asset.key, asset.url, segmented, (p) =>
-                report(p.bytesWritten, p.totalBytes),
+            ? ports.download.resume(
+                asset.key,
+                asset.url,
+                segmented,
+                (p) => report(p.bytesWritten, p.totalBytes),
+                checkpoint,
               )
             : paused !== null
-              ? ports.download.resume(asset.key, asset.url, paused.state, (p) =>
-                  report(p.bytesWritten, p.totalBytes),
+              ? ports.download.resume(
+                  asset.key,
+                  asset.url,
+                  paused.state,
+                  (p) => report(p.bytesWritten, p.totalBytes),
+                  checkpoint,
                 )
-              : ports.download.start(asset.key, asset.url, (p) =>
-                  report(p.bytesWritten, p.totalBytes),
+              : ports.download.start(
+                  asset.key,
+                  asset.url,
+                  (p) => report(p.bytesWritten, p.totalBytes),
+                  checkpoint,
                 );
 
         slot.handle = task;
@@ -197,16 +235,18 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         //      `outcome.state`가 `SegmentedResume` 모양(`segmentCount` 있음)이면
         //      `withSegmentedResume`, 아니면 `withPaused` (data-model.md 상태 전이).
         if (outcome.kind === "paused") {
-          const fresh = await readState(ports.metadata);
-          const next = isSegmentedResume(outcome.state, asset.key)
-            ? withSegmentedResume(fresh, {
-                assetKey: asset.key,
-                totalBytes: outcome.state.totalBytes,
-                segmentCount: outcome.state.segmentCount,
-                receivedBytes: outcome.state.receivedBytes,
-              })
-            : withPaused(fresh, { assetKey: asset.key, state: outcome.state });
-          await writeState(ports.metadata, next);
+          // 구간 경로의 끝난 구간은 이미 체크포인트로 남아 있다 — 같은 값을 한 번 더 쓴다.
+          const state = outcome.state;
+          await mutateState(ports.metadata, (fresh) =>
+            isSegmentedResume(state, asset.key)
+              ? withSegmentedResume(fresh, {
+                  assetKey: asset.key,
+                  totalBytes: state.totalBytes,
+                  segmentCount: state.segmentCount,
+                  doneIndices: state.doneIndices,
+                })
+              : withPaused(fresh, { assetKey: asset.key, state }),
+          );
           return { ok: false, failure: { kind: "network", reason: "받다가 멈췄다" } };
         }
 
@@ -220,11 +260,9 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
 
         // 검증에 실패하면 기록을 남기되 **대체 자산으로 채우지 않는다**(FR-035, 원칙 I).
         // `withoutAsset`이 세그먼트 재개 상태도 함께 비운다 (026) — 다 받았으므로 유효하지 않다.
-        const settled = withVerdict(
-          withoutAsset(await readState(ports.metadata), asset.key),
-          verdict,
+        await mutateState(ports.metadata, (fresh) =>
+          withVerdict(withoutAsset(fresh, asset.key), verdict),
         );
-        await writeState(ports.metadata, settled);
 
         if (!verdict.passed) {
           return { ok: false, failure: { kind: "verification-failed" } };
@@ -252,14 +290,14 @@ function isSegmentedResume(
   assetKey: string;
   totalBytes: number;
   segmentCount: number;
-  receivedBytes: number[];
+  doneIndices: number[];
 } {
   return (
     typeof state === "object" &&
     state !== null &&
     "segmentCount" in state &&
-    "receivedBytes" in state &&
-    Array.isArray((state as { receivedBytes: unknown }).receivedBytes) &&
+    "doneIndices" in state &&
+    Array.isArray((state as { doneIndices: unknown }).doneIndices) &&
     // 다른 자산의 것이 섞이지 않는다.
     ("assetKey" in state ? (state as { assetKey: string }).assetKey === assetKey : true)
   );
