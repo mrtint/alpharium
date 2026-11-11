@@ -55,12 +55,12 @@
 ## Phase 7: Polish & 확인
 
 - [x] T020 `design/DESIGN.md`에 홈의 날 이동 입력이 둘(스트립·본문 밀기)이며 보드 밖 초안·사람이 정한 수치임을 적는다
-- [ ] T021 `npm test`와 `npm run lint`(eslint·tsc·헌법 검사·prettier)를 실행해 통과를 확인한다
-- [ ] T022 위반 주입 — (a) `swipeDay`의 오늘 제한을 빼면 T003·T014가 실패하는지, (b) `DaySwipe`를 `PhotoCarousel` 안으로 옮기면 T016이 실패하는지, (c) 쓰는 중 분기에도 `DaySwipe`를 걸면 T016이 실패하는지 본다. 치환이 적용됐는지 먼저 단언하고 확인 뒤 되돌린다
-- [ ] T023 독립 코드 리뷰(`requesting-code-review`) — Critical·Important 수정, 테스트·린트 재확인
-- [ ] T024 iOS 시뮬레이터 확인(`quickstart.md`): 쓴 날·안 쓴 날 모두 밀기로 이동, 주 경계에서 스트립이 따라감, 오늘에서 다음 없음, 캐러셀·세로 스크롤 경합 없음. 결과를 `quickstart.md` 아래 「실측」에 적는다
-- [ ] T025 iPhone 14 개발 서명 Release 빌드를 설치하고(`quickstart.md`) 사람이 한 번 밀어 손에 맞는 정도와 세로 스크롤 경합을 확인한다 — 사람의 손이 필요하므로 결과를 받기 전에는 「확인했다」고 쓰지 않는다
-- [ ] T026 `docs/roadmap/README.md`에서 이 과제를 「진행 예정 과제」에서 빼고 「완료 이력」에 114로 옮긴다(실기기 확인을 못 했으면 못 본 것으로 적는다)
+- [x] T021 `npm test`와 `npm run lint`(eslint·tsc·헌법 검사·prettier)를 실행해 통과를 확인한다
+- [x] T022 위반 주입 — (a) `swipeDay`의 오늘 제한을 빼면 T003·T014가 실패하는지, (b) `DaySwipe`를 `PhotoCarousel` 안으로 옮기면 T016이 실패하는지, (c) 쓰는 중 분기에도 `DaySwipe`를 걸면 T016이 실패하는지 본다. 치환이 적용됐는지 먼저 단언하고 확인 뒤 되돌린다
+- [x] T023 독립 코드 리뷰(`requesting-code-review`) — Critical·Important 수정, 테스트·린트 재확인
+- [x] T024 iOS 시뮬레이터 확인(`quickstart.md`): 쓴 날·안 쓴 날 모두 밀기로 이동, 주 경계에서 스트립이 따라감, 오늘에서 다음 없음, 캐러셀·세로 스크롤 경합 없음. 결과를 `quickstart.md` 아래 「실측」에 적는다
+- [ ] T025 (사람의 손 대기 중 — 빌드는 iPhone 14에 설치해 두었다) iPhone 14 개발 서명 Release 빌드를 설치하고(`quickstart.md`) 사람이 한 번 밀어 손에 맞는 정도와 세로 스크롤 경합을 확인한다 — 사람의 손이 필요하므로 결과를 받기 전에는 「확인했다」고 쓰지 않는다
+- [x] T026 `docs/roadmap/README.md`에서 이 과제를 「진행 예정 과제」에서 빼고 「완료 이력」에 114로 옮긴다(실기기 확인을 못 했으면 못 본 것으로 적는다)
 
 ## Dependencies
 
@@ -75,4 +75,5 @@ US1(T001~T013)이 본체다. US2·US3·US4는 같은 코어 위의 한계·경�
 ## 메모
 
 - T001 baseline(2026-11-11, 구현 전): 6 suites · 201 passed (day-boundary·state·day-picker·written-day-home·diary-list·diary-home-week). 구현 뒤 전체 `npm test` 8428 passed, `npm run lint` 통과.
+- T022 위반 주입: (a) `swipeDay`의 오늘 제한 제거 → state·home 테스트 실패 (b) 홈의 `screen.kind === "list"` 조건 제거 → 「쓰는 중에는 밀기를 넘기지 않는다」 실패 (c) `onEnd`의 `success` 확인 제거 → 취소가 날을 넘기는 배선 테스트 실패 (d) 반대 방향 되돌림 판정 제거 → `daySwipeDirectionOf` 테스트 실패 — 모두 되돌렸다.
 - 테스트가 잡은 실제 버그: `DaySwipe`의 `onEnd`가 취소(`success === false`)에서도 불려 날이 넘어갔다 — `success` 확인을 더했다(스트립 `DayPicker`는 같은 자리에 `onFinalize`로 되돌리는 처리가 따로 있다).
