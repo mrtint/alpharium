@@ -21,6 +21,7 @@
 - **`with-battery-exception.js`** — 알림 권한을 매니페스트에 선언한다. 이름과 달리
   배터리 예외 권한은 더 이상 넣지 않는다(065에서 Play 정책 때문에 걷었다).
 - **`with-force-light-theme.js`** — One UI 8.5+의 다크 모드에서 앱을 라이트로 고정한다(031).
+- **`with-nav-bar-contrast.js`** — 안드로이드 3버튼 내비게이션 바 위 시스템 대비 막을 끈다(`enforceNavigationBarContrast=false`, 116). 하단 바 색이 막에 옅어지지 않게.
 - **`with-backup-rules.js`** — Auto Backup 규칙(`res/xml/pocketlog_*.xml` 둘 + 매니페스트 속성 둘)으로 `files/models/`만 뺀다(099). 일기·설정은 OS 기본대로.
 - **`with-no-push-entitlement.js`** — iOS entitlements에서 `expo-notifications`가 넣는 `aps-environment`(원격 푸시)를 걷는다(066).
   배포 프로파일에 푸시 기능이 없어 남아 있으면 서명이 실패한다. **plugins 맨 마지막**에 둔다.
