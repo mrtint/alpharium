@@ -52,8 +52,8 @@
 - [x] T020 `npm test`와 `npm run lint`(eslint·tsc·헌법 검사·prettier)를 실행해 통과를 확인한다
 - [x] T021 위반 주입 — (a) `mutateState`를 `readState`+`writeState`로 되돌리면 T003의 동시성 테스트가 실패하는지, (b) `isResumeConsistent`의 크기 조건을 빼면 T004·T017이 실패하는지, (c) 풀 크기를 8로 바꾸면 T009①이 실패하는지 본다. 치환이 적용됐는지 먼저 단언하고 확인 뒤 되돌린다
 - [x] T022 독립 코드 리뷰(`requesting-code-review`) — Critical·Important 수정, 테스트·린트 재확인
-- [ ] T023 iPhone 실기기 확인(`quickstart.md`): 개발 빌드에서 받는 도중 앱을 죽이고 다시 열어 끝난 구간을 건너뛰는지, 지문 검증이 통과하는지(비행기 모드는 가능한 만큼). 처음부터 받는 데 걸린 대략의 시간을 개발용으로 적어 둔다(SC-005 — 제품 코드에는 재지 않는다, 원칙 IV). 결과와 못 본 것을 `specs/113-resumable-segments/quickstart.md` 아래 「실측」에 적는다
-- [ ] T024 `docs/roadmap/README.md`에서 이 과제를 「진행 예정 과제」에서 빼고 「완료 이력」에 113으로 옮긴다. `AGENTS.md`의 「첫 실행」 줄 중 「받는 도중에 끊기거나 죽으면 아직 처음부터다」를 사실대로 고친다(앞 서술을 덧대지 않고 고친다)
+- [x] T023 iPhone 실기기 확인(`quickstart.md`): 개발 빌드에서 받는 도중 앱을 죽이고 다시 열어 끝난 구간을 건너뛰는지, 지문 검증이 통과하는지(비행기 모드는 가능한 만큼). 처음부터 받는 데 걸린 대략의 시간을 개발용으로 적어 둔다(SC-005 — 제품 코드에는 재지 않는다, 원칙 IV). 결과와 못 본 것을 `specs/113-resumable-segments/quickstart.md` 아래 「실측」에 적는다
+- [x] T024 `docs/roadmap/README.md`에서 이 과제를 「진행 예정 과제」에서 빼고 「완료 이력」에 113으로 옮긴다. `AGENTS.md`의 「첫 실행」 줄 중 「받는 도중에 끊기거나 죽으면 아직 처음부터다」를 사실대로 고친다(앞 서술을 덧대지 않고 고친다)
 
 ## Dependencies
 
