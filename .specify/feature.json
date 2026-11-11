@@ -1,1 +1,3 @@
-{ "feature_directory": "specs/111-first-diary-branch" }
+{
+  "feature_directory": "specs/113-resumable-segments"
+}
