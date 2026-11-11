@@ -168,6 +168,16 @@ export function shiftWeek(day: DayDate, weeks: number): DayDate {
 }
 
 /**
+ * 며칠 옮긴 날 (114) — 일기 본문을 밀어 전날·다음 날로 갈 때 쓴다.
+ *
+ * `addDays`와 같은 계산이다 — 원본에서 정오에 두고 더하므로 서머타임 전환일에도 정확히 그 날수만큼 옮겨진다.
+ * 하루 계산은 이 파일에서만 한다(`DB11`) — 화면·상태 파일이 날짜를 직접 더하지 않게 내보낸다.
+ */
+export function shiftDay(day: DayDate, days: number): DayDate {
+  return addDays(day, days);
+}
+
+/**
  * 다음 하루가 시작되는 시각 — 다음 자정 (049 DB9).
  *
  * 홈이 켜진 채 자정을 넘길 때 오늘 밑줄을 옮기는 타이머가 쓴다(FR-019). 경계 시각을 화면이

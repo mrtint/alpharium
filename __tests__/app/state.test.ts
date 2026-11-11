@@ -25,6 +25,7 @@ import {
   dayParts,
   canSwipeNext,
   cellFor,
+  swipeDay,
   swipeWeek,
   weekCellsFor,
   writePromptFor,
@@ -782,5 +783,50 @@ describe("048 dayParts와 경계", () => {
   it("★ DP8 — state.ts는 신호 계층을 import하지 않는다 (화면이 이 파일을 거쳐 신호에 닿지 않게)", () => {
     const source = readFileSync(join(__dirname, "..", "..", "src", "app", "state.ts"), "utf8");
     expect(source).not.toMatch(/from\s+["'][^"']*signals\//);
+  });
+});
+
+describe("114 swipeDay — 본문을 밀어 이웃한 날로 (contracts/day-swipe.md)", () => {
+  const now = new Date("2026-09-24T09:00:00"); // 목요일, 오늘 = 2026-09-24
+
+  it("previous는 하루 앞이다 (제한 없음)", () => {
+    expect(swipeDay("2026-09-24", "previous", now)).toBe("2026-09-23");
+    expect(swipeDay("2026-09-01", "previous", now)).toBe("2026-08-31");
+    expect(swipeDay("2024-01-01", "previous", now)).toBe("2023-12-31");
+  });
+
+  it("next는 하루 뒤다", () => {
+    expect(swipeDay("2026-09-22", "next", now)).toBe("2026-09-23");
+    expect(swipeDay("2026-09-23", "next", now)).toBe("2026-09-24");
+  });
+
+  it("오늘에서는 next가 null이다 (오늘 다음은 없다)", () => {
+    expect(swipeDay("2026-09-24", "next", now)).toBeNull();
+  });
+
+  it("오늘 이후 날이 들어와도 next는 null이다 (방어)", () => {
+    expect(swipeDay("2026-09-25", "next", now)).toBeNull();
+    expect(swipeDay("2027-01-01", "next", now)).toBeNull();
+  });
+
+  it("주 경계를 넘는다 (토 → 일, 일 → 토)", () => {
+    expect(swipeDay("2026-09-19", "next", now)).toBe("2026-09-20");
+    expect(swipeDay("2026-09-20", "previous", now)).toBe("2026-09-19");
+  });
+
+  it("자정을 넘기면 오늘이 하루 늘어 다음 날로 갈 수 있다", () => {
+    const beforeMidnight = new Date("2026-09-24T23:59:59");
+    const afterMidnight = new Date("2026-09-25T00:00:01");
+    expect(swipeDay("2026-09-24", "next", beforeMidnight)).toBeNull();
+    expect(swipeDay("2026-09-24", "next", afterMidnight)).toBe("2026-09-25");
+  });
+
+  it("DB11 — state.ts는 날짜를 직접 계산하지 않고 shiftDay만 쓴다", () => {
+    const source = readFileSync(join(__dirname, "../../src/app/state.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    const body = /export function swipeDay[\s\S]*?\n}\n/.exec(source)?.[0] ?? "";
+    expect(body).toContain("shiftDay(");
+    expect(body).not.toMatch(/new Date|getDate|setDate|getHours/);
   });
 });

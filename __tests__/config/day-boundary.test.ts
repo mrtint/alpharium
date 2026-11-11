@@ -24,6 +24,7 @@ import {
   latestClosedDay,
   nextDayStartAt,
   selectableDays,
+  shiftDay,
   shiftWeek,
   weekOf,
 } from "../../src/config/day-boundary";
@@ -215,6 +216,40 @@ describe("DB8 weekOf·shiftWeek — 일요일 시작 주", () => {
     expect(shiftWeek("2027-01-02", -1)).toBe("2026-12-26");
     expect(shiftWeek("2026-09-26", -4)).toBe("2026-08-29");
     expect(weekOf(shiftWeek("2026-09-24", -1))[0]).toBe("2026-09-13");
+  });
+});
+
+describe("114 shiftDay — 하루씩 옮긴다", () => {
+  it("하루 뒤·앞, 월·연 경계", () => {
+    expect(shiftDay("2026-09-26", 1)).toBe("2026-09-27");
+    expect(shiftDay("2026-09-26", -1)).toBe("2026-09-25");
+    expect(shiftDay("2026-09-30", 1)).toBe("2026-10-01");
+    expect(shiftDay("2026-10-01", -1)).toBe("2026-09-30");
+    expect(shiftDay("2026-12-31", 1)).toBe("2027-01-01");
+    expect(shiftDay("2027-01-01", -1)).toBe("2026-12-31");
+  });
+
+  it("2월 말(윤년이 아닌 해·윤년)", () => {
+    expect(shiftDay("2026-02-28", 1)).toBe("2026-03-01");
+    expect(shiftDay("2028-02-28", 1)).toBe("2028-02-29");
+    expect(shiftDay("2028-03-01", -1)).toBe("2028-02-29");
+  });
+
+  it("서머타임 전환일을 걸쳐도 정확히 하루다 (정오에 두고 원본에서 더한다)", () => {
+    // 미국 시간대에서 하루가 23시간·25시간인 날. 기기 시간대가 달라도 달력 날짜는 하루씩 옮겨진다.
+    expect(shiftDay("2026-03-07", 1)).toBe("2026-03-08");
+    expect(shiftDay("2026-03-08", 1)).toBe("2026-03-09");
+    expect(shiftDay("2026-10-31", 1)).toBe("2026-11-01");
+    expect(shiftDay("2026-11-01", 1)).toBe("2026-11-02");
+    expect(shiftDay("2026-03-09", -1)).toBe("2026-03-08");
+    expect(shiftDay("2026-11-02", -1)).toBe("2026-11-01");
+  });
+
+  it("shiftWeek와 같은 계산이다 (7일)", () => {
+    for (const day of ["2026-09-26", "2027-01-02", "2028-02-29"]) {
+      expect(shiftDay(day, 7)).toBe(shiftWeek(day, 1));
+      expect(shiftDay(day, -7)).toBe(shiftWeek(day, -1));
+    }
   });
 });
 

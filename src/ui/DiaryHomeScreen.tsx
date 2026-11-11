@@ -50,6 +50,7 @@ import {
   toList,
   canSwipeNext,
   cellFor,
+  swipeDay,
   swipeWeek,
   weekCellsFor,
   writePromptFor,
@@ -675,6 +676,19 @@ export function DiaryHomeScreen({
     (direction: SwipeDirection) => {
       const current = writePromptFor(listItems ?? [], now(), chosenDay).day;
       const next = swipeWeek(current, direction, now());
+      if (next !== null) setChosenDay(next);
+    },
+    [listItems, now, chosenDay, setChosenDay],
+  );
+
+  /**
+   * 일기 본문을 밀었다 — 이웃한 날로 간다 (114). 어느 날이 될지는 `swipeDay()`가 정한다(`null`이면 오늘 다음이라 그대로).
+   * 스트립 칸·스트립 넘기기·달력과 같은 `setChosenDay`를 쓰므로 스트립이 그 날이 든 주로 저절로 따라간다.
+   */
+  const onSwipeDay = useCallback(
+    (direction: SwipeDirection) => {
+      const current = writePromptFor(listItems ?? [], now(), chosenDay).day;
+      const next = swipeDay(current, direction, now());
       if (next !== null) setChosenDay(next);
     },
     [listItems, now, chosenDay, setChosenDay],
@@ -1459,6 +1473,8 @@ export function DiaryHomeScreen({
               barLocked={barLocked}
               onStop={() => void cancel()}
               onSwipe={onSwipe}
+              // 114 — 쓰는 중에는 화면이 스스로 걸지 않는다(054). 덮어쓰기 확인이 떠 있는 동안에도 날을 옮기지 않는다.
+              onSwipeDay={screen.kind === "list" ? onSwipeDay : undefined}
               onWrite={() => void write()}
               simulation={simulation}
               paper={paper}

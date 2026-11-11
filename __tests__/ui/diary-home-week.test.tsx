@@ -122,6 +122,94 @@ describe("049 HS1 — 주 넘기기", () => {
   });
 });
 
+describe("114 — 본문 밀기로 이웃한 날", () => {
+  beforeEach(() => {
+    seen.length = 0;
+  });
+
+  it("★ 전날 — 밀면 하루 앞을 고른다 (부모가 들고 있을 때)", async () => {
+    const onChooseDay = jest.fn();
+    await renderHome({ chosenDay: "2026-09-24", onChooseDay });
+
+    await act(async () => {
+      latest().onSwipeDay?.("previous");
+    });
+    expect(onChooseDay).toHaveBeenCalledWith("2026-09-23");
+  });
+
+  it("★ 다음 날 — 어제에서 밀면 오늘을 고른다", async () => {
+    const onChooseDay = jest.fn();
+    await renderHome({ chosenDay: "2026-09-23", onChooseDay });
+
+    await act(async () => {
+      latest().onSwipeDay?.("next");
+    });
+    expect(onChooseDay).toHaveBeenCalledWith("2026-09-24");
+  });
+
+  it("★ 오늘에서 다음 날로는 가지 않는다 — 고른 날이 그대로다 (FR-003)", async () => {
+    const onChooseDay = jest.fn();
+    await renderHome({ chosenDay: "2026-09-24", onChooseDay });
+
+    await act(async () => {
+      latest().onSwipeDay?.("next");
+    });
+    expect(onChooseDay).not.toHaveBeenCalled();
+  });
+
+  it("과거로는 제한이 없다 (아주 오래된 날에서 전날)", async () => {
+    const onChooseDay = jest.fn();
+    await renderHome({ chosenDay: "2025-01-01", onChooseDay });
+
+    await act(async () => {
+      latest().onSwipeDay?.("previous");
+    });
+    expect(onChooseDay).toHaveBeenCalledWith("2024-12-31");
+  });
+
+  it("★ 로컬 상태로도 넘어가고 스트립이 그 날이 든 주를 따라간다 (주 경계, FR-002)", async () => {
+    await renderHome({ chosenDay: undefined });
+    // 2026-09-24는 목요일 — 일요일(9/20)로 되돌아가 주 경계(9/19 토)를 넘는다.
+    for (let i = 0; i < 4; i += 1) {
+      await act(async () => {
+        latest().onSwipeDay?.("previous");
+      });
+    }
+    expect(latest().write?.day).toBe("2026-09-20");
+    expect(latest().cells?.[0].day).toBe("2026-09-20");
+
+    await act(async () => {
+      latest().onSwipeDay?.("previous");
+    });
+    expect(latest().write?.day).toBe("2026-09-19");
+    expect(latest().cells?.[0].day).toBe("2026-09-13");
+    expect(latest().cells?.find((c) => c.selected)?.day).toBe("2026-09-19");
+  });
+
+  it("★ 쓰는 중에는 밀기를 화면에 넘기지 않는다 (FR-006)", async () => {
+    await renderHome();
+    expect(latest().onSwipeDay).toBeDefined();
+
+    await act(async () => {
+      latest().onWrite();
+    });
+    await waitFor(() => expect(latest().writing).toBeDefined());
+    expect(latest().onSwipeDay).toBeUndefined();
+  });
+
+  it("스트립 `onSwipe`와 같은 상태를 쓴다 — 밀기 직후 칸을 누르면 마지막 입력이 이긴다", async () => {
+    await renderHome({ chosenDay: undefined });
+    await act(async () => {
+      latest().onSwipeDay?.("previous");
+    });
+    expect(latest().write?.day).toBe("2026-09-23");
+    await act(async () => {
+      latest().onSelectDay?.("2026-09-21");
+    });
+    expect(latest().write?.day).toBe("2026-09-21");
+  });
+});
+
 describe("049 — 고른 날의 쓰기", () => {
   beforeEach(() => {
     seen.length = 0;

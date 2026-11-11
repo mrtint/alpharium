@@ -33,6 +33,9 @@ export const home = {
   /** 날짜로 이동 (`2j`, 보드 `cal.title`·`cal.cancel`) */
   dateJump: { title: "날짜로 이동", cancel: "취소" },
 
+  /** 일기 본문을 밀어 날을 옮기는 것의 접근성 대안 (114, 보드 밖 초안) — 큰 날짜 요소의 사용자 지정 동작 이름 */
+  daySwipeActions: { previous: "전날", next: "다음 날" },
+
   /** 쓴 날 읽기 (051, 보드 `2c`·`2g`) */
   writtenDay: {
     /** 쓴 날의 하단 바 (보드 `h2.rewrite`) */
