@@ -36,6 +36,8 @@ import {
 import { reachedEnd, type PaperState } from "../app/written-day";
 import { AppText } from "./components/Text";
 import { MATERIAL_TEXT, WRITTEN_DAY_TEXT } from "./home-text";
+import type { SwipeDirection } from "../app/state";
+import { DaySwipe } from "./DaySwipe";
 import { PhotoCarousel } from "./PhotoCarousel";
 import { COLORS, WRITTEN_DAY } from "./theme/tokens";
 
@@ -57,6 +59,12 @@ export type WrittenDayPaperProps = {
    * 지면 맨 아래에 더하는 여백 (108) — 쓰기 바 위의 제약 띠가 마지막 문단을 가리지 않게 띠 높이를 더한다. 띠가 없으면 0이다.
    */
   bottomInset?: number;
+  /**
+   * 본문을 좌우로 밀었다 (114, 보드 밖 초안) — 전날·다음 날로 간다. 어느 날이 될지는 부르는 쪽이 정한다. 있으면 본문(캐러셀 아래, 글이
+   * 짧아도 지면 아래까지)과 읽을 수 없는 지면·읽는 중의 빈 지면을 밀기 영역으로 둔다. **캐러셀은 영역 밖이다** — 자기 가로 밀기가 있다(051).
+   * 읽는 중에도 영역을 두는 까닭: 연달아 넘길 때 새 날이 읽히는 동안에도 다음 밀기가 되어야 한다.
+   */
+  onSwipeDay?: (direction: SwipeDirection) => void;
   onScrollSample?: (sample: {
     y: number;
     previousY: number;
@@ -73,7 +81,17 @@ export function WrittenDayPaper({
   onScrollSample,
   topSpacer,
   bottomInset = 0,
+  onSwipeDay,
 }: WrittenDayPaperProps) {
+  // 114 — 밀기 영역: 남은 높이를 채워 글이 짧아도 아래 빈 곳에서 밀 수 있다. `onSwipeDay`가 없으면 그대로 둔다.
+  const swipeable = (node: ReactNode) =>
+    onSwipeDay === undefined ? (
+      node
+    ) : (
+      <DaySwipe onSwipeDay={onSwipeDay} style={SWIPE_FILL} testID="written-day-swipe">
+        {node}
+      </DaySwipe>
+    );
   // 슬라이드 폭 = 지면 폭 − 좌우 여백. 지면을 잰 값을 쓰고, 재기 전 첫 프레임만 창 폭으로 둔다 —
   // 지면은 화면 끝까지 닿으므로(아래 PAPER) 둘은 같아야 한다. 캐러셀이 늦게 튀어나오지 않게.
   const window = useWindowDimensions();
@@ -156,37 +174,43 @@ export function WrittenDayPaper({
             </View>
           )}
           {/* 사진이 없으면 본문이 지면 맨 위 20부터다(보드 `2k`), 있으면 인디케이터 아래 16 */}
-          <View
-            style={[BODY, { paddingTop: hasPhotos ? body.paddingTop : body.paddingTopAlone }]}
-            testID="written-body"
-          >
-            {/*
+          {swipeable(
+            <View
+              style={[BODY, { paddingTop: hasPhotos ? body.paddingTop : body.paddingTopAlone }]}
+              testID="written-body"
+            >
+              {/*
               053 — 「지어낸 하루」 (보드에 없는 사람이 정한 한 줄). 쓰인 때 셀 수 있는 재료가 없었던 일기에만,
               본문 문단 앞(캐러셀 뒤)에 조용히 둔다. 지면과 함께 스크롤되어 헤더·접힘(052)에 영향이 없다.
             */}
-            {paper.madeUp && (
-              <AppText style={MADE_UP} testID="made-up-day">
-                {MATERIAL_TEXT.madeUpDay}
-              </AppText>
-            )}
-            {paragraphsOf(paper.entry.text).map((text, i) => (
-              <AppText key={i} style={PARAGRAPH}>
-                {text}
-              </AppText>
-            ))}
-          </View>
+              {paper.madeUp && (
+                <AppText style={MADE_UP} testID="made-up-day">
+                  {MATERIAL_TEXT.madeUpDay}
+                </AppText>
+              )}
+              {paragraphsOf(paper.entry.text).map((text, i) => (
+                <AppText key={i} style={PARAGRAPH}>
+                  {text}
+                </AppText>
+              ))}
+            </View>,
+          )}
         </>
       )}
 
-      {paper.kind === "unreadable" && (
-        <View style={[BODY, { paddingTop: body.paddingTopAlone }]} testID="written-unreadable">
-          {WRITTEN_DAY_TEXT.unreadableLines.map((line) => (
-            <AppText key={line} style={PARAGRAPH}>
-              {line}
-            </AppText>
-          ))}
-        </View>
-      )}
+      {paper.kind === "unreadable" &&
+        swipeable(
+          <View style={[BODY, { paddingTop: body.paddingTopAlone }]} testID="written-unreadable">
+            {WRITTEN_DAY_TEXT.unreadableLines.map((line) => (
+              <AppText key={line} style={PARAGRAPH}>
+                {line}
+              </AppText>
+            ))}
+          </View>,
+        )}
+
+      {/* 읽는 중 — 빈 지면이어도 밀기 영역은 있다 (114) */}
+      {paper.kind === "loading" && onSwipeDay !== undefined && swipeable(null)}
     </ScrollView>
   );
 }
@@ -213,6 +237,9 @@ const PAPER: ViewStyle = {
   flex: 1,
   backgroundColor: WRITTEN_DAY.paper,
 };
+
+/** 114 — 밀기 영역은 캐러셀 아래 남은 높이를 채운다 */
+const SWIPE_FILL: ViewStyle = { flexGrow: 1 };
 
 const CAROUSEL_FRAME: ViewStyle = {
   paddingTop: carouselPadding.top,

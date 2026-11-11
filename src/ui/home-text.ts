@@ -84,6 +84,8 @@ export const OVERWRITE_CONFIRM = lazyText((c) => c.home.overwriteConfirm);
 
 /** 날짜로 이동 (`2j`, 보드 `cal.title`·`cal.cancel`) */
 export const DATE_JUMP = lazyText((c) => c.home.dateJump);
+/** 114 — 큰 날짜 요소의 접근성 동작 이름(「전날」·「다음 날」) */
+export const DAY_SWIPE_ACTIONS = lazyText((c) => c.home.daySwipeActions);
 
 /** 달력 요일 머리 — 일요일 시작 (보드 `cal.dows`) */
 export const CALENDAR_WEEKDAYS = lazyList((c) => c.calendar.weekdayShort);

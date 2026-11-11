@@ -73,8 +73,10 @@ import { AppText } from "./components/Text";
 import { ConstraintBand } from "./components/ConstraintBand";
 import { FadeLayer } from "./components/FadeLayer";
 import { DayPicker } from "./DayPicker";
+import { DaySwipe } from "./DaySwipe";
 import {
   DATE_JUMP,
+  DAY_SWIPE_ACTIONS,
   dayStateText,
   monthText,
   weekdayLong,
@@ -123,6 +125,11 @@ export type DiaryListScreenProps = {
   onSwipe?: (direction: SwipeDirection) => void;
   /** 다음 주로 넘길 수 있는가 (049) — 거짓이면 스트립이 튕긴다 */
   canSwipeNext?: boolean;
+  /**
+   * 일기 본문(쓴 날)·재료 지면(안 쓴 날)을 좌우로 밀었다 (114, 보드 밖 초안) — 전날·다음 날로 간다. 어느 날이 될지는 부르는 쪽이 정한다.
+   * 큰 날짜 요소의 접근성 동작 「전날」·「다음 날」도 같은 것을 부른다. **쓰는 중에는 넘겨도 쓰지 않는다**(054). 없으면 걸지 않는다.
+   */
+  onSwipeDay?: (direction: SwipeDirection) => void;
   /**
    * 신호 줄의 사진·다닌 자리 (048 US3). 없으면(통로 없음) 두 칸 「모름」.
    *
@@ -192,6 +199,7 @@ export function DiaryListScreen({
   onSelectDay,
   onSwipe,
   canSwipeNext,
+  onSwipeDay,
   constraint,
   preview,
   onRequestPhoto,
@@ -294,6 +302,7 @@ export function DiaryListScreen({
         onOpenDeveloper={simulation?.onOpenDeveloper}
         onOpenSettings={onOpenSettings}
         onPressDate={writing !== undefined ? undefined : onPressDate}
+        onSwipeDay={writing !== undefined ? undefined : onSwipeDay}
         paper={paper}
         stripBlock={stripBlock}
         stripOverlaid={writing === undefined && written !== undefined}
@@ -345,6 +354,7 @@ export function DiaryListScreen({
               if (next !== collapsed) setFoldState({ day: write.day, collapsed: next });
             }}
             bottomInset={bandInset}
+            onSwipeDay={onSwipeDay}
             paper={written}
             topSpacer={<FoldSpacer motion={motion} />}
           />
@@ -372,6 +382,24 @@ export function DiaryListScreen({
     );
   }
 
+  // 114 — 재료 지면은 `onSwipeDay`가 있으면 밀기 영역 안에 둔다(지면 전체 — 캐러셀이 없다).
+  const materialPaperView = (
+    <View
+      style={[MATERIAL_PAPER, { paddingBottom: MATERIAL_GRID.paperPadding.bottom + bandInset }]}
+      testID="material-paper"
+    >
+      <MaterialGrid onRequestPhoto={onRequestPhoto} preview={preview} />
+    </View>
+  );
+  const materialPaper =
+    onSwipeDay === undefined ? (
+      materialPaperView
+    ) : (
+      <DaySwipe onSwipeDay={onSwipeDay} style={{ flexGrow: 1 }} testID="material-day-swipe">
+        {materialPaperView}
+      </DaySwipe>
+    );
+
   // 053 — 안 쓴 날은 보드 `1d`대로: 헤더(고정 여백) 아래에 화면 바닥까지 채우는 지면이고, 「일기 쓰기」 바는
   // 그 위에 겹쳐 바닥에 붙는다(지면 아래 여백 120이 바를 비킨다). 큰 글꼴에서 넘치면 함께 스크롤된다.
   if (write !== undefined) {
@@ -382,15 +410,7 @@ export function DiaryListScreen({
           style={{ flex: 1, backgroundColor: COLORS.bg }}
         >
           <View style={FIXED_HEADER}>{header}</View>
-          <View
-            style={[
-              MATERIAL_PAPER,
-              { paddingBottom: MATERIAL_GRID.paperPadding.bottom + bandInset },
-            ]}
-            testID="material-paper"
-          >
-            <MaterialGrid onRequestPhoto={onRequestPhoto} preview={preview} />
-          </View>
+          {materialPaper}
         </ScrollView>
         <View
           onLayout={(e) => setBarHeight(e.nativeEvent.layout.height)}
@@ -425,6 +445,7 @@ function Header({
   onOpenDeveloper,
   onOpenSettings,
   onPressDate,
+  onSwipeDay,
   paper,
   stripOverlaid,
   stripBlock,
@@ -437,6 +458,8 @@ function Header({
   onOpenDeveloper?: () => void;
   onOpenSettings?: () => void;
   onPressDate?: () => void;
+  /** 114 — 큰 날짜 요소의 접근성 동작이 부른다. 쓰는 중에는 `onPressDate`와 함께 없다 */
+  onSwipeDay?: (direction: SwipeDirection) => void;
   paper?: PaperState;
   /** 052 — 쓴 날이면 스트립을 부모가 지면 위 판에 그린다. 안 쓴 날은 여기서 그대로 그린다 */
   stripOverlaid: boolean;
@@ -496,7 +519,7 @@ function Header({
         상태 줄이 숫자 아래 따로 한 줄이었다(보드와 어긋남).
       */}
       <View style={DATE_ROW}>
-        <DateJump onPress={onPressDate} primary>
+        <DateJump isToday={isToday} onPress={onPressDate} onSwipeDay={onSwipeDay} primary>
           <DayHeading day={write.day} part="number" />
         </DateJump>
         <View style={DATE_COLUMN}>
@@ -636,10 +659,16 @@ function FoldSpacer({ motion }: { motion: FoldMotion }) {
  */
 function DateJump({
   onPress,
+  onSwipeDay,
+  isToday,
   primary,
   children,
 }: {
   onPress?: () => void;
+  /** 114 — 있으면 큰 숫자(스크린 리더가 읽는 유일한 날짜 요소)에 「전날」·「다음 날」 사용자 지정 동작을 단다 */
+  onSwipeDay?: (direction: SwipeDirection) => void;
+  /** 114 — 고른 날이 오늘이면 「다음 날」 동작을 빼 스크린 리더 사용자가 반응 없는 동작을 고르지 않게 한다 */
+  isToday?: boolean;
   primary?: boolean;
   children: ReactNode;
 }) {
@@ -654,8 +683,24 @@ function DateJump({
   }
   return primary ? (
     <Pressable
+      accessibilityActions={
+        onSwipeDay === undefined
+          ? undefined
+          : [
+              { name: "previousDay", label: DAY_SWIPE_ACTIONS.previous },
+              ...(isToday === true ? [] : [{ name: "nextDay", label: DAY_SWIPE_ACTIONS.next }]),
+            ]
+      }
       accessibilityLabel={DATE_JUMP.title}
       accessibilityRole="button"
+      onAccessibilityAction={
+        onSwipeDay === undefined
+          ? undefined
+          : (event) => {
+              if (event.nativeEvent.actionName === "previousDay") onSwipeDay("previous");
+              else if (event.nativeEvent.actionName === "nextDay") onSwipeDay("next");
+            }
+      }
       onPress={onPress}
       testID="home-date-button"
     >

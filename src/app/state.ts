@@ -24,7 +24,14 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { dayOf, isDayWritable, shiftWeek, weekOf, type DayDate } from "../config/day-boundary";
+import {
+  dayOf,
+  isDayWritable,
+  shiftDay,
+  shiftWeek,
+  weekOf,
+  type DayDate,
+} from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
 import type { PipelineResult } from "../diary/pipeline";
 import type { MonologueBranch, ProgressStage } from "../inference/types";
@@ -281,6 +288,18 @@ export function swipeWeek(selected: DayDate, direction: SwipeDirection, now: Dat
   if (weekOf(selected).includes(today)) return null;
   const next = shiftWeek(selected, 1);
   return next > today ? today : next;
+}
+
+/**
+ * 일기 본문을 밀어 옮길 이웃한 날 (114, contracts/day-swipe.md).
+ *
+ * 한 번에 하루다. **오늘 다음은 없다**(`null` — 화면은 아무 일도 하지 않는다, 본문은 끌려 움직이지 않아 튕길 것이 없다).
+ * 과거로는 제한이 없다. 날짜 계산은 `shiftDay()`가 한다 — 하루 경계가 이 파일로 새지 않는다(`DB11`).
+ */
+export function swipeDay(selected: DayDate, direction: SwipeDirection, now: Date): DayDate | null {
+  if (direction === "previous") return shiftDay(selected, -1);
+  if (selected >= dayOf(now)) return null;
+  return shiftDay(selected, 1);
 }
 
 /** 다음 주로 넘길 수 있는가 — 거짓이면 화면이 끌림에 저항을 건다(러버밴드) */
