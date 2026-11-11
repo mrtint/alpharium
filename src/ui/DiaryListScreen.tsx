@@ -519,7 +519,7 @@ function Header({
         상태 줄이 숫자 아래 따로 한 줄이었다(보드와 어긋남).
       */}
       <View style={DATE_ROW}>
-        <DateJump onPress={onPressDate} onSwipeDay={onSwipeDay} primary>
+        <DateJump isToday={isToday} onPress={onPressDate} onSwipeDay={onSwipeDay} primary>
           <DayHeading day={write.day} part="number" />
         </DateJump>
         <View style={DATE_COLUMN}>
@@ -660,12 +660,15 @@ function FoldSpacer({ motion }: { motion: FoldMotion }) {
 function DateJump({
   onPress,
   onSwipeDay,
+  isToday,
   primary,
   children,
 }: {
   onPress?: () => void;
   /** 114 — 있으면 큰 숫자(스크린 리더가 읽는 유일한 날짜 요소)에 「전날」·「다음 날」 사용자 지정 동작을 단다 */
   onSwipeDay?: (direction: SwipeDirection) => void;
+  /** 114 — 고른 날이 오늘이면 「다음 날」 동작을 빼 스크린 리더 사용자가 반응 없는 동작을 고르지 않게 한다 */
+  isToday?: boolean;
   primary?: boolean;
   children: ReactNode;
 }) {
@@ -685,7 +688,7 @@ function DateJump({
           ? undefined
           : [
               { name: "previousDay", label: DAY_SWIPE_ACTIONS.previous },
-              { name: "nextDay", label: DAY_SWIPE_ACTIONS.next },
+              ...(isToday === true ? [] : [{ name: "nextDay", label: DAY_SWIPE_ACTIONS.next }]),
             ]
       }
       accessibilityLabel={DATE_JUMP.title}

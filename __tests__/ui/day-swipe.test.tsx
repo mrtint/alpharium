@@ -14,7 +14,9 @@ import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-han
 
 import {
   DaySwipe,
+  DAY_SWIPE_ACTIVE_X,
   DAY_SWIPE_DISTANCE,
+  DAY_SWIPE_FAIL_Y,
   DAY_SWIPE_VELOCITY,
   daySwipeDirectionOf,
 } from "../../src/ui/DaySwipe";
@@ -44,6 +46,27 @@ describe("daySwipeDirectionOf — 손을 뗀 순간의 방향", () => {
     expect(daySwipeDirectionOf(0, -DAY_SWIPE_VELOCITY)).toBe("next");
   });
 
+  it("멀리 끌었다가 빠르게 되돌려 놓으면(거리와 속도가 반대) 넘기지 않는다 — 취소하려던 동작이다", () => {
+    expect(daySwipeDirectionOf(DAY_SWIPE_DISTANCE + 10, -(DAY_SWIPE_VELOCITY + 100))).toBeNull();
+    expect(daySwipeDirectionOf(-(DAY_SWIPE_DISTANCE + 10), DAY_SWIPE_VELOCITY + 100)).toBeNull();
+  });
+
+  it("멀리 끌고 천천히 되돌려도 거리의 방향으로 넘긴다", () => {
+    expect(daySwipeDirectionOf(DAY_SWIPE_DISTANCE + 10, -(DAY_SWIPE_VELOCITY - 100))).toBe(
+      "previous",
+    );
+  });
+
+  it("멀리 끌고 같은 방향으로 빠르게 놓으면 그 방향이다", () => {
+    expect(daySwipeDirectionOf(-(DAY_SWIPE_DISTANCE + 10), -(DAY_SWIPE_VELOCITY + 100))).toBe(
+      "next",
+    );
+  });
+
+  it("거리가 짧고 속도만 빠르면 속도의 방향이다", () => {
+    expect(daySwipeDirectionOf(-10, DAY_SWIPE_VELOCITY + 100)).toBe("previous");
+  });
+
   it("아무것도 못 미치면 null", () => {
     expect(daySwipeDirectionOf(0, 0)).toBeNull();
   });
@@ -51,6 +74,8 @@ describe("daySwipeDirectionOf — 손을 뗀 순간의 방향", () => {
   it("수치는 사람이 정한 값으로 못박혀 있다 (원칙 V)", () => {
     expect(DAY_SWIPE_DISTANCE).toBe(60);
     expect(DAY_SWIPE_VELOCITY).toBe(600);
+    expect(DAY_SWIPE_ACTIVE_X).toBe(16);
+    expect(DAY_SWIPE_FAIL_Y).toBe(12);
   });
 });
 
@@ -108,8 +133,8 @@ describe("DaySwipe — 제스처 배선", () => {
 
 describe("DaySwipe — 소스 계약 (주석을 걷어낸 소스)", () => {
   it("가로 16pt 이상에서 활성, 세로 12pt에서 포기한다 (세로 스크롤·캐러셀과 겨루지 않는다)", () => {
-    expect(CODE).toMatch(/activeOffsetX\(\[-16, 16\]\)/);
-    expect(CODE).toMatch(/failOffsetY\(\[-12, 12\]\)/);
+    expect(CODE).toMatch(/activeOffsetX\(\[-DAY_SWIPE_ACTIVE_X, DAY_SWIPE_ACTIVE_X\]\)/);
+    expect(CODE).toMatch(/failOffsetY\(\[-DAY_SWIPE_FAIL_Y, DAY_SWIPE_FAIL_Y\]\)/);
   });
 
   it("FR-009 — 새 전환 움직임이 없다: 끌림을 따라 움직이지도, 애니메이션을 쓰지도 않는다", () => {

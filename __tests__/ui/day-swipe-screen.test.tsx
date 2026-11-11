@@ -143,6 +143,17 @@ describe("114 쓴 날 지면에 걸린 밀기", () => {
     expect(props.onSwipeDay).toHaveBeenCalledTimes(2);
   });
 
+  it("접근성 — 고른 날이 오늘이면 「다음 날」 동작을 뺀다 (반응 없는 동작을 고르지 않게)", async () => {
+    const write = writePromptFor(items, NOW, null); // 기본 선택은 오늘
+    expect(write.day).toBe("2026-09-24");
+    await renderScreen({ kind: "unwritten" }, { write, cells: weekCellsFor(items, write, NOW) });
+
+    const names = (
+      screen.getByTestId("home-date-button").props.accessibilityActions as { name: string }[]
+    ).map((a) => a.name);
+    expect(names).toEqual(["previousDay"]);
+  });
+
   it("접근성 동작은 onSwipeDay가 없으면 없다", async () => {
     await renderScreen(
       { kind: "readable", entry: entry(false), madeUp: false },

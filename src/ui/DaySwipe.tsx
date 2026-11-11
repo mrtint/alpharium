@@ -26,6 +26,9 @@ import type { SwipeDirection } from "../app/state";
  */
 export const DAY_SWIPE_DISTANCE = 60;
 export const DAY_SWIPE_VELOCITY = 600;
+/** 팬이 활성이 되는 가로 이동(pt)과 포기하는 세로 이동(pt) — 같은 이유로 사람이 정한 값이다(원칙 V) */
+export const DAY_SWIPE_ACTIVE_X = 16;
+export const DAY_SWIPE_FAIL_Y = 12;
 
 /**
  * 손을 뗀 순간의 끌림으로 넘김 방향을 정한다 — 멀리 끌었거나 빠르게 튕겼으면 넘긴다.
@@ -38,7 +41,10 @@ export function daySwipeDirectionOf(
   const far = Math.abs(translationX) >= DAY_SWIPE_DISTANCE;
   const fast = Math.abs(velocityX) >= DAY_SWIPE_VELOCITY;
   if (!far && !fast) return null;
-  const sign = translationX !== 0 ? translationX : velocityX;
+  // 멀리 끌었다가 빠르게 되돌려 놓은 것(거리와 속도의 방향이 반대)은 취소하려던 동작이다 — 넘기지 않는다.
+  if (far && fast && Math.sign(translationX) !== Math.sign(velocityX)) return null;
+  // 멀리 끌었으면 거리의 방향, 빠르게 튕기기만 했으면 속도의 방향이다.
+  const sign = far ? translationX : velocityX;
   return sign > 0 ? "previous" : "next";
 }
 
@@ -54,9 +60,9 @@ export function DaySwipe({ onSwipeDay, children, style, testID }: DaySwipeProps)
   const pan = Gesture.Pan()
     .runOnJS(true)
     // 가로로 16pt를 넘겨야 팬이 된다 — 글을 읽다 살짝 스치는 정도로는 날이 넘어가지 않는다.
-    .activeOffsetX([-16, 16])
+    .activeOffsetX([-DAY_SWIPE_ACTIVE_X, DAY_SWIPE_ACTIVE_X])
     // 세로로 먼저 움직이면 팬을 포기한다 — 지면의 세로 스크롤과 겨루지 않는다.
-    .failOffsetY([-12, 12])
+    .failOffsetY([-DAY_SWIPE_FAIL_Y, DAY_SWIPE_FAIL_Y])
     // 취소(시스템 가로채기·다른 제스처가 가져감)도 끝으로 불린다 — `success`가 거짓이면 날을 옮기지 않는다.
     .onEnd((event, success) => {
       if (!success) return;
