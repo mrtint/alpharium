@@ -28,6 +28,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 
+import { useBottomInset } from "./safe-bottom";
 import { COLORS, SETTINGS } from "./theme/tokens";
 
 /** 겹이 밀리는 목표 — 열리면 제자리(0), 닫히면 화면 폭만큼 오른쪽(밖). */
@@ -51,6 +52,8 @@ export function StackLayer({
   children: ReactNode;
 }) {
   const { width } = useWindowDimensions();
+  // 115 — 홈 루트가 아래 안전 영역을 비우지 않으므로 겹이 직접 비킨다. 중첩된 겹은 절대 배치라 부모 패딩을 받지 않고 자기 몫을 비킨다.
+  const inset = useBottomInset();
   const [mounted, setMounted] = useState(open);
   // 마운트가 열림을 따라잡는다 — effect 안의 setState 대신 렌더에서 맞춘다(react-hooks/set-state-in-effect).
   if (open && !mounted) setMounted(true);
@@ -102,7 +105,9 @@ export function StackLayer({
 
   if (!mounted) return null;
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.layer, style]}>{children}</Animated.View>
+    <Animated.View style={[StyleSheet.absoluteFill, styles.layer, style, { paddingBottom: inset }]}>
+      {children}
+    </Animated.View>
   );
 }
 

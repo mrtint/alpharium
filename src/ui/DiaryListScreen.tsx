@@ -98,6 +98,8 @@ import { SIMULATION_TEXT } from "./developer-text";
 import { SETTINGS_TEXT } from "./settings-text";
 import { MaterialGrid, type PreviewState } from "./MaterialGrid";
 import { FailureToast } from "./FailureToast";
+import { barMetrics } from "./bar-metrics";
+import { useBottomInset } from "./safe-bottom";
 import { WritingPaper } from "./WritingPaper";
 import { WrittenDayPaper } from "./WrittenDayPaper";
 
@@ -214,6 +216,8 @@ export function DiaryListScreen({
   onDismissToast,
   simulation,
 }: DiaryListScreenProps) {
+  // 115 — 아래 안전 영역. 바 세 개의 면이 그만큼 내려가고(`barMetrics`), 지면 아래 여백·토스트·제약 띠가 따라온다.
+  const inset = useBottomInset();
   const written = paper !== undefined && paper.kind !== "unwritten" ? paper : undefined;
   // 쓴 날의 지면이 끝에 닿았는가 — **그 날의 값만** 믿는다. 날을 바꾸면 새 지면이 잴 때까지 바는 내려가 있다.
   const [end, setEnd] = useState<{ day: DayDate; atEnd: boolean } | undefined>(undefined);
@@ -241,7 +245,7 @@ export function DiaryListScreen({
 
   // 054 — 토스트는 하단 바의 **잰 높이** + 12 위다(보드 `2i`). 바가 내려가 있어도(`RewriteBar`) `onLayout` 높이는
   // 그대로라 바가 올라와도 겹치지 않는다. 재기 전에는 최소 높이다.
-  const [barHeight, setBarHeight] = useState<number>(WRITTEN_DAY.bar.minHeight);
+  const [barHeight, setBarHeight] = useState<number>(WRITTEN_DAY.bar.minHeight + inset);
   const toastNode =
     toast !== undefined ? (
       <FailureToast
@@ -332,7 +336,8 @@ export function DiaryListScreen({
   // 051 수정 — 쓴 날은 헤더·스트립이 고정되고 지면만 스크롤된다(보드 `2c`). 바는 지면 위에 겹쳐
   // 아래에서 올라온다 — 지면 본문 아래 여백(104)이 바를 비켜 마지막 문단을 가리지 않는다.
   if (write !== undefined && written !== undefined) {
-    // 내려간 바가 아래 안전 영역(내비게이션 바) 뒤로 비치지 않게 자른다 — 실기기 관측.
+    // 115 — 바가 내려가면 화면 밖(아래 안전 영역 포함)으로 나간다. 루트가 아래 인셋을 비우지 않아 홈이 맨 아래까지 가므로, 내려간
+    // 바가 비쳐 보이지 않게 이 뿌리가 자른다(종전에는 루트의 안전 영역 띠가 가렸다).
     return (
       <View style={[ROOT, { overflow: "hidden" }]}>
         <View style={FIXED_HEADER}>{header}</View>
@@ -353,7 +358,7 @@ export function DiaryListScreen({
               });
               if (next !== collapsed) setFoldState({ day: write.day, collapsed: next });
             }}
-            bottomInset={bandInset}
+            bottomInset={bandInset + inset}
             onSwipeDay={onSwipeDay}
             paper={written}
             topSpacer={<FoldSpacer motion={motion} />}
@@ -385,7 +390,10 @@ export function DiaryListScreen({
   // 114 — 재료 지면은 `onSwipeDay`가 있으면 밀기 영역 안에 둔다(지면 전체 — 캐러셀이 없다).
   const materialPaperView = (
     <View
-      style={[MATERIAL_PAPER, { paddingBottom: MATERIAL_GRID.paperPadding.bottom + bandInset }]}
+      style={[
+        MATERIAL_PAPER,
+        { paddingBottom: MATERIAL_GRID.paperPadding.bottom + bandInset + inset },
+      ]}
       testID="material-paper"
     >
       <MaterialGrid onRequestPhoto={onRequestPhoto} preview={preview} />
@@ -828,6 +836,7 @@ function WriteBar({
   /** 잠깐 잠겼다 — 흐리고 눌리지 않는다 */
   locked?: boolean;
 }) {
+  const inset = useBottomInset();
   return (
     <Pressable
       accessibilityRole="button"
@@ -835,6 +844,7 @@ function WriteBar({
       onPress={() => onWrite()}
       style={[
         BAR,
+        barMetrics(inset),
         { backgroundColor: simulated ? SIMULATION.barFill : COLORS.accent },
         locked && BAR_LOCKED,
       ]}
@@ -872,12 +882,13 @@ function DevBadge({ color, testID }: { color: string; testID?: string }) {
  * 배경 `text`(검정), 글자 `bg`. 누르면 바로 멈추고 쓰기 전 상태로 돌아간다 — 그 판단은 부르는 쪽이 한다.
  */
 function StopBar({ onStop, locked = false }: { onStop?: () => void; locked?: boolean }) {
+  const inset = useBottomInset();
   return (
     <Pressable
       accessibilityRole="button"
       disabled={locked || undefined}
       onPress={() => onStop?.()}
-      style={[BAR, { backgroundColor: COLORS.text }, locked && BAR_LOCKED]}
+      style={[BAR, barMetrics(inset), { backgroundColor: COLORS.text }, locked && BAR_LOCKED]}
       testID="stop-button"
     >
       <AppText style={[BAR_TEXT, { color: COLORS.bg }]}>{WRITING_TEXT.stop}</AppText>
@@ -914,8 +925,9 @@ function RewriteBar({
   /** 잰 높이를 위로 알린다 — 토스트가 바의 자리 기준으로 놓인다 (054) */
   onLayoutHeight?: (height: number) => void;
 }) {
+  const inset = useBottomInset();
   const shown = useSharedValue(visible ? 1 : 0);
-  const height = useSharedValue<number>(WRITTEN_DAY.bar.minHeight);
+  const height = useSharedValue<number>(WRITTEN_DAY.bar.minHeight + inset);
   useEffect(() => {
     shown.value = withTiming(visible ? 1 : 0, {
       duration: WRITTEN_DAY.bar.slideMs,
@@ -944,6 +956,7 @@ function RewriteBar({
         onPress={() => onWrite()}
         style={[
           BAR,
+          barMetrics(inset),
           { backgroundColor: simulated ? SIMULATION.barFill : WRITTEN_DAY.rewriteBar },
           locked && BAR_LOCKED,
         ]}
@@ -1090,15 +1103,14 @@ const MATERIAL_PAPER: ViewStyle = {
 };
 
 /**
- * 하단 바 — 화면 폭 전체, 위 좌우 반경 6, 최소 높이 64, 글자 17/800 (보드 `1d`·`2c`). 아래 안전 영역은
- * 루트 `SafeAreaView`가 비킨다.
+ * 하단 바 — 화면 폭 전체, 위 좌우 반경 6, 최소 높이 64, 글자 17/800 (보드 `1d`·`2c`). **최소 높이와 아래 여백은 여기 없다** —
+ * `barMetrics(인셋)`이 아래 안전 영역만큼 더해 면이 화면 맨 아래까지 닿는다(115, 보드 밖 초안). 글자는 위 64 안에 그대로 선다.
  */
 const BAR: ViewStyle = {
-  minHeight: WRITTEN_DAY.bar.minHeight,
   justifyContent: "center",
   alignItems: "center",
   paddingHorizontal: 20,
-  paddingVertical: 10,
+  paddingTop: 10,
   borderTopLeftRadius: WRITTEN_DAY.bar.radius,
   borderTopRightRadius: WRITTEN_DAY.bar.radius,
 };

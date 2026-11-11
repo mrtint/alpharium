@@ -54,6 +54,50 @@ describe("★ 상태 표시줄과 겹치지 않는다", () => {
 });
 
 /**
+ * 115 — 홈은 루트에서 아래 안전 영역을 비우지 않는다(하단 바 면이 맨 아래까지 간다). 그 대신 겹·바·토스트가 각자 비킨다.
+ * 첫 실행 화면은 자기 `SafeAreaView`가 따로 있어 아래 인셋을 그대로 비킨다. 소스 계약이다(인셋은 기기에서 온다).
+ */
+describe("115 S1·S2·S3 — 아래 인셋을 누가 비키는가", () => {
+  const strip = (file: string) =>
+    readFileSync(join(__dirname, "../..", file), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+  const app = strip("App.tsx");
+  const edgesOf = (source: string) =>
+    [...source.matchAll(/<SafeAreaView[^>]*edges=\{\[([^\]]*)\]\}/g)].map((m) => m[1] ?? "");
+
+  it("S1 — 홈(마지막 SafeAreaView)은 bottom을 비우지 않고 top·left·right를 비운다", () => {
+    const all = edgesOf(app);
+    const home = all.at(-1) ?? "";
+    expect(home).not.toMatch(/"bottom"/);
+    for (const edge of ["top", "left", "right"]) expect(home).toContain(`"${edge}"`);
+  });
+
+  it("S1 — 첫 실행 화면들의 SafeAreaView는 모두 bottom을 비운다", () => {
+    const all = edgesOf(app);
+    expect(all.length).toBeGreaterThan(1);
+    for (const edges of all.slice(0, -1)) expect(edges).toContain('"bottom"');
+  });
+
+  it("S2 — StackLayer가 아래 인셋 훅을 읽어 안쪽 여백을 둔다", () => {
+    const layer = strip("src/ui/StackLayer.tsx");
+    expect(layer).toContain("useBottomInset()");
+    expect(layer).toMatch(/paddingBottom/);
+  });
+
+  it("S3 — 앱 토스트 바닥에 인셋을 더한다", () => {
+    expect(app).toContain("useBottomInset()");
+    expect(app).toMatch(/toastBottom\s*=[^;]*\+\s*bottomInset;/);
+  });
+
+  it("S4 — 인셋은 SafeAreaInsetsContext로 읽는다(useSafeAreaInsets는 제공자 없는 렌더에서 던진다)", () => {
+    const hook = strip("src/ui/safe-bottom.ts");
+    expect(hook).toContain("SafeAreaInsetsContext");
+    expect(hook).not.toContain("useSafeAreaInsets");
+  });
+});
+
+/**
  * **의존성이 선언되어 있는가.**
  *
  * `expo install`이 SDK 57에 맞는 판을 골라 넣었다. 선언이 빠지면 다른 사람의

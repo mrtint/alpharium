@@ -146,7 +146,7 @@ export const PRESS = {
 export const WRITING = {
   /** 잠근 스트립의 불투명도 — 잠긴 것이 보이게 (보드 `2b`) */
   stripLockedOpacity: 0.35,
-  /** 지면 안쪽 여백 — 아래 120은 하단 바가 덮는 자리 */
+  /** 지면 안쪽 여백 — 아래 120은 하단 바가 덮는 자리(115 — 쓰는 곳이 아래 안전 영역을 더한다) */
   paperPadding: { top: 32, horizontal: 20, bottom: 120 },
   gap: 14,
   /** 머리말 11/600, 대문자 간격 .1em */
@@ -323,7 +323,7 @@ export const READING_SCROLL = {
  * 지면 배경은 `WRITTEN_DAY.paper`(neutral-100), 글자는 `COLORS`.
  */
 export const MATERIAL_GRID = {
-  /** 지면 안쪽 여백 — 아래 120은 하단 바가 덮는 자리 */
+  /** 지면 안쪽 여백 — 아래 120은 하단 바가 덮는 자리(115 — 쓰는 곳이 아래 안전 영역을 더한다) */
   paperPadding: { top: 20, horizontal: 20, bottom: 120 },
   /** 지면 컬럼 간격 — 안내 한 줄의 위 간격은 이 6 + `noteMarginTop` 8 = 14 */
   columnGap: 6,

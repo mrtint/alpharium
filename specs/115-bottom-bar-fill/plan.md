@@ -58,24 +58,25 @@ specs/115-bottom-bar-fill/
 
 ```text
 App.tsx                         # 홈 SafeAreaView edges에서 bottom 제거, 토스트 바닥에 인셋 더함
-src/ui/safe-bottom.ts           # (새) useBottomInset() · barMetrics(inset)
+src/ui/safe-bottom.ts           # (새) useBottomInset()
+src/ui/bar-metrics.ts           # (새) barMetrics(inset) — RN 없는 순수 함수
 src/ui/StackLayer.tsx           # 겹 안쪽 paddingBottom = 인셋
 src/ui/DiaryListScreen.tsx      # 바 세 개 치수·지면 아래 여백·주석
 design/DESIGN.md                # 바 면이 안전 영역까지 닿는다는 한 줄
 AGENTS.md                       # 홈 항목에 한 줄
 __tests__/ui/safe-area.test.tsx # 소스 계약(홈 edges·겹)
 __tests__/ui/bottom-bar-fill.test.tsx   # (새) 렌더 계약
-__tests__/app/safe-bottom.test.ts       # (새) barMetrics
+__tests__/app/bar-metrics.test.ts       # (새) barMetrics
 ```
 
-**Structure Decision**: 인셋 읽기와 바 치수를 `src/ui/safe-bottom.ts` 한 곳에 모아 세 호출처가 같은 규칙을 쓰게 한다(규칙 복제 방지).
+**Structure Decision**: 인셋 읽기(`safe-bottom.ts`)와 바 치수(`bar-metrics.ts`, RN 없는 순수 함수)를 한 쌍으로 모아 세 호출처가 같은 규칙을 쓰게 한다(규칙 복제 방지).
 
 ## 설계
 
 1. `useBottomInset(): number` — `useContext(SafeAreaInsetsContext)?.bottom ?? 0`(`PhotoViewer`와 같은 방식).
 2. `barMetrics(inset)` — `{ minHeight: WRITTEN_DAY.bar.minHeight + inset, paddingBottom: BAR_PADDING_V + inset }`. `BAR`의 `paddingVertical: 10`을 위 10·아래 10 + 인셋으로 나눈다(`paddingTop`·`paddingBottom`). 글은 `justifyContent: "center"`로 내용 상자(위 64 안) 안에 선다.
 3. 바 세 개(`WriteBar`·`StopBar`·`RewriteBar`의 Pressable)는 `[BAR, barMetrics(inset), {backgroundColor}]`. 잰 높이(`onLayout`)가 바 + 인셋이라 토스트·제약 띠의 `bottom`과 `RewriteBar`의 내려가는 거리(`translateY = 높이`)가 따라온다. 내려갈 때 바는 화면 밖(ROOT가 `overflow: hidden`)으로 간다.
-4. 지면 아래 여백: 안 쓴 날 `MATERIAL_GRID.paperPadding.bottom + bandInset + inset`, 쓴 날 `bottomInset = bandInset + inset`. 지면은 ROOT 바닥까지 닿는다(루트 인셋이 없으므로).
+4. 지면 아래 여백: 쓰는 중 `WritingPaper`도 `120 + 인셋`. 안 쓴 날 `MATERIAL_GRID.paperPadding.bottom + bandInset + inset`, 쓴 날 `bottomInset = bandInset + inset`. 지면은 ROOT 바닥까지 닿는다(루트 인셋이 없으므로).
 5. `App.tsx`: 홈 `edges={["top","left","right"]}`, `toastBottom = (route !== "home" ? 24 : HOME_TOAST_BOTTOM) + inset`. 첫 실행 `SafeAreaView`들은 그대로.
 6. `StackLayer`: `[absoluteFill, layer, style, { paddingBottom: inset }]`. 중첩 겹은 절대 배치라 부모 패딩을 받지 않고 자기 인셋을 따로 비킨다.
 7. 주석 갱신: `BAR`의 「아래 안전 영역은 루트가 비킨다」, 쓴 날 분기의 「내려간 바가 내비게이션 바 뒤로 비치지 않게 자른다」, `App.tsx`의 `edges` 주석.
