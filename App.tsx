@@ -68,6 +68,7 @@ import { expoCharacterNamesPort, loadCustomNames, saveCustomNames } from "./src/
 import { shouldShowLogo } from "./src/firstrun/logo";
 import { resolveFirstRunStage } from "./src/firstrun/progress";
 import { LogoScreen } from "./src/ui/LogoScreen";
+import { useBottomInset } from "./src/ui/safe-bottom";
 import { OnboardingScreen, type OnboardingPorts } from "./src/ui/OnboardingScreen";
 import { DownloadConsentGate } from "./src/ui/DownloadConsentGate";
 import { DownloadProgressScreen } from "./src/ui/DownloadProgressScreen";
@@ -246,6 +247,7 @@ const DOWNLOAD_RETRY_INTERVAL_MS = 10_000;
  * 실기기에서 바와 겹치지 않는지 본다(quickstart 5).
  */
 const HOME_TOAST_BOTTOM = 88;
+// 115 — 위 값과 설정 쪽 24는 **화면 바닥에서 잰 값**이다. 홈이 아래 안전 영역까지 가므로 `AppFrame`이 인셋을 더해 쓴다.
 
 /**
  * 074·095 — 첫 실행 동의(표준·모바일)에 보일 받을 양. `DownloadConsentGate`가 연결 종류와 함께 읽는다(095). 059 `planRedownload`와 같은 통로·같은
@@ -366,7 +368,8 @@ function AppFrame() {
   );
   const homeCovered = route !== "home" || layersMounted.settings || layersMounted.developer;
   /** 060 — 홈에서 뜨는 토스트(진단에서 쓰기를 시작했어요)는 하단 바 위로, 설정·개발자의 토스트는 아래 그대로 */
-  const toastBottom = route !== "home" ? 24 : HOME_TOAST_BOTTOM;
+  const bottomInset = useBottomInset();
+  const toastBottom = (route !== "home" ? 24 : HOME_TOAST_BOTTOM) + bottomInset;
 
   /**
    * ★ 056 — 설정 값(자동 쓰기 설정·장소 갈래)은 여기서 **앱 실행마다 한 번** 읽어 들고 있는다(FR-030, research R5).
@@ -1668,7 +1671,10 @@ function AppFrame() {
   return (
     // `edges`를 적어 둔다 — 기본값은 네 변 전부이며, 무엇을 피하는지가 코드에 보이는
     // 편이 낫다. 좌우는 세로 화면에서 0이지만 가로로 눕히면 노치가 파고든다.
-    <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]}>
+    // 115 — **아래(`bottom`)는 비우지 않는다**: 홈 하단 바의 면이 화면 맨 아래(홈 표시줄·내비게이션 바 자리)까지 닿아야 한다. 아래 인셋은
+    // 쓰는 곳이 각자 비킨다 — 하단 바(`barMetrics`)·겹(`StackLayer`)·토스트(`toastBottom`). 첫 실행 화면들은 위의 자기 `SafeAreaView`가
+    // 그대로 아래를 비킨다.
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       {/*
         **048 — 전역 탭 줄이 없다**(설계 D1). 홈이 뿌리이고 설정·개발자는 그 위의 하위 화면이다. 새 내비게이션
         라이브러리 없이 상태 하나(`route`)로 가른다(006 관례, FR-008).

@@ -71,7 +71,10 @@ describe("TO2 — 토스트는 진단 겹 안이 아니라 AppFrame 루트에서
   });
 
   it("홈에서는 하단 바 위로 올린다(HOME_TOAST_BOTTOM)", () => {
-    expect(APP).toMatch(/const toastBottom = route !== "home" \? 24 : HOME_TOAST_BOTTOM;/);
+    // 115 — 화면 바닥에서 잰 값이라 아래 인셋을 더한다.
+    expect(APP).toMatch(
+      /const toastBottom = \(route !== "home" \? 24 : HOME_TOAST_BOTTOM\) \+ bottomInset;/,
+    );
     expect(APP).toMatch(/bottom=\{toastBottom\}/);
   });
 });

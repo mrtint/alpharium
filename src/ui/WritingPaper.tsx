@@ -13,7 +13,7 @@
  * 실기기 녹화(quickstart D3).
  *
  * 지면 배경은 **연회색이 아니라 배경색**이다(보드 `2b` 마크업 — 쓴 날의 지면과 다르다). 안쪽 여백 32/20/120:
- * 아래 120은 하단 「그만두기」 바가 덮는 자리다.
+ * 아래 120은 하단 「그만두기」 바가 덮는 자리다(115 — 바가 아래 안전 영역만큼 커졌으니 인셋을 더한다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -23,6 +23,7 @@ import { View } from "react-native";
 import { FadeLayer } from "./components/FadeLayer";
 import { AppText } from "./components/Text";
 import { WRITING_TEXT } from "./home-text";
+import { useBottomInset } from "./safe-bottom";
 import { COLORS, WRITING } from "./theme/tokens";
 
 const MONOLOGUE_STYLE = {
@@ -42,6 +43,7 @@ export function WritingPaper({
   name?: string;
   leaveNote?: string;
 }) {
+  const inset = useBottomInset();
   const text = line ?? WRITING_TEXT.fallback;
 
   // 렌더 중 이전 값 기억(049 `DayHeading`과 같은 방식) — effect 안 동기 `setState`는 lint가 막는다.
@@ -58,7 +60,7 @@ export function WritingPaper({
         backgroundColor: COLORS.bg,
         paddingTop: WRITING.paperPadding.top,
         paddingHorizontal: WRITING.paperPadding.horizontal,
-        paddingBottom: WRITING.paperPadding.bottom,
+        paddingBottom: WRITING.paperPadding.bottom + inset,
         gap: WRITING.gap,
       }}
       testID="writing-paper"
