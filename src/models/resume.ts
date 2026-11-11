@@ -22,6 +22,11 @@ import type { SegmentedResume } from "./segmented/types";
  *  3. 최종 파일이 있고, 크기가 **끝난 구간 중 가장 뒤 구간의 end + 1** 이상 `totalBytes` 이하다
  *     (구간은 제 오프셋에 쓰이므로 순서대로 끝나지 않아 크기가 전체와 같다고 요구할 수 없다).
  *  4. `doneIndices`가 구간 범위 안이다.
+ *
+ * **비교 기준이 없으면 안전망도 얇다.** 기준 크기(`expectedBytes`)가 0이면 2번을 건너뛰고, 기준 지문도
+ * 없으면 최종 검증이 채록이라 서버 파일이 바뀐 것을 잡지 못한다(지금 로스터는 모두 값이 차 있다 — 원칙 V).
+ * 기록에는 주소·지문이 없어, 같은 크기의 다른 파일로 로스터가 바뀌면 섞인 파일이 되고 최종 지문 검증이
+ * 잡아 다시 받는다(비용은 전체 다시 받기).
  */
 export function isResumeConsistent(
   resume: SegmentedResume,

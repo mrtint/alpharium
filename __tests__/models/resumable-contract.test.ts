@@ -55,11 +55,25 @@ describe("state.json 쓰기는 한 줄로 선다 (FR-005)", () => {
     expect(offenders).toEqual([]);
   });
 
-  it("acquisition.ts가 체크포인트를 start·resume 모두에 넘긴다", () => {
-    const acquisition = code("src/models/acquisition.ts");
-    expect(acquisition).toMatch(/const checkpoint = \(entry: SegmentedResume\) =>\s*mutateState/);
-    // 세 호출 모두 마지막 인자로 checkpoint를 받는다.
-    expect((acquisition.match(/\n\s*checkpoint,\n/g) ?? []).length).toBe(3);
+  it("받는 두 길(캐릭터·사진 모델)이 체크포인트를 start·resume 모두에 넘긴다", () => {
+    for (const rel of ["src/models/acquisition.ts", "src/vision/acquisition.ts"]) {
+      const source = code(rel);
+      expect(source).toMatch(/const checkpoint = segmentCheckpoint\(ports\.metadata\)/);
+      expect(source).toMatch(/checkpoint,?\s*\)/);
+      expect(source).toMatch(/settleResumeRecord\(ports/);
+    }
+  });
+
+  it("체크포인트는 mutateState로 쓴다 (한 줄로 선다)", () => {
+    expect(code("src/models/verification.ts")).toMatch(
+      /segmentCheckpoint[\s\S]*?mutateState\(metadata[\s\S]*?withSegmentedResume/,
+    );
+  });
+
+  it("expoMetadataPort는 프로세스에 하나다 — 통로가 둘이면 쓰기 줄이 둘이 된다", () => {
+    const expoPort = code("src/models/expo-port.ts");
+    expect(expoPort).toMatch(/let sharedMetadataPort:\s*MetadataPort \| null = null/);
+    expect(expoPort).toMatch(/sharedMetadataPort \?\?= createExpoMetadataPort\(\)/);
   });
 
   it("expo-port.ts가 체크포인트를 runSegmented의 onCheckpoint로 전달한다", () => {

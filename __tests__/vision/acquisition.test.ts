@@ -7,6 +7,9 @@ import {
 } from "../../src/vision/acquisition";
 import { visionAssets } from "../../src/vision/roster";
 import type { TransferOutcome, TransferProgress } from "../../src/models/port";
+import { planSegments } from "../../src/models/segmented/plan";
+import type { SegmentCheckpoint } from "../../src/models/segmented/types";
+import { readState } from "../../src/models/storage";
 
 /**
  * 사진 보는 모델 준비의 계약 테스트.
@@ -31,6 +34,14 @@ type Options = {
   hash?: string | null;
   /** 받기 전과 받은 뒤의 지문이 다를 때(깨진 파일을 다시 받는 경우). `hash`보다 먼저 쓴다 */
   hashes?: Record<string, string>;
+  /** 113 — 시작할 때 이미 있는 state.json 내용 */
+  metadata?: string | null;
+  /** 113 — 받는 도중 일어나는 일(체크포인트 호출 등). 값을 주면 그것이 결과다 */
+  scenario?: (ctx: {
+    key: string;
+    checkpoint?: SegmentCheckpoint;
+    resumed: boolean;
+  }) => Promise<TransferOutcome | void>;
 };
 
 function makePorts(options: Options = {}) {
@@ -38,7 +49,31 @@ function makePorts(options: Options = {}) {
   const removed: string[] = [];
   const started: string[] = [];
   const hashed: string[] = [];
-  let metadata: string | null = null;
+  const resumed: string[] = [];
+  let metadata: string | null = options.metadata ?? null;
+
+  const makeTask = (
+    key: string,
+    onProgress: (p: TransferProgress) => void,
+    checkpoint: SegmentCheckpoint | undefined,
+    isResume: boolean,
+  ) => {
+    return {
+      async wait() {
+        onProgress({ bytesWritten: 100, totalBytes: 100 });
+        const scripted = await options.scenario?.({ key, checkpoint, resumed: isResume });
+        if (scripted !== undefined) return scripted;
+        const outcome = options.outcome ?? ({ kind: "completed" } as TransferOutcome);
+        // 성공했으면 파일이 생긴 것으로 둔다.
+        if (outcome.kind === "completed") {
+          const asset = [ASSETS.base, ASSETS.projector].find((a) => a.key === key);
+          files.set(key, asset?.expectedBytes ?? 0);
+        }
+        return outcome;
+      },
+      async pause() {},
+    };
+  };
 
   const ports: VisionAcquisitionPorts = {
     files: {
@@ -86,29 +121,18 @@ function makePorts(options: Options = {}) {
       },
     },
     download: {
-      start(key, _url, onProgress: (p: TransferProgress) => void) {
+      start(key, _url, onProgress: (p: TransferProgress) => void, checkpoint?: SegmentCheckpoint) {
         started.push(key);
-        return {
-          async wait() {
-            onProgress({ bytesWritten: 100, totalBytes: 100 });
-            const outcome = options.outcome ?? ({ kind: "completed" } as TransferOutcome);
-            // 성공했으면 파일이 생긴 것으로 둔다.
-            if (outcome.kind === "completed") {
-              const asset = [ASSETS.base, ASSETS.projector].find((a) => a.key === key);
-              files.set(key, asset?.expectedBytes ?? 0);
-            }
-            return outcome;
-          },
-          async pause() {},
-        };
+        return makeTask(key, onProgress, checkpoint, false);
       },
-      resume(key, _url, _state, onProgress) {
-        return this.start(key, "", onProgress);
+      resume(key, _url, _state, onProgress, checkpoint) {
+        resumed.push(key);
+        return makeTask(key, onProgress, checkpoint, true);
       },
-    },
+    } as VisionAcquisitionPorts["download"],
   };
 
-  return { ports, files, removed, started, hashed, metadataOf: () => metadata };
+  return { ports, files, removed, started, resumed, hashed, metadataOf: () => metadata };
 }
 
 describe("준비 상태 — 둘을 하나로 접는다 (FR-026)", () => {
@@ -389,5 +413,117 @@ describe("저장 공간 — 하나의 수 (FR-029)", () => {
   it("하나만 있어도 그 크기가 나온다 — 자리를 차지하고 있다", async () => {
     const { ports } = makePorts({ present: { [ASSETS.base.key]: 100 } });
     expect(await visionStorageBytes(ports)).toBe(100);
+  });
+});
+
+describe("끝난 구간을 기록하고 이어받는다 (113)", () => {
+  const BASE = ASSETS.base;
+  const COUNT = planSegments(BASE.expectedBytes).segments.length;
+  const PLAN = planSegments(BASE.expectedBytes);
+  const record = (assetKey: string, doneIndices: number[], over: object = {}) => ({
+    assetKey,
+    totalBytes: BASE.expectedBytes,
+    segmentCount: COUNT,
+    doneIndices,
+    ...over,
+  });
+  const meta = (r: unknown) => JSON.stringify({ verdicts: [], paused: [], segmented: [r] });
+
+  it("구간이 끝나면 그 번호가 state.json에 남는다", async () => {
+    const h = makePorts({
+      scenario: async ({ key, checkpoint }) => {
+        if (key !== BASE.key) return;
+        await checkpoint?.(record(key, [0, 2]));
+        return { kind: "failed", reason: "끊김" };
+      },
+    });
+
+    const result = await prepareVision(h.ports);
+
+    expect(result.ok).toBe(false);
+    const state = await readState({
+      read: async () => h.metadataOf(),
+      writeAtomically: async () => {},
+    });
+    expect(state.segmented).toEqual([record(BASE.key, [0, 2])]);
+  });
+
+  it("정합한 기록이 있으면 그 기록으로 이어받는다", async () => {
+    const h = makePorts({
+      present: { [BASE.key]: PLAN.segments[1].end + 1 },
+      metadata: meta(record(BASE.key, [0, 1])),
+    });
+
+    const result = await prepareVision(h.ports);
+
+    expect(result).toEqual({ ok: true });
+    expect(h.resumed).toEqual([BASE.key]);
+    expect(h.started).toEqual([ASSETS.projector.key]);
+  });
+
+  it("받기가 끝나면 구간 기록이 지워진다 — 남으면 다음에 받지도 검증하지도 못한다", async () => {
+    const h = makePorts({
+      present: { [BASE.key]: PLAN.segments[1].end + 1 },
+      metadata: meta(record(BASE.key, [0, 1])),
+    });
+
+    await prepareVision(h.ports);
+
+    const state = await readState({
+      read: async () => h.metadataOf(),
+      writeAtomically: async () => {},
+    });
+    expect(state.segmented).toEqual([]);
+    expect(state.verdicts.map((v) => v.assetKey).sort()).toEqual(
+      [ASSETS.base.key, ASSETS.projector.key].sort(),
+    );
+  });
+
+  it("파일과 어긋난 기록은 지우고 처음부터 받는다", async () => {
+    const h = makePorts({
+      present: { [BASE.key]: PLAN.segments[3].end }, // 끝난 구간의 끝에 못 미친다
+      metadata: meta(record(BASE.key, [0, 3])),
+    });
+
+    const result = await prepareVision(h.ports);
+
+    expect(result).toEqual({ ok: true });
+    expect(h.resumed).toEqual([]);
+    expect(h.started).toContain(BASE.key);
+    expect(h.removed).toContain(BASE.key);
+  });
+
+  it("지문이 달라 파일을 지우면 구간 기록도 지운다", async () => {
+    const h = makePorts({
+      present: { [BASE.key]: PLAN.segments[1].end + 1 },
+      metadata: meta(record(BASE.key, [0, 1])),
+      hash: "다른 지문",
+    });
+
+    const result = await prepareVision(h.ports);
+
+    expect(result).toEqual({ ok: false, failure: { kind: "verification-failed" } });
+    const state = await readState({
+      read: async () => h.metadataOf(),
+      writeAtomically: async () => {},
+    });
+    expect(state.segmented).toEqual([]);
+  });
+
+  it("이어받을 때는 남은 양만 공간으로 요구한다", async () => {
+    const done = PLAN.segments.slice(0, COUNT - 1).map((s) => s.index);
+    const last = PLAN.segments[COUNT - 1];
+    const h = makePorts({
+      present: { [BASE.key]: BASE.expectedBytes },
+      metadata: meta(record(BASE.key, done)),
+      // 본체는 마지막 구간만, 사진 투영 모델(처음부터)은 전체가 들어갈 자리.
+      free: Math.max(last.end - last.start + 1, ASSETS.projector.expectedBytes),
+    });
+
+    const result = await prepareVision(h.ports);
+
+    // 기준 크기가 파일과 같고 기록이 있어 이어받는다(먼저 검증하지 않는다 — 110).
+    expect(result).toEqual({ ok: true });
+    expect(h.resumed).toContain(BASE.key);
   });
 });

@@ -23,7 +23,6 @@
  */
 
 import type { Character } from "../diary/types";
-import { isResumeConsistent } from "./resume";
 import { remainingCapacity, remainingSegmentBytes } from "./segmented/plan";
 import type { DownloadPort, DiskSpacePort, MetadataPort, ModelFilePort } from "./port";
 import { assetFor } from "./roster";
@@ -31,16 +30,18 @@ import {
   mutateState,
   pausedFor,
   readState,
-  segmentedFor,
   withPaused,
   withSegmentedResume,
   withVerdict,
   withoutAsset,
-  withoutSegmented,
 } from "./storage";
-import type { SegmentedResume } from "./segmented/types";
 import type { DownloadFailure, DownloadProgress } from "./types";
-import { settleExistingFile, verifyDownloaded } from "./verification";
+import {
+  segmentCheckpoint,
+  settleExistingFile,
+  settleResumeRecord,
+  verifyDownloaded,
+} from "./verification";
 
 /**
  * 요구하는 공간 여유 배수.
@@ -143,21 +144,13 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
 
         const state = await readState(ports.metadata);
         const paused = pausedFor(state, asset.key);
-        let segmented = segmentedFor(state, asset.key);
 
-        // 1-b. 재개 기록이 파일과 맞는지 본다 (113, FR-006).
-        //
-        //      맞지 않으면(파일 없음·크기 부족·구간 수나 전체 크기가 지금과 다름) 그 기록을
-        //      믿지 않는다 — 없는 구간을 건너뛰면 깨진 파일이 된다. 기록과 부분 파일을 함께
-        //      지우고 처음부터 받는다. 마지막 안전망은 받은 뒤의 지문 검증이다.
-        if (segmented !== null) {
-          const file = await ports.files.facts(asset.key);
-          if (!isResumeConsistent(segmented, file, asset.expectedBytes)) {
-            await ports.files.remove(asset.key);
-            await mutateState(ports.metadata, (fresh) => withoutSegmented(fresh, asset.key));
-            segmented = null;
-          }
-        }
+        // 1-b. 재개 기록이 파일과 맞는지 본다 (113, FR-006). 맞지 않으면 기록과 부분 파일을 지우고
+        //      처음부터 받는다. 사진 모델 받기도 같은 함수를 쓴다.
+        const segmented = await settleResumeRecord(ports, {
+          assetKey: asset.key,
+          expectedBytes: asset.expectedBytes,
+        });
 
         // 2. 공간을 본다 (FR-019, 026 FR-007).
         //
@@ -201,8 +194,7 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         //
         //        113 — 구간이 하나 끝날 때마다 `checkpoint`가 그 사실을 `state.json`에 남긴다.
         //        앱이 죽거나 연결이 끊겨도 끝난 구간은 다음 받기에서 건너뛴다.
-        const checkpoint = (entry: SegmentedResume) =>
-          mutateState(ports.metadata, (fresh) => withSegmentedResume(fresh, entry));
+        const checkpoint = segmentCheckpoint(ports.metadata);
         const task =
           segmented !== null
             ? ports.download.resume(

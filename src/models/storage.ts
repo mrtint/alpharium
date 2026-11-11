@@ -110,6 +110,9 @@ const writeQueues = new WeakMap<MetadataPort, Promise<void>>();
  * 구간 둘이 거의 동시에 끝나면 `readState → 바꾸기 → writeState`가 겹쳐 한쪽 구간 기록이
  * 지워진다. `state.json`을 쓰는 자리는 전부 이 함수를 지난다(받기·검증·사진 모델). 앞 호출이
  * 던져도 줄은 이어진다 — 그 오류는 그 호출자에게만 간다.
+ *
+ * **같은 파일을 쓰는 `MetadataPort`는 프로세스에 하나여야 한다** — 줄이 포트 객체별이라 통로가 둘이면
+ * 보장이 사라진다(`expoMetadataPort()`가 하나를 돌려준다, `resumable-contract.test.ts`가 잠근다).
  */
 export function mutateState(
   metadata: MetadataPort,

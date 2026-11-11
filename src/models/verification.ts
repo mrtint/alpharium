@@ -12,14 +12,18 @@
  */
 
 import type { MetadataPort, ModelFilePort } from "./port";
+import { isResumeConsistent } from "./resume";
 import { readinessOf } from "./readiness";
+import type { SegmentedResume } from "./segmented/types";
 import {
   pausedFor,
   readState,
   segmentedFor,
   verdictFor,
+  withSegmentedResume,
   withVerdict,
   withoutAsset,
+  withoutSegmented,
   mutateState,
 } from "./storage";
 import type { AssetKey, VerificationVerdict } from "./types";
@@ -149,4 +153,37 @@ export function verdictMatchesFile(
 ): boolean {
   if (!facts.exists) return false;
   return facts.bytes === verdict.verifiedBytes;
+}
+
+/**
+ * 이 자산의 재개 기록을 파일과 맞춰 본다 (113, FR-006). 받는 두 길(캐릭터 모델·사진 모델)이 같은 규칙을 쓴다.
+ *
+ * 맞으면 그 기록을 돌려주고, 맞지 않으면(파일 없음·크기 부족·구간 수나 전체 크기가 지금과 다름) 기록과
+ * 부분 파일을 함께 지우고 `null`을 돌려준다 — 없는 구간을 건너뛰면 깨진 파일이 된다. 기록이 없어도 `null`이다.
+ * 마지막 안전망은 받은 뒤의 지문 검증이다.
+ */
+export async function settleResumeRecord(
+  ports: { files: ModelFilePort; metadata: MetadataPort },
+  target: { assetKey: AssetKey; expectedBytes: number },
+): Promise<SegmentedResume | null> {
+  const record = segmentedFor(await readState(ports.metadata), target.assetKey);
+  if (record === null) return null;
+
+  const file = await ports.files.facts(target.assetKey);
+  if (isResumeConsistent(record, file, target.expectedBytes)) return record;
+
+  await ports.files.remove(target.assetKey);
+  await mutateState(ports.metadata, (fresh) => withoutSegmented(fresh, target.assetKey));
+  return null;
+}
+
+/**
+ * 구간이 끝날 때마다 불리는 체크포인트 — 끝난 구간 기록을 `state.json`에 남긴다 (113, FR-002).
+ *
+ * 쓰기는 `mutateState`로 한 줄로 서므로 동시에 끝난 구간이 서로를 덮어쓰지 않는다.
+ */
+export function segmentCheckpoint(
+  metadata: MetadataPort,
+): (entry: SegmentedResume) => Promise<void> {
+  return (entry) => mutateState(metadata, (fresh) => withSegmentedResume(fresh, entry));
 }

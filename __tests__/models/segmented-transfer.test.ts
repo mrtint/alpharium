@@ -193,6 +193,42 @@ it("C12 — 멈춘 뒤에는 새 구간을 시작하지 않는다", async () => 
   expect(r.calls.length).toBeLessThanOrEqual(SEGMENT_CONCURRENCY);
 });
 
+it("C12 — 멈춤 신호가 시작 전에 이미 발동했으면 구간을 하나도 받지 않고 paused", async () => {
+  const pause = new AbortController();
+  pause.abort();
+  const r = fakeRange({ support: "supported", totalBytes: MIN_SEGMENT_BYTES * 8 });
+
+  const result = await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: () => {},
+    pauseSignal: pause.signal,
+  });
+
+  expect(r.calls).toHaveLength(0);
+  expect(result).toMatchObject({ kind: "paused", resume: { doneIndices: [] } });
+});
+
+it("C12 — 실패와 멈춤이 겹치면 실패가 우선한다", async () => {
+  const pause = new AbortController();
+  const r = fakeRange({
+    support: "supported",
+    totalBytes: MIN_SEGMENT_BYTES * 8,
+    gate: async (segment) => {
+      if (segment.index === 0) {
+        pause.abort();
+        return { kind: "failed", reason: "끊김" };
+      }
+      return { kind: "aborted" };
+    },
+  });
+
+  const result = await runSegmented({ range: r.port }, "a1", "http://x", {
+    onProgress: () => {},
+    pauseSignal: pause.signal,
+  });
+
+  expect(result).toEqual({ kind: "failed", reason: "끊김" });
+});
+
 /* ───────────────────── C13 — 재개는 끝나지 않은 구간만 fetch ───────────────────── */
 
 it("C13 — resume 주입 시 끝난 구간은 fetchRange를 부르지 않고 남은 구간은 전체를 받는다", async () => {

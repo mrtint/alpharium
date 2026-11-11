@@ -115,6 +115,8 @@ export async function runSegmented(
   const internal = new AbortController();
   const onPause = () => internal.abort();
   opts.pauseSignal.addEventListener("abort", onPause, { once: true });
+  // 신호가 진입 전이나 probe 중에 이미 발동했으면 리스너가 불리지 않는다 — 그대로 두면 멈춤이 무시된다.
+  if (opts.pauseSignal.aborted) internal.abort();
 
   const report = () => opts.onProgress(mergeProgress(receivedBytes, totalBytes));
   if (opts.resume) report();

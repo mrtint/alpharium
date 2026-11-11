@@ -165,7 +165,20 @@ export function expoModelFilePort(): ModelFilePort {
   };
 }
 
+/**
+ * `state.json`의 통로는 프로세스에 **하나**다 (113).
+ *
+ * `mutateState`가 `MetadataPort` 객체별로 쓰기를 한 줄로 세우므로, 같은 파일을 쓰는 통로가 둘이면
+ * 줄이 둘이 되어 구간 기록이 서로를 덮어쓸 수 있다. 그래서 호출마다 새 객체를 만들지 않는다.
+ */
+let sharedMetadataPort: MetadataPort | null = null;
+
 export function expoMetadataPort(): MetadataPort {
+  sharedMetadataPort ??= createExpoMetadataPort();
+  return sharedMetadataPort;
+}
+
+function createExpoMetadataPort(): MetadataPort {
   return {
     async read() {
       const { dir, File } = await openDirectory();
