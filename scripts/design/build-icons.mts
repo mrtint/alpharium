@@ -1,11 +1,11 @@
 /**
- * 102 — `design/icon.json`(정본)에서 아이콘 PNG·스토어 에셋·SVG 미리보기를 다시 쓴다.
+ * 117 — `design/icon-art.svg`(그림)와 `design/icon.json`(배치 값)에서 아이콘 PNG·스토어 에셋·SVG 미리보기를 다시 쓴다.
  *
  *   node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/design/build-icons.mts          # 쓴다
  *   node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON scripts/design/build-icons.mts --check   # 쓰지 않고 어긋나면 종료 코드 1
  *
- * 쓰는 것은 icon-build.ts의 `buildOutputs` 목록이다. 정본이 규칙을 어기면(없는 토큰 이름 등) 아무것도 쓰지 않고 실패한다.
- * `--check`는 PNG를 픽셀로 비교한다(zlib 버전에 따라 인코딩 바이트가 달라질 수 있다). 값을 만들지 않는다(원칙 V) — 코어는 `icon-build.ts`.
+ * 쓰는 것은 icon-build.ts의 `buildOutputs` 목록이다. 정본이 규칙을 어기면(없는 그림 파일·id 등) 아무것도 쓰지 않고 실패한다.
+ * `--check`는 PNG를 픽셀로 비교한다(zlib 버전에 따라 인코딩 바이트가 달라질 수 있어 바이트가 아니라 픽셀이고, 래스터라이저의 플랫폼 차이를 위해 채널당 `PIXEL_TOLERANCE` 이내면 같다고 본다). 값을 만들지 않는다(원칙 V) — 코어는 `icon-build.ts`(래스터화는 @resvg/resvg-js).
  * 아이콘 PNG를 바꾼 뒤에는 네이티브 prebuild를 다시 돌려야 런처에 반영된다(specs/102 research R3).
  */
 
@@ -14,7 +14,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PNG } from "pngjs";
 
-import { buildOutputs, encodePng, type IconSource, type TokensColors } from "./icon-build.ts";
+import { buildOutputs, encodePng, samePixels, type IconSource } from "./icon-build.ts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const check = process.argv.includes("--check");
@@ -23,7 +23,8 @@ const readJson = <T,>(rel: string): T => JSON.parse(readFileSync(join(root, rel)
 
 let outputs;
 try {
-  outputs = buildOutputs(readJson<IconSource>("design/icon.json"), readJson<TokensColors>("design/tokens.json"));
+  const source = readJson<IconSource>("design/icon.json");
+  outputs = buildOutputs(source, readFileSync(join(root, source.art.file), "utf8"));
 } catch (e) {
   console.error(`✗ 아이콘 정본이 규칙을 어긴다 — 아무것도 쓰지 않았다: ${(e as Error).message}`);
   process.exit(1);
@@ -47,7 +48,7 @@ for (const out of outputs) {
     current !== null &&
     current.width === out.width &&
     current.height === out.height &&
-    Buffer.compare(current.data, Buffer.from(out.rgba)) === 0 &&
+    samePixels(current.data, out.rgba) &&
     readFileSync(target)[25] === out.colorType;
   if (same) continue;
   stale.push(out.path);

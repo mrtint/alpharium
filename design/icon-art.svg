@@ -1,12 +1,17 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<!-- 앱 아이콘의 그림 정본(117) — 노을 풍경을 품은 「P.」. 색·그라데이션·곡선은 이 파일에만 둔다(16진수는 여기서만 쓴다).
+     배치(배율·중심)는 design/icon.json, PNG는 scripts/design/build-icons.mts가 만든다. 후보 원본(2026-11-01 외부 시안)에서 바꾼 것은
+     마침표 원을 기둥 오른쪽 기준선 옆 (508, 875)으로 옮긴 것뿐이다. -->
 <defs>
  <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#fffdf8"/><stop offset="1" stop-color="#f3e9df"/></linearGradient>
  <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#6688c9"/><stop offset=".45" stop-color="#cb8eb2"/><stop offset=".8" stop-color="#ffb48e"/><stop offset="1" stop-color="#ffe0a2"/></linearGradient>
  <linearGradient id="sea" x2="0" y2="1"><stop stop-color="#a88fba"/><stop offset=".35" stop-color="#758cc2"/><stop offset="1" stop-color="#24538f"/></linearGradient>
  <linearGradient id="dot" x2="0" y2="1"><stop stop-color="#718cc7"/><stop offset="1" stop-color="#ffae91"/></linearGradient>
- <clipPath id="p"><path d="M276 210 H535 C715 210 823 324 823 474 C823 624 716 724 565 724 H493 C450 724 422 750 422 796 V839 C422 887 389 921 344 921 C297 921 266 888 266 839 V290 C266 244 280 210 326 210 Z"/></clipPath>
+ <path id="p-shape" d="M276 210 H535 C715 210 823 324 823 474 C823 624 716 724 565 724 H493 C450 724 422 750 422 796 V839 C422 887 389 921 344 921 C297 921 266 888 266 839 V290 C266 244 280 210 326 210 Z"/>
+ <circle id="dot-shape" cx="508" cy="875" r="46"/>
+ <clipPath id="p"><use href="#p-shape"/></clipPath>
 </defs>
-<g transform="translate(512 512) scale(0.7845) translate(-473.1 -561.5)">
+<g id="art">
 <g clip-path="url(#p)">
 <rect width="1024" height="710" fill="url(#sky)"/>
 <path d="M0 601 Q75 577 140 600 L214 580 L287 618 L347 595 L412 627 L489 604 L560 629 L640 609 L723 630 L800 605 L1024 634 V711 H0Z" fill="#8e83ae" opacity=".7"/>
@@ -20,6 +25,6 @@
 <g fill="#ffcbab" opacity=".45"><path d="M338 422q44-30 78 0t71 7q44-12 79 16t71 1q-64 43-133 19t-166-43"/><path d="M594 370q54-22 93 12t77 14q-36 40-89 16t-81-42"/></g>
 <g stroke="#b3a4c4" stroke-width="5" opacity=".3"><path d="M290 681h180 M314 732h151 M291 789h125 M300 855h95"/></g>
 </g>
-<circle cx="508" cy="875" r="46" fill="url(#dot)"/>
+<use href="#dot-shape" fill="url(#dot)"/>
 </g>
 </svg>
