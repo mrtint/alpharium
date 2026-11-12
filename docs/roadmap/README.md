@@ -116,6 +116,8 @@
 
 **배경**: 소유자가 외부 시안(노을 풍경을 품은 「P」, 2026-11-01)을 받아 A안 — 오른쪽 위에 떠 있던 작은 원을 기둥 옆 마침표로 옮긴 「P.」 — 으로 가기로 했다. 원을 원래 자리에 두면 안드로이드 안전 영역에 넣으려고 배율이 0.673까지 줄어 걷었다(A안 0.784). 후보 SVG·미리보기·실측·남은 문제는 [design/icon-candidates/sunset-p/README.md](../../design/icon-candidates/sunset-p/README.md)에 있다 — 지금 앱 아이콘은 그대로(102)이고 이 폴더는 아무것도 읽지 않는다.
 
+**진행(스펙 117, 2026-11-12)**: 정본 방식은 (가) 그림 SVG로 정했다(소유자). 설계 `docs/superpowers/specs/2026-11-12-sunset-p-icon-design.md`, 스펙 `specs/117-sunset-p-icon/`.
+
 **할 일**:
 1. **정본 방식 결정(소유자)** — 지금 `design/icon.json`은 토큰 색 + 기하 도형만 받는다(`DESIGN.md` 「아이콘」 「16진수를 적지 않는다」). (가) 그림 SVG를 정본으로 삼고 생성기는 래스터화·배율만 맡는다, (나) 노을 색을 `tokens.json`에 아이콘 전용 역할로 올리고 생성기가 그라데이션·경로를 그린다 중 고른다. 고른 쪽에 맞춰 `DESIGN.md` 「아이콘」을 고친다.
 2. 생성기(`scripts/design/icon-build.ts`)와 `__tests__/design/icons.test.ts`를 새 정본에 맞춘다 — 출력 목록(`icon.png`·안드로이드 foreground/background/monochrome·favicon·스토어 아이콘 512·기능 그래픽)은 그대로. PNG를 손으로 만들지 않는다.
