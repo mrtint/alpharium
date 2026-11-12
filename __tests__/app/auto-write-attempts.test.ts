@@ -15,6 +15,7 @@ import {
   loadAttemptSummaries,
   loadDayAttempts,
   recordAttemptEnd,
+  recordContinuedProbe,
   recordAttemptExpired,
   recordAttemptProgress,
   recordAttemptStart,
@@ -58,8 +59,8 @@ function lines(port: ReturnType<typeof memoryPort>, day = DAY): AutoWriteAttempt
 }
 
 describe("AT1 — 갈래는 사람이 못 박은 상수다", () => {
-  it("경로 셋, 결과 열다섯 — 순서까지 (080: 사용자가 그만둠, 090: 시간 예산이 끝남)", () => {
-    expect(ATTEMPT_PATHS).toEqual(["background", "app-open", "manual"]);
+  it("경로 넷(118: 이어 하기 관찰), 결과 열다섯 — 순서까지 (080: 사용자가 그만둠, 090: 시간 예산이 끝남)", () => {
+    expect(ATTEMPT_PATHS).toEqual(["background", "app-open", "manual", "continued"]);
     expect(ATTEMPT_OUTCOMES).toEqual([
       "started",
       "simulation",
@@ -596,5 +597,57 @@ describe("시도 줄의 단계와 기기 상태", () => {
     expect(line.stage).toBeUndefined();
     expect(line.device).toEqual({ at: AT });
     expect(line.deviceLast).toBeUndefined();
+  });
+});
+
+describe("118 — 이어 하기 관찰 줄 (개발 빌드 전용 진단)", () => {
+  it("경로 continued·결과 ran에 관찰 갈래와 앱 상태 원값을 싣고 읽으면 돌아온다", async () => {
+    const port = memoryPort();
+    await recordContinuedProbe(port, AT, "saved-session-lost", "inactive");
+    expect(await loadDayAttempts(port, DAY)).toEqual([
+      {
+        at: AT,
+        path: "continued",
+        outcome: "ran",
+        probe: "saved-session-lost",
+        device: { at: AT, appState: "inactive" },
+      },
+    ]);
+  });
+
+  it("앱 상태를 모르면 appState 없이 남긴다(채우지 않는다)", async () => {
+    const port = memoryPort();
+    await recordContinuedProbe(port, AT, "expired", undefined);
+    const [line] = await loadDayAttempts(port, DAY);
+    expect(line?.probe).toBe("expired");
+    expect(line?.device).toEqual({ at: AT });
+  });
+
+  it("모르는 관찰 갈래는 필드 없이 읽는다", async () => {
+    const port = memoryPort({
+      [DAY]: JSON.stringify({
+        items: [{ at: AT.toISOString(), path: "continued", outcome: "ran", probe: "zzz" }],
+      }),
+    });
+    const [line] = await loadDayAttempts(port, DAY);
+    expect(line?.probe).toBeUndefined();
+  });
+
+  it("날짜별 요약은 관찰 줄을 세지 않는다 — 백그라운드만 센다", async () => {
+    const port = memoryPort();
+    await recordContinuedProbe(port, AT, "expired", "background");
+    expect(summarizeDay(DAY, await loadDayAttempts(port, DAY)).wakes).toBe(0);
+  });
+
+  it("같은 시각에 두 줄이 연달아 와도 서로 덮지 않는다", async () => {
+    const port = memoryPort();
+    await Promise.all([
+      recordContinuedProbe(port, AT, "expired", "inactive"),
+      recordContinuedProbe(port, AT, "saved-session-lost", "inactive"),
+    ]);
+    expect((await loadDayAttempts(port, DAY)).map((l) => l.probe)).toEqual([
+      "expired",
+      "saved-session-lost",
+    ]);
   });
 });

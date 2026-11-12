@@ -33,10 +33,13 @@ describe("092 FR-011 — 세션은 iOS에서만 주입한다", () => {
 
 describe("092 CW5·FR-008 — 앱 밖 저장이면 맞추기 뒤 완성 알림", () => {
   it("홈의 저장 콜백은 notifyContinuedSaved 하나로만 간다 — 판정·순서는 continued-saved.ts(continued-saved.test.ts)", () => {
-    const saved = body("const onContinuedSaved = useCallback(", "[characterNames],");
-    expect(saved).toMatch(
-      /notifyContinuedSaved\(day, character, characterNames, CONTINUED_SAVED_DEPS\)/,
+    const saved = body(
+      "const onContinuedSaved = useCallback(",
+      "[characterNames, continuedProbe],",
     );
+    // 118 — 관찰(observe)만 더해진다. 기기 통로는 CONTINUED_SAVED_DEPS 그대로다.
+    expect(saved).toMatch(/\.\.\.CONTINUED_SAVED_DEPS,\s*observe: continuedProbe/);
+    expect(saved).toMatch(/notifyContinuedSaved\(day, character, characterNames,/);
   });
 
   it("기기 통로: 앞 판정은 readLaunchState, 맞추기는 reconcileReminders, 알림은 sendCompletionNotification", () => {
@@ -56,5 +59,14 @@ describe("092 CW5·FR-008 — 앱 밖 저장이면 맞추기 뒤 완성 알림",
   it("task.ts가 완성 알림 함수를 내보낸다", () => {
     const task = strip(readFileSync(join(ROOT, "src/schedule/task.ts"), "utf8"));
     expect(task).toMatch(/export async function sendCompletionNotification\(/);
+  });
+});
+
+describe("118 — 관찰은 개발 환경에서만 기록 통로를 부른다", () => {
+  it("probeAllowed(environment)를 allowed로 넘기고 앱 상태는 AppState.currentState 원값이다", () => {
+    const probe = body("const continuedProbe = useMemo(", "[environment],");
+    expect(probe).toMatch(/allowed: probeAllowed\(environment\)/);
+    expect(probe).toMatch(/readAppState: \(\) => AppState\.currentState/);
+    expect(APP).toMatch(/onContinuedProbe=\{continuedProbe\}/);
   });
 });

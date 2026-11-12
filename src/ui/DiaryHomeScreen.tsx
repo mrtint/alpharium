@@ -277,6 +277,11 @@ export type DiaryHomeScreenProps = {
    * 끝나기를 기다린 뒤 이어 하기를 닫는다 — 닫으면 iOS가 앱을 멈춘다. 던져도 쓰기는 그대로다.
    */
   onContinuedSaved?: (day: DayDate, character: Character) => Promise<void>;
+  /**
+   * 118 — 이어 하기 완성 알림 관찰(개발 빌드 전용 진단, 판정을 바꾸지 않는다). 만료 처리기가 불린 순간과, 만료로 세션을 잃은 채 저장된
+   * 순간을 알린다. 던져도 쓰기에 영향이 없다.
+   */
+  onContinuedProbe?: (event: "expired" | "saved-session-lost") => void;
 };
 
 /**
@@ -371,6 +376,7 @@ export function DiaryHomeScreen({
   simulatedFailToast = false,
   continuedWrite,
   onContinuedSaved,
+  onContinuedProbe,
   writingLeaveNote,
 }: DiaryHomeScreenProps) {
   const [screen, setScreen] = useState<AppScreen>(() => initialScreen(resolution, []));
@@ -920,6 +926,11 @@ export function DiaryHomeScreen({
             .start(
               { name: String(nameOf(params.character, characterNames)), day: params.day },
               () => {
+                try {
+                  onContinuedProbe?.("expired");
+                } catch {
+                  // 관찰이 쓰기를 막지 않는다.
+                }
                 if (attempt.current !== mine || !running.current) return;
                 if (continued.current === session) continued.current = null;
                 if (AppState.currentState === "active") return;
@@ -959,6 +970,13 @@ export function DiaryHomeScreen({
 
         // 092 FR-008 — 이어 하기를 받은 쓰기가 저장됐다(만료로 잃지 않았다). 앞에 없으면 조립부가 완성 알림을 띄운다 — 닫기(아래
         // `finally`) 전에 끝낸다. 걸려도 닫기를 붙잡지 않게 한도를 둔다(코드 리뷰 — 닫지 않으면 홈이 「쓰는 중」에 남는다).
+        if (result.ok && session?.accepted === true && continued.current !== session) {
+          try {
+            onContinuedProbe?.("saved-session-lost");
+          } catch {
+            // 관찰이 쓰기를 막지 않는다.
+          }
+        }
         if (result.ok && session !== null && continued.current === session) {
           await withinLimit(
             onContinuedSaved?.(params.day, params.character) ?? Promise.resolve(),
@@ -1035,6 +1053,7 @@ export function DiaryHomeScreen({
       liveWrites,
       continuedWrite,
       onContinuedSaved,
+      onContinuedProbe,
       stop,
     ],
   );

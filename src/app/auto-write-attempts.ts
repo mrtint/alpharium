@@ -23,8 +23,30 @@ import { dayOf, type DayDate } from "../config/day-boundary";
 import type { ProgressStage } from "../inference/types";
 import type { AutoWriteDecision } from "../schedule/auto-write";
 
-export type AttemptPath = "background" | "app-open" | "manual";
-export const ATTEMPT_PATHS: readonly AttemptPath[] = ["background", "app-open", "manual"];
+/** 118 — `continued`는 이어 하기 완성 알림 관찰 줄의 경로다(개발 환경 전용 진단, 판정 입력이 아니다). 날짜별 요약은 `background`만 센다. */
+export type AttemptPath = "background" | "app-open" | "manual" | "continued";
+export const ATTEMPT_PATHS: readonly AttemptPath[] = [
+  "background",
+  "app-open",
+  "manual",
+  "continued",
+];
+
+/**
+ * 118 — 이어 하기 쓰기의 저장·만료 순간에 무엇이 일어났는가. 사람이 못 박은 갈래다(원칙 IV — 시간·횟수·이유 문자열은 싣지 않는다).
+ * - `expired`: 시스템이 이어 하기를 끝냈다고 알렸다(만료 처리기가 불렸다)
+ * - `saved-session-lost`: 저장됐으나 만료로 이어 하기 세션을 잃어 완성 알림 경로에 들어가지 않았다
+ * - `saved-not-background`: 저장 시점 앱 상태가 `background`가 아니어서 알림 없이 돌아왔다
+ * - `saved-notified`: 완성 알림 경로를 탔다
+ */
+export type ContinuedProbeEvent =
+  "expired" | "saved-session-lost" | "saved-not-background" | "saved-notified";
+export const CONTINUED_PROBE_EVENTS: readonly ContinuedProbeEvent[] = [
+  "expired",
+  "saved-session-lost",
+  "saved-not-background",
+  "saved-notified",
+];
 
 export type AttemptOutcome =
   | "started"
@@ -113,6 +135,8 @@ export type AutoWriteAttempt = {
    * 옛 줄·형식이 틀린 값은 없다.
    */
   day?: DayDate;
+  /** 118 — `continued` 줄에만. 그 순간의 일. 옛 줄·두 값 밖은 없다 */
+  probe?: ContinuedProbeEvent;
   /** 2026-11-03 — 마지막으로 들어간 단계. 끝나지 않은 줄에서는 멈춘 단계다 */
   stage?: ProgressStage;
   /** 2026-11-03 — 시작 무렵의 기기 상태 */
@@ -218,7 +242,9 @@ export async function loadDayAttempts(
         stage,
         device,
         deviceLast,
+        probe,
       } = item as {
+        probe?: unknown;
         at?: unknown;
         path?: unknown;
         outcome?: unknown;
@@ -242,6 +268,9 @@ export async function loadDayAttempts(
         ...(isLaunch(launch) ? { launch } : {}),
         ...(isWake(wake) ? { wake } : {}),
         ...(isDay(picked) ? { day: picked } : {}),
+        ...(oneOf(probe, CONTINUED_PROBE_EVENTS) !== undefined
+          ? { probe: oneOf(probe, CONTINUED_PROBE_EVENTS) as ContinuedProbeEvent }
+          : {}),
         ...(readStage !== undefined ? { stage: readStage } : {}),
         ...(first !== undefined ? { device: first } : {}),
         ...(last !== undefined ? { deviceLast: last } : {}),
@@ -266,6 +295,7 @@ function toStored(item: AutoWriteAttempt) {
     ...(item.launch !== undefined ? { launch: item.launch } : {}),
     ...(item.wake !== undefined ? { wake: item.wake } : {}),
     ...(item.day !== undefined ? { day: item.day } : {}),
+    ...(item.probe !== undefined ? { probe: item.probe } : {}),
     ...(item.stage !== undefined ? { stage: item.stage } : {}),
     ...(item.device !== undefined ? { device: storedDevice(item.device) } : {}),
     ...(item.deviceLast !== undefined ? { deviceLast: storedDevice(item.deviceLast) } : {}),
@@ -396,6 +426,29 @@ export function recordAttemptEnd(
  */
 export function recordAttemptExpired(port: AutoWriteAttemptPort, at: Date): Promise<void> {
   return updateDay(port, at, (items) => [...items, { at, path: "background", outcome: "expired" }]);
+}
+
+/**
+ * 118 — 이어 하기 관찰 한 줄을 그 날 파일 끝에. 앱 상태는 원값(`active`·`inactive`·`background`)이고 모르면 빠진다(원칙 V). 합치지 않는다.
+ * 실패는 삼킨다.
+ */
+export function recordContinuedProbe(
+  port: AutoWriteAttemptPort,
+  at: Date,
+  probe: ContinuedProbeEvent,
+  appState: string | undefined,
+): Promise<void> {
+  const state = oneOf(appState, ["active", "background", "inactive"] as const);
+  return updateDay(port, at, (items) => [
+    ...items,
+    {
+      at,
+      path: "continued",
+      outcome: "ran",
+      probe,
+      device: { at, ...(state !== undefined ? { appState: state } : {}) },
+    },
+  ]);
 }
 
 /* ────────────────────────── 날짜별 요약 (읽을 때 계산) ────────────────────────── */
