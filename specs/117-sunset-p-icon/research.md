@@ -6,7 +6,7 @@
 - **Alternatives**: 자체 래스터라이저(그라데이션·곡선·clipPath·불투명도·stroke를 다시 짜는 큰 코드, 후보 시안과 어긋날 위험), Chromium 렌더(환경마다 픽셀이 달라 정확 일치 대조가 흔들린다), `sharp`(libvips 용량·SVG 지원이 librsvg 의존).
 
 ## R2 — 그림 파일의 구조
-- **Decision**: `design/icon-art.svg` 한 파일에 `<defs>`(그라데이션 4·`p-shape`·`dot-shape`·`clipPath`), 배경 `<g id="bg-layer">`, 그림 `<g id="art">`가 있다. 생성기는 이 셋을 이름으로 꺼내 출력별 SVG를 조립한다. 없는 id면 아무것도 쓰지 않고 실패한다.
+- **Decision**: `design/icon-art.svg` 한 파일에 `<defs>`(그라데이션 4·`p-shape`·`dot-shape`·`clipPath`), 그림 `<g id="art">`가 있다. 생성기는 이 조각을 이름으로 꺼내 출력별 SVG를 조립한다. 없는 id면 아무것도 쓰지 않고 실패한다.
 - **Rationale**: 후보 원본은 이미 그라데이션·경로가 한 파일이고, monochrome은 P 윤곽·마침표를 따로 써야 한다. 문자열 추출은 우리 파일 한 개에 대한 것이라 XML 파서를 들이지 않는다.
 - **Alternatives**: 출력마다 SVG 파일 여러 개(정본 분산, 102가 막으려던 것), XML 파서 의존성 추가(과함).
 - **확인할 것**: `clipPath` 안에서 `<use href="#p-shape"/>`가 resvg에서 되는지 — 안 되면 clipPath에 경로를 직접 두고 `p-shape`는 별도 id의 같은 `d`를 둔다(구현 중 렌더로 확인, 같은 `d`가 둘이면 테스트가 일치를 본다).
