@@ -21,7 +21,17 @@ export type ContinuedSavedDeps = {
   reconcile: (names: CustomNames | undefined) => Promise<void>;
   /** 완성 알림(057, `task.ts`의 `sendCompletionNotification`) */
   notify: (day: DayDate, character: Character, names: CustomNames | undefined) => Promise<void>;
+  /** 118 — 개발 빌드 전용 관찰. 판정을 바꾸지 않고, 던져도 무시한다 */
+  observe?: (event: "saved-not-background" | "saved-notified") => void;
 };
+
+function observed(deps: ContinuedSavedDeps, event: "saved-not-background" | "saved-notified") {
+  try {
+    deps.observe?.(event);
+  } catch {
+    // 관찰이 알림을 막지 않는다.
+  }
+}
 
 export async function notifyContinuedSaved(
   day: DayDate,
@@ -30,10 +40,14 @@ export async function notifyContinuedSaved(
   deps: ContinuedSavedDeps,
 ): Promise<void> {
   try {
-    if (deps.launchState() !== "background") return;
+    if (deps.launchState() !== "background") {
+      observed(deps, "saved-not-background");
+      return;
+    }
   } catch {
     return;
   }
+  observed(deps, "saved-notified");
   await deps.reconcile(names).catch(() => {});
   await deps.notify(day, character, names).catch(() => {});
 }

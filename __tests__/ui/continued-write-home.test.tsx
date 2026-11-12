@@ -125,6 +125,7 @@ type Over = {
   stop?: () => Promise<void>;
   recordFailure?: (result: PipelineFailure) => void;
   onContinuedSaved?: (day: string, character: string) => Promise<void>;
+  onContinuedProbe?: (event: string) => void;
   writeRequest?: { id: number; day: string } | null;
   wipeRequest?: number;
   onWipeReady?: (token: number) => void;
@@ -145,6 +146,7 @@ function element(over: Over, store = memoryStore()) {
       recordFailure={over.recordFailure}
       continuedWrite={over.continued}
       onContinuedSaved={over.onContinuedSaved as never}
+      onContinuedProbe={over.onContinuedProbe as never}
       writeRequest={over.writeRequest as never}
       wipeRequest={over.wipeRequest}
       onWipeReady={over.onWipeReady}
@@ -303,6 +305,41 @@ describe("092 FR-006 — 만료·그만두기·지우기", () => {
     await p.finish({ ok: true, entry, overwrote: false });
     await waitFor(() => expect(c.log.at(-1)).toEqual(["finish", true]));
     expect(onContinuedSaved).not.toHaveBeenCalled();
+  });
+
+  it("118 — 만료 처리기가 불리면 expired, 잃은 쓰기가 저장되면 saved-session-lost를 관찰한다", async () => {
+    const p = controlledPipeline();
+    const c = fakeContinued(true);
+    const onContinuedProbe = jest.fn();
+    appStateNow("active");
+    await renderWithPortal(
+      element({ pipeline: p.pipeline, continued: c.continued, onContinuedProbe }),
+    );
+    await startWriting();
+    await waitFor(() => expect(p.run).toHaveBeenCalled());
+    await c.expire();
+    await p.finish({ ok: true, entry, overwrote: false });
+    await waitFor(() => expect(c.log.at(-1)).toEqual(["finish", true]));
+    expect(onContinuedProbe.mock.calls.map((x) => x[0])).toEqual(["expired", "saved-session-lost"]);
+  });
+
+  it("118 — 세션을 잃지 않은 저장은 session-lost를 관찰하지 않는다", async () => {
+    const p = controlledPipeline();
+    const c = fakeContinued(true);
+    const onContinuedProbe = jest.fn();
+    await renderWithPortal(
+      element({
+        pipeline: p.pipeline,
+        continued: c.continued,
+        onContinuedProbe,
+        onContinuedSaved: async () => {},
+      }),
+    );
+    await startWriting();
+    await waitFor(() => expect(p.run).toHaveBeenCalled());
+    await p.finish({ ok: true, entry, overwrote: false });
+    await waitFor(() => expect(c.log.at(-1)).toEqual(["finish", true]));
+    expect(onContinuedProbe).not.toHaveBeenCalled();
   });
 
   it("뒤에 있을 때 만료면 stop()하고, 끊긴 결과를 쓰기 실패로 기록한다(그만두기가 아니다)", async () => {

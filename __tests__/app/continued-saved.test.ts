@@ -61,3 +61,30 @@ describe("092 CW5 — notifyContinuedSaved", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe("118 — 관찰(판정은 바꾸지 않는다)", () => {
+  it("뒤가 아니라서 돌아오면 not-background, 알리면 notified를 알린다", async () => {
+    const seen: string[] = [];
+    const observe = (e: string) => seen.push(e);
+    await notifyContinuedSaved("2026-10-19", "quiet", undefined, {
+      ...deps("active", []),
+      observe,
+    });
+    await notifyContinuedSaved("2026-10-19", "quiet", undefined, {
+      ...deps("background", []),
+      observe,
+    });
+    expect(seen).toEqual(["saved-not-background", "saved-notified"]);
+  });
+
+  it("관찰이 던져도 알림은 그대로 나간다", async () => {
+    const log: unknown[][] = [];
+    await notifyContinuedSaved("2026-10-19", "quiet", undefined, {
+      ...deps("background", log),
+      observe: () => {
+        throw new Error("x");
+      },
+    });
+    expect(log.map((l) => l[0])).toEqual(["reconcile", "notify"]);
+  });
+});

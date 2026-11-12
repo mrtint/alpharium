@@ -93,6 +93,7 @@ import { writingLeaveNote } from "./src/app/leave-note";
 import { appPlatform } from "./src/app/platform";
 import { createContinuedWrite } from "./src/app/continued-write";
 import { notifyContinuedSaved, type ContinuedSavedDeps } from "./src/app/continued-saved";
+import { createContinuedProbe, probeAllowed } from "./src/app/continued-probe";
 import { readLaunchState } from "./src/app/launch-state-port";
 import { expoReminderDeps } from "./src/schedule/reminder-deps";
 import { reconcileReminders } from "./src/schedule/reminders";
@@ -2407,10 +2408,27 @@ function DiarySection({
    * 092 FR-008 — 이어 하기를 받은 쓰기가 저장됐다. 앱이 뒤에 있을 때만 쓸 차례 알림을 맞춘 뒤 완성 알림을 띄운다 — 판정·순서는
    * `notifyContinuedSaved`(`src/app/continued-saved.ts`)가 갖는다. 통로는 백그라운드 자동 쓰기와 같은 것이다(085 맞추기·057 완성 알림).
    */
+  /**
+   * 118 — 완성 알림이 안 온 원인을 가르는 관찰(개발 환경 전용, 판정을 바꾸지 않는다). 배포 빌드·환경 판정 실패는 기록 통로를 부르지 않는다.
+   * 앱 상태는 `AppState.currentState` 원값이다(`inactive` 포함).
+   */
+  const continuedProbe = useMemo(
+    () =>
+      createContinuedProbe({
+        allowed: probeAllowed(environment),
+        port: expoAutoWriteAttemptPort(),
+        now: () => new Date(),
+        readAppState: () => AppState.currentState,
+      }),
+    [environment],
+  );
   const onContinuedSaved = useCallback(
     (day: DayDate, character: Character) =>
-      notifyContinuedSaved(day, character, characterNames, CONTINUED_SAVED_DEPS),
-    [characterNames],
+      notifyContinuedSaved(day, character, characterNames, {
+        ...CONTINUED_SAVED_DEPS,
+        observe: continuedProbe,
+      }),
+    [characterNames, continuedProbe],
   );
 
   /** 생성 성공 시 실제로 쓴 캐릭터를 기록한다 (029 FR-008a). */
@@ -2472,6 +2490,7 @@ function DiarySection({
       // 092 — iPhone 이어 쓰기(iOS만)와 앱 밖 저장의 완성 알림
       continuedWrite={continuedWrite}
       onContinuedSaved={onContinuedSaved}
+      onContinuedProbe={continuedProbe}
     />
   );
 }
