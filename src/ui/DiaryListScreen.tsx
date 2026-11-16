@@ -71,7 +71,7 @@ import { useFontScale } from "./font-scale";
 import { AppText } from "./components/Text";
 import { ConstraintBand } from "./components/ConstraintBand";
 import { FadeLayer } from "./components/FadeLayer";
-import { DayPicker } from "./DayPicker";
+import { DayPicker, newStripMemory } from "./DayPicker";
 import { DaySwipe } from "./DaySwipe";
 import {
   DATE_JUMP,
@@ -222,6 +222,8 @@ export function DiaryListScreen({
     undefined,
   );
   const stripHeight = useRef(0);
+  // 119 — 스트립은 갈래(쓴 날·안 쓴 날·쓰는 중)마다 트리의 다른 자리라 새로 마운트된다. 보던 자리를 잇는 기억은 여기 하나다.
+  const stripMemory = useRef(newStripMemory());
   const collapsed =
     writing === undefined &&
     write !== undefined &&
@@ -280,10 +282,10 @@ export function DiaryListScreen({
         style={{ opacity: WRITING.stripLockedOpacity }}
         testID="home-strip-lock"
       >
-        <DayPicker cells={cells ?? []} onSelect={() => {}} />
+        <DayPicker cells={cells ?? []} memoryRef={stripMemory} onSelect={() => {}} />
       </View>
     ) : (
-      <DayPicker cells={cells ?? []} onSelect={onSelectDay ?? (() => {})} />
+      <DayPicker cells={cells ?? []} memoryRef={stripMemory} onSelect={onSelectDay ?? (() => {})} />
     );
 
   const header =

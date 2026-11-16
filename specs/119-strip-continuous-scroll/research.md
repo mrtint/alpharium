@@ -39,3 +39,10 @@
 - `weekOf`·`shiftWeek`: `src/`·`App.tsx`·`scripts/`에서 쓰는 곳은 `state.ts`의 `weekCellsFor`·`swipeWeek`뿐이다(2026-11-16 grep) — 지운다.
 - `src/ui/DaySwipe.tsx` 주석이 `swipeDirectionOf`를 가리킨다 — 고친다.
 - `home-text.ts`가 주 관련 문구를 갖고 있으면 쓰는 곳을 확인한다.
+
+## R8 코드 리뷰 반영 (2026-11-16)
+
+- 갈래(쓴 날·안 쓴 날·쓰는 중)마다 스트립이 트리의 다른 자리에 놓여 새로 마운트돼, 칸을 누를 때마다 처음 자리로 튀었다(리뷰 Important 1, 관측 아님 — 코드 읽기). `DiaryListScreen`이 기억(`StripMemory` — 보던 첫 칸의 날·잰 폭)을 `useRef`로 하나 들고 `DayPicker`에 넘긴다. 스트립은 마운트할 때 한 번만 읽는다(`react-hooks/refs` 규칙은 지연 초기화도 막아 그 두 줄만 끈다).
+- 먼 날로 옮길 때 거리와 상관없이 미끄러졌다(리뷰 Important 2). 한 화면(7칸, 사람이 정한 값)보다 멀거나 범위 앞쪽이 바뀐 직후면 움직임 없이 옮긴다.
+- 고른 날이 바뀌었는지는 인덱스가 아니라 날짜로 비교한다. 칸 그리기는 `memo`·`useCallback`으로 다시 그리기를 줄였다.
+- `stripCellsFor`가 `cellFor`와 같은 판정을 다시 쓰는 것은 일기 날짜 집합으로 366칸을 한 번에 보려는 것이다 — 두 결과가 같다는 것은 CAL6 테스트가 잠근다.

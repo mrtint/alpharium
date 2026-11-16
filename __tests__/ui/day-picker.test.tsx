@@ -23,7 +23,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react-n
 import { AccessibilityInfo, FlatList } from "react-native";
 
 import type { StripCell } from "../../src/app/state";
-import { DayPicker } from "../../src/ui/DayPicker";
+import { DayPicker, newStripMemory } from "../../src/ui/DayPicker";
 import { COLORS, DAY_STRIP } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
@@ -250,7 +250,20 @@ describe("119 DayPicker — 오늘에서 끝나는 이어 스크롤 스트립", 
     expect(spy.mock.calls[0][0]).toMatchObject({ animated: false });
   });
 
-  it("CS-S7 — 동작 줄이기가 꺼져 있으면 미끄러진다", async () => {
+  it("CS-S7 — 동작 줄이기가 꺼져 있으면 가까운 칸으로는 미끄러진다", async () => {
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false);
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    // 보이는 칸 24~30일 — 20일(인덱스 19)은 네 칸 왼쪽이다.
+    await screen.rerender(<DayPicker cells={month("2026-09-20")} onSelect={onSelect} />);
+    expect(spy.mock.calls[0][0]).toMatchObject({ offset: 19 * CELL, animated: true });
+  });
+
+  it("리뷰 — 한 화면보다 먼 칸으로는 움직임 없이 옮긴다(수백 칸을 미끄러지지 않는다)", async () => {
     jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false);
     const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
     const onSelect = jest.fn();
@@ -259,7 +272,24 @@ describe("119 DayPicker — 오늘에서 끝나는 이어 스크롤 스트립", 
     spy.mockClear();
 
     await screen.rerender(<DayPicker cells={month("2026-09-03")} onSelect={onSelect} />);
-    expect(spy.mock.calls[0][0]).toMatchObject({ animated: true });
+    expect(spy.mock.calls[0][0]).toMatchObject({ offset: 2 * CELL, animated: false });
+  });
+
+  it("리뷰 — 범위 앞쪽이 늘어난 직후의 이동은 움직임 없이 옮긴다", async () => {
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false);
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    // 8월 31일을 골라 앞에 한 칸이 붙었다(먼 날을 골라 범위가 늘어난 것과 같다).
+    const grown: StripCell[] = [
+      { day: "2026-08-31", hasDiary: false, isToday: false, selectable: true, selected: true },
+      ...month("none"),
+    ];
+    await screen.rerender(<DayPicker cells={grown} onSelect={onSelect} />);
+    expect(spy.mock.calls[0][0]).toMatchObject({ offset: 0, animated: false });
   });
 
   it("범위 앞쪽이 바뀌어도(자정·먼 날) 보던 날을 기준으로 위치를 고친다", async () => {
@@ -304,5 +334,33 @@ describe("119 DayPicker — 오늘에서 끝나는 이어 스크롤 스트립", 
   it("088 FR-004 — opacity는 흐린 칸(CELL_DIMMED) 한 곳에만 있다 (C4)", () => {
     expect(SOURCE.match(/\bopacity\s*:/g) ?? []).toHaveLength(1);
     expect(SOURCE).toMatch(/const CELL_DIMMED\s*=\s*\{\s*opacity:\s*0\.3\s*\}/);
+  });
+
+  it("★ 리뷰 — 기억을 넘기면 다시 마운트돼도 보던 첫 칸에서 이어 간다(쓴 날 ↔ 안 쓴 날 갈래 전환)", async () => {
+    const memoryRef = { current: newStripMemory() };
+    const onSelect = jest.fn();
+    const first = await render(
+      <DayPicker cells={month("2026-09-30")} memoryRef={memoryRef} onSelect={onSelect} />,
+    );
+    await layout();
+    // 5~11일이 보이게 밀었다.
+    await fireEvent.scroll(list(), { nativeEvent: { contentOffset: { x: 4 * CELL, y: 0 } } });
+    expect(memoryRef.current).toEqual({ firstDay: "2026-09-05", width: WIDTH });
+    await first.unmount();
+
+    // 보이던 8일을 눌러 갈래가 바뀌고 스트립이 새로 마운트된다 — 같은 자리(5일이 첫 칸)에서 시작한다.
+    await render(
+      <DayPicker cells={month("2026-09-08")} memoryRef={memoryRef} onSelect={onSelect} />,
+    );
+    expect(list().props.initialScrollIndex).toBe(4);
+    expect(flatStyle(screen.getByTestId("day-2026-09-08").props.style).width).toBe(CELL);
+  });
+
+  it("리뷰 — 기억한 자리 밖의 날로 다시 마운트되면 그 칸이 보이게 최소 거리만 옮긴 자리에서 시작한다", async () => {
+    const memoryRef = { current: { firstDay: "2026-09-05", width: WIDTH } };
+    await render(
+      <DayPicker cells={month("2026-09-20")} memoryRef={memoryRef} onSelect={jest.fn()} />,
+    );
+    expect(list().props.initialScrollIndex).toBe(19 - 6);
   });
 });

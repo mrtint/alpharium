@@ -60,7 +60,7 @@ appId: com.a810labs.pocketlog
 
 # ★ W3 — 보이는 지난 칸을 누르면 그 날이 골라진다.
 - tapOn:
-    id: "day-.*"
+    id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
     selected: false
     enabled: true
 - assertVisible:

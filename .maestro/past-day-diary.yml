@@ -97,7 +97,7 @@ appId: com.a810labs.pocketlog
 - assertNotVisible:
     id: "day-today-.*"
 - tapOn:
-    id: "day-.*"
+    id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
     selected: false
     enabled: true
 - assertVisible:
@@ -108,7 +108,7 @@ appId: com.a810labs.pocketlog
     id: "home-day-number"
 # 119 — 스트립에는 흐린(미래) 칸이 없다 — 어느 칸이든 누를 수 있다.
 - tapOn:
-    id: "day-.*"
+    id: "day-[0-9]{4}-[0-9]{2}-[0-9]{2}"
     selected: false
     enabled: true
 - assertVisible:

@@ -223,4 +223,38 @@ describe("119 FR-011 — 본문 밀기 뒤 스트립이 따라간다", () => {
     expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ offset: index * cellWidth }));
     scroll.mockRestore();
   });
+
+  it("★ 리뷰 — 쓴 날에서 화면 안의 안 쓴 날 칸을 눌러 갈래가 바뀌어도 스트립은 보던 자리에 있다", async () => {
+    const scroll = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const paper: PaperState = { kind: "readable", entry: entry(false), madeUp: false };
+    const base = {
+      items,
+      onWrite: jest.fn(),
+      onSelectDay: jest.fn(),
+      onPressDate: jest.fn(),
+      onSwipeDay: jest.fn(),
+    };
+    const first = writePromptFor(items, NOW, DAY);
+    const firstCells = stripCellsFor(items, first.day, NOW);
+    const view = await render(
+      <DiaryListScreen {...base} cells={firstCells} paper={paper} write={first} />,
+    );
+    const stripList = () =>
+      view.getAllByTestId(/^day-strip-list$/, { includeHiddenElements: true })[0];
+    const cellWidth = stripList().props.snapToInterval as number;
+    // 스트립을 밀어 9/1이 첫 칸이 되게 했다.
+    const firstDay = firstCells.findIndex((cell) => cell.day === "2026-09-01");
+    await fireEvent.scroll(stripList(), {
+      nativeEvent: { contentOffset: { x: firstDay * cellWidth, y: 0 } },
+    });
+    scroll.mockClear();
+
+    // 화면 안의 9/4(안 쓴 날)를 눌러 고른 날이 바뀌고 지면 갈래가 바뀐다 — 스트립이 새로 마운트된다.
+    const next = writePromptFor(items, NOW, "2026-09-04");
+    const nextCells = stripCellsFor(items, next.day, NOW);
+    await view.rerender(<DiaryListScreen {...base} cells={nextCells} write={next} />);
+    expect(stripList().props.initialScrollIndex).toBe(firstDay);
+    expect(scroll).not.toHaveBeenCalled();
+    scroll.mockRestore();
+  });
 });

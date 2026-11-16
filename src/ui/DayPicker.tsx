@@ -27,7 +27,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import {
   FlatList,
   Pressable,
@@ -46,17 +46,48 @@ import { weekdayShort } from "./home-text";
 import { useReduceMotion } from "./reduce-motion";
 import { COLORS, DAY_STRIP } from "./theme/tokens";
 
+/**
+ * 스트립이 다시 마운트돼도 이어 가는 기억 — 보던 첫 칸의 날과 잰 폭. 부모가 하나 만들어 갈래(쓴 날·안 쓴 날·쓰는 중)를
+ * 넘나드는 동안 같은 것을 넘긴다. 갈래마다 스트립이 트리의 다른 자리에 놓여 새로 마운트되기 때문이다(119 리뷰).
+ * 부모가 `useRef(newStripMemory())`로 들고 ref를 넘기면 스트립이 직접 고쳐 쓴다(렌더에 쓰지 않는 값이라 상태로 두지 않는다).
+ */
+export type StripMemory = { firstDay: DayDate | null; width: number };
+
+export function newStripMemory(): StripMemory {
+  return { firstDay: null, width: 0 };
+}
+
 export type DayPickerProps = {
   /** 범위 시작일부터 오늘까지 하루에 한 칸, 오래된 것이 먼저. `stripCellsFor()`가 만든다 */
   cells: readonly StripCell[];
   onSelect: (day: DayDate) => void;
+  /** 다시 마운트돼도 보던 자리를 잇는 기억. 없으면 마운트마다 처음 자리(FR-008)에서 시작한다 */
+  memoryRef?: RefObject<StripMemory>;
 };
+
+/**
+ * 바깥 변경으로 옮길 때 이 칸 수보다 멀면 움직임 없이 옮긴다 — **사람이 정한 값이다**(한 화면). 수백 칸을 미끄러지면
+ * 「짧게 미끄러진다」가 아니게 되고 가상화된 빈 칸이 비칠 수 있다(추정).
+ */
+const ANIMATE_MAX_CELLS = STRIP_VISIBLE_CELLS;
 
 /** 처음 보일 첫 칸 — 오른쪽 끝(오늘)이 보이게, 고른 칸이 그보다 앞이면 고른 칸이 왼쪽 끝 (FR-008) */
 function initialFirstIndex(cells: readonly StripCell[]): number {
   const rightmost = Math.max(0, cells.length - STRIP_VISIBLE_CELLS);
   const selected = cells.findIndex((cell) => cell.selected);
   return selected >= 0 && selected < rightmost ? selected : rightmost;
+}
+
+/** 다시 마운트될 때의 첫 칸 — 기억한 날이 있으면 그 자리, 고른 칸이 그 화면 밖이면 최소 거리만 옮긴 자리 */
+function mountFirstIndex(cells: readonly StripCell[], remembered: DayDate | null): number {
+  const rememberedIndex =
+    remembered === null ? -1 : cells.findIndex((cell) => cell.day === remembered);
+  if (rememberedIndex < 0) return initialFirstIndex(cells);
+  const rightmost = Math.max(0, cells.length - STRIP_VISIBLE_CELLS);
+  const first = Math.min(rememberedIndex, rightmost);
+  const selected = cells.findIndex((cell) => cell.selected);
+  if (selected < 0 || (selected >= first && selected < first + STRIP_VISIBLE_CELLS)) return first;
+  return selected < first ? selected : selected - STRIP_VISIBLE_CELLS + 1;
 }
 
 /** 앞 칸 목록의 첫 날이 새 목록에서 몇 칸 옮겨졌는가 — 범위 앞쪽이 늘면 양수, 줄면 음수 */
@@ -70,62 +101,89 @@ function headShift(previous: readonly StripCell[], next: readonly StripCell[]): 
   return shrunk >= 0 ? -shrunk : 0;
 }
 
-export function DayPicker({ cells, onSelect }: DayPickerProps) {
+export function DayPicker({ cells, onSelect, memoryRef }: DayPickerProps) {
   const window = useWindowDimensions();
-  const [measured, setMeasured] = useState(0);
+  // 기억은 마운트할 때 한 번만 읽는다(지연 초기화) — 렌더마다 읽지 않으므로 그 뒤의 바뀜이 렌더에 새지 않는다.
+  // eslint-disable-next-line react-hooks/refs
+  const [measured, setMeasured] = useState(() => memoryRef?.current.width ?? 0);
   const width = measured > 0 ? measured : window.width;
   const cellWidth = width / STRIP_VISIBLE_CELLS;
   const reduceMotion = useReduceMotion();
 
   const listRef = useRef<FlatList<StripCell>>(null);
+  // 목록을 세울 때의 첫 칸 — 처음에는 기억한 자리(없으면 오른쪽 끝 또는 고른 칸), 폭이 바뀌어 다시 세우면 보던 첫 칸.
+  // 기억은 위와 같이 마운트할 때 한 번만 읽는다.
+  // eslint-disable-next-line react-hooks/refs
+  const [firstIndex, setFirstIndex] = useState(() => {
+    return mountFirstIndex(cells, memoryRef?.current.firstDay ?? null);
+  });
   // 지금 스크롤 위치 — 다시 그리지 않으려고 상태가 아니라 ref에 둔다. 처음에는 목록을 세운 첫 칸이다.
-  const offset = useRef(initialFirstIndex(cells) * cellWidth);
+  const offset = useRef(firstIndex * cellWidth);
+  const currentCells = useRef(cells);
   const previousCells = useRef(cells);
-  const selectedIndex = cells.findIndex((cell) => cell.selected);
-  const previousSelected = useRef(selectedIndex);
-  // 목록을 세울 때의 첫 칸 — 처음에는 오른쪽 끝(또는 고른 칸), 폭이 바뀌어 다시 세우면 보던 첫 칸.
-  const [firstIndex, setFirstIndex] = useState(() => initialFirstIndex(cells));
+  const selectedDay = cells.find((cell) => cell.selected)?.day ?? null;
+  const previousSelectedDay = useRef(selectedDay);
+
+  /** 스크롤 위치를 적고 기억에도 보던 첫 칸의 날을 남긴다 */
+  const remember = useCallback(
+    (x: number) => {
+      offset.current = x;
+      if (memoryRef !== undefined && cellWidth > 0) {
+        const index = Math.round(x / cellWidth);
+        memoryRef.current.firstDay = currentCells.current[index]?.day ?? memoryRef.current.firstDay;
+      }
+    },
+    [memoryRef, cellWidth],
+  );
 
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const next = event.nativeEvent.layout.width;
-      if (next <= 0 || next === width) return;
-      const seen =
-        cellWidth > 0 ? Math.round(offset.current / cellWidth) : initialFirstIndex(cells);
+      if (next <= 0) return;
+      if (memoryRef !== undefined) memoryRef.current.width = next;
+      if (next === width) return;
+      const seen = cellWidth > 0 ? Math.round(offset.current / cellWidth) : firstIndex;
       offset.current = seen * (next / STRIP_VISIBLE_CELLS);
       setFirstIndex(seen);
       setMeasured(next);
     },
-    [cells, width, cellWidth],
+    [memoryRef, width, cellWidth, firstIndex],
   );
 
-  const onScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    offset.current = event.nativeEvent.contentOffset.x;
-  }, []);
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => remember(event.nativeEvent.contentOffset.x),
+    [remember],
+  );
 
   useLayoutEffect(() => {
     const before = previousCells.current;
-    const selectedBefore = previousSelected.current;
+    const selectedBefore = previousSelectedDay.current;
+    currentCells.current = cells;
     previousCells.current = cells;
-    previousSelected.current = selectedIndex;
+    previousSelectedDay.current = selectedDay;
     if (cellWidth <= 0 || before === cells) return;
 
     const shift = headShift(before, cells);
     if (shift !== 0) offset.current += shift * cellWidth;
 
-    // 고른 칸이 바뀌었을 때만 화면 안으로 가져온다 — 사용자가 스크롤만 했으면 끼어들지 않는다.
+    // 고른 날이 바뀌었을 때만 화면 안으로 가져온다 — 사용자가 스크롤만 했으면 끼어들지 않는다.
+    const selectedIndex = cells.findIndex((cell) => cell.selected);
     const target =
-      selectedIndex !== selectedBefore + shift && selectedIndex >= 0
+      selectedDay !== selectedBefore && selectedIndex >= 0
         ? stripScrollTarget({ index: selectedIndex, offset: offset.current, cellWidth })
         : null;
 
     if (target !== null) {
-      offset.current = target;
-      listRef.current?.scrollToOffset({ offset: target, animated: reduceMotion === false });
+      // 짧은 거리만 미끄러진다 — 범위 앞쪽이 바뀐 직후(네이티브 위치가 아직 옛 값)나 한 화면보다 멀면 움직임 없이.
+      const near = Math.abs(target - offset.current) <= ANIMATE_MAX_CELLS * cellWidth;
+      const animated = reduceMotion === false && shift === 0 && near;
+      remember(target);
+      listRef.current?.scrollToOffset({ offset: target, animated });
     } else if (shift !== 0) {
+      remember(offset.current);
       listRef.current?.scrollToOffset({ offset: offset.current, animated: false });
     }
-  }, [cells, selectedIndex, cellWidth, reduceMotion]);
+  }, [cells, selectedDay, cellWidth, reduceMotion, remember]);
 
   const getItemLayout = useCallback(
     (_data: ArrayLike<StripCell> | null | undefined, index: number) => ({
@@ -134,6 +192,11 @@ export function DayPicker({ cells, onSelect }: DayPickerProps) {
       index,
     }),
     [cellWidth],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: StripCell }) => <Cell cell={item} onSelect={onSelect} width={cellWidth} />,
+    [onSelect, cellWidth],
   );
 
   return (
@@ -150,7 +213,7 @@ export function DayPicker({ cells, onSelect }: DayPickerProps) {
         key={width}
         onScroll={onScroll}
         ref={listRef}
-        renderItem={({ item }) => <Cell cell={item} onSelect={onSelect} width={cellWidth} />}
+        renderItem={renderItem}
         scrollEventThrottle={16}
         showsHorizontalScrollIndicator={false}
         snapToAlignment="start"
@@ -161,7 +224,7 @@ export function DayPicker({ cells, onSelect }: DayPickerProps) {
   );
 }
 
-function Cell({
+const Cell = memo(function Cell({
   cell,
   onSelect,
   width,
@@ -203,7 +266,7 @@ function Cell({
       />
     </Pressable>
   );
-}
+});
 
 /**
  * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(032·047 관례). 색은 `COLORS.*`·`DAY_STRIP.*`만.
