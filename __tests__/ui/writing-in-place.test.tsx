@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import {
-  weekCellsFor,
+  stripCellsFor,
   writePromptFor,
   type DiaryListItem,
   type WritePrompt,
@@ -46,10 +46,9 @@ function props(over: Partial<DiaryListScreenProps> = {}): DiaryListScreenProps {
   return {
     items,
     write,
-    cells: weekCellsFor(items, write, NOW),
+    cells: stripCellsFor(items, write.day, NOW),
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
-    onSwipe: jest.fn(),
     onPressDate: jest.fn(),
     onStop: jest.fn(),
     writing: { line: "사진 속에 뭐가 담겼는지 찬찬히 보는 중…", name: "금동이" },
@@ -119,13 +118,12 @@ describe("W4 — 스트립 잠금", () => {
     expect(lock.props.importantForAccessibility).toBe("no-hide-descendants");
   });
 
-  it("칸을 눌러도 onSelectDay가 불리지 않는다(스트립을 스와이프로 넘기는 통로도 없다)", async () => {
+  it("칸을 눌러도 onSelectDay가 불리지 않는다", async () => {
     const p = props();
     await render(<DiaryListScreen {...p} />);
     const cell = screen.getByTestId(`day-${OTHER}`, { includeHiddenElements: true });
     await fireEvent.press(cell);
     expect(p.onSelectDay).not.toHaveBeenCalled();
-    expect(p.onSwipe).not.toHaveBeenCalled();
   });
 
   it("writing이 없으면 스트립은 잠기지 않는다 (053 그대로)", async () => {
@@ -236,7 +234,7 @@ describe("W8 — 하단 바", () => {
         {...props({
           items,
           write,
-          cells: weekCellsFor(items, write, NOW),
+          cells: stripCellsFor(items, write.day, NOW),
           paper: {
             kind: "readable",
             madeUp: false,

@@ -9,11 +9,12 @@
  */
 
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
+import { FlatList } from "react-native";
 import { State } from "react-native-gesture-handler";
 import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
 
 import type { PaperState } from "../../src/app/written-day";
-import { writePromptFor, weekCellsFor, type DiaryListItem } from "../../src/app/state";
+import { writePromptFor, stripCellsFor, type DiaryListItem } from "../../src/app/state";
 import type { DiaryEntry } from "../../src/diary/types";
 import { DiaryListScreen, type DiaryListScreenProps } from "../../src/ui/DiaryListScreen";
 import { DAY_SWIPE_ACTIONS } from "../../src/ui/home-text";
@@ -67,7 +68,7 @@ async function renderScreen(
     onPressDate: jest.fn(),
     onSwipeDay: jest.fn(),
     write,
-    cells: weekCellsFor(items, write, NOW),
+    cells: stripCellsFor(items, write.day, NOW),
     paper,
     ...over,
   };
@@ -146,7 +147,10 @@ describe("114 쓴 날 지면에 걸린 밀기", () => {
   it("접근성 — 고른 날이 오늘이면 「다음 날」 동작을 뺀다 (반응 없는 동작을 고르지 않게)", async () => {
     const write = writePromptFor(items, NOW, null); // 기본 선택은 오늘
     expect(write.day).toBe("2026-09-24");
-    await renderScreen({ kind: "unwritten" }, { write, cells: weekCellsFor(items, write, NOW) });
+    await renderScreen(
+      { kind: "unwritten" },
+      { write, cells: stripCellsFor(items, write.day, NOW) },
+    );
 
     const names = (
       screen.getByTestId("home-date-button").props.accessibilityActions as { name: string }[]
@@ -165,8 +169,9 @@ describe("114 쓴 날 지면에 걸린 밀기", () => {
   /** 팬 배선은 한 렌더 안에서만 쏜다 — 위 테스트들은 팬을 쏘지 않는다. */
   it("★ 본문을 오른쪽으로 밀면 onSwipeDay(previous), 왼쪽이면 next가 불린다 (FR-001)", async () => {
     const props = await renderScreen({ kind: "readable", entry: entry(true), madeUp: false });
+    // RNTL 14의 act는 Promise다 — 기다리지 않으면 act 범위가 열린 채 남아 뒤 테스트의 렌더가 비었다(119에서 발견).
     const pan = (translationX: number) =>
-      act(() => {
+      act(async () => {
         fireGestureHandler(getByGestureTestId("day-swipe-pan"), [
           { state: State.BEGAN, translationX: 0, velocityX: 0 },
           { state: State.ACTIVE, translationX: translationX / 2, velocityX: 0 },
@@ -175,11 +180,47 @@ describe("114 쓴 날 지면에 걸린 밀기", () => {
         ]);
       });
 
-    pan(90);
+    await pan(90);
     expect(props.onSwipeDay).toHaveBeenLastCalledWith("previous");
-    pan(-90);
+    await pan(-90);
     expect(props.onSwipeDay).toHaveBeenLastCalledWith("next");
-    pan(20);
+    await pan(20);
     expect(props.onSwipeDay).toHaveBeenCalledTimes(2);
+  });
+});
+
+/**
+ * 119 FR-011 — 본문 밀기로 고른 날이 스트립 화면 밖이 되면 스트립이 그 칸으로 따라간다.
+ * 홈의 `onSwipeDay → swipeDay → setChosenDay → stripCellsFor` 배선은 `diary-home-week.test.tsx`가 보고,
+ * 여기서는 밀기로 바뀐 고른 날이 스트립에 들어왔을 때 스크롤이 일어나는지를 본다.
+ */
+describe("119 FR-011 — 본문 밀기 뒤 스트립이 따라간다", () => {
+  it("첫 화면 왼쪽 끝 날에서 전날로 밀면 스트립이 그 칸으로 스크롤한다", async () => {
+    const scroll = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    // 첫 화면은 9/18~9/24 — 9/18을 고른 채 본문을 오른쪽으로 밀었다고 친다(팬 배선은 위 「114」 블록이 본다).
+    const paper: PaperState = { kind: "readable", entry: entry(false), madeUp: false };
+    const base = {
+      items,
+      onWrite: jest.fn(),
+      onSelectDay: jest.fn(),
+      onPressDate: jest.fn(),
+      onSwipeDay: jest.fn(),
+      paper,
+    };
+    const first = writePromptFor(items, NOW, "2026-09-18");
+    const view = await render(
+      <DiaryListScreen {...base} cells={stripCellsFor(items, first.day, NOW)} write={first} />,
+    );
+    scroll.mockClear();
+
+    // 홈이 고른 날을 9/17로 바꿔 다시 그린다.
+    const next = writePromptFor(items, NOW, "2026-09-17");
+    const cells = stripCellsFor(items, next.day, NOW);
+    await view.rerender(<DiaryListScreen {...base} cells={cells} write={next} />);
+    const list = view.getAllByTestId(/^day-strip-list$/, { includeHiddenElements: true })[0];
+    const cellWidth = list.props.snapToInterval as number;
+    const index = cells.findIndex((cell) => cell.day === "2026-09-17");
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ offset: index * cellWidth }));
+    scroll.mockRestore();
   });
 });

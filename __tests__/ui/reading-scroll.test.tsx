@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react-native";
 
 import {
-  weekCellsFor,
+  stripCellsFor,
   writePromptFor,
   type DiaryListItem,
   type WritePrompt,
@@ -68,7 +68,7 @@ function props(day: string, over: Partial<DiaryListScreenProps> = {}): DiaryList
   return {
     items,
     write,
-    cells: weekCellsFor(items, write, NOW),
+    cells: stripCellsFor(items, write.day, NOW),
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
     onPressDate: jest.fn(),

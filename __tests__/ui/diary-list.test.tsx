@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
 
 import {
-  weekCellsFor,
+  stripCellsFor,
   writePromptFor,
   type DayPreview,
   type DiaryListItem,
@@ -57,7 +57,7 @@ async function renderHome(
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
     write,
-    cells: weekCellsFor(items, write, now),
+    cells: stripCellsFor(items, write.day, now),
     ...opts,
   };
   await render(<DiaryListScreen {...props} />);
@@ -181,13 +181,17 @@ describe("048 H — 1d 구조와 헤더", () => {
     const second = writePromptFor(items, MORNING, "2026-09-21");
     const base = { items, onOpen: jest.fn(), onWrite: jest.fn(), onSelectDay: jest.fn() };
     await render(
-      <DiaryListScreen {...base} cells={weekCellsFor(items, first, MORNING)} write={first} />,
+      <DiaryListScreen {...base} cells={stripCellsFor(items, first.day, MORNING)} write={first} />,
     );
     expect(screen.queryByTestId("home-day-fade-out")).toBeNull();
 
     await act(async () => {
       screen.rerender(
-        <DiaryListScreen {...base} cells={weekCellsFor(items, second, MORNING)} write={second} />,
+        <DiaryListScreen
+          {...base}
+          cells={stripCellsFor(items, second.day, MORNING)}
+          write={second}
+        />,
       );
     });
     expect(screen.getByTestId("home-day-fade-out")).toHaveTextContent(/24/);

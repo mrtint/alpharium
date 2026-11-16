@@ -1,15 +1,16 @@
 /**
- * DayPicker — 홈의 주간 스트립 (049, 보드 `1d`).
+ * DayPicker — 홈의 날 스트립 (119, 이전 049 보드 `1d`).
  *
- * 계약: specs/049-home-day-picker/contracts/day-picking.md S1~S6
- *       (이전: specs/048-diary-home-modernist/contracts/home-screen.md — 오늘로 끝나는 7일)
+ * 계약: specs/119-strip-continuous-scroll/contracts/strip-scroll.md CS-S1~S8
+ *       (049 contracts/day-picking.md S1·S2·S3·S5를 잇는다. S4·S6은 119가 대신한다)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **049 — 일~토 고정 주, 좌우로 넘겨 주 단위로 오간다.** 판정은 여전히 여기 없다 —
- * 칸은 `weekCellsFor()`가, 넘긴 뒤의 날은 `swipeWeek()`가 정한다. 스트립은 방향만 알린다.
+ * **119 — 오늘에서 끝나는 이어 스크롤.** 하루에 한 칸, 가로 목록이 칸 단위로 붙는다. 스크롤은 고른 날을
+ * 바꾸지 않고 칸 누름만 바꾼다. 칸 목록은 `stripCellsFor()`가, 고른 칸을 화면 안으로 가져올 위치는
+ * `stripScrollTarget()`가 정한다 — 스트립은 판정하지 않는다.
  *
- * **jest는 배선만 본다**(C9). 끌림·튕김이 실제로 움직이는지는 reanimated 목 때문에 여기서
- * 검증할 수 없다 — quickstart D4·D5 실기기에서 본다.
+ * **jest는 배선만 본다.** 관성·붙기의 실제 손맛은 실기기에서 본다(quickstart).
+ * 칸 폭은 `onLayout`으로 안다 — 테스트는 스트립에 `layout` 이벤트(폭 350 → 칸 50)를 쏜다.
  *
  * ⚠️ RNTL 14의 `render`·`fireEvent`는 Promise를 반환한다 — `await`한다.
  * ─────────────────────────────────────────────────────────────────────────────
@@ -19,16 +20,15 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { act, fireEvent, render, screen, within } from "@testing-library/react-native";
-import { State } from "react-native-gesture-handler";
-import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
+import { AccessibilityInfo, FlatList } from "react-native";
 
 import type { StripCell } from "../../src/app/state";
-import { DayPicker, swipeDirectionOf } from "../../src/ui/DayPicker";
+import { DayPicker } from "../../src/ui/DayPicker";
 import { COLORS, DAY_STRIP } from "../../src/ui/theme/tokens";
 
 jest.setTimeout(30000);
 
-/** 오늘 2026-09-24(목), 23일 선택. 25·26은 미래 */
+/** 오늘 2026-09-24(목), 23일 선택. 25·26은 흐린 칸(실제 스트립에는 미래 칸이 없지만 표시 규칙을 잠근다) */
 const cells: readonly StripCell[] = [
   { day: "2026-09-20", hasDiary: false, isToday: false, selectable: true, selected: false },
   { day: "2026-09-21", hasDiary: true, isToday: false, selectable: true, selected: false },
@@ -39,6 +39,20 @@ const cells: readonly StripCell[] = [
   { day: "2026-09-26", hasDiary: false, isToday: false, selectable: false, selected: false },
 ];
 
+/** 30칸 — 2026-09-01 ~ 09-30, 오늘 30일. 고른 날을 바꿔 가며 쓴다 */
+function month(selected: string): StripCell[] {
+  return Array.from({ length: 30 }, (_, i) => {
+    const day = `2026-09-${String(i + 1).padStart(2, "0")}`;
+    return {
+      day,
+      hasDiary: false,
+      isToday: day === "2026-09-30",
+      selectable: true,
+      selected: day === selected,
+    };
+  });
+}
+
 const flatStyle = (style: unknown): Record<string, unknown> =>
   Object.assign({}, ...[style].flat(Infinity).filter(Boolean));
 
@@ -46,32 +60,35 @@ const SOURCE = readFileSync(join(__dirname, "../../src/ui/DayPicker.tsx"), "utf8
   .replace(/\/\*[\s\S]*?\*\//g, "")
   .replace(/\/\/.*$/gm, "");
 
-async function renderPicker(overrides: Partial<Parameters<typeof DayPicker>[0]> = {}) {
-  const props = {
-    cells,
-    onSelect: jest.fn(),
-    onSwipe: jest.fn(),
-    canSwipeNext: true,
-    ...overrides,
-  };
-  await render(<DayPicker {...props} />);
-  return props;
-}
+const WIDTH = 350;
+const CELL = WIDTH / 7;
 
-/** 팬 제스처를 끝까지 쏜다 — 시작 → 끌림 → 끝 */
-function pan(translationX: number, velocityX = 0) {
-  act(() => {
-    fireGestureHandler(getByGestureTestId("day-strip-pan"), [
-      { state: State.BEGAN, translationX: 0, velocityX: 0 },
-      { state: State.ACTIVE, translationX: translationX / 2, velocityX },
-      { state: State.ACTIVE, translationX, velocityX },
-      { state: State.END, translationX, velocityX },
-    ]);
+async function layout() {
+  await act(async () => {
+    fireEvent(screen.getByTestId("day-strip"), "layout", {
+      nativeEvent: { layout: { x: 0, y: 0, width: WIDTH, height: 60 } },
+    });
   });
 }
 
-describe("049 DayPicker — 일~토 주간 스트립", () => {
-  it("S1 — 7칸이 날짜 testID와 요일·날짜 숫자를 갖는다 (일~토)", async () => {
+async function renderPicker(overrides: Partial<Parameters<typeof DayPicker>[0]> = {}) {
+  const props = { cells, onSelect: jest.fn(), ...overrides };
+  await render(<DayPicker {...props} />);
+  await layout();
+  return props;
+}
+
+/** 가로 목록 — testID `day-strip-list` */
+function list() {
+  return screen.getByTestId("day-strip-list");
+}
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
+describe("119 DayPicker — 오늘에서 끝나는 이어 스크롤 스트립", () => {
+  it("CS-S1·CS-S8 — 칸마다 날짜 testID와 요일·날짜 숫자, 스트립 testID는 day-strip", async () => {
     await renderPicker();
 
     expect(screen.getByTestId("day-strip")).toBeTruthy();
@@ -80,17 +97,36 @@ describe("049 DayPicker — 일~토 주간 스트립", () => {
     expect(screen.getByTestId("day-2026-09-26")).toHaveTextContent(/토\s*26/);
   });
 
-  it("S1 — 일기가 있는 날에만 점", async () => {
+  it("폭을 재기 전에는 창 폭으로 어림해 칸을 그리고, 잰 뒤에는 그 폭으로 다시 세운다", async () => {
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={jest.fn()} />);
+    expect(screen.getByTestId("day-2026-09-30")).toBeTruthy();
+    const estimated = flatStyle(screen.getByTestId("day-2026-09-30").props.style).width;
+    expect(estimated).toBeGreaterThan(0);
+    await layout();
+    expect(flatStyle(screen.getByTestId("day-2026-09-30").props.style).width).toBe(CELL);
+    expect(list().props.initialScrollIndex).toBe(30 - 7);
+  });
+
+  it("CS-S1 — 일기가 있는 날에만 점", async () => {
     await renderPicker();
     expect(screen.getByTestId("day-dot-2026-09-21")).toBeTruthy();
     expect(screen.getByTestId("day-dot-2026-09-23")).toBeTruthy();
     expect(screen.queryByTestId("day-dot-2026-09-24")).toBeNull();
   });
 
-  it("누를 수 있는 칸을 누르면 그 날이 전달된다", async () => {
+  it("★ CS-S2 — 누를 수 있는 칸을 누르면 그 날이 전달된다", async () => {
     const props = await renderPicker();
     await fireEvent.press(screen.getByTestId("day-2026-09-24"));
     expect(props.onSelect).toHaveBeenCalledWith("2026-09-24");
+  });
+
+  it("★ CS-S3 — 스크롤만으로는 고른 날이 바뀌지 않는다", async () => {
+    const props = await renderPicker({ cells: month("2026-09-30") });
+    const event = { nativeEvent: { contentOffset: { x: 5 * CELL, y: 0 } } };
+    await fireEvent.scroll(list(), event);
+    await fireEvent(list(), "momentumScrollEnd", event);
+    await fireEvent(list(), "scrollEndDrag", event);
+    expect(props.onSelect).not.toHaveBeenCalled();
   });
 
   it("고른 칸은 selected이고 강조색 배경이다", async () => {
@@ -100,14 +136,14 @@ describe("049 DayPicker — 일~토 주간 스트립", () => {
     expect(flatStyle(chosen.props.style).backgroundColor).toBe(COLORS.accent);
   });
 
-  it("★ S2 — 오늘 칸만 밑줄, 선택되지 않았으면 강조색", async () => {
+  it("★ 049 S2 — 오늘 칸만 밑줄, 선택되지 않았으면 강조색", async () => {
     await renderPicker();
     const underline = screen.getByTestId("day-today-2026-09-24");
     expect(flatStyle(underline.props.style).backgroundColor).toBe(COLORS.accent);
     expect(screen.queryByTestId("day-today-2026-09-23")).toBeNull();
   });
 
-  it("S2 — 오늘이 선택되면 밑줄은 선택 칸 글자색", async () => {
+  it("049 S2 — 오늘이 선택되면 밑줄은 선택 칸 글자색", async () => {
     await renderPicker({
       cells: cells.map((c) => ({ ...c, selected: c.day === "2026-09-24" })),
     });
@@ -115,7 +151,7 @@ describe("049 DayPicker — 일~토 주간 스트립", () => {
     expect(flatStyle(underline.props.style).backgroundColor).toBe(COLORS.accentForeground);
   });
 
-  it("★ S3 — 흐린(미래) 칸은 disabled·불투명도 0.3이고 눌러도 아무 일도 없다", async () => {
+  it("049 S3 — 흐린 칸은 disabled·불투명도 0.3이고 눌러도 아무 일도 없다", async () => {
     const props = await renderPicker();
     const future = screen.getByTestId("day-2026-09-25");
     await fireEvent.press(future);
@@ -137,73 +173,135 @@ describe("049 DayPicker — 일~토 주간 스트립", () => {
     const unselectedStyle = flatStyle(unselectedDow.props.style);
     expect(unselectedStyle.color).toBe(DAY_STRIP.dowMuted);
     expect(unselectedStyle.opacity).toBeUndefined();
-    expect(unselectedStyle.fontSize).toBe(10);
-    expect(unselectedStyle.letterSpacing).toBe(0.6);
   });
 
-  /**
-   * **팬 배선은 한 렌더 안에서만 쏜다.** gesture-handler의 jest 레지스트리는 testID로 핸들러를
-   * 찾는데, 앞 테스트에서 팬을 쏜 뒤 새로 렌더한 스트립에 쏘면 **앞 테스트의 핸들러**가 불리는
-   * 것을 실측했다(2026-09-27, 핸들러 태그가 매번 1). 그래서 배선은 이 테스트 하나에서 보고,
-   * 문턱 판정은 순수 함수 `swipeDirectionOf`로 따로 잠근다.
-   */
-  it("★ S4 — 팬이 끝나면 방향이 전달된다 (오른쪽 → 이전 주, 왼쪽 → 다음 주, 짧으면 없음)", async () => {
-    const props = await renderPicker();
-    pan(80);
-    expect(props.onSwipe).toHaveBeenLastCalledWith("previous");
-    pan(-80);
-    expect(props.onSwipe).toHaveBeenLastCalledWith("next");
-    pan(20);
-    expect(props.onSwipe).toHaveBeenCalledTimes(2);
+  it("★ FR-004·FR-005 — 칸 폭은 스트립 폭의 1/7이고 칸 단위로 붙는다", async () => {
+    await renderPicker({ cells: month("2026-09-30") });
+    const props = list().props;
+    expect(props.horizontal).toBe(true);
+    expect(props.snapToInterval).toBe(CELL);
+    expect(props.getItemLayout(null, 4)).toEqual({ length: CELL, offset: 4 * CELL, index: 4 });
+    expect(flatStyle(screen.getByTestId("day-2026-09-30").props.style).width).toBe(CELL);
   });
 
-  it.each([
-    [80, 0, "previous"],
-    [-80, 0, "next"],
-    [40, 0, "previous"],
-    [39, 0, null],
-    [20, 0, null],
-    [15, 800, "previous"],
-    [-15, -800, "next"],
-    [0, 600, "previous"],
-    [15, 100, null],
-  ] as const)("S4 — swipeDirectionOf(%d, %d) = %s", (dx, vx, expected) => {
-    expect(swipeDirectionOf(dx, vx)).toBe(expected);
+  it("★ FR-008 — 오른쪽 끝(오늘)에서 시작한다", async () => {
+    await renderPicker({ cells: month("2026-09-30") });
+    expect(list().props.initialScrollIndex).toBe(30 - 7);
   });
 
-  it("★ S5 — 스트립은 판정하지 않는다 (지금 시각·경계를 모른다)", () => {
+  it("FR-008 — 고른 날이 그 화면 밖이면 고른 날이 왼쪽 끝인 위치에서 시작한다", async () => {
+    await renderPicker({ cells: month("2026-09-05") });
+    expect(list().props.initialScrollIndex).toBe(4);
+  });
+
+  it("FR-008 — 칸이 7보다 적으면 처음부터", async () => {
+    await renderPicker({ cells: cells.slice(0, 3) });
+    expect(list().props.initialScrollIndex).toBe(0);
+  });
+
+  it("★ CS-S6 — 고른 날이 화면 밖의 날로 바뀌면 그 칸이 보이게 스크롤한다", async () => {
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    // 지금 보이는 칸은 24~30일(인덱스 23~29). 3일(인덱스 2)은 왼쪽 밖이다.
+    await screen.rerender(<DayPicker cells={month("2026-09-03")} onSelect={onSelect} />);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toMatchObject({ offset: 2 * CELL });
+  });
+
+  it("★ CS-S6 — 화면 안의 날로 바뀌면 스크롤하지 않는다", async () => {
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    await screen.rerender(<DayPicker cells={month("2026-09-26")} onSelect={onSelect} />);
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("CS-S6 — 사용자가 스크롤한 위치를 기준으로 판정한다", async () => {
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    // 1~7일이 보이게 스크롤했다
+    await fireEvent.scroll(list(), { nativeEvent: { contentOffset: { x: 0, y: 0 } } });
+    spy.mockClear();
+
+    await screen.rerender(<DayPicker cells={month("2026-09-05")} onSelect={onSelect} />);
+    expect(spy).not.toHaveBeenCalled();
+    await screen.rerender(<DayPicker cells={month("2026-09-20")} onSelect={onSelect} />);
+    expect(spy.mock.calls[0][0]).toMatchObject({ offset: (19 - 6) * CELL });
+  });
+
+  it("★ CS-S7 — 동작 줄이기가 켜져 있으면 움직임 없이 옮긴다", async () => {
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(true);
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    await screen.rerender(<DayPicker cells={month("2026-09-03")} onSelect={onSelect} />);
+    expect(spy.mock.calls[0][0]).toMatchObject({ animated: false });
+  });
+
+  it("CS-S7 — 동작 줄이기가 꺼져 있으면 미끄러진다", async () => {
+    jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockResolvedValue(false);
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    await render(<DayPicker cells={month("2026-09-30")} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    await screen.rerender(<DayPicker cells={month("2026-09-03")} onSelect={onSelect} />);
+    expect(spy.mock.calls[0][0]).toMatchObject({ animated: true });
+  });
+
+  it("범위 앞쪽이 바뀌어도(자정·먼 날) 보던 날을 기준으로 위치를 고친다", async () => {
+    const spy = jest.spyOn(FlatList.prototype, "scrollToOffset").mockImplementation(() => {});
+    const onSelect = jest.fn();
+    const base = month("2026-09-30");
+    await render(<DayPicker cells={base} onSelect={onSelect} />);
+    await layout();
+    spy.mockClear();
+
+    // 첫 칸이 하나 빠지고(자정) 고른 날은 그대로 — 보이던 날들이 그대로 보이게 한 칸 당긴다.
+    const shifted = base.slice(1);
+    await screen.rerender(<DayPicker cells={shifted} onSelect={onSelect} />);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toMatchObject({ offset: 22 * CELL, animated: false });
+  });
+
+  it("★ CS-S4 — 주 넘김 팬이 없고 가로 목록이 있다(소스)", () => {
+    expect(SOURCE).not.toMatch(/Gesture\.Pan/);
+    expect(SOURCE).not.toContain("day-strip-pan");
+    expect(SOURCE).not.toContain("swipeDirectionOf");
+    expect(SOURCE).not.toContain("RUBBER_BAND");
+    expect(SOURCE).not.toMatch(/\bonSwipe\b/);
+    expect(SOURCE).toMatch(/\bFlatList\b/);
+    expect(SOURCE).toContain("getItemLayout");
+    expect(SOURCE).toContain("snapToInterval");
+  });
+
+  it("★ CS-S5 — 스트립은 판정하지 않는다 (지금 시각·경계를 모른다)", () => {
     expect(SOURCE).not.toContain("new Date(");
     expect(SOURCE).not.toContain("dayOf");
     expect(SOURCE).not.toMatch(/\bnow\s*\(/);
     expect(SOURCE).not.toContain("isDayWritable");
-    expect(SOURCE).not.toContain("swipeWeek");
+    expect(SOURCE).toContain("stripScrollTarget");
   });
 
-  it("★ S6 — 이어 스크롤하지 않는다 (ScrollView·FlatList 없음)", () => {
-    expect(SOURCE).not.toMatch(/\bScrollView\b/);
-    expect(SOURCE).not.toMatch(/\bFlatList\b/);
-  });
-
-  // 실기기(2026-09-28): 밑줄을 오늘 칸에만 그리니 오늘이 든 주에서만 스트립이 높아져, 주를 넘길
-  // 때마다 아래 신호 줄·목록이 위아래로 튀었다. 밑줄 자리는 모든 칸에 둔다.
-  // 실기기(2026-09-28, 화면 녹화): 넘길 때도 스프링으로 돌려 놓으니 새 주가 끌던 자리에서 되돌아오며
-  // 좌우로 출렁여 「숫자가 빠르게 여러 번 바뀐다」로 보였다. 넘기면 그 자리에서 교체하고, 튕김도
-  // 출렁이지 않는다.
-  it("★ S8 — 넘기면 즉시 교체, 되돌림은 출렁이지 않는다 (스프링 없음)", () => {
-    expect(SOURCE).not.toContain("withSpring");
-    // 새 주가 그려지는 커밋에서 제자리로 — 손을 뗀 순간이 아니다.
-    expect(SOURCE).toMatch(
-      /useLayoutEffect\(\(\) => \{[\s\S]*?translateX\.value = 0;[\s\S]*?\}, \[week, translateX, awaitingWeek\]\)/,
-    );
-    expect(SOURCE).not.toMatch(/onSwipe\?\.\(direction\);\s*translateX\.value = 0/);
-  });
-
-  it("★ S7 — 밑줄 자리는 오늘 칸에만 생기지 않는다 (주를 넘겨도 높이가 같다)", () => {
+  it("049 S7 — 밑줄 자리는 오늘 칸에만 생기지 않는다 (높이가 같다)", () => {
     expect(SOURCE).not.toMatch(/isToday\s*&&/);
     expect(SOURCE).toMatch(/testID=\{isToday \? `day-today-\$\{day\}` : undefined\}/);
   });
 
-  it("088 FR-004 — DayPicker.tsx에서 opacity는 미래 칸 흐림(CELL_DIMMED) 한 곳에만 있다 (C4)", () => {
+  it("088 FR-004 — opacity는 흐린 칸(CELL_DIMMED) 한 곳에만 있다 (C4)", () => {
     expect(SOURCE.match(/\bopacity\s*:/g) ?? []).toHaveLength(1);
     expect(SOURCE).toMatch(/const CELL_DIMMED\s*=\s*\{\s*opacity:\s*0\.3\s*\}/);
   });

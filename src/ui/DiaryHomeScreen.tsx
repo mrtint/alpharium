@@ -18,8 +18,8 @@
  * **048 — 홈이 보드 `1d`가 됐다.** 고른 날의 신호 요약을 읽어 신호 줄에 넘긴다(US3). 고른 날은
  * 밖(`App.tsx`)에서 들고 있을 수 있다(Q4).
  *
- * **049 — 날 고르기.** 스트립을 넘기면 `swipeWeek()`로 다음 날을 정하고, 다음 자정에 한 번 다시
- * 그려 오늘 밑줄만 옮긴다(FR-019). 고른 날은 언제나 쓸 수 있다(정오 제한 폐지).
+ * **049·119 — 날 고르기.** 스트립은 오늘에서 끝나는 이어 스크롤이고(`stripCellsFor()`, 119) 칸을 누르면 고른다.
+ * 다음 자정에 한 번 다시 그려 오늘 칸과 밑줄을 옮긴다(FR-019). 고른 날은 언제나 쓸 수 있다(정오 제한 폐지).
  * 106 — 018 미리 준비(`prepare`·`release`·`captionDay`·`canPrepare`)는 앱이 한 번도 연결하지 않아 걷었다(두 모델 동시 적재 방지는 파이프라인이
  * 적재를 한 번에 하나만 하는 데 있다).
  *
@@ -48,11 +48,9 @@ import {
   startWriting,
   toFailed,
   toList,
-  canSwipeNext,
   cellFor,
+  stripCellsFor,
   swipeDay,
-  swipeWeek,
-  weekCellsFor,
   writePromptFor,
   type SwipeDirection,
   type AppScreen,
@@ -677,19 +675,9 @@ export function DiaryHomeScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onList, tick]);
 
-  /** 스트립을 넘겼다 — 어느 날이 될지는 `swipeWeek()`가 정한다(049 HS1). `null`이면 그대로 */
-  const onSwipe = useCallback(
-    (direction: SwipeDirection) => {
-      const current = writePromptFor(listItems ?? [], now(), chosenDay).day;
-      const next = swipeWeek(current, direction, now());
-      if (next !== null) setChosenDay(next);
-    },
-    [listItems, now, chosenDay, setChosenDay],
-  );
-
   /**
    * 일기 본문을 밀었다 — 이웃한 날로 간다 (114). 어느 날이 될지는 `swipeDay()`가 정한다(`null`이면 오늘 다음이라 그대로).
-   * 스트립 칸·스트립 넘기기·달력과 같은 `setChosenDay`를 쓰므로 스트립이 그 날이 든 주로 저절로 따라간다.
+   * 스트립 칸·달력과 같은 `setChosenDay`를 쓰고, 그 칸이 화면 밖이면 스트립이 따라간다(119 FR-011).
    */
   const onSwipeDay = useCallback(
     (direction: SwipeDirection) => {
@@ -1479,8 +1467,7 @@ export function DiaryHomeScreen({
         return (
           <>
             <DiaryListScreen
-              canSwipeNext={canSwipeNext(prompt.day, now())}
-              cells={weekCellsFor(items, prompt, now())}
+              cells={stripCellsFor(items, prompt.day, now())}
               constraint={constraint}
               items={items}
               // 050 — 헤더 날짜 → 날짜로 이동. 덮어쓰기 확인이 떠 있는 동안에는 열지 않는다.
@@ -1491,7 +1478,6 @@ export function DiaryHomeScreen({
               onDismissToast={() => setToast(null)}
               barLocked={barLocked}
               onStop={() => void cancel()}
-              onSwipe={onSwipe}
               // 114 — 쓰는 중에는 화면이 스스로 걸지 않는다(054). 덮어쓰기 확인이 떠 있는 동안에도 날을 옮기지 않는다.
               onSwipeDay={screen.kind === "list" ? onSwipeDay : undefined}
               onWrite={() => void write()}

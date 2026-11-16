@@ -152,19 +152,19 @@ export function includesTodayAtHour(hour: number): boolean {
 }
 
 /**
- * 그 날이 든 주 — **일요일부터 토요일까지 7일**, 오래된 것이 먼저 (049 DB8, 보드 `1d` 스트립).
- *
- * 주 시작(일요일)은 보드가 정한 값이다. 요일은 `Date.getDay()`(0 = 일요일)를 따른다.
+ * 홈 스트립이 오늘에서 거슬러 보이는 날수 (119) — **사람이 정한 값이다**(소유자 결정, 측정 아님).
+ * 그보다 먼 날은 달력(050)으로 간다.
  */
-export function weekOf(day: DayDate): readonly DayDate[] {
-  const [year, month, date] = day.split("-").map(Number);
-  const weekday = new Date(year, month - 1, date, 12, 0, 0, 0).getDay();
-  return Array.from({ length: 7 }, (_, i) => addDays(day, i - weekday));
-}
+export const STRIP_PAST_DAYS = 365;
 
-/** 같은 요일로 `weeks`주 떨어진 날 (049 DB8 W4) */
-export function shiftWeek(day: DayDate, weeks: number): DayDate {
-  return addDays(day, weeks * 7);
+/**
+ * 홈 스트립 범위의 왼쪽 끝 (119 CS-DB1~3) — 오늘부터 `STRIP_PAST_DAYS`일 전과 고른 날 중 이른 날.
+ *
+ * 달력·본문 밀기는 1년보다 먼 날도 고를 수 있다 — 그 날도 스트립에 칸이 있어야 고른 칸이 사라지지 않는다.
+ */
+export function stripStartDay(selected: DayDate, now: Date): DayDate {
+  const yearAgo = addDays(dayOf(now), -STRIP_PAST_DAYS);
+  return selected < yearAgo ? selected : yearAgo;
 }
 
 /**
