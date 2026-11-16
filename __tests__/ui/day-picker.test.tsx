@@ -371,4 +371,29 @@ describe("119 DayPicker — 오늘에서 끝나는 이어 스크롤 스트립", 
     );
     expect(memoryRef.current.firstDay).toBe("2026-09-05");
   });
+
+  it("★ 119 — 토·일 요일은 시그니처 주홍(accent), 평일은 dowMuted, 고른 칸은 accentForeground (소유자 결정 2026-11-16)", async () => {
+    // 9/20 일, 9/26 토 — 9/23(수)이 골라져 있다.
+    await renderPicker();
+    const dow = (day: string, label: string) =>
+      flatStyle(within(screen.getByTestId(`day-${day}`)).getByText(label).props.style).color;
+    expect(dow("2026-09-20", "일")).toBe(COLORS.accent);
+    expect(dow("2026-09-26", "토")).toBe(COLORS.accent);
+    expect(dow("2026-09-21", "월")).toBe(DAY_STRIP.dowMuted);
+    expect(dow("2026-09-24", "목")).toBe(DAY_STRIP.dowMuted);
+
+    await screen.rerender(
+      <DayPicker
+        cells={cells.map((c) => ({ ...c, selected: c.day === "2026-09-20" }))}
+        onSelect={jest.fn()}
+      />,
+    );
+    expect(dow("2026-09-20", "일")).toBe(COLORS.accentForeground);
+  });
+
+  it("119 — 주말 숫자는 바꾸지 않는다(요일 글자만)", async () => {
+    await renderPicker();
+    const num = within(screen.getByTestId("day-2026-09-26")).getByText("26");
+    expect(flatStyle(num.props.style).color).toBe(COLORS.text);
+  });
 });

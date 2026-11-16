@@ -68,3 +68,7 @@ MVP는 US1+US2(소유자가 짚은 현상 해소). US3는 같은 PR에서 마친
 - [x] T020 갈래 전환 재마운트에도 스트립 위치 유지(`StripMemory`·`memoryRef`) in src/ui/DayPicker.tsx, src/ui/DiaryListScreen.tsx — 리뷰 Important 1, CS-S9
 - [x] T021 먼 칸·범위 앞쪽 변경 직후 이동은 움직임 없이 in src/ui/DayPicker.tsx — 리뷰 Important 2, CS-S10
 - [x] T022 고른 날 변화를 날짜로 비교, `Cell` memo·`renderItem` useCallback, Maestro 칸 정규식을 `day-[0-9]{4}-[0-9]{2}-[0-9]{2}`로 좁힘 — 리뷰 Minor
+
+## Phase 9: 주말 요일 색 (소유자 요청 2026-11-16)
+
+- [x] T023 토·일 요일 글자를 `COLORS.accent`로 in src/ui/DayPicker.tsx, 테스트 **tests**/ui/day-picker.test.tsx, 예외 기록 design/DESIGN.md — FR-013

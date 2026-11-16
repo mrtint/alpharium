@@ -244,7 +244,14 @@ const Cell = memo(function Cell({
   const { day, hasDiary, isToday, selectable, selected } = cell;
   const { date, weekday } = dayParts(day);
   const fg = selected ? COLORS.accentForeground : COLORS.text;
-  const dowColor = selected ? COLORS.accentForeground : DAY_STRIP.dowMuted;
+  // 토·일 요일 글자는 시그니처 주홍이다(119, 소유자 결정 2026-11-16) — 작은 글자 대비 3.76:1로 AA 미달임을 알고 정했다
+  // (design/DESIGN.md 「홈에서 날 옮기기」). 숫자는 바꾸지 않는다. 고른 칸은 주홍 바탕이라 다른 칸과 같은 오프화이트다.
+  const weekend = weekday === 0 || weekday === 6;
+  const dowColor = selected
+    ? COLORS.accentForeground
+    : weekend
+      ? COLORS.accent
+      : DAY_STRIP.dowMuted;
 
   return (
     <Pressable
