@@ -44,7 +44,7 @@
 - [x] T015 [P] `specs/049-home-day-picker/contracts/day-picking.md`의 S4·S6·SW1·SW3~SW6·HS1·DB8 행을 「119 `contracts/strip-scroll.md`로 옮겼다」로 고친다
 - [x] T016 [P] `design/DESIGN.md`·`AGENTS.md` 홈 항목의 스트립 서술(일~토 7칸·주 넘김)과 `src/ui/DaySwipe.tsx` 주석의 `swipeDirectionOf` 언급을 119 기준으로 고친다
 - [x] T017 `npm test`·`npm run lint` 통과, 헌법 검사 통과
-- [ ] T018 iOS 시뮬레이터에서 quickstart 「iOS 시뮬레이터」 1~6을 보고, iPhone 14 개발 서명 Release로 소유자 확인을 받아 `quickstart.md`에 관측/못 본 것을 적는다
+- [X] T018 iOS 시뮬레이터에서 quickstart 「iOS 시뮬레이터」 1~6을 보고, iPhone 14 개발 서명 Release로 소유자 확인을 받아 `quickstart.md`에 관측/못 본 것을 적는다
 
 ## Dependencies
 
