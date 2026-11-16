@@ -5,7 +5,7 @@
  *
  * ─────────────────────────────────────────────────────────────────────────────
  * **§2 성립 조건 (원칙 I)**: 「최근」 목록을 지워도 옛 일기에 닿는 길이 있어야 한다 — 049 스트립(과거
- * 한계 없음)과 050 달력(가장 이른 날 한계 없음)이 그 길이다. 여기서 그 사실을 잠근다. 하나라도
+ * 1년, 그보다 먼 고른 날까지 늘어남 — 119)과 050 달력(가장 이른 날 한계 없음)이 그 길이다. 여기서 그 사실을 잠근다. 하나라도
  * 무너지면 목록이 없어진 뒤 사흘 밖의 옛 일기가 화면에서 사라진다.
  *
  * 소스를 읽는 검사는 주석을 먼저 걷어낸다 — 이 저장소의 주석은 무엇을 왜 금지하는지 적으므로
@@ -17,7 +17,7 @@ import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
-import { cellFor, swipeWeek, type DiaryListItem } from "../../src/app/state";
+import { cellFor, stripCellsFor, type DiaryListItem } from "../../src/app/state";
 import { WRITTEN_DAY_TEXT } from "../../src/ui/home-text";
 
 const ROOT = join(__dirname, "../..");
@@ -66,14 +66,11 @@ describe("★ 051 REACH — 목록 없이도 모든 옛 일기에 닿는다 (§2
     expect(code("src/ui/DateJumpDialog.tsx")).not.toMatch(/minDate/);
   });
 
-  it("REACH3 — 스트립은 과거로 한계 없이 한 주씩 간다 (52주 뒤로)", () => {
-    let day = "2026-09-28";
-    for (let i = 0; i < 52; i += 1) {
-      const previous = swipeWeek(day, "previous", NOW);
-      expect(previous).not.toBeNull();
-      day = previous as string;
-    }
-    expect(day < "2025-10-01").toBe(true);
+  it("REACH3 — 스트립은 1년 전까지 모든 날을 고를 수 있는 칸으로 보이고, 더 먼 날은 달력으로 고르면 스트립이 그 날까지 늘어난다 (119)", () => {
+    const cells = stripCellsFor([], "2026-09-28", NOW);
+    expect(cells[0].day).toBe("2025-09-28");
+    expect(cells.every((c) => c.selectable)).toBe(true);
+    expect(stripCellsFor([], "2019-01-01", NOW)[0].day).toBe("2019-01-01");
   });
 });
 

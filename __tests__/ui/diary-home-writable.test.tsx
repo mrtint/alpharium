@@ -109,7 +109,7 @@ describe("049 HS — 자정 전환과 미리 준비의 범위", () => {
     expect(screen.queryByTestId("day-today-2026-09-25")).toBeNull();
   });
 
-  it("HS2 — 토요일 밤을 넘기면 새 오늘은 다음 주 — 선택은 그대로(보던 주가 남는다)", async () => {
+  it("HS2 — 토요일 밤을 넘겨도 선택은 그대로, 새 오늘 칸이 스트립 끝에 붙는다 (119)", async () => {
     const c = clock("2026-09-26T23:59:30");
     await renderAt(c);
     c.set("2026-09-27T00:00:01");
@@ -118,9 +118,13 @@ describe("049 HS — 자정 전환과 미리 준비의 범위", () => {
     });
 
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("26");
-    expect(screen.getByTestId("day-2026-09-20")).toBeTruthy();
-    // 새 오늘(27일)은 이 주에 없다 — 밑줄이 보이지 않는다.
-    expect(screen.queryByTestId(/^day-today-/)).toBeNull();
+    const cells = screen.getByTestId("day-strip-list").props.data as {
+      day: string;
+      selected: boolean;
+    }[];
+    expect(cells[cells.length - 1].day).toBe("2026-09-27");
+    expect(cells.find((cell) => cell.selected)?.day).toBe("2026-09-26");
+    expect(screen.getByTestId("day-today-2026-09-27")).toBeTruthy();
   });
 
   it("앱으로 돌아오면(active) 곧바로 다시 판정한다 — 잠든 사이 자정이 지났어도", async () => {

@@ -23,11 +23,10 @@ import {
   toList,
   toWriting,
   dayParts,
-  canSwipeNext,
   cellFor,
   swipeDay,
-  swipeWeek,
-  weekCellsFor,
+  stripCellsFor,
+  stripScrollTarget,
   writePromptFor,
   type DiaryListItem,
   type PhotoHint,
@@ -330,82 +329,91 @@ describe("049 writePromptFor — 고른 날 (contracts/day-picking.md WP)", () =
   });
 });
 
-describe("049 weekCellsFor·swipeWeek — 주간 스트립 (contracts/day-picking.md SW)", () => {
+describe("119 stripCellsFor — 오늘에서 끝나는 이어 스크롤 스트립 (contracts/strip-scroll.md SC)", () => {
   const now = new Date("2026-09-24T09:00:00"); // 목요일
 
-  it("★ SW1 — 7칸 일~토, selected 정확히 1, 오늘만 isToday", () => {
-    const cells = weekCellsFor([], writePromptFor([], now), now);
-    expect(cells.map((c) => c.day)).toEqual([
-      "2026-09-20",
-      "2026-09-21",
-      "2026-09-22",
-      "2026-09-23",
-      "2026-09-24",
-      "2026-09-25",
-      "2026-09-26",
-    ]);
-    expect(cells.filter((c) => c.selected).map((c) => c.day)).toEqual(["2026-09-24"]);
+  it("★ CS-SC1 — 마지막 칸이 오늘이고 isToday는 그 칸만", () => {
+    const cells = stripCellsFor([], "2026-09-24", now);
+    expect(cells[cells.length - 1].day).toBe("2026-09-24");
     expect(cells.filter((c) => c.isToday).map((c) => c.day)).toEqual(["2026-09-24"]);
   });
 
-  it("SW1 — 일기가 있는 날만 hasDiary", () => {
-    const cells = weekCellsFor([readable("2026-09-21")], writePromptFor([], now), now);
-    expect(cells.filter((c) => c.hasDiary).map((c) => c.day)).toEqual(["2026-09-21"]);
-  });
-
-  it("★ SW2 — 미래 칸은 누를 수 없고, 몇 주 전 칸은 누를 수 있다", () => {
-    const cells = weekCellsFor([], writePromptFor([], now), now);
-    expect(cells.filter((c) => !c.selectable).map((c) => c.day)).toEqual([
-      "2026-09-25",
-      "2026-09-26",
-    ]);
-    const old = weekCellsFor([], writePromptFor([], now, "2026-08-12"), now);
-    expect(old.every((c) => c.selectable)).toBe(true);
-    expect(old.some((c) => c.isToday)).toBe(false);
-  });
-
-  it("SW3 — 이전 주로 넘기면 같은 요일 (토 26 → 토 19)", () => {
-    const sat = new Date("2026-09-26T09:00:00");
-    expect(swipeWeek("2026-09-26", "previous", sat)).toBe("2026-09-19");
-  });
-
-  it("★ SW4 — 오늘이 든 주로 돌아올 때 유지한 요일이 오늘 이후면 오늘 (clamp)", () => {
-    expect(swipeWeek("2026-09-19", "next", now)).toBe("2026-09-24");
-    expect(swipeWeek("2026-09-15", "next", now)).toBe("2026-09-22");
-  });
-
-  it("★ SW5 — 오늘이 든 주에서는 다음 주가 없다 (튕김)", () => {
-    expect(swipeWeek("2026-09-24", "next", now)).toBeNull();
-    expect(swipeWeek("2026-09-20", "next", now)).toBeNull();
-    expect(canSwipeNext("2026-09-20", now)).toBe(false);
-    expect(canSwipeNext("2026-09-19", now)).toBe(true);
-  });
-
-  it("S1 — 결과는 언제나 오늘 이하다", () => {
-    for (const day of ["2026-09-13", "2026-09-17", "2026-09-19", "2026-09-24"]) {
-      const next = swipeWeek(day, "next", now);
-      if (next !== null) expect(next <= "2026-09-24").toBe(true);
+  it("★ CS-SC2 — 이웃 칸은 언제나 하루 차이(월·연 경계 포함)", () => {
+    const cells = stripCellsFor([], "2026-09-24", now);
+    const ms = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+    for (let i = 1; i < cells.length; i++) {
+      expect(ms(cells[i].day) - ms(cells[i - 1].day)).toBe(86_400_000);
     }
+    const days = cells.map((c) => c.day);
+    expect(days).toContain("2025-12-31");
+    expect(days[days.indexOf("2025-12-31") + 1]).toBe("2026-01-01");
   });
 
-  it("SW6 — 두 달에 걸친 주는 고른 날이 든 주다 (8/31 → 8/30~9/5)", () => {
-    const cells = weekCellsFor([], writePromptFor([], now, "2026-08-31"), now);
-    expect(cells[0].day).toBe("2026-08-30");
-    expect(cells[6].day).toBe("2026-09-05");
+  it("★ CS-SC3 — 기본 366칸, 고른 날이 1년보다 이르면 고른 날부터", () => {
+    const cells = stripCellsFor([], "2026-09-24", now);
+    expect(cells).toHaveLength(366);
+    expect(cells[0].day).toBe("2025-09-24");
+    const far = stripCellsFor([], "2024-02-10", now);
+    expect(far[0].day).toBe("2024-02-10");
+    expect(far[far.length - 1].day).toBe("2026-09-24");
   });
 
-  it("오늘이 일요일이면 여섯 칸이 미래다", () => {
-    const sunday = new Date("2026-09-20T09:00:00");
-    const cells = weekCellsFor([], writePromptFor([], sunday), sunday);
-    expect(cells.filter((c) => !c.selectable)).toHaveLength(6);
-    expect(swipeWeek("2026-09-19", "next", sunday)).toBe("2026-09-20");
+  it("CS-SC4 — selected는 정확히 한 칸, 모든 칸을 누를 수 있다(미래 칸 없음)", () => {
+    const cells = stripCellsFor([], "2026-08-31", now);
+    expect(cells.filter((c) => c.selected).map((c) => c.day)).toEqual(["2026-08-31"]);
+    expect(cells.every((c) => c.selectable)).toBe(true);
+  });
+
+  it("CS-SC5 — 일기가 있는 날만 hasDiary", () => {
+    const cells = stripCellsFor(
+      [readable("2026-09-21"), unreadable("2026-01-03")],
+      "2026-09-24",
+      now,
+    );
+    expect(cells.filter((c) => c.hasDiary).map((c) => c.day)).toEqual(["2026-01-03", "2026-09-21"]);
+  });
+
+  it("CS-SC6 — 주 넘김 함수를 선언하지 않는다(소스)", () => {
+    const source = readFileSync(join(__dirname, "../../src/app/state.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).not.toMatch(/\bweekCellsFor\b/);
+    expect(source).not.toMatch(/\bswipeWeek\b/);
+    expect(source).not.toMatch(/\bcanSwipeNext\b/);
+  });
+});
+
+describe("119 stripScrollTarget — 고른 칸을 화면 안으로 (contracts/strip-scroll.md ST)", () => {
+  const w = 50;
+
+  it("CS-ST1 — 화면 안(첫 칸·끝 칸 포함)이면 null", () => {
+    expect(stripScrollTarget({ index: 10, offset: 10 * w, cellWidth: w })).toBeNull();
+    expect(stripScrollTarget({ index: 16, offset: 10 * w, cellWidth: w })).toBeNull();
+    expect(stripScrollTarget({ index: 13, offset: 10 * w, cellWidth: w })).toBeNull();
+  });
+
+  it("CS-ST2 — 왼쪽 밖이면 그 칸이 왼쪽 끝", () => {
+    expect(stripScrollTarget({ index: 9, offset: 10 * w, cellWidth: w })).toBe(9 * w);
+    expect(stripScrollTarget({ index: 0, offset: 300 * w, cellWidth: w })).toBe(0);
+  });
+
+  it("CS-ST3 — 오른쪽 밖이면 그 칸이 오른쪽 끝", () => {
+    expect(stripScrollTarget({ index: 17, offset: 10 * w, cellWidth: w })).toBe(11 * w);
+  });
+
+  it("반 칸 걸친 오프셋은 가까운 칸으로 본다", () => {
+    expect(stripScrollTarget({ index: 10, offset: 10.4 * w, cellWidth: w })).toBeNull();
+  });
+
+  it("CS-ST4 — 칸 폭이 0 이하이면 null", () => {
+    expect(stripScrollTarget({ index: 0, offset: 100, cellWidth: 0 })).toBeNull();
   });
 });
 
 /**
  * 050 — 한 날 칸 판정 `cellFor` (data-model §1, contracts/dialogs.md CAL6).
  *
- * 달력(`2j`)과 스트립이 **같은 판정 하나**를 쓴다(FR-017). 스트립은 7칸, 달력은 한 달이지만 칸 하나의
+ * 달력(`2j`)과 스트립이 **같은 판정 하나**를 쓴다(FR-017). 스트립은 1년, 달력은 한 달이지만 칸 하나의
  * 판정은 이 함수뿐이다.
  */
 describe("050 cellFor — 한 날 칸 판정", () => {
@@ -436,11 +444,11 @@ describe("050 cellFor — 한 날 칸 판정", () => {
     );
   });
 
-  it("★ CAL6 — weekCellsFor 7칸은 같은 날의 cellFor와 같다", () => {
+  it("★ CAL6 — 스트립 칸은 같은 날의 cellFor와 같다", () => {
     const items = [readable("2026-09-21"), unreadable("2026-09-22")];
     for (const chosen of ["2026-09-24", "2026-09-22", "2026-08-31"]) {
       const prompt = writePromptFor(items, now, chosen);
-      for (const cell of weekCellsFor(items, prompt, now)) {
+      for (const cell of stripCellsFor(items, prompt.day, now)) {
         expect(cell).toEqual(cellFor(cell.day, items, prompt.day, now));
       }
     }

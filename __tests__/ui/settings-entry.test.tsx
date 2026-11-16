@@ -14,7 +14,7 @@ import { fireEvent, render, screen, userEvent } from "@testing-library/react-nat
 import { StyleSheet } from "react-native";
 
 import type { ResolveOutcome } from "../../src/app/resolve-generation";
-import { weekCellsFor, writePromptFor, type DiaryListItem } from "../../src/app/state";
+import { stripCellsFor, writePromptFor, type DiaryListItem } from "../../src/app/state";
 import type { PaperState } from "../../src/app/written-day";
 import type { EnvironmentResolution } from "../../src/config/types";
 import type { DiaryEntry } from "../../src/diary/types";
@@ -48,7 +48,7 @@ function props(
   return {
     items,
     write,
-    cells: weekCellsFor(items, write, NOW),
+    cells: stripCellsFor(items, write.day, NOW),
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
     ...over,

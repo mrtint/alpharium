@@ -28,8 +28,7 @@ import {
   dayOf,
   isDayWritable,
   shiftDay,
-  shiftWeek,
-  weekOf,
+  stripStartDay,
   type DayDate,
 } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
@@ -259,36 +258,60 @@ export function cellFor(
 }
 
 /**
- * 홈 스트립의 7칸 — **고른 날이 든 일~토 주** (049 SW1·SW2, 보드 `1d`).
+ * 홈 스트립의 칸 — **범위 시작일부터 오늘까지 하루에 한 칸** (119 CS-SC1~5).
  *
- * **날짜 계산은 `weekOf()`가 한다** — 하루 경계가 이 파일로 새지 않는다. 칸 하나의 판정은
- * `cellFor()`다(050). 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
+ * 범위 시작은 `stripStartDay()`(오늘부터 1년 전, 고른 날이 더 이르면 고른 날)다. 날짜 계산은
+ * `day-boundary.ts`가 한다 — 하루 경계가 이 파일로 새지 않는다(`DB11`). 칸 하나의 판정은 `cellFor()`의
+ * 규칙과 같고(050 CAL6), 일기 유무는 날짜 집합을 한 번만 만들어 본다(칸이 수백 개다).
+ * 스트립(`DayPicker`)은 판정하지 않고 이 결과만 그린다.
  */
-export function weekCellsFor(
+export function stripCellsFor(
   items: readonly DiaryListItem[],
-  prompt: WritePrompt,
+  selected: DayDate,
   now: Date,
 ): StripCell[] {
-  return weekOf(prompt.day).map((day) => cellFor(day, items, prompt.day, now));
+  const today = dayOf(now);
+  const written = new Set(items.map((item) => item.day));
+  const cells: StripCell[] = [];
+  for (let day = stripStartDay(selected, now); day <= today; day = shiftDay(day, 1)) {
+    cells.push({
+      day,
+      hasDiary: written.has(day),
+      isToday: day === today,
+      selectable: isDayWritable(day, now),
+      selected: day === selected,
+    });
+  }
+  return cells;
 }
 
-/** 스트립을 넘기는 방향 — 오른쪽으로 끌면 이전 주, 왼쪽이면 다음 주 */
-export type SwipeDirection = "previous" | "next";
+/** 스트립에 한 번에 보이는 칸 수 (119 FR-004 — 지금과 같은 7칸) */
+export const STRIP_VISIBLE_CELLS = 7;
 
 /**
- * 주를 넘긴 뒤 고를 날 (049 SW3~SW5, data-model §5).
+ * 고른 칸을 화면 안으로 가져올 스크롤 위치 (119 CS-ST1~4) — **화면 안이면 `null`(움직이지 않는다)**.
  *
- * 요일을 유지한 채 7일 옮긴다. **오늘이 든 주에서는 다음 주가 없다**(`null` — 화면은 튕김만
- * 보인다). 오늘이 든 주로 돌아올 때 유지한 요일이 오늘 이후면 오늘로 맞춘다(FR-006).
+ * 최소 거리만 옮긴다: 왼쪽 밖이면 그 칸이 왼쪽 끝, 오른쪽 밖이면 오른쪽 끝에 온다. 지금 첫 칸은 오프셋을
+ * 칸 폭으로 나눠 반올림한다(붙기 도중의 반 칸 걸침을 가까운 칸으로 본다).
  */
-export function swipeWeek(selected: DayDate, direction: SwipeDirection, now: Date): DayDate | null {
-  if (direction === "previous") return shiftWeek(selected, -1);
-
-  const today = dayOf(now);
-  if (weekOf(selected).includes(today)) return null;
-  const next = shiftWeek(selected, 1);
-  return next > today ? today : next;
+export function stripScrollTarget({
+  index,
+  offset,
+  cellWidth,
+}: {
+  index: number;
+  offset: number;
+  cellWidth: number;
+}): number | null {
+  if (cellWidth <= 0) return null;
+  const first = Math.round(offset / cellWidth);
+  const last = first + STRIP_VISIBLE_CELLS - 1;
+  if (index >= first && index <= last) return null;
+  return index < first ? index * cellWidth : (index - STRIP_VISIBLE_CELLS + 1) * cellWidth;
 }
+
+/** 본문을 미는 방향 — 오른쪽으로 끌면 전날, 왼쪽이면 다음 날 (114) */
+export type SwipeDirection = "previous" | "next";
 
 /**
  * 일기 본문을 밀어 옮길 이웃한 날 (114, contracts/day-swipe.md).
@@ -300,11 +323,6 @@ export function swipeDay(selected: DayDate, direction: SwipeDirection, now: Date
   if (direction === "previous") return shiftDay(selected, -1);
   if (selected >= dayOf(now)) return null;
   return shiftDay(selected, 1);
-}
-
-/** 다음 주로 넘길 수 있는가 — 거짓이면 화면이 끌림에 저항을 건다(러버밴드) */
-export function canSwipeNext(selected: DayDate, now: Date): boolean {
-  return swipeWeek(selected, "next", now) !== null;
 }
 
 /**

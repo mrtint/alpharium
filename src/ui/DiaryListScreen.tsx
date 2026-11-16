@@ -17,12 +17,11 @@
  * 스트립에서 날을 고르며, 신호 줄이 「지금 쓰면 볼 것」을 미리 보이고, 쓰기는 화면 아래
  * 고정 바가 맡는다. 헤더와 목록은 함께 스크롤되고 하단 바만 고정된다(FR-023).
  *
- * **049 — 헤더와 주간 스트립이 보드 `1d` ①②③이 됐다.** 스트립은 고른 날이 든 일~토 주이고
- * 좌우로 넘겨 주를 오간다. 헤더의 날짜는 150ms 크로스페이드로 바뀌고, 상태 줄은 「오늘/이 날
+ * **049 — 헤더와 스트립이 보드 `1d` ①②③이 됐다.** 119 — 스트립은 오늘에서 끝나는 이어 스크롤이다(보드 밖). 헤더의 날짜는 150ms 크로스페이드로 바뀌고, 상태 줄은 「오늘/이 날
  * 일기를 쓸 수 있어요」 또는 그 일기의 제목이다. 헤더에는 누름 처리가 없다(C7).
  *
  * **판정하지 않는다.** 고른 날은 `writePromptFor()`가, 스트립 칸(오늘·미래·점)은
- * `weekCellsFor()`가, 넘긴 뒤의 날은 `swipeWeek()`(`DiaryHomeScreen`)가, 신호 개수는
+ * `stripCellsFor()`가, 신호 개수는
  * `DayPreview`가 정해서 온다. 이 화면은 신호 원형(`DaySignals`)도, 하루 경계도, 지금 시각도
  * 모른다(G9·G10).
  *
@@ -72,7 +71,7 @@ import { useFontScale } from "./font-scale";
 import { AppText } from "./components/Text";
 import { ConstraintBand } from "./components/ConstraintBand";
 import { FadeLayer } from "./components/FadeLayer";
-import { DayPicker } from "./DayPicker";
+import { DayPicker, newStripMemory } from "./DayPicker";
 import { DaySwipe } from "./DaySwipe";
 import {
   DATE_JUMP,
@@ -119,14 +118,10 @@ export type DiaryListScreenProps = {
    * 권한 안내 테스트). 실제 홈은 언제나 넘긴다.
    */
   write?: WritePrompt;
-  /** 주간 스트립의 7칸 (049). `weekCellsFor()`가 만든다 */
+  /** 스트립 칸 — 범위 시작일부터 오늘까지 (119). `stripCellsFor()`가 만든다 */
   cells?: readonly StripCell[];
   /** 스트립에서 하루를 고른다 (009 FR-006). `onWrite`는 여전히 하루를 받지 않는다 */
   onSelectDay?: (day: DayDate) => void;
-  /** 스트립을 넘겼다 (049). 어느 날이 될지는 부르는 쪽이 정한다 */
-  onSwipe?: (direction: SwipeDirection) => void;
-  /** 다음 주로 넘길 수 있는가 (049) — 거짓이면 스트립이 튕긴다 */
-  canSwipeNext?: boolean;
   /**
    * 일기 본문(쓴 날)·재료 지면(안 쓴 날)을 좌우로 밀었다 (114, 보드 밖 초안) — 전날·다음 날로 간다. 어느 날이 될지는 부르는 쪽이 정한다.
    * 큰 날짜 요소의 접근성 동작 「전날」·「다음 날」도 같은 것을 부른다. **쓰는 중에는 넘겨도 쓰지 않는다**(054). 없으면 걸지 않는다.
@@ -162,7 +157,7 @@ export type DiaryListScreenProps = {
   /**
    * 쓰는 중 (054, 보드 `2b`). 있으면 쓴 날 여부와 무관하게 헤더(잠긴 스트립) + 혼잣말 지면 + 검정 「그만두기」 바를
    * 그린다. **문자열만 받는다** — 진행률·시간·글 조각이 들어올 자리가 없다(원칙 IV, FR-007). 이 모드에서는
-   * `onSelectDay`·`onSwipe`·`onPressDate`를 넘겨도 쓰지 않는다 — 잠금은 부르는 쪽의 깜빡임에 기대지 않고 이
+   * `onSelectDay`·`onSwipeDay`·`onPressDate`를 넘겨도 쓰지 않는다 — 잠금은 부르는 쪽의 깜빡임에 기대지 않고 이
    * 화면이 스스로 건다(FR-003·004).
    */
   writing?: { line?: string; name?: string; leaveNote?: string };
@@ -199,8 +194,6 @@ export function DiaryListScreen({
   write,
   cells,
   onSelectDay,
-  onSwipe,
-  canSwipeNext,
   onSwipeDay,
   constraint,
   preview,
@@ -229,6 +222,8 @@ export function DiaryListScreen({
     undefined,
   );
   const stripHeight = useRef(0);
+  // 119 — 스트립은 갈래(쓴 날·안 쓴 날·쓰는 중)마다 트리의 다른 자리라 새로 마운트된다. 보던 자리를 잇는 기억은 여기 하나다.
+  const stripMemory = useRef(newStripMemory());
   const collapsed =
     writing === undefined &&
     write !== undefined &&
@@ -287,15 +282,10 @@ export function DiaryListScreen({
         style={{ opacity: WRITING.stripLockedOpacity }}
         testID="home-strip-lock"
       >
-        <DayPicker canSwipeNext={false} cells={cells ?? []} onSelect={() => {}} />
+        <DayPicker cells={cells ?? []} memoryRef={stripMemory} onSelect={() => {}} />
       </View>
     ) : (
-      <DayPicker
-        canSwipeNext={canSwipeNext}
-        cells={cells ?? []}
-        onSelect={onSelectDay ?? (() => {})}
-        onSwipe={onSwipe}
-      />
+      <DayPicker cells={cells ?? []} memoryRef={stripMemory} onSelect={onSelectDay ?? (() => {})} />
     );
 
   const header =

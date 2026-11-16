@@ -23,8 +23,7 @@ jest.setTimeout(30000);
 
 const resolved: EnvironmentResolution = { ok: true, environment: "dev" };
 const NOW = new Date("2026-09-28T16:00:00");
-const DAY = "2026-09-27"; // 스트립(9/27~10/3)에 보이는 지난 날
-const OTHER = "2026-09-29";
+const DAY = "2026-09-27"; // 스트립 첫 화면에 보이는 지난 날
 
 const signals: DaySignals = {
   date: DAY,
@@ -146,6 +145,10 @@ describe("051 NR — 알림의 날은 홈의 고른 날이다", () => {
     await waitFor(() => expect(screen.getByText("일기 쓰기")).toBeTruthy());
     expect(onInitialDayApplied).not.toHaveBeenCalled();
     expect(onAcknowledge).not.toHaveBeenCalled();
-    expect(screen.queryByTestId(`day-${OTHER}`)).toBeTruthy();
+    // 119 — 스트립에는 미래 칸이 없다. 오늘(9/28) 칸이 골라져 있다.
+    expect(screen.getByTestId("day-2026-09-28")).toHaveProp(
+      "accessibilityState",
+      expect.objectContaining({ selected: true }),
+    );
   });
 });

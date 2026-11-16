@@ -8,7 +8,7 @@ import { act, render, screen, within } from "@testing-library/react-native";
 import { State } from "react-native-gesture-handler";
 import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
 
-import { writePromptFor, weekCellsFor } from "../../src/app/state";
+import { writePromptFor, stripCellsFor } from "../../src/app/state";
 import { DiaryListScreen, type DiaryListScreenProps } from "../../src/ui/DiaryListScreen";
 
 jest.setTimeout(30000);
@@ -23,7 +23,7 @@ async function renderMaterial(over: Partial<DiaryListScreenProps> = {}) {
     onSelectDay: jest.fn(),
     onSwipeDay: jest.fn(),
     write,
-    cells: weekCellsFor([], write, NOW),
+    cells: stripCellsFor([], write.day, NOW),
     ...over,
   };
   await render(<DiaryListScreen {...props} />);

@@ -1,13 +1,13 @@
 /**
- * 일기 홈 — 주 넘기기와 고른 날의 쓰기 (049).
+ * 일기 홈 — 스트립 칸·본문 밀기와 고른 날의 쓰기 (049·114·119).
  *
- * 계약: specs/049-home-day-picker/contracts/day-picking.md HS1·HS4, WP1~WP3
+ * 계약: specs/119-strip-continuous-scroll/contracts/strip-scroll.md CS-HS1·CS-HS2,
+ *       specs/049-home-day-picker/contracts/day-picking.md HS4, WP1~WP3
  *       (이전 파일: diary-home-write-gate.test.tsx — 048 B6 「쓸 수 없는 날의 쓰기」)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * `DiaryListScreen`을 대역으로 바꿔 받은 props를 기록한다 — 스트립을 끌지 않고 `onSwipe`를
- * 직접 부른다. gesture-handler의 jest 레지스트리는 테스트 사이에 핸들러가 남는 것을 실측했다
- * (`day-picker.test.tsx` 참조) — 배선은 그 파일이, 넘긴 뒤 어느 날이 되는지는 여기서 본다.
+ * `DiaryListScreen`을 대역으로 바꿔 받은 props를 기록한다 — 칸 누름(`onSelectDay`)·본문 밀기(`onSwipeDay`)를
+ * 직접 부른다. 스트립 자체의 배선은 `day-picker.test.tsx`가 본다.
  *
  * **048 B6은 이제 성립하지 않는다.** 정오 제한이 사라져 쓸 수 없는 오늘이 없고, 미래 날은
  * `writePromptFor`가 오늘로 떨어뜨린다. 대신 「미래를 골라도 오늘이 쓰인다」를 잠근다. 미래 날의
@@ -73,52 +73,48 @@ async function renderHome(extra: Record<string, unknown> = {}) {
   return run;
 }
 
-describe("049 HS1 — 주 넘기기", () => {
+describe("119 — 스트립은 넘기지 않고 칸을 고른다", () => {
   beforeEach(() => {
     seen.length = 0;
   });
 
-  it("★ HS1 — 오늘이 든 주에서 다음 주로 넘기면 아무 것도 바뀌지 않는다 (튕김)", async () => {
-    const onChooseDay = jest.fn();
-    await renderHome({ chosenDay: "2026-09-24", onChooseDay });
-
-    expect(latest().canSwipeNext).toBe(false);
-    await act(async () => {
-      latest().onSwipe?.("next");
-    });
-    expect(onChooseDay).not.toHaveBeenCalled();
-  });
-
-  it("HS1 — 이전 주로 넘기면 같은 요일 7일 전을 고른다", async () => {
-    const onChooseDay = jest.fn();
-    await renderHome({ chosenDay: "2026-09-24", onChooseDay });
-
-    await act(async () => {
-      latest().onSwipe?.("previous");
-    });
-    expect(onChooseDay).toHaveBeenCalledWith("2026-09-17");
-  });
-
-  it("HS1 — 지난 주에서 다음 주로 넘기면 오늘 이후 요일은 오늘로 맞춘다", async () => {
-    const onChooseDay = jest.fn();
-    await renderHome({ chosenDay: "2026-09-19", onChooseDay });
-
-    expect(latest().canSwipeNext).toBe(true);
-    await act(async () => {
-      latest().onSwipe?.("next");
-    });
-    expect(onChooseDay).toHaveBeenCalledWith("2026-09-24");
-  });
-
-  it("로컬 상태로도 넘어간다 (부모가 들고 있지 않을 때)", async () => {
+  it("★ CS-HS1 — 화면에 주 넘김 입력을 넘기지 않는다(소스·props)", async () => {
     await renderHome();
-    expect(latest().write?.day).toBe("2026-09-24");
+    const props = latest() as unknown as Record<string, unknown>;
+    expect(props.onSwipe).toBeUndefined();
+    expect(props.canSwipeNext).toBeUndefined();
+    for (const file of ["src/ui/DiaryHomeScreen.tsx", "src/ui/DiaryListScreen.tsx"]) {
+      const source = readFileSync(join(__dirname, "../..", file), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/\/\/.*$/gm, "");
+      expect(source).not.toMatch(/\bonSwipe=/);
+      expect(source).not.toMatch(/\bcanSwipeNext\b/);
+      expect(source).not.toMatch(/\bswipeWeek\b/);
+    }
+  });
 
+  it("★ 스트립 칸은 1년 전부터 오늘까지, 마지막 칸이 오늘이다", async () => {
+    await renderHome();
+    const cells = latest().cells ?? [];
+    expect(cells).toHaveLength(366);
+    expect(cells[0].day).toBe("2025-09-24");
+    expect(cells[cells.length - 1].day).toBe("2026-09-24");
+    expect(cells.find((c) => c.selected)?.day).toBe("2026-09-24");
+  });
+
+  it("칸을 누르면 그 날을 고른다 (로컬 상태)", async () => {
+    await renderHome();
     await act(async () => {
-      latest().onSwipe?.("previous");
+      latest().onSelectDay?.("2026-08-02");
     });
-    expect(latest().write?.day).toBe("2026-09-17");
-    expect(latest().cells?.[0].day).toBe("2026-09-13");
+    expect(latest().write?.day).toBe("2026-08-02");
+    expect(latest().cells?.find((c) => c.selected)?.day).toBe("2026-08-02");
+  });
+
+  it("1년보다 먼 날을 고르면 스트립이 그 날까지 늘어난다", async () => {
+    await renderHome({ chosenDay: "2024-05-05", onChooseDay: () => {} });
+    expect(latest().cells?.[0].day).toBe("2024-05-05");
+    expect(latest().cells?.[0].selected).toBe(true);
   });
 });
 
@@ -167,23 +163,16 @@ describe("114 — 본문 밀기로 이웃한 날", () => {
     expect(onChooseDay).toHaveBeenCalledWith("2024-12-31");
   });
 
-  it("★ 로컬 상태로도 넘어가고 스트립이 그 날이 든 주를 따라간다 (주 경계, FR-002)", async () => {
+  it("★ 로컬 상태로도 넘어가고 스트립의 고른 칸이 따라간다 (119 FR-011)", async () => {
     await renderHome({ chosenDay: undefined });
-    // 2026-09-24는 목요일 — 일요일(9/20)로 되돌아가 주 경계(9/19 토)를 넘는다.
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       await act(async () => {
         latest().onSwipeDay?.("previous");
       });
     }
-    expect(latest().write?.day).toBe("2026-09-20");
-    expect(latest().cells?.[0].day).toBe("2026-09-20");
-
-    await act(async () => {
-      latest().onSwipeDay?.("previous");
-    });
     expect(latest().write?.day).toBe("2026-09-19");
-    expect(latest().cells?.[0].day).toBe("2026-09-13");
     expect(latest().cells?.find((c) => c.selected)?.day).toBe("2026-09-19");
+    expect(latest().cells?.[latest().cells!.length - 1].day).toBe("2026-09-24");
   });
 
   it("★ 쓰는 중에는 밀기를 화면에 넘기지 않는다 (FR-006)", async () => {
@@ -197,7 +186,7 @@ describe("114 — 본문 밀기로 이웃한 날", () => {
     expect(latest().onSwipeDay).toBeUndefined();
   });
 
-  it("스트립 `onSwipe`와 같은 상태를 쓴다 — 밀기 직후 칸을 누르면 마지막 입력이 이긴다", async () => {
+  it("스트립 칸과 같은 상태를 쓴다 — 밀기 직후 칸을 누르면 마지막 입력이 이긴다", async () => {
     await renderHome({ chosenDay: undefined });
     await act(async () => {
       latest().onSwipeDay?.("previous");

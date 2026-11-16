@@ -19,7 +19,7 @@
 | 쓴 날 읽기(홈이 곧 상세) | `.maestro/restart-persistence.yml`, `.maestro/diary-body-screen.yml` | `__tests__/ui/written-day-home.test.tsx`, `__tests__/app/written-day.test.ts`, `__tests__/diary/store.test.ts`(직렬화 왕복) | — | — | 층 1과 같음 | — |
 | 강제 종료 후 재시작해도 읽힘 | `.maestro/restart-persistence.yml` | `__tests__/diary/expo-file-sync.test.ts`(비동기 `text()` 호출이 소스에 없음 — 소스만 센다) | — | — (GC가 끼는 확률 결함은 jest에 런타임이 없어 이 흐름이 유일한 방어) | 층 1과 같음 | — |
 | 읽기 스크롤(스트립 접힘) | — | `__tests__/ui/reading-scroll.test.tsx`, `__tests__/app/reading-scroll.test.ts`(접힘 판정) | — | 접힘 움직임·손맛 — 기존 `reading-scroll`이 `-e` 변수를 받아 실행기로 못 돈다. 사람이 `maestro test`로 직접 돌린다 | — | — |
-| 날 고르기(주간 스트립) | `.maestro/week-strip-swipe.yml`, `.maestro/diary-home-1d.yml`, `.maestro/sample-days.yml`(30일치 표본 위 대표 날 여덟 곳으로 이동) | `__tests__/ui/day-picker.test.tsx`, `__tests__/ui/diary-home-week.test.tsx` | — | 스트립 끌림의 손맛 | 층 1과 같음(iOS는 날짜 버튼이 큰 숫자를 가려 골라진 스트립 칸의 글자로 본다) | — |
+| 날 고르기(날 스트립, 119 이어 스크롤) | `.maestro/week-strip-swipe.yml`, `.maestro/diary-home-1d.yml`, `.maestro/sample-days.yml`(30일치 표본 위 대표 날 여덟 곳으로 이동) | `__tests__/ui/day-picker.test.tsx`, `__tests__/ui/diary-home-week.test.tsx` | — | 스트립 관성·붙기의 손맛 | 층 1과 같음(iOS는 날짜 버튼이 큰 숫자를 가려 골라진 스트립 칸의 글자로 본다) | — |
 | 날짜로 이동(달력) | `.maestro/dialog-foundation.yml`, `.maestro/sample-days.yml`(이전 달을 넘겨 먼 날로 이동) | `__tests__/ui/date-jump-dialog.test.tsx`, `__tests__/app/calendar.test.ts` | — | 월·연 목록, 미래 칸 — `dialog-foundation` 머리말에 「사람이 눈으로 본다」로 적혀 있다 | 층 1과 같음 | — |
 | 덮어쓰기 확인 | `.maestro/dialog-foundation.yml`(열고 취소) | `__tests__/ui/overwrite-confirm.test.tsx` | — | 다시 쓰기를 끝까지 하는 것은 생성이라 층 2 | 층 1과 같음(iOS는 대화상자 루트 id가 안 보여 취소 버튼 id로 열림을 본다) | — |
 | 사진 확대 화면 | `.maestro/single-photo-swipe.yml`(쓸기에 안 열림·탭에 열림·뒤로 가기에 닫힘) | `__tests__/ui/photo-viewer.test.tsx`(배선), `__tests__/app/photo-viewer.test.ts`(문턱 판정) | — | 핀치·두 번 탭·이동 — `adb`로 두 손가락 입력을 만들 수 없다 | 층 1과 같음(iOS는 확대 화면 루트 id가 안 보여 닫기 버튼으로 열림·닫힘을 본다) | — |
@@ -48,7 +48,7 @@
 | `.maestro/settings-developer-sweep.yml` | ○ | ○ | 설정 각 행(서체 라이선스 포함), 개발자 메뉴, 진단 | — | — | ○ |
 | `.maestro/dialog-foundation.yml` | ○ | ○ | 날짜로 이동(달력), 덮어쓰기 확인 | — (실측 통과) | — | ○ |
 | `.maestro/diary-home-1d.yml` | ○ | ○ | 날 고르기, 설정 진입 | — (실측 통과) | — | ○ |
-| `.maestro/week-strip-swipe.yml` | ○ | ○ | 날 고르기 | — (실측 통과) | — | ○ |
+| `.maestro/week-strip-swipe.yml` | ○ | ○ | 날 고르기 | — (119에서 이어 스크롤로 다시 썼다 — 새 흐름은 아직 실기기에서 돌리지 않았다) | — | ○ |
 | `.maestro/diary-body-screen.yml` | ○ | ○ | 쓴 날 읽기 | — (실측 통과) | — | ○ |
 | `.maestro/state-simulation.yml` | ○ | ○ | 상태 흉내 | — (실측 통과, 마지막에 둔다) | — | ○ |
 | `.maestro/sample-days.yml` | ○ | ○ | 쓸 재료, 날 고르기, 날짜로 이동 | — (표본 30일치 위에서만 돈다 — `--layer1`의 「표본 보장」이 심고 대표 날 값을 `-e`로 넘긴다. 일반 실행에서는 제외) | — | ○ |

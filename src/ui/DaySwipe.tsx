@@ -21,8 +21,8 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import type { SwipeDirection } from "../app/state";
 
 /**
- * 넘김 판정 수치 — **사람이 정한 값이다**(보드에 수치 없음, 원칙 V). 글을 읽다 스치는 오작동을 줄이려 스트립의 40pt·500보다
- * 크게 잡았다. iPhone에서 손에 맞지 않으면 여기를 고친다 — 실기기에서 재서 정한 값이 아니다.
+ * 넘김 판정 수치 — **사람이 정한 값이다**(보드에 수치 없음, 원칙 V). 글을 읽다 스치는 오작동을 줄이려 옛 주간 스트립(049, 119에서
+ * 걷었다)의 40pt·500보다 크게 잡았다. iPhone에서 손에 맞지 않으면 여기를 고친다 — 실기기에서 재서 정한 값이 아니다.
  */
 export const DAY_SWIPE_DISTANCE = 60;
 export const DAY_SWIPE_VELOCITY = 600;
@@ -32,7 +32,7 @@ export const DAY_SWIPE_FAIL_Y = 12;
 
 /**
  * 손을 뗀 순간의 끌림으로 넘김 방향을 정한다 — 멀리 끌었거나 빠르게 튕겼으면 넘긴다.
- * 오른쪽으로 끌면(양수) 전날 — 스트립(`swipeDirectionOf`)과 같다.
+ * 오른쪽으로 끌면(양수) 전날 — 스트립을 밀 때 지난날이 들어오는 방향과 같다(119).
  */
 export function daySwipeDirectionOf(
   translationX: number,

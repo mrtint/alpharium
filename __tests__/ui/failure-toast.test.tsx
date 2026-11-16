@@ -24,7 +24,7 @@ import { State } from "react-native-gesture-handler";
 import { fireGestureHandler, getByGestureTestId } from "react-native-gesture-handler/jest-utils";
 
 import {
-  weekCellsFor,
+  stripCellsFor,
   writePromptFor,
   type DiaryListItem,
   type WritePrompt,
@@ -89,7 +89,7 @@ describe("T8 — 위치: 바의 잰 높이 + 12", () => {
     return {
       items,
       write,
-      cells: weekCellsFor(items, write, NOW),
+      cells: stripCellsFor(items, write.day, NOW),
       onWrite: jest.fn(),
       toast: { id: 1, text: TOAST_TEXT.retry },
       onDismissToast: jest.fn(),
@@ -120,7 +120,7 @@ describe("T8 — 위치: 바의 잰 높이 + 12", () => {
         {...props({
           items,
           write,
-          cells: weekCellsFor(items, write, NOW),
+          cells: stripCellsFor(items, write.day, NOW),
           writtenAt: "2시간 15분 전에 작성",
           paper: {
             kind: "readable",

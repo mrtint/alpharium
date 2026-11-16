@@ -13,7 +13,7 @@
 | DB5 | `isDayWritable(내일, now)`은 거짓, `isDayWritable(1년 전, now)`은 참 | logic |
 | DB6 | `selectableDays(09-26 09:00)` = `[09-25, 09-24, 09-23]`(오늘 없음), `selectableDays(09-26 12:00)` = `[09-26, 09-25, 09-24]` — **FR-020 보존** | logic |
 | DB7 | `selectableDays(09-26 00:30)` = `[09-25, 09-24, 09-23]`(자정 경계) | logic |
-| DB8 | `weekOf` W1~W4(data-model §2), 연말 2026-12-31 → 12-27~2027-01-02 | logic |
+| DB8 | ~~`weekOf` W1~W4~~ — 119에서 지웠다(`weekOf`·`shiftWeek` 삭제, 119 `contracts/strip-scroll.md` CS-DB1~4) | — |
 | DB9 | `nextDayStartAt(09-26 23:59:30)` = `09-27 00:00` | logic |
 | DB10 | 소스에 `writableAt`·`stripDays`·`STRIP_DAY_COUNT`·`DAY_STARTS_AT_HOUR` 선언이 없다 | 소스 |
 | DB11 | `src/`·`App.tsx`에서 `day-boundary.ts` 밖의 파일이 시(時)를 빼거나 더해 하루 기준을 옮기지 않는다 — `getHours() -`·`getHours() +` 패턴이 0곳. `getHours()` 자체는 허용 목록에서만: `diary/prompt.ts`(사진 시각 표시), `schedule/decision.ts`(목표 시각 창), `vision/select.ts`(자정 기준 하루 안의 분) | 소스 |
@@ -31,6 +31,8 @@
 | WP5 | `overwrites`는 고른 날의 일기 유무만 본다 |
 
 ## SW — 주·스와이프 (`src/app/state.ts`)
+
+> **119가 SW1·SW3~SW6을 대신한다** — 스트립은 오늘에서 끝나는 이어 스크롤이고 주 넘김이 없다(`specs/119-strip-continuous-scroll/contracts/strip-scroll.md` CS-SC·CS-ST). SW2(과거 칸은 누를 수 있다)는 CS-SC4가 잇는다.
 
 | ID | 계약 |
 | --- | --- |
@@ -61,15 +63,15 @@
 | S1 | 칸 testID `day-YYYY-MM-DD`, 점 `day-dot-YYYY-MM-DD` 유지(FR-023) |
 | S2 | 오늘 칸 밑줄 testID `day-today-YYYY-MM-DD`, 선택 여부에 따라 색이 `COLORS.accent` / 선택 글자색 |
 | S3 | 흐린 칸: `disabled`, 불투명도 0.3, 누르면 `onSelect`가 안 불린다 |
-| S4 | 팬 제스처 testID `day-strip-pan`. `fireGestureHandler`로 `translationX: +80` 끝 → `onSwipe("previous")`, `−80` → `onSwipe("next")`, `+20`·속도 0 → 호출 없음. 문턱 판정은 순수 함수 `swipeDirectionOf(dx, vx)`로도 잠근다(RNGH jest 레지스트리가 테스트 사이에 핸들러를 남기는 것을 실측 — 배선은 한 렌더에서만 쏜다) |
+| S4 | **119가 대신한다(CS-S2~S4) — 팬이 없어졌다.** 옛 내용: 팬 제스처 testID `day-strip-pan`. `fireGestureHandler`로 `translationX: +80` 끝 → `onSwipe("previous")`, `−80` → `onSwipe("next")`, `+20`·속도 0 → 호출 없음. 문턱 판정은 순수 함수 `swipeDirectionOf(dx, vx)`로도 잠근다(RNGH jest 레지스트리가 테스트 사이에 핸들러를 남기는 것을 실측 — 배선은 한 렌더에서만 쏜다) |
 | S5 | `DayPicker`는 `Date`·`dayOf`·`new Date(`를 쓰지 않는다(판정하지 않는다, 소스) |
-| S6 | 스트립은 이어 스크롤하지 않는다 — `ScrollView`·`FlatList`를 쓰지 않는다(소스) |
+| S6 | **119가 뒤집었다(CS-S4) — 스트립은 가로 `FlatList` 이어 스크롤이다.** |
 
 ## HS — 홈 화면 조립 (`DiaryHomeScreen`)
 
 | ID | 계약 |
 | --- | --- |
-| HS1 | 스와이프 결과 `null`이면 `onChooseDay`가 불리지 않는다 |
+| HS1 | **119가 대신한다(CS-HS1) — 스트립 넘김 입력이 없다.** |
 | HS2 | 자정 타이머: 가짜 시계로 23:59:30 → 00:00:01을 넘기면 고른 날은 그대로, 밑줄(`day-today-*`)만 새 오늘로 |
 | HS3 | `canPrepare(day) === false`인 날을 고르면 `prepare`·`captionDay`가 안 불리고 `release`가 불린다(R5) |
 | HS4 | 소스에 `writableAt`·`WRITABLE_TIMER_SLACK_MS`·`write-unavailable`이 없다 |

@@ -17,7 +17,7 @@ import type { ReactElement } from "react";
 import { StyleSheet, Text } from "react-native";
 import { SafeAreaInsetsContext } from "react-native-safe-area-context";
 
-import { weekCellsFor, writePromptFor, type DiaryListItem } from "../../src/app/state";
+import { stripCellsFor, writePromptFor, type DiaryListItem } from "../../src/app/state";
 import type { DiaryEntry } from "../../src/diary/types";
 import { DiaryListScreen, type DiaryListScreenProps } from "../../src/ui/DiaryListScreen";
 import { StackLayer } from "../../src/ui/StackLayer";
@@ -65,7 +65,7 @@ function props(
   return {
     items,
     write,
-    cells: weekCellsFor(items, write, NOW),
+    cells: stripCellsFor(items, write.day, NOW),
     onWrite: jest.fn(),
     onSelectDay: jest.fn(),
     ...over,

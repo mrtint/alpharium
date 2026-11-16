@@ -14,7 +14,7 @@
  */
 
 import { act, render, screen, userEvent, waitFor } from "@testing-library/react-native";
-import { BackHandler } from "react-native";
+import { BackHandler, FlatList } from "react-native";
 
 import type { ResolveOutcome } from "../../src/app/resolve-generation";
 import type { EnvironmentResolution } from "../../src/config/types";
@@ -929,7 +929,8 @@ describe("016 — 사진 보기 갈래(많음/보통)", () => {
 describe("050 — 날짜로 이동 (CAL1·CAL7)", () => {
   const NOW = new Date("2026-09-28T09:00:00");
 
-  it("★ 헤더 날짜 → 달력 → ‹ 두 번 → 7/15 → 닫히고 스트립이 7/12~7/18 주, 7/15 선택", async () => {
+  it("★ 헤더 날짜 → 달력 → ‹ 두 번 → 7/15 → 닫히고 스트립이 7/15 칸을 고른다 (119 — 화면 밖이면 그 칸으로 스크롤)", async () => {
+    const scroll = jest.spyOn(FlatList.prototype, "scrollToOffset");
     jest
       .spyOn(BackHandler, "addEventListener")
       .mockImplementation(
@@ -953,11 +954,15 @@ describe("050 — 날짜로 이동 (CAL1·CAL7)", () => {
 
     await waitFor(() => expect(screen.queryByTestId("calendar-dialog")).toBeNull());
     expect(screen.getByTestId("home-day-number")).toHaveTextContent("15");
-    expect(screen.getByTestId("day-2026-07-12")).toBeTruthy();
-    expect(screen.getByTestId("day-2026-07-18")).toBeTruthy();
-    expect(screen.getByTestId("day-2026-07-15")).toHaveProp(
-      "accessibilityState",
-      expect.objectContaining({ selected: true }),
-    );
+    const cells = screen.getByTestId("day-strip-list").props.data as {
+      day: string;
+      selected: boolean;
+    }[];
+    expect(cells.find((cell) => cell.selected)?.day).toBe("2026-07-15");
+    // 7/15는 처음 화면(9/22~9/28) 밖이다 — 그 칸이 왼쪽 끝에 오게 스크롤한다.
+    const index = cells.findIndex((cell) => cell.day === "2026-07-15");
+    const cellWidth = screen.getByTestId("day-strip-list").props.snapToInterval as number;
+    expect(scroll).toHaveBeenCalledWith(expect.objectContaining({ offset: index * cellWidth }));
+    scroll.mockRestore();
   });
 });

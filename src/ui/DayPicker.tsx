@@ -1,192 +1,293 @@
 /**
- * 하루를 고르는 자리 — 홈의 주간 스트립 (049, 보드 `1d` ③).
+ * 하루를 고르는 자리 — 홈의 날 스트립 (119, 이전 049 보드 `1d` ③).
  *
- * 계약: specs/049-home-day-picker/contracts/day-picking.md S1~S6
- *       (이전: specs/048-diary-home-modernist/contracts/home-screen.md — 오늘로 끝나는 7일)
+ * 계약: specs/119-strip-continuous-scroll/contracts/strip-scroll.md CS-S1~S8
+ *       (049 contracts/day-picking.md S1·S2·S3·S5를 잇는다)
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **언제나 일~토 7칸이다.** 칸 수·순서·폭은 바뀌지 않고, 고른 날을 가운데로 옮기거나 이어
- * 스크롤하지 않는다(보드 원문). 좌우로 넘기면 7칸이 통째로 이전·다음 주로 바뀐다 — 칸이 옆으로
- * 흘러 들어오는 페이지 애니메이션은 두지 않는다(교체는 즉시, research R7).
+ * **오늘에서 끝나는 이어 스크롤이다.** 하루에 한 칸, 오른쪽 끝이 오늘이고 왼쪽으로 지난날이 이어진다.
+ * 한 화면에 7칸이 보이고 손을 떼면 칸 경계에 붙는다. 월·주 경계 표시는 없다(소유자가 보여 준 참조
+ * 녹화에 없다 — 월은 헤더의 월 라벨이 고른 날 기준으로 보인다).
  *
- * **판정하지 않는다.** 어느 칸을 누를 수 있는지·어느 칸이 오늘인지는 `weekCellsFor()`가, 넘긴
- * 뒤 어느 날을 고를지는 `swipeWeek()`가 정한다. 여기는 방향(`"previous"`·`"next"`)만 알린다.
- * 지금 시각도 읽지 않는다(S5).
+ * **스크롤은 고른 날을 바꾸지 않는다.** 칸을 눌러야 `onSelect`가 불린다.
  *
- * **다음 주가 없으면 끌림에 저항을 건다**(`canSwipeNext`) — 「살짝 끌리다 제자리로 튕김」.
- * 튕김은 짧은 타이밍 애니메이션이 하고, 날을 바꾸지 않는 것은 `swipeWeek()`가 `null`을 주는 것으로 성립한다.
+ * **판정하지 않는다.** 칸 목록은 `stripCellsFor()`가, 고른 칸을 화면 안으로 가져올 위치는
+ * `stripScrollTarget()`가 정한다. 여기는 지금 시각을 읽지 않는다(049 S5).
  *
- * ★ **넘기면 그 자리에서 바로 교체한다 — 새 주를 미끄러뜨리지 않는다**(실기기, 사용자 관측 「넘기는 중에
- * 숫자가 빠르게 여러 번 바뀐다」). 처음에는 넘길 때도 스프링으로 돌려 놓았는데, 새 주가 끌던 자리에
- * 나타나 되돌아오며 스프링이 좌우로 출렁여 숫자가 여러 번 바뀌는 것처럼 보였다(화면 녹화로 확인).
- * 이제 보이는 숫자는 **끌던 주와 도착한 주 둘뿐이다.** 튕김도 스프링 대신 출렁임 없는 타이밍이다.
+ * **고른 날이 바깥(달력·본문 밀기·자정)에서 바뀌면** 그 칸이 화면 밖일 때만 최소 거리로 옮긴다 —
+ * 화면 안이면 움직이지 않는다. 동작 줄이기가 켜져 있거나 값을 모르면 움직임 없이 옮긴다(100).
  *
- * **팬은 JS 스레드에서 돈다**(`runOnJS(true)`) — worklet·`scheduleOnRN` 없이 콜백을 부를 수
- * 있고 jest에서 `fireGestureHandler`로 그대로 쏠 수 있다. 끌림이 끊겨 보이면(짐작 — 실기기
- * D4에서 확인) worklet으로 바꾼다.
+ * **범위 앞쪽이 바뀌면**(자정에 첫 칸이 빠짐, 1년보다 먼 날을 골라 범위가 늘었다 줄어듦) 같은 오프셋이
+ * 다른 날을 가리킨다. 그래서 앞 칸 목록과 비교해 늘거나 준 칸 수만큼 오프셋을 고쳐, 보던 날이 그대로
+ * 보이게 한다(움직임 없이).
+ *
+ * **칸 폭은 `onLayout`으로 안다.** 재기 전 첫 프레임은 창 폭으로 어림해 그리고(칸 높이는 폭과 무관해 052 읽기
+ * 스크롤 접힘이 기대는 높이가 흔들리지 않는다), 잰 폭이 다르면 목록을 그 폭으로 다시 세워 보던 첫 칸을 그대로 둔다
+ * (`initialScrollIndex`는 처음 세울 때만 듣는다).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useLayoutEffect } from "react";
-import { Pressable, View, type TextStyle } from "react-native";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { memo, useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import {
+  FlatList,
+  Pressable,
+  View,
+  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  type TextStyle,
+  useWindowDimensions,
+} from "react-native";
 
-import { dayParts, type StripCell, type SwipeDirection } from "../app/state";
+import { STRIP_VISIBLE_CELLS, dayParts, stripScrollTarget, type StripCell } from "../app/state";
 import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { weekdayShort } from "./home-text";
+import { useReduceMotion } from "./reduce-motion";
 import { COLORS, DAY_STRIP } from "./theme/tokens";
 
 /**
- * 넘김 판정 수치 — **사람이 정한 값이다**(보드에 수치 없음, research R7).
- * 실기기 D4에서 손에 맞지 않으면 여기를 고친다.
+ * 스트립이 다시 마운트돼도 이어 가는 기억 — 보던 첫 칸의 날과 잰 폭. 부모가 하나 만들어 갈래(쓴 날·안 쓴 날·쓰는 중)를
+ * 넘나드는 동안 같은 것을 넘긴다. 갈래마다 스트립이 트리의 다른 자리에 놓여 새로 마운트되기 때문이다(119 리뷰).
+ * 부모가 `useRef(newStripMemory())`로 들고 ref를 넘기면 스트립이 직접 고쳐 쓴다(렌더에 쓰지 않는 값이라 상태로 두지 않는다).
  */
-const SWIPE_DISTANCE = 40;
-const SWIPE_VELOCITY = 500;
-/** 다음 주가 없을 때 끌림을 줄이는 비율 — 「살짝 끌리다」 */
-const RUBBER_BAND = 0.25;
-/** 넘기지 않고 놓았을 때 제자리로 돌아오는 시간(ms) — 출렁이지 않는다 */
-const RETURN_MS = 180;
-/** 넘겼는데 새 주가 이만큼 안 오면 제자리로 돌린다(ms) — 끌린 채 멈춰 있지 않게 하는 안전장치 */
-const SWAP_TIMEOUT_MS = 1000;
+export type StripMemory = { firstDay: DayDate | null; width: number };
 
-/**
- * 손을 뗀 순간의 끌림으로 넘김 방향을 정한다 — 멀리 끌었거나 빠르게 튕겼으면 넘긴다.
- * 오른쪽으로 끌면(양수) 이전 주 — 과거가 왼쪽에서 들어온다.
- */
-export function swipeDirectionOf(translationX: number, velocityX: number): SwipeDirection | null {
-  const far = Math.abs(translationX) >= SWIPE_DISTANCE;
-  const fast = Math.abs(velocityX) >= SWIPE_VELOCITY;
-  if (!far && !fast) return null;
-  const sign = translationX !== 0 ? translationX : velocityX;
-  return sign > 0 ? "previous" : "next";
+export function newStripMemory(): StripMemory {
+  return { firstDay: null, width: 0 };
 }
 
 export type DayPickerProps = {
-  /** 7칸 — 일요일이 왼쪽. `weekCellsFor()`가 만든다 */
+  /** 범위 시작일부터 오늘까지 하루에 한 칸, 오래된 것이 먼저. `stripCellsFor()`가 만든다 */
   cells: readonly StripCell[];
   onSelect: (day: DayDate) => void;
-  /** 넘긴 방향. 어느 날이 될지는 부르는 쪽이 `swipeWeek()`로 정한다 */
-  onSwipe?: (direction: SwipeDirection) => void;
-  /** 다음 주로 넘길 수 있는가. 거짓이면 왼쪽 끌림에 저항이 걸린다 */
-  canSwipeNext?: boolean;
+  /** 다시 마운트돼도 보던 자리를 잇는 기억. 없으면 마운트마다 처음 자리(FR-008)에서 시작한다 */
+  memoryRef?: RefObject<StripMemory>;
 };
 
-export function DayPicker({ cells, onSelect, onSwipe, canSwipeNext = false }: DayPickerProps) {
-  const translateX = useSharedValue(0);
+/**
+ * 바깥 변경으로 옮길 때 이 칸 수보다 멀면 움직임 없이 옮긴다 — **사람이 정한 값이다**(한 화면). 수백 칸을 미끄러지면
+ * 「짧게 미끄러진다」가 아니게 되고 가상화된 빈 칸이 비칠 수 있다(추정).
+ */
+const ANIMATE_MAX_CELLS = STRIP_VISIBLE_CELLS;
 
-  // 끌림을 따라가고(`drag`), 넘기지 않으면 제자리로 돌아온다(`settle`).
-  const drag = (to: number) => {
-    translateX.value = to;
-  };
-  const settle = () => {
-    translateX.value = withTiming(0, { duration: RETURN_MS });
-  };
+/** 처음 보일 첫 칸 — 오른쪽 끝(오늘)이 보이게, 고른 칸이 그보다 앞이면 고른 칸이 왼쪽 끝 (FR-008) */
+function initialFirstIndex(cells: readonly StripCell[]): number {
+  const rightmost = Math.max(0, cells.length - STRIP_VISIBLE_CELLS);
+  const selected = cells.findIndex((cell) => cell.selected);
+  return selected >= 0 && selected < rightmost ? selected : rightmost;
+}
 
-  // ★ 넘기면 **새 주가 그려지는 그 커밋에서** 제자리로 둔다. 손을 뗀 순간 0으로 두면 새 주가 그려질
-  // 때까지(dev에서 약 0.2초) 끌던 주가 가운데로 돌아와 멈춰 있어, 끌던 주 → 같은 주 → 새 주로 두 번
-  // 바뀌어 보였다(실기기 화면 녹화).
-  const week = cells[0]?.day;
-  const awaitingWeek = useSharedValue(false);
-  const commit = (direction: SwipeDirection) => {
-    awaitingWeek.value = true;
-    onSwipe?.(direction);
-    setTimeout(() => {
-      if (!awaitingWeek.value) return;
-      awaitingWeek.value = false;
-      settle();
-    }, SWAP_TIMEOUT_MS);
-  };
+/** 다시 마운트될 때의 첫 칸 — 기억한 날이 있으면 그 자리, 고른 칸이 그 화면 밖이면 최소 거리만 옮긴 자리 */
+function mountFirstIndex(cells: readonly StripCell[], remembered: DayDate | null): number {
+  const rememberedIndex =
+    remembered === null ? -1 : cells.findIndex((cell) => cell.day === remembered);
+  if (rememberedIndex < 0) return initialFirstIndex(cells);
+  const rightmost = Math.max(0, cells.length - STRIP_VISIBLE_CELLS);
+  const first = Math.min(rememberedIndex, rightmost);
+  const selected = cells.findIndex((cell) => cell.selected);
+  if (selected < 0 || (selected >= first && selected < first + STRIP_VISIBLE_CELLS)) return first;
+  return selected < first ? selected : selected - STRIP_VISIBLE_CELLS + 1;
+}
 
-  const pan = Gesture.Pan()
-    .runOnJS(true)
-    // 가로로 10pt를 넘겨야 팬이 된다 — 그 전에 손을 떼면 칸 탭이다.
-    .activeOffsetX([-10, 10])
-    // 세로로 먼저 움직이면 팬을 포기한다 — 홈의 세로 스크롤과 겨루지 않는다.
-    .failOffsetY([-10, 10])
-    .onUpdate((event) => {
-      const dx = event.translationX;
-      drag(canSwipeNext || dx > 0 ? dx : dx * RUBBER_BAND);
-    })
-    .onEnd((event) => {
-      const direction = swipeDirectionOf(event.translationX, event.velocityX);
-      // 다음 주가 없으면 넘기지 않는다 — 부르는 쪽의 `swipeWeek()`도 `null`을 주지만, 여기서
-      // 거르지 않으면 교체 없이 제자리로 순간이동해 튕김이 사라진다.
-      const moves = direction === "previous" || (direction === "next" && canSwipeNext);
-      if (direction !== null && moves) {
-        commit(direction);
-      } else {
-        settle();
+/** 앞 칸 목록의 첫 날이 새 목록에서 몇 칸 옮겨졌는가 — 범위 앞쪽이 늘면 양수, 줄면 음수 */
+function headShift(previous: readonly StripCell[], next: readonly StripCell[]): number {
+  const oldFirst = previous[0]?.day;
+  const newFirst = next[0]?.day;
+  if (oldFirst === undefined || newFirst === undefined || oldFirst === newFirst) return 0;
+  const grown = next.findIndex((cell) => cell.day === oldFirst);
+  if (grown >= 0) return grown;
+  const shrunk = previous.findIndex((cell) => cell.day === newFirst);
+  return shrunk >= 0 ? -shrunk : 0;
+}
+
+export function DayPicker({ cells, onSelect, memoryRef }: DayPickerProps) {
+  const window = useWindowDimensions();
+  // 기억은 마운트할 때 한 번만 읽는다(지연 초기화) — 렌더마다 읽지 않으므로 그 뒤의 바뀜이 렌더에 새지 않는다.
+  // eslint-disable-next-line react-hooks/refs
+  const [measured, setMeasured] = useState(() => memoryRef?.current.width ?? 0);
+  const width = measured > 0 ? measured : window.width;
+  const cellWidth = width / STRIP_VISIBLE_CELLS;
+  const reduceMotion = useReduceMotion();
+
+  const listRef = useRef<FlatList<StripCell>>(null);
+  // 목록을 세울 때의 첫 칸 — 처음에는 기억한 자리(없으면 오른쪽 끝 또는 고른 칸), 폭이 바뀌어 다시 세우면 보던 첫 칸.
+  // 기억은 위와 같이 마운트할 때 한 번만 읽는다.
+  // eslint-disable-next-line react-hooks/refs
+  const [firstIndex, setFirstIndex] = useState(() => {
+    return mountFirstIndex(cells, memoryRef?.current.firstDay ?? null);
+  });
+  // 지금 스크롤 위치 — 다시 그리지 않으려고 상태가 아니라 ref에 둔다. 처음에는 목록을 세운 첫 칸이다.
+  const offset = useRef(firstIndex * cellWidth);
+  const currentCells = useRef(cells);
+  const previousCells = useRef(cells);
+  const selectedDay = cells.find((cell) => cell.selected)?.day ?? null;
+  const previousSelectedDay = useRef(selectedDay);
+
+  /** 스크롤 위치를 적고 기억에도 보던 첫 칸의 날을 남긴다 */
+  const remember = useCallback(
+    (x: number) => {
+      offset.current = x;
+      if (memoryRef !== undefined && cellWidth > 0) {
+        const index = Math.round(x / cellWidth);
+        memoryRef.current.firstDay = currentCells.current[index]?.day ?? memoryRef.current.firstDay;
       }
-    })
-    // 끌기 전에 끝났거나 취소됐을 때도 제자리로.
-    .onFinalize((_event, success) => {
-      if (!success) settle();
-    })
-    .withTestId("day-strip-pan");
+    },
+    [memoryRef, cellWidth],
+  );
+
+  const onLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      const next = event.nativeEvent.layout.width;
+      if (next <= 0) return;
+      if (memoryRef !== undefined) memoryRef.current.width = next;
+      if (next === width) return;
+      const seen = cellWidth > 0 ? Math.round(offset.current / cellWidth) : firstIndex;
+      offset.current = seen * (next / STRIP_VISIBLE_CELLS);
+      setFirstIndex(seen);
+      setMeasured(next);
+    },
+    [memoryRef, width, cellWidth, firstIndex],
+  );
+
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => remember(event.nativeEvent.contentOffset.x),
+    [remember],
+  );
+
+  // 마운트한 자리도 곧바로 기억한다 — 스크롤 없이 칸을 눌러 갈래가 바뀌어도 같은 자리에서 다시 시작하게.
+  useLayoutEffect(() => {
+    if (memoryRef !== undefined)
+      memoryRef.current.firstDay = currentCells.current[firstIndex]?.day ?? null;
+    // 마운트·다시 세울 때만 — 그 뒤는 `remember`가 적는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstIndex]);
 
   useLayoutEffect(() => {
-    if (!awaitingWeek.value) return;
-    awaitingWeek.value = false;
-    translateX.value = 0;
-  }, [week, translateX, awaitingWeek]);
+    const before = previousCells.current;
+    const selectedBefore = previousSelectedDay.current;
+    currentCells.current = cells;
+    previousCells.current = cells;
+    previousSelectedDay.current = selectedDay;
+    if (cellWidth <= 0 || before === cells) return;
 
-  const dragStyle = useAnimatedStyle(() => ({ transform: [{ translateX: translateX.value }] }));
+    const shift = headShift(before, cells);
+    if (shift !== 0) offset.current += shift * cellWidth;
+
+    // 고른 날이 바뀌었을 때만 화면 안으로 가져온다 — 사용자가 스크롤만 했으면 끼어들지 않는다.
+    const selectedIndex = cells.findIndex((cell) => cell.selected);
+    const target =
+      selectedDay !== selectedBefore && selectedIndex >= 0
+        ? stripScrollTarget({ index: selectedIndex, offset: offset.current, cellWidth })
+        : null;
+
+    if (target !== null) {
+      // 짧은 거리만 미끄러진다 — 범위 앞쪽이 바뀐 직후(네이티브 위치가 아직 옛 값)나 한 화면보다 멀면 움직임 없이.
+      const near = Math.abs(target - offset.current) <= ANIMATE_MAX_CELLS * cellWidth;
+      const animated = reduceMotion === false && shift === 0 && near;
+      remember(target);
+      listRef.current?.scrollToOffset({ offset: target, animated });
+    } else if (shift !== 0) {
+      remember(offset.current);
+      listRef.current?.scrollToOffset({ offset: offset.current, animated: false });
+    }
+  }, [cells, selectedDay, cellWidth, reduceMotion, remember]);
+
+  const getItemLayout = useCallback(
+    (_data: ArrayLike<StripCell> | null | undefined, index: number) => ({
+      length: cellWidth,
+      offset: cellWidth * index,
+      index,
+    }),
+    [cellWidth],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: StripCell }) => <Cell cell={item} onSelect={onSelect} width={cellWidth} />,
+    [onSelect, cellWidth],
+  );
 
   return (
-    <GestureDetector gesture={pan}>
-      <Animated.View style={[STRIP, dragStyle]} testID="day-strip">
-        {cells.map(({ day, hasDiary, isToday, selectable, selected }) => {
-          const { date, weekday } = dayParts(day);
-          const fg = selected ? COLORS.accentForeground : COLORS.text;
-          const dowColor = selected ? COLORS.accentForeground : DAY_STRIP.dowMuted;
-
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected, disabled: !selectable }}
-              disabled={!selectable}
-              key={day}
-              onPress={selectable ? () => onSelect(day) : undefined}
-              style={[CELL, selected ? CELL_SELECTED : null, selectable ? null : CELL_DIMMED]}
-              // **하루마다 따로 준다** — RN 접근성 트리가 평탄화되어 Maestro의 `childOf`가
-              // 통하지 않는다(008 실측). 009의 `day-<date>` 규칙을 그대로 잇는다(FR-023).
-              testID={`day-${day}`}
-            >
-              <AppText style={[DOW, { color: dowColor }]}>{weekdayShort(weekday)}</AppText>
-              <View style={{ alignItems: "center" }}>
-                <AppText style={[NUM, { color: fg }]}>{date}</AppText>
-                {/* 오늘 — 숫자 밑줄(선택되면 선택 칸 글자색). 헤더에는 「오늘」 글자가 없다.
-                    자리는 모든 칸에 둔다 — 오늘이 든 주에서만 스트립이 높아져 넘길 때 아래가 튀었다(실기기). */}
-                <View
-                  style={[
-                    UNDERLINE,
-                    isToday ? { backgroundColor: selected ? fg : COLORS.accent } : null,
-                  ]}
-                  testID={isToday ? `day-today-${day}` : undefined}
-                />
-              </View>
-              {/* 쓴 날의 점. 골라진 칸에서는 글자색으로 보인다. */}
-              <View
-                style={[DOT, hasDiary ? { backgroundColor: selected ? fg : COLORS.accent } : null]}
-                testID={hasDiary ? `day-dot-${day}` : undefined}
-              />
-            </Pressable>
-          );
-        })}
-      </Animated.View>
-    </GestureDetector>
+    <View onLayout={onLayout} style={STRIP} testID="day-strip">
+      <FlatList
+        data={cells}
+        decelerationRate="fast"
+        getItemLayout={getItemLayout}
+        horizontal
+        initialNumToRender={STRIP_VISIBLE_CELLS * 2}
+        initialScrollIndex={Math.min(firstIndex, Math.max(0, cells.length - STRIP_VISIBLE_CELLS))}
+        keyExtractor={(cell) => cell.day}
+        // 폭이 바뀌면 다시 세운다 — 칸 폭이 바뀐 목록의 처음 위치는 `initialScrollIndex`로만 정확히 맞는다.
+        key={width}
+        onScroll={onScroll}
+        ref={listRef}
+        renderItem={renderItem}
+        scrollEventThrottle={16}
+        showsHorizontalScrollIndicator={false}
+        snapToAlignment="start"
+        snapToInterval={cellWidth}
+        testID="day-strip-list"
+      />
+    </View>
   );
 }
+
+const Cell = memo(function Cell({
+  cell,
+  onSelect,
+  width,
+}: {
+  cell: StripCell;
+  onSelect: (day: DayDate) => void;
+  width: number;
+}) {
+  const { day, hasDiary, isToday, selectable, selected } = cell;
+  const { date, weekday } = dayParts(day);
+  const fg = selected ? COLORS.accentForeground : COLORS.text;
+  // 토·일 요일 글자는 시그니처 주홍이다(119, 소유자 결정 2026-11-16) — 작은 글자 대비 3.76:1로 AA 미달임을 알고 정했다
+  // (design/DESIGN.md 「홈에서 날 옮기기」). 숫자는 바꾸지 않는다. 고른 칸은 주홍 바탕이라 다른 칸과 같은 오프화이트다.
+  const weekend = weekday === 0 || weekday === 6;
+  const dowColor = selected
+    ? COLORS.accentForeground
+    : weekend
+      ? COLORS.accent
+      : DAY_STRIP.dowMuted;
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected, disabled: !selectable }}
+      disabled={!selectable}
+      onPress={selectable ? () => onSelect(day) : undefined}
+      style={[CELL, { width }, selected ? CELL_SELECTED : null, selectable ? null : CELL_DIMMED]}
+      // **하루마다 따로 준다** — RN 접근성 트리가 평탄화되어 Maestro의 `childOf`가
+      // 통하지 않는다(008 실측). 009의 `day-<date>` 규칙을 그대로 잇는다(FR-023).
+      testID={`day-${day}`}
+    >
+      <AppText style={[DOW, { color: dowColor }]}>{weekdayShort(weekday)}</AppText>
+      <View style={{ alignItems: "center" }}>
+        <AppText style={[NUM, { color: fg }]}>{date}</AppText>
+        {/* 오늘 — 숫자 밑줄(선택되면 선택 칸 글자색). 헤더에는 「오늘」 글자가 없다.
+            자리는 모든 칸에 둔다 — 오늘 칸이 보일 때만 스트립이 높아지면 아래가 튄다(049 실기기). */}
+        <View
+          style={[UNDERLINE, isToday ? { backgroundColor: selected ? fg : COLORS.accent } : null]}
+          testID={isToday ? `day-today-${day}` : undefined}
+        />
+      </View>
+      {/* 쓴 날의 점. 골라진 칸에서는 글자색으로 보인다. */}
+      <View
+        style={[DOT, hasDiary ? { backgroundColor: selected ? fg : COLORS.accent } : null]}
+        testID={hasDiary ? `day-dot-${day}` : undefined}
+      />
+    </Pressable>
+  );
+});
 
 /**
  * 치수는 보드 `1d`의 값을 옮긴 레이아웃 숫자다(032·047 관례). 색은 `COLORS.*`·`DAY_STRIP.*`만.
  * 선택 칸 글자는 `accentForeground`(보드의 오프화이트).
  */
 const STRIP = {
-  flexDirection: "row",
-  justifyContent: "space-between",
   marginTop: 18,
   borderTopWidth: 2,
   borderTopColor: COLORS.text,
@@ -195,7 +296,6 @@ const STRIP = {
 } as const;
 
 const CELL = {
-  flex: 1,
   alignItems: "center",
   gap: 6,
   paddingVertical: 10,

@@ -25,8 +25,8 @@ import {
   nextDayStartAt,
   selectableDays,
   shiftDay,
-  shiftWeek,
-  weekOf,
+  STRIP_PAST_DAYS,
+  stripStartDay,
 } from "../../src/config/day-boundary";
 
 const SOURCE = readFileSync(join(__dirname, "../../src/config/day-boundary.ts"), "utf8")
@@ -163,59 +163,29 @@ describe("DB6·DB7 selectableDays — 사흘, 정오 이후에만 오늘", () =>
   });
 });
 
-describe("DB8 weekOf·shiftWeek — 일요일 시작 주", () => {
-  it("W1·W2 — 7칸, [0] 일요일 ~ [6] 토요일, 그 날을 포함", () => {
-    const week = weekOf("2026-09-24");
-    expect(week).toEqual([
-      "2026-09-20",
-      "2026-09-21",
-      "2026-09-22",
-      "2026-09-23",
-      "2026-09-24",
-      "2026-09-25",
-      "2026-09-26",
-    ]);
-    week.forEach((day, i) => {
-      const [y, m, d] = day.split("-").map(Number);
-      expect(new Date(y, m - 1, d).getDay()).toBe(i);
-    });
+describe("119 stripStartDay — 스트립 범위의 왼쪽 끝", () => {
+  const at = (iso: string) => new Date(`${iso}T09:00:00`);
+
+  it("CS-DB1 — 오늘부터 365일 전", () => {
+    expect(STRIP_PAST_DAYS).toBe(365);
+    expect(stripStartDay("2026-11-16", at("2026-11-16"))).toBe("2025-11-16");
   });
 
-  it("일요일·토요일 자신도 그 주에 든다", () => {
-    expect(weekOf("2026-09-20")[0]).toBe("2026-09-20");
-    expect(weekOf("2026-09-26")[6]).toBe("2026-09-26");
+  it("CS-DB2 — 고른 날이 더 이르면 고른 날", () => {
+    expect(stripStartDay("2024-03-01", at("2026-11-16"))).toBe("2024-03-01");
+    expect(stripStartDay("2025-11-16", at("2026-11-16"))).toBe("2025-11-16");
   });
 
-  it("W3 — 월 경계를 넘는 주", () => {
-    expect(weekOf("2026-08-31")).toEqual([
-      "2026-08-30",
-      "2026-08-31",
-      "2026-09-01",
-      "2026-09-02",
-      "2026-09-03",
-      "2026-09-04",
-      "2026-09-05",
-    ]);
+  it("CS-DB3 — 윤년을 건너도 365일", () => {
+    expect(stripStartDay("2028-03-01", at("2028-03-01"))).toBe("2027-03-02");
   });
 
-  it("W3 — 연말 2026-12-31 → 12-27 ~ 2027-01-02", () => {
-    expect(weekOf("2026-12-31")).toEqual([
-      "2026-12-27",
-      "2026-12-28",
-      "2026-12-29",
-      "2026-12-30",
-      "2026-12-31",
-      "2027-01-01",
-      "2027-01-02",
-    ]);
-  });
-
-  it("W4 — shiftWeek는 같은 요일로 ±7n일", () => {
-    expect(shiftWeek("2026-09-26", -1)).toBe("2026-09-19");
-    expect(shiftWeek("2026-09-19", 1)).toBe("2026-09-26");
-    expect(shiftWeek("2027-01-02", -1)).toBe("2026-12-26");
-    expect(shiftWeek("2026-09-26", -4)).toBe("2026-08-29");
-    expect(weekOf(shiftWeek("2026-09-24", -1))[0]).toBe("2026-09-13");
+  it("CS-DB4 — weekOf·shiftWeek를 내보내지 않는다(소스)", () => {
+    const source = readFileSync(join(__dirname, "../../src/config/day-boundary.ts"), "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(source).not.toMatch(/export function weekOf\b/);
+    expect(source).not.toMatch(/export function shiftWeek\b/);
   });
 });
 
@@ -245,11 +215,10 @@ describe("114 shiftDay — 하루씩 옮긴다", () => {
     expect(shiftDay("2026-11-02", -1)).toBe("2026-11-01");
   });
 
-  it("shiftWeek와 같은 계산이다 (7일)", () => {
-    for (const day of ["2026-09-26", "2027-01-02", "2028-02-29"]) {
-      expect(shiftDay(day, 7)).toBe(shiftWeek(day, 1));
-      expect(shiftDay(day, -7)).toBe(shiftWeek(day, -1));
-    }
+  it("7일씩 옮겨도 같은 요일이다", () => {
+    expect(shiftDay("2026-09-26", 7)).toBe("2026-10-03");
+    expect(shiftDay("2027-01-02", -7)).toBe("2026-12-26");
+    expect(shiftDay("2028-02-29", 7)).toBe("2028-03-07");
   });
 });
 
