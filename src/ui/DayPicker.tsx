@@ -155,6 +155,14 @@ export function DayPicker({ cells, onSelect, memoryRef }: DayPickerProps) {
     [remember],
   );
 
+  // 마운트한 자리도 곧바로 기억한다 — 스크롤 없이 칸을 눌러 갈래가 바뀌어도 같은 자리에서 다시 시작하게.
+  useLayoutEffect(() => {
+    if (memoryRef !== undefined)
+      memoryRef.current.firstDay = currentCells.current[firstIndex]?.day ?? null;
+    // 마운트·다시 세울 때만 — 그 뒤는 `remember`가 적는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstIndex]);
+
   useLayoutEffect(() => {
     const before = previousCells.current;
     const selectedBefore = previousSelectedDay.current;

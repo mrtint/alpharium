@@ -363,4 +363,12 @@ describe("119 DayPicker — 오늘에서 끝나는 이어 스크롤 스트립", 
     );
     expect(list().props.initialScrollIndex).toBe(19 - 6);
   });
+
+  it("리뷰 — 마운트한 자리도 곧바로 기억한다(스크롤하지 않아도)", async () => {
+    const memoryRef = { current: newStripMemory() };
+    await render(
+      <DayPicker cells={month("2026-09-05")} memoryRef={memoryRef} onSelect={jest.fn()} />,
+    );
+    expect(memoryRef.current.firstDay).toBe("2026-09-05");
+  });
 });
