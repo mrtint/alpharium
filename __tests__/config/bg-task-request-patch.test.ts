@@ -235,3 +235,39 @@ describe("다음 요청을 먼저 낸다", () => {
     );
   });
 });
+
+/**
+ * 120 — 안드로이드: 새 프로세스에서 태스크가 다시 등록될 때 돌고 있는 워커를 교체(REPLACE)해 취소하지 않는다.
+ *
+ * 실기기(SM-S901N, 2026-11-17, 2회 중 2회): 잡이 새 프로세스를 띄우면 `doWork` 직후 JS 쪽 등록이 `scheduleWorker`를 다시 부른다.
+ * expo의 가드는 고유 작업 목록의 **첫 항목**만 봤는데, 주기 실행은 APPEND로 이어 붙어 목록 앞에는 끝난 작업이 쌓여 있다
+ * (기기의 WorkManager DB: SUCCEEDED 4 + ENQUEUED 1). 가드가 빗나가 REPLACE가 돌던 워커를 취소했고, 잡이 0.2초 만에 끝난 것으로
+ * 처리돼 삼성 freecess가 3초 뒤 프로세스를 얼렸다 — 장부는 `started`에 멈추고 일기는 저장되지 않았다.
+ */
+describe("120 — 안드로이드 워커 가드는 고유 작업 목록 전체에서 살아 있는 작업을 찾는다", () => {
+  const KOTLIN = strip(
+    readFileSync(
+      join(
+        ROOT,
+        "node_modules/expo-background-task/android/src/main/java/expo/modules/backgroundtask/BackgroundTaskScheduler.kt",
+      ),
+      "utf8",
+    ),
+  );
+  const body = /private suspend fun getWorkerInfo[\s\S]*?\n {2}}\n/.exec(KOTLIN)?.[0] ?? "";
+
+  it("getWorkerInfo가 목록의 첫 항목을 그대로 돌려주지 않는다", () => {
+    expect(body).not.toBe("");
+    expect(body).not.toMatch(/return workInfos\.firstOrNull\(\)\s*\n/);
+  });
+
+  it("대기·실행 중인 작업을 먼저 고르고, 없을 때만 첫 항목이다", () => {
+    expect(body).toMatch(
+      /workInfos\.firstOrNull \{\s*it\.state == WorkInfo\.State\.RUNNING \|\| it\.state == WorkInfo\.State\.ENQUEUED\s*\}\s*\?: workInfos\.firstOrNull\(\)/,
+    );
+  });
+
+  it("가드와 취소 판정이 모두 getWorkerInfo를 거친다(목록을 따로 읽는 자리가 없다)", () => {
+    expect(KOTLIN.match(/getWorkInfosForUniqueWork\(/g)).toHaveLength(1);
+  });
+});
