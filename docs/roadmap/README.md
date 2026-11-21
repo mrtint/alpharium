@@ -193,7 +193,7 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 
 **위험**: 이 앱의 약속(배터리·권한)에 가장 크게 닿는 과제다. 백그라운드 쓰기와 같은 OS 제한(삼성 얼림·iOS 깨움 비보장)을 받아 며칠 단위 실측이 든다 — 개발 빌드 검증이 끝나기 전에는 릴리스 빌드로 가지 않는다(작업 습관). 위치 이력은 이 앱이 지금 다루는 어떤 데이터보다 민감해 소유자 판단이 필요하다.
 
-### 온디바이스 일기 모델 교체와 R2 미러·폴백 내려받기
+### 온디바이스 일기 모델 교체와 R2 미러·폴백 내려받기 (스펙 122)
 
 **배경**: `src/models/roster.ts`의 `ASSETS.quiet`(`key: "a1"`)는 현재 순정 `Q4_K_M` 모델(`1_522_796_768` B, `md5=d8506380fd1f0fdb8e4318a01b8b8e34`)과 단일 Hugging Face 경로를 쓰고, `src/inference/sampling.ts`는 미실측 짐작값(`temperature: 0.8`, `top_p: 0.95`)을 둔 상태다. 옆 저장소(`terrarium` `EXP-013`~`EXP-015`·`US-020`)에서 일기 특화 `kanana-v3-dpo-iq4_nl_im.gguf`(`expectedBytes: 1_241_435_520` / `1.156 GiB`, 순정 대비 `-268.3 MiB`, `md5: "dfc35a88fb1f5215f708ea5a348121b8"`)와 샘플링 최적값(`temperature: 0.60`, `top_p: 0.90`)이 확정됐고, Cloudflare R2 버킷(`models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf`)과 Hugging Face Hub 폴백 경로 모두 `HTTP 200`·`Content-Length`·`Range 206` 검증을 마쳤다.
 
