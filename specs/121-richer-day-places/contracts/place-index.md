@@ -14,11 +14,11 @@
 `category` 코드: 0 station · 1 landmark · 2 park · 3 mall · 4 institution · 5 building · 6 residential · 7 locality.
 
 IX0. 건물·기관은 경계 상자만 남고 상자로 안·밖을 가른다. int16 범위(±0.327도)를 넘어 꼭짓점을 담을 수 없는 그 밖의 면은 상자도 두지 않고 점(대표 좌표)으로만 남는다 — 상자로 가르면 해상 국립공원 셋(한려·다도해·변산반도)이 목포·여수·통영·거제를 통째로 품었다(코드 리뷰, 2026-11-21).
-IX6. 역(`station`)은 철도역뿐이다 — `railway=station|halt`, 또는 `public_transport=station`에 `train|subway|light_rail|monorail|tram=yes`. 버스·여객선 터미널과 탈것 태그 없는 정류장은 명소(이름 그대로, 「역」을 붙이지 않는다). `office`는 공공·연구·기업처럼 그 자리를 대표할 만한 종류만 건물로 받는다(중개·법무·세무·이사·물류·`yes`는 뺀다).
+IX6. 역(`station`)은 철도역뿐이다 — `railway=station|halt`, 또는 `public_transport=station`에 `train|subway|light_rail|monorail|tram=yes`. 버스·여객선 터미널과 탈것 태그 없는 정류장은 명소(이름 그대로, 「역」을 붙이지 않는다). `office`는 공공·행정·외교·공단(`government`·`administrative`·`diplomatic`·`quango`)만 건물로 받고 민간 회사·학원·대리점·중개·법무·세무·`yes`는 뺀다. 동네 의원(`○○의원`·진료과목·비만/피부숍 등, 병원·의료원·보건소 제외)·학원·교습소·법인 표지(`(주)` 등)와 가게·숙박·유흥 상호명도 `categorize.ts`에서 거른다.
 IX1. 머리 매직·판이 다르거나 길이가 맞지 않으면 파서는 던진다(포트가 잡아 `unknown`으로 접는다).
 IX2. 이름은 모두 한글을 하나 이상 품는다.
 IX3. 가게·음식점 범주가 없다(코드 8 이상 없음).
-IX4. 파일 크기 ≤ 10MB(SC-006). 2026-11-21 데이터 9.70MB — 다음 OSM 갱신에서 넘으면 형식(칸 색인 미리 계산 등)을 다시 본다.
+IX4. 파일 크기 ≤ 10MB(SC-006). 2026-11-21 데이터 9.05MB(161,204곳) — 다음 OSM 갱신에서 넘으면 형식(칸 색인 미리 계산 등)을 다시 본다.
 IX5. `kr-places.meta.json`의 sha256이 파일과 같다(테스트가 대조).
 
 ## 이름 고르기 `choosePlaceName(index, coordinate): PlaceName`

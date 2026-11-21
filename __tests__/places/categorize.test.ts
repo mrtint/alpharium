@@ -25,9 +25,9 @@ describe("categorize", () => {
     [{ amenity: "university" }, "institution"],
     [{ amenity: "exhibition_centre" }, "institution"],
     [{ building: "commercial" }, "building"],
-    [{ office: "company" }, "building"],
     [{ office: "government" }, "building"],
-    [{ office: "research" }, "building"],
+    [{ office: "diplomatic" }, "building"],
+    [{ office: "quango" }, "building"],
     [{ landuse: "residential" }, "residential"],
     [{ building: "apartments" }, "residential"],
     [{ place: "neighbourhood" }, "locality"],
@@ -42,18 +42,28 @@ describe("categorize", () => {
     [{ amenity: "restaurant" }],
     [{ amenity: "fast_food" }],
     [{ amenity: "bank" }],
+    [{ amenity: "clinic" }],
     [{ shop: "clothes", building: "yes" }],
     [{ amenity: "cafe", building: "commercial" }],
+    [{ building: "apartments", shop: "convenience" }],
+    [{ building: "commercial", tourism: "motel" }],
+    [{ building: "yes", leisure: "fitness_centre" }],
+    [{ building: "yes", healthcare: "clinic" }],
+    [{ building: "retail" }],
     [{ highway: "residential" }],
-    // 리뷰 — 중개·법무·세무·이사 사무소는 가게 수준이다(소유자: 가게·음식점 제외)
+    // 리뷰 — 중개·법무·세무·이사 사무소와 민간 회사·학원·대리점은 상호 수준이라 담지 않는다
     [{ office: "estate_agent" }],
     [{ office: "lawyer" }],
     [{ office: "tax_advisor" }],
     [{ office: "moving_company" }],
     [{ office: "logistics" }],
+    [{ office: "company" }],
+    [{ office: "it" }],
+    [{ office: "educational_institution" }],
+    [{ office: "telecommunication" }],
     [{ office: "yes" }],
     [{}],
-  ])("가게·음식점·기타는 null — %j", (tags) => {
+  ])("가게·음식점·상호·기타는 null — %j", (tags) => {
     expect(categorize(tags)).toBeNull();
   });
 
@@ -81,5 +91,43 @@ describe("placeNameOf", () => {
 
   it("앞뒤 공백을 걷는다", () => {
     expect(placeNameOf({ name: "  경복궁 " })).toBe("경복궁");
+  });
+
+  it("동네 의원·진료과목은 null이고, 병원·의료원·보건소·의원회관은 남긴다", () => {
+    expect(placeNameOf({ name: "엔비의원" })).toBeNull();
+    expect(placeNameOf({ name: "김동훈한의원" })).toBeNull();
+    expect(placeNameOf({ name: "연세미메이드치과" })).toBeNull();
+    expect(placeNameOf({ name: "메이저피부과 성신여대점" })).toBeNull();
+    expect(placeNameOf({ amenity: "hospital", name: "바른정내과" })).toBeNull();
+    expect(placeNameOf({ amenity: "hospital", name: "킴스코바디스타일 서면본점" })).toBeNull();
+
+    expect(placeNameOf({ amenity: "hospital", name: "삼성서울병원" })).toBe("삼성서울병원");
+    expect(placeNameOf({ amenity: "hospital", name: "성남시의료원" })).toBe("성남시의료원");
+    expect(placeNameOf({ amenity: "hospital", name: "남양주보건소" })).toBe("남양주보건소");
+    expect(placeNameOf({ amenity: "hospital", name: "서울대학교치과병원" })).toBe(
+      "서울대학교치과병원",
+    );
+    expect(placeNameOf({ name: "국회의원회관" })).toBe("국회의원회관");
+  });
+
+  it("학원·교습소는 null이고, 대학원·과학원은 남긴다", () => {
+    expect(placeNameOf({ name: "플러스 수학 학원" })).toBeNull();
+    expect(placeNameOf({ name: "이산국어수학전문학원" })).toBeNull();
+    expect(placeNameOf({ name: "메이플어학원" })).toBeNull();
+    expect(placeNameOf({ name: "한빛 정보 통신학원" })).toBeNull();
+    expect(placeNameOf({ name: "학교법인 영신학원" })).toBeNull();
+
+    expect(placeNameOf({ name: "법학전문대학원" })).toBe("법학전문대학원");
+    expect(placeNameOf({ name: "국립기상과학원" })).toBe("국립기상과학원");
+    expect(placeNameOf({ name: "고려신학대학원" })).toBe("고려신학대학원");
+  });
+
+  it("법인 표지·상호명과 동네 수리/애완 병원 이름은 null이다", () => {
+    expect(placeNameOf({ name: "(주)이너웨이브" })).toBeNull();
+    expect(placeNameOf({ name: "한국토코넷(주)" })).toBeNull();
+    expect(placeNameOf({ name: "만복부동산" })).toBeNull();
+    expect(placeNameOf({ name: "파랑새노래방" })).toBeNull();
+    expect(placeNameOf({ name: "힐링PC방" })).toBeNull();
+    expect(placeNameOf({ name: "컴퓨터종합병원" })).toBeNull();
   });
 });
