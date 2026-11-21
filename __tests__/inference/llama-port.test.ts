@@ -1468,7 +1468,7 @@ describe("091 — 조각 생성 (PC3·PC5)", () => {
     expect(calls).toHaveLength(1);
   });
 
-  it("123 — 제목 호출(ask)은 앞부분 KV가 본문 직후 그대로 있으므로 미리 읽기 없이 곧바로 조각 생성한다 (iOS 실측: 미리 읽기가 KV를 버리고 다시 읽었다)", async () => {
+  it("123 — 앱이 앞에 있으면 제목 호출(ask)은 앞부분 KV가 본문 직후 그대로 있으므로 미리 읽기 없이 곧바로 조각 생성한다 (iOS 실측: 미리 읽기가 KV를 버리고 다시 읽었다)", async () => {
     // 본문(run): 미리 읽기 둘 + 조각 하나, 제목(ask): 조각 하나뿐이어야 한다
     const { context, calls } = chunkedContext([
       { text: "버림" },
@@ -1481,6 +1481,7 @@ describe("091 — 조각 생성 (PC3·PC5)", () => {
       pacing: { pauseRatio: 0, chunkTokens: 32, prefillChars: 10 },
       sleep: async () => {},
       onChunk,
+      isActive: () => true,
     });
     await engine.load(QUIET);
     await engine.run("프롬프트", { timeoutMs: 1000 });
@@ -1493,6 +1494,34 @@ describe("091 — 조각 생성 (PC3·PC5)", () => {
     expect(calls[3].prompt).toBe(FORMATTED);
     // 박동은 제목 조각 하나만큼 더 난다(092 — 제목 구간도 박동이 나온다)
     expect(onChunk).toHaveBeenCalledTimes(4);
+  });
+
+  it("123 — 앱이 앞이 아니거나(앱 밖) 앞인지 모르거나 알아보다 던지면 제목 호출도 종전 미리 읽기를 한다 (092 앱 밖 보호)", async () => {
+    for (const isActive of [
+      () => false,
+      undefined,
+      () => {
+        throw new Error("x");
+      },
+    ]) {
+      const { context, calls } = chunkedContext([
+        { text: "버림" },
+        { text: "버림" },
+        { text: "본문", eos: true },
+        { text: "버림" },
+        { text: "버림" },
+        { text: "제목", eos: true },
+      ]);
+      const engine = createLlamaEngine(async () => context, pathFor, {
+        pacing: { pauseRatio: 0, chunkTokens: 32, prefillChars: 10 },
+        sleep: async () => {},
+        ...(isActive === undefined ? {} : { isActive }),
+      });
+      await engine.load(QUIET);
+      await engine.run("프롬프트", { timeoutMs: 1000 });
+      await engine.ask("프롬프트", "본문", "제목은?", { timeoutMs: 1000 });
+      expect(calls.slice(3).map((c) => c.n_predict)).toEqual([1, 1, 32]);
+    }
   });
 
   it("123 — 본문(run)은 종전대로 미리 읽는다 (그만두기·박동·092 앱 밖 읽기 보호는 그대로)", async () => {
