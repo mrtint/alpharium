@@ -4,7 +4,7 @@
 
 **Created**: 2026-11-21
 
-**Status**: Draft
+**Status**: Completed
 
 **Input**: 설계문서 `docs/superpowers/specs/2026-11-21-richer-day-places-design.md` — 일기가 하루의 장소를 여러 자리·장소명으로 「근처」 짐작하며 시각순으로 말한다(기기 안 장소 데이터, OS 역지오코딩·위치 권한 제거, 설정 켬/끔).
 

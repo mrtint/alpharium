@@ -80,9 +80,9 @@
 - [X] T044 위반 주입: `src/`에 `import("expo-location")`, `PERMISSION_REQUIREMENTS`에 `location`, `prompt.ts`에 「다녀온 곳은」을 각각 넣어 테스트가 잡는지 확인하고 되돌림
 - [X] T045 `AGENTS.md` 갱신(장소명 = 기기 안 OSM 데이터, 역지오코딩·위치 권한 없음, 데이터 다시 만들기 절차) — `AGENTS.md`
 - [X] T046 `npm test`·`npm run lint`(tsc 0 포함) 통과
-- [ ] T047 실기기: `npx expo prebuild --platform android --clean` → `dumpsys package`로 위치 권한 부재 확인, SM-S901N dev 빌드에서 `sample:seed` 여러 곳 날 일기(프롬프트 미리보기·본문), 「끔」 다시 쓰기, 비행기 모드, 이름 찾기 시간(SC-007) — 기록 `specs/121-richer-day-places/quickstart.md`
-- [ ] T048 실기기: iPhone 14 개발 서명 빌드에서 여러 곳 날 일기 1회 — 기록 `quickstart.md`
-- [ ] T049 시뮬레이터: 첫 실행 권한 단계(위치 없음)·설정 대화상자 두 칸·글꼴 2.0배 — 기록 `quickstart.md`
+- [X] T047 실기기: `npx expo prebuild --platform android --clean` → `dumpsys package`로 위치 권한 부재 확인, SM-S901N dev 빌드에서 `sample:seed` 여러 곳 날 일기(프롬프트 미리보기·본문), 「끔」 다시 쓰기, 비행기 모드, 이름 찾기 시간(SC-007) — 기록 `specs/121-richer-day-places/quickstart.md`
+- [X] T048 실기기: iPhone 14 개발 서명 빌드에서 여러 곳 날 일기 1회 — 기록 `quickstart.md`
+- [X] T049 시뮬레이터: 첫 실행 권한 단계(위치 없음)·설정 대화상자 두 칸·글꼴 2.0배 — 기록 `quickstart.md`
 
 ## Dependencies
 
