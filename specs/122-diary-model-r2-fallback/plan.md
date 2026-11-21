@@ -44,4 +44,14 @@ __tests__/models/acquisition-fallback.test.ts  (신규)
 __tests__/models/roster.test.ts, __tests__/app/module-lines|redownload 테스트, __tests__/inference/sampling.test.ts (신규), __tests__/models/boundaries.test.ts
 ```
 
+site/privacy/index.html      모듈 내려받기 받는 곳에 Cloudflare(R2) 추가, 크기 약 1.7GB
+site/support/index.html      모듈 크기 약 1.7GB
+site/licenses/index.html     kanana 항목 출처를 운영자 수정본(DPO·양자화)으로
+docs/store/privacy-declarations.md  R2 반영, IP 판단은 소유자 재검토 [미확인]
+__tests__/privacy/*          허용 호스트에 r2.dev, 방침 항목·라이선스 출처 단언
+
+**공개 문서 갱신 근거**: 앱이 접속하는 외부 호스트가 늘면 방침이 먼저 바뀌어야 한다(086 — 방침 → 선언 초안 → 표 순서,
+`policy-facts.test.ts` F3가 허용 목록 밖 호스트를 막는다). 받는 파일이 DevQuasar 재배포본에서 운영자 수정본으로 바뀌어
+라이선스 페이지의 출처가 틀리게 된다(Apache 2.0 — 수정본임을 밝힌다).
+
 **Structure Decision**: 기존 `src/models/` 경계 안에서만 바꾼다. 구간 코어(`segmented/`)·`expo-port.ts`는 손대지 않는다.

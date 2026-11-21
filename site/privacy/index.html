@@ -50,16 +50,18 @@
     <section data-outbound="model-download">
       <h3>모듈 내려받기</h3>
       <!-- 근거: 설계 §1.3 [코드] — src/models/roster.ts·src/vision/roster.ts 의 huggingface.co 주소, 앱이 직접 받는다 -->
+      <!-- 근거: 122 [코드] — src/models/roster.ts 일기 모듈의 주 경로는 운영자의 Cloudflare R2 공개 버킷(r2.dev), 실패하면 huggingface.co로 넘어간다 -->
+      <!-- 근거: [문서] Cloudflare, Inc.는 미국 회사다(cloudflare.com/privacypolicy). 운영자는 버킷 관리 화면에서 요청 수 같은 집계를 볼 수 있다 — 요청별 IP 기록은 운영자가 따로 켜거나 보관하지 않는다 -->
       <!-- 근거: [코드] src/models/expo-port.ts — 앱이 요청에 직접 붙이는 머리는 Range 하나다. 인증 토큰·기기 식별자·계정은 없다 -->
       <!-- 근거: [미확인] 휴대폰의 네트워크 기능(OS·네이티브 다운로드 모듈)이 붙이는 머리는 패킷으로 재지 않았다 → 「기기·앱 종류를 알리는 정보」로 묶고 「등」을 쓰지 않는다 -->
       <!-- 근거: [문서] Hugging Face, Inc.는 미국 회사다(huggingface.co/privacy). 108 — 운영자가 넘기는 것이 아니라 휴대폰이 직접 요청한다 -->
-      <p>처음 실행할 때와 모듈을 다시 받을 때, 일기를 쓰는 데 필요한 모듈(약 2.0GB)을 Hugging Face와 그 전송망에서 받습니다. 운영자가 정보를 모아 넘기는 것이 아니라 휴대폰이 Hugging Face에 직접 파일을 요청합니다. 사진과 일기는 보내지 않습니다.</p>
+      <p>처음 실행할 때와 모듈을 다시 받을 때, 일기를 쓰는 데 필요한 모듈(약 1.7GB)을 받습니다. 일기 모듈은 운영자가 Cloudflare에 올려 둔 저장소에서 먼저 받고, 받지 못하면 Hugging Face에서 받습니다. 사진 모듈은 Hugging Face에서 받습니다. 운영자가 정보를 모아 넘기는 것이 아니라 휴대폰이 이 곳들에 직접 파일을 요청합니다. 사진과 일기는 보내지 않습니다.</p>
       <ul>
-        <li>받는 곳: Hugging Face, Inc.(미국)와 그 전송망</li>
+        <li>받는 곳: Cloudflare, Inc.(미국)의 저장소(운영자가 빌려 쓰는 곳), Hugging Face, Inc.(미국)와 그 전송망</li>
         <li>받는 정보: IP 주소, 요청 시각, 받는 파일의 주소, 휴대폰의 네트워크 기능이 요청에 붙이는 기기·앱 종류 정보. 포켓로그는 계정·기기 식별자를 보내지 않습니다.</li>
         <li>때: 처음 실행할 때와 모듈을 다시 받을 때</li>
         <li>목적: 모듈 파일 내려받기</li>
-        <li>보관: Hugging Face의 방침을 따릅니다.</li>
+        <li>보관: Cloudflare와 Hugging Face 각자의 방침을 따릅니다. 운영자는 Cloudflare 관리 화면에서 요청 수 같은 집계만 보며, 요청별 IP 기록을 따로 남기지 않습니다.</li>
       </ul>
     </section>
 

@@ -118,9 +118,11 @@ describe("101 licenses page — 고지 페이지", () => {
     });
   });
 
-  it("LP4 — kanana 항목은 재배포본(DevQuasar)의 출처와 저작권자 표기 없음을 밝힌다", () => {
+  it("LP4 — kanana 항목은 앱이 받는 수정본(122 — 운영자의 추가 학습·양자화)의 출처와 저작권자 표기 없음을 밝힌다", () => {
     const html = stripHtmlComments(sectionBy(readSite(PAGE), "data-license", "kanana") ?? "");
-    expect(html).toContain("DevQuasar");
+    expect(html).toContain("수정본");
+    expect(html).toContain("mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf");
+    expect(html).not.toContain("DevQuasar");
     expect(html).toContain("Kanana LLM");
     expect(html).toContain("원문에 저작권자 표기가 없음");
   });

@@ -40,6 +40,20 @@ describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
     }
   });
 
+  // 122 — a1은 일기 특화 모델이고 주 경로(R2)와 예비 경로(HF)를 가진다.
+  it("a1은 R2 주 경로·HF 예비 경로·실측 크기·지문을 가진다", () => {
+    const asset = assetFor("quiet");
+    expect(asset.key).toBe("a1");
+    expect(asset.url).toBe(
+      "https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf",
+    );
+    expect(asset.fallbackUrl).toBe(
+      "https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/main/kanana-v3-dpo-iq4_nl_im.gguf",
+    );
+    expect(asset.expectedBytes).toBe(1_241_435_520);
+    expect(asset.md5).toBe("dfc35a88fb1f5215f708ea5a348121b8");
+  });
+
   // R2 — 크기를 모르면 공간 판정도 완료 판정도 불가능하다
   it("자산이 예상 크기를 안다", () => {
     for (const character of CHARACTERS) {

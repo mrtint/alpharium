@@ -45,7 +45,7 @@ export async function planRedownload(deps: RedownloadDeps): Promise<RedownloadPl
 }
 
 /**
- * 받을 양(바이트) — 준비되지 않은 키마다 `max(0, 기대 크기 − 이미 받은 만큼)`의 합이다(받다 만 조각은 이어받으므로 뺀다, RD4).
+ * 받을 양(바이트) — 준비되지 않은 키마다 `기대 크기 − 이미 받은 만큼`의 합이다(기대보다 크면 기대 전체, 122)(받다 만 조각은 이어받으므로 뺀다, RD4).
  * **이미 받은 만큼을 못 읽은 키(`null`)는 기대 크기 전체로 센다** — 적게 말하지 않는다. 준비된 키는 0이다.
  */
 export function remainingBytes({
@@ -62,7 +62,8 @@ export function remainingBytes({
     if (facts.some((f) => f.key === key && f.ready === true)) continue;
     const expected = expectedBytes[key] ?? 0;
     const used = usedBytes[key];
-    total += used === null || used === undefined ? expected : Math.max(0, expected - used);
+    // 122 — 기대보다 큰 파일(옛 모델)은 받기 시작에서 지워지고 전부 다시 받는다.
+    total += used === null || used === undefined || used > expected ? expected : expected - used;
   }
   return total;
 }

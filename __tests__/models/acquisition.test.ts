@@ -463,15 +463,19 @@ describe("내려받기", () => {
   }, 10000);
 
   // A8 / A9 — 처음부터 다시 받지 않는다 (FR-015, SC-006)
-  it("중단 정보가 있으면 이어받는다", async () => {
+  // 122 — 예비 경로가 있는 자산(지금 로스터의 a1)은 단일 스트림 재개 기록(옛 주소를 품음)을 이어받지 않고
+  // 부분 파일과 함께 지운 뒤 처음부터 받는다. 단일 스트림 이어받기 자체는 기기 통로 계약(resumable-contract)이 지킨다.
+  it("예비 경로가 있는 자산의 단일 스트림 중단 정보는 지우고 처음부터 받는다 (122)", async () => {
     const key = assetFor("quiet").key;
+    expect(assetFor("quiet").fallbackUrl).toBeDefined();
     const h = harness({
       metadata: JSON.stringify({ verdicts: [], paused: [{ assetKey: key, state: { at: 1 } }] }),
     });
 
     await createAcquisition(h.ports).prepare("quiet");
 
-    expect(h.requested[0].resumed).toBe(true);
+    expect(h.requested[0].resumed).toBe(false);
+    expect(h.removed).toContain(key);
   });
 
   // A9 — 026: 세그먼트 재개 상태가 있으면 그것을 resume에 넘긴다 (FR-022).
@@ -734,7 +738,8 @@ describe("받기 전에 먼저 검증한다 (110)", () => {
 
     await createAcquisition(ports).prepare("quiet");
 
-    expect(requested).toHaveLength(1);
+    // 받기 전 검증이 기록만 믿고 통과시키지 않았다 — 받으러 갔다. 실패하면 예비 경로로 한 번 더 간다(122).
+    expect(requested.map((r) => r.url)).toEqual([ASSET.url, ASSET.fallbackUrl]);
     expect((await readState(metadataPort)).verdicts).toEqual([]);
   });
 
@@ -818,7 +823,8 @@ describe("끝난 구간을 기록하고 이어받는다 (113)", () => {
     const result = await createAcquisition(h.ports).prepare("quiet");
 
     expect(result.ok).toBe(false);
-    expect(snapshots).toEqual([[0], [0, 4]]);
+    // 주 경로 받기의 두 기록. 실패 뒤 예비 경로(122)도 같은 대역을 돌아 같은 기록을 한 번 더 남긴다.
+    expect(snapshots.slice(0, 2)).toEqual([[0], [0, 4]]);
   });
 
   it("동시에 끝난 구간의 기록이 서로를 덮어쓰지 않는다 (FR-005)", async () => {
