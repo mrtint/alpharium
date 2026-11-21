@@ -14,7 +14,7 @@
 #
 # **자동화되지 않았다고 통과한 것이 아니다**(원칙 V).
 #
-# ⚠️ 이 흐름은 기기 설정을 바꾼다 — 끝에서 시각을 오후 10시(22, 기본값)·장소를 「자동」(기본값)으로 둔다. 원래 값이
+# ⚠️ 이 흐름은 기기 설정을 바꾼다 — 끝에서 시각을 오후 10시(22, 기본값)·장소를 「켬」(121 기본값)으로 둔다. 원래 값이
 # 다른 기기라면 손으로 되돌린다. 자동으로 쓰기가 꺼져 있었으면 켜고 끝난다.
 # 12시간 형식(ko) 기기를 가정한다 — 24시간 형식이면 오전/오후 칸이 없어 M2가 실패한다.
 # ─────────────────────────────────────────────────────────────────────────────
@@ -127,14 +127,14 @@ appId: com.a810labs.pocketlog
     timeout: 5000
 - assertVisible: "오후 10시쯤"
 
-# ★ M4 — 장소 이름 행 → 「끔」 → 행 값 「끔」 → 「자동」으로 되돌린다.
+# ★ M4 — 장소 이름 행 → 「끔」 → 행 값 「끔」 → 「켬」으로 되돌린다(121).
 - tapOn:
     id: "settings-place-names"
 - extendedWaitUntil:
     visible:
       id: "place-name-dialog"
     timeout: 5000
-- assertVisible: "좌표를 기기의 지도 서비스에 물어봐요."
+- assertVisible: "장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요."
 - tapOn:
     id: "place-name-off"
 - extendedWaitUntil:
@@ -152,9 +152,9 @@ appId: com.a810labs.pocketlog
       id: "place-name-dialog"
     timeout: 5000
 - tapOn:
-    id: "place-name-auto"
+    id: "place-name-on"
 - extendedWaitUntil:
     notVisible:
       id: "place-name-dialog"
     timeout: 5000
-- assertVisible: "자동"
+- assertVisible: "켬"

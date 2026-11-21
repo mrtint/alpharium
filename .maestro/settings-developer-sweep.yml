@@ -97,19 +97,7 @@ appId: com.a810labs.pocketlog
     visible:
       id: "settings-screen"
     timeout: 10000
-# 위치·알림·배터리 행도 같은 왕복 (2026-10-10 SM-G986N에서 위치 3회 연속·알림·배터리 통과)
-- scrollUntilVisible:
-    element:
-      id: "settings-perm-location"
-- tapOn:
-    id: "settings-perm-location"
-- waitForAnimationToEnd:
-    timeout: 3000
-- runFlow: _return-from-os-settings.yml
-- extendedWaitUntil:
-    visible:
-      id: "settings-screen"
-    timeout: 10000
+# 알림·배터리 행도 같은 왕복 (121에서 위치 권한 행을 걷었다)
 - scrollUntilVisible:
     element:
       id: "settings-perm-notifications"

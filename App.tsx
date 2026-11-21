@@ -374,8 +374,9 @@ function AppFrame() {
   /**
    * ★ 056 — 설정 값(자동 쓰기 설정·장소 갈래)은 여기서 **앱 실행마다 한 번** 읽어 들고 있는다(FR-030, research R5).
    * 설정 겹은 닫히면 언마운트되므로(`StackLayer`) 거기서 읽으면 열 때마다 「설정을 읽는 중…」이 약 1초 보였다(055 관측).
-   * 이 두 파일을 쓰는 곳은 설정 화면뿐이라(백그라운드 태스크는 읽기만) 여기 값이 낡을 경로가 없다. 생성 파이프라인은 장소명
-   * 파일을 매번 직접 읽는다(아래 `DiarySection`) — 이 보관과 무관하다. 아직 못 읽었으면 `null` — 기본값을 그리지 않는다(FR-031).
+   * 이 두 파일을 쓰는 곳은 설정 화면뿐이라(백그라운드 태스크는 읽기만) 여기 값이 낡을 경로가 없다. 121 — `DiarySection`도
+   * 이 값을 그대로 받아 쓰므로 설정 화면에서 바꾸고 돌아오면 재마운트·백그라운드 왕복 없이 곧바로 반영된다.
+   * 아직 못 읽었으면 `null` — 기본값을 그리지 않는다(FR-031).
    */
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
@@ -1705,6 +1706,8 @@ function AppFrame() {
           onChooseDay={setChosenDay}
           // 057 — 앱을 열 때의 자동 쓰기. 설정 값을 아직 못 읽었으면 판정하지 않는다.
           autoDiarySettings={settingsValues?.autoDiary ?? null}
+          // 121 — 장소 이름 설정. 설정 겹에서 바꾸면 곧바로 홈 파이프라인에 반영되도록 같은 상태를 넘긴다.
+          geocodingPreference={settingsValues?.geocoding ?? "on"}
           claimAutoWrite={claimAutoWrite}
           // 106 — 빠른 주기: 앱 열기 판정 직전의 리셋·시간 규칙 읽기, 리셋 때 「한 번」 다시 열기, 합류한 쓰기가 실패하면 한 번 다시 열기
           resetFastCycle={resetFastCycle}
@@ -2084,6 +2087,7 @@ function DiarySection({
   chosenDay,
   onChooseDay,
   autoDiarySettings,
+  geocodingPreference = "on",
   claimAutoWrite,
   resetFastCycle,
   loadFastCycleTiming,
@@ -2123,6 +2127,8 @@ function DiarySection({
   onWipeReady?: (token: number) => void;
   /** 057 — 자동 쓰기 설정. `AppFrame`이 들고 있다. 아직 못 읽었으면 `null` — 앱 열기 판정을 하지 않는다 */
   autoDiarySettings?: AutoDiarySettings | null;
+  /** 121 — 장소 이름 설정. `AppFrame`이 들고 있다 — 설정 변경 직후 같은 세션의 홈에서도 즉시 반영된다 */
+  geocodingPreference?: GeocodingPreference;
   /** 057 — 홈이 자동 쓰기를 실제로 시작하는 순간 부른다(한 실행에 한 번) */
   claimAutoWrite?: () => boolean;
   /** 106 — 앱 열기 판정 직전의 빠른 주기 리셋(`createFastCycleResetter`로 `AppFrame`이 만든 클로저). 안정된 참조여야 한다 */
@@ -2187,33 +2193,6 @@ function DiarySection({
   const [selectionRead, setSelectionRead] = useState(false);
 
   const selectionPort = useMemo(() => expoSelectionPort(), []);
-
-  /**
-   * 029 — 설정 탭의 선호. 홈의 위젯이 사라졌으므로 여기서 읽어 자동 판정
-   * (`resolveGenerationParams`)에 넘긴다. `AppState active`에서 다시 읽는다 —
-   * 설정 탭에서 바꾸고 일기 탭으로 돌아오면 반영돼야 한다.
-   *
-   * **042 — 「사진 보기」가 빠졌다.** 고를 것이 없어졌으므로 읽을 설정도 없다.
-   */
-  const geocodingSettingPort = useMemo(() => expoGeocodingSettingPort(), []);
-  // 121 — 처음 값은 「켬」이고 위치 권한은 보지 않는다(장소 이름을 앱에 든 데이터에서 찾는다).
-  const [geocodingPreference, setGeocodingPreference] = useState<GeocodingPreference>("on");
-
-  useEffect(() => {
-    let alive = true;
-    async function readPrefs() {
-      const g = await loadGeocodingSetting(geocodingSettingPort).catch(() => "on" as const);
-      if (alive) setGeocodingPreference(g);
-    }
-    void readPrefs();
-    const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active") void readPrefs();
-    });
-    return () => {
-      alive = false;
-      sub.remove();
-    };
-  }, [geocodingSettingPort]);
 
   /**
    * 029 — 최근 3일 중 사진 신호가 1장 이상인 하루들 (FR-010, 임계값 없음).

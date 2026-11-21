@@ -37,6 +37,12 @@ describe("AS3 — 설정 값은 AppFrame이 들고 있다 (056 FR-030·T3)", () 
     expect(frame).toMatch(/loadGeocodingSetting\(/);
   });
 
+  it("DiarySection은 장소 설정 파일을 따로 읽지 않고 AppFrame의 값을 받는다 (121 실기기 수정)", () => {
+    const diary = bodyOf("DiarySection");
+    expect(diary).not.toMatch(/loadGeocodingSetting\(|expoGeocodingSettingPort\(/);
+    expect(bodyOf("AppFrame")).toMatch(/geocodingPreference=\{settingsValues\?\.geocoding/);
+  });
+
   it("「설정을 읽는 중…」은 값이 아직 없을 때만이다 (FR-031)", () => {
     const section = bodyOf("SettingsSection");
     expect(section).toMatch(/values === null/);
