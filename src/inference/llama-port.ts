@@ -206,7 +206,12 @@ export function createLlamaEngine(
    * 108 — `maxTokens`는 **이 호출만의** 생성 상한이다(`RunLimits.maxTokens`). 엔진 상태에 남기지 않는다 — 다음 호출은 다시
    * `SAMPLING.n_predict`다.
    */
-  function send(open: LlamaLike, messages: ChatMessage[], requested?: number): Promise<RunResult> {
+  function send(
+    open: LlamaLike,
+    messages: ChatMessage[],
+    requested?: number,
+    warm = false,
+  ): Promise<RunResult> {
     // 양의 정수가 아니면 상한이 없는 것으로 본다 — 음수 `n_predict`는 llama.cpp에서 「끝없이」라 짧게 끊으려던 값이 무한 생성이
     // 된다(코드 리뷰). 두 경로가 같은 값을 받게 여기 한 곳에서 정한다.
     const maxTokens =
@@ -227,6 +232,7 @@ export function createLlamaEngine(
       options.onChunk,
       options.onToken,
       options.isActive,
+      warm,
     );
   }
 
@@ -421,6 +427,8 @@ export function createLlamaEngine(
             { role: "user", content: question },
           ],
           limits.maxTokens,
+          // 123 — 제목 호출은 본문 직후 같은 컨텍스트다. 앞부분 KV가 그대로라 미리 읽기가 필요 없다.
+          true,
         ),
       );
     },
@@ -560,6 +568,13 @@ async function completePaced(
   onChunk?: () => void,
   onToken?: () => void,
   isActive?: () => boolean,
+  /**
+   * 123 — 앞부분 KV가 이미 컨텍스트에 있는 호출(제목 호출 — 본문 직후 같은 컨텍스트)이면 참. 프롬프트 미리 읽기를 건너뛴다.
+   * 미리 읽기는 짧은 접두어부터 `n_predict: 1`로 부르는데, llama.rn이 새 프롬프트가 짧으면 그 뒤의 KV(본문까지 쓴 것)를 버려
+   * iPhone 14 실측에서 제목 호출이 프롬프트를 처음부터 다시 읽었다(제목 약 12.7초 → 안드로이드의 접두어 재사용 약 3.9초).
+   * 새로 읽을 토큰이 질문 몇십 개뿐이라 앱 밖에서도 진행 공백이 길어지지 않는다(092의 보호가 필요한 큰 읽기가 아니다).
+   */
+  warm = false,
 ): Promise<RunResult> {
   const formatted = await (context.formatChat as NonNullable<LlamaLike["formatChat"]>)(messages);
   // 서식 프롬프트를 못 얻었으면 빈 프롬프트로 생성하지 않고 종전 경로로(코드 리뷰)
@@ -574,7 +589,7 @@ async function completePaced(
   // 쓰기를 그만큼 늦췄다, 091 리뷰).
   let pending = 0;
   // 092 — 프롬프트를 토막씩 미리 읽는다(위 `prefillChars`). 마지막 토막(프롬프트 전체)은 첫 조각이 읽는다.
-  if (pacing.prefillChars !== undefined && pacing.prefillChars > 0) {
+  if (!warm && pacing.prefillChars !== undefined && pacing.prefillChars > 0) {
     const small = pacing.prefillChars;
     const step = () => {
       let active = false;

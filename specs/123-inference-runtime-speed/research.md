@@ -6,16 +6,16 @@
 - Alternatives: 기본 유지(변경 없음). 이득이 오차 안이면 이쪽이 결론이다.
 - 확인법: 개발 중 `logcat`/Xcode 콘솔의 llama.cpp 로그(「Flash Attention was auto, set to …」)로 `auto`의 실제 결과를 먼저 읽는다.
 
-## R2. 1→2턴 재사용
-- Fact: 본문(`run`)과 제목(`ask`)은 이미 한 컨텍스트다(해제는 `unload()` 한 번). `completion()`은 슬롯 시작에서 그 시퀀스 KV를 지운다(`rn-slot.cpp` 「No loaded state, start fresh」) — 접두어 재사용은 상태를 불러올 때만 일어난다. `cache_prompt`·`cache_reuse`는 0.12.9에 없다.
-- Candidates: (a) `completion()` 파라미터로 `save_state_path`/`load_state_path`(타입은 병렬 요청용 `NativeParallelCompletionParams`라 일반 `completion()`이 받는지 불명) (b) `LlamaContext.saveSession`/`loadSession`(JSI에 있음)으로 본문 직후 저장 → 제목 전에 불러오기 (c) 아무것도 안 함.
-- Decision: 스파이크로 (a)·(b) 중 동작하는 것과 이득을 재고, 이득이 없거나 불안정하면 (c) — 까닭과 수치를 quickstart에 기록한다. 이 결정은 구현 전 T-스파이크 결과로 닫는다.
-- Rationale: 제목 구간은 사진 있는 날 약 4.6초(AGENTS 100)이고 그 중 프롬프트(수천 토큰) 재읽기가 비중이 클 수 있다. 상태 저장·복원 I/O가 그보다 싸야 이득이다.
+## R2. 1→2턴 재사용 (실측으로 정정됨, 2026-11-22)
+- 처음 가설(0.12.9는 요청마다 KV를 지워 상태 파일이 필요하다)은 틀렸다. SM-S901N 실측: 제목 호출의 `timings` — 새로 읽은 프롬프트 52토큰, `cache_n` 약 850 → 같은 컨텍스트의 다음 호출은 공통 접두어 KV를 이미 재사용한다. 상태 파일(`save/load_state_path`·`saveSession`)은 넣지 않는다.
+- iPhone 14 실측: iOS 화면 쓰기의 조각 경로는 제목(`ask`)에서도 프롬프트를 짧은 접두어부터 `n_predict: 1`로 미리 읽는다. llama.rn은 새 프롬프트가 KV보다 짧으면 그 뒤를 버려, 제목 호출이 프롬프트(약 1,440자 서식)와 본문을 처음부터 다시 읽었다(제목 12.7초 — 안드로이드 3.9초).
+- Decision: `ask()`는 미리 읽기를 건너뛰고 첫 호출이 곧바로 조각 생성(`warm`). 새로 읽을 토큰은 질문 수십 개뿐이라 092의 앱 밖 진행 공백 보호가 필요한 큰 읽기가 아니다.
 
 ## R3. KV q8_0과 메모리 기준
 - Decision: `cache_type_k`/`cache_type_v: "q8_0"`. 양자화 V 캐시는 FA 필요(llama.cpp 규칙) — 함께 켜야 하는지 기기에서 확인한다.
 - 메모리를 읽는 자리: 이미 쓰는 `getBackendDevicesInfo()`(`llama.rn`, on-device.ts가 지연 import로 호출) 결과의 `maxMemorySize`. 새 의존성(`expo-device`)을 들이지 않는다. 어느 장치 항목이 기기 RAM을 뜻하는지는 기기에서 값을 찍어 확인한다(모르면 q8_0을 켜지 않는다 — 원칙 V).
 - 기준 2 GiB: 로드맵이 정한 값, 사람이 정한 값이다(실측 아님).
+- 결과(2026-11-22, SM-S901N): q8_0은 프롬프트 읽기를 느리게 해(39 → 31 t/s) 1+2턴이 짧아지지 않았고 PSS 차이는 흔들림 안이었다 → 미채택(quickstart).
 
 ## R4. 측정 도구(제품 밖)
 - t/s·1+2턴 시간: 개발 중 `logcat`/콘솔의 llama.cpp 타이밍 줄과 앱 로그 시각. 최고 RAM: 안드로이드 `dumpsys meminfo` 폴링, iOS Xcode Instruments/`devicectl`·lldb. 제품 코드에는 넣지 않는다(원칙 IV).
