@@ -57,7 +57,6 @@ import {
   readEssentialRemainingBytes,
 } from "./src/app/essential-assets-port";
 import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
-import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
 import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
 import { PERMISSION_REQUIREMENTS } from "./src/onboarding/requirements";
 // 035 — 환영 연출·작명. 조립부가 파일을 읽고 화면에는 문자열만 넘긴다.
@@ -375,8 +374,9 @@ function AppFrame() {
   /**
    * ★ 056 — 설정 값(자동 쓰기 설정·장소 갈래)은 여기서 **앱 실행마다 한 번** 읽어 들고 있는다(FR-030, research R5).
    * 설정 겹은 닫히면 언마운트되므로(`StackLayer`) 거기서 읽으면 열 때마다 「설정을 읽는 중…」이 약 1초 보였다(055 관측).
-   * 이 두 파일을 쓰는 곳은 설정 화면뿐이라(백그라운드 태스크는 읽기만) 여기 값이 낡을 경로가 없다. 생성 파이프라인은 장소명
-   * 파일을 매번 직접 읽는다(아래 `DiarySection`) — 이 보관과 무관하다. 아직 못 읽었으면 `null` — 기본값을 그리지 않는다(FR-031).
+   * 이 두 파일을 쓰는 곳은 설정 화면뿐이라(백그라운드 태스크는 읽기만) 여기 값이 낡을 경로가 없다. 121 — `DiarySection`도
+   * 이 값을 그대로 받아 쓰므로 설정 화면에서 바꾸고 돌아오면 재마운트·백그라운드 왕복 없이 곧바로 반영된다.
+   * 아직 못 읽었으면 `null` — 기본값을 그리지 않는다(FR-031).
    */
   const settingsPort = useMemo(() => expoAutoDiarySettingsPort(), []);
   const backgroundPort = useMemo(() => expoBackgroundSchedulePort(), []);
@@ -386,7 +386,7 @@ function AppFrame() {
     let alive = true;
     void Promise.all([
       loadAutoDiarySettings(settingsPort),
-      loadGeocodingSetting(geoPort).catch(() => "auto" as const),
+      loadGeocodingSetting(geoPort).catch(() => "on" as const),
     ]).then(([autoDiary, geocoding]) => {
       if (alive) setSettingsValues({ autoDiary, geocoding });
     });
@@ -624,7 +624,6 @@ function AppFrame() {
       photo: expoPhotoPort(),
       notification: expoNotificationPort(),
       battery: expoBatteryExceptionPort(),
-      location: expoLocationPermissionPort(),
       osSettings: expoOsSettingsPort(),
       // 029 — 필수 에셋 다운로드 통로 (FR-015). `src/app/`에 있어 로스터 접근 허용.
       essentialAssets: expoEssentialAssetsPort(),
@@ -1707,6 +1706,8 @@ function AppFrame() {
           onChooseDay={setChosenDay}
           // 057 — 앱을 열 때의 자동 쓰기. 설정 값을 아직 못 읽었으면 판정하지 않는다.
           autoDiarySettings={settingsValues?.autoDiary ?? null}
+          // 121 — 장소 이름 설정. 설정 겹에서 바꾸면 곧바로 홈 파이프라인에 반영되도록 같은 상태를 넘긴다.
+          geocodingPreference={settingsValues?.geocoding ?? "on"}
           claimAutoWrite={claimAutoWrite}
           // 106 — 빠른 주기: 앱 열기 판정 직전의 리셋·시간 규칙 읽기, 리셋 때 「한 번」 다시 열기, 합류한 쓰기가 실패하면 한 번 다시 열기
           resetFastCycle={resetFastCycle}
@@ -2086,6 +2087,7 @@ function DiarySection({
   chosenDay,
   onChooseDay,
   autoDiarySettings,
+  geocodingPreference = "on",
   claimAutoWrite,
   resetFastCycle,
   loadFastCycleTiming,
@@ -2125,6 +2127,8 @@ function DiarySection({
   onWipeReady?: (token: number) => void;
   /** 057 — 자동 쓰기 설정. `AppFrame`이 들고 있다. 아직 못 읽었으면 `null` — 앱 열기 판정을 하지 않는다 */
   autoDiarySettings?: AutoDiarySettings | null;
+  /** 121 — 장소 이름 설정. `AppFrame`이 들고 있다 — 설정 변경 직후 같은 세션의 홈에서도 즉시 반영된다 */
+  geocodingPreference?: GeocodingPreference;
   /** 057 — 홈이 자동 쓰기를 실제로 시작하는 순간 부른다(한 실행에 한 번) */
   claimAutoWrite?: () => boolean;
   /** 106 — 앱 열기 판정 직전의 빠른 주기 리셋(`createFastCycleResetter`로 `AppFrame`이 만든 클로저). 안정된 참조여야 한다 */
@@ -2191,44 +2195,6 @@ function DiarySection({
   const selectionPort = useMemo(() => expoSelectionPort(), []);
 
   /**
-   * 029 — 설정 탭의 선호. 홈의 위젯이 사라졌으므로 여기서 읽어 자동 판정
-   * (`resolveGenerationParams`)에 넘긴다. `AppState active`에서 다시 읽는다 —
-   * 설정 탭에서 바꾸고 일기 탭으로 돌아오면 반영돼야 한다.
-   *
-   * **042 — 「사진 보기」가 빠졌다.** 고를 것이 없어졌으므로 읽을 설정도 없다.
-   */
-  const geocodingSettingPort = useMemo(() => expoGeocodingSettingPort(), []);
-  const [geocodingPreference, setGeocodingPreference] = useState<GeocodingPreference>("auto");
-  const [locationPermission, setLocationPermission] = useState(false);
-
-  useEffect(() => {
-    let alive = true;
-    async function readPrefs() {
-      const g = await loadGeocodingSetting(geocodingSettingPort).catch(() => "auto" as const);
-      let loc = false;
-      try {
-        const Location = await import("expo-location");
-        const status = await Location.getForegroundPermissionsAsync();
-        loc = status.granted === true;
-      } catch {
-        // 통로가 없는 환경 — 권한 없음으로 다룬다.
-      }
-      if (alive) {
-        setGeocodingPreference(g);
-        setLocationPermission(loc);
-      }
-    }
-    void readPrefs();
-    const sub = AppState.addEventListener("change", (s) => {
-      if (s === "active") void readPrefs();
-    });
-    return () => {
-      alive = false;
-      sub.remove();
-    };
-  }, [geocodingSettingPort]);
-
-  /**
    * 029 — 최근 3일 중 사진 신호가 1장 이상인 하루들 (FR-010, 임계값 없음).
    *
    * **049 — 화면은 지난 날 전부를 고르지만 이 탐색은 사흘 그대로다**(FR-020). 사흘 밖의 날은
@@ -2277,18 +2243,13 @@ function DiarySection({
     };
   }, []);
 
-  // 029 — 장소명이 켜짐(자동+권한 있음, 또는 고정 on)인지 배선에 넘긴다.
+  // 121 — 장소 이름이 켜져 있는지(설정만 본다) 배선에 넘긴다.
   // `createPipeline`이 구성 시점에 이 값을 고정하므로, 바뀌면 파이프라인을 다시 만든다.
-  const geocodingEnabled =
-    geocodingPreference === "on"
-      ? true
-      : geocodingPreference === "off"
-        ? false
-        : locationPermission;
+  const placeNamesEnabled = geocodingPreference === "on";
 
   const wiring = useMemo(
-    () => createAppPipeline(environment, { store, geocodingEnabled }),
-    [environment, store, geocodingEnabled],
+    () => createAppPipeline(environment, { store, placeNamesEnabled }),
+    [environment, store, placeNamesEnabled],
   );
 
   /**
@@ -2349,10 +2310,9 @@ function DiarySection({
         chosenDay: day,
         // 029 — 그 날 사진 신호가 1장 이상인가. 임계값 없음(FR-010).
         photoSignalPresent: photoDays.has(day),
-        locationPermission,
         geocodingPreference,
       }),
-    [stored, ready, photoDays, locationPermission, geocodingPreference],
+    [stored, ready, photoDays, geocodingPreference],
   );
 
   /**
@@ -2638,8 +2598,8 @@ function SettingsSection({
   );
 
   /**
-   * 056 — 장소 갈래. 대화상자를 닫고, 저장이 성공한 뒤에만 값을 바꾼다(FR-018). 「켬」으로 바뀌었을 때만 닫힌 직후 위치 권한을
-   * 요청한다(017 L8·L9 — 거부돼도 값은 「켬」, 이미 허용이면 OS가 창을 띄우지 않는다, FR-025).
+   * 056 — 장소 갈래. 대화상자를 닫고, 저장이 성공한 뒤에만 값을 바꾼다(FR-018). 121 — 「켬」이어도 위치 권한을 요청하지 않는다
+   * (장소 이름을 앱에 든 데이터에서 찾는다, contracts/diary-places.md NX1).
    */
   const onSelectGeocoding = useCallback(
     async (g: GeocodingPreference) => {
@@ -2650,11 +2610,6 @@ function SettingsSection({
       );
       if (!saved) return;
       onGeocodingChange(g);
-      if (g === "on") {
-        void import("expo-location")
-          .then((Location) => Location.requestForegroundPermissionsAsync())
-          .catch(() => {});
-      }
     },
     [geoPort, onGeocodingChange],
   );
@@ -2666,15 +2621,14 @@ function SettingsSection({
   const batteryPort = useMemo(() => expoBatteryExceptionPort(), []);
   const readPermissions = useCallback(async (): Promise<PermissionFacts> => {
     const unknown = () => "unknown" as const;
-    const [photos, photoLocation, location, notifications, battery] = await Promise.all([
+    const [photos, photoLocation, notifications, battery] = await Promise.all([
       onboardingPorts.photo.photoPermission().catch(unknown),
       photoLocationProbe(photoPort, Date.now()),
-      onboardingPorts.location.status().catch(unknown),
       onboardingPorts.notification.getPermission().catch(unknown),
       // 104 — 배터리 예외 상태. 읽지 못하면 `unknown`(꼬리표 없음)
       batteryPort.readStatus().catch(unknown),
     ]);
-    return { photos, photoLocation, location, notifications, battery };
+    return { photos, photoLocation, notifications, battery };
   }, [onboardingPorts, photoPort, batteryPort]);
   const permissionTags = usePermissionTags(readPermissions);
   // 085 FR-015 — 자동 쓰기가 켜져 있고 알림이 「허용 안 함」이면 알림 행 아래 한 줄(쓸 차례 알림이 보이지 않는다).
@@ -2843,9 +2797,8 @@ function SettingsSection({
 /** 056 — 설정 화면의 값. `AppFrame`이 들고 있다(FR-030) */
 type SettingsValues = { autoDiary: AutoDiarySettings; geocoding: GeocodingPreference };
 
-/** 056 — 장소 갈래 → 행 값(보드 `place.auto`·`place.on`·`place.off`) */
+/** 056 — 장소 갈래 → 행 값(보드 `place.on`·`place.off`, 121에서 `place.auto`를 걷었다) */
 const PLACE_NAME_TEXT: Record<GeocodingPreference, string> = {
-  auto: SETTINGS_TEXT.placeAuto,
   on: SETTINGS_TEXT.placeOn,
   off: SETTINGS_TEXT.placeOff,
 };

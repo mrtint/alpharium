@@ -838,7 +838,7 @@ export function DiaryHomeScreen({
    * 실제 생성을 돈다.
    *
    * **029 — `params`는 상위가 `resolve(day)`로 정한 것.** `pipeline.run`에는
-   * `character`·`vision`만 넘긴다(FR-013 — prompt.ts 불변). `geocodingEnabled`는
+   * `character`·`vision`만 넘긴다(FR-013 — prompt.ts 불변). `placeNamesEnabled`는
    * 배선(`createAppPipeline`)이 이미 파이프라인에 넣어 두었다.
    */
   const generate = useCallback(

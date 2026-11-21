@@ -26,7 +26,7 @@ const NOW = new Date("2026-09-24T13:00:00");
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: true, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: true, placeNamesEnabled: false },
 });
 
 const neverPipeline = (): Pipeline => ({
@@ -133,7 +133,7 @@ describe("HP6 — 캐릭터 대체 안내는 토스트다", () => {
       character: "quiet",
       day: day as never,
       hasPhotos: true,
-      geocodingEnabled: false,
+      placeNamesEnabled: false,
       movedFrom: FUTURE_CHARACTER,
     },
   });

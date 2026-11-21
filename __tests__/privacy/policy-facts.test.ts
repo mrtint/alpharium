@@ -2,8 +2,8 @@
  * 086 — 방침이 기대는 코드의 사실 (contracts/policy-facts.md F1~F6).
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * 방침(`site/privacy/index.html`)은 「분석·크래시 SDK가 없다」「앱이 접속하는 곳은 모듈 내려받기뿐이다」「좌표는 장소 이름을 얻을
- * 때 하나만 나간다」를 말한다. 그 문장이 출시 뒤 조용히 거짓이 되면 스토어 허위 신고다(헌법 원칙 V). 이 테스트는 그 사실을
+ * 방침(`site/privacy/index.html`)은 「분석·크래시 SDK가 없다」「앱이 접속하는 곳은 모듈 내려받기뿐이다」「사진의 좌표는 휴대폰
+ * 밖으로 나가지 않는다」(121 — 이전에는 「장소 이름을 얻을 때 하나만 나간다」)를 말한다. 그 문장이 출시 뒤 조용히 거짓이 되면 스토어 허위 신고다(헌법 원칙 V). 이 테스트는 그 사실을
  * 소스에서 잠근다 — 실패하면 코드를 되돌리거나, 방침·선언 초안·표(`outbound.ts`)를 함께 고친다.
  *
  * **범위: 소스에서 보이는 것만 본다.** 네이티브 라이브러리가 스스로 하는 통신, OS 백업, OS 지오코더 뒤의 서버는 보지 못한다 —
@@ -81,14 +81,12 @@ describe("086 F — 방침이 기대는 코드의 사실 (소스에서 보이는
     expect({ offenders, fix: FIX_POLICY }).toEqual({ offenders: [], fix: FIX_POLICY });
   });
 
-  it("F4 — reverseGeocodeAsync 호출은 src/signals/geocoding-port.ts 한 곳, 한 번뿐이다", () => {
+  // 121 — 장소 이름을 앱에 든 데이터에서 찾게 되어 역지오코딩을 걷었다. 좌표가 휴대폰 밖으로 나가지 않는다(방침 「휴대폰 안에서 다루는 것」).
+  it("F4 — reverseGeocodeAsync 호출이 없다(121)", () => {
     const calls = [...sources].flatMap(([path, code]) =>
       [...code.matchAll(/\breverseGeocodeAsync\s*\(/g)].map(() => path),
     );
-    expect({ calls, fix: FIX_POLICY }).toEqual({
-      calls: ["src/signals/geocoding-port.ts"],
-      fix: FIX_POLICY,
-    });
+    expect({ calls, fix: FIX_POLICY }).toEqual({ calls: [], fix: FIX_POLICY });
   });
 
   it("F7 — 기기의 현재 위치를 읽거나 주소 문자열을 지오코딩하는 호출이 없다(방침 「현재 위치를 읽지 않습니다」)", () => {

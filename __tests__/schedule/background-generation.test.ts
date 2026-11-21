@@ -1021,16 +1021,41 @@ describe("091 FR-003 — 깬 요청이 조립에 간다", () => {
       return (pipelineWith(WITH_PHOTOS) as (r: unknown, d: unknown) => unknown)(resolution, deps);
     }) as never;
     const quiet = { launchState: () => undefined, subscribeExpiry: () => () => {} };
-    await runAutoDiaryTask(
-      baseDeps({ ...quiet, wakeKind: () => "battery", makePipeline: recordingPipeline }).deps,
-    );
-    await runAutoDiaryTask(
-      baseDeps({ ...quiet, wakeKind: () => undefined, makePipeline: recordingPipeline }).deps,
-    );
+    // 121 — 장소 이름 설정도 함께 간다(설정 통로 대역: 「끔」).
+    const off = {
+      placeNameSettingPort: { read: async () => '{"mode":"off"}', write: async () => {} },
+    };
+    await runAutoDiaryTask({
+      ...baseDeps({ ...quiet, wakeKind: () => "battery", makePipeline: recordingPipeline }).deps,
+      ...off,
+    });
+    await runAutoDiaryTask({
+      ...baseDeps({ ...quiet, wakeKind: () => undefined, makePipeline: recordingPipeline }).deps,
+      ...off,
+    });
     expect(seen).toEqual([
-      { lockOwner: "background", wake: "battery" },
-      { lockOwner: "background" },
+      { lockOwner: "background", placeNamesEnabled: false, wake: "battery" },
+      { lockOwner: "background", placeNamesEnabled: false },
     ]);
+  });
+
+  it("121 — 백그라운드도 장소 이름 설정을 따른다(켬이면 참, 읽지 못하면 처음 값 켬)", async () => {
+    const seen: unknown[] = [];
+    const recordingPipeline = ((resolution: unknown, deps: unknown) => {
+      seen.push(deps);
+      return (pipelineWith(WITH_PHOTOS) as (r: unknown, d: unknown) => unknown)(resolution, deps);
+    }) as never;
+    const quiet = { launchState: () => undefined, subscribeExpiry: () => () => {} };
+    await runAutoDiaryTask({
+      ...baseDeps({ ...quiet, wakeKind: () => undefined, makePipeline: recordingPipeline }).deps,
+      placeNameSettingPort: {
+        read: async () => {
+          throw new Error("읽지 못함");
+        },
+        write: async () => {},
+      },
+    });
+    expect(seen).toEqual([{ lockOwner: "background", placeNamesEnabled: true }]);
   });
 });
 

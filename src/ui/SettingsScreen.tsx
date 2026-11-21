@@ -169,7 +169,6 @@ export function SettingsScreen({
         {(
           [
             ["photos", SETTINGS_TEXT.permPhotos],
-            ["location", SETTINGS_TEXT.permLocation],
             ["notifications", SETTINGS_TEXT.permNotif],
           ] as const
         ).map(([key, label]) => (

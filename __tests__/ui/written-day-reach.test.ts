@@ -118,7 +118,11 @@ describe("★ 051 DEL — 없어지는 것이 정말 없다", () => {
     // 062 — `expo-localization`을 더했다(기기 언어 감지 — research R1, 새 네이티브 모듈 하나. dev 실기기에서 매니페스트 확인).
     // 094 — `expo-build-properties`를 더했다(iOS UIScene 채택 `enableSceneSupport` — 빌드 시 config plugin뿐, 앱에 새 네이티브 코드가 실리지 않는다).
     // 104 — `expo-battery`를 더했다(배터리 예외 상태 읽기 — 새 네이티브 모듈 하나, AndroidManifest에 권한이 없다. 읽는 곳은 `battery-exception-port.ts` 하나).
+    // 121 — `expo-asset`을 직접 의존성으로 올렸다(장소 데이터 번들 자산의 경로 — `expo`가 이미 링크하던 모듈이라 새 네이티브 코드가 아니다).
+    //       `expo-location`을 걷었다(OS 역지오코딩·위치 권한 제거). 둘 다 이 브랜치가 main에 들어가면 다시 같아진다.
     const known = new Set([
+      "expo-asset",
+      "expo-location",
       "expo-application",
       "expo-battery",
       "expo-network",

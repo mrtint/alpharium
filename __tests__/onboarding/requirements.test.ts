@@ -22,12 +22,13 @@ const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 const MODEL_TOKENS = /kanana|exaone|hyperclovax|qwen3?|gemma3?|\.gguf|Q4_|Q8_|\b\d+(?:\.\d+)?B\b/i;
 
 describe("R2 — order와 목록 구조", () => {
-  it("order가 [1,2,3,4]와 정확히 일치한다 (연속, 중복 없음)", () => {
+  it("order가 [1,2,3]과 정확히 일치한다 (연속, 중복 없음)", () => {
+    // 121 — location 단계 제거로 4 → 3개(장소 이름을 앱에 든 데이터에서 찾는다).
     // 031 — photo-location 단계 제거로 5 → 4개. `ACCESS_MEDIA_LOCATION`은 조회·요청
     // API가 없어 온보딩에서 판정할 수 없다(무한 루프의 원인) — collect.ts가 실제
     // 좌표 읽기로 처리한다(021 FR-013a).
     const orders = PERMISSION_REQUIREMENTS.map((r) => r.order).sort((a, b) => a - b);
-    expect(orders).toEqual([1, 2, 3, 4]);
+    expect(orders).toEqual([1, 2, 3]);
   });
 
   it("battery-exception의 order가 가장 크다 (마지막 단계)", () => {
@@ -36,26 +37,26 @@ describe("R2 — order와 목록 구조", () => {
     expect(battery?.order).toBe(maxOrder);
   });
 
-  it("PermissionKey 유니온에 정확히 4개 멤버가 있다 (031 — photo-location 제거)", () => {
-    const keys: PermissionKey[] = ["photos", "location", "notifications", "battery-exception"];
+  it("PermissionKey 유니온에 정확히 3개 멤버가 있다 (031 — photo-location, 121 — location 제거)", () => {
+    const keys: PermissionKey[] = ["photos", "notifications", "battery-exception"];
     const actual = PERMISSION_REQUIREMENTS.map((r) => r.key).sort();
     expect(actual).toEqual([...keys].sort());
   });
 
-  it("고정 순서가 사진 → 위치 → 알림 → 배터리 예외다", () => {
+  it("고정 순서가 사진 → 알림 → 배터리 예외다", () => {
     const byOrder = [...PERMISSION_REQUIREMENTS].sort((a, b) => a.order - b.order);
-    expect(byOrder.map((r) => r.key)).toEqual([
-      "photos",
-      "location",
-      "notifications",
-      "battery-exception",
-    ]);
+    expect(byOrder.map((r) => r.key)).toEqual(["photos", "notifications", "battery-exception"]);
   });
 
   it("★ 소스에 photo-location이 남아 있지 않다 (031, 위반 주입 방어)", () => {
     // PermissionKey union·PERMISSION_REQUIREMENTS 정의 어디에도 문자열이 없어야 한다.
     // 도로 넣으면 무한 루프가 재발한다.
     expect(CODE).not.toMatch(/["']photo-location["']/);
+  });
+
+  it("★ 121 — 위치 권한(location)이 목록에 없다 (NX4, 위반 주입 방어)", () => {
+    expect(PERMISSION_REQUIREMENTS.map((r) => r.key as string)).not.toContain("location");
+    expect(CODE).not.toMatch(/["']location["']/);
   });
 });
 
@@ -79,7 +80,6 @@ describe("R3 — 문안 규칙 (원칙 II·III, SC-008)", () => {
   it("048 — ifDenied는 해요체다 (FR-015)", () => {
     const byKey = Object.fromEntries(PERMISSION_REQUIREMENTS.map((r) => [r.key, r.ifDenied]));
     expect(byKey.photos).toBe("사진을 볼 수 없어서 일기는 사진 없이 써요.");
-    expect(byKey.location).toBe("지명을 옮기지 못해서 장소는 비워 둬요.");
     expect(byKey.notifications).toBe("쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.");
     expect(byKey["battery-exception"]).toBe("앱을 열 때까지 쓰지 못할 수 있어요.");
     for (const r of PERMISSION_REQUIREMENTS) expect(r.ifDenied).not.toMatch(/니다\.$/);
@@ -103,8 +103,8 @@ describe("R4 — platforms 메타데이터 (FR-003)", () => {
     }
   });
 
-  it("photos·location·notifications·battery-exception은 android를 포함한다", () => {
-    for (const key of ["photos", "location", "notifications", "battery-exception"] as const) {
+  it("photos·notifications·battery-exception은 android를 포함한다", () => {
+    for (const key of ["photos", "notifications", "battery-exception"] as const) {
       const r = PERMISSION_REQUIREMENTS.find((x) => x.key === key);
       expect(r?.platforms).toContain("android");
     }

@@ -139,7 +139,7 @@ describe("055 E2·E6 — DiaryHomeScreen을 거쳐", () => {
   const resolved: EnvironmentResolution = { ok: true, environment: "dev" };
   const resolveQuiet = (day: string): ResolveOutcome => ({
     kind: "resolved",
-    params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+    params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
   });
 
   it("홈이 onOpenSettings를 헤더까지 흘린다", async () => {

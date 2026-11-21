@@ -83,8 +83,8 @@ appId: com.a810labs.pocketlog
 
 # ★ M3 — **장소명 설정이 설정의 「장소 이름으로 보기」 행에 있다**(FR-004~006).
 #
-# ⚠️ **056 갱신** — 029의 설정 카드(3-상태 칸)가 「장소 이름으로 보기」 행 + 세 갈래 대화상자(보드 `6l`)로 바뀌었다.
-# 지도 고지는 대화상자 안에 늘 있다(「좌표를 기기의 지도 서비스에 물어봐요.」, 056 FR-026). 칸을 누르면 바로 적용·닫힌다.
+# ⚠️ **056 → 121 갱신** — 「장소 이름으로 보기」 행 + 두 갈래 대화상자(「켬/끔」)로 바뀌었다(121).
+# 지도 고지는 대화상자 안에 늘 있다(「장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요.」, 121 ST3). 칸을 누르면 바로 적용·닫힌다.
 - tapOn:
     id: "home-settings"
 - extendedWaitUntil:
@@ -98,35 +98,33 @@ appId: com.a810labs.pocketlog
       id: "place-name-dialog|place-name-cancel"
     timeout: 5000
 - assertVisible:
-    id: "place-name-auto"
-- assertVisible:
     id: "place-name-on"
 - assertVisible:
     id: "place-name-off"
 
-# ★ FR-006 — 고지 문구가 대화상자 안에 있다(056 FR-026).
-- assertVisible: "좌표를 기기의 지도 서비스에 물어봐요."
+# ★ FR-006 — 고지 문구가 대화상자 안에 있다(121 ST3).
+- assertVisible: "장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요."
 
 # ★ 원칙 III·IV — 좌표·수치·모델 정보가 화면에 없다.
 - assertNotVisible: "latitude"
 - assertNotVisible: "longitude"
 - assertNotVisible: "expo-location"
 
-# ★ 056 — 칸을 누르면 바로 적용·닫힌다. 기기 상태를 「자동」(기본값)으로 둔다.
+# ★ 056 · 121 — 칸을 누르면 바로 적용·닫힌다. 기기 상태를 「켬」(기본값)으로 둔다.
 - tapOn:
-    id: "place-name-auto"
+    id: "place-name-on"
 - extendedWaitUntil:
     notVisible:
       id: "place-name-dialog|place-name-cancel"
     timeout: 5000
-# iOS는 설정 행이 한 접근성 요소(「장소 이름으로 보기, 자동, ›」)라 값만 따로 보이지 않는다 — 행의 라벨로 같은 것을 본다.
+# iOS는 설정 행이 한 접근성 요소(「장소 이름으로 보기, 켬, ›」)라 값만 따로 보이지 않는다 — 행의 라벨로 같은 것을 본다.
 - runFlow:
     when:
       platform: Android
     commands:
-      - assertVisible: "자동"
+      - assertVisible: "켬"
 - runFlow:
     when:
       platform: iOS
     commands:
-      - assertVisible: ".*장소 이름으로 보기, 자동.*"
+      - assertVisible: ".*장소 이름으로 보기, 켬.*"

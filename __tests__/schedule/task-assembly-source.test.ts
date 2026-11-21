@@ -26,9 +26,9 @@ describe("079 A9 — 자동 쓰기 태스크의 파이프라인 조립", () => {
   });
 
   it("백그라운드 주체로 조립한다", () => {
-    // 091 — 깬 요청(wake)이 있으면 함께 싣는다
+    // 091 — 깬 요청(wake)이 있으면 함께 싣는다. 121 — 장소 이름 설정(placeNamesEnabled)도 함께 싣는다
     expect(code).toMatch(
-      /makePipeline\(resolution,\s*\{\s*lockOwner:\s*"background",\s*\.\.\.\(wake === undefined \? \{\} : \{ wake \}\),?\s*\}\)/,
+      /makePipeline\(resolution,\s*\{\s*lockOwner:\s*"background",\s*placeNamesEnabled,\s*\.\.\.\(wake === undefined \? \{\} : \{ wake \}\),?\s*\}\)/,
     );
   });
 

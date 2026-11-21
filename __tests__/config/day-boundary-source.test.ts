@@ -52,6 +52,7 @@ describe("DB11 — 하루 기준을 옮기는 시(時) 계산은 경계 파일 �
   const ALLOWED = new Set([
     "src/config/day-boundary.ts",
     "src/diary/prompt.ts", // 사진 시각 표시
+    "src/diary/place-lines.ts", // 121 자리의 때(오전·오후·저녁·밤) — prompt.ts 사진 시각 표시와 같은 구간, 하루 기준 계산이 아니다
     "src/schedule/timing.ts", // 106 목표 시각 창 — 배포 규칙(`productionTiming`)이 decision.ts의 시 단위 창 논리를 그대로 옮겨 왔다
     "src/schedule/manual.ts", // 060 진단 「지금 실행」 — 목표 시각을 지금 시로(하루 기준 계산이 아니다)
     "src/app/reminder-summary.ts", // 085 개발자 화면 예약 줄의 표시용 시(하루 기준 계산이 아니다 — research R15)

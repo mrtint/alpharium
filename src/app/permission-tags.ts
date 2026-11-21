@@ -13,6 +13,9 @@
  *
  * 사진은 사진 읽기 + 사진의 위치 정보를 한 행으로 묶는다(보드 `6c` ④, S4). 위치 정보는 조회 API가 없어(AGENTS) 사진
  * 한 장의 좌표를 실제로 읽어 본 결과다. 볼 사진이 없거나(`no-photo`) 읽어 보지 못했으면(`unknown`) 사진 읽기만으로 정한다.
+ *
+ * **121 — 「위치」 행을 걷었다.** 위치 권한은 장소 이름을 OS 지도 서비스에서 얻는 데만 썼고, 장소 이름을 앱에 든 데이터에서
+ * 찾게 되어 앱이 위치 권한을 요청하지 않는다.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -27,7 +30,6 @@ export type PhotoLocationReading = "ok" | "denied" | "no-photo" | "unknown";
 export type PermissionFacts = {
   photos: PermissionReading;
   photoLocation: PhotoLocationReading;
-  location: PermissionReading;
   notifications: PermissionReading;
   /** 104 — 배터리 예외 상태. 안드로이드 전용이며 iOS·읽기 실패는 `unknown` */
   battery: BatteryExceptionStatus;
@@ -36,7 +38,7 @@ export type PermissionFacts = {
 /** 꼬리표 셋 + 그리지 않음 */
 export type PermissionTag = "allowed" | "partial" | "denied" | "unread";
 /** 꼬리표가 있는 행 — 배터리도 예외 상태를 읽어 꼬리표를 단다(104) */
-export type TaggedPermission = "photos" | "location" | "notifications" | "battery";
+export type TaggedPermission = "photos" | "notifications" | "battery";
 
 export function permissionTagFor(key: TaggedPermission, facts: PermissionFacts): PermissionTag {
   if (key === "photos") return photoTag(facts.photos, facts.photoLocation);

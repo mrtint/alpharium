@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.a810labs.pocketlog",
       "buildNumber": "18",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSMotionUsageDescription": "앱은 움직임 정보를 쓰지 않습니다."
       },
       "entitlements": {
         "com.apple.developer.kernel.increased-memory-limit": true
@@ -33,13 +34,14 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
         "android.permission.ACCESS_MEDIA_LOCATION",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.READ_MEDIA_IMAGES"
       ],
       "blockedPermissions": [
         "android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
-        "android.permission.SYSTEM_ALERT_WINDOW"
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ]
     },
     "web": {
@@ -84,15 +86,6 @@
       ],
       "expo-background-task",
       "./plugins/with-battery-bg-task",
-      [
-        "expo-location",
-        {
-          "locationWhenInUsePermission": "사진에 담긴 장소를 사람이 읽을 수 있는 이름으로 바꾸는 데 위치를 씁니다. 이때 사진의 좌표를 Apple 지도 서비스에 보냅니다.",
-          "locationAlwaysAndWhenInUsePermission": false,
-          "locationAlwaysPermission": false,
-          "motionUsagePermission": "앱은 움직임 정보를 쓰지 않습니다. 위치 기능이 포함한 라이브러리 때문에 표시되는 항목입니다."
-        }
-      ],
       [
         "expo-font",
         {

@@ -37,6 +37,12 @@ describe("AS3 — 설정 값은 AppFrame이 들고 있다 (056 FR-030·T3)", () 
     expect(frame).toMatch(/loadGeocodingSetting\(/);
   });
 
+  it("DiarySection은 장소 설정 파일을 따로 읽지 않고 AppFrame의 값을 받는다 (121 실기기 수정)", () => {
+    const diary = bodyOf("DiarySection");
+    expect(diary).not.toMatch(/loadGeocodingSetting\(|expoGeocodingSettingPort\(/);
+    expect(bodyOf("AppFrame")).toMatch(/geocodingPreference=\{settingsValues\?\.geocoding/);
+  });
+
   it("「설정을 읽는 중…」은 값이 아직 없을 때만이다 (FR-031)", () => {
     const section = bodyOf("SettingsSection");
     expect(section).toMatch(/values === null/);
@@ -62,11 +68,11 @@ describe("AS1·AS2 — 두 대화상자의 배선", () => {
     expect(section).toMatch(/<TargetHourDialog/);
   });
 
-  it("장소는 저장이 성공한 뒤에만 값을 바꾸고, 「켬」으로 바뀔 때만 위치 권한을 요청한다", () => {
+  it("장소는 저장이 성공한 뒤에만 값을 바꾸고, 위치 권한을 요청하지 않는다(121)", () => {
     const section = bodyOf("SettingsSection");
     expect(section).toMatch(/<PlaceNameDialog/);
     expect(section).toMatch(/saveGeocodingSetting\(/);
-    expect(section).toMatch(/requestForegroundPermissionsAsync/);
+    expect(section).not.toMatch(/requestForegroundPermissionsAsync|expo-location/);
   });
 
   it("열린 대화상자만 그린다 — 열 때마다 새로 마운트된다 (FR-017)", () => {

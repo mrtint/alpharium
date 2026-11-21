@@ -23,10 +23,9 @@
 import { text } from "../i18n/current";
 
 /**
- * 권한 항목의 식별자. **정확히 4갈래**(contracts R2).
+ * 권한 항목의 식별자. **정확히 3갈래**(contracts R2 — 121에서 `location`을 걷었다).
  *
  * - `photos` — `READ_MEDIA_IMAGES` (+`READ_MEDIA_VISUAL_USER_SELECTED`)
- * - `location` — `ACCESS_FINE_LOCATION` (장소명 지오코딩, T030 실측: 안드로이드도 권한 필요 → platforms ["android","ios"])
  * - `notifications` — `POST_NOTIFICATIONS` (Android 13+)
  * - `battery-exception` — `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` (권한 아님, 시스템 설정)
  *
@@ -39,11 +38,11 @@ import { text } from "../i18n/current";
  * 선언은 유지된다(`app.json`). 조회 API가 생기면 이 상수에 항목을 다시 넣는다(원칙 V —
  * "축을 영구히 지우는 것이 아니다").
  */
-export type PermissionKey = "photos" | "location" | "notifications" | "battery-exception";
+export type PermissionKey = "photos" | "notifications" | "battery-exception";
 
 export type PermissionRequirement = {
   key: PermissionKey;
-  /** 온보딩 고정 순서상의 위치. 낮을수록 먼저. photos=1 … battery-exception=4 */
+  /** 온보딩 고정 순서상의 위치. 낮을수록 먼저. photos=1 … battery-exception=3 */
   order: number;
   /**
    * 이 항목이 의미 있는 플랫폼. 현재 플랫폼이 없으면 온보딩에서 제시하지 않는다
@@ -87,28 +86,18 @@ export const PERMISSION_REQUIREMENTS: readonly PermissionRequirement[] = [
     order: 1,
     platforms: ["android", "ios"],
   }),
-  // 요구하는 기능: 장소명(017) — 좌표를 지명으로 옮긴다 (안드로이드·iOS 모두 권한 필요, T030 실측)
-  requirement({
-    key: "location",
-    order: 2,
-    // T030 실측 완료 (2026-08-29, SM-S901N/Galaxy S22, Android 16): 안드로이드에서도
-    // `expo-location`의 `reverseGeocodeAsync`는 ACCESS_FINE_LOCATION이 있어야 지명을
-    // 준다 — 권한을 거부하면 예외를 던지고(`geocoding-port.ts`가 삼켜 `unknown`),
-    // 같은 좌표(37.5172,127.0473)가 권한 있을 때 "강남구", 없을 때 `placeName: unknown`
-    // 으로 갈렸다. 따라서 platforms는 ["android","ios"] 유지 — 안드로이드에서도 이
-    // 단계가 실제로 의미가 있다.
-    platforms: ["android", "ios"],
-  }),
+  // 121 — 장소명(017)의 `location`(ACCESS_FINE_LOCATION, 2번)을 걷었다. 장소 이름을 앱에 든 데이터에서 찾게 되어 위치 권한을
+  // 쓰는 곳이 없다(specs/121-richer-day-places). 사진 좌표는 사진 권한으로 읽는다.
   // 요구하는 기능: 완성 알림(020) — 자동으로 쓴 일기를 알린다
   requirement({
     key: "notifications",
-    order: 3,
+    order: 2,
     platforms: ["android", "ios"],
   }),
   // 요구하는 기능: 백그라운드 자동 생성(019/020) — 절전 중에도 먼저 써 둘 수 있게(085 — 시각을 약속하지 않는다)
   requirement({
     key: "battery-exception",
-    order: 4,
+    order: 3,
     // 043 FR-017 — iOS는 `expo-intent-launcher`를 지원하지 않는다(공식 README:
     // "동등한 API가 없어 iOS에서는 의미가 없다"). 021이 잘못 ["android","ios"]로
     // 선언했던 것을 정정 — 검증 환경 제약이 아니라 iOS 자체에 대응 API가 없다.

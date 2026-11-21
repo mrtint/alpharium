@@ -176,3 +176,44 @@ describe("상수", () => {
     expect(SAME_PLACE_METERS).toBe(100);
   });
 });
+
+describe("121 TV1~TV3 — 자리 목록(visits)", () => {
+  it("TV1·TV2 — 자리마다 첫 좌표·첫/마지막 시각·사진 수, 시각순", () => {
+    const { visits } = tracePlaces([
+      { ...northOf(1000), takenAtMs: at("2026-08-12T13:00:00") },
+      { ...BASE, takenAtMs: at("2026-08-12T09:00:00") },
+      { ...northOf(30), takenAtMs: at("2026-08-12T10:30:00") },
+      { ...northOf(1020), takenAtMs: at("2026-08-12T15:00:00") },
+    ]);
+
+    expect(visits).toEqual([
+      {
+        coordinate: BASE,
+        firstSeenAt: new Date(at("2026-08-12T09:00:00")),
+        lastSeenAt: new Date(at("2026-08-12T10:30:00")),
+        photoCount: 2,
+        source: "photo-exif",
+      },
+      {
+        coordinate: northOf(1000),
+        firstSeenAt: new Date(at("2026-08-12T13:00:00")),
+        lastSeenAt: new Date(at("2026-08-12T15:00:00")),
+        photoCount: 2,
+        source: "photo-exif",
+      },
+    ]);
+  });
+
+  it("자리 수·대표 좌표와 맞는다", () => {
+    const trace = tracePlaces([
+      { ...BASE, takenAtMs: at("2026-08-12T09:00:00") },
+      { ...northOf(500), takenAtMs: at("2026-08-12T14:00:00") },
+    ]);
+    expect(trace.visits).toHaveLength(trace.visitCount);
+    expect(trace.visits[0].coordinate).toEqual(trace.representativeCoordinate);
+  });
+
+  it("TV3 — 좌표가 없으면 빈 목록", () => {
+    expect(tracePlaces([]).visits).toEqual([]);
+  });
+});

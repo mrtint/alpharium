@@ -61,7 +61,7 @@ describe("DiaryRequest 타입 불변 (002·012·035)", () => {
     // 최상위 필드 이름만 뽑는다 (주석·중첩 무시하기 위해 "  <name>:" 패턴).
     const fields = [...body.matchAll(/^ {2}([a-zA-Z]+)\??:/gm)].map((m) => m[1]);
     expect(new Set(fields)).toEqual(
-      new Set(["signals", "character", "vision", "dayStillOpen", "placeName", "customNames"]),
+      new Set(["signals", "character", "vision", "dayStillOpen", "places", "customNames"]),
     );
   });
 

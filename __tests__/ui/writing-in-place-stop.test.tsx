@@ -54,7 +54,7 @@ const entryFor = (day: string): DiaryEntry => ({
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 });
 
 function hangingPipeline(): Pipeline & { finish: (result: PipelineResult) => void } {

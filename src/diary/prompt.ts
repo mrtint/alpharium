@@ -32,6 +32,7 @@
  * 데스크톱 경로와 맞추기 쉽다.
  */
 
+import { dayPeriodOfHour, type DayPeriod, type PromptPlaces } from "./place-lines";
 import { USER_VISIBLE_SIGNAL_AXES, type DaySignals, type SignalValue } from "../signals/types";
 import type { PhotoVision } from "../vision/types";
 import { displayNameOf } from "./character-name";
@@ -225,6 +226,14 @@ const KO_NUM = [
   "열두",
 ];
 
+/** 때 → 낱말. 사진 시각 줄(`partOf`)과 장소 줄(`placeLines`)이 함께 쓴다 */
+const PERIOD_WORD: Record<DayPeriod, string> = {
+  morning: "오전",
+  afternoon: "오후",
+  evening: "저녁",
+  night: "밤",
+};
+
 /**
  * 때 이름 (061 — 여섯에서 넷으로).
  *
@@ -236,7 +245,7 @@ const KO_NUM = [
  * 인자만 읽는다 — `buildPrompt()`가 결정적이어야 하기 때문(005 P6).
  */
 function partOf(h: number): string {
-  return h < 12 ? "오전" : h < 18 ? "오후" : h < 21 ? "저녁" : "밤";
+  return PERIOD_WORD[dayPeriodOfHour(h)];
 }
 
 /** 처음~끝 때 (061). 찍힌 순서의 중복 없는 때 이름에서 처음과 끝만 쓴다 */
@@ -409,15 +418,31 @@ const PLACES_LIMITATION =
   "이 자리들은 하루의 궤적이 아니라 사진이 찍힌 지점들이다. 사진을 찍지 않은 곳은 여기 없다.";
 
 /**
- * 대표 장소 이름 줄을 만든다 (017 FR-008, contracts/place-name.md L4).
+ * 장소 줄 (121, specs/121-richer-day-places/contracts/diary-places.md PL1~PL8).
  *
- * **관측 서술이지 단정이 아니다** — 원칙 II의 문체를 그대로 따른다("다녀온
- * 곳은 ○○ 근처였다"). `request.placeName`이 이미 `known`으로 확정된
- * 문자열이므로 여기서는 짐작 어미를 강제하지 않는다 — 좌표를 실제로 물어봐
- * 얻은 이름이라는 점에서 사진 캡션과 같은 자격의 관측이다.
+ * 017의 「다녀온 곳은 ○○ 근처였다」 한 줄을 대체했다 — 이름이 다른 자리 최대 세 곳을 시각순으로, 때와 함께 싣는다.
+ *
+ * **사실은 「사진이 그 근처에서 찍혔다」까지다**(원칙 II, FR-006) — 갔다·머물렀다를 쓰지 않는다. 「있었던 것 같다」는
+ * 모델의 짐작으로 남긴다. 이름은 기기 안 장소 데이터에서 고른 것이라 그 자리를 단정하지 않도록 「근처」를 붙이고,
+ * 이름 붙은 곳이 없던 자리는 「이름을 모르는 곳」이다(지어낸 이름을 넣지 않는다).
+ *
+ * 때 이름은 사진 시각 줄과 같은 넷(`partOf`)이다 — 한 기록 안에서 섞이지 않게.
+ * **이 문장들은 v5에서 잰 문장이 아니다**(원칙 V) — 실기기 일기로 처음 본다.
+ *
+ * 인자만 읽는다 — `buildPrompt()`가 결정적이어야 하기 때문(005 P6).
  */
-function placeNameLine(placeName: string): string {
-  return `다녀온 곳은 ${placeName} 근처였다.`;
+
+function placeLines(places: PromptPlaces, polite: boolean): string[] {
+  const ending = polite ? "찍혔어요." : "찍혔다.";
+  const items = places.items
+    .map(
+      (p) =>
+        `${PERIOD_WORD[p.period]}에 ${p.label === null ? "이름을 모르는 곳" : `${p.label} 근처`}`,
+    )
+    .join(", ");
+  const lines = [`사진은 ${items}에서 ${ending}`];
+  if (places.more > 0) lines.push(`그 밖에 ${koCount(places.more, "곳")}에서도 ${ending}`);
+  return lines;
 }
 
 /* ──────────────────── 사진의 내용 (011) ──────────────────── */
@@ -783,8 +808,8 @@ function sentenceSignalLines(
     lines.push(ph.kind === "known" ? PLACES_UNREAD : PLACES_NO_PHOTOS);
   }
 
-  if (request.placeName !== undefined) {
-    lines.push(`다녀온 곳은 ${request.placeName} 근처였어요.`);
+  if (request.places !== undefined) {
+    lines.push(...placeLines(request.places, true));
   }
 
   // 본 장면과 「일부만 보았다」는 본 장면 있는 날에만 — 본 장면 없는 날의 꼬리 「사진 속을
@@ -1002,7 +1027,7 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
   const head = fixedHead(request.character, request.customNames ?? {});
 
   // 036·061 — 한국어 캐릭터는 문장형 기록 + 날의 갈래 넷에 따른 꼬리. 날짜 머리줄·별도
-  // dayStillOpen/placeName/vision 조각이 전부 sentenceSignalLines()·tailFor() 안으로
+  // dayStillOpen/places/vision 조각이 전부 sentenceSignalLines()·tailFor() 안으로
   // 들어간다. `signals.date` 필드 자체는 안 지운다 — 날짜 문자열은 싣지 않고(036 FR-007),
   // 077부터 첫 문장 틀을 고르는 데만 쓴다(`frameFor`).
   if (usesE2SN(request.character)) {
@@ -1028,9 +1053,8 @@ export function buildPrompt(request: DiaryRequest, vision?: PhotoVision): string
   // 012 — 사진 축과 무관하게, 신호 목록과 독립된 자리에 온다(FR-004).
   const dayStillOpenPart = request.dayStillOpen ? [DAY_STILL_OPEN, ""] : [];
 
-  // 017 — 장소명 설정이 켜져 있고 이름을 얻은 경우에만 붙는다(FR-008,
-  // contracts/place-name.md L4). 화면과 같은 지오코딩 호출 결과를 공유한다.
-  const placeNamePart = request.placeName !== undefined ? [placeNameLine(request.placeName)] : [];
+  // 121 — 장소 이름 설정이 켜져 있고 자리 이름을 찾은 경우에만 붙는다(contracts/diary-places.md PL8).
+  const placeNamePart = request.places !== undefined ? placeLines(request.places, false) : [];
 
   return [
     // 018 — promptPrefix()와 같은 배열에서 나온다(contracts/prompt-prefix.md P9).

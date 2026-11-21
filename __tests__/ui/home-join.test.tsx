@@ -58,7 +58,7 @@ const YESTERDAY = "2026-09-27";
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: true, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: true, placeNamesEnabled: false },
 });
 
 function entryFor(day: string, title: string): DiaryEntry {

@@ -24,10 +24,11 @@
 import type { DayDate } from "../config/day-boundary";
 import type { Character } from "../diary/types";
 
+import type { GeocodingPreference } from "./geocoding-setting-store";
 import { resolveSelection } from "./selection";
 
-/** 설정 탭 "장소명"이 돌려주는 값 (contracts/settings-sections.md S3). */
-export type GeocodingPreference = "auto" | "on" | "off";
+/** 설정 탭 "장소 이름"이 돌려주는 값 — 정의는 저장소 한 곳에만 둔다(121에서 복제를 걷었다). */
+export type { GeocodingPreference } from "./geocoding-setting-store";
 
 export type ResolveInput = {
   /** selected-character.json 로드값. 로스터 밖·파일 없음이면 null (FR-008). */
@@ -42,9 +43,7 @@ export type ResolveInput = {
   chosenDay: DayDate;
   /** 그 날 사진 신호가 1장 이상인가 (FR-010). 호출자가 신호에서 계산 — 임계값 없음. */
   photoSignalPresent: boolean;
-  /** 위치 런타임 권한이 부여됐는가 (FR-011). */
-  locationPermission: boolean;
-  /** 설정 탭 "장소명" (FR-012·025). */
+  /** 설정 탭 "장소 이름" (FR-012·025, 121 — 위치 권한은 더 보지 않는다). */
   geocodingPreference: GeocodingPreference;
 };
 
@@ -63,7 +62,7 @@ export type ResolvedParams = {
    * 않는다(029 경계 유지, "두 개의 진실" 금지).
    */
   hasPhotos: boolean;
-  geocodingEnabled: boolean;
+  placeNamesEnabled: boolean;
   /** 캐릭터가 준비를 잃어 옮겨졌으면 (FR-014). 화면이 알린다. */
   movedFrom?: Character;
 };
@@ -103,13 +102,8 @@ export function resolveGenerationParams(input: ResolveInput): ResolveOutcome {
   // 신호를 읽어서 한다(011) — 여기 값은 화면의 미리 읽기 갈래용 근사치다.
   const hasPhotos = input.photoSignalPresent;
 
-  // ── 장소명 (R6) ────────────────────────────────────────────────────────
-  const geocodingEnabled =
-    input.geocodingPreference === "on"
-      ? true
-      : input.geocodingPreference === "off"
-        ? false
-        : input.locationPermission;
+  // ── 장소 이름 (R6, 121) — 기기 안에서 찾으므로 설정만 본다 ─────────────
+  const placeNamesEnabled = input.geocodingPreference === "on";
 
   return {
     kind: "resolved",
@@ -118,7 +112,7 @@ export function resolveGenerationParams(input: ResolveInput): ResolveOutcome {
       // R4: 하루는 인자로 받은 것 그대로 — 이 함수는 재계산하지 않는다.
       day: input.chosenDay,
       hasPhotos,
-      geocodingEnabled,
+      placeNamesEnabled,
       ...(selection.movedFrom !== undefined ? { movedFrom: selection.movedFrom } : {}),
     },
   };

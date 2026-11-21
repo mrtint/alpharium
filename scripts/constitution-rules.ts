@@ -1075,6 +1075,11 @@ export const SCREEN_TEXT_ALLOWLIST: Readonly<Record<string, string>> = {
   "src/signals/collect.ts":
     "신호의 「모른다」 까닭 — 프롬프트에 「사진은 모른다. {까닭}.」으로 들어간다",
   "src/signals/fake.ts": "테스트·개발용 신호 — 까닭은 모델 입력 모양",
+  "src/signals/place-index.ts":
+    "장소 데이터 해석 실패 이유 — 내부 값, `placeNamer`가 잡아 이름 「모름」으로 접는다(121 R10)",
+  "src/signals/place-index-port.ts":
+    "장소 데이터 읽기 실패 이유 — 내부 값, 이름 「모름」으로 접힌다(121 R10)",
+  "src/signals/place-names.ts": "역 이름 꼴(「○○역」) — 장소 데이터의 이름을 모델 입력으로 옮기는 규칙(121 PN)",
   "src/diagnostics/prompt-preview.ts":
     "프리셋 신호의 까닭 — 실제 buildPrompt()에 들어간다(022 PP1)",
   "src/welcome/liveness.ts": "LIVENESS_INPUT — 모델에게 보내는 말",

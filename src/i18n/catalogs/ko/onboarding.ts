@@ -6,6 +6,8 @@
  *
  * 085 — 알림·배터리의 `rationale`·`ifDenied`는 「정한 시간대에 쓴다」를 약속하지 않는다(소유자 승인 2026-10-15).
  *
+ * 121 — 위치(`location`) 문안을 걷었다(앱이 위치 권한을 요청하지 않는다).
+ *
  * 권한 목록의 키·순서·플랫폼은 `requirements.ts`에 그대로 있다 — 여기는 말만 둔다(K4). 모델 식별자 토큰을 담지 않는다(021, 원칙 III).
  */
 
@@ -17,10 +19,6 @@ export const onboarding = {
       rationale: "그날 찍힌 사진 몇 장을 살펴 하루를 짐작해 씁니다.",
       ifDenied: "사진을 볼 수 없어서 일기는 사진 없이 써요.",
     },
-    location: {
-      rationale: "그날 머문 곳을 지명으로 적기 위해 위치를 씁니다.",
-      ifDenied: "지명을 옮기지 못해서 장소는 비워 둬요.",
-    },
     notifications: {
       rationale: "쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.",
       ifDenied: "쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.",
@@ -31,7 +29,6 @@ export const onboarding = {
     },
   } as {
     photos: PermissionText;
-    location: PermissionText;
     notifications: PermissionText;
     "battery-exception": PermissionText;
   },

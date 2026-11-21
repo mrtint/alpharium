@@ -9,13 +9,12 @@ import {
 } from "../../src/app/geocoding-setting-store";
 
 /**
- * 장소명 설정 영속화의 계약 테스트.
+ * 장소 이름 설정 영속화의 계약 테스트.
  *
- * 계약: specs/017-diary-body-screen/contracts/place-name.md L1
- *       specs/029-writing-flow-simplification/contracts/settings-sections.md S3 (ST2)
+ * 계약: specs/121-richer-day-places/contracts/diary-places.md ST1 (017 L1, 029 S3를 이었다)
  *
- * 029에서 2-상태(boolean)에서 3-상태(`"auto"|"on"|"off"`)로 바뀌었다. 파일
- * 없음·깨짐 → `"auto"`. 구형 `{enabled:boolean}` → `"on"`/`"off"` 마이그레이션.
+ * 121에서 두 갈래(`"on"|"off"`)로 줄었다 — 장소 이름을 기기 안에서 찾아 위치 권한을 볼 이유가 없어졌다. 파일 없음·깨짐
+ * → `"on"`. 옛 `"auto"` → `"on"`. 구형 `{enabled:boolean}` → `"on"`/`"off"`.
  */
 
 function memoryPort(
@@ -33,7 +32,7 @@ function memoryPort(
 }
 
 describe("왕복 — 담고 꺼낸다 (L1, ST2)", () => {
-  it.each(["auto", "on", "off"] as const)("%s를 담고 그대로 꺼낸다", async (mode) => {
+  it.each(["on", "off"] as const)("%s를 담고 그대로 꺼낸다", async (mode) => {
     const port = memoryPort();
     await saveGeocodingSetting(port, mode);
 
@@ -50,11 +49,15 @@ describe("왕복 — 담고 꺼낸다 (L1, ST2)", () => {
 });
 
 /**
- * ★ 읽기 실패·파일 없음 → `"auto"` (029, S3/SS10).
+ * ★ 읽기 실패·파일 없음 → `"on"` (121 ST1 — 처음 값이 「켬」이다).
  */
-describe('읽기 실패는 "auto"다 (SS10)', () => {
-  it('담은 적이 없으면 "auto"', async () => {
-    expect(await loadGeocodingSetting(memoryPort())).toBe("auto");
+describe('읽기 실패는 "on"이다 (ST1)', () => {
+  it('담은 적이 없으면 "on"', async () => {
+    expect(await loadGeocodingSetting(memoryPort())).toBe("on");
+  });
+
+  it('옛 "auto"는 "on"으로 옮긴다', async () => {
+    expect(await loadGeocodingSetting(memoryPort('{"mode":"auto"}'))).toBe("on");
   });
 
   it.each([
@@ -63,13 +66,13 @@ describe('읽기 실패는 "auto"다 (SS10)', () => {
     ["객체가 아님", '"on"'],
     ["null", "null"],
     ["자리가 없음", "{}"],
-    ["mode가 셋 밖", '{"mode":"maybe"}'],
+    ["mode가 둘 밖", '{"mode":"maybe"}'],
     ["mode가 숫자", '{"mode":1}'],
-  ])('%s이면 "auto" — 설정을 지어내지 않는다', async (_label, raw) => {
-    expect(await loadGeocodingSetting(memoryPort(raw))).toBe("auto");
+  ])('%s이면 처음 값 "on"', async (_label, raw) => {
+    expect(await loadGeocodingSetting(memoryPort(raw))).toBe("on");
   });
 
-  it('통로가 던져도 "auto"이며 앱을 죽이지 않는다', async () => {
+  it('통로가 던져도 "on"이며 앱을 죽이지 않는다', async () => {
     const broken: GeocodingSettingPort = {
       async read() {
         throw new Error("읽지 못했다");
@@ -77,7 +80,7 @@ describe('읽기 실패는 "auto"다 (SS10)', () => {
       async write() {},
     };
 
-    await expect(loadGeocodingSetting(broken)).resolves.toBe("auto");
+    await expect(loadGeocodingSetting(broken)).resolves.toBe("on");
   });
 });
 
@@ -93,8 +96,8 @@ describe("구형 파일 마이그레이션 (SS10)", () => {
     expect(await loadGeocodingSetting(memoryPort('{"enabled":false}'))).toBe("off");
   });
 
-  it('{"enabled":"true"} (문자열) → "auto"', async () => {
-    expect(await loadGeocodingSetting(memoryPort('{"enabled":"true"}'))).toBe("auto");
+  it('{"enabled":"true"} (문자열) → 처음 값 "on"', async () => {
+    expect(await loadGeocodingSetting(memoryPort('{"enabled":"true"}'))).toBe("on");
   });
 });
 
@@ -131,5 +134,5 @@ describe("vision-setting과 섞이지 않는다", () => {
 });
 
 // 타입 존재 확인 (tsc).
-const _pref: GeocodingPreference = "auto";
+const _pref: GeocodingPreference = "on";
 void _pref;

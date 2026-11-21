@@ -4,11 +4,11 @@
  * 계약: specs/056-settings-time-place/contracts/settings-time-place.md PD1~PD3, spec FR-021~FR-027
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **칸을 누르면 바로 적용한다**(보드 `6l` ②) — 지금과 다른 칸이면 그 값을 한 번 올리고, 같은 칸이면 닫기만 한다. 저장과
- * 「켬」의 위치 권한 요청은 조립부가 한다(FR-024·FR-025) — 이 부품은 기기·저장에 닿지 않는다.
+ * **칸을 누르면 바로 적용한다**(보드 `6l` ②) — 지금과 다른 칸이면 그 값을 한 번 올리고, 같은 칸이면 닫기만 한다. 저장은
+ * 조립부가 한다(FR-024) — 이 부품은 기기·저장에 닿지 않는다.
  *
- * 지도 고지는 017 FR-006(「좌표를 기기의 지도 서비스에 물어봅니다.」)을 해요체로 옮겨 칸 목록 아래에 늘 둔다(056 FR-026).
- * 029의 3상태 값(`GeocodingPreference`)은 그대로다.
+ * ★ 121 — 칸이 「켬」·「끔」 둘이다(보드 `6l`의 「자동」을 걷었다, contracts/diary-places.md ST2). 장소 이름을 앱에 든 데이터에서
+ * 찾으므로 위치 권한을 묻지 않고, 칸 목록 아래 고지는 좌표를 보내지 않는다는 사실을 말한다(ST3).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -25,7 +25,6 @@ const P = SETTINGS.placeDialog;
 
 /** 보드 `6l`의 칸 순서와 문구 */
 const OPTIONS: readonly { mode: GeocodingPreference; name: string; desc: string }[] = [
-  { mode: "auto", name: SETTINGS_TEXT.placeAuto, desc: SETTINGS_TEXT.placeAutoDesc },
   { mode: "on", name: SETTINGS_TEXT.placeOn, desc: SETTINGS_TEXT.placeOnDesc },
   { mode: "off", name: SETTINGS_TEXT.placeOff, desc: SETTINGS_TEXT.placeOffDesc },
 ];

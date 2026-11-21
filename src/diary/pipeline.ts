@@ -8,6 +8,9 @@
  * 파이프라인이 거기까지 도달한다는 것 자체가 검증 대상이다.
  */
 
+import { buildPromptPlaces, savedPlacesOf } from "./place-lines";
+import type { PlaceName } from "../signals/place-names";
+import type { Coordinate } from "../signals/places";
 import { isDayWritable, type DayDate } from "../config/day-boundary";
 import {
   isGenerationFailure,
@@ -158,19 +161,14 @@ export type PipelineDeps = {
    */
   cleanupResizedPhoto?: (path: string) => Promise<void>;
   /**
-   * 좌표를 장소 이름으로 바꾼다 (017, contracts/place-name.md).
+   * 자리 좌표들의 장소 이름을 기기 안에서 찾는다 (121, contracts/diary-places.md DP1~DP3 — 017의 `geocoding?`을 대체했다).
    *
-   * 설정이 켜져 있고 대표 좌표가 있을 때만 정확히 1회 호출된다. 주지
-   * 않으면 지오코딩을 시도하지 않는다(옵셔널 확장).
+   * 설정이 켜져 있고 자리가 있을 때만 한 번 불린다(자리 전부를 한꺼번에). 좌표를 기기 밖으로 보내지 않는다.
+   * 주지 않으면 이름을 찾지 않는다(옵셔널 확장).
    */
-  geocoding?: {
-    reverseGeocode(coordinate: {
-      latitude: number;
-      longitude: number;
-    }): Promise<{ kind: "known"; value: string } | { kind: "unknown" }>;
-  };
-  /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
-  geocodingEnabled?: boolean;
+  placeNames?: (coordinates: readonly Coordinate[]) => Promise<PlaceName[]>;
+  /** 장소 이름 설정이 켜져 있는가 (121, FR-008). 주지 않으면 꺼짐으로 다룬다 */
+  placeNamesEnabled?: boolean;
   /**
    * 살아 있는 쓰기 등록부의 칸을 차지한다 (080, contracts/live-write.md P1~P6 — 020의 `acquireLock?`을 대체한다).
    *
@@ -182,7 +180,7 @@ export type PipelineDeps = {
    *
    * **동기다.** 확인과 차지 사이에 다른 쓰기가 끼어들 틈이 없다 — 020의 파일 잠금은 「읽고 → 쓴다」 사이가 비어 있었다.
    *
-   * **옵셔널 확장이다**(003의 `isModelReady?`, 017의 `geocoding?`과 같은 방식) — 주지 않으면 등록부를 쓰지 않는다.
+   * **옵셔널 확장이다**(003의 `isModelReady?`, 121의 `placeNames?`와 같은 방식) — 주지 않으면 등록부를 쓰지 않는다.
    *
    * 누가 조립했는가(주체)와 멈춤 함수는 여기 오지 않는다 — `wiring.ts`가 묶어서 준다(`PipelineInput`은 화면·태스크가
    * 공유하는 데이터라 주체 개념이 안 어울린다).
@@ -201,6 +199,20 @@ export interface Pipeline {
 /** 실패를 만든다. stage 없이 실패하는 경로가 없도록 이 함수만 쓴다. */
 function stop(stage: PipelineStage, reason: string): PipelineResult {
   return { ok: false, stage, reason };
+}
+
+/**
+ * 저장할 신호 기록 — 자리 목록(`trace.visits`, 자리마다 좌표·시각)을 걷는다 (121, research R9, 코드 리뷰).
+ *
+ * 저장 일기에는 이름·시각만 담은 `places`(좌표 없음)가 따로 남는다. 자리 수·거리·대표 좌표는 121 이전과 같이 남는다.
+ */
+function withoutVisits(signals: DaySignals): DaySignals {
+  if (signals.places.kind !== "known" || signals.places.value.trace.visits === undefined) {
+    return signals;
+  }
+  const { visits: _visits, ...trace } = signals.places.value.trace;
+  void _visits;
+  return { ...signals, places: { kind: "known", value: { ...signals.places.value, trace } } };
 }
 
 /**
@@ -340,28 +352,24 @@ async function runStages(
     }
   }
 
-  // 4c. 장소명을 얻는다 (017, contracts/place-name.md).
+  // 4c. 자리마다 장소 이름을 찾는다 (121, contracts/diary-places.md DP1~DP5 — 017의 지오코딩을 대체했다).
   //
-  // **`buildPrompt()`보다 먼저 일어나야 한다**(L4) — 화면과 프롬프트가 같은
-  // 호출 결과를 공유하려면, 그 값이 `request.request`에 실린 채로
-  // `backend.generate()`(안에서 buildPrompt를 부른다)에 들어가야 한다.
-  // 설정이 꺼져 있거나 대표 좌표가 없으면(L2) 시도하지 않는다.
-  let placeName: DiaryEntry["placeName"];
-  const representativeCoordinate =
-    signals.places.kind === "known"
-      ? signals.places.value.trace.representativeCoordinate
-      : undefined;
-  if (
-    deps.geocodingEnabled === true &&
-    deps.geocoding !== undefined &&
-    representativeCoordinate !== undefined
-  ) {
-    const geocoded = await deps.geocoding.reverseGeocode(representativeCoordinate);
-    placeName = geocoded;
-    if (geocoded.kind === "known") {
-      request.request = { ...request.request, placeName: geocoded.value };
+  // **기기 안에서만 찾는다**(DP2) — 앱에 든 장소 데이터를 읽고 좌표를 어디에도 보내지 않는다.
+  // **`buildPrompt()`보다 먼저 일어나야 한다**(DP4) — 프롬프트와 저장 일기가 같은 찾기 결과를 쓰려면 그 값이
+  // `request.request`에 실린 채로 `backend.generate()`(안에서 buildPrompt를 부른다)에 들어가야 한다.
+  // 설정이 꺼져 있거나 자리가 없으면 찾지 않는다(DP1). **찾기가 던져도 쓰기는 계속된다**(DP3) — 판정 갈래를 늘리지 않는다.
+  const visits = signals.places.kind === "known" ? (signals.places.value.trace.visits ?? []) : [];
+  let names: PlaceName[] = [];
+  if (deps.placeNamesEnabled === true && deps.placeNames !== undefined && visits.length > 0) {
+    try {
+      names = await deps.placeNames(visits.map((v) => v.coordinate));
+    } catch {
+      names = visits.map(() => ({ kind: "unknown" }) as const);
     }
+    const places = buildPromptPlaces(visits, names);
+    if (places !== undefined) request.request = { ...request.request, places };
   }
+  const savedPlaces = visits.length > 0 ? savedPlacesOf(visits, names) : undefined;
 
   // ★ 080 (코드 리뷰) — **생성에 들어서기 전에 끊겼으면 시작하지 않는다.** 어댑터는 `generate()`에 들어설 때 지난 그만두기
   // 신호를 비운다(새 요청이므로) — 신호 읽기·지오코딩 도중에 온 끊기는 거기서 사라지고, 사진 읽기·모델 적재·본문·제목이 끝까지
@@ -416,11 +424,11 @@ async function runStages(
     // 요청에 이름이 없으면(옛 경로) 키 자체를 만들지 않는다(N10) — `undefined`를
     // 담으면 「없다」와 「모른다」가 뒤섞인다.
     ...(input.authorName !== undefined ? { authorName: input.authorName } : {}),
-    signalsUsed: signals,
+    signalsUsed: withoutVisits(signals),
     createdAt: input.now,
     ...(generated.usedPhotos !== undefined ? { photos: generated.usedPhotos } : {}),
     ...(generated.timing !== undefined ? { timing: generated.timing } : {}),
-    ...(placeName !== undefined ? { placeName } : {}),
+    ...(savedPlaces !== undefined ? { places: savedPlaces } : {}),
   };
 
   const saved = await deps.store.save(entry);

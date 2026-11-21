@@ -24,7 +24,7 @@ describe("068 C4 — battery-exception은 안드로이드 전용", () => {
   it("iOS 단계 목록에 battery-exception이 없다", () => {
     const keys = planOnboardingSteps({ ...base, platform: "ios" }).map((s) => s.requirement.key);
     expect(keys).not.toContain("battery-exception");
-    expect(keys).toEqual(["photos", "location", "notifications"]);
+    expect(keys).toEqual(["photos", "notifications"]);
   });
 
   it("안드로이드 단계 목록에는 마지막으로 있다", () => {

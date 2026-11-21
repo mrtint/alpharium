@@ -59,6 +59,11 @@ import { readDeviceState } from "../app/device-state-port";
 import { readLaunchState } from "../app/launch-state-port";
 import { resetFastCycleIfDue } from "../app/fast-cycle-reset";
 import { createAppPipeline } from "../app/wiring";
+import {
+  expoGeocodingSettingPort,
+  loadGeocodingSetting,
+  type GeocodingSettingPort,
+} from "../app/geocoding-setting-store";
 import { showsOnScreen } from "../diagnostics/sink";
 import {
   expoWriteFailurePort,
@@ -132,6 +137,8 @@ export type AutoDiaryTaskDeps = {
   manual?: boolean;
   /** 060 — 쓰기 실패 기록 통로. 주지 않으면 `preferences/write-failures.json` */
   failurePort?: WriteFailurePort;
+  /** 121 — 장소 이름 설정 통로. 주지 않으면 설정 화면과 같은 파일(`geocoding-setting-store.ts`) */
+  placeNameSettingPort?: GeocodingSettingPort;
   /** 064 — 상태 흉내 기록 통로. 주지 않으면 `preferences/simulation.json` */
   simulationPort?: SimulationStorePort;
   /** 078 → 109 — 자동 쓰기 시도 기록 통로. 주지 않으면 날짜별 장부 `attempt-ledger/` */
@@ -304,8 +311,13 @@ async function runBody(
     // 살아 있는 쓰기 등록부의 칸을 차지한다(080). 다른 쓰기가 살아 있어 못 차지한
     // already-running 결과는 아래에서 "skipped"로 매핑한다.
     // 091 — 깬 요청을 함께 넘긴다: 배터리 요청이면 조립이 느린 쓰기(CPU 감시 밑)를 고른다
+    // 121 — 장소 이름은 기기 안에서 찾으므로 백그라운드도 화면과 같은 설정을 따른다(017의 지오코딩은 백그라운드에서 하지 않았다).
+    const placeNamesEnabled =
+      (await loadGeocodingSetting(deps.placeNameSettingPort ?? expoGeocodingSettingPort())) ===
+      "on";
     const app = makePipeline(resolution, {
       lockOwner: "background",
+      placeNamesEnabled,
       ...(wake === undefined ? {} : { wake }),
     });
     if (!app.ok) {
