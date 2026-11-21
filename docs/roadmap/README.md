@@ -212,6 +212,32 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 
 **위험**: 이 앱의 약속(배터리·권한)에 가장 크게 닿는 과제다. 백그라운드 쓰기와 같은 OS 제한(삼성 얼림·iOS 깨움 비보장)을 받아 며칠 단위 실측이 든다 — 개발 빌드 검증이 끝나기 전에는 릴리스 빌드로 가지 않는다(작업 습관). 위치 이력은 이 앱이 지금 다루는 어떤 데이터보다 민감해 소유자 판단이 필요하다.
 
+### 온디바이스 일기 모델 교체와 R2 미러·폴백 내려받기
+
+**배경**: `src/models/roster.ts`의 `ASSETS.quiet`(`key: "a1"`)는 현재 순정 `Q4_K_M` 모델(`1_522_796_768` B, `md5=d8506380fd1f0fdb8e4318a01b8b8e34`)과 단일 Hugging Face 경로를 쓰고, `src/inference/sampling.ts`는 미실측 짐작값(`temperature: 0.8`, `top_p: 0.95`)을 둔 상태다. 옆 저장소(`terrarium` `EXP-013`~`EXP-015`·`US-020`)에서 일기 특화 `kanana-v3-dpo-iq4_nl_im.gguf`(`expectedBytes: 1_241_435_520` / `1.156 GiB`, 순정 대비 `-268.3 MiB`, `md5: "dfc35a88fb1f5215f708ea5a348121b8"`)와 샘플링 최적값(`temperature: 0.60`, `top_p: 0.90`)이 확정됐고, Cloudflare R2 버킷(`models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf`)과 Hugging Face Hub 폴백 경로 모두 `HTTP 200`·`Content-Length`·`Range 206` 검증을 마쳤다.
+
+**할 일**:
+1. `src/models/roster.ts` (`ASSETS.quiet`, `key: "a1"`)에 주 내려받기 경로(Cloudflare R2 공개 URL — `roster.ts` 계약상 `process.env`를 읽지 않으므로 착수 시 실제 공개/커스텀 도메인 전체 URL을 코드에 고정)·폴백 경로(`https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/main/kanana-v3-dpo-iq4_nl_im.gguf`)·`expectedBytes: 1_241_435_520`·`md5: "dfc35a88fb1f5215f708ea5a348121b8"`를 반영한다.
+2. 다운로드 계층(세그먼트 이어받기·검증 포함)에서 R2 요청 실패 시 폴백 경로로 전환하고, 기존 기기에 받아 둔 옛 `a1` 파일이나 부분 구간이 새 `expectedBytes`/`md5`와 다를 때 정리 후 다시 받는지 확인한다.
+3. `src/inference/sampling.ts`의 `temperature`를 `0.60`, `top_p`를 `0.90`으로 교체한다(`top_k: 40`, `n_predict: 512`, `ROMAN_LETTER_BLOCK_GRAMMAR` 유지).
+
+**완료 조건**: 실기기(iOS 또는 Android)에서 R2 경로로 `1_241_435_520` B 내려받기·구간 이어받기(`Range 206`)·`md5` 검증이 통과하고, R2 실패 시 HF 폴백 전환과 기존 `a1` 캐시 교체가 확인되며, 새 샘플링 값으로 일기 본문·제목 생성이 완주한다.
+
+**위험**: 기존 사용자가 이미 받아 둔 옛 `a1` 파일이나 이어받기 메타데이터를 `md5`·바이트 불일치로 매 실행 거부하거나 지우지 못하면 모델 교체가 막힐 수 있다. `r2.dev` 개발 URL을 그대로 상용에 쓰면 트래픽 제한에 걸릴 수 있으므로 상용 배포 전 커스텀 도메인 연결 여부를 소유자가 확정해야 한다.
+
+### 온디바이스 추론 런타임 속도 최적화 — Flash Attention·2턴 컨텍스트 재사용
+
+**배경**: `terrarium` `EXP-015`(x86 CPU / Vulkan GPU 실측)에서 `flash_attn: true`(`-fa on`), 1턴(본문)과 2턴(제목) 사이 모델 언로드 없는 컨텍스트 재사용(`cache_prompt: true`, `cache_reuse: 0`), 저사양 RAM 단말용 KV 캐시 `q8_0`(`-120 MiB` 절감) 조합이 1+2턴 총 소요 시간을 크게 줄였다. 모바일 ARM(iOS Metal / Android NEON) 실기기에서도 같은 효과가 유지되는지·메모리 2 GiB 미만 한도를 지키는지는 아직 미확인이다.
+
+**할 일**:
+1. 추론 어댑터(`src/inference/llama-port.ts` 및 `llama.rn` 호출부)에서 `flash_attn` 옵션 지원 여부와 1턴(본문) → 2턴(제목) 호출 사이 컨텍스트·KV 접두어 재사용(`cache_prompt: true`, `cache_reuse: 0`) 적용 가능 범위를 확인해 반영한다.
+2. RAM 2 GiB 미만 저사양 기기에서 필요 시 `cache_type_k` / `cache_type_v`를 `"q8_0"`으로 내릴 수 있는 런타임 구성을 검토한다.
+3. 실기기(iOS/Android)에서 변경 전후의 `iq4_nl_im` vs 기존 모델 토큰 생성 속도(`t/s`)·1+2턴 총 소요 시간·피크 RAM을 측정해 기록한다(`terrarium` 실기기 검증 과제의 근거 자료로 환류).
+
+**완료 조건**: 실기기에서 1턴+2턴 연속 생성이 메모리 한도(< 2 GiB) 안에서 회귀 없이 완주하고, 변경 전후 실측 속도·메모리 수치가 기록됐다.
+
+**위험**: `EXP-015` 수치는 데스크톱 x86/Vulkan 환경 실측이므로 모바일 `llama.rn`의 Metal/NEON 백엔드에서는 `flash_attn` 또는 `q8_0` KV 캐시 지원 여부·속도 이득이 다를 수 있다.
+
 ## 완료 이력
 
 과제별 상세 기록(배경·실측·결정)은 각 `specs/NNN-*/`와 이 파일의 git 히스토리
