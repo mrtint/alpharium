@@ -35,6 +35,7 @@ import {
   withVerdict,
   withoutAsset,
 } from "./storage";
+import type { SegmentedResume } from "./segmented/types";
 import type { DownloadFailure, DownloadProgress } from "./types";
 import {
   segmentCheckpoint,
@@ -95,6 +96,8 @@ type Running = {
   handle: { pause(): Promise<void> };
   /** 지금까지 받은 바이트. 진행 콜백이 갱신한다. 공간 판정(§6)에만 쓰이고 밖으로 안 나감 */
   receivedBytes: number;
+  /** 사용자가 멈추기를 눌렀다 — 받기가 실패로 끝나도 예비 경로로 넘어가지 않는다 (122 AF4) */
+  pauseRequested: boolean;
 };
 
 export function createAcquisition(ports: AcquisitionPorts): Acquisition {
@@ -108,10 +111,16 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
 
     async pause(character) {
       if (character === undefined) {
-        for (const entry of running.values()) await entry.handle.pause();
+        for (const entry of running.values()) {
+          entry.pauseRequested = true;
+          await entry.handle.pause();
+        }
         return;
       }
-      await running.get(character)?.handle.pause();
+      const entry = running.get(character);
+      if (entry === undefined) return;
+      entry.pauseRequested = true;
+      await entry.handle.pause();
     },
 
     async prepare(character, onProgress) {
@@ -127,7 +136,11 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
       // **자리를 곧바로 잡는다.** 아래에 `await`가 있으므로, 여기서 잡지 않으면 두 요청이
       // 나란히 검사를 통과해 같은 파일을 둘이 쓴다 — 파일이 손상된다.
       // 자바스크립트가 단일 스레드라 해도 `await` 사이에 다른 요청이 끼어들 수 있다.
-      const slot: Running = { handle: { async pause() {} }, receivedBytes: 0 };
+      const slot: Running = {
+        handle: { async pause() {} },
+        receivedBytes: 0,
+        pauseRequested: false,
+      };
       running.set(character, slot);
       try {
         const asset = assetFor(character);
@@ -136,6 +149,17 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
           expectedBytes: asset.expectedBytes,
           expectedMd5: asset.md5,
         };
+
+        // 122 — 예비 경로가 있는 자산은 단일 스트림 재개 기록을 이어받지 않는다. 그 기록(`savable()`)은 안에 옛
+        //       주소를 품고 있어 해석할 수 없고, 옛 모델의 기록이면 옛 파일을 끝까지 받은 뒤에야 지문에서 떨어진다.
+        //       두 경로 모두 구간 받기를 지원하므로 이 기록은 113 이전에 남은 것뿐이다 — 부분 파일과 함께 지운다.
+        if (asset.fallbackUrl !== undefined) {
+          const stale = pausedFor(await readState(ports.metadata), asset.key);
+          if (stale !== null) {
+            await ports.files.remove(asset.key);
+            await mutateState(ports.metadata, (fresh) => withoutAsset(fresh, asset.key));
+          }
+        }
 
         // 110 — 이미 온전히 있으면 받지 않는다. 공간 판정보다 먼저다: 받지 않을 파일에 공간을 요구하지 않는다.
         if ((await settleExistingFile(ports, target)) === "ready") {
@@ -195,32 +219,38 @@ export function createAcquisition(ports: AcquisitionPorts): Acquisition {
         //        113 — 구간이 하나 끝날 때마다 `checkpoint`가 그 사실을 `state.json`에 남긴다.
         //        앱이 죽거나 연결이 끊겨도 끝난 구간은 다음 받기에서 건너뛴다.
         const checkpoint = segmentCheckpoint(ports.metadata);
-        const task =
-          segmented !== null
-            ? ports.download.resume(
-                asset.key,
-                asset.url,
-                segmented,
-                (p) => report(p.bytesWritten, p.totalBytes),
-                checkpoint,
-              )
-            : paused !== null
-              ? ports.download.resume(
-                  asset.key,
-                  asset.url,
-                  paused.state,
-                  (p) => report(p.bytesWritten, p.totalBytes),
-                  checkpoint,
-                )
-              : ports.download.start(
-                  asset.key,
-                  asset.url,
-                  (p) => report(p.bytesWritten, p.totalBytes),
-                  checkpoint,
-                );
+        const progress = (p: { bytesWritten: number; totalBytes: number }) =>
+          report(p.bytesWritten, p.totalBytes);
+        const begin = (url: string, record: SegmentedResume | null, single: unknown | null) =>
+          record !== null
+            ? ports.download.resume(asset.key, url, record, progress, checkpoint)
+            : single !== null
+              ? ports.download.resume(asset.key, url, single, progress, checkpoint)
+              : ports.download.start(asset.key, url, progress, checkpoint);
 
+        let task = begin(asset.url, segmented, paused?.state ?? null);
         slot.handle = task;
-        const outcome = await task.wait();
+        let outcome = await task.wait();
+
+        // 3-b. 주 경로가 실패했다 — 예비 경로로 한 번 넘어간다 (122 AF1~AF5).
+        //
+        //      두 경로는 바이트까지 같은 파일이므로 체크포인트로 남은 끝난 구간을 그대로 이어받는다
+        //      (구간 기록에는 주소가 없다). 단일 스트림 재개 기록은 위에서 이미 걷었다.
+        //      멈추기를 눌렀으면 넘어가지 않는다 — 기록을 정리하는 `await` 사이에 눌러도 마찬가지다.
+        //      마지막 안전망은 받은 뒤의 지문 검증이다.
+        if (outcome.kind === "failed" && asset.fallbackUrl !== undefined && !slot.pauseRequested) {
+          const record = await settleResumeRecord(ports, {
+            assetKey: asset.key,
+            expectedBytes: asset.expectedBytes,
+          });
+          if (slot.pauseRequested) {
+            return { ok: false, failure: { kind: "network", reason: "받다가 멈췄다" } };
+          }
+          slot.receivedBytes = 0;
+          task = begin(asset.fallbackUrl, record, null);
+          slot.handle = task;
+          outcome = await task.wait();
+        }
 
         // 4-a. 사용자가 멈췄다. **실패가 아니다** — 이어받을 수 있는 상태로 남긴다.
         //

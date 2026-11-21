@@ -26,7 +26,7 @@ export type OutboundEntry = {
 export const OUTBOUND: readonly OutboundEntry[] = [
   {
     id: "model-download",
-    what: "모듈 내려받기 — Hugging Face 서버가 일반 웹 요청 정보(IP 주소 등)를 받는다",
+    what: "모듈 내려받기 — Cloudflare R2(일기 모듈 주 경로, 122)와 Hugging Face 서버가 일반 웹 요청 정보(IP 주소 등)를 받는다",
     evidence: { kind: "code", paths: ["src/models/roster.ts", "src/vision/roster.ts"] },
   },
   {
@@ -44,6 +44,10 @@ export type AllowedHost = { host: string; reason: string };
 /** 앱 소스(`src/`·`App.tsx`)에 상수로 나와도 되는 외부 호스트 (F3·F5) */
 export const ALLOWED_HOSTS: readonly AllowedHost[] = [
   { host: "huggingface.co", reason: "모듈 내려받기(model-download)" },
+  {
+    host: "pub-9ba5686e50794962939808ea062b7deb.r2.dev",
+    reason: "일기 모듈 내려받기 주 경로 — 운영자의 Cloudflare R2 공개 버킷(model-download, 122)",
+  },
   {
     host: "mrtint.github.io",
     reason: "방침·지원 페이지 — 앱이 접속하지 않고 OS 브라우저에 넘긴다(src/app/policy-links.ts)",

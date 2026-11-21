@@ -54,19 +54,23 @@ export type { Character };
  *
  * 로스터에 남은 캐릭터는 지문이 채워져 있다 — **채록이 아니라 검증**을 한다.
  *
- * **양자화는 Q4_K_M이고 우리가 만든 것이 없다.** kanana는 커뮤니티 배포본이다(공식이
- * GGUF를 내지 않음). 직접 양자화한 것은 옆 저장소의 Ollama 데스크톱 쪽이었고 모바일
- * GGUF는 기성품이다.
+ * **122가 `a1`을 일기 특화 DPO 모델(IQ4_NL imatrix)로 바꿨다.** 옆 저장소(terrarium)가
+ * 학습·양자화하고 실측으로 고른 파일이다. 옛 Q4_K_M(1_522_796_768 B)을 받아 둔 기기는 받기를
+ * 시작할 때 기준보다 큰 파일로 지워지고 새로 받는다(`verification.ts` `settleExistingFile`).
  * ─────────────────────────────────────────────────────────────────────────────
  */
 const ASSETS: Readonly<Record<Character, ModelAsset>> = {
   quiet: {
     key: "a1",
-    url: "https://huggingface.co/DevQuasar/kakaocorp.kanana-1.5-2.1b-instruct-2505-GGUF/resolve/main/kakaocorp.kanana-1.5-2.1b-instruct-2505.Q4_K_M.gguf",
-    expectedBytes: 1_522_796_768,
-    // 실측 (2026-08-14, SM-G986N): 실기기에서 받아 채록한 값이다. 이 값이 들어왔으므로
-    // 이 캐릭터는 이제 **채록이 아니라 검증**을 한다 — 크기가 같아도 내용이 다르면 걸린다.
-    md5: "d8506380fd1f0fdb8e4318a01b8b8e34",
+    // 122 — 일기 특화 kanana-v3-dpo(IQ4_NL imatrix). 주 경로 Cloudflare R2(r2.dev 개발 주소 —
+    // 트래픽 제한이 있어 상용 전 커스텀 도메인은 소유자가 정한다), 예비 경로 Hugging Face.
+    // 실측(2026-11-21, curl): R2 200 · Content-Length 1241435520 · Range 206.
+    // 크기·지문은 옆 저장소 terrarium EXP-013~015에서 확정한 값이다.
+    url: "https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf",
+    fallbackUrl:
+      "https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/main/kanana-v3-dpo-iq4_nl_im.gguf",
+    expectedBytes: 1_241_435_520,
+    md5: "dfc35a88fb1f5215f708ea5a348121b8",
   },
   // 037(헌법 1.6.0): a2(exaone)·a3(hyperclovax)·a4(qwen3)·a5(gemma3)가
   // 로스터를 나갔다. 자동 생성에 부적합이 실측으로 확정됐다 —

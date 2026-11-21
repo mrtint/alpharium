@@ -371,9 +371,9 @@ describe("V7. 일기의 샘플링을 재사용하지 않는다 (원칙 I)", () =
    * **값이 정반대인 것이 핵심이다.** 일기는 감상이라 흔들려도 되고, 캡션은 관찰이라
    * 흔들리면 같은 사진에서 다른 답이 나온다. **같은 자리에 둘 수 없는 값이다.**
    */
-  it("캡션은 0.1이고 일기는 0.8이다 (옆 저장소 2026-08-10 실측)", () => {
+  it("캡션은 0.1이고 일기는 0.6이다 (122 — terrarium EXP-015)", () => {
     expect(CAPTION_SAMPLING.temperature).toBe(0.1);
-    expect(SAMPLING.temperature).toBe(0.8);
+    expect(SAMPLING.temperature).toBe(0.6);
   });
 });
 

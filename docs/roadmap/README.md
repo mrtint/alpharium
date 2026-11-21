@@ -193,19 +193,6 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 
 **위험**: 이 앱의 약속(배터리·권한)에 가장 크게 닿는 과제다. 백그라운드 쓰기와 같은 OS 제한(삼성 얼림·iOS 깨움 비보장)을 받아 며칠 단위 실측이 든다 — 개발 빌드 검증이 끝나기 전에는 릴리스 빌드로 가지 않는다(작업 습관). 위치 이력은 이 앱이 지금 다루는 어떤 데이터보다 민감해 소유자 판단이 필요하다.
 
-### 온디바이스 일기 모델 교체와 R2 미러·폴백 내려받기
-
-**배경**: `src/models/roster.ts`의 `ASSETS.quiet`(`key: "a1"`)는 현재 순정 `Q4_K_M` 모델(`1_522_796_768` B, `md5=d8506380fd1f0fdb8e4318a01b8b8e34`)과 단일 Hugging Face 경로를 쓰고, `src/inference/sampling.ts`는 미실측 짐작값(`temperature: 0.8`, `top_p: 0.95`)을 둔 상태다. 옆 저장소(`terrarium` `EXP-013`~`EXP-015`·`US-020`)에서 일기 특화 `kanana-v3-dpo-iq4_nl_im.gguf`(`expectedBytes: 1_241_435_520` / `1.156 GiB`, 순정 대비 `-268.3 MiB`, `md5: "dfc35a88fb1f5215f708ea5a348121b8"`)와 샘플링 최적값(`temperature: 0.60`, `top_p: 0.90`)이 확정됐고, Cloudflare R2 버킷(`models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf`)과 Hugging Face Hub 폴백 경로 모두 `HTTP 200`·`Content-Length`·`Range 206` 검증을 마쳤다.
-
-**할 일**:
-1. `src/models/roster.ts` (`ASSETS.quiet`, `key: "a1"`)에 주 내려받기 경로(Cloudflare R2 공개 URL — `roster.ts` 계약상 `process.env`를 읽지 않으므로 착수 시 실제 공개/커스텀 도메인 전체 URL을 코드에 고정)·폴백 경로(`https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/main/kanana-v3-dpo-iq4_nl_im.gguf`)·`expectedBytes: 1_241_435_520`·`md5: "dfc35a88fb1f5215f708ea5a348121b8"`를 반영한다.
-2. 다운로드 계층(세그먼트 이어받기·검증 포함)에서 R2 요청 실패 시 폴백 경로로 전환하고, 기존 기기에 받아 둔 옛 `a1` 파일이나 부분 구간이 새 `expectedBytes`/`md5`와 다를 때 정리 후 다시 받는지 확인한다.
-3. `src/inference/sampling.ts`의 `temperature`를 `0.60`, `top_p`를 `0.90`으로 교체한다(`top_k: 40`, `n_predict: 512`, `ROMAN_LETTER_BLOCK_GRAMMAR` 유지).
-
-**완료 조건**: 실기기(iOS 또는 Android)에서 R2 경로로 `1_241_435_520` B 내려받기·구간 이어받기(`Range 206`)·`md5` 검증이 통과하고, R2 실패 시 HF 폴백 전환과 기존 `a1` 캐시 교체가 확인되며, 새 샘플링 값으로 일기 본문·제목 생성이 완주한다.
-
-**위험**: 기존 사용자가 이미 받아 둔 옛 `a1` 파일이나 이어받기 메타데이터를 `md5`·바이트 불일치로 매 실행 거부하거나 지우지 못하면 모델 교체가 막힐 수 있다. `r2.dev` 개발 URL을 그대로 상용에 쓰면 트래픽 제한에 걸릴 수 있으므로 상용 배포 전 커스텀 도메인 연결 여부를 소유자가 확정해야 한다.
-
 ### 온디바이스 추론 런타임 속도 최적화 — Flash Attention·2턴 컨텍스트 재사용
 
 **배경**: `terrarium` `EXP-015`(x86 CPU / Vulkan GPU 실측)에서 `flash_attn: true`(`-fa on`), 1턴(본문)과 2턴(제목) 사이 모델 언로드 없는 컨텍스트 재사용(`cache_prompt: true`, `cache_reuse: 0`), 저사양 RAM 단말용 KV 캐시 `q8_0`(`-120 MiB` 절감) 조합이 1+2턴 총 소요 시간을 크게 줄였다. 모바일 ARM(iOS Metal / Android NEON) 실기기에서도 같은 효과가 유지되는지·메모리 2 GiB 미만 한도를 지키는지는 아직 미확인이다.
@@ -327,6 +314,7 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 |    —    |    119    | 홈 날 스트립을 오늘에서 끝나는 이어 스크롤로 (보드 밖, 사용자 제안·소유자 확인) — `DayPicker`를 가로 `FlatList`로: 하루 한 칸·한 화면 7칸·칸 단위 붙기, 왼쪽 끝 1년 전(사람이 정한 값, 고른 날이 더 이르면 고른 날까지), 스크롤은 고른 날을 바꾸지 않고 칸 누름만 바꾼다. 다른 입력(달력·본문 밀기·자정)으로 고른 칸이 화면 밖이면 최소 거리로 따라가고(한 화면보다 멀거나 범위 앞쪽이 바뀐 직후는 움직임 없이), 갈래(쓴 날·안 쓴 날·쓰는 중)가 바뀌어 다시 마운트돼도 보던 자리를 잇는다(`StripMemory`). 주 넘김(`weekCellsFor`·`swipeWeek`·`canSwipeNext`·`weekOf`·`shiftWeek`·팬)은 지웠고 049 계약 S4·S6·SW·HS1을 119 `contracts/strip-scroll.md`로 옮겼다. 114 본문 밀기는 유지(소유자 결정). 토·일 요일 글자는 시그니처 주홍(소유자 결정, 작은 글자 대비 3.76:1 AA 미달을 알고 정함). 독립 코드 리뷰 Important 2건(갈래 전환 재마운트로 위치 튐, 먼 거리 애니메이션) 반영. iOS 시뮬레이터(iPhone 17e)에서 첫 화면·밀기·월 경계·칸 누름·갈래 전환 위치 유지, iPhone 14에서 소유자가 밀어 보고 괜찮다고 했다(항목별 기록 없음). **못 본 것: 안드로이드 전부, 달력 먼 날·자정·동작 줄이기·큰 글꼴·쓰는 중 잠금·052 겹침의 항목별 확인, VoiceOver, 다시 쓴 Maestro 흐름 실행.** (`specs/119-strip-continuous-scroll/`) |
 |    —    |    120    | 안드로이드 새 프로세스에서 돌던 백그라운드 워커가 취소되던 것 — 잡이 죽어 있던 프로세스를 띄우면 태스크 재등록이 `scheduleWorker`를 부르는데, expo 가드가 WorkManager 고유 작업 목록의 첫 항목(APPEND로 쌓인 끝난 작업)만 봐 REPLACE로 돌던 워커를 취소했고 약 3초 뒤 `freecess`가 얼려 장부가 `started`에 멈췄다(재현 2/2). `expo-background-task` 패치가 대기·실행 중인 항목을 먼저 고른다(`bg-task-request-patch.test.ts`). 실기기(SM-S901N, JS 내장 디버그 빌드): 수정 뒤 같은 조건에서 워커 `SUCCESS`, 11-17 밤 창 안 OS 깨움이 새 프로세스로 두 날을 저장(충전 중). 충전 없는 밤·릴리스·OS가 스스로 죽인 뒤의 깨움은 미확인 |
 |    —    |    121    | 일기가 하루의 장소를 더 풍부하게 말한다 — 앱에 함께 넣은 OSM 한국 장소 데이터(`assets/places/kr-places.bin`, 9.05MB, ODbL, 가게·의원·학원·상호명 제외)로 기기 안에서 자리 이름을 찾아 시각순 최대 3곳을 때와 함께 「~근처에서 찍혔어요」로 싣고 저장 일기에 `places`(좌표 없음)를 남김(`signalsUsed`의 `visits`는 걷음). `expo-location`·OS 역지오코딩·위치 권한 제거, 설정 「켬/끔」 축소, 방침·지원·선언 초안·라이선스 ODbL 표기 갱신. 실기기에서 발견한 `App.tsx`의 같은 세션 설정 미반영 버그 수정. SM-S901N(위치 권한 부재, 12곳 `prepare=72ms/51ms`·`names=174ms/167ms`, 「끔」 다시 쓰기, 비행기 모드, 글꼴 2.0배), iPhone 14(`2026-09-15` 세 곳 일기, 3~4c 전체 1.065s/0.333s), 시뮬레이터(위치 권한 없음, 대화상자 `accessibility-large`) 확인. 못 본 것: iOS 「끔」·비행기 모드, 백그라운드 자동 쓰기 장소명 실측 (`specs/121-richer-day-places/`) |
+|    —    |    122    | 일기 모델을 일기 특화 `kanana-v3-dpo-iq4_nl_im.gguf`(1,241,435,520 B)로 교체 — Cloudflare R2(r2.dev 개발 주소) 주 경로가 실패하면 같은 받기 안에서 Hugging Face로 한 번 넘어가 끝난 구간을 이어받음, 옛 Q4_K_M·옛 재개 기록은 받기 시작에서 정리, 받을 양이 옛 큰 파일에서 0이던 것 수정, 샘플링 0.60/0.90, 방침·라이선스·지원·선언 초안 갱신. SM-S901N dev: 옛 a1 교체·R2 206·`kill -9` 뒤 이어받기·md5·HF 폴백(R2 404)·본문·제목 완주 확인. 못 본 것: iPhone, 받는 도중 R2가 끊긴 뒤의 폴백 이어받기, 모바일 데이터, 릴리스. 상용 전 커스텀 도메인은 소유자 결정 (`specs/122-diary-model-r2-fallback/`) |
 
 ## 참고 — 디자인 리뷰 보드
 

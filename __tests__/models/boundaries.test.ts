@@ -35,6 +35,8 @@ describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
       expect(code).not.toContain("ModelAsset");
       expect(code).not.toContain("assetFor");
       expect(code).not.toContain("assetKey");
+      // 122 — 예비 경로도 자산의 안쪽 값이다.
+      expect(code).not.toContain("fallbackUrl");
       expect(code).not.toMatch(/from\s+["'].*models\/roster["']/);
     }
   });
@@ -54,7 +56,7 @@ describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
     expect(start).toBeGreaterThan(-1);
     const props = code.slice(start, code.indexOf("\n};", start));
 
-    expect(props).not.toMatch(/asset|url|md5|expectedBytes/i);
+    expect(props).not.toMatch(/asset|url|md5|expectedBytes|fallback/i);
     // 잘라 낸 것이 실제로 props인지 확인한다 — 범위가 비면 위 검사가 무의미하다.
     expect(props).toMatch(/modules/);
   });
@@ -82,6 +84,17 @@ describe("원칙 III — 매핑이 화면으로 새지 않는다", () => {
     const code = codeOf("models", "types.ts");
     const progress = code.slice(code.indexOf("DownloadProgress"), code.indexOf("DownloadFailure"));
     expect(progress).not.toMatch(/bytes/i);
+  });
+});
+
+describe("122 — 예비 경로가 바깥쪽 값으로 새지 않는다", () => {
+  it("바깥쪽 타입 구역에 fallbackUrl이 없다", () => {
+    const code = codeOf("models", "types.ts");
+    const outward = code.indexOf("export type ModelReadiness");
+    expect(outward).toBeGreaterThan(-1);
+    expect(code.indexOf("fallbackUrl")).toBeGreaterThan(-1);
+    expect(code.indexOf("fallbackUrl")).toBeLessThan(outward);
+    expect(code.slice(outward)).not.toContain("fallbackUrl");
   });
 });
 

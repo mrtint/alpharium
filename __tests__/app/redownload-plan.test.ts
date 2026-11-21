@@ -105,15 +105,25 @@ describe("RD6 — 파일을 지우지 않는다", () => {
 describe("RD4 — 받을 양", () => {
   const expectedBytes = { v1: 380, v2: 100, a1: 1500 };
 
-  it("준비되지 않은 키마다 기대 − 이미 받은 만큼(0 이상)의 합이다", () => {
+  it("준비되지 않은 키마다 기대 − 이미 받은 만큼의 합이다", () => {
     const facts = [
       { key: "v1", ready: false },
-      { key: "v2", ready: false },
+      { key: "v2", ready: true },
       { key: "a1", ready: true },
     ];
-    expect(remainingBytes({ facts, expectedBytes, usedBytes: { v1: 80, v2: 130, a1: 1500 } })).toBe(
+    expect(remainingBytes({ facts, expectedBytes, usedBytes: { v1: 80, v2: 100, a1: 1500 } })).toBe(
       300,
     );
+  });
+
+  // 122 — 기대보다 큰 파일(옛 모델)은 받기 시작에서 지워지고 전부 다시 받는다. 0이라고 말하지 않는다.
+  it("이미 있는 양이 기대보다 크면 기대 전체로 센다", () => {
+    const facts = [
+      { key: "v1", ready: true },
+      { key: "v2", ready: true },
+      { key: "a1", ready: false },
+    ];
+    expect(remainingBytes({ facts, expectedBytes, usedBytes: { a1: 1522 } })).toBe(1500);
   });
 
   it("이미 받은 만큼을 못 읽은 키는 기대 전체로 센다(적게 말하지 않는다)", () => {

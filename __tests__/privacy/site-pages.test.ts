@@ -137,7 +137,14 @@ describe("086 site — 사이트 원문", () => {
     const body = stripHtmlComments(
       sectionBy(readSite("privacy/index.html"), "data-outbound", "model-download") ?? "",
     );
-    for (const item of ["Hugging Face, Inc.", "미국", "IP 주소", "요청 시각", "받는 파일의 주소"])
+    for (const item of [
+      "Cloudflare, Inc.",
+      "Hugging Face, Inc.",
+      "미국",
+      "IP 주소",
+      "요청 시각",
+      "받는 파일의 주소",
+    ])
       expect(body).toContain(item);
     expect(body).not.toContain("IP 주소 등");
   });
