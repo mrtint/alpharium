@@ -195,6 +195,8 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 
 ### 온디바이스 추론 런타임 속도 최적화 — Flash Attention·2턴 컨텍스트 재사용
 
+**스펙**: 123 (`specs/123-inference-runtime-speed/`)
+
 **배경**: `terrarium` `EXP-015`(x86 CPU / Vulkan GPU 실측)에서 `flash_attn: true`(`-fa on`), 1턴(본문)과 2턴(제목) 사이 모델 언로드 없는 컨텍스트 재사용(`cache_prompt: true`, `cache_reuse: 0`), 저사양 RAM 단말용 KV 캐시 `q8_0`(`-120 MiB` 절감) 조합이 1+2턴 총 소요 시간을 크게 줄였다. 모바일 ARM(iOS Metal / Android NEON) 실기기에서도 같은 효과가 유지되는지·메모리 2 GiB 미만 한도를 지키는지는 아직 미확인이다.
 
 **할 일**:
