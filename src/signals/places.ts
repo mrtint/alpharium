@@ -9,7 +9,7 @@
  * 이어도 회사에서만 찍었으면 이동 거리는 0이다. 그 한계가 `PhotoPlaces`에 함께 담긴다.
  */
 
-import type { PlaceTrace } from "./types";
+import type { PlaceTrace, PlaceVisit } from "./types";
 
 /**
  * 이 거리 안이면 같은 자리로 본다.
@@ -82,23 +82,32 @@ function distanceMeters(a: Coordinate, b: Coordinate): number {
  * **유효하지 않은 좌표는 들어오기 전에 걸러져야 한다**(FR-013d). 이 함수는 받은 것을
  * 그대로 믿는다.
  */
-export function tracePlaces(points: TimedCoordinate[]): PlaceTrace {
+export function tracePlaces(points: TimedCoordinate[]): PlaceTrace & { visits: PlaceVisit[] } {
   if (points.length === 0) {
-    return { visitCount: 0, approximateDistanceMeters: 0 };
+    return { visitCount: 0, approximateDistanceMeters: 0, visits: [] };
   }
 
   const ordered = [...points].sort((a, b) => a.takenAtMs - b.takenAtMs);
 
-  // 자리의 대표 좌표들. 첫 점이 첫 자리다.
-  const places: Coordinate[] = [{ latitude: ordered[0].latitude, longitude: ordered[0].longitude }];
-
-  for (const point of ordered.slice(1)) {
-    const previous = places[places.length - 1];
-
-    if (distanceMeters(previous, point) > SAME_PLACE_METERS) {
-      places.push({ latitude: point.latitude, longitude: point.longitude });
+  // 자리들. 첫 점이 첫 자리다. 자리의 좌표는 그 자리 첫 점이다(대표 좌표 — 017과 같은 규칙).
+  // 121 — 묶는 김에 자리마다 첫·마지막 시각과 사진 수도 남긴다(묶는 규칙은 그대로다).
+  const visits: PlaceVisit[] = [];
+  for (const point of ordered) {
+    const previous = visits[visits.length - 1];
+    if (previous !== undefined && distanceMeters(previous.coordinate, point) <= SAME_PLACE_METERS) {
+      previous.lastSeenAt = new Date(point.takenAtMs);
+      previous.photoCount += 1;
+    } else {
+      visits.push({
+        coordinate: { latitude: point.latitude, longitude: point.longitude },
+        firstSeenAt: new Date(point.takenAtMs),
+        lastSeenAt: new Date(point.takenAtMs),
+        photoCount: 1,
+        source: "photo-exif",
+      });
     }
   }
+  const places = visits.map((v) => v.coordinate);
 
   // 자리들을 시각 순으로 이은 거리의 합. **실제 이동 거리가 아니다**(FR-013e).
   let total = 0;
@@ -110,5 +119,6 @@ export function tracePlaces(points: TimedCoordinate[]): PlaceTrace {
     visitCount: places.length,
     approximateDistanceMeters: Math.round(total),
     representativeCoordinate: places[0],
+    visits,
   };
 }

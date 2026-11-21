@@ -68,6 +68,34 @@ export type PlaceTrace = {
    * 없던 하루(`points.length === 0`)에는 이 필드 자체가 없다.
    */
   representativeCoordinate?: Coordinate;
+  /**
+   * 자리 목록 — 시각순, 전부 (121). 있으면 `visits.length === visitCount`,
+   * `visits[0].coordinate === representativeCoordinate`.
+   *
+   * **신호 수집(`tracePlaces`)은 늘 채운다. 저장 일기의 신호 기록(`signalsUsed`)에서는 걷는다**(research R9 — 하루 동선의
+   * 좌표·시각을 백업되는 일기 파일에 새로 늘리지 않는다, 코드 리뷰). 그래서 옵셔널이다 — 121 이전 일기에도 없다.
+   */
+  visits?: PlaceVisit[];
+};
+
+/**
+ * 하루 중 사진이 찍힌 한 자리 (121, specs/121-richer-day-places/data-model.md).
+ *
+ * `tracePlaces()`가 자리를 묶으며 이미 하던 순차 묶기의 결과를 그대로 낸 것이다 — 묶는 규칙(100m, 짐작 값)은
+ * 바꾸지 않았다. **이것도 하루의 궤적이 아니라 사진이 찍힌 지점이다**(FR-013e).
+ *
+ * 화면 표시·사진 밖 위치 수집 과제가 이 모양을 읽거나 `source`를 넓힌다.
+ */
+export type PlaceVisit = {
+  /** 그 자리 첫 사진의 좌표 */
+  coordinate: Coordinate;
+  /** 그 자리에 묶인 사진들의 가장 이른 시각 */
+  firstSeenAt: Date;
+  /** 가장 늦은 시각 */
+  lastSeenAt: Date;
+  /** 그 자리에 묶인 좌표 있는 사진 수(≥1) */
+  photoCount: number;
+  source: "photo-exif";
 };
 
 /**

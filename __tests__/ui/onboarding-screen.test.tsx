@@ -35,8 +35,6 @@ jest.setTimeout(30000);
 function makePorts(overrides?: {
   photo?: PermissionState;
   photoResult?: PermissionState;
-  location?: PermissionState;
-  locationResult?: PermissionState;
   notification?: "granted" | "denied" | "undetermined" | "blocked";
   notificationResult?: "granted" | "denied";
   essentialAssets?: {
@@ -51,7 +49,6 @@ function makePorts(overrides?: {
 }) {
   const calls: string[] = [];
   const photoState = { value: overrides?.photo ?? ("undetermined" as PermissionState) };
-  const locState = { value: overrides?.location ?? ("undetermined" as PermissionState) };
   const notifState = {
     value: overrides?.notification ?? ("undetermined" as const),
   };
@@ -83,15 +80,6 @@ function makePorts(overrides?: {
       battery: {
         openSettingsList: async () => {
           calls.push("openBatterySettings");
-        },
-      },
-      location: {
-        status: async () => locState.value,
-        request: async () => {
-          calls.push("requestLocation");
-          const result = overrides?.locationResult ?? ("granted" as PermissionState);
-          locState.value = result;
-          return result;
         },
       },
       osSettings: {
@@ -183,7 +171,7 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
     expect(screen.queryByTestId("onboarding-allow")).toBeNull();
   });
 
-  it("사진·위치·알림 단계에는 onboarding-skip 버튼이 없다 (FR-008)", async () => {
+  it("사진·알림 단계에는 onboarding-skip 버튼이 없다 (FR-008)", async () => {
     const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
 
@@ -194,7 +182,6 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
   it("배터리 예외 단계(actionable)에는 여전히 onboarding-skip·allow 버튼이 있다 (FR-007c)", async () => {
     const { ports } = makePorts({
       photo: "granted",
-      location: "granted",
       notification: "granted",
     });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
@@ -212,7 +199,6 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
   it("065 — 배터리 단계의 [허용]은 예외를 직접 요청하지 않고 설정 목록을 연다(Play 정책)", async () => {
     const { ports, calls } = makePorts({
       photo: "granted",
-      location: "granted",
       notification: "granted",
     });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
@@ -243,14 +229,15 @@ describe("043 — 스텝 진입 즉시 자동 호출 (FR-007a)", () => {
     expect(calls).toContain("requestPhoto");
   });
 
-  it("허용되면 다음 단계(location)로 자동 전환된다", async () => {
+  it("허용되면 다음 단계(notifications)로 자동 전환된다 — 121부터 위치 단계가 없다", async () => {
     jest.useFakeTimers();
     const { ports } = makePorts({ photoResult: "granted" });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
 
     await advance();
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
+    expect(screen.queryByTestId("onboarding-step-location")).toBeNull();
   });
 });
 
@@ -260,7 +247,7 @@ describe("★ 043 CRITICAL — 거부(denied) 시 자동 건너뛰기 (FR-008 �
     jest.useRealTimers();
   });
 
-  it("사진 요청이 거부(denied)로 응답해도 자동으로 다음 단계(location)로 전환된다", async () => {
+  it("사진 요청이 거부(denied)로 응답해도 자동으로 다음 단계(notifications)로 전환된다", async () => {
     jest.useFakeTimers();
     const { ports } = makePorts({ photoResult: "denied" });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
@@ -271,21 +258,23 @@ describe("★ 043 CRITICAL — 거부(denied) 시 자동 건너뛰기 (FR-008 �
 
     // FR-008 — 거부는 곧 건너뛰기와 같은 효과. 화면에 skip 버튼이 없으므로
     // 화면 스스로 다음 단계로 넘어가야 한다(수동 스킵 없이).
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
   });
 
-  it("위치 요청이 거부돼도 자동으로 알림 단계로 전환된다", async () => {
+  it("알림 요청이 거부돼도 자동으로 배터리 단계로 전환된다", async () => {
     jest.useFakeTimers();
     const { ports } = makePorts({
       photo: "granted",
-      locationResult: "denied",
+      notificationResult: "denied",
     });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
     await advance();
 
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
+    await waitFor(() =>
+      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
+    );
   });
 
   it("blocked(다시 묻지 않음)면 자동 전환하지 않고 [설정 열기]가 뜬다 (FR-008a)", async () => {
@@ -323,7 +312,6 @@ describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2,
     jest.useFakeTimers();
     const { ports, calls } = makePorts({
       photo: "granted",
-      location: "granted",
       notification: "granted",
     });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
@@ -351,9 +339,7 @@ describe("[시작하기] (FR-011·SC-003)", () => {
     const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={onComplete} />);
 
-    // 사진 → 위치 → 알림 자동 통과, 배터리는 버튼으로.
-    await advance();
-    await waitFor(() => expect(screen.getByTestId("onboarding-step-location")).toBeTruthy());
+    // 사진 → 알림 자동 통과, 배터리는 버튼으로(121 — 위치 단계 없음).
     await advance();
     await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
     await advance();
@@ -373,13 +359,12 @@ describe("[시작하기] (FR-011·SC-003)", () => {
 });
 
 describe("S1 — 플랫폼 필터 (FR-003)", () => {
-  it("ios + location.platforms:['android']이면 위치 단계가 안 나온다", async () => {
+  it("ios + notifications.platforms:['android']이면 알림 단계가 안 나온다", async () => {
     const { ports } = makePorts({
       photo: "granted",
-      notification: "granted",
     });
     const reqs = PERMISSION_REQUIREMENTS.map((r) =>
-      r.key === "location" ? { ...r, platforms: ["android"] as const } : r,
+      r.key === "notifications" ? { ...r, platforms: ["android"] as const } : r,
     );
     await render(
       <OnboardingScreen
@@ -395,7 +380,7 @@ describe("S1 — 플랫폼 필터 (FR-003)", () => {
         onComplete={() => {}}
       />,
     );
-    // 전부 satisfied → [시작하기]. 위치 단계는 필터로 빠졌다.
+    // 전부 satisfied → [시작하기]. 알림 단계는 필터로 빠졌다.
     await waitFor(() => expect(screen.getByTestId("onboarding-start")).toBeTruthy(), {
       timeout: 4000,
     });
@@ -427,7 +412,6 @@ describe("S5 — 소스 검사 (SC-008, 원칙 III)", () => {
 describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8, 043 무변경 회귀)", () => {
   const allGranted = {
     photo: "granted" as PermissionState,
-    location: "granted" as PermissionState,
     notification: "granted" as const,
   };
 

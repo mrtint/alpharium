@@ -1,0 +1,90 @@
+/**
+ * 121 — 저장된 자리 목록 (spec US4, FR-011, data-model SavedPlace).
+ *
+ * 저장 일기는 자리 목록(`places`, 좌표 없음)을 함께 담는다. 신호 기록의 자리 목록(좌표)은 파이프라인이 저장 전에 걷는다(R9).
+ * 옛 형식(대표 장소 이름 하나, `placeName`) 일기는 그대로 읽힌다.
+ */
+import { deserializeEntry, serializeEntry } from "../../src/diary/store";
+import type { DiaryEntry } from "../../src/diary/types";
+
+const DAY = "2026-11-21";
+const T = (h: number) => new Date(`${DAY}T${String(h).padStart(2, "0")}:00:00`);
+
+function entry(over: Partial<DiaryEntry> = {}): DiaryEntry {
+  return {
+    date: DAY as DiaryEntry["date"],
+    text: "오늘 하루.",
+    character: "quiet",
+    signalsUsed: {
+      date: DAY,
+      photos: { kind: "none" },
+      places: {
+        kind: "known",
+        value: {
+          trace: {
+            visitCount: 2,
+            approximateDistanceMeters: 1200,
+            representativeCoordinate: { latitude: 37.5, longitude: 127 },
+            visits: [
+              {
+                coordinate: { latitude: 37.5, longitude: 127 },
+                firstSeenAt: T(8),
+                lastSeenAt: T(9),
+                photoCount: 2,
+                source: "photo-exif",
+              },
+              {
+                coordinate: { latitude: 37.51, longitude: 127.01 },
+                firstSeenAt: T(13),
+                lastSeenAt: T(13),
+                photoCount: 1,
+                source: "photo-exif",
+              },
+            ],
+          },
+          source: "photo-exif",
+          photosWithLocation: 3,
+          photosConsidered: 3,
+        },
+      },
+      steps: { kind: "unknown", reason: "-" },
+      battery: { kind: "unknown", reason: "-" },
+      connectivity: { kind: "unknown", reason: "-" },
+    },
+    createdAt: T(22),
+    ...over,
+  } as DiaryEntry;
+}
+
+describe("121 US4 — 자리 목록 저장 왕복", () => {
+  it("places가 그대로 돌아온다", () => {
+    const places = [
+      {
+        label: "판교역",
+        category: "station" as const,
+        firstSeenAt: T(8).toISOString(),
+        lastSeenAt: T(9).toISOString(),
+        photoCount: 2,
+      },
+      {
+        label: null,
+        category: null,
+        firstSeenAt: T(13).toISOString(),
+        lastSeenAt: T(13).toISOString(),
+        photoCount: 1,
+      },
+    ];
+    expect(deserializeEntry(serializeEntry(entry({ places }))).places).toEqual(places);
+  });
+
+  it("옛 형식(placeName, visits 없음) 일기도 오류 없이 읽힌다", () => {
+    const old = JSON.parse(serializeEntry(entry())) as Record<string, unknown>;
+    const signals = old.signalsUsed as { places: { value: { trace: Record<string, unknown> } } };
+    delete signals.places.value.trace.visits;
+    old.placeName = { kind: "known", value: "강남구" };
+    const back = deserializeEntry(JSON.stringify(old));
+    expect(back.text).toBe("오늘 하루.");
+    expect(back.placeName).toEqual({ kind: "known", value: "강남구" });
+    expect(back.places).toBeUndefined();
+  });
+});

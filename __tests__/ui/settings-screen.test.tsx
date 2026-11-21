@@ -35,7 +35,6 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onToggleAutoWrite: jest.fn(),
     permissionTags: {
       photos: "allowed",
-      location: "denied",
       notifications: "partial",
       battery: "unread",
     },
@@ -44,7 +43,7 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     versionText: "1.0.0 (9)",
     targetHourText: "오후 10시쯤",
     onOpenTargetHour: jest.fn(),
-    placeNamesText: "자동",
+    placeNamesText: "켬",
     onOpenPlaceNames: jest.fn(),
     moduleSizeText: "2.0GB",
     wipeEnabled: true,
@@ -64,7 +63,6 @@ describe("055 FR-031 — 보드 KO 원문", () => {
       autoWrite: "자동으로 쓰기",
       groupPerm: "권한 · 휴대폰 설정으로 이동",
       permPhotos: "사진",
-      permLocation: "위치",
       permNotif: "알림",
       permBattery: "배터리",
       permBatteryHint: "제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요",
@@ -89,14 +87,12 @@ describe("055 FR-031 — 보드 KO 원문", () => {
       timePm: "오후",
       timeCancel: "취소",
       placeTitle: "장소 이름으로 보기",
-      placeAuto: "자동",
-      placeAutoDesc: "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요",
       placeOn: "켬",
-      placeOnDesc: "일기를 쓸 때 다닌 자리의 이름을 참고해요",
+      placeOnDesc: "일기를 쓸 때 다닌 자리 근처의 장소 이름을 참고해요",
       placeOff: "끔",
       placeOffDesc: "장소 이름을 옮기지 않아요",
       placeCancel: "취소",
-      placeNotice: "좌표를 기기의 지도 서비스에 물어봐요.",
+      placeNotice: "장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요.",
     });
   });
 
@@ -108,7 +104,6 @@ describe("055 FR-031 — 보드 KO 원문", () => {
       "자동으로 쓰기",
       "권한 · 휴대폰 설정으로 이동",
       "사진",
-      "위치",
       "알림",
       "배터리",
       "제한 없음이면 열지 않아도 먼저 써 둘 때가 있어요",
@@ -347,8 +342,14 @@ describe("055 C4·C5·C6 — 권한 네 행", () => {
   });
 
   it("C5 — 허용 안 함: 1px accent 테두리 + accent-700 글자, 여백 2·7", async () => {
-    await render(<SettingsScreen {...props()} />);
-    const tag = screen.getByTestId("settings-tag-location");
+    await render(
+      <SettingsScreen
+        {...props({
+          permissionTags: { photos: "denied", notifications: "partial", battery: "unread" },
+        })}
+      />,
+    );
+    const tag = screen.getByTestId("settings-tag-photos");
     expect(tag).toHaveTextContent("허용 안 함");
     expect(flat(tag)).toMatchObject({
       borderWidth: 1,
@@ -373,14 +374,13 @@ describe("055 C4·C5·C6 — 권한 네 행", () => {
         {...props({
           permissionTags: {
             photos: "unread",
-            location: "unread",
             notifications: "unread",
             battery: "unread",
           },
         })}
       />,
     );
-    for (const key of ["photos", "location", "notifications"]) {
+    for (const key of ["photos", "notifications"]) {
       expect(screen.queryByTestId(`settings-tag-${key}`)).toBeNull();
     }
     expect(screen.queryByText(/허용/)).toBeNull();
@@ -394,13 +394,19 @@ describe("055 C4·C5·C6 — 권한 네 행", () => {
     expect(within(battery).getByText("›")).toBeTruthy();
   });
 
-  it("★ C6 — 네 행 어느 것을 눌러도 onOpenAppSettings", async () => {
+  it("★ C6 — 세 행 어느 것을 눌러도 onOpenAppSettings", async () => {
     const p = props();
     await render(<SettingsScreen {...p} />);
-    for (const key of ["photos", "location", "notifications", "battery"]) {
+    for (const key of ["photos", "notifications", "battery"]) {
       await fireEvent.press(screen.getByTestId(`settings-perm-${key}`));
     }
-    expect(p.onOpenAppSettings).toHaveBeenCalledTimes(4);
+    expect(p.onOpenAppSettings).toHaveBeenCalledTimes(3);
+  });
+
+  it("121 — 위치 행이 없다(앱이 위치 권한을 요청하지 않는다)", async () => {
+    await render(<SettingsScreen {...props()} />);
+    expect(screen.queryByTestId("settings-perm-location")).toBeNull();
+    expect(screen.queryByText("위치")).toBeNull();
   });
 });
 
@@ -418,7 +424,6 @@ describe("057 SL2·SL4 — 사진 권한 건너뜀 보조 줄 (보드 `6g`)", ()
         {...props({
           permissionTags: {
             photos: "denied",
-            location: "allowed",
             notifications: "allowed",
             battery: "unread",
           },
@@ -465,7 +470,7 @@ describe("★ 055 C7 — 권한은 마운트 때와 전경 복귀 때 다시 읽
     const tags = usePermissionTags(read);
     return (
       <>
-        <Text testID="probe">{`${tags.photos}/${tags.location}/${tags.notifications}`}</Text>
+        <Text testID="probe">{`${tags.photos}/${tags.notifications}`}</Text>
         <Text testID="probe-battery">{tags.battery}</Text>
       </>
     );
@@ -484,30 +489,29 @@ describe("★ 055 C7 — 권한은 마운트 때와 전경 복귀 때 다시 읽
     const facts: PermissionFacts = {
       photos: "granted",
       photoLocation: "ok",
-      location: "denied",
-      notifications: "granted",
+      notifications: "denied",
       battery: "restricted",
     };
     const read = jest.fn(async () => facts);
     await render(<Probe read={read} />);
-    expect(await screen.findByText("allowed/denied/allowed")).toBeTruthy();
+    expect(await screen.findByText("allowed/denied")).toBeTruthy();
     expect(read).toHaveBeenCalledTimes(1);
     // 104 PT2 — 배터리도 같은 읽기에서 나오고, 전경 복귀 때 다시 읽는다
     expect(screen.getByTestId("probe-battery").props.children).toBe("denied");
 
-    facts.location = "granted";
+    facts.notifications = "granted";
     facts.battery = "exempt";
     await act(async () => listener?.("background"));
     expect(read).toHaveBeenCalledTimes(1);
     await act(async () => listener?.("active"));
     expect(read).toHaveBeenCalledTimes(2);
-    expect(await screen.findByText("allowed/allowed/allowed")).toBeTruthy();
+    expect(await screen.findByText("allowed/allowed")).toBeTruthy();
     expect(screen.getByTestId("probe-battery").props.children).toBe("allowed");
   });
 
   it("읽기 전·읽기 실패는 전부 unread다", async () => {
     await render(<Probe read={() => Promise.reject(new Error("x"))} />);
-    expect(await screen.findByText("unread/unread/unread")).toBeTruthy();
+    expect(await screen.findByText("unread/unread")).toBeTruthy();
     expect(screen.getByTestId("probe-battery").props.children).toBe("unread");
   });
 });
@@ -591,10 +595,16 @@ describe("088 FR-001·FR-002 — 작은 강조 글자는 COLORS.danger만 쓰고
   });
 
   it("FR-002 — 권한 「허용 안 함」 꼬리표는 글자 COLORS.danger + 테두리 COLORS.accent를 유지한다", async () => {
-    await render(<SettingsScreen {...props()} />);
-    const tag = flat(screen.getByTestId("settings-tag-location"));
+    await render(
+      <SettingsScreen
+        {...props({
+          permissionTags: { photos: "denied", notifications: "partial", battery: "unread" },
+        })}
+      />,
+    );
+    const tag = flat(screen.getByTestId("settings-tag-photos"));
     expect(tag.borderColor).toBe(COLORS.accent);
-    const label = flat(within(screen.getByTestId("settings-tag-location")).getByText("허용 안 함"));
+    const label = flat(within(screen.getByTestId("settings-tag-photos")).getByText("허용 안 함"));
     expect(label.color).toBe(COLORS.danger);
   });
 });

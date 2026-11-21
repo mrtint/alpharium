@@ -50,7 +50,7 @@ const generated: DiaryEntry = {
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 });
 
 const resolveNoReady = (): ResolveOutcome => ({ kind: "no-ready-character" });

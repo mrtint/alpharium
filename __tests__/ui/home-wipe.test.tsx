@@ -29,7 +29,7 @@ const TODAY = "2026-09-28";
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: true, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: true, placeNamesEnabled: false },
 });
 
 function once() {

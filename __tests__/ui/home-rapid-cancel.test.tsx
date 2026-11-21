@@ -53,7 +53,7 @@ const entryFor = (day: string): DiaryEntry => ({
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 });
 
 /** 호출마다 따로 풀 수 있는 파이프라인 — 앞 시도와 새 시도를 테스트가 쥔다 */

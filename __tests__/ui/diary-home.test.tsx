@@ -69,7 +69,7 @@ const resolveQuiet =
       character: "quiet",
       day: day as never,
       hasPhotos: over.hasPhotos ?? false,
-      geocodingEnabled: false,
+      placeNamesEnabled: false,
       ...(over.movedFrom ? { movedFrom: over.movedFrom } : {}),
     },
   });

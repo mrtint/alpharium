@@ -154,7 +154,7 @@ describe("048 createAppPipeline — previewDay", () => {
         : {
             kind: "known",
             value: {
-              trace: { visitCount: visits, approximateDistanceMeters: 0 },
+              trace: { visitCount: visits, approximateDistanceMeters: 0, visits: [] },
               source: "photo-exif",
               photosWithLocation: photos,
               photosConsidered: photos,

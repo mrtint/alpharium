@@ -30,7 +30,7 @@ const YESTERDAY = "2026-09-27";
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: true, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: true, placeNamesEnabled: false },
 });
 
 /** 조립부의 claim과 같다 — 한 실행에 한 번만 참 */

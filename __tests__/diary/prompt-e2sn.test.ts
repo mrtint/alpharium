@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { buildPrompt, instructionLines, promptPrefix, titleQuestion } from "../../src/diary/prompt";
+import type { PromptPlaces } from "../../src/diary/place-lines";
 import { buildRequest } from "../../src/diary/request";
 import {
   CHARACTERS,
@@ -36,11 +37,11 @@ const PROMPT_CODE = PROMPT_SRC.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$
 function req(
   signals: DaySignals,
   character: Character = "quiet",
-  opts: { day?: string; now?: Date; customNames?: CustomNames; placeName?: string } = {},
+  opts: { day?: string; now?: Date; customNames?: CustomNames; places?: PromptPlaces } = {},
 ): DiaryRequest {
   const r = buildRequest(signals, character, "quick", opts.day, opts.now, opts.customNames);
   if (!r.ok) throw new Error("테스트 준비 실패");
-  return opts.placeName ? { ...r.request, placeName: opts.placeName } : r.request;
+  return opts.places ? { ...r.request, places: opts.places } : r.request;
 }
 
 /* ── 신호 헬퍼 (concept-cases.ts와 같은 모양) ── */
@@ -72,7 +73,7 @@ function placesKnown(): DaySignals["places"] {
   return {
     kind: "known",
     value: {
-      trace: { visitCount: 3, approximateDistanceMeters: 5100 },
+      trace: { visitCount: 3, approximateDistanceMeters: 5100, visits: [] },
       source: "photo-exif",
       photosWithLocation: 4,
       photosConsidered: 5,
@@ -253,7 +254,7 @@ describe("E2 — 문장형 기록, 숫자 시각 없음", () => {
       places: {
         kind: "known",
         value: {
-          trace: { visitCount: 1, approximateDistanceMeters: 0 },
+          trace: { visitCount: 1, approximateDistanceMeters: 0, visits: [] },
           source: "photo-exif",
           photosWithLocation: 2,
           photosConsidered: 2,
@@ -480,7 +481,7 @@ describe("V5 — 원본 케이스의 기록·꼬리", () => {
       places: {
         kind: "known",
         value: {
-          trace: { visitCount: 2, approximateDistanceMeters: 8200 },
+          trace: { visitCount: 2, approximateDistanceMeters: 8200, visits: [] },
           source: "photo-exif",
           photosWithLocation: 3,
           photosConsidered: 3,
@@ -496,12 +497,21 @@ describe("V5 — 원본 케이스의 기록·꼬리", () => {
       considered: 3,
       available: 3,
     };
-    expect(record(buildPrompt(req(s, "quiet", { placeName: "강남구" }), vision))).toEqual([
+    expect(
+      record(
+        buildPrompt(
+          req(s, "quiet", {
+            places: { items: [{ period: "afternoon", label: "강남역" }], more: 0 },
+          }),
+          vision,
+        ),
+      ),
+    ).toEqual([
       SIG_HEAD,
       "사진은 세 장이 남았어요. 오후부터 밤까지 찍혔어요.",
       "자리는 두 곳에 남았고, 가장 먼 두 곳은 여덟 킬로미터쯤 떨어져 있어요. 사진 세 장 중 세 장에서 얻은 자리예요.",
       S_PLACES,
-      "다녀온 곳은 강남구 근처였어요.",
+      "사진은 오후에 강남역 근처에서 찍혔어요.",
       "오후에 담은 장면: A restaurant menu board on the table.",
       "밤에 담은 장면: A cat sleeping on the living room sofa.",
       "밤에 담은 장면: A cat curled up on a blanket.",

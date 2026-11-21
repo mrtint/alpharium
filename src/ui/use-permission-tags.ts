@@ -22,7 +22,6 @@ export type PermissionTags = Record<TaggedPermission, PermissionTag>;
 
 const UNREAD: PermissionTags = {
   photos: "unread",
-  location: "unread",
   notifications: "unread",
   battery: "unread",
 };
@@ -43,7 +42,6 @@ export function usePermissionTags(read: () => Promise<PermissionFacts>): Permiss
           if (!alive) return;
           setTags({
             photos: permissionTagFor("photos", facts),
-            location: permissionTagFor("location", facts),
             notifications: permissionTagFor("notifications", facts),
             battery: permissionTagFor("battery", facts),
           });

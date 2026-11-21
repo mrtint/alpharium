@@ -9,7 +9,7 @@
  * - `policy-facts.test.ts` F1~F6 — 금지 SDK·외부 주소·지오코딩 통로
  *
  * **범위**: 이 표와 테스트는 **소스에서 보이는 것만** 잠근다. 네이티브 라이브러리가 스스로 하는 통신, OS 백업, OS 지오코더
- * 뒤의 서버는 보지 못한다. 표를 고치면 방침(`site/privacy/index.html`)과 선언 초안(`docs/store/privacy-declarations.md`)을
+ * 뒤의 서버는 보지 못한다. 121 — `place-name`(좌표 → OS 지도 서비스)을 걷었다. 장소 이름은 앱에 든 데이터에서 찾는다. 표를 고치면 방침(`site/privacy/index.html`)과 선언 초안(`docs/store/privacy-declarations.md`)을
  * 함께 고친다 — 순서는 방침 → 선언 초안 → 이 표.
  * ─────────────────────────────────────────────────────────────────────────────
  */
@@ -28,11 +28,6 @@ export const OUTBOUND: readonly OutboundEntry[] = [
     id: "model-download",
     what: "모듈 내려받기 — Hugging Face 서버가 일반 웹 요청 정보(IP 주소 등)를 받는다",
     evidence: { kind: "code", paths: ["src/models/roster.ts", "src/vision/roster.ts"] },
-  },
-  {
-    id: "place-name",
-    what: "일기 한 편당 대표 좌표 하나 → 운영체제의 지도 서비스(iOS는 Apple, 안드로이드는 기기의 지오코더 제공자)",
-    evidence: { kind: "code", paths: ["src/signals/geocoding-port.ts"] },
   },
   {
     id: "os-diagnostics",

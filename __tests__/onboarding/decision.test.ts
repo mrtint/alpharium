@@ -178,7 +178,7 @@ describe("D3 — battery-exception은 batteryNoticeShown으로 판정", () => {
 describe("D4 — planOnboardingSteps", () => {
   it("platform 필터: ios 온보딩에서 android 전용 항목이 빠진다", () => {
     const androidOnly = REQS.map((r) =>
-      r.key === "location" ? { ...r, platforms: ["android"] as const } : r,
+      r.key === "notifications" ? { ...r, platforms: ["android"] as const } : r,
     );
     const steps = planOnboardingSteps({
       platform: "ios",
@@ -187,12 +187,12 @@ describe("D4 — planOnboardingSteps", () => {
       batteryNoticeShown: false,
       skippedThisSession: [],
     });
-    expect(steps.find((s) => s.requirement.key === "location")).toBeUndefined();
+    expect(steps.find((s) => s.requirement.key === "notifications")).toBeUndefined();
   });
 
   it("platform 필터: android 온보딩에서 ios 전용 항목이 빠진다", () => {
     const iosOnly = REQS.map((r) =>
-      r.key === "location" ? { ...r, platforms: ["ios"] as const } : r,
+      r.key === "notifications" ? { ...r, platforms: ["ios"] as const } : r,
     );
     const steps = planOnboardingSteps({
       platform: "android",
@@ -201,7 +201,7 @@ describe("D4 — planOnboardingSteps", () => {
       batteryNoticeShown: false,
       skippedThisSession: [],
     });
-    expect(steps.find((s) => s.requirement.key === "location")).toBeUndefined();
+    expect(steps.find((s) => s.requirement.key === "notifications")).toBeUndefined();
   });
 
   it("order 오름차순으로 정렬된다", () => {
@@ -222,18 +222,18 @@ describe("D5 — nextStep", () => {
     const steps = planOnboardingSteps({
       platform: "android",
       requirements: REQS,
-      states: { photos: "granted", location: "denied" },
+      states: { photos: "granted", notifications: "denied" },
       batteryNoticeShown: false,
       skippedThisSession: [],
     });
-    expect(nextStep(steps)?.requirement.key).toBe("location");
+    expect(nextStep(steps)?.requirement.key).toBe("notifications");
   });
 
   it("actionable이 뒤에 있어도 order가 앞인 blocked를 먼저 고른다", () => {
     const steps = planOnboardingSteps({
       platform: "android",
       requirements: REQS,
-      states: { photos: "blocked", location: "undetermined" },
+      states: { photos: "blocked", notifications: "undetermined" },
       batteryNoticeShown: false,
       skippedThisSession: [],
     });
@@ -246,7 +246,6 @@ describe("D5 — nextStep", () => {
       requirements: REQS,
       states: {
         photos: "granted",
-        location: "granted",
         notifications: "granted",
       },
       batteryNoticeShown: true,
@@ -261,12 +260,12 @@ describe("D5 — nextStep", () => {
       requirements: REQS,
       states: { photos: "granted" },
       batteryNoticeShown: true,
-      skippedThisSession: ["location", "notifications"],
+      skippedThisSession: ["notifications"],
     });
     expect(nextStep(steps)).toBeNull();
   });
 
-  it("★ 031 — 사진 허용 후 다음 단계가 location이다 (photo-location 단계 부재, 무한 루프 없음)", () => {
+  it("★ 031 — 사진 허용 후 다음 단계가 notifications다(121 — location을 걷었다) (photo-location 단계 부재, 무한 루프 없음)", () => {
     // 이 스펙 이전에는 사진 granted → photo-location이 늘 "undetermined" →
     // statusOf가 "actionable" → nextStep이 photo-location을 영원히 반환했다.
     const steps = planOnboardingSteps({
@@ -277,7 +276,7 @@ describe("D5 — nextStep", () => {
       skippedThisSession: [],
     });
     expect(steps.map((s) => s.requirement.key)).not.toContain("photo-location");
-    expect(nextStep(steps)?.requirement.key).toBe("location");
+    expect(nextStep(steps)?.requirement.key).toBe("notifications");
   });
 });
 

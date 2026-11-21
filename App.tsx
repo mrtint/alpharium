@@ -57,7 +57,6 @@ import {
   readEssentialRemainingBytes,
 } from "./src/app/essential-assets-port";
 import { expoOnboardingFlagPort } from "./src/onboarding/flag-port";
-import { expoLocationPermissionPort } from "./src/onboarding/location-permission-port";
 import { expoOsSettingsPort } from "./src/onboarding/os-settings-port";
 import { PERMISSION_REQUIREMENTS } from "./src/onboarding/requirements";
 // 035 — 환영 연출·작명. 조립부가 파일을 읽고 화면에는 문자열만 넘긴다.
@@ -386,7 +385,7 @@ function AppFrame() {
     let alive = true;
     void Promise.all([
       loadAutoDiarySettings(settingsPort),
-      loadGeocodingSetting(geoPort).catch(() => "auto" as const),
+      loadGeocodingSetting(geoPort).catch(() => "on" as const),
     ]).then(([autoDiary, geocoding]) => {
       if (alive) setSettingsValues({ autoDiary, geocoding });
     });
@@ -624,7 +623,6 @@ function AppFrame() {
       photo: expoPhotoPort(),
       notification: expoNotificationPort(),
       battery: expoBatteryExceptionPort(),
-      location: expoLocationPermissionPort(),
       osSettings: expoOsSettingsPort(),
       // 029 — 필수 에셋 다운로드 통로 (FR-015). `src/app/`에 있어 로스터 접근 허용.
       essentialAssets: expoEssentialAssetsPort(),
@@ -2198,25 +2196,14 @@ function DiarySection({
    * **042 — 「사진 보기」가 빠졌다.** 고를 것이 없어졌으므로 읽을 설정도 없다.
    */
   const geocodingSettingPort = useMemo(() => expoGeocodingSettingPort(), []);
-  const [geocodingPreference, setGeocodingPreference] = useState<GeocodingPreference>("auto");
-  const [locationPermission, setLocationPermission] = useState(false);
+  // 121 — 처음 값은 「켬」이고 위치 권한은 보지 않는다(장소 이름을 앱에 든 데이터에서 찾는다).
+  const [geocodingPreference, setGeocodingPreference] = useState<GeocodingPreference>("on");
 
   useEffect(() => {
     let alive = true;
     async function readPrefs() {
-      const g = await loadGeocodingSetting(geocodingSettingPort).catch(() => "auto" as const);
-      let loc = false;
-      try {
-        const Location = await import("expo-location");
-        const status = await Location.getForegroundPermissionsAsync();
-        loc = status.granted === true;
-      } catch {
-        // 통로가 없는 환경 — 권한 없음으로 다룬다.
-      }
-      if (alive) {
-        setGeocodingPreference(g);
-        setLocationPermission(loc);
-      }
+      const g = await loadGeocodingSetting(geocodingSettingPort).catch(() => "on" as const);
+      if (alive) setGeocodingPreference(g);
     }
     void readPrefs();
     const sub = AppState.addEventListener("change", (s) => {
@@ -2277,18 +2264,13 @@ function DiarySection({
     };
   }, []);
 
-  // 029 — 장소명이 켜짐(자동+권한 있음, 또는 고정 on)인지 배선에 넘긴다.
+  // 121 — 장소 이름이 켜져 있는지(설정만 본다) 배선에 넘긴다.
   // `createPipeline`이 구성 시점에 이 값을 고정하므로, 바뀌면 파이프라인을 다시 만든다.
-  const geocodingEnabled =
-    geocodingPreference === "on"
-      ? true
-      : geocodingPreference === "off"
-        ? false
-        : locationPermission;
+  const placeNamesEnabled = geocodingPreference === "on";
 
   const wiring = useMemo(
-    () => createAppPipeline(environment, { store, geocodingEnabled }),
-    [environment, store, geocodingEnabled],
+    () => createAppPipeline(environment, { store, placeNamesEnabled }),
+    [environment, store, placeNamesEnabled],
   );
 
   /**
@@ -2349,10 +2331,9 @@ function DiarySection({
         chosenDay: day,
         // 029 — 그 날 사진 신호가 1장 이상인가. 임계값 없음(FR-010).
         photoSignalPresent: photoDays.has(day),
-        locationPermission,
         geocodingPreference,
       }),
-    [stored, ready, photoDays, locationPermission, geocodingPreference],
+    [stored, ready, photoDays, geocodingPreference],
   );
 
   /**
@@ -2638,8 +2619,8 @@ function SettingsSection({
   );
 
   /**
-   * 056 — 장소 갈래. 대화상자를 닫고, 저장이 성공한 뒤에만 값을 바꾼다(FR-018). 「켬」으로 바뀌었을 때만 닫힌 직후 위치 권한을
-   * 요청한다(017 L8·L9 — 거부돼도 값은 「켬」, 이미 허용이면 OS가 창을 띄우지 않는다, FR-025).
+   * 056 — 장소 갈래. 대화상자를 닫고, 저장이 성공한 뒤에만 값을 바꾼다(FR-018). 121 — 「켬」이어도 위치 권한을 요청하지 않는다
+   * (장소 이름을 앱에 든 데이터에서 찾는다, contracts/diary-places.md NX1).
    */
   const onSelectGeocoding = useCallback(
     async (g: GeocodingPreference) => {
@@ -2650,11 +2631,6 @@ function SettingsSection({
       );
       if (!saved) return;
       onGeocodingChange(g);
-      if (g === "on") {
-        void import("expo-location")
-          .then((Location) => Location.requestForegroundPermissionsAsync())
-          .catch(() => {});
-      }
     },
     [geoPort, onGeocodingChange],
   );
@@ -2666,15 +2642,14 @@ function SettingsSection({
   const batteryPort = useMemo(() => expoBatteryExceptionPort(), []);
   const readPermissions = useCallback(async (): Promise<PermissionFacts> => {
     const unknown = () => "unknown" as const;
-    const [photos, photoLocation, location, notifications, battery] = await Promise.all([
+    const [photos, photoLocation, notifications, battery] = await Promise.all([
       onboardingPorts.photo.photoPermission().catch(unknown),
       photoLocationProbe(photoPort, Date.now()),
-      onboardingPorts.location.status().catch(unknown),
       onboardingPorts.notification.getPermission().catch(unknown),
       // 104 — 배터리 예외 상태. 읽지 못하면 `unknown`(꼬리표 없음)
       batteryPort.readStatus().catch(unknown),
     ]);
-    return { photos, photoLocation, location, notifications, battery };
+    return { photos, photoLocation, notifications, battery };
   }, [onboardingPorts, photoPort, batteryPort]);
   const permissionTags = usePermissionTags(readPermissions);
   // 085 FR-015 — 자동 쓰기가 켜져 있고 알림이 「허용 안 함」이면 알림 행 아래 한 줄(쓸 차례 알림이 보이지 않는다).
@@ -2843,9 +2818,8 @@ function SettingsSection({
 /** 056 — 설정 화면의 값. `AppFrame`이 들고 있다(FR-030) */
 type SettingsValues = { autoDiary: AutoDiarySettings; geocoding: GeocodingPreference };
 
-/** 056 — 장소 갈래 → 행 값(보드 `place.auto`·`place.on`·`place.off`) */
+/** 056 — 장소 갈래 → 행 값(보드 `place.on`·`place.off`, 121에서 `place.auto`를 걷었다) */
 const PLACE_NAME_TEXT: Record<GeocodingPreference, string> = {
-  auto: SETTINGS_TEXT.placeAuto,
   on: SETTINGS_TEXT.placeOn,
   off: SETTINGS_TEXT.placeOff,
 };

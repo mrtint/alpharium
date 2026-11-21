@@ -360,7 +360,7 @@ describe("P-4 관측의 한계가 함께 간다 (FR-012c·d)", () => {
       places: {
         kind: "known",
         value: {
-          trace: { visitCount: 1, approximateDistanceMeters: 0 },
+          trace: { visitCount: 1, approximateDistanceMeters: 0, visits: [] },
           source: "photo-exif",
           photosWithLocation: 2,
           photosConsidered: 10,

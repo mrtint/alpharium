@@ -194,11 +194,14 @@ const ADDED_AFTER_GOLDEN: readonly string[] = [
  *
  * 골든 json은 다시 쓰지 않는다(「이전」이 사라진다). 대신 바뀐 것마다 스펙 번호·옛 값(`from`)·새 값(`to`)을 여기 적는다 —
  * 테스트는 골든에 `from`이 **있음을 먼저 단언**하고 `to`로 바꿔 비교한다(085 contracts GD1). 그래서 「바뀜」은 이 표에, 「이전」은 json에 남는다.
+ * 121부터 `to: null`은 「지움」이다 — 골든에 있던 것이 사라진 것도 같은 방식으로 이 표에 남긴다.
  */
 type GoldenChange = {
   spec: string;
-  literal?: { from: string; to: string };
-  outputs?: readonly { key: string; path?: string; from: string; to: string }[];
+  /** `to: null`은 문구를 지웠다는 뜻이다(121부터) */
+  literal?: { from: string; to: string | null };
+  /** `to: null`은 그 자리(키·경로)를 지웠다는 뜻이다(121부터) */
+  outputs?: readonly { key: string; path?: string; from: string; to: string | null }[];
 };
 
 const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
@@ -548,6 +551,82 @@ const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
       to: "일기를 쓰는 AI는 이 휴대폰 안에서 돌아요.",
     },
   },
+  // 121 — 장소 이름을 앱에 든 데이터에서 찾게 되어 위치 권한과 「자동」 갈래를 걷었다(specs/121-richer-day-places).
+  // 옛 값은 골든 json에 그대로 있다. 098이 얹은 값(placeAutoDesc·placeOnDesc)을 `from`으로 삼으므로 098 항목 뒤에 와야 한다.
+  {
+    spec: "121",
+    literal: { from: "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요", to: null },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "placeAutoDesc",
+        from: "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요",
+        to: null,
+      },
+    ],
+  },
+  {
+    spec: "121",
+    literal: { from: "자동", to: null },
+    outputs: [{ key: "SETTINGS_TEXT", path: "placeAuto", from: "자동", to: null }],
+  },
+  {
+    spec: "121",
+    literal: { from: "위치", to: null },
+    outputs: [{ key: "SETTINGS_TEXT", path: "permLocation", from: "위치", to: null }],
+  },
+  {
+    spec: "121",
+    literal: {
+      from: "일기를 쓸 때 다닌 자리의 이름을 참고해요",
+      to: "일기를 쓸 때 다닌 자리 근처의 장소 이름을 참고해요",
+    },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "placeOnDesc",
+        from: "일기를 쓸 때 다닌 자리의 이름을 참고해요",
+        to: "일기를 쓸 때 다닌 자리 근처의 장소 이름을 참고해요",
+      },
+    ],
+  },
+  {
+    spec: "121",
+    literal: {
+      from: "좌표를 기기의 지도 서비스에 물어봐요.",
+      to: "장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요.",
+    },
+    outputs: [
+      {
+        key: "SETTINGS_TEXT",
+        path: "placeNotice",
+        from: "좌표를 기기의 지도 서비스에 물어봐요.",
+        to: "장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요.",
+      },
+    ],
+  },
+  {
+    spec: "121",
+    literal: { from: "그날 머문 곳을 지명으로 적기 위해 위치를 씁니다.", to: null },
+    outputs: [
+      {
+        key: "permission(location).rationale",
+        from: "그날 머문 곳을 지명으로 적기 위해 위치를 씁니다.",
+        to: null,
+      },
+    ],
+  },
+  {
+    spec: "121",
+    literal: { from: "지명을 옮기지 못해서 장소는 비워 둬요.", to: null },
+    outputs: [
+      {
+        key: "permission(location).ifDenied",
+        from: "지명을 옮기지 못해서 장소는 비워 둬요.",
+        to: null,
+      },
+    ],
+  },
 ];
 
 /** 골든 리터럴 집합에 바뀐 값을 얹는다 — `from`이 골든에 없으면 실패한다(V10) */
@@ -560,7 +639,7 @@ function changedLiterals(golden: readonly string[]): string[] {
       inGolden: true,
     });
     set.delete(change.literal.from);
-    set.add(change.literal.to);
+    if (change.literal.to !== null) set.add(change.literal.to);
   }
   return [...set].sort();
 }
@@ -572,7 +651,8 @@ function changedOutputs(golden: Record<string, string>): Record<string, string> 
     for (const o of change.outputs ?? []) {
       if (o.path === undefined) {
         expect({ key: o.key, value: out[o.key] }).toEqual({ key: o.key, value: o.from });
-        out[o.key] = o.to;
+        if (o.to === null) delete out[o.key];
+        else out[o.key] = o.to;
       } else {
         const parsed = JSON.parse(out[o.key]) as Record<string, unknown>;
         expect({ key: o.key, path: o.path, value: parsed[o.path] }).toEqual({
@@ -580,7 +660,8 @@ function changedOutputs(golden: Record<string, string>): Record<string, string> 
           path: o.path,
           value: o.from,
         });
-        parsed[o.path] = o.to;
+        if (o.to === null) delete parsed[o.path];
+        else parsed[o.path] = o.to;
         out[o.key] = JSON.stringify(parsed);
       }
     }

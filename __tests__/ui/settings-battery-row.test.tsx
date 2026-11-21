@@ -28,7 +28,6 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onToggleAutoWrite: jest.fn(),
     permissionTags: {
       photos: "allowed",
-      location: "allowed",
       notifications: "allowed",
       battery: "unread",
     },
@@ -37,7 +36,7 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     versionText: "1.0.0 (1)",
     targetHourText: "오후 10시쯤",
     onOpenTargetHour: jest.fn(),
-    placeNamesText: "자동",
+    placeNamesText: "켬",
     onOpenPlaceNames: jest.fn(),
     moduleSizeText: "2.0GB",
     wipeEnabled: true,
@@ -69,7 +68,6 @@ describe("068 C2 — 배터리 행", () => {
 describe("104 PT4~PT6 — 배터리 꼬리표", () => {
   const permissionTags = (battery: "allowed" | "denied" | "unread") => ({
     photos: "allowed" as const,
-    location: "allowed" as const,
     notifications: "allowed" as const,
     battery,
   });

@@ -23,7 +23,7 @@
  * **모델 정보 없음**(원칙 III) — `expo-*`를 직접 import하지 않고 통로를 주입받는다.
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **★ 043 — 사진·위치·알림 세 단계는 목적 설명 카드·[허용]/[건너뛰기] 버튼을
+ * **★ 043 — 사진·알림 단계(121 — 위치는 걷었다)는 목적 설명 카드·[허용]/[건너뛰기] 버튼을
  * 화면에 두지 않는다**(FR-007a·FR-009). 스텝 진입 즉시(고정 지연 후) 시스템
  * 권한 요청 함수가 자동 호출되고, 배경은 스플래시와 같은 Modernist 배경만
  * 유지한다 — 사용자는 OS 다이얼로그에서 직접 허용·거부한다.
@@ -68,7 +68,6 @@ import {
 } from "../onboarding/decision";
 import { essentialAssetsReady } from "../onboarding/essential-assets";
 import type { EssentialAssetFact, EssentialAssetsPort } from "../app/essential-assets-port";
-import type { LocationPermissionPort } from "../onboarding/location-permission-port";
 import type { OsSettingsPort } from "../onboarding/os-settings-port";
 import type { PermissionKey, PermissionRequirement } from "../onboarding/requirements";
 import type { PermissionState } from "../signals/port";
@@ -87,7 +86,6 @@ export type OnboardingPorts = {
   battery: {
     openSettingsList(): Promise<void>;
   };
-  location: LocationPermissionPort;
   osSettings: OsSettingsPort;
   /** 029 — 필수 에셋(공용 사진 모델 + 기본 캐릭터) 다운로드 통로 (FR-015). */
   essentialAssets: EssentialAssetsPort;
@@ -124,16 +122,15 @@ export type OnboardingScreenProps = {
   onAllStepsDecided?: () => void;
 };
 
-/** 사진·위치·알림 권한을 한 번에 조회한다 (battery는 조회 대상이 아님). */
+/** 사진·알림 권한을 한 번에 조회한다 (battery는 조회 대상이 아님. 121 — 위치는 묻지 않는다). */
 async function readStates(
   ports: OnboardingPorts,
 ): Promise<Partial<Record<PermissionKey, PermissionState>>> {
-  const [photos, location, notifications] = await Promise.all([
+  const [photos, notifications] = await Promise.all([
     ports.photo.photoPermission().catch(() => "undetermined" as PermissionState),
-    ports.location.status().catch(() => "undetermined" as PermissionState),
     ports.notification.getPermission().catch(() => "undetermined" as const),
   ]);
-  return { photos, location, notifications };
+  return { photos, notifications };
 }
 
 export function OnboardingScreen({
@@ -242,7 +239,7 @@ export function OnboardingScreen({
 
   /**
    * ★ 043 — 요청 결과가 허용(`granted`/`limited`)이 아니면 자동으로
-   * `skip(key)`를 호출한다(FR-008). 사진·위치·알림 세 단계에만 적용 —
+   * `skip(key)`를 호출한다(FR-008). 사진·알림 단계(121 — 위치는 걷었다)에만 적용 —
    * `battery-exception`은 결과를 조회할 API가 없어 이 판정 대상이 아니다
    * (그 분기는 별도로 처리, 아래 switch에서 조기 반환).
    */
@@ -256,9 +253,6 @@ export function OnboardingScreen({
         switch (step.requirement.key) {
           case "photos":
             result = await ports.photo.requestPhotoPermission();
-            break;
-          case "location":
-            result = await ports.location.request();
             break;
           case "notifications": {
             await ports.notification.ensureChannel().catch(() => {});
@@ -349,7 +343,7 @@ export function OnboardingScreen({
   const showAssetsStep = current === null && !assetsReady;
   const T = text().onboarding;
 
-  // ★ 065 — 사진·위치·알림 단계는 OS 권한 창이 자동으로 뜨는 동안 스플래시 그림만 둔다. 창 뒤에 비치는
+  // ★ 065 — 사진·알림 단계는 OS 권한 창이 자동으로 뜨는 동안 스플래시 그림만 둔다. 창 뒤에 비치는
   // 제목·설명은 흐려서 읽히지 않았다(소유자 실기기 확인). `blocked`(설정 열기 안내)와 배터리 단계는 글이 필요해 그대로다.
   if (
     !showAssetsStep &&
@@ -458,7 +452,7 @@ export function OnboardingScreen({
           </Pressable>
         </View>
       ) : (
-        // ★ 043 FR-007a·FR-009 — 사진·위치·알림 세 단계는 설명 카드·버튼 없이
+        // ★ 043 FR-007a·FR-009 — 사진·알림 단계(121 — 위치는 걷었다)는 설명 카드·버튼 없이
         // 스플래시와 같은 Modernist 배경만 유지한다. OS 다이얼로그가 이
         // 컨테이너 위에서 자동으로 뜬다(아래 useEffect). `blocked`("다시 묻지
         // 않음")만 예외적으로 [설정 열기]가 남는다(FR-008a — OS가 더 이상
@@ -499,7 +493,7 @@ const styles = StyleSheet.create({
   progressFill: { height: 8, backgroundColor: COLORS.accent },
   section: { gap: 10, marginTop: 8 },
   secondary: { paddingVertical: 8, paddingHorizontal: 4, alignSelf: "flex-start" },
-  // ★ 043 — 사진·위치·알림 단계의 배경 컨테이너. 설명 카드가 없으므로
+  // ★ 043 — 사진·알림 단계의 배경 컨테이너. 설명 카드가 없으므로
   // blocked일 때만 안내+버튼이 뜬다(FR-008a), 그 외엔 빈 배경(FR-009).
   permissionBackground: { flex: 1, minHeight: 200, justifyContent: "center" },
   splashBackdrop: { flex: 1, backgroundColor: COLORS.bg },

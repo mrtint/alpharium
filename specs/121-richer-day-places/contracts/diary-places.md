@@ -2,7 +2,7 @@
 
 ## 자리 목록 (`tracePlaces` 확장)
 
-TV1. `tracePlaces(points)`는 `visits`를 함께 낸다(`PhotoPlaces.visits`). 묶기 규칙(직전 자리에서 `SAME_PLACE_METERS` 초과면 새 자리)은 그대로.
+TV1. `tracePlaces(points)`는 `visits`를 함께 낸다(`PlaceTrace.visits` — `PhotoPlaces.trace.visits`로 읽는다). 묶기 규칙(직전 자리에서 `SAME_PLACE_METERS` 초과면 새 자리)은 그대로.
 TV2. `visits[i].photoCount`의 합 = 좌표 있는 사진 수. `firstSeenAt ≤ lastSeenAt`. 시각순.
 TV3. 좌표 0개면 `visits: []`.
 
@@ -19,7 +19,7 @@ DP5. 저장 `entry.places`는 자리 전부를 시각순으로 담는다(data-mo
 PL1. 항목 1개: `사진은 {때}에 {이름} 근처에서 찍혔어요.` / 이름 없음이면 `사진은 {때}에 이름을 모르는 곳에서 찍혔어요.`
 PL2. 항목 2~3개: `사진은 {때}에 {이름} 근처, {때}에 {이름} 근처…에서 찍혔어요.`(마지막 항목 뒤에 「에서 찍혔어요.」)
 PL3. `more > 0`: 다음 줄 `그 밖에 {N}곳에서도 찍혔어요.`(N은 기존 `koCount` 고유어 수 — 「두 곳」).
-PL4. 때 낱말: dawn 새벽 · morning 아침 · daytime 낮 · evening 저녁 · night 밤.
+PL4. 때 낱말: morning 오전 · afternoon 오후 · evening 저녁 · night 밤(기존 사진 시각 줄과 같은 넷).
 PL5. `request.places`가 없으면 장소 이름 줄이 없다. 기존 자리 수·거리·`S_PLACES` 문장은 그대로.
 PL6. 「다녀온 곳은」 문자열이 `prompt.ts`에 없다.
 PL7. 장소 줄은 「갔다·머물렀다·있었다」를 사실로 쓰지 않는다(「찍혔어요」만).

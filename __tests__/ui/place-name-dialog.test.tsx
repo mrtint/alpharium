@@ -1,5 +1,6 @@
 /**
  * 056 — 장소 이름으로 보기 대화상자 (보드 `6l`, contracts/settings-time-place.md PD1~PD3).
+ * 121 — 두 칸(켬·끔)과 고지 문구(contracts/diary-places.md ST2·ST3). 보드 `6l`의 「자동」 칸은 걷었다(보드 밖 변경).
  *
  * ⚠️ RNTL 14의 `render`·`fireEvent`는 Promise다 — await한다. 대화상자는 포털로 올라가므로 `renderWithPortal`.
  */
@@ -28,7 +29,7 @@ function captureBackHandlers(): BackListener[] {
 const flat = (node: { props: { style?: unknown } }): Record<string, unknown> =>
   (StyleSheet.flatten(node.props.style as never) ?? {}) as Record<string, unknown>;
 
-async function open(value: GeocodingPreference = "auto") {
+async function open(value: GeocodingPreference = "on") {
   const onSelect = jest.fn();
   const onClose = jest.fn();
   const handlers = captureBackHandlers();
@@ -43,12 +44,11 @@ afterEach(() => {
 });
 
 describe("PD1 — 열린 모양", () => {
-  it("제목·세 칸(이름·설명)·지도 고지·「취소」가 원문 그대로다", async () => {
+  it("제목·두 칸(이름·설명)·고지·「취소」가 원문 그대로다", async () => {
     await open();
     expect(screen.getByText("장소 이름으로 보기")).toBeTruthy();
     const cases = [
-      ["auto", "자동", "위치 권한이 있으면 이름을 참고하고, 없으면 비워 둬요"],
-      ["on", "켬", "일기를 쓸 때 다닌 자리의 이름을 참고해요"],
+      ["on", "켬", "일기를 쓸 때 다닌 자리 근처의 장소 이름을 참고해요"],
       ["off", "끔", "장소 이름을 옮기지 않아요"],
     ] as const;
     for (const [mode, name, desc] of cases) {
@@ -57,14 +57,17 @@ describe("PD1 — 열린 모양", () => {
       expect(within(option).getByText(desc)).toBeTruthy();
     }
     expect(screen.getByTestId("place-name-notice")).toHaveTextContent(
-      "좌표를 기기의 지도 서비스에 물어봐요.",
+      "장소 이름은 휴대폰 안의 지도 자료에서 찾아요. 좌표는 밖으로 보내지 않아요.",
     );
     expect(screen.getByTestId("place-name-cancel")).toBeTruthy();
+    // ST2 — 「자동」 칸이 없다
+    expect(screen.queryByTestId("place-name-auto")).toBeNull();
+    expect(screen.queryByText("자동")).toBeNull();
   });
 
-  it.each(["auto", "on", "off"] as const)("지금 값 %s의 칸이 선택돼 있다", async (value) => {
+  it.each(["on", "off"] as const)("지금 값 %s의 칸이 선택돼 있다", async (value) => {
     await open(value);
-    for (const mode of ["auto", "on", "off"] as const) {
+    for (const mode of ["on", "off"] as const) {
       expect(screen.getByTestId(`place-name-${mode}`).props.accessibilityState).toMatchObject({
         selected: mode === value,
       });
@@ -72,15 +75,15 @@ describe("PD1 — 열린 모양", () => {
   });
 
   it("선택 칸은 2px 본문색 테두리 + accent 표식, 아닌 칸은 1px 구분선", async () => {
-    await open("auto");
-    expect(flat(screen.getByTestId("place-name-auto"))).toMatchObject({
+    await open("off");
+    expect(flat(screen.getByTestId("place-name-off"))).toMatchObject({
       borderWidth: 2,
       borderColor: COLORS.text,
     });
-    expect(flat(screen.getByTestId("place-name-auto-mark"))).toMatchObject({
+    expect(flat(screen.getByTestId("place-name-off-mark"))).toMatchObject({
       backgroundColor: COLORS.accent,
     });
-    expect(flat(screen.getByText("자동"))).toMatchObject({
+    expect(flat(screen.getByText("끔"))).toMatchObject({
       fontSize: 16,
       fontWeight: "800",
       lineHeight: 16 * 1.55,
@@ -95,7 +98,7 @@ describe("PD1 — 열린 모양", () => {
 
 describe("PD2 — 칸 한 번에 적용", () => {
   it("다른 칸 → onSelect(값) 1회", async () => {
-    const { onSelect, onClose } = await open("auto");
+    const { onSelect, onClose } = await open("on");
     await fireEvent.press(screen.getByTestId("place-name-off"));
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(onSelect).toHaveBeenCalledWith("off");
@@ -110,7 +113,7 @@ describe("PD2 — 칸 한 번에 적용", () => {
   });
 
   it("연타해도 onSelect는 한 번", async () => {
-    const { onSelect } = await open("auto");
+    const { onSelect } = await open("off");
     const option = screen.getByTestId("place-name-on");
     await fireEvent.press(option);
     await fireEvent.press(option);

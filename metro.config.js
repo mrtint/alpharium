@@ -12,4 +12,8 @@ const { withNativeWind } = require("nativewind/metro");
 
 const config = getDefaultConfig(__dirname);
 
+// 121 — 장소 이름 데이터(`assets/places/kr-places.bin`)를 번들 자산으로 싣는다.
+// `src/signals/place-index-port.ts`가 `require()`로 가리키고 `expo-asset`이 파일 경로를 준다.
+config.resolver.assetExts.push("bin");
+
 module.exports = withNativeWind(config, { input: "./global.css" });

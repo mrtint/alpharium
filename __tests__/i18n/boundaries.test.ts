@@ -114,6 +114,8 @@ describe("B6 — 저장된 데이터에 화면 문구가 없다 (research R13)",
       "createdAt",
       "photos",
       "timing",
+      // 121 — 자리 목록. 이름은 장소 데이터(OSM)에서 온 고유명사이고 화면 문구 카탈로그의 글이 아니다
+      "places",
       "placeName",
     ]);
   });

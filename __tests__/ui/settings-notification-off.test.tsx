@@ -22,7 +22,6 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     onToggleAutoWrite: jest.fn(),
     permissionTags: {
       photos: "denied",
-      location: "allowed",
       notifications: "denied",
       battery: "unread",
     },
@@ -31,7 +30,7 @@ function props(over: Partial<SettingsScreenProps> = {}): SettingsScreenProps {
     versionText: "1.0.0 (9)",
     targetHourText: "오후 10시쯤",
     onOpenTargetHour: jest.fn(),
-    placeNamesText: "자동",
+    placeNamesText: "켬",
     onOpenPlaceNames: jest.fn(),
     moduleSizeText: "2.0GB",
     wipeEnabled: true,

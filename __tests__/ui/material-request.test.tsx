@@ -32,7 +32,7 @@ const resolved: EnvironmentResolution = { ok: true, environment: "dev" };
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 });
 
 const neverPipeline = (): Pipeline => ({

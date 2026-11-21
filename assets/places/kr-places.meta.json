@@ -1,0 +1,27 @@
+{
+  "source": {
+    "url": "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf",
+    "lastModified": "Sat, 21 Nov 2026 00:58:40 GMT",
+    "bytes": 292399858,
+    "sha256": "492ceebb946500fa54dd1b460b4ff923884dd9e673f65d3750e1d60122b85a8e",
+    "license": "ODbL 1.0 — © OpenStreetMap contributors"
+  },
+  "output": {
+    "file": "assets/places/kr-places.bin",
+    "bytes": 9697799,
+    "sha256": "e0c186f511ccb74dd00c83c445d319978a4c5806e3a126e530a2fcda0665fd40",
+    "places": 174751,
+    "byCategory": {
+      "landmark": 8339,
+      "institution": 43165,
+      "building": 34493,
+      "station": 1481,
+      "park": 27510,
+      "locality": 20502,
+      "residential": 38151,
+      "mall": 1110
+    }
+  },
+  "simplifyToleranceDegrees": 0.0002,
+  "builtAt": "2026-11-21"
+}

@@ -45,7 +45,7 @@ const entryFor = (day: string): DiaryEntry => ({
 
 const resolveStub = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 });
 
 function home(

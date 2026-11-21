@@ -92,7 +92,7 @@ function element(o: Over) {
             character: "quiet",
             day: day as never,
             hasPhotos: true,
-            geocodingEnabled: false,
+            placeNamesEnabled: false,
           },
         }))
       }
@@ -117,7 +117,7 @@ describe("HM1 — 막혀 있으면 쓰기 바는 알리기만 한다", () => {
     const { pipeline, run } = pendingPipeline();
     const resolve = jest.fn((day: string): ResolveOutcome => ({
       kind: "resolved",
-      params: { character: "quiet", day: day as never, hasPhotos: true, geocodingEnabled: false },
+      params: { character: "quiet", day: day as never, hasPhotos: true, placeNamesEnabled: false },
     }));
     const blocked = jest.fn();
     await renderWithPortal(

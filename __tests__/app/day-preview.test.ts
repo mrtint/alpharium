@@ -45,7 +45,7 @@ const knownPhotos = (n: number): SignalValue<PhotoObservation> => ({
 const knownPlaces = (visits: number): SignalValue<PhotoPlaces> => ({
   kind: "known",
   value: {
-    trace: { visitCount: visits, approximateDistanceMeters: 1200 },
+    trace: { visitCount: visits, approximateDistanceMeters: 1200, visits: [] },
     source: "photo-exif",
     photosWithLocation: 2,
     photosConsidered: 3,

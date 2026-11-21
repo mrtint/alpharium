@@ -30,7 +30,7 @@ const resolveQuiet =
   (hasPhotos = false) =>
   (day: string): ResolveOutcome => ({
     kind: "resolved",
-    params: { character: "quiet", day: day as never, hasPhotos, geocodingEnabled: false },
+    params: { character: "quiet", day: day as never, hasPhotos, placeNamesEnabled: false },
   });
 
 function neverPipeline(): Pipeline & { calls: number } {

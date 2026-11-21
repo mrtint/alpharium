@@ -35,7 +35,9 @@ import type { InferenceLocation, SelectionFailure } from "../inference/types";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
 import type { PermissionState } from "../signals/port";
-import { expoGeocodingPort } from "../signals/geocoding-port";
+import { expoPlaceIndexPort } from "../signals/place-index-port";
+import { placeNamer, type PlaceName } from "../signals/place-names";
+import type { Coordinate } from "../signals/places";
 import type { DaySignals } from "../signals/types";
 import { photoAccessOf, toDayPreview } from "./day-preview";
 import type { DayPreview, PhotoAccess } from "./state";
@@ -136,8 +138,10 @@ export type WiringDeps = {
   /** 사진 권한 상태를 묻는다 (053 — 미리보기의 「권한이 없어요」). 주지 않으면 실제 통로를 쓴다 */
   photoPermission?: () => Promise<PermissionState>;
   isModelReady?: (character: Character) => Promise<boolean>;
-  /** 장소명 설정이 켜져 있는가 (017, FR-004). 주지 않으면 꺼짐으로 다룬다 */
-  geocodingEnabled?: boolean;
+  /** 장소 이름 설정이 켜져 있는가 (121 FR-008). 주지 않으면 꺼짐으로 다룬다 */
+  placeNamesEnabled?: boolean;
+  /** 자리 좌표의 장소 이름을 찾는다 (121). 주지 않으면 앱에 든 장소 데이터를 읽는 기기 통로를 쓴다 */
+  placeNames?: (coordinates: readonly Coordinate[]) => Promise<PlaceName[]>;
   /**
    * 사용자가 지은 캐릭터 이름들을 읽는다 (035 N14).
    *
@@ -186,6 +190,22 @@ function deviceCustomNames(): Promise<CustomNames> {
 /** 그 하루의 실제 신호. 004의 수집을 그대로 쓴다 */
 function deviceSignals(day: DayDate): Promise<DaySignals> {
   return collectDaySignals(expoPhotoPort(), day);
+}
+
+/**
+ * 121 — 앱에 든 장소 데이터로 자리 이름을 찾는 기기 통로. 프로세스에 하나다 — 데이터(약 10MB)를 처음 찾을 때 한 번 읽어
+ * 화면·백그라운드 파이프라인이 함께 쓴다. 자산 경로를 얻지 못하면 이름은 모두 「모름」이다(R10).
+ */
+const placeIndexPort = expoPlaceIndexPort();
+const sharedNamer = placeNamer(placeIndexPort);
+
+async function devicePlaceNames(coordinates: readonly Coordinate[]): Promise<PlaceName[]> {
+  try {
+    await placeIndexPort.prepare();
+  } catch {
+    return coordinates.map(() => ({ kind: "unknown" }) as const);
+  }
+  return sharedNamer.nameAll(coordinates);
 }
 
 /**
@@ -250,11 +270,10 @@ export function createAppPipeline(
     store,
     loadSignals,
     isModelReady: deps.isModelReady,
-    // 017 — 설정이 켜져 있을 때만 지오코딩 포트를 만든다. `expoGeocodingPort()`가
-    // 스스로 지연 import하므로 여기서 만드는 것 자체는 비용이 없다(011의
-    // `expoModelPorts()`와 같은 판단).
-    geocoding: expoGeocodingPort(),
-    geocodingEnabled: deps.geocodingEnabled,
+    // 121 — 기기 안 장소 이름(017의 지오코딩을 대체). 데이터는 처음 이름을 찾을 때 한 번 읽는다 — 여기서 만드는 것 자체는
+    // 비용이 없다(지연 import, 011의 `expoModelPorts()`와 같은 판단).
+    placeNames: deps.placeNames ?? devicePlaceNames,
+    placeNamesEnabled: deps.placeNamesEnabled,
     beginWrite,
   });
 

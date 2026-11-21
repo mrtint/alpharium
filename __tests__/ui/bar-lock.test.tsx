@@ -24,7 +24,7 @@ const LOCK_MS = 300;
 
 const resolveQuiet = (day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 });
 
 const hangingPipeline = (): Pipeline => ({ run: () => new Promise<PipelineResult>(() => {}) });

@@ -40,25 +40,18 @@ describe("066 — iOS 권한 문구", () => {
     expect(optionsOf("expo-media-library").savePhotosPermission).toBe(false);
   });
 
-  it("위치 권한은 「앱을 사용하는 동안」 하나뿐이다 — 항상 문구는 넣지 않는다", () => {
-    const location = optionsOf("expo-location");
-    expect(location.locationWhenInUsePermission).toMatch(HANGUL);
-    expect(location.locationAlwaysAndWhenInUsePermission).toBe(false);
-    expect(location.locationAlwaysPermission).toBe(false);
-  });
-
-  // 066 빌드 1이 ITMS-90683으로 거부됐다 — 앱은 모션을 안 쓰지만 `expo-location`이 CoreMotion API를
-  // 참조하므로 Apple 정적 검사가 NSMotionUsageDescription을 요구한다. 키를 빼면(false) 업로드 뒤 거부된다.
-  it("모션 문구는 한국어로 둔다 — 빼면 App Store Connect 처리에서 ITMS-90683으로 거부된다", () => {
-    expect(optionsOf("expo-location").motionUsagePermission).toMatch(HANGUL);
-  });
-
-  // 086 T3 — 권한 창이 방침(site/privacy)과 같은 사실을 말한다. 장소 이름을 얻으려 사진의 좌표가 `CLGeocoder`로 Apple에
-  // 간다([문서] "network-based service"). 사진 파일은 나가지 않으므로 사진 문구는 그대로 둔다(FR-018).
-  it("086 — 위치 문구는 좌표가 Apple 지도 서비스로 간다는 사실을 말한다", () => {
-    expect(optionsOf("expo-location").locationWhenInUsePermission).toBe(
-      "사진에 담긴 장소를 사람이 읽을 수 있는 이름으로 바꾸는 데 위치를 씁니다. 이때 사진의 좌표를 Apple 지도 서비스에 보냅니다.",
+  // 121 — 위치 권한을 걷었다(장소 이름을 앱에 든 데이터에서 찾는다). `expo-location` 플러그인과 위치 문구가 없다(NX2·NX6).
+  it("121 — 위치 플러그인·위치 문구가 없다", () => {
+    expect(APP.expo.plugins.some((p) => (Array.isArray(p) ? p[0] : p) === "expo-location")).toBe(
+      false,
     );
+    expect(JSON.stringify(APP.expo)).not.toMatch(/NSLocation|locationWhenInUsePermission/);
+  });
+
+  // 066 빌드 1이 ITMS-90683으로 거부됐다 — 그때는 `expo-location`이 CoreMotion API를 참조했다. 121에서 그 모듈을 걷었지만
+  // 정적 검사가 다른 데서 걸릴 수 있어(확인하지 않았다) 모션 문구는 `infoPlist`에 직접 남긴다. 빼려면 업로드로 먼저 확인한다.
+  it("모션 문구는 한국어로 남아 있다 — ITMS-90683 대비", () => {
+    expect(APP.expo.ios.infoPlist?.NSMotionUsageDescription).toMatch(HANGUL);
   });
 
   it("086 — 사진 문구는 그대로다(사진 파일은 휴대폰 밖으로 나가지 않는다)", () => {

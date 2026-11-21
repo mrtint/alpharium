@@ -29,8 +29,7 @@ function base(over: Partial<ResolveInput> = {}): ResolveInput {
     fixedAuthor: null,
     chosenDay: DAY,
     photoSignalPresent: false,
-    locationPermission: false,
-    geocodingPreference: "auto",
+    geocodingPreference: "on",
     ...over,
   };
 }
@@ -127,29 +126,19 @@ describe("사진 유무 (R5, 042 개정)", () => {
   });
 });
 
-describe("장소명 (R6, C11~C14)", () => {
-  it("C11 — auto + 권한 없음 → false", () => {
-    expect(
-      params(base({ geocodingPreference: "auto", locationPermission: false })).geocodingEnabled,
-    ).toBe(false);
+describe("장소 이름 (R6, 121 — 설정만 본다)", () => {
+  it("on → true", () => {
+    expect(params(base({ geocodingPreference: "on" })).placeNamesEnabled).toBe(true);
   });
 
-  it("C12 — auto + 권한 있음 → true", () => {
-    expect(
-      params(base({ geocodingPreference: "auto", locationPermission: true })).geocodingEnabled,
-    ).toBe(true);
+  it("off → false", () => {
+    expect(params(base({ geocodingPreference: "off" })).placeNamesEnabled).toBe(false);
   });
 
-  it("C13 — 고정 on (권한 없어도 true)", () => {
-    expect(
-      params(base({ geocodingPreference: "on", locationPermission: false })).geocodingEnabled,
-    ).toBe(true);
-  });
-
-  it("C14 — 고정 off (권한 있어도 false)", () => {
-    expect(
-      params(base({ geocodingPreference: "off", locationPermission: true })).geocodingEnabled,
-    ).toBe(false);
+  it("위치 권한을 입력으로 받지 않는다", () => {
+    const SOURCE = readFileSync(join(__dirname, "../../src/app/resolve-generation.ts"), "utf8");
+    const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+    expect(CODE).not.toMatch(/locationPermission/);
   });
 });
 
@@ -187,7 +176,7 @@ describe("R7 — 소스 불변식", () => {
 });
 
 // 타입 존재 확인 (tsc).
-const _g: GeocodingPreference = "auto";
+const _g: GeocodingPreference = "on";
 const _c: Character = "quiet";
 void _g;
 void _c;

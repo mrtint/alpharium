@@ -70,7 +70,7 @@ assets/places/
 ├── kr-places.bin
 └── kr-places.meta.json
 src/signals/
-├── types.ts                  # PlaceVisit, PhotoPlaces.visits
+├── types.ts                  # PlaceVisit, PlaceTrace.visits
 ├── places.ts                 # tracePlaces가 visits를 낸다
 ├── place-index.ts            # 이진 파싱·격자 색인 (순수)
 ├── place-names.ts            # choosePlaceName·placeNamer (순수 + 포트 주입)

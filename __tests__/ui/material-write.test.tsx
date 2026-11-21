@@ -31,7 +31,7 @@ const DAY = "2026-09-24";
 
 const resolveQuiet = jest.fn((day: string): ResolveOutcome => ({
   kind: "resolved",
-  params: { character: "quiet", day: day as never, hasPhotos: false, geocodingEnabled: false },
+  params: { character: "quiet", day: day as never, hasPhotos: false, placeNamesEnabled: false },
 }));
 
 function countingPipeline(): Pipeline & { calls: number } {

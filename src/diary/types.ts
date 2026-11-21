@@ -7,6 +7,7 @@
  * 헌법 원칙 IV — 측정 장치를 제품에 두지 않는다. 속도·점수 필드가 없다.
  */
 
+import type { PromptPlaces, SavedPlace } from "./place-lines";
 import type { DayDate } from "../config/day-boundary";
 import type { DaySignals } from "../signals/types";
 
@@ -101,19 +102,18 @@ export type DiaryRequest = {
    */
   dayStillOpen: boolean;
   /**
-   * 대표 장소의 사람이 읽는 이름 (017 FR-008, 장소명 설정이 켜진 경우만).
+   * 하루의 장소 항목 (121, 장소 이름 설정이 켜지고 자리 이름을 찾은 경우만).
    *
-   * **이미 `known`으로 확정된 문자열만 담는다** — `unknown`/좌표 없음이면
-   * 이 필드 자체가 없다. 화면(`entry.placeName`)과 같은 지오코딩 호출
-   * 결과에서 나온 값이어야 한다("두 개의 진실" 금지, 원칙 II).
+   * 017의 `placeName?`(대표 장소 하나)을 대체했다. `buildPromptPlaces()`가 만든다 — 자리가 없거나 이름을 하나도
+   * 읽지 못했으면 이 필드 자체가 없다. 저장되는 자리 목록(`DiaryEntry.places`)과 같은 이름 찾기 결과에서 나온다.
    */
-  placeName?: string;
+  places?: PromptPlaces;
   /**
    * 사용자가 지은 캐릭터 이름들 (035 FR-018·FR-019).
    *
    * **요청에 실려 다닌다** — 별도 인자로 두면 부르는 쪽이 잊을 수 있고, 잊어도
    * 오류가 아니라 **조용히 기본 이름이 쓰인다**(011의 `has_media=0`, 013의 URI
-   * 계약 불일치와 같은 계열의 결함). 017이 `placeName?`을 같은 방식으로 더했다.
+   * 계약 불일치와 같은 계열의 결함). 017이 `placeName?`(121에서 `places?`)을 같은 방식으로 더했다.
    *
    * 옵셔널이며 없으면 코드 안 기본 이름을 쓴다 — `displayNameOf()`가 그 폴백의
    * 유일한 자리다(FR-017). **호칭 한 줄에만 흐르고 소개·말투로 번지지
@@ -190,6 +190,15 @@ export type DiaryEntry = {
    */
   timing?: { visionMs?: number; writingMs: number };
   /**
+   * 하루의 자리 목록 (121, data-model SavedPlace) — 자리 전부, 시각순. 좌표는 없다.
+   *
+   * 좌표 있는 사진이 없던 날은 이 필드가 없다. 장소 이름 설정이 「끔」이면 자리는 남고 이름 칸이 `null`이다.
+   * 화면에 장소를 보여주는 과제가 읽는다.
+   */
+  places?: SavedPlace[];
+  /**
+   * **옛 일기에만 있다 — 읽기만 한다**(121부터 쓰지 않는다. 새 일기는 `places`).
+   *
    * 대표 장소 이름 (017 FR-007, 장소명 설정이 켜진 경우만).
    *
    * `SignalValue`와 같은 성격의 구분을 갖는다 — 좌표 자체가 없으면(또는

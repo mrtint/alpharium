@@ -64,17 +64,18 @@ describe("086 D — 스토어 선언 초안", () => {
     }
   });
 
+  // 121 — 위치 줄이 「수집 안 함」이 되며 [미확인] 줄(위치의 일시 처리·전송 암호화)이 사라졌다. 남는 [미확인] 줄이 있으면 보수적 답을 단다.
   it("D3 — [미확인] 줄에는 보수적 답이 있다", () => {
     const rows = [...answerRows(part(PLAY)), ...answerRows(part(APPLE))].filter((r) =>
       r.includes("[미확인]"),
     );
-    expect(rows.length).toBeGreaterThan(0);
     for (const row of rows)
       expect({ row, ok: row.includes("보수적 답") }).toEqual({ row, ok: true });
   });
 
-  it("D4 — Play 위치 줄: 정확한 위치 — 수집함 · 공유 안 함 · 선택 사항 · 앱 기능", () => {
-    expect(part(PLAY)).toContain("정확한 위치 — 수집함 · 공유 안 함 · 선택 사항 · 앱 기능");
+  it("D4 — Play 위치 줄: 수집 안 함(121 — 좌표를 기기 밖으로 보내지 않는다)", () => {
+    expect(part(PLAY)).toContain("| 위치 → 정확한 위치 · 대략적인 위치 | 수집 안 함 |");
+    expect(part(PLAY)).not.toContain("정확한 위치 — 수집함");
   });
 
   it("D5 — App Store: Data Not Collected", () => {

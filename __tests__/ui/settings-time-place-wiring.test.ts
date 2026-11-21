@@ -62,11 +62,11 @@ describe("AS1·AS2 — 두 대화상자의 배선", () => {
     expect(section).toMatch(/<TargetHourDialog/);
   });
 
-  it("장소는 저장이 성공한 뒤에만 값을 바꾸고, 「켬」으로 바뀔 때만 위치 권한을 요청한다", () => {
+  it("장소는 저장이 성공한 뒤에만 값을 바꾸고, 위치 권한을 요청하지 않는다(121)", () => {
     const section = bodyOf("SettingsSection");
     expect(section).toMatch(/<PlaceNameDialog/);
     expect(section).toMatch(/saveGeocodingSetting\(/);
-    expect(section).toMatch(/requestForegroundPermissionsAsync/);
+    expect(section).not.toMatch(/requestForegroundPermissionsAsync|expo-location/);
   });
 
   it("열린 대화상자만 그린다 — 열 때마다 새로 마운트된다 (FR-017)", () => {
