@@ -26,7 +26,7 @@
 
 **Constraints**: 외부 요청 0·새 권한 0·좌표가 `app/` 밖으로 나가지 않음·글꼴 2.0배에서 첫 화면 본문 노출 불변·디자인 토큰만(색)
 
-**Scale/Scope**: 자리 최대 12곳 표시(넘으면 「외 N곳」). 새 파일 7개(소스 2 — `day-route.ts`·`DayRouteSection.tsx`, 테스트 5), 고치는 소스 4개(`wiring.ts`·`DiaryHomeScreen.tsx`·`WrittenDayPaper.tsx`·`ko/home.ts`)와 기존 테스트 3개(아래 「Source Code」 목록)·문서(`AGENTS.md`)
+**Scale/Scope**: 자리 최대 12곳 표시(넘으면 「외 N곳」). 새 파일 7개(소스 2 — `day-route.ts`·`DayRouteSection.tsx`, 테스트 5), 고치는 소스 8개(`wiring.ts`·`DiaryHomeScreen.tsx`·`DiaryListScreen.tsx`·`WrittenDayPaper.tsx`·`ko/home.ts`·`home-text.ts`·`places.ts`·`App.tsx`)와 기존 테스트 3개(아래 「Source Code」 목록)·문서(`AGENTS.md`)
 
 ## Constitution Check
 
@@ -66,10 +66,15 @@ src/
 ├── app/
 │   ├── day-route.ts            # 새 — 순수. 자리·저장 자리 → DayRoute (좌표는 여기서 멈춘다)
 │   └── wiring.ts               # routeDay 추가(previewDay 옆) — loadSignals → buildDayRoute
+├── signals/
+│   └── places.ts               # `distanceMeters`를 내보냄 — 도식의 겹침 판정이 tracePlaces와 같은 하버사인을 재사용해 거리 계산이 두 벌이 되지 않게 한다(다른 변경 없음)
 ├── ui/
 │   ├── DayRouteSection.tsx     # 새 — DayRoute만 받아 그린다(점·선·범례·설명 한 줄)
-│   ├── WrittenDayPaper.tsx     # 지면 끝에 칸을 붙인다 (route prop)
-│   └── DiaryHomeScreen.tsx     # routeDay 호출·늦은 응답 폐기·전달
+│   ├── WrittenDayPaper.tsx     # 본문 View 안 문단 뒤에 칸을 붙인다 (route prop)
+│   ├── DiaryListScreen.tsx     # route prop을 지면에 전달
+│   └── DiaryHomeScreen.tsx     # routeDay 호출·늦은 응답 폐기·route 계산
+└── (루트) App.tsx              # wiring.routeDay를 홈에 넘긴다(previewDay 옆). 상태 흉내(064)가 켜져 있으면 넘기지 않는다 — 흉내 날과 실제 사진이 어긋난다(소스 계약 DB6)
+├── ui/home-text.ts             # ROUTE_TEXT 래퍼(다른 홈 문구와 같은 lazyText 방식)
 └── i18n/catalogs/ko/home.ts    # 도식 이름·설명 한 줄·화면 낭독·범례 문구
 
 __tests__/

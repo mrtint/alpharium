@@ -21,7 +21,9 @@ import { join } from "node:path";
 import { createAppPipeline } from "../../src/app/wiring";
 import { createLiveWrites } from "../../src/diary/live-write";
 import type { EnvironmentResolution } from "../../src/config/types";
-import type { DaySignals } from "../../src/signals/types";
+import type { SavedPlace } from "../../src/diary/place-lines";
+import { memoryStore } from "../../src/diary/store";
+import type { DaySignals, PlaceVisit } from "../../src/signals/types";
 
 const resolved = (environment: "local" | "dev" | "prod"): EnvironmentResolution => ({
   ok: true,
@@ -252,6 +254,134 @@ describe("048 createAppPipeline — previewDay", () => {
       .replace(/\/\/.*$/gm, "");
     // 결정은 한 번만 한다 — 두 자리에서 따로 `deps.loadSignals ?? deviceSignals`를 쓰지 않는다.
     expect(code.match(/deps\.loadSignals\s*\?\?\s*deviceSignals/g)).toHaveLength(1);
+  });
+});
+
+/**
+ * 125 — `routeDay`: 쓴 날 지면의 동선 도식 모델 (specs/125-day-route-diagram/contracts/day-route.md DF2·DF5·DB3).
+ *
+ * 쓴 날 지면을 열 때 그 날의 사진 좌표를 **다시 읽는다**(`loadSignals`, 저장하지 않는다 — FR-007). 던지지 않는다 —
+ * 읽지 못하면 저장된 목록으로 남는다(DF5). 읽기만 한다 — 일기 저장소를 건드리지 않는다(DB3).
+ */
+describe("125 createAppPipeline — routeDay", () => {
+  const DAY = "2026-11-16";
+  const visit = (latitude: number, longitude: number, hour: number): PlaceVisit => ({
+    coordinate: { latitude, longitude },
+    firstSeenAt: new Date(2026, 10, 16, hour, 0),
+    lastSeenAt: new Date(2026, 10, 16, hour, 30),
+    photoCount: 1,
+    source: "photo-exif",
+  });
+  const VISITS = [
+    visit(37.5665, 126.978, 9),
+    visit(37.5133, 127.1028, 13),
+    visit(37.5796, 126.977, 19),
+  ];
+  /** 저장된 자리 — 처음 시각·사진 수가 다시 읽은 `VISITS`(9·13·19시, 사진 1장)와 같다 */
+  const HOURS = [9, 13, 19];
+  const saved = (count: number): SavedPlace[] =>
+    Array.from({ length: count }, (_, i) => ({
+      label: `자리${i + 1}`,
+      category: null,
+      firstSeenAt: new Date(2026, 10, 16, HOURS[i] ?? 20 + i, 0).toISOString(),
+      lastSeenAt: new Date(2026, 10, 16, HOURS[i] ?? 20 + i, 30).toISOString(),
+      photoCount: 1,
+    }));
+  const signalsWith = (places: DaySignals["places"]): DaySignals => ({
+    date: DAY,
+    photos: { kind: "none" },
+    places,
+    steps: { kind: "unknown", reason: "-" },
+    battery: { kind: "unknown", reason: "-" },
+    connectivity: { kind: "unknown", reason: "-" },
+  });
+  const knownPlaces = (visits: PlaceVisit[]): DaySignals["places"] => ({
+    kind: "known",
+    value: {
+      trace: { visitCount: visits.length, approximateDistanceMeters: 0, visits },
+      source: "photo-exif",
+      photosWithLocation: visits.length,
+      photosConsidered: visits.length,
+    },
+  });
+  const pipeline = (deps: Parameters<typeof createAppPipeline>[1]) => {
+    const result = createAppPipeline(resolved("dev"), deps);
+    if (!result.ok) throw new Error("조립 실패");
+    return result;
+  };
+
+  it("RD1 — 다시 읽은 자리 수가 저장 수와 같으면 도식(상대 위치)", async () => {
+    const loadSignals = jest.fn(async () => signalsWith(knownPlaces(VISITS)));
+    const route = await pipeline({ loadSignals }).routeDay(DAY, saved(3));
+    expect(loadSignals).toHaveBeenCalledWith(DAY);
+    expect(route?.diagram).toBe(true);
+    expect(route?.items.map((i) => i.label)).toEqual(["자리1", "자리2", "자리3"]);
+    expect(JSON.stringify(route)).not.toMatch(/latitude|longitude/);
+  });
+
+  it("RD2 — 자리 수가 어긋나면 도식 없이 저장된 목록", async () => {
+    const route = await pipeline({
+      loadSignals: async () => signalsWith(knownPlaces(VISITS.slice(0, 2))),
+    }).routeDay(DAY, saved(3));
+    expect(route?.diagram).toBe(false);
+    expect(route?.items).toHaveLength(3);
+  });
+
+  it("RD3 — 위치를 모르거나(unknown) 없거나(none) 신호가 null이어도 저장된 목록 — 채우지 않는다", async () => {
+    for (const places of [
+      { kind: "unknown", reason: "권한 없음" } as const,
+      { kind: "none" } as const,
+    ]) {
+      const route = await pipeline({ loadSignals: async () => signalsWith(places) }).routeDay(
+        DAY,
+        saved(3),
+      );
+      expect(route?.diagram).toBe(false);
+      expect(route?.items).toHaveLength(3);
+    }
+    const nullSignals = await pipeline({ loadSignals: async () => null }).routeDay(DAY, saved(3));
+    expect(nullSignals?.diagram).toBe(false);
+  });
+
+  it("★ RD4(DF5) — 읽기가 던져도 밖으로 나오지 않고 저장된 목록", async () => {
+    const route = await pipeline({
+      loadSignals: async () => {
+        throw new Error("사진 서비스 막힘");
+      },
+    }).routeDay(DAY, saved(3));
+    expect(route?.diagram).toBe(false);
+    expect(route?.items).toHaveLength(3);
+  });
+
+  it("RD5(DF2) — 저장된 자리가 없거나 1곳이면 읽지 않는다", async () => {
+    const loadSignals = jest.fn(async () => signalsWith(knownPlaces(VISITS)));
+    const p = pipeline({ loadSignals });
+    expect(await p.routeDay(DAY, undefined)).toBeNull();
+    expect(await p.routeDay(DAY, [])).toBeNull();
+    const one = await p.routeDay(DAY, saved(1));
+    expect(one?.diagram).toBe(false);
+    expect(one?.items).toHaveLength(1);
+    expect(loadSignals).not.toHaveBeenCalled();
+  });
+
+  it("★ RD6(DB3·FR-007) — 일기 저장소를 건드리지 않는다(저장·읽기·지우기 0건)", async () => {
+    const store = memoryStore();
+    const spies = (["save", "load", "has", "listDays", "removeAll", "removeDay"] as const).map(
+      (method) => jest.spyOn(store, method),
+    );
+    const p = pipeline({ store, loadSignals: async () => signalsWith(knownPlaces(VISITS)) });
+    await p.routeDay(DAY, saved(3));
+    await p.routeDay(DAY, saved(1));
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("RD7 — 실패 조립(ok:false)에는 routeDay가 없다", () => {
+    const result = createAppPipeline(
+      { ok: false, error: "environment-unresolved", detail: "x" } as never,
+      {},
+    );
+    expect(result.ok).toBe(false);
+    expect(result.routeDay).toBeUndefined();
   });
 });
 

@@ -61,7 +61,9 @@ import type { ContinuedSession, ContinuedWrite } from "../app/continued-write";
 import type { ResolveOutcome, ResolvedParams } from "../app/resolve-generation";
 import { TOAST_TEXT, toastKindFor, type PipelineFailure } from "../app/failure-toast";
 import type { FirstWriteSettled } from "../app/first-diary-material";
+import { buildDayRoute, type DayRoute } from "../app/day-route";
 import { paperFor, type LoadedEntry } from "../app/written-day";
+import type { SavedPlace } from "../diary/place-lines";
 import type { ConstraintKind } from "../app/constraint-band";
 import { dayOf, nextDayStartAt, type DayDate } from "../config/day-boundary";
 import type { EnvironmentResolution } from "../config/types";
@@ -185,6 +187,12 @@ export type DiaryHomeScreenProps = {
    * **`DaySignals`가 아니라 개수로 좁혀진 `DayPreview`다**(FR-020). 없으면 신호 줄은 「모름」.
    */
   previewDay?: (day: DayDate) => Promise<DayPreview>;
+  /**
+   * 쓴 날 지면의 「하루 동선」을 읽는 통로 (125). 조립부가 `wiring.routeDay`를 넘긴다(`previewDay` 옆). **쓴 날이고 저장된
+   * 자리가 2곳 이상일 때만** 부른다 — 그 날의 사진 좌표를 다시 읽어 저장된 자리와 합친 도식 모델을 받는다. 없으면(통로
+   * 없음·흉내 중) 저장된 목록만 보인다. 던져도 저장된 목록으로 남는다(DF5). **결과를 저장·재사용하지 않는다**(FR-015).
+   */
+  routeDay?: (day: DayDate, saved: readonly SavedPlace[] | undefined) => Promise<DayRoute | null>;
   /**
    * 사진 권한 요청·설정 열기 통로 (053). 조립부(`App.tsx`)가 021의 통로를 감싸 넘긴다 — 이 화면은 `expo-*`에
    * 닿지 않는다. 없으면 「권한이 없어요 ›」를 눌러도 아무 일도 없다(권한을 강제하지 않는다, FR-012).
@@ -356,6 +364,7 @@ export function DiaryHomeScreen({
   chosenDay: controlledDay,
   onChooseDay,
   previewDay,
+  routeDay,
   photoAccessPort,
   autoWriteDay,
   claimAutoWrite,
@@ -777,6 +786,46 @@ export function DiaryHomeScreen({
     listItems !== null && previewTarget !== undefined
       ? paperFor(previewTarget, listItems, loaded)
       : undefined;
+
+  /**
+   * 쓴 날 지면의 「하루 동선」 (125, contracts/day-route.md DF2~DF5).
+   *
+   * **쓴 날이고 저장된 자리(`entry.places`)가 2곳 이상일 때만** `routeDay`로 그 날의 사진 좌표를 다시 읽는다 — 쓰는 중에는
+   * `paper`가 없으므로 읽지 않는다. 읽는 동안에는 저장된 목록(`buildDayRoute(null, …)`)이 먼저 보이고 지면은 막히지
+   * 않는다(DF4). **늦게 도착한 이전 날의 결과는 버린다** — 신호 줄(`previewFor`)·일기 읽기(`loadFor`)와 같은 방식으로,
+   * 읽는 대상을 저장된 자리 배열의 정체성으로 가른다(날마다 새로 읽은 일기는 새 배열이다). 캐시를 두지 않는다 — 날을
+   * 다시 열면 다시 읽는다(FR-015). 던져도 저장된 목록으로 남는다(DF5).
+   */
+  const routeSaved = paper?.kind === "readable" ? paper.entry.places : undefined;
+  const [routed, setRouted] = useState<
+    { saved: readonly SavedPlace[]; route: DayRoute | null } | undefined
+  >(undefined);
+  const routeFor = useRef<readonly SavedPlace[] | undefined>(undefined);
+  useEffect(() => {
+    if (
+      routeDay === undefined ||
+      previewTarget === undefined ||
+      routeSaved === undefined ||
+      routeSaved.length < 2
+    ) {
+      // 읽을 대상이 없다 — 앞서 떠난 읽기의 늦은 결과가 이제 와서 반영되지 않게 비운다
+      routeFor.current = undefined;
+      return;
+    }
+    routeFor.current = routeSaved;
+    void routeDay(previewTarget, routeSaved)
+      .catch((): null => null)
+      .then((result) => {
+        if (routeFor.current !== routeSaved) return;
+        setRouted({ saved: routeSaved, route: result });
+      });
+  }, [routeDay, previewTarget, routeSaved]);
+  const route: DayRoute | undefined =
+    routeSaved === undefined
+      ? undefined
+      : routed !== undefined && routed.saved === routeSaved && routed.route !== null
+        ? routed.route
+        : (buildDayRoute(null, routeSaved) ?? undefined);
 
   /**
    * 확인 기록 (020 FR-007 (2), 051 FR-028·FR-029) — 읽을 수 있는 일기가 보인 날마다 한 번.
@@ -1483,6 +1532,7 @@ export function DiaryHomeScreen({
               onWrite={() => void write()}
               simulation={simulation}
               paper={paper}
+              route={route}
               preview={shownPreview}
               toast={toast === null ? undefined : toast}
               write={prompt}

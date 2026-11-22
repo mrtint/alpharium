@@ -7,8 +7,9 @@
  * **홈이 곧 상세다.** 스트립 아래 회색 지면에 캐러셀과 본문이 한 덩어리로 놓인다. 날짜 책등이 없다.
  * 판정은 `paperFor()`(`src/app/written-day.ts`)가 하고 여기서는 그리기만 한다.
  *
- * **지면은 캐러셀과 본문뿐이다**(FR-016a) — 017의 「이 일기가 본 것」·소요 시간·작성자 문장·장소
- * 이름을 보이지 않는다. 저장된 값은 남는다. 장소 이름은 프롬프트를 거쳐 본문에 실릴 수 있다.
+ * **지면은 캐러셀과 본문, 그리고 본문 끝의 「하루 동선」이다**(FR-016a, 125) — 017의 「이 일기가 본 것」·소요 시간·
+ * 작성자 문장은 보이지 않는다. 저장된 값은 남는다. 「하루 동선」(`DayRouteSection`)은 본문 View 안 문단 뒤에 붙고, 있는지·
+ * 도식인지 목록인지는 부르는 쪽이 `buildDayRoute()`로 정해 `route`로 넘긴다 — 이 지면은 그리기만 한다.
  *
  * **읽는 중에는 빈 지면이다**(FR-016) — 회전 표시를 두지 않는다. 쓴 날인가는 이미 목록 요약이
  * 정했으므로 하단 바는 이미 「다시 쓰기」다.
@@ -33,10 +34,12 @@ import {
   type ViewStyle,
 } from "react-native";
 
+import type { DayRoute } from "../app/day-route";
 import { reachedEnd, type PaperState } from "../app/written-day";
 import { AppText } from "./components/Text";
 import { MATERIAL_TEXT, WRITTEN_DAY_TEXT } from "./home-text";
 import type { SwipeDirection } from "../app/state";
+import { DayRouteSection } from "./DayRouteSection";
 import { DaySwipe } from "./DaySwipe";
 import { PhotoCarousel } from "./PhotoCarousel";
 import { COLORS, WRITTEN_DAY } from "./theme/tokens";
@@ -44,6 +47,11 @@ import { COLORS, WRITTEN_DAY } from "./theme/tokens";
 export type WrittenDayPaperProps = {
   /** 쓴 날의 지면 상태 — 안 쓴 날(`unwritten`)에는 이 화면을 그리지 않는다 */
   paper: Exclude<PaperState, { kind: "unwritten" }>;
+  /**
+   * 본문 끝의 「하루 동선」 (125). 없으면 칸이 없다(옛 일기·자리 없음·읽기 전에 저장된 자리도 없는 날). **칸의 자리는
+   * 미리 잡지 않는다** — 늦게 더해져 높이가 늘어도 끝 판정은 `onContentSizeChange`가 다시 잰다(FR-016).
+   */
+  route?: DayRoute;
   /** 지면 끝에 닿았는가가 바뀌었다 (처음 잰 순간에도 한 번 알린다) */
   onReachEndChange?: (atEnd: boolean) => void;
   /**
@@ -82,6 +90,7 @@ export function WrittenDayPaper({
   topSpacer,
   bottomInset = 0,
   onSwipeDay,
+  route,
 }: WrittenDayPaperProps) {
   // 114 — 밀기 영역: 남은 높이를 채워 글이 짧아도 아래 빈 곳에서 밀 수 있다. `onSwipeDay`가 없으면 그대로 둔다.
   const swipeable = (node: ReactNode) =>
@@ -193,6 +202,8 @@ export function WrittenDayPaper({
                   {text}
                 </AppText>
               ))}
+              {/* 125 — 문단 뒤 본문 끝. 하단 바가 비키는 아래 여백(104)은 이 칸 아래에 그대로 남는다 */}
+              {route !== undefined && <DayRouteSection route={route} />}
             </View>,
           )}
         </>
