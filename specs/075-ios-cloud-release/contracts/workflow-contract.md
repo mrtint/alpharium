@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | W1 | 파일이 있다 | — |
 | W2 | `on:` 아래 키가 `workflow_dispatch` **하나뿐**이다 (`pull_request`·`pull_request_target`·`push`·`schedule`·`workflow_run` 없음) | FR-002 |
-| W3 | 정확히 한 잡이 있고 `environment: ios-release`, `runs-on: macos-latest` | FR-001·003 |
+| W3 | 정확히 한 잡이 있고 `environment: ios-release`, `runs-on: xcode-27` (124에서 `macos-latest`에서 바뀜) | FR-001·003 |
 | W4 | 최상위 `permissions:`가 `contents: read` **하나뿐**이다 | FR-003 |
 | W5 | `secrets.X` 참조의 집합이 허용 여섯(`IOS_DIST_P12_BASE64`·`IOS_DIST_P12_PASSWORD`·`IOS_PROFILE_BASE64`·`ASC_API_KEY_P8`·`ASC_KEY_ID`·`ASC_ISSUER_ID`)의 부분집합이고 각 참조는 `env:` 값 자리에서만 나온다(`run:` 본문에 `${{ secrets.` 직접 보간 없음) | FR-004·005 |
 | W6 | `actions/upload-artifact`·`actions/cache`가 없다 | FR-008 |

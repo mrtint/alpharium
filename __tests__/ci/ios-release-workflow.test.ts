@@ -80,12 +80,22 @@ describe("075 ios-release 워크플로", () => {
       expect(triggers).toEqual(["workflow_dispatch"]);
     });
 
-    it("W3 잡은 하나이고 보호 환경 ios-release의 macos-latest에서 돈다", () => {
+    it("W3 잡은 하나이고 보호 환경 ios-release의 xcode-27 러너에서 돈다 (124 — iOS 27 SDK, ITMS-90725)", () => {
       const jobs = section(read(), "jobs", 0);
       const names = [...jobs.matchAll(/^ {2}([\w-]+):/gm)].map((m) => m[1]);
       expect(names).toHaveLength(1);
       expect(jobs).toMatch(/^ {4}environment:\s*ios-release\s*$/m);
-      expect(jobs).toMatch(/^ {4}runs-on:\s*macos-latest\s*$/m);
+      expect(jobs).toMatch(/^ {4}runs-on:\s*xcode-27\s*$/m);
+    });
+
+    it("124 macos-latest 글자가 워크플로에 남지 않고 실행 요약 제목이 러너 라벨을 말한다", () => {
+      const text = read();
+      expect(text).not.toMatch(/macos-latest/);
+      const label = /^ {4}runs-on:\s*(\S+)\s*$/m.exec(section(text, "jobs", 0))?.[1];
+      expect(label).toBe("xcode-27");
+      const spec = step(text, "러너 사양");
+      expect(spec).toContain(`### iOS 릴리스 (${label})`);
+      expect(spec).toMatch(/xcodebuild -version/);
     });
 
     it("W4 권한은 contents: read 하나뿐이다 (잡 수준 권한도 없다)", () => {
@@ -191,10 +201,10 @@ describe("075 ios-release 워크플로", () => {
       expect(text.slice(at, at + 120)).toMatch(/persist-credentials:\s*false/);
     });
 
-    it("러너의 Xcode가 26 미만이면 사전 점검에서 실패한다", () => {
+    it("러너의 Xcode가 27 미만이면 사전 점검에서 실패한다 (124)", () => {
       const check = step(read(), "사전 점검");
       expect(check).toMatch(/xcodebuild -version/);
-      expect(check).toMatch(/-lt 26/);
+      expect(check).toMatch(/-lt 27 \]/);
     });
 
     it("프로파일을 해독하지 못하면 조용히 넘어가지 않는다", () => {

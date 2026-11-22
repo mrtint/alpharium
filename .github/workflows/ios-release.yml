@@ -30,7 +30,9 @@ permissions:
 
 jobs:
   release:
-    runs-on: macos-latest
+    # 124 — App Store Connect는 2027년 4월부터 iOS 27 SDK(Xcode 27) 미만 빌드를 거절한다(ITMS-90725). 기본 최신 라벨은 macOS 26(Xcode 26.6)에
+    # 묶여 저절로 올라가지 않아 Xcode 27 라벨을 쓴다(러너 이미지 문서의 프리뷰 라벨). 안 쓰이면 로컬 Xcode 27 아카이브로 간다.
+    runs-on: xcode-27
     environment: ios-release
     timeout-minutes: 90
     steps:
@@ -66,10 +68,10 @@ jobs:
               failed=1
               ;;
           esac
-          # macos-latest 이미지는 흘러간다. App Store는 최신 SDK로 만든 빌드만 받으므로(Xcode 26 이상) 비싼 아카이브 전에 확인한다.
+          # 러너 이미지는 흘러간다. App Store는 최신 SDK로 만든 빌드만 받으므로(Xcode 27 이상) 비싼 아카이브 전에 확인한다.
           xcode_major=$(xcodebuild -version | awk '/^Xcode/{split($2, v, "."); print v[1]}')
-          if [ -z "$xcode_major" ] || [ "$xcode_major" -lt 26 ]; then
-            echo "::error::러너의 Xcode 가 26 미만이다 ($(xcodebuild -version | head -1))"
+          if [ -z "$xcode_major" ] || [ "$xcode_major" -lt 27 ]; then
+            echo "::error::러너의 Xcode 가 27 미만이다 ($(xcodebuild -version | head -1))"
             failed=1
           fi
           exit "$failed"
@@ -95,7 +97,7 @@ jobs:
       - name: 러너 사양
         run: |
           {
-            echo "### iOS 릴리스 (macos-latest)"
+            echo "### iOS 릴리스 (xcode-27)"
             echo "- CPU: $(sysctl -n hw.ncpu)코어"
             echo "- 메모리: $(( $(sysctl -n hw.memsize) / 1048576 )) MB"
             echo "- $(sw_vers -productName) $(sw_vers -productVersion), $(xcodebuild -version | head -1)"
