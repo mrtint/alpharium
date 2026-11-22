@@ -15,6 +15,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 import { act, fireEvent, render, screen } from "@testing-library/react-native";
+import { AccessibilityInfo } from "react-native";
 
 import type { DiaryEntry } from "../../src/diary/types";
 import { PHOTO_VIEWER_TEXT } from "../../src/ui/home-text";
@@ -207,6 +208,32 @@ describe("051 CAR — 사진 수에 따른 갈래", () => {
     expect(screen.getByTestId("photo-viewer")).toBeTruthy();
     expect(screen.getByTestId("photo-viewer-badge")).toHaveTextContent("1 / 3");
     expect(screen.getByTestId("photo-viewer-carousel").props.defaultIndex).toBe(0);
+  });
+
+  describe("127 RM2 — 동작 줄이기에 따른 확대 화면 전환", () => {
+    afterEach(() => jest.restoreAllMocks());
+
+    const stub = (read: Promise<boolean>) => {
+      jest.spyOn(AccessibilityInfo, "isReduceMotionEnabled").mockReturnValue(read);
+      jest
+        .spyOn(AccessibilityInfo, "addEventListener")
+        .mockReturnValue({ remove: jest.fn() } as never);
+    };
+
+    it("★ 읽은 값이 켜짐이면 전환 없이 열린다", async () => {
+      stub(Promise.resolve(true));
+      await render(<PhotoCarousel photos={three} width={320} />);
+      await act(async () => {});
+      await fireEvent.press(screen.getByTestId("photo-open-p1"));
+      expect(screen.getByTestId("photo-viewer").props.animationType).toBe("none");
+    });
+
+    it("읽기 전에 열면(모름) 종전 페이드로 열린다", async () => {
+      stub(new Promise<boolean>(() => {}));
+      await render(<PhotoCarousel photos={three} width={320} />);
+      await fireEvent.press(screen.getByTestId("photo-open-p1"));
+      expect(screen.getByTestId("photo-viewer").props.animationType).toBe("fade");
+    });
   });
 
   it("ZC4 — 사본을 못 불러온 칸은 누를 수 없다", async () => {
