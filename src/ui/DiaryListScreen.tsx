@@ -65,6 +65,7 @@ import {
   type WritePrompt,
 } from "../app/state";
 import { foldAfterScroll } from "../app/reading-scroll";
+import type { DayRoute } from "../app/day-route";
 import type { PaperState } from "../app/written-day";
 import type { DayDate } from "../config/day-boundary";
 import { useFontScale } from "./font-scale";
@@ -150,6 +151,11 @@ export type DiaryListScreenProps = {
    */
   paper?: PaperState;
   /**
+   * 쓴 날 지면 끝의 「하루 동선」 (125). 부르는 쪽이 `buildDayRoute()`로 정해 넘긴다 — 이 화면은 좌표·신호를 모르고
+   * 지면에 전달만 한다. 없으면 칸이 없다.
+   */
+  route?: DayRoute;
+  /**
    * 오늘의 일기 작성 시각 문구 (051 보드 `2g`). **문자열만 받는다** — 이 화면은 시각을 모른다(G9).
    * 부르는 쪽이 오늘인가(`cellFor`)와 문구(`writtenAtText`)를 정해 넘긴다.
    */
@@ -201,6 +207,7 @@ export function DiaryListScreen({
   onPressDate,
   onOpenSettings,
   paper,
+  route,
   writtenAt,
   writing,
   onStop,
@@ -351,6 +358,7 @@ export function DiaryListScreen({
             bottomInset={bandInset + inset}
             onSwipeDay={onSwipeDay}
             paper={written}
+            route={route}
             topSpacer={<FoldSpacer motion={motion} />}
           />
           <StripOverlay

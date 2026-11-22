@@ -66,6 +66,14 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 125 — 쓴 날 지면의 「하루 동선」(`home.dayRoute`, 보드 밖 초안). 「오전」·「오후」는 골든에 이미 있다
+  "하루 동선",
+  "사진이 찍힌 자리를 시간순으로 이은 거예요",
+  "이름을 모르는 곳",
+  "저녁",
+  "밤",
+  "외 ${}곳",
+  "사진이 찍힌 자리 ${}곳을 시간순으로 이은 도식",
   // 114 — 일기 본문 밀기의 접근성 대안(`home.daySwipeActions`, 보드 밖 초안 — 소유자 확인 대기). 「다음 날」은 골든에 이미 있을 수 있다
   "전날",
   "다음 날",

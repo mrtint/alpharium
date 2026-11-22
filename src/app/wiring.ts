@@ -28,6 +28,7 @@ import { desktopInferenceUrl } from "../config/environment";
 import type { EnvironmentResolution } from "../config/types";
 import { liveWrites, type LiveWrites } from "../diary/live-write";
 import { createPipeline, type Pipeline } from "../diary/pipeline";
+import type { SavedPlace } from "../diary/place-lines";
 import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
 import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
@@ -39,6 +40,7 @@ import { expoPlaceIndexPort } from "../signals/place-index-port";
 import { placeNamer, type PlaceName } from "../signals/place-names";
 import type { Coordinate } from "../signals/places";
 import type { DaySignals } from "../signals/types";
+import { buildDayRoute, type DayRoute } from "./day-route";
 import { photoAccessOf, toDayPreview } from "./day-preview";
 import type { DayPreview, PhotoAccess } from "./state";
 import type { VisionOutcome } from "../vision/types";
@@ -116,6 +118,16 @@ export type AppPipelineResult =
        * 두 칸 「모름」이다.
        */
       previewDay: (day: DayDate) => Promise<DayPreview>;
+      /**
+       * 쓴 날 지면의 「하루 동선」 칸 (125, contracts/day-route.md). 지면을 열 때 그 날의 사진 좌표를 **다시 읽어**(저장하지
+       * 않는다 — FR-007) 저장된 `entry.places`와 합친다. 파이프라인·`previewDay`와 **같은 `loadSignals`**를 부르므로 새 수집
+       * 경로가 아니다. **던지지 않는다** — 읽지 못하면 저장된 목록이다(DF5). 저장된 자리가 2곳 미만이면 읽지 않는다(DF2).
+       * **일기 저장소를 건드리지 않는다**(DB3).
+       */
+      routeDay: (
+        day: DayDate,
+        saved: readonly SavedPlace[] | undefined,
+      ) => Promise<DayRoute | null>;
     }
   | {
       ok: false;
@@ -129,6 +141,7 @@ export type AppPipelineResult =
       checkLiveness?: undefined;
       store?: undefined;
       previewDay?: undefined;
+      routeDay?: undefined;
     };
 
 /** 조립에 필요한 통로. 테스트가 기기 없이 갈아끼운다 */
@@ -306,6 +319,22 @@ export function createAppPipeline(
       } catch {
         // 권한 회수·통로 없음 — 「모른다」로 둔다(원칙 V). 화면까지 예외를 올리지 않는다.
         return toDayPreview(day, null, access);
+      }
+    },
+    // 125 — 쓴 날 지면의 동선 도식. `previewDay`와 같은 `loadSignals`로 사진 좌표를 다시 읽을 뿐, 저장소는 건드리지 않는다.
+    routeDay: async (day: DayDate, saved: readonly SavedPlace[] | undefined) => {
+      // 저장된 자리가 2곳 미만이면 이을 선이 없어 읽을 것이 없다(DF2) — 사진 서비스를 부르지 않는다.
+      if (saved === undefined || saved.length < 2) return buildDayRoute(null, saved);
+      try {
+        const signals = await loadSignals(day);
+        const visits =
+          signals !== null && signals.places.kind === "known"
+            ? (signals.places.value.trace.visits ?? null)
+            : null;
+        return buildDayRoute(visits, saved);
+      } catch {
+        // 읽지 못했다 — 도식 없이 저장된 이름·때 목록으로 남는다(원칙 V, DF5). 화면까지 예외를 올리지 않는다.
+        return buildDayRoute(null, saved);
       }
     },
   };

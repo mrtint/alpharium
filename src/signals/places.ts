@@ -55,7 +55,7 @@ export function isUsableCoordinate(latitude: number, longitude: number): boolean
  * **평면 근사를 쓰지 않는 이유**: 100m 규모에서는 근사로도 충분하지만, 위도에 따라 경도
  * 1도의 실제 거리가 달라져 고위도에서 틀린다. 공식이 다섯 줄이므로 근사할 이유가 없다.
  */
-function distanceMeters(a: Coordinate, b: Coordinate): number {
+export function distanceMeters(a: Coordinate, b: Coordinate): number {
   const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
 
   const lat1 = toRadians(a.latitude);

@@ -2425,6 +2425,8 @@ function DiarySection({
       // 048 US3 — 신호 줄. 파이프라인과 같은 신호 통로에서 개수로 좁혀 온다.
       // 064 — 상태 흉내(재료 0·권한 없음)가 있으면 그 미리보기를 **홈에만** 넘긴다(AF4).
       previewDay={homePreviewDay ?? (wiring.ok ? wiring.previewDay : undefined)}
+      // 125 — 쓴 날 지면의 「하루 동선」. 상태 흉내(064)가 켜져 있으면 실제 사진을 읽지 않는다 — 흉내 날과 어긋난다.
+      routeDay={homePreviewDay === undefined && wiring.ok ? wiring.routeDay : undefined}
       // 053 — 권한 요청·설정 열기. 없으면 「권한이 없어요 ›」를 눌러도 아무 일도 없다.
       photoAccessPort={photoAccessPort}
       // 057 — 앱을 열 때의 자동 쓰기. 판정은 위에서 했고 홈은 그 날을 쓴다.

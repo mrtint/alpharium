@@ -154,5 +154,8 @@ export function writtenAtText(createdAt: Date, now: Date): string {
  */
 export const MATERIAL_TEXT = lazyText((c) => c.home.material);
 
+/** 125 — 쓴 날 지면의 「하루 동선」 문구 (보드 밖 초안). 판정하지 않는다 — 어떤 칸을 보일지는 `buildDayRoute`가 정한다 */
+export const ROUTE_TEXT = lazyText((c) => c.home.dayRoute);
+
 /** 111 — 첫 일기 확인 문구 (규칙 문서 0-1) */
 export const FIRST_DIARY_TEXT = lazyText((c) => c.home.firstDiary);
