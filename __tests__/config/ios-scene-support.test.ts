@@ -58,9 +58,9 @@ describe("094 — UIScene 대응 설정", () => {
     );
   });
 
-  it("C5: ios-release.yml은 Xcode를 고정하지 않고 26 미만만 막는다", () => {
+  it("C5: ios-release.yml은 Xcode를 고정하지 않고 27 미만만 막는다 (124 — 26에서 올림)", () => {
     const yml = read(".github/workflows/ios-release.yml");
-    expect(yml).toMatch(/\[ "\$xcode_major" -lt 26 \]/);
+    expect(yml).toMatch(/\[ "\$xcode_major" -lt 27 \]/);
     expect(yml).not.toMatch(/xcode-select|setup-xcode|DEVELOPER_DIR=\/Applications\/Xcode_/);
   });
 
