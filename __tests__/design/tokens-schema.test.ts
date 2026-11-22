@@ -24,10 +24,27 @@ const APP_TYPE_ROLES = ["title", "sectionTitle", "body", "bodyStrong", "caption"
 describe("089 tokens.json — 정본 규칙", () => {
   const tokens = loadTokens();
 
-  it("C1 — 최상위 키는 정해진 일곱뿐이다", () => {
+  it("C1 — 최상위 키는 정해진 여덟뿐이다(126 — 동선 지도 색 `mapColor` 추가)", () => {
     expect(Object.keys(tokens).sort()).toEqual(
-      ["color", "contrast", "font", "radius", "space", "type", "version"].sort(),
+      ["color", "contrast", "font", "mapColor", "radius", "space", "type", "version"].sort(),
     );
+  });
+
+  it("126 — mapColor는 지도 전용 색 다섯이고 라이트·다크 모두 #rrggbb 소문자다", () => {
+    expect(Object.keys(tokens.mapColor.items).sort()).toEqual(
+      ["mapLand", "mapPark", "mapRoad", "mapRoadMinor", "mapWater"].sort(),
+    );
+    for (const v of Object.values(tokens.mapColor.items)) {
+      expect(v.light).toMatch(/^#[0-9a-f]{6}$/);
+      expect(v.dark).toMatch(/^#[0-9a-f]{6}$/);
+      expect(v.note.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("126 — validateTokens는 mapColor 역할이 어긋나면 거부한다(위반 주입)", () => {
+    const bad = clone(tokens);
+    delete (bad.mapColor.items as Record<string, unknown>).mapWater;
+    expect(() => validateTokens(bad)).toThrow(/mapColor/);
   });
 
   it("C2/V1/V2 — 색 역할은 정확히 아홉이고 라이트·다크 모두 #rrggbb 소문자다", () => {

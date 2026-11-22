@@ -190,7 +190,8 @@ export type DiaryEntry = {
    */
   timing?: { visionMs?: number; writingMs: number };
   /**
-   * 하루의 자리 목록 (121, data-model SavedPlace) — 자리 전부, 시각순. 좌표는 없다.
+   * 하루의 자리 목록 (121, data-model SavedPlace) — 자리 전부, 시각순. **126부터 자리마다 좌표(`latE5`·`lonE5`, 약 1m)를 담는다 —
+   * 옛 일기에는 없다.**
    *
    * 좌표 있는 사진이 없던 날은 이 필드가 없다. 장소 이름 설정이 「끔」이면 자리는 남고 이름 칸이 `null`이다.
    * 화면에 장소를 보여주는 과제가 읽는다.

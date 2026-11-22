@@ -77,6 +77,46 @@ describe("121 US4 — 자리 목록 저장 왕복", () => {
     expect(deserializeEntry(serializeEntry(entry({ places }))).places).toEqual(places);
   });
 
+  it("126 DM21 — 좌표(latE5·lonE5)가 저장·읽기 왕복에서 그대로 돌아온다", () => {
+    const places = [
+      {
+        label: "서울숲",
+        category: "park" as const,
+        firstSeenAt: T(8).toISOString(),
+        lastSeenAt: T(9).toISOString(),
+        photoCount: 2,
+        latE5: 3_754_440,
+        lonE5: 12_703_740,
+      },
+      {
+        label: null,
+        category: null,
+        firstSeenAt: T(13).toISOString(),
+        lastSeenAt: T(13).toISOString(),
+        photoCount: 1,
+        latE5: -3_386_880,
+        lonE5: -7_066_930,
+      },
+    ];
+    expect(deserializeEntry(serializeEntry(entry({ places }))).places).toEqual(places);
+  });
+
+  it("126 DM21 — 좌표 없는 옛 일기(121~125)는 그대로 읽히고 좌표가 채워지지 않는다", () => {
+    const places = [
+      {
+        label: "판교역",
+        category: "station" as const,
+        firstSeenAt: T(8).toISOString(),
+        lastSeenAt: T(9).toISOString(),
+        photoCount: 2,
+      },
+    ];
+    const back = deserializeEntry(serializeEntry(entry({ places }))).places!;
+    expect(back[0]!.latE5).toBeUndefined();
+    expect(back[0]!.lonE5).toBeUndefined();
+    expect("latE5" in back[0]!).toBe(false);
+  });
+
   it("옛 형식(placeName, visits 없음) 일기도 오류 없이 읽힌다", () => {
     const old = JSON.parse(serializeEntry(entry())) as Record<string, unknown>;
     const signals = old.signalsUsed as { places: { value: { trace: Record<string, unknown> } } };

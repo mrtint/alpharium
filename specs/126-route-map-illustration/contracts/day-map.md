@@ -22,7 +22,7 @@
 ## 화면
 
 - DM9: `DayRouteSection`은 `route.map`이 있으면 도식 상자 뒤에 `RouteMapLayer`를 깐다(`DayRoute`·`RouteMap`만 받고 신호·`Coordinate`·`MapIndex`를 import하지 않는다 — DU1·DB2 확장). 자리가 1곳이면 설명 줄(「사진이 찍힌 자리를 시간순으로 이은 거예요」)을 생략한다.
-- DM10: `RouteMapLayer`는 `react-native-svg`의 `Svg`(viewBox = `RouteMap.box`)로 바탕·면·선을 그린다. 색은 토큰만(`mapLand`·`mapWater`·`mapPark`·`mapRoad`·`mapRoadMinor`), 모서리 반경·그림자·그라데이션 없음, 낭독에서 숨긴다(DU5).
+- DM10: `RouteMapLayer`는 `react-native-svg`의 `Svg`(viewBox = `RouteMap.box`)로 바탕·면·선을 그린다(면은 비영 채우기 — 지도 파일이 바깥 고리 반시계·구멍 시계로 맞춰져 있다). 색은 토큰만(`mapLand`·`mapWater`·`mapPark`·`mapRoad`·`mapRoadMinor`), 모서리 반경·그림자·그라데이션 없음, 낭독에서 숨긴다(DU5).
 - DM11: 라벨은 `labelPlacement`(순수)가 점·앞 라벨과 겹치지 않는 후보 자리를 정하고 못 찾으면 그 라벨만 생략한다. 이름이 `null`인 자리는 라벨이 없다. 라벨 글자 크기는 글꼴 배율에 변하지 않는다.
 - DM12: 범례는 이름이 `null`이면 「번호 · 때」만 적는다(FR-015). 「이름을 모르는 곳」 문구는 코드·카탈로그에 남지 않는다. 낭독도 번호와 때만 읽는다.
 

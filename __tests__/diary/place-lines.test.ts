@@ -98,6 +98,8 @@ describe("savedPlacesOf", () => {
         firstSeenAt: new Date(2026, 10, 21, 8, 0).toISOString(),
         lastSeenAt: new Date(2026, 10, 21, 8, 30).toISOString(),
         photoCount: 2,
+        latE5: 3_750_000,
+        lonE5: 12_708_000,
       },
       {
         label: "서울숲",
@@ -105,6 +107,8 @@ describe("savedPlacesOf", () => {
         firstSeenAt: new Date(2026, 10, 21, 9, 0).toISOString(),
         lastSeenAt: new Date(2026, 10, 21, 9, 30).toISOString(),
         photoCount: 1,
+        latE5: 3_750_000,
+        lonE5: 12_709_000,
       },
     ]);
   });
@@ -116,5 +120,49 @@ describe("savedPlacesOf", () => {
       null,
       null,
     ]);
+  });
+
+  it("126 DM20 — 좌표를 1e-5도 정수(약 1m)로 담는다(스냅샷)", () => {
+    const v: PlaceVisit = {
+      ...visit(8),
+      coordinate: { latitude: 37.554712, longitude: 126.897683 },
+    };
+    const [p] = savedPlacesOf([v]);
+    expect(p).toMatchObject({ latE5: 3_755_471, lonE5: 12_689_768 });
+    expect(Number.isInteger(p!.latE5)).toBe(true);
+    expect(Number.isInteger(p!.lonE5)).toBe(true);
+  });
+
+  it("126 DM20 — 음수 좌표도 반올림해 담는다", () => {
+    const v: PlaceVisit = { ...visit(8), coordinate: { latitude: -33.8688, longitude: -70.6693 } };
+    expect(savedPlacesOf([v])[0]).toMatchObject({ latE5: -3_386_880, lonE5: -7_066_930 });
+  });
+
+  it("126 DM20 — 좌표가 유한한 수가 아니면 그 자리의 두 필드를 모두 담지 않는다(NaN을 저장하지 않는다)", () => {
+    const bad: PlaceVisit = { ...visit(8), coordinate: { latitude: Number.NaN, longitude: 127 } };
+    const inf: PlaceVisit = {
+      ...visit(9),
+      coordinate: { latitude: 37, longitude: Number.POSITIVE_INFINITY },
+    };
+    const out = savedPlacesOf([bad, inf, visit(10)]);
+    expect("latE5" in out[0]!).toBe(false);
+    expect("lonE5" in out[0]!).toBe(false);
+    expect("latE5" in out[1]!).toBe(false);
+    expect("lonE5" in out[1]!).toBe(false);
+    expect(out[2]).toMatchObject({ latE5: 3_750_000 });
+  });
+
+  it("126 — 「장소 이름으로 보기」가 꺼져 이름이 없어도 좌표는 담는다(이름 칸만 null)", () => {
+    const [p] = savedPlacesOf([visit(8)]);
+    expect(p).toMatchObject({ label: null, category: null, latE5: 3_750_000, lonE5: 12_708_000 });
+  });
+
+  it("126 — 좌표 두 필드는 함께 있거나 함께 없다", () => {
+    for (const p of savedPlacesOf([
+      visit(8),
+      { ...visit(9), coordinate: { latitude: Number.NaN, longitude: 1 } },
+    ])) {
+      expect("latE5" in p).toBe("lonE5" in p);
+    }
   });
 });

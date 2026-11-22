@@ -24,6 +24,8 @@ import type { EnvironmentResolution } from "../../src/config/types";
 import type { SavedPlace } from "../../src/diary/place-lines";
 import { memoryStore } from "../../src/diary/store";
 import type { DaySignals, PlaceVisit } from "../../src/signals/types";
+import { packMapFile } from "../../scripts/map/pack";
+import { parseMapFile } from "../../src/map/map-file";
 
 const resolved = (environment: "local" | "dev" | "prod"): EnvironmentResolution => ({
   ok: true,
@@ -287,6 +289,13 @@ describe("125 createAppPipeline — routeDay", () => {
       lastSeenAt: new Date(2026, 10, 16, HOURS[i] ?? 20 + i, 30).toISOString(),
       photoCount: 1,
     }));
+  /** 126 — 저장된 좌표가 있는 일기(새 일기). `VISITS`와 같은 좌표다 */
+  const savedWithCoords = (count: number): SavedPlace[] =>
+    saved(count).map((p, i) => ({
+      ...p,
+      latE5: Math.round(VISITS[i]!.coordinate.latitude * 1e5),
+      lonE5: Math.round(VISITS[i]!.coordinate.longitude * 1e5),
+    }));
   const signalsWith = (places: DaySignals["places"]): DaySignals => ({
     date: DAY,
     photos: { kind: "none" },
@@ -353,15 +362,16 @@ describe("125 createAppPipeline — routeDay", () => {
     expect(route?.items).toHaveLength(3);
   });
 
-  it("RD5(DF2) — 저장된 자리가 없거나 1곳이면 읽지 않는다", async () => {
-    const loadSignals = jest.fn(async () => signalsWith(knownPlaces(VISITS)));
+  it("RD5 — 저장된 자리가 없으면 읽지 않고 null이다(1곳은 126부터 읽는다 — 점 하나 도식)", async () => {
+    const loadSignals = jest.fn(async () => signalsWith(knownPlaces(VISITS.slice(0, 1))));
     const p = pipeline({ loadSignals });
     expect(await p.routeDay(DAY, undefined)).toBeNull();
     expect(await p.routeDay(DAY, [])).toBeNull();
-    const one = await p.routeDay(DAY, saved(1));
-    expect(one?.diagram).toBe(false);
-    expect(one?.items).toHaveLength(1);
     expect(loadSignals).not.toHaveBeenCalled();
+    const one = await p.routeDay(DAY, saved(1));
+    expect(loadSignals).toHaveBeenCalledTimes(1);
+    expect(one?.diagram).toBe(true); // 첫 자리(9시·사진 1장)가 저장된 한 자리와 같다
+    expect(one?.items).toHaveLength(1);
   });
 
   it("★ RD6(DB3·FR-007) — 일기 저장소를 건드리지 않는다(저장·읽기·지우기 0건)", async () => {
@@ -372,7 +382,75 @@ describe("125 createAppPipeline — routeDay", () => {
     const p = pipeline({ store, loadSignals: async () => signalsWith(knownPlaces(VISITS)) });
     await p.routeDay(DAY, saved(3));
     await p.routeDay(DAY, saved(1));
+    await p.routeDay(DAY, savedWithCoords(3));
     for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("RD8(126 FR-017) — 저장된 좌표가 있으면 사진을 읽지 않는다(loadSignals 0건)", async () => {
+    const loadSignals = jest.fn(async () => signalsWith(knownPlaces(VISITS)));
+    const route = await pipeline({ loadSignals }).routeDay(DAY, savedWithCoords(3));
+    expect(loadSignals).not.toHaveBeenCalled();
+    expect(route?.diagram).toBe(true);
+    expect(route?.items.map((i) => i.label)).toEqual(["자리1", "자리2", "자리3"]);
+  });
+
+  it("RD8 — 한 자리라도 좌표가 없으면 다시 읽는다(옛 일기 폴백)", async () => {
+    const loadSignals = jest.fn(async () => signalsWith(knownPlaces(VISITS)));
+    const mixed = savedWithCoords(3).map((p, i) => (i === 2 ? saved(3)[2]! : p));
+    const route = await pipeline({ loadSignals }).routeDay(DAY, mixed);
+    expect(loadSignals).toHaveBeenCalledTimes(1);
+    expect(route?.diagram).toBe(true);
+  });
+
+  /** 경도 126.9~127.2 · 위도 37.4~37.6을 덮는 표본 지도 — 칸마다 큰 길 하나 */
+  const mapIndex = () =>
+    parseMapFile(
+      packMapFile({
+        minLonE5: 12_690_000,
+        minLatE5: 3_740_000,
+        cols: 3,
+        rows: 2,
+        cells: new Map(
+          Array.from(
+            { length: 6 },
+            (_, c) => [c, { roadMajor: [[0, 0, 10_000, 10_000]] }] as const,
+          ),
+        ),
+      }),
+    );
+
+  it("RD9(126 DM13) — 지도 파일을 읽었으면 도식에 map이 붙는다", async () => {
+    const route = await pipeline({
+      loadSignals: async () => signalsWith(knownPlaces(VISITS)),
+      mapIndex: async () => mapIndex(),
+    }).routeDay(DAY, saved(3));
+    expect(route?.diagram).toBe(true);
+    expect(route?.map?.roadMajor).toMatch(/^M/);
+  });
+
+  it("RD9 — 저장된 좌표로 그린 도식에도 map이 붙는다(사진 없이)", async () => {
+    const route = await pipeline({ mapIndex: async () => mapIndex() }).routeDay(
+      DAY,
+      savedWithCoords(3),
+    );
+    expect(route?.diagram).toBe(true);
+    expect(route?.map).toBeDefined();
+  });
+
+  it("★ RD10(DM13) — 지도 읽기가 던지거나 null이어도 밖으로 나오지 않고 지도 없는 125 도식이다", async () => {
+    for (const mapIndexFn of [
+      async () => {
+        throw new Error("자산 없음");
+      },
+      async () => null,
+    ]) {
+      const route = await pipeline({
+        loadSignals: async () => signalsWith(knownPlaces(VISITS)),
+        mapIndex: mapIndexFn,
+      }).routeDay(DAY, saved(3));
+      expect(route?.diagram).toBe(true);
+      expect(route?.map).toBeUndefined();
+    }
   });
 
   it("RD7 — 실패 조립(ok:false)에는 routeDay가 없다", () => {

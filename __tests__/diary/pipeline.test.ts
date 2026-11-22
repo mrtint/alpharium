@@ -1234,6 +1234,41 @@ describe("121 — 기기 안 장소 이름 (contracts/diary-places.md DP1~DP5)",
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.entry.places?.map((p) => p.label)).toEqual([null, null]);
   });
+  it("126 DM21 — 새 일기의 places는 자리 수만큼 좌표(1e-5도 정수)를 가진다 — 「끔」이어도 같다", async () => {
+    const { box, backend } = capturing();
+    for (const enabled of [false, true]) {
+      const pipeline = createPipeline({
+        backend,
+        store: memoryStore(),
+        loadSignals: async () => signalsWithPlaces(),
+        placeNames: async () => KNOWN,
+        placeNamesEnabled: enabled,
+      });
+      const result = await pipeline.run(inputFor());
+      expect(result.ok && result.entry.places?.map((p) => [p.latE5, p.lonE5])).toEqual([
+        [3_739_000, 12_711_000],
+        [3_754_000, 12_704_000],
+      ]);
+      // 이름 칸만 설정을 따른다
+      expect(result.ok && result.entry.places?.map((p) => p.label)).toEqual(
+        enabled ? ["판교역", "서울숲"] : [null, null],
+      );
+    }
+    // 일기 글·프롬프트에는 좌표가 들어가지 않는다(원칙 II)
+    expect(JSON.stringify(box.request)).not.toMatch(/3739000|12711000|3754000|12704000/);
+  });
+
+  it("126 — 좌표를 읽지 못한 날(자리 없음)은 entry.places 자체가 없다(채우지 않는다)", async () => {
+    const pipeline = createPipeline({
+      backend: generating("오늘 하루."),
+      store: memoryStore(),
+      loadSignals: async () => signalsWithoutPlace(),
+      placeNames: async () => KNOWN,
+      placeNamesEnabled: true,
+    });
+    const result = await pipeline.run(inputFor());
+    expect(result.ok && result.entry.places).toBeUndefined();
+  });
 });
 
 /**

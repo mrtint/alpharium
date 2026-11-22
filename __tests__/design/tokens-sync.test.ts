@@ -56,7 +56,7 @@ describe("089 앱 생성 영역 (G-A1~A5)", () => {
     expect(region).toMatch(/export const COLORS = \{/);
     const block = region.slice(
       region.indexOf("export const COLORS"),
-      region.indexOf("export const RADIUS"),
+      region.indexOf("export const MAP_COLORS"),
     );
     expect([...block.matchAll(/^\s{2}(\w+): "#[0-9a-f]{6}",$/gm)]).toHaveLength(9);
     for (const [role, v] of Object.entries(tokens.color.items)) {

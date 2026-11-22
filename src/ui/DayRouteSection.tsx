@@ -1,10 +1,11 @@
 /**
- * 쓴 날 지면의 「하루 동선」 칸 (125, 보드 밖 초안).
+ * 쓴 날 지면의 「하루 동선」 칸 (125·126, 보드 밖 초안).
  *
- * 계약: specs/125-day-route-diagram/contracts/day-route.md DU1~DU7
+ * 계약: specs/125-day-route-diagram/contracts/day-route.md DU1~DU7(126이 DU3·DU4를 바꾼다),
+ *       specs/126-route-map-illustration/contracts/day-map.md DM9~DM12
  *
  * ─────────────────────────────────────────────────
- * **이 부품은 `DayRoute`만 안다**(DU1). 자리의 좌표·신호는 모른다 — `app/day-route.ts`가 0~1 상대 위치로 바꿔
+ * **이 부품은 `DayRoute`만 안다**(DU1) — 126부터 `route.map`(상자 안 정수 경로 문자열)도 안다. 자리의 좌표·신호·지도 파일은 모른다 — `app/day-route.ts`가 0~1 상대 위치로 바꿔
  * 넘기고(FR-004), 여기서는 그 위치에 잰 폭·높이를 곱해 그리기만 한다. 판정(도식을 그릴까, 목록만 보일까)도 하지 않는다 —
  * `diagram`이 말한다.
  *
@@ -14,6 +15,9 @@
  *
  * **선은 GPS 궤적이 아니다**(원칙 V). 설명 한 줄이 「사진이 찍힌 자리를 시간순으로 이은 거예요」라고 말한다. 점 옆에는
  * 글자를 두지 않고 번호만 둔다 — 이름·때는 아래 범례 목록에 있어 겹침을 풀 필요가 없고 화면 낭독이 순서대로 읽는다(DU5).
+ * **126: 지도(`route.map`)가 있으면 지도 위에서 점만으로 어느 곳인지 짚기 어려워 점 옆에 이름 라벨을 단다**(`labelPlacement`가 겹치지 않는
+ * 자리를 고르고 못 찾으면 그 라벨만 생략한다). 라벨은 낭독에서 숨은 캔버스 안에 있고 범례가 정확한 이름을 읽는다. 이름이 없는 자리는 라벨도
+ * 범례 이름 칸도 비운다(FR-015). 지도가 없으면 125 모양 그대로다(라벨 없음).
  *
  * **점의 번호는 글꼴 배율에 커지지 않는다**(점이 고정 크기). 범례 줄은 말줄임 없이 줄바꿈된다.
  * ─────────────────────────────────────────────────
@@ -22,10 +26,12 @@
 import { useState } from "react";
 import { useWindowDimensions, View, type TextStyle, type ViewStyle } from "react-native";
 
-import { ROUTE_ASPECT, type DayRoute, type RouteItem } from "../app/day-route";
+import { ROUTE_ASPECT, type DayRoute, type RouteItem, type RouteMap } from "../app/day-route";
 import { AppText } from "./components/Text";
 import { ROUTE_TEXT } from "./home-text";
-import { COLORS, WRITTEN_DAY } from "./theme/tokens";
+import { labelPlacement, LABEL_STYLE, type LabelMarker } from "./label-placement";
+import { RouteMapLayer } from "./RouteMapLayer";
+import { COLORS, MAP_COLORS, WRITTEN_DAY } from "./theme/tokens";
 
 /**
  * 도식 치수. **사람이 정한 값이다**(보드 밖 초안, 헌법 원칙 V) — 실기기에서 보고 고친다.
@@ -46,8 +52,9 @@ export function DayRouteSection({ route }: DayRouteSectionProps) {
   return (
     <View style={SECTION} testID="day-route">
       <AppText variant="sectionTitle">{ROUTE_TEXT.title}</AppText>
-      {route.diagram && <Diagram items={route.items} />}
-      {route.diagram && (
+      {route.diagram && <Diagram items={route.items} map={route.map} />}
+      {/* 126 FR-016 — 자리가 1곳이면 이은 선이 없어 설명 줄이 어색하다 */}
+      {route.diagram && route.items.length + route.more > 1 && (
         <AppText testID="day-route-note" variant="caption">
           {ROUTE_TEXT.note}
         </AppText>
@@ -55,11 +62,9 @@ export function DayRouteSection({ route }: DayRouteSectionProps) {
       <View style={LEGEND} testID="day-route-legend">
         {route.items.map((item) => (
           <AppText key={item.n} testID={`day-route-legend-${item.n}`}>
-            {ROUTE_TEXT.line(
-              item.n,
-              ROUTE_TEXT.period[item.period],
-              item.label ?? ROUTE_TEXT.unknownPlace,
-            )}
+            {item.label === null
+              ? ROUTE_TEXT.lineNoName(item.n, ROUTE_TEXT.period[item.period])
+              : ROUTE_TEXT.line(item.n, ROUTE_TEXT.period[item.period], item.label)}
           </AppText>
         ))}
         {route.more > 0 && (
@@ -73,7 +78,7 @@ export function DayRouteSection({ route }: DayRouteSectionProps) {
 }
 
 /** 도식 상자 — 잰 폭을 채우고 높이는 폭에 비례한다(DU7). 재기 전 첫 프레임은 창 폭에서 본문 좌우 여백을 뺀 값이다 */
-function Diagram({ items }: { items: readonly RouteItem[] }) {
+function Diagram({ items, map }: { items: readonly RouteItem[]; map: RouteMap | undefined }) {
   const window = useWindowDimensions();
   const [measured, setMeasured] = useState<number | undefined>(undefined);
   const width = measured ?? window.width - WRITTEN_DAY.body.paddingH * 2;
@@ -88,6 +93,15 @@ function Diagram({ items }: { items: readonly RouteItem[] }) {
   );
 
   const markers = markersOf(centers, dot);
+  // 지도가 있을 때만 점 옆에 이름 라벨을 단다. 합친 점의 이름은 번호가 가장 작은 이름 있는 항목의 것이다
+  const labelMarkers: LabelMarker[] = markers.map((m) => ({
+    id: m.numbers[0]!,
+    cx: m.cx,
+    cy: m.cy,
+    halfW: (dot + (m.numbers.length - 1) * merged) / 2,
+    label: items.find((it) => m.numbers.includes(it.n) && it.label !== null)?.label ?? null,
+  }));
+  const labels = map === undefined ? [] : labelPlacement(labelMarkers, width, height);
 
   return (
     <View
@@ -99,6 +113,7 @@ function Diagram({ items }: { items: readonly RouteItem[] }) {
       style={[FRAME, { height }]}
       testID="day-route-diagram"
     >
+      {map !== undefined && <RouteMapLayer map={map} />}
       <View
         accessibilityElementsHidden
         importantForAccessibility="no-hide-descendants"
@@ -131,6 +146,17 @@ function Diagram({ items }: { items: readonly RouteItem[] }) {
             />
           );
         })}
+        {labels.map((l) => (
+          <View
+            key={`label-${l.id}`}
+            style={[LABEL, { left: l.left, top: l.top, width: l.width, height: l.height }]}
+            testID={`day-route-label-${l.id}`}
+          >
+            <AppText allowFontScaling={false} numberOfLines={1} style={LABEL_TEXT}>
+              {l.label}
+            </AppText>
+          </View>
+        ))}
         {markers.map(({ numbers, cx, cy }) => {
           const first = numbers.includes(1);
           const width = dot + (numbers.length - 1) * merged;
@@ -208,3 +234,18 @@ const DOT_NUMBER: TextStyle = {
 };
 
 const LEGEND: ViewStyle = { gap: 6 };
+
+/** 점 옆 이름 라벨 — 지도 바탕색의 평평한 판(반경·그림자 없음)에 글자. 판 치수는 `LABEL_STYLE`(사람이 정한 값)이다 */
+const LABEL: ViewStyle = {
+  position: "absolute",
+  backgroundColor: MAP_COLORS.mapLand,
+  paddingHorizontal: LABEL_STYLE.padH,
+  justifyContent: "center",
+};
+
+const LABEL_TEXT: TextStyle = {
+  fontSize: LABEL_STYLE.fontSize,
+  fontWeight: "600",
+  lineHeight: LABEL_STYLE.fontSize + 3,
+  color: COLORS.text,
+};
