@@ -6,7 +6,7 @@
  * ─────────────────────────────────────────────
  * 날짜 기준: 지금 = 2026-09-28(월) 16:15. 스트립은 9/22~9/28이다. 쓴 날은 9/27(일)·9/26(토).
  *
- * `routeDay`는 **쓴 날 + 저장된 자리 2곳 이상**일 때만 부른다(DF2). 읽는 동안에는 저장된 목록이 먼저 보이고(DF4) 지면이
+ * `routeDay`는 **쓴 날 + 저장된 자리 1곳 이상**일 때만 부른다(126 DM14 — 125는 2곳 이상이었다). 읽는 동안에는 저장된 목록이 먼저 보이고(DF4) 지면이
  * 막히지 않는다. 늦게 도착한 이전 날의 결과는 버린다(DF3). 캐시가 없다 — 날을 다시 열면 다시 읽는다(FR-015).
  *
  * ⚠️ RNTL 14의 `render`·`fireEvent`는 Promise다 — 반드시 await한다.
@@ -160,7 +160,7 @@ describe("DF2·US1 — 쓴 날 + 저장된 자리 2곳 이상이면 읽어 도�
     expect(screen.queryByTestId("day-route")).toBeNull();
   });
 
-  it("자리 1곳은 부르지 않고 저장된 한 줄만 보인다", async () => {
+  it("126 DM14 — 자리 1곳도 routeDay를 부르고 먼저 저장된 한 줄이 보인다(좌표 없는 옛 일기는 못 읽으면 한 줄로 남는다)", async () => {
     const store = memoryStore();
     await store.save(entryFor(SUN, { places: [place("집 근처", 21)] }));
     const routeDay = jest.fn<ReturnType<RouteDay>, Parameters<RouteDay>>(async () => null);
@@ -168,8 +168,22 @@ describe("DF2·US1 — 쓴 날 + 저장된 자리 2곳 이상이면 읽어 도�
     await selectDay(SUN);
 
     expect(await screen.findByText(/^1 · .* · 집 근처$/)).toBeTruthy();
-    expect(routeDay).not.toHaveBeenCalled();
+    expect(routeDay).toHaveBeenCalledTimes(1);
+    expect(routeDay.mock.calls[0]![1]).toHaveLength(1);
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
+  });
+
+  it("126 — 좌표가 저장된 새 일기는 routeDay를 기다리지 않고 도식이 먼저 보인다", async () => {
+    const store = memoryStore();
+    await store.save(
+      entryFor(SUN, { places: [{ ...place("집 근처", 21), latE5: 3_750_000, lonE5: 12_700_000 }] }),
+    );
+    const pending = deferred<DayRoute | null>();
+    const routeDay: RouteDay = jest.fn(() => pending.promise);
+    await renderHome(store, routeDay);
+    await selectDay(SUN);
+
+    expect(await screen.findByTestId("day-route-diagram")).toBeTruthy();
   });
 
   it("routeDay가 없으면(통로 없음) 저장된 목록만 보인다 — 도식을 지어내지 않는다", async () => {
@@ -257,6 +271,43 @@ describe("DF3·FR-015 — 늦은 결과는 버리고 캐시가 없다", () => {
     });
     expect(screen.queryByText(/일요일-늦은/)).toBeNull();
     expect(screen.getByText(/토요일-읽음-가/)).toBeTruthy();
+  });
+
+  it("★ 126 FR-009 — 일요일의 늦은 응답에 지도가 붙어 있어도 토요일 지면에는 지도가 그려지지 않는다", async () => {
+    const store = memoryStore();
+    await store.save(entryFor(SUN, { places: SAVED_SUN }));
+    await store.save(entryFor(SAT, { places: SAVED_SAT }));
+    const sunPending = deferred<DayRoute | null>();
+    const routeDay: RouteDay = jest.fn((day) =>
+      day === SUN
+        ? sunPending.promise
+        : Promise.resolve(diagramOf(["토요일-읽음-가", "토요일-읽음-나"])),
+    );
+    await renderHome(store, routeDay);
+
+    await selectDay(SUN);
+    await screen.findByTestId("written-body");
+    await userEvent.press(await screen.findByTestId(`day-${SAT}`));
+    expect(await screen.findByText(/토요일-읽음-가/)).toBeTruthy();
+
+    await act(async () => {
+      sunPending.resolve({
+        ...diagramOf(["일요일-늦은-가", "일요일-늦은-나"]),
+        map: {
+          box: { w: 1000, h: 620 },
+          water: "",
+          park: "",
+          rail: "",
+          river: "",
+          roadMajor: "M0 0L9 9",
+          roadMid: "",
+          roadMinor: "",
+          roadWidth: 16,
+        },
+      });
+    });
+    expect(screen.queryByText(/일요일-늦은/)).toBeNull();
+    expect(screen.queryByTestId("day-route-map", { includeHiddenElements: true })).toBeNull();
   });
 
   it("★ 같은 날을 다시 열면 다시 읽는다 — 결과를 저장·재사용하지 않는다", async () => {

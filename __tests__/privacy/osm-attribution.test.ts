@@ -30,4 +30,11 @@ describe("121 — OpenStreetMap 출처 표기", () => {
     expect(existsSync(join(ROOT, "assets/places/kr-places.bin"))).toBe(true);
     expect(existsSync(join(ROOT, "scripts/places/build-place-index.mts"))).toBe(true);
   });
+
+  it("126 — 동선 지도 가공 데이터와 만드는 방법의 자리도 알리고, 그 자리가 저장소에 있다", () => {
+    expect(section).toContain("assets/map");
+    expect(section).toContain("scripts/map");
+    expect(existsSync(join(ROOT, "assets/map/kr-map.bin"))).toBe(true);
+    expect(existsSync(join(ROOT, "scripts/map/build-map.mts"))).toBe(true);
+  });
 });

@@ -40,6 +40,8 @@ export interface ContrastPair {
 export interface TokensJson {
   version: 1;
   color: { note: string; items: Record<string, ColorEntry> };
+  /** 126 — 동선 지도 전용 색. 앱 `MAP_COLORS`로만 나간다(웹은 쓰지 않는다) */
+  mapColor: { note: string; items: Record<string, ColorEntry> };
   radius: { note: string; items: Record<string, RadiusEntry> };
   type: { note: string; items: Record<string, TypeEntry> };
   font: {
@@ -67,9 +69,10 @@ const COLOR_ROLES = [
   "danger",
   "dangerForeground",
 ];
+const MAP_COLOR_ROLES = ["mapLand", "mapWater", "mapPark", "mapRoad", "mapRoadMinor"];
 const RADIUS_NAMES = ["card", "pill", "control"];
 const APP_TYPE_ROLES = ["title", "sectionTitle", "body", "bodyStrong", "caption", "button"];
-const TOP_KEYS = ["version", "color", "radius", "type", "font", "space", "contrast"];
+const TOP_KEYS = ["version", "color", "mapColor", "radius", "type", "font", "space", "contrast"];
 const HEX = /^#[0-9a-f]{6}$/;
 
 function fail(message: string): never {
@@ -104,6 +107,20 @@ export function validateTokens(t: TokensJson): void {
       }
     }
     checkNote(`color.${role}`, v.note);
+  }
+
+  // 지도 색 (126)
+  checkNote("mapColor", t.mapColor.note);
+  if (!sameSet(Object.keys(t.mapColor.items), MAP_COLOR_ROLES)) {
+    fail(`mapColor 의 역할이 정확히 ${MAP_COLOR_ROLES.join("·")} 다섯이 아니다`);
+  }
+  for (const [role, v] of Object.entries(t.mapColor.items)) {
+    for (const mode of ["light", "dark"] as const) {
+      if (typeof v[mode] !== "string" || !HEX.test(v[mode])) {
+        fail(`mapColor.${role}.${mode} 가 #rrggbb 소문자 hex 색이 아니다`);
+      }
+    }
+    checkNote(`mapColor.${role}`, v.note);
   }
 
   // 반경 (C3)
@@ -190,6 +207,16 @@ function appRegion(t: TokensJson): string {
   out.push("export const COLORS = {");
   for (const role of COLOR_ROLES) {
     const v = t.color.items[role];
+    out.push(...doc(v.note, "  "));
+    out.push(`  ${role}: ${q(v.light)},`);
+  }
+  out.push("} as const;");
+  out.push("");
+
+  out.push(...doc(t.mapColor.note, ""));
+  out.push("export const MAP_COLORS = {");
+  for (const role of MAP_COLOR_ROLES) {
+    const v = t.mapColor.items[role];
     out.push(...doc(v.note, "  "));
     out.push(`  ${role}: ${q(v.light)},`);
   }

@@ -19,6 +19,7 @@
 | `danger` | 진한 레드 — 삭제·되돌릴 수 없는 동작, 웹의 링크·강조 글자 | 링크, 위험 버튼 |
 | `dangerForeground` | danger 면 위 글자 | danger 버튼 라벨 |
 
+- **지도 전용 색(126)**: `mapLand`·`mapWater`·`mapPark`·`mapRoad`·`mapRoadMinor`는 정본의 별도 묶음 `mapColor`에 있고 앱에서 `MAP_COLORS`로만 나간다(웹은 쓰지 않는다). **쓰는 곳은 쓴 날 지면의 동선 지도 하나뿐이다** — 화면·웹의 다른 곳에 쓰지 않는다. 위의 아홉 역할과 달리 대비 쌍 표(`contrast`)가 아니라 `__tests__/design/map-colors.test.ts`가 지도 위 라벨(`text` 글자 + `mapLand` 후광)의 대비를 본다.
 - 앱에서는 `COLORS.bg`처럼 `src/ui/theme/tokens.ts`에서 읽는다. 앱은 라이트만 쓴다(031).
 - 웹에서는 `--color-bg`처럼 `site/assets/tokens.css`의 변수로 읽는다. 라이트가 기본이고 다크는 `prefers-color-scheme: dark`에서 같은 이름의 변수 값이 바뀐다. 변수 이름은 `--color-*`·`--radius-*`·`--font-sans`·`--text-*`·`--space-*` 다섯 꼴뿐이다.
 - 반경은 `RADIUS.card`·`RADIUS.pill`(둘 다 0, 직선)과 `RADIUS.control`(버튼만 6)이다.

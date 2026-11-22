@@ -12,7 +12,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/react-native";
 import { StyleSheet } from "react-native";
 
-import type { DayRoute, RouteItem } from "../../src/app/day-route";
+import type { DayRoute, RouteItem, RouteMap } from "../../src/app/day-route";
 import { DayRouteSection, ROUTE_DIAGRAM } from "../../src/ui/DayRouteSection";
 import { COLORS } from "../../src/ui/theme/tokens";
 
@@ -120,11 +120,12 @@ describe("DU7 — 폭을 채우고 높이는 폭에 비례한다", () => {
 });
 
 describe("DU3 — 범례 목록", () => {
-  it("「번호 · 때 · 이름」 순서이고 이름을 모르는 자리는 「이름을 모르는 곳」이다(지어내지 않는다)", async () => {
+  it("「번호 · 때 · 이름」 순서이고 이름을 모르는 자리는 이름 칸을 비운다(지어내지 않는다, 126 FR-015)", async () => {
     await renderMeasured(THREE);
     expect(screen.getByText("1 · 오전 · 시청")).toBeTruthy();
     expect(screen.getByText("2 · 오후 · 잠실")).toBeTruthy();
-    expect(screen.getByText("3 · 저녁 · 이름을 모르는 곳")).toBeTruthy();
+    expect(screen.getByText("3 · 저녁")).toBeTruthy();
+    expect(screen.queryByText(/이름을 모르는 곳/)).toBeNull();
   });
 
   it("범례 줄은 줄바꿈된다 — 글꼴을 키워도 잘리지 않는다(말줄임 없음)", async () => {
@@ -146,6 +147,18 @@ describe("DU3 — 범례 목록", () => {
 describe("DU4 — 설명 한 줄은 도식일 때만", () => {
   it("diagram true: 「사진이 찍힌 자리를 시간순으로 이은 거예요」", async () => {
     await renderMeasured(THREE);
+    expect(screen.getByText("사진이 찍힌 자리를 시간순으로 이은 거예요")).toBeTruthy();
+  });
+
+  it("126 FR-016 — 자리가 1곳인 도식에는 설명 줄이 없다(이은 선이 없다)", async () => {
+    await renderMeasured({ items: [item(1, 0.5, 0.5, "집 근처")], more: 0, diagram: true });
+    expect(screen.queryByText("사진이 찍힌 자리를 시간순으로 이은 거예요")).toBeNull();
+    expect(byId("day-route-dot-1")).toBeTruthy();
+    expect(maybeId("day-route-line-1")).toBeNull();
+  });
+
+  it("126 — 자리가 1곳이고 외 N곳이 있으면(12곳 밖은 불가능하지만) 설명 줄은 이어진 선이 있을 때만이다", async () => {
+    await renderMeasured({ ...THREE, more: 2 });
     expect(screen.getByText("사진이 찍힌 자리를 시간순으로 이은 거예요")).toBeTruthy();
   });
 
@@ -263,7 +276,8 @@ describe("diagram false — 범례 목록만(US2)", () => {
     expect(screen.queryByText("사진이 찍힌 자리를 시간순으로 이은 거예요")).toBeNull();
     expect(screen.getByText("하루 동선")).toBeTruthy();
     expect(screen.getByText("1 · 오전 · 시청")).toBeTruthy();
-    expect(screen.getByText("2 · 밤 · 이름을 모르는 곳")).toBeTruthy();
+    expect(screen.getByText("2 · 밤")).toBeTruthy();
+    expect(screen.queryByText(/이름을 모르는 곳/)).toBeNull();
   });
 
   it("자리 1곳은 한 줄만이다", async () => {
@@ -274,5 +288,109 @@ describe("diagram false — 범례 목록만(US2)", () => {
     });
     expect(screen.getByText("1 · 저녁 · 집 근처")).toBeTruthy();
     expect(maybeId("day-route-diagram")).toBeNull();
+  });
+});
+
+/* ═══════════════════════════════ 126 — 지도와 이름 라벨 ═══════════════════════════════ */
+
+const MAP: RouteMap = {
+  box: { w: 1000, h: 620 },
+  water: "M0 0L500 0L500 300L0 0Z",
+  park: "",
+  rail: "",
+  river: "",
+  roadMajor: "M0 620L1000 0",
+  roadMid: "",
+  roadMinor: "",
+  roadWidth: 16,
+};
+
+describe("126 DM9 — 지도 층이 점·선 뒤에 깔린다", () => {
+  it("route.map이 있으면 도식 상자 안에 지도 층(Svg)이 있다", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    expect(byId("day-route-map")).toBeTruthy();
+    expect(within(byId("day-route-diagram")).getByTestId("day-route-map", HIDDEN)).toBeTruthy();
+  });
+
+  it("지도 층은 점·선 캔버스보다 먼저(뒤에) 그려진다", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    const ids: string[] = [];
+    const walk = (node: unknown): void => {
+      if (node === null || typeof node !== "object") return;
+      if (Array.isArray(node)) return node.forEach(walk);
+      const n = node as { props?: { testID?: string }; children?: unknown };
+      if (n.props?.testID !== undefined) ids.push(n.props.testID);
+      walk(n.children);
+    };
+    walk(screen.toJSON());
+    expect(ids.indexOf("day-route-map")).toBeGreaterThanOrEqual(0);
+    expect(ids.indexOf("day-route-map")).toBeLessThan(ids.indexOf("day-route-canvas"));
+  });
+
+  it("route.map이 없으면 지도 층도 이름 라벨도 없다 — 125 모양 그대로", async () => {
+    await renderMeasured(THREE);
+    expect(maybeId("day-route-map")).toBeNull();
+    expect(maybeId("day-route-label-1")).toBeNull();
+    expect(maybeId("day-route-label-2")).toBeNull();
+  });
+
+  it("★ DM15 — 지도가 더해져도 도식 상자 높이는 그대로다(지면 높이·끝 판정이 흔들리지 않는다)", async () => {
+    await renderMeasured(THREE);
+    const without = flat("day-route-diagram").height as number;
+    await screen.unmount();
+    await renderMeasured({ ...THREE, map: MAP });
+    expect(flat("day-route-diagram").height as number).toBe(without);
+  });
+
+  it("점·번호·선은 지도가 있어도 125와 같다", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    for (const n of [1, 2, 3]) expect(byId(`day-route-dot-${n}`)).toBeTruthy();
+    expect(byId("day-route-line-1")).toBeTruthy();
+    expect(byId("day-route-line-2")).toBeTruthy();
+  });
+
+  it("지도는 도식의 낭독을 바꾸지 않는다(DU5) — 한 요소, 같은 문장", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    const diagram = byId("day-route-diagram");
+    expect(diagram.props.accessibilityLabel).toBe("사진이 찍힌 자리 3곳을 시간순으로 이은 도식");
+    expect(diagram.props.accessible).toBe(true);
+  });
+});
+
+describe("126 DM11 — 점 옆 이름 라벨", () => {
+  it("지도가 있으면 이름 있는 점마다 라벨이 있고, 이름 없는 점은 없다", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    expect(byId("day-route-label-1")).toBeTruthy();
+    expect(byId("day-route-label-2")).toBeTruthy();
+    expect(maybeId("day-route-label-3")).toBeNull(); // label null
+  });
+
+  it("라벨 글자는 이름이고 글꼴 배율에 커지지 않는다", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    const label = byId("day-route-label-1");
+    expect(within(label).getByText("시청", HIDDEN).props.allowFontScaling).toBe(false);
+  });
+
+  it("라벨은 낭독에서 숨겨진 캔버스 안에 있다(범례가 이름을 읽는다)", async () => {
+    await renderMeasured({ ...THREE, map: MAP });
+    expect(within(byId("day-route-canvas")).getByTestId("day-route-label-1", HIDDEN)).toBeTruthy();
+  });
+
+  it("겹쳐서 놓을 자리가 없는 라벨은 그 라벨만 생략된다 — 앞 라벨은 남는다", async () => {
+    // 상자 폭보다 긴 이름은 어디에도 들어가지 않아 그 라벨만 빠진다. 앞 라벨은 남는다.
+    const crowded: DayRoute = {
+      items: [
+        item(1, 0.3, 0.5, "서울함공원"),
+        item(2, 0.6, 0.55, "이름이 상자 폭보다 길어서 어디에도 들어가지 않는 라벨입니다 정말로"),
+      ],
+      more: 0,
+      diagram: true,
+      map: MAP,
+    };
+    await renderMeasured(crowded);
+    expect(byId("day-route-label-1")).toBeTruthy();
+    expect(maybeId("day-route-label-2")).toBeNull();
+    // 범례에는 이름이 그대로 있다
+    expect(screen.getByText(/^2 · .* · 이름이 상자 폭보다/)).toBeTruthy();
   });
 });

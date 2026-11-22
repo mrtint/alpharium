@@ -40,6 +40,8 @@ import { expoPlaceIndexPort } from "../signals/place-index-port";
 import { placeNamer, type PlaceName } from "../signals/place-names";
 import type { Coordinate } from "../signals/places";
 import type { DaySignals } from "../signals/types";
+import { parseMapFile, type MapIndex } from "../map/map-file";
+import { expoMapPort } from "../map/map-port";
 import { buildDayRoute, type DayRoute } from "./day-route";
 import { photoAccessOf, toDayPreview } from "./day-preview";
 import type { DayPreview, PhotoAccess } from "./state";
@@ -119,10 +121,11 @@ export type AppPipelineResult =
        */
       previewDay: (day: DayDate) => Promise<DayPreview>;
       /**
-       * 쓴 날 지면의 「하루 동선」 칸 (125, contracts/day-route.md). 지면을 열 때 그 날의 사진 좌표를 **다시 읽어**(저장하지
-       * 않는다 — FR-007) 저장된 `entry.places`와 합친다. 파이프라인·`previewDay`와 **같은 `loadSignals`**를 부르므로 새 수집
-       * 경로가 아니다. **던지지 않는다** — 읽지 못하면 저장된 목록이다(DF5). 저장된 자리가 2곳 미만이면 읽지 않는다(DF2).
-       * **일기 저장소를 건드리지 않는다**(DB3).
+       * 쓴 날 지면의 「하루 동선」 칸 (125·126, contracts/day-route.md·day-map.md). **저장된 `entry.places`에 좌표가 다 있으면 사진을
+       * 읽지 않는다**(126 FR-017) — 없는 옛 일기만 그 날의 사진 좌표를 **다시 읽어**(저장하지 않는다) 저장된 자리와 맞춘다. 다시
+       * 읽을 때는 파이프라인·`previewDay`와 **같은 `loadSignals`**를 부르므로 새 수집 경로가 아니다. 앱에 든 지도 파일(`mapIndex`)을
+       * 읽어 도식에 지도를 붙인다. **던지지 않는다** — 읽지 못하면 저장된 목록이고 지도를 못 읽으면 지도 없는 도식이다(DM13).
+       * 저장된 자리가 없으면 읽지 않는다. **일기 저장소를 건드리지 않는다**(DB3·DM22).
        */
       routeDay: (
         day: DayDate,
@@ -153,6 +156,11 @@ export type WiringDeps = {
   isModelReady?: (character: Character) => Promise<boolean>;
   /** 장소 이름 설정이 켜져 있는가 (121 FR-008). 주지 않으면 꺼짐으로 다룬다 */
   placeNamesEnabled?: boolean;
+  /**
+   * 앱에 든 지도 파일의 해석 결과 (126). 못 읽었으면 `null`(던지지 않아도 된다 — `routeDay`가 접는다). 주지 않으면 실제 기기 통로를
+   * 쓴다(`deviceMapIndex` — 프로세스당 한 번 읽고 보관한다).
+   */
+  mapIndex?: () => Promise<MapIndex | null>;
   /** 자리 좌표의 장소 이름을 찾는다 (121). 주지 않으면 앱에 든 장소 데이터를 읽는 기기 통로를 쓴다 */
   placeNames?: (coordinates: readonly Coordinate[]) => Promise<PlaceName[]>;
   /**
@@ -211,6 +219,31 @@ function deviceSignals(day: DayDate): Promise<DaySignals> {
  */
 const placeIndexPort = expoPlaceIndexPort();
 const sharedNamer = placeNamer(placeIndexPort);
+
+/**
+ * 126 — 앱에 든 지도 파일의 기기 통로. 프로세스에 하나다 — 처음 쓴 날 지면에서 한 번 읽어(약 10MB) 해석 결과를 보관한다. 읽기에
+ * 실패하면 `null`이고 **실패를 보관하지 않는다**(다음에 열 때 다시 시도한다).
+ */
+const mapPort = expoMapPort();
+let mapIndexPromise: Promise<MapIndex | null> | null = null;
+
+function deviceMapIndex(): Promise<MapIndex | null> {
+  if (mapIndexPromise === null) {
+    const attempt = (async () => {
+      try {
+        await mapPort.prepare();
+        return parseMapFile(mapPort.load());
+      } catch {
+        return null;
+      }
+    })();
+    mapIndexPromise = attempt.then((index) => {
+      if (index === null) mapIndexPromise = null;
+      return index;
+    });
+  }
+  return mapIndexPromise;
+}
 
 async function devicePlaceNames(coordinates: readonly Coordinate[]): Promise<PlaceName[]> {
   try {
@@ -321,17 +354,30 @@ export function createAppPipeline(
         return toDayPreview(day, null, access);
       }
     },
-    // 125 — 쓴 날 지면의 동선 도식. `previewDay`와 같은 `loadSignals`로 사진 좌표를 다시 읽을 뿐, 저장소는 건드리지 않는다.
+    // 125·126 — 쓴 날 지면의 동선 도식. 저장된 좌표가 있으면 사진을 읽지 않고, 옛 일기만 `previewDay`와 같은 `loadSignals`로 사진
+    // 좌표를 다시 읽는다. 저장소는 건드리지 않는다(DB3·DM22).
     routeDay: async (day: DayDate, saved: readonly SavedPlace[] | undefined) => {
-      // 저장된 자리가 2곳 미만이면 이을 선이 없어 읽을 것이 없다(DF2) — 사진 서비스를 부르지 않는다.
-      if (saved === undefined || saved.length < 2) return buildDayRoute(null, saved);
+      // 저장된 자리가 없으면 칸 자체가 없다(DR1) — 읽을 것도 없다
+      if (saved === undefined || saved.length === 0) return buildDayRoute(null, saved);
+      const mapIndex = await (async () => {
+        try {
+          return await (deps.mapIndex ?? deviceMapIndex)();
+        } catch {
+          return null; // 지도를 못 읽었다 — 지도 없는 도식(DM13)
+        }
+      })();
+      // (a) 저장된 좌표가 모든 자리에 있으면 사진을 읽지 않는다(FR-017)
+      if (saved.every((p) => Number.isFinite(p.latE5) && Number.isFinite(p.lonE5))) {
+        return buildDayRoute(null, saved, mapIndex);
+      }
+      // (b) 옛 일기 — 사진 좌표를 다시 읽는다
       try {
         const signals = await loadSignals(day);
         const visits =
           signals !== null && signals.places.kind === "known"
             ? (signals.places.value.trace.visits ?? null)
             : null;
-        return buildDayRoute(visits, saved);
+        return buildDayRoute(visits, saved, mapIndex);
       } catch {
         // 읽지 못했다 — 도식 없이 저장된 이름·때 목록으로 남는다(원칙 V, DF5). 화면까지 예외를 올리지 않는다.
         return buildDayRoute(null, saved);

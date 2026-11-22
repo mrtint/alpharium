@@ -22,20 +22,26 @@ const code = (file: string) =>
     .replace(/\/\*[\s\S]*?\*\//g, "")
     .replace(/\/\/.*$/gm, "");
 
-const ROUTE_FILES = ["src/app/day-route.ts", "src/ui/DayRouteSection.tsx"] as const;
+const ROUTE_FILES = [
+  "src/app/day-route.ts",
+  "src/ui/DayRouteSection.tsx",
+  // 126 — 지도 층·라벨 배치. `react-native-svg`는 `RouteMapLayer` 한 곳에서만 쓰고(dialog-foundation-deps DEP1) 지도 라이브러리는 아니다
+  "src/ui/RouteMapLayer.tsx",
+  "src/ui/label-placement.ts",
+] as const;
 /** 좌표·신호를 몰라야 하는 화면 파일 — 도식 부품과 그것을 지면까지 나르는 두 곳 */
 const SCREEN_FILES = [
   "src/ui/DayRouteSection.tsx",
   "src/ui/WrittenDayPaper.tsx",
   "src/ui/DiaryListScreen.tsx",
+  "src/ui/RouteMapLayer.tsx", // 126
+  "src/ui/label-placement.ts", // 126
 ] as const;
 
 describe("DB1 — 지도·네트워크가 없다", () => {
   it.each(ROUTE_FILES)("%s에 지도·위치 라이브러리와 네트워크 호출이 없다", (file) => {
     const src = code(file);
-    expect(src).not.toMatch(
-      /react-native-maps|maplibre|mapbox|expo-location|react-native-svg|google-maps|leaflet/i,
-    );
+    expect(src).not.toMatch(/react-native-maps|maplibre|mapbox|expo-location|google-maps|leaflet/i);
     expect(src).not.toMatch(/\bfetch\s*\(|XMLHttpRequest|WebSocket|axios|\.sendBeacon/);
   });
 
@@ -71,9 +77,10 @@ describe("DB2·FR-004 — 화면은 좌표·신호를 모른다", () => {
 describe("DR9 — 변환은 순수하다", () => {
   it("day-route.ts는 파일·기기·네트워크·화면을 import하지 않는다", () => {
     const src = code("src/app/day-route.ts");
-    const imports = [...src.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]!);
+    const imports = [...new Set([...src.matchAll(/from\s+["']([^"']+)["']/g)].map((m) => m[1]!))];
+    // 126 — 이미 읽은 지도 파일의 해석(`../map/map-file`, 타입)과 지도 렌더 위임(`./day-map`)이 더해졌다. 좌표 계산(`signals/places`)은 걷었다.
     expect(imports.sort()).toEqual(
-      ["../diary/place-lines", "../signals/places", "../signals/types"].sort(),
+      ["../diary/place-lines", "../map/map-file", "../signals/types", "./day-map"].sort(),
     );
     expect(src).not.toMatch(/\bDate\.now\b|new Date\(\)|Math\.random|process\.env|require\(/);
   });
@@ -103,15 +110,18 @@ describe("DB4·FR-012 — 모르는 것을 기본값으로 채우지 않는다",
   it("day-route.ts는 좌표를 기본값(`?? 0`·`|| 0`)으로 채우지 않는다", () => {
     const src = code("src/app/day-route.ts");
     expect(src).not.toMatch(/(latitude|longitude)\s*(\?\?|\|\|)/);
-    expect(src).not.toMatch(/\bx\s*:\s*0\.5\b|\by\s*:\s*0\.5\b/);
+    // 126 — 위치를 0.5로 채우는 리터럴(`x: 0.5,`)이 없다. 한 곳뿐인 날의 가운데 위치는 투영 결과이지 기본값이 아니다.
+    expect(src).not.toMatch(/\bx\s*:\s*0\.5\s*[,}]|\by\s*:\s*0\.5\s*[,}]/);
   });
 
-  it("읽지 못한 경우(visits null)는 투영보다 먼저 목록으로 돌아간다", () => {
+  it("좌표를 모르는 경우(저장된 좌표도 다시 읽은 좌표도 없음)는 투영보다 먼저 목록으로 돌아간다", () => {
     const src = code("src/app/day-route.ts");
-    const guard = src.indexOf("visits === null");
-    const projection = src.indexOf("project(");
+    const guard = src.indexOf("coordinates === null");
+    const projection = src.indexOf("projectFrame(coordinates");
     expect(guard).toBeGreaterThan(-1);
     expect(guard).toBeLessThan(projection);
+    // 다시 읽은 좌표는 읽었고(null 아님) 저장된 자리와 같을 때만 쓴다
+    expect(src).toMatch(/visits\s*!==\s*null\s*&&\s*sameVisits\(/);
   });
 });
 
@@ -163,5 +173,28 @@ describe("DU6 — 색은 토큰만, 모서리·그림자 없음", () => {
     expect(src).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
     expect(src).not.toMatch(/\bborderRadius\b|\bshadow\w*\b|\belevation\b|gradient/i);
     expect(src).toMatch(/\bCOLORS\./);
+  });
+});
+
+describe("126 DM22 — 좌표는 일기를 쓸 때만 저장한다(지면을 열어 보는 동작은 일기를 고쳐 쓰지 않는다)", () => {
+  it("routeDay·day-route는 저장소를 쓰거나 좌표 필드를 채우지 않는다 — 옛 일기에 좌표를 채우는 이행 코드가 없다", () => {
+    const wiring = code("src/app/wiring.ts");
+    const body = /routeDay:\s*async[\s\S]*?\n {4}\},\n {2}\};/.exec(wiring)![0];
+    expect(body).not.toMatch(/\bstore\b|\.save\(|latE5\s*[:=]|lonE5\s*[:=]/);
+    expect(code("src/app/day-route.ts")).not.toMatch(/latE5\s*[:=]|lonE5\s*[:=]/);
+  });
+
+  it("latE5·lonE5 값을 만드는 곳은 `savedPlacesOf`(일기를 쓸 때) 하나다 — 다른 소스 파일은 읽기만 한다", () => {
+    const { readdirSync } = require("node:fs") as typeof import("node:fs");
+    const walk = (dir: string): string[] =>
+      readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap((e) =>
+        e.isDirectory()
+          ? walk(`${dir}/${e.name}`)
+          : /\.tsx?$/.test(e.name)
+            ? [`${dir}/${e.name}`]
+            : [],
+      );
+    const writers = walk("src").filter((f) => /\blatE5\s*:\s*Math\.round/.test(code(f)));
+    expect(writers).toEqual(["src/diary/place-lines.ts"]);
   });
 });

@@ -626,6 +626,52 @@ export function checkSimulationFile(fileName: string, contents: string): Violati
 }
 
 /**
+ * 126 — 동선 지도의 경계 (contracts/day-map.md DM16·DM17, 원칙 I·V).
+ *
+ *  - **MP1** `src/ui/`가 `src/map/`을 import한다 — 화면은 지도 파일·위경도를 모른다. `RouteMap` 타입은 `src/app/day-route.ts`가 다시 내보낸다.
+ *  - **MP2** `src/map/`이 `src/app/`·`src/ui/`를 import한다 — 순수 폴더가 위로 올라간다(상세 정도 값은 `options`로 받는다).
+ *  - **MP3** `src/map/`의 `map-port.ts` 밖이 `react-native`·`expo-*`를 import한다 — 기기에 닿는 건 포트 하나다.
+ *  - **MP4** 지도 코드(`src/map/`·`src/app/day-route.ts`·`day-map.ts`·`src/ui/DayRouteSection.tsx`·`RouteMapLayer.tsx`)에 외부 요청(`fetch(`·
+ *    `XMLHttpRequest`)·지도 라이브러리(`react-native-maps`·`maplibre`·`mapbox`)가 있다 — 지도는 앱에 든 파일에서만 온다.
+ */
+const MAP_FILES = new Set([
+  "src/app/day-route.ts",
+  "src/app/day-map.ts",
+  "src/ui/DayRouteSection.tsx",
+  "src/ui/RouteMapLayer.tsx",
+]);
+const MAP_PORT_FILE = "src/map/map-port.ts";
+
+export function checkMapFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  const inMap = normalized.startsWith("src/map/");
+  const inUi = normalized.startsWith("src/ui/");
+  if (!inMap && !inUi && !MAP_FILES.has(normalized)) return [];
+  const code = contents.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const at = (key: string) => ({ file: normalized, key });
+  const violations: Violation[] = [];
+
+  if (inUi && /from\s+["'](?:\.\.\/)+map\//.test(code)) {
+    violations.push({ ...at("ui→map"), rule: "src/ui/가 src/map/을 import한다 — 화면은 지도 파일을 모른다. RouteMap 타입은 app/day-route.ts에서 가져온다 (126 DM16)" });
+  }
+  if (inMap && /from\s+["'](?:\.\.\/)+(?:app|ui)\//.test(code)) {
+    violations.push({ ...at("map→app/ui"), rule: "src/map/이 src/app/·src/ui/를 import한다 — 순수 폴더는 위로 올라가지 않는다. 값은 options로 받는다 (126 DM16)" });
+  }
+  if (inMap && normalized !== MAP_PORT_FILE && /(?:from\s+|import\s*\(\s*|require\s*\(\s*)["'](?:react-native|expo-[a-z-]+|react-native-[a-z-]+)["']/.test(code)) {
+    violations.push({ ...at("map→device"), rule: "map-port.ts 밖의 src/map/이 react-native·expo를 import한다 — 기기에 닿는 건 포트 하나다 (126 DM16)" });
+  }
+  if (inMap || MAP_FILES.has(normalized)) {
+    if (/\bfetch\s*\(|\bXMLHttpRequest\b/.test(code)) {
+      violations.push({ ...at("network"), rule: "지도 코드가 외부 요청(fetch·XMLHttpRequest)을 한다 — 지도는 앱에 든 파일에서만 온다 (126 DM17, 원칙 I)" });
+    }
+    if (/react-native-maps|maplibre|mapbox/i.test(code)) {
+      violations.push({ ...at("map-lib"), rule: "지도 라이브러리(react-native-maps·maplibre·mapbox)를 쓴다 — 지도는 앱에 든 파일에서만 온다 (126 DM17, 원칙 I)" });
+    }
+  }
+  return violations;
+}
+
+/**
  * 빠른 주기(개발 빌드 전용, 일기를 지운다)의 읽기·지우기 위치 (106 FL1~FL3, 원칙 V).
  *
  * 이 기능은 개발 환경에서만 효력이 있고 오늘의 일기를 지운다. 가드가 우회되면 배포 사용자의 일기를 지울 수 있으므로 읽는 자리와 지우는 자리를
@@ -1079,6 +1125,10 @@ export const SCREEN_TEXT_ALLOWLIST: Readonly<Record<string, string>> = {
     "장소 데이터 해석 실패 이유 — 내부 값, `placeNamer`가 잡아 이름 「모름」으로 접는다(121 R10)",
   "src/signals/place-index-port.ts":
     "장소 데이터 읽기 실패 이유 — 내부 값, 이름 「모름」으로 접힌다(121 R10)",
+  "src/map/map-file.ts":
+    "지도 파일 해석 실패 이유 — 내부 값, `wiring.routeDay`가 잡아 「지도 없음」(125 도식)으로 접는다(126 MP8)",
+  "src/map/map-port.ts":
+    "지도 파일 읽기 실패 이유 — 내부 값, `wiring.routeDay`가 잡아 「지도 없음」으로 접는다(126 DM13)",
   "src/signals/place-names.ts": "역 이름 꼴(「○○역」) — 장소 데이터의 이름을 모델 입력으로 옮기는 규칙(121 PN)",
   "src/diagnostics/prompt-preview.ts":
     "프리셋 신호의 까닭 — 실제 buildPrompt()에 들어간다(022 PP1)",

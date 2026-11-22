@@ -790,9 +790,10 @@ export function DiaryHomeScreen({
   /**
    * 쓴 날 지면의 「하루 동선」 (125, contracts/day-route.md DF2~DF5).
    *
-   * **쓴 날이고 저장된 자리(`entry.places`)가 2곳 이상일 때만** `routeDay`로 그 날의 사진 좌표를 다시 읽는다 — 쓰는 중에는
-   * `paper`가 없으므로 읽지 않는다. 읽는 동안에는 저장된 목록(`buildDayRoute(null, …)`)이 먼저 보이고 지면은 막히지
-   * 않는다(DF4). **늦게 도착한 이전 날의 결과는 버린다** — 신호 줄(`previewFor`)·일기 읽기(`loadFor`)와 같은 방식으로,
+   * **쓴 날이고 저장된 자리(`entry.places`)가 1곳 이상일 때만** `routeDay`를 부른다(126 DM14 — 125는 2곳 이상이었다. 한 곳도 점 하나
+   * 도식과 지도를 그린다). 좌표가 저장된 일기는 사진을 읽지 않고 지도만 읽으며, 옛 일기는 그 날의 사진 좌표를 다시 읽는다 — 쓰는
+   * 중에는 `paper`가 없으므로 부르지 않는다. 읽는 동안에는 저장된 목록(`buildDayRoute(null, …)` — 좌표가 저장된 일기면 도식까지)이
+   * 먼저 보이고 지면은 막히지 않는다(DF4). **늦게 도착한 이전 날의 결과는 버린다** — 신호 줄(`previewFor`)·일기 읽기(`loadFor`)와 같은 방식으로,
    * 읽는 대상을 저장된 자리 배열의 정체성으로 가른다(날마다 새로 읽은 일기는 새 배열이다). 캐시를 두지 않는다 — 날을
    * 다시 열면 다시 읽는다(FR-015). 던져도 저장된 목록으로 남는다(DF5).
    */
@@ -806,7 +807,7 @@ export function DiaryHomeScreen({
       routeDay === undefined ||
       previewTarget === undefined ||
       routeSaved === undefined ||
-      routeSaved.length < 2
+      routeSaved.length < 1
     ) {
       // 읽을 대상이 없다 — 앞서 떠난 읽기의 늦은 결과가 이제 와서 반영되지 않게 비운다
       routeFor.current = undefined;

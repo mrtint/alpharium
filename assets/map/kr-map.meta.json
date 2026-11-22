@@ -1,0 +1,73 @@
+{
+  "source": {
+    "url": "https://download.geofabrik.de/asia/south-korea-latest.osm.pbf",
+    "lastModified": null,
+    "bytes": 292399858,
+    "sha256": "492ceebb946500fa54dd1b460b4ff923884dd9e673f65d3750e1d60122b85a8e",
+    "license": "ODbL 1.0 © OpenStreetMap contributors"
+  },
+  "output": {
+    "bytes": 9735426,
+    "sha256": "4facb12258e7df458c380f624b7720fedb424069687040bd5b5d364db02a8393",
+    "cells": 1385,
+    "layerBytes": {
+      "water": 801793,
+      "park": 1376932,
+      "rail": 169001,
+      "river": 739803,
+      "roadMajor": 874964,
+      "roadMid": 1640582,
+      "roadMinor": 4071939
+    },
+    "counts": {
+      "water": {
+        "shapes": 25772,
+        "points": 241862
+      },
+      "park": {
+        "shapes": 14379,
+        "points": 356315
+      },
+      "rail": {
+        "shapes": 8700,
+        "points": 42035
+      },
+      "river": {
+        "shapes": 9495,
+        "points": 240251
+      },
+      "roadMajor": {
+        "shapes": 40729,
+        "points": 243290
+      },
+      "roadMid": {
+        "shapes": 77355,
+        "points": 468153
+      },
+      "roadMinor": {
+        "shapes": 298629,
+        "points": 1133426
+      }
+    }
+  },
+  "build": {
+    "grid": {
+      "minLonE5": 12400000,
+      "minLatE5": 3300000,
+      "cols": 90,
+      "rows": 60
+    },
+    "cellE5": 10000,
+    "toleranceM": {
+      "water": 20,
+      "park": 50,
+      "rail": 8,
+      "river": 15,
+      "roadMajor": 8,
+      "roadMid": 10,
+      "roadMinor": 15
+    },
+    "forestToleranceM": 60,
+    "minForestM2": 10000000
+  }
+}

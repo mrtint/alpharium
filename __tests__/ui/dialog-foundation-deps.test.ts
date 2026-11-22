@@ -33,9 +33,16 @@ const FILES = [...sourceFiles("src"), "App.tsx"];
 const code = (file: string) => stripComments(readFileSync(join(ROOT, file), "utf8"));
 
 describe("DEP1 — 네이티브 의존성을 끌고 오는 패키지를 import하지 않는다 (C2, research R2)", () => {
-  it.each(["react-native-screens", "lucide-react-native", "react-native-svg"])("%s", (pkg) => {
+  it.each(["react-native-screens", "lucide-react-native"])("%s", (pkg) => {
     const offenders = FILES.filter((f) => new RegExp(`from\\s+["']${pkg}["']`).test(code(f)));
     expect(offenders).toEqual([]);
+  });
+
+  // 126 — 동선 지도가 수천 개 선·면을 그리려고 `react-native-svg`를 들였다(새 네이티브 모듈 하나, 개발 빌드 재설치). 대화상자 기반이 아니라
+  // 지도 층 한 곳(`RouteMapLayer`)에서만 쓴다 — 다른 곳으로 번지지 않게 잠근다.
+  it("react-native-svg는 지도 층 `src/ui/RouteMapLayer.tsx` 한 곳에서만 import한다 (126)", () => {
+    const offenders = FILES.filter((f) => /from\s+["']react-native-svg["']/.test(code(f)));
+    expect(offenders).toEqual(["src/ui/RouteMapLayer.tsx"]);
   });
 });
 
