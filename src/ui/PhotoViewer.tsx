@@ -42,9 +42,15 @@ export type PhotoViewerProps = {
   startIndex: number;
   /** 닫혔다 — 마지막으로 본 장 */
   onClose: (index: number) => void;
+  /**
+   * OS 「동작 줄이기」(127). **켜진 것으로 알려진 때만** `Modal`을 전환 없이 열고 닫는다 — 꺼짐·모름(`undefined`)은 종전 페이드(원칙 V).
+   * iOS의 `Modal` 페이드는 OS 값을 따르지 않아(100 실측) 앱이 고른다. 뷰어는 누를 때 마운트되어 훅 값이 아직 비어 있으므로
+   * 먼저 떠 있는 `PhotoCarousel`이 읽어 넘긴다.
+   */
+  reduceMotion?: boolean;
 };
 
-export function PhotoViewer({ photos, startIndex, onClose }: PhotoViewerProps) {
+export function PhotoViewer({ photos, startIndex, onClose, reduceMotion }: PhotoViewerProps) {
   const window = useWindowDimensions();
   const insets = useContext(SafeAreaInsetsContext);
   const count = photos.length;
@@ -96,7 +102,7 @@ export function PhotoViewer({ photos, startIndex, onClose }: PhotoViewerProps) {
 
   return (
     <Modal
-      animationType="fade"
+      animationType={reduceMotion === true ? "none" : "fade"}
       navigationBarTranslucent
       onRequestClose={close}
       statusBarTranslucent

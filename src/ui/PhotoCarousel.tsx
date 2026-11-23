@@ -43,6 +43,7 @@ import { indexAtProgress, isTap, type Point } from "../app/photo-viewer";
 import { AppText } from "./components/Text";
 import { PHOTO_VIEWER_TEXT, WRITTEN_DAY_TEXT } from "./home-text";
 import { PhotoViewer } from "./PhotoViewer";
+import { useReduceMotion } from "./reduce-motion";
 import { COLORS, WRITTEN_DAY } from "./theme/tokens";
 
 /** 이 일기가 실제로 본 사진 하나 (`DiaryEntry.photos[]`의 항목) */
@@ -61,6 +62,7 @@ export function PhotoCarousel({ photos, width }: PhotoCarouselProps) {
   const [index, setIndex] = useState(0);
   // 열린 확대 화면이 시작한 장 — 닫혀 있으면 null (data-model §2)
   const [viewerStart, setViewerStart] = useState<number | null>(null);
+  const reduceMotion = useReduceMotion();
   const carouselRef = useRef<CarouselRef>(null);
   const count = photos?.length ?? 0;
   const onProgressChange = useCallback(
@@ -78,7 +80,12 @@ export function PhotoCarousel({ photos, width }: PhotoCarouselProps) {
   if (photos === undefined || photos.length === 0) return null;
 
   const viewer = viewerStart !== null && (
-    <PhotoViewer onClose={closeViewer} photos={photos} startIndex={viewerStart} />
+    <PhotoViewer
+      onClose={closeViewer}
+      photos={photos}
+      reduceMotion={reduceMotion}
+      startIndex={viewerStart}
+    />
   );
 
   if (photos.length === 1) {

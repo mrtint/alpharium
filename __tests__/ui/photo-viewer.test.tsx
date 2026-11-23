@@ -176,3 +176,24 @@ describe("067 ZP — 핀치·두 번 탭·이동 (US3)", () => {
     }
   });
 });
+
+describe("127 — 동작 줄이기에 따른 전환", () => {
+  it("RM1 — 켜진 것으로 알려진 때만 전환 없음, 꺼짐·모름은 페이드", async () => {
+    for (const [reduceMotion, expected] of [
+      [true, "none"],
+      [false, "fade"],
+      [undefined, "fade"],
+    ] as const) {
+      const { unmount } = await render(
+        <PhotoViewer
+          onClose={() => {}}
+          photos={three}
+          reduceMotion={reduceMotion}
+          startIndex={0}
+        />,
+      );
+      expect(screen.getByTestId("photo-viewer").props.animationType).toBe(expected);
+      await unmount();
+    }
+  });
+});
