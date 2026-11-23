@@ -92,6 +92,7 @@ import {
   TOAST,
   WRITING,
   WRITTEN_DAY,
+  TYPE,
 } from "./theme/tokens";
 import { text } from "../i18n/current";
 import { SIMULATION_TEXT } from "./developer-text";
@@ -1052,13 +1053,21 @@ const DAY_NUMBER: TextStyle = {
 };
 
 /** 요일 16/700 */
-const WEEKDAY: TextStyle = { fontSize: 16, fontWeight: "700", color: COLORS.text };
+const WEEKDAY: TextStyle = {
+  fontSize: TYPE.sectionTitle.fontSize,
+  fontWeight: "700",
+  color: COLORS.text,
+};
 
 /** 상태 줄 13, 보조색 (보드 `1d` — 요일 아래) */
-const DAY_STATE: TextStyle = { fontSize: 13, color: COLORS.textMuted };
+const DAY_STATE: TextStyle = { fontSize: TYPE.caption.fontSize, color: COLORS.textMuted };
 
 /** 쓰는 중 상태 줄 13/600, 진한 레드 danger (보드 `2b` · 088 FR-001 AA 대비) */
-const WRITING_STATE: TextStyle = { fontSize: 13, fontWeight: "600", color: COLORS.danger };
+const WRITING_STATE: TextStyle = {
+  fontSize: TYPE.caption.fontSize,
+  fontWeight: "600",
+  color: COLORS.danger,
+};
 
 /** 큰 숫자와 세로 묶음 — 아래끝 맞춤, 간격 12 (보드 `1d` ②) */
 const DATE_ROW: ViewStyle = { flexDirection: "row", alignItems: "flex-end", gap: 12, marginTop: 4 };

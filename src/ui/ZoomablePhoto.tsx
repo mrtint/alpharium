@@ -36,7 +36,7 @@ import {
 import { AppText } from "./components/Text";
 import { WRITTEN_DAY_TEXT } from "./home-text";
 import type { CarouselPhoto } from "./PhotoCarousel";
-import { COLORS } from "./theme/tokens";
+import { COLORS, TYPE } from "./theme/tokens";
 
 /** 손을 뗀 뒤 제자리·확대로 옮겨 가는 시간(ms) — 사람이 정한 값 */
 const SETTLE_MS = 180;
@@ -186,4 +186,8 @@ export function ZoomablePhoto({
 
 const MISSING: ViewStyle = { flex: 1, alignItems: "center", justifyContent: "center", padding: 16 };
 
-const MISSING_TEXT = { fontSize: 15, color: COLORS.bg, textAlign: "center" } as const;
+const MISSING_TEXT = {
+  fontSize: TYPE.body.fontSize,
+  color: COLORS.bg,
+  textAlign: "center",
+} as const;

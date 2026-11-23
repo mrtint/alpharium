@@ -43,7 +43,7 @@ import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { DialogCancelButton, DismissibleDialog } from "./components/Dialog";
 import { CALENDAR_WEEKDAYS, DATE_JUMP, calendarMonthText, calendarYearText } from "./home-text";
-import { CALENDAR, COLORS } from "./theme/tokens";
+import { CALENDAR, COLORS, TYPE } from "./theme/tokens";
 
 export type DateJumpDialogProps = {
   open: boolean;
@@ -301,7 +301,11 @@ const NAV = {
 const DIMMED = { opacity: CALENDAR.disabledOpacity } as const;
 
 /** 월·연 16/700 */
-const HEAD_LABEL: TextStyle = { fontSize: 16, fontWeight: "700", color: COLORS.text };
+const HEAD_LABEL: TextStyle = {
+  fontSize: TYPE.sectionTitle.fontSize,
+  fontWeight: "700",
+  color: COLORS.text,
+};
 
 /** 요일 머리 10 */
 const WEEKDAY: TextStyle = { fontSize: 10, color: COLORS.text, textAlign: "center" };

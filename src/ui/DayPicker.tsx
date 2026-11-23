@@ -44,7 +44,7 @@ import type { DayDate } from "../config/day-boundary";
 import { AppText } from "./components/Text";
 import { weekdayShort } from "./home-text";
 import { useReduceMotion } from "./reduce-motion";
-import { COLORS, DAY_STRIP } from "./theme/tokens";
+import { COLORS, DAY_STRIP, TYPE } from "./theme/tokens";
 
 /**
  * 스트립이 다시 마운트돼도 이어 가는 기억 — 보던 첫 칸의 날과 잰 폭. 부모가 하나 만들어 갈래(쓴 날·안 쓴 날·쓰는 중)를
@@ -309,7 +309,11 @@ const CELL_DIMMED = { opacity: 0.3 } as const;
 /** 088 FR-004~FR-006 — `opacity` 없이 명시적 색(`accentForeground` / `DAY_STRIP.dowMuted`)으로 구분한다 */
 const DOW = { fontSize: 10, letterSpacing: 0.6 } as const;
 
-const NUM: TextStyle = { fontSize: 15, fontWeight: "700", fontVariant: ["tabular-nums"] };
+const NUM: TextStyle = {
+  fontSize: TYPE.body.fontSize,
+  fontWeight: "700",
+  fontVariant: ["tabular-nums"],
+};
 
 /** 오늘 밑줄 — 2px, 숫자에서 4 떨어짐 */
 const UNDERLINE = { alignSelf: "stretch", height: 2, marginTop: 4 } as const;

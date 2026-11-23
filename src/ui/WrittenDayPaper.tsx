@@ -42,7 +42,7 @@ import type { SwipeDirection } from "../app/state";
 import { DayRouteSection } from "./DayRouteSection";
 import { DaySwipe } from "./DaySwipe";
 import { PhotoCarousel } from "./PhotoCarousel";
-import { COLORS, WRITTEN_DAY } from "./theme/tokens";
+import { COLORS, WRITTEN_DAY, TYPE } from "./theme/tokens";
 
 export type WrittenDayPaperProps = {
   /** 쓴 날의 지면 상태 — 안 쓴 날(`unwritten`)에는 이 화면을 그리지 않는다 */
@@ -270,4 +270,8 @@ const PARAGRAPH = {
 } as const;
 
 /** 「지어낸 하루」 — 본문보다 작고 조용한 보조색 한 줄 */
-const MADE_UP: TextStyle = { fontSize: 13, fontWeight: "600", color: COLORS.textMuted };
+const MADE_UP: TextStyle = {
+  fontSize: TYPE.caption.fontSize,
+  fontWeight: "600",
+  color: COLORS.textMuted,
+};

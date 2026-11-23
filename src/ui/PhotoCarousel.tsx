@@ -44,7 +44,7 @@ import { AppText } from "./components/Text";
 import { PHOTO_VIEWER_TEXT, WRITTEN_DAY_TEXT } from "./home-text";
 import { PhotoViewer } from "./PhotoViewer";
 import { useReduceMotion } from "./reduce-motion";
-import { COLORS, WRITTEN_DAY } from "./theme/tokens";
+import { COLORS, WRITTEN_DAY, TYPE } from "./theme/tokens";
 
 /** 이 일기가 실제로 본 사진 하나 (`DiaryEntry.photos[]`의 항목) */
 export type CarouselPhoto = { photoId: string; takenAt: Date; resizedPath: string };
@@ -285,4 +285,8 @@ const DOT_IDLE: ViewStyle = {
 
 const MISSING: ViewStyle = { flex: 1, alignItems: "center", justifyContent: "center", padding: 8 };
 
-const MISSING_TEXT = { fontSize: 13, color: COLORS.textMuted, textAlign: "center" } as const;
+const MISSING_TEXT = {
+  fontSize: TYPE.caption.fontSize,
+  color: COLORS.textMuted,
+  textAlign: "center",
+} as const;

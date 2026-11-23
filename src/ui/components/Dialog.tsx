@@ -43,7 +43,7 @@ import { Button } from "../rnr/button";
 import { Dialog, DialogContent, DialogTitle } from "../rnr/dialog";
 import { Text } from "../rnr/text";
 import { AppText } from "./Text";
-import { COLORS, DIALOG, OVERLAY, RADIUS } from "../theme/tokens";
+import { COLORS, DIALOG, OVERLAY, RADIUS, TYPE } from "../theme/tokens";
 
 /**
  * 최신 값을 담는 ref — 마운트 시점에 붙잡힌 콜백도 지금의 함수를 부르게 한다. 렌더 중에 ref를 쓰지
@@ -268,10 +268,19 @@ const BODY_SCROLL = { flexGrow: 0, flexShrink: 1 } as const;
 const BODY = { gap: DIALOG.gap } as const;
 
 /** 제목 20/700, 줄높이 1.3 */
-const TITLE = { fontSize: 20, fontWeight: "700", lineHeight: 26, color: COLORS.text } as const;
+const TITLE = {
+  fontSize: TYPE.title.fontSize,
+  fontWeight: "700",
+  lineHeight: 26,
+  color: COLORS.text,
+} as const;
 
 /** 설명 16, 줄높이 1.5, 보조색 */
-const DESCRIPTION = { fontSize: 16, lineHeight: 24, color: COLORS.textMuted } as const;
+const DESCRIPTION = {
+  fontSize: TYPE.sectionTitle.fontSize,
+  lineHeight: 24,
+  color: COLORS.textMuted,
+} as const;
 
 const FOOTER = { flexDirection: "column", gap: DIALOG.buttonGap } as const;
 
@@ -296,4 +305,4 @@ const CANCEL = {
 } as const;
 
 /** 버튼 글자 16/600 */
-const LABEL = { fontSize: 16, fontWeight: "600" } as const;
+const LABEL = { fontSize: TYPE.sectionTitle.fontSize, fontWeight: "600" } as const;

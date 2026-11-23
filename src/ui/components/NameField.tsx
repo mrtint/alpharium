@@ -12,7 +12,7 @@
 import { TextInput, View, type KeyboardTypeOptions } from "react-native";
 
 import { AppText } from "./Text";
-import { COLORS, TEXT_FONT } from "../theme/tokens";
+import { COLORS, TEXT_FONT, TYPE } from "../theme/tokens";
 
 export function NameField({
   value,
@@ -104,7 +104,7 @@ const INPUT_ROW_COMPACT = {
 const INPUT_COMPACT = {
   flex: 1,
   padding: 0,
-  fontSize: 15,
+  fontSize: TYPE.body.fontSize,
   fontWeight: "600",
   color: COLORS.text,
 } as const;
