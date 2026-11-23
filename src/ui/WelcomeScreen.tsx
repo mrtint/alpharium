@@ -46,7 +46,7 @@ import { lazyText } from "../i18n/current";
 import { Button } from "./components/Button";
 import { NameField } from "./components/NameField";
 import { AppText } from "./components/Text";
-import { COLORS } from "./theme/tokens";
+import { COLORS, TYPE } from "./theme/tokens";
 
 /**
  * 지금 어느 단계인가.
@@ -355,7 +355,11 @@ const WELCOME_TITLE = {
 } as const;
 
 /** 1a 본문 — 16px / line-height 1.5. */
-const WELCOME_BODY = { fontSize: 16, lineHeight: 24, color: COLORS.textMuted } as const;
+const WELCOME_BODY = {
+  fontSize: TYPE.sectionTitle.fontSize,
+  lineHeight: 24,
+  color: COLORS.textMuted,
+} as const;
 
 /** 1a 구분선 — 2px, 위아래 8. */
 const DIVIDER = {

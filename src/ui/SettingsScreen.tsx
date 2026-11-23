@@ -37,7 +37,7 @@ import {
   POLICY_LINKS_TEXT,
   SETTINGS_TEXT,
 } from "./settings-text";
-import { COLORS, SETTINGS } from "./theme/tokens";
+import { COLORS, SETTINGS, TYPE } from "./theme/tokens";
 
 const { group, paperPadding, row, tag, toggle } = SETTINGS;
 
@@ -591,7 +591,7 @@ const VALUE_MONO: TextStyle = {
   ...VALUE,
   // 보드 `6e`·`6h`: 고정폭 값은 13(일반 값 15보다 작다). 서체는 Pretendard이고 숫자 폭만 고정폭(`VALUE`의
   // `tabular-nums`) — 보드의 고정폭 서체는 따르지 않는다(083 FR-009)
-  fontSize: 13,
+  fontSize: TYPE.caption.fontSize,
 };
 const HINT_MONO: TextStyle = {
   fontSize: 11,

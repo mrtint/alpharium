@@ -28,7 +28,7 @@ import { AppText } from "./components/Text";
 import { DialogCancelButton, DismissibleDialog } from "./components/Dialog";
 import { SIMULATION_TEXT } from "./developer-text";
 import { CALENDAR_WEEKDAYS, calendarMonthText, calendarYearText } from "./home-text";
-import { CALENDAR, COLORS } from "./theme/tokens";
+import { CALENDAR, COLORS, TYPE } from "./theme/tokens";
 
 export type SimulationDateDialogProps = {
   open: boolean;
@@ -179,7 +179,11 @@ const NAV = {
   borderColor: COLORS.border,
 } as const;
 
-const HEAD_LABEL: TextStyle = { fontSize: 16, fontWeight: "700", color: COLORS.text };
+const HEAD_LABEL: TextStyle = {
+  fontSize: TYPE.sectionTitle.fontSize,
+  fontWeight: "700",
+  color: COLORS.text,
+};
 
 const WEEKDAY: TextStyle = { fontSize: 10, color: COLORS.text, textAlign: "center" };
 

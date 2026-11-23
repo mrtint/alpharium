@@ -19,7 +19,7 @@ import { DIAGNOSTICS_TEXT as T } from "../app/diagnostics-text";
 import type { ProbeAxis, ProbeCell } from "../app/diagnostics-view";
 import type { PromptPreview } from "../diagnostics/types";
 import { AppText } from "./components/Text";
-import { COLORS, SETTINGS } from "./theme/tokens";
+import { COLORS, SETTINGS, TYPE } from "./theme/tokens";
 
 const AXIS_LABEL: Readonly<Record<ProbeAxis, string>> = {
   photos: T.probePhotos,
@@ -122,7 +122,7 @@ export function PromptPreviewBox({
             >
               <AppText
                 style={{
-                  fontSize: 13,
+                  fontSize: TYPE.caption.fontSize,
                   fontWeight: on ? "800" : "600",
                   textAlign: "center",
                   color: on ? COLORS.bg : COLORS.text,
@@ -172,7 +172,7 @@ export function PromptPreviewBox({
  */
 const LABEL: TextStyle = { fontSize: 11, fontWeight: "600", color: COLORS.textMuted };
 const VALUE_KNOWN: TextStyle = {
-  fontSize: 15,
+  fontSize: TYPE.body.fontSize,
   fontWeight: "700",
   fontVariant: ["tabular-nums"],
   color: COLORS.text,

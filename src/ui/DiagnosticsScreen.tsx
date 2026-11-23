@@ -34,7 +34,7 @@ import { SIMULATION_TEXT } from "./developer-text";
 import { SETTINGS_TEXT } from "./settings-text";
 import { text } from "../i18n/current";
 import { Group, Row, Value } from "./SettingsScreen";
-import { COLORS } from "./theme/tokens";
+import { COLORS, TYPE } from "./theme/tokens";
 
 /** 자동 쓰기 한 번의 결과 — 진단은 스케줄 계층 타입에 닿지 않는다(DS8) */
 export type AutoRunResult = "ran" | "skipped" | "failed";
@@ -84,7 +84,11 @@ const PERMISSION_TEXT = {
 } as const;
 
 /** 064 — 차단 문구(설정 행 보조 줄과 같은 크기·색) */
-const BLOCKED_TEXT: TextStyle = { marginTop: 8, fontSize: 13, color: COLORS.textMuted };
+const BLOCKED_TEXT: TextStyle = {
+  marginTop: 8,
+  fontSize: TYPE.caption.fontSize,
+  color: COLORS.textMuted,
+};
 
 const BUTTON: ViewStyle = {
   height: 48,
@@ -92,7 +96,7 @@ const BUTTON: ViewStyle = {
   alignItems: "center",
   justifyContent: "center",
 };
-const BUTTON_TEXT: TextStyle = { fontSize: 15, fontWeight: "700" };
+const BUTTON_TEXT: TextStyle = { fontSize: TYPE.body.fontSize, fontWeight: "700" };
 
 /** 062 — 모듈을 불러올 때 문구를 읽지 않게 함수로 둔다(contracts C4) */
 function autoText(result: AutoRunResult): string {
@@ -217,7 +221,13 @@ export function DiagnosticsScreen({
             onPress={onRefreshProbe}
             testID="diagnostics-probe-refresh"
           >
-            <AppText style={{ fontSize: 13, fontWeight: "700", textDecorationLine: "underline" }}>
+            <AppText
+              style={{
+                fontSize: TYPE.caption.fontSize,
+                fontWeight: "700",
+                textDecorationLine: "underline",
+              }}
+            >
               {T.probeRefresh}
             </AppText>
           </Pressable>
