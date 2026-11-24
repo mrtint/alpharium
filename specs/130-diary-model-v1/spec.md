@@ -20,3 +20,9 @@
 
 - `readiness.ts`의 비교를 `if (false)`로 바꾸면 모델 테스트 2건 실패(판정·정리 둘 다).
 - `verification.ts`의 지름길을 끄면 1건 실패(지문 재계산 0회 단언).
+
+## 기록 — 실기기 (SM-S901N, dev 빌드 + 이 브랜치 Metro 번들, 2026-11-24)
+
+- 전: `state.json`의 `a1` 기록 `verifiedMd5 dfc35a88…`(옛 kanana-v3-dpo), `a1.bin` 1,241,435,520바이트.
+- 앱을 열자 옛 `a1.bin`과 기록이 지워지고 16구간 받기가 시작됐다(19:38). 약 1분 뒤 `a1` 기록 `verifiedMd5 0de25a2d5cf36d7e6b8ba1da968436ff`·`passed: true`(19:39).
+- 못 본 것: iOS, 모바일 데이터 안내 경로(이 기기는 Wi-Fi), 교체 뒤 새 모델로 실제 일기 쓰기, 화면에 보인 안내 모양.
