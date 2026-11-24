@@ -33,7 +33,7 @@
 - [X] T012 시딩 스크립트·문서 주석의 023 설명 갱신(`scripts/seed-day.mts`·`scripts/seed/device.ts`), 층 1 흐름 기대값 확인(SC-005)
 - [X] T013 AGENTS.md 해당 서술 갱신(023 폴더 거르기·128 읽기 전 판정·`getUri()` 폴더)
 - [X] T014 `npm test`·`npm run lint`
-- [ ] T015 실기기: SM-S901N·iPhone 14 quickstart 수행, 「기록」 채움(SC-001·002)
+- [X] T015 실기기: SM-S901N·iPhone 14 quickstart 수행, 「기록」 채움(SC-001·002)
 
 ## Dependencies
 
