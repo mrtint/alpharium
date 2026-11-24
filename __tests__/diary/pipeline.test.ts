@@ -1341,6 +1341,7 @@ describe("018 — PipelineInput.seen이 backend.generate()로 그대로 전달�
     captions: [{ photoId: "a", takenAt: new Date("2026-08-12T08:00:00"), text: "커피잔" }],
     considered: 1,
     available: 1,
+    unreadable: 0,
   };
 
   it("seen을 채워 run()을 부르면 backend.generate()가 세 번째 인자로 그 값을 받는다", async () => {

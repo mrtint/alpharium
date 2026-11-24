@@ -52,6 +52,10 @@ export type Photo = {
    * 읽지 않으면 그대로 동작한다.
    */
   folderName?: string;
+  /** 128 — `PhotoFacts`의 파일 이름·가로·세로를 이월한 값. 모르면 없다 */
+  filename?: string;
+  width?: number;
+  height?: number;
 };
 
 /** GPS로 본 이동. 좌표의 나열이 아니라 "얼마나 움직였나"의 요약이다. */

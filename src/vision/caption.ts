@@ -22,6 +22,55 @@ import { resizePhoto, type ResizeExecutor } from "./resize";
 import type { PhotoCaption, PhotoVision } from "./types";
 import type { VisionEngine } from "./vision-port";
 
+/* ─────────────────────── 128 — 문서류 판정 (contracts/detection.md) ───────────────────────
+ *
+ * **판정은 이 파일 한 곳에만 있다**(FR-001). 기준은 전부 **사람이 정한 값이고 측정이 아니다**
+ * (`select.ts`의 `NON_CAMERA_FOLDERS` 선례) — 근거는 2026-11-24 SM-S901N에서 실제 사진으로 본
+ * 묘사다: 카메라로 찍은 영수증·서류와 스크린샷 12건이 전부 묘사 대신 「**Question:** … **Answer:** …」
+ * 문답 꼴로 금액·날짜를 지어냈고, 보통 사진 4장에는 그 꼴이 없었다(specs/128 research R1·R3).
+ * 표본이 작다. 바깥에서 기준을 읽거나 바꿀 수 없도록 export하지 않는다(FR-005).
+ *
+ * 수만 센다 — 거른 묘사의 글·이유는 어디에도 남기지 않는다(원칙 IV).
+ * ─────────────────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * 읽기 전 — 화면 캡처로 볼 세로/가로 비율의 하한. 폰 화면은 19.5:9·20:9(≈2.17~2.22),
+ * 카메라는 4:3·16:9(≤1.78). 가로로 긴 파노라마는 세로가 짧아 걸리지 않는다. 사람이 정한 값.
+ */
+const SCREEN_ASPECT_MIN = 2;
+
+/** 읽기 전 — 이 접두로 시작하는 파일 이름은 화면 캡처다(대소문자 무시). 사람이 정한 값 */
+const SCREENSHOT_NAME_PREFIX = "screenshot";
+
+/**
+ * 읽은 뒤 — 이 낱말을 품은 묘사는 문서로 본다(낱말 경계, 복수형 포함, 대소문자 무시).
+ * `table`·`text`·`paper`·`screen`은 넣지 않는다 — 호텔방 묘사에 `table`이 실제로 나왔다.
+ * 사람이 정한 값.
+ */
+const DOCUMENT_WORDS = /\b(receipt|invoice|document|transaction)s?\b/i;
+
+/** 읽은 뒤 — 꾸밈 기호(`*`·`#`)와 공백을 벗긴 묘사가 이것으로 시작하면 문답 꼴이다. 사람이 정한 값 */
+const QUESTION_MARKER = /^question:/i;
+
+/** 묘사 전에 알아본 화면 캡처인가. 이름·크기를 모르면 그 값으로는 판정하지 않는다(원칙 V) */
+function looksLikeScreenCapture(photo: Photo): boolean {
+  if (
+    photo.filename !== undefined &&
+    photo.filename.toLowerCase().startsWith(SCREENSHOT_NAME_PREFIX)
+  ) {
+    return true;
+  }
+  const { width, height } = photo;
+  if (width === undefined || height === undefined || width <= 0 || height <= 0) return false;
+  return height / width >= SCREEN_ASPECT_MIN;
+}
+
+/** 묘사가 문서를 말하는가 — 문답 꼴이거나 문서 낱말을 품는다 */
+function describesDocument(text: string): boolean {
+  const bare = text.replace(/^[\s*#]+/, "");
+  return QUESTION_MARKER.test(bare) || DOCUMENT_WORDS.test(text);
+}
+
 /**
  * 사진 파일의 실제 경로를 얻는 함수.
  *
@@ -80,6 +129,7 @@ export async function captionAll(
   onPhotoStart?: PhotoAdvanceSignal,
 ): Promise<PhotoVision | null> {
   const captions: PhotoCaption[] = [];
+  let unreadable = 0;
 
   for (const photo of photos) {
     // E5 — 그만두면 **거기까지 읽은 것을 버린다**(FR-009).
@@ -91,6 +141,12 @@ export async function captionAll(
 
     // 015 — 사진 전환 신호. 취소 검사 직후, 경로 해석 이전.
     onPhotoStart?.();
+
+    // 128 D2 — 화면 캡처는 경로를 풀지도, 줄이지도, 묘사하지도 않는다. 사본이 생기지 않는다.
+    if (looksLikeScreenCapture(photo)) {
+      unreadable += 1;
+      continue;
+    }
 
     // 경로를 얻지 못하면 이 장은 읽지 못한 것이다. **나머지는 계속 읽는다**(E4).
     let path: string | null;
@@ -142,6 +198,16 @@ export async function captionAll(
     // (contracts/photo-preservation.md P2). 아무도 참조하지 못하므로 미룰
     // 이유가 없다 — 성공한 장만 삭제를 미룬다(아래로 이어짐).
     // ─────────────────────────────────────────────────────────────────────
+    // 128 D3 — 문서 묘사는 담지 않는다. 빈 묘사와 같은 길로 사본을 즉시 지우되, 실패가 아니라
+    // 거른 장으로 센다(빈 묘사는 `unreadable`에 세지 않는다 — D4).
+    if (result.text !== "" && describesDocument(result.text)) {
+      if (shouldCleanup && cleanup !== undefined) {
+        await cleanup(captionPath).catch(() => {});
+      }
+      unreadable += 1;
+      continue;
+    }
+
     if (result.text === "") {
       if (shouldCleanup && cleanup !== undefined) {
         await cleanup(captionPath).catch(() => {});
@@ -175,5 +241,5 @@ export async function captionAll(
   // 마지막으로 한 번 더 본다 — 마지막 장을 읽는 동안 그만뒀을 수 있다.
   if (cancel?.cancelled === true) return null;
 
-  return { captions, considered: photos.length, available };
+  return { captions, considered: photos.length, available, unreadable };
 }

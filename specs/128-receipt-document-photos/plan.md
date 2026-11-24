@@ -50,3 +50,5 @@ __tests__/vision/…, __tests__/diary/…, __tests__/inference/…
 ## Complexity Tracking
 
 없음.
+
+- **소유자 결정(2026-11-24)**: iPhone 「적용 전」 일기는 재지 않는다 — 같은 VLM이라 안드로이드 「전」으로 갈음한다(SC-001의 iPhone 「전」 미측정).

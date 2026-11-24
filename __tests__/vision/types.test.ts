@@ -90,9 +90,10 @@ describe("PhotoCaption — 원칙 IV의 첫 방어선", () => {
 describe("PhotoVision — 세 수가 함께 다닌다 (FR-006)", () => {
   const declaration = declarationOf("PhotoVision");
 
-  it("captions·considered·available 셋을 지닌다", () => {
+  // 128 — 문서류로 거른 장의 수(`unreadable`)가 넷째로 더해졌다. 수만이다(원칙 IV).
+  it("captions·considered·available·unreadable 넷을 지닌다", () => {
     const fields = [...declaration.matchAll(/^\s{2}(\w+)\??:/gm)].map((m) => m[1]);
-    expect(fields.sort()).toEqual(["available", "captions", "considered"]);
+    expect(fields.sort()).toEqual(["available", "captions", "considered", "unreadable"]);
   });
 
   it("시간·속도·점수를 담지 않는다 (원칙 IV)", () => {

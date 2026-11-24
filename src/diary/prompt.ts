@@ -782,6 +782,14 @@ function sentenceSignalLines(
     const when = spanOf(ph.value.photos.map((p) => p.takenAt.getHours()));
     lines.push(`사진은 ${koCount(ph.value.photos.length, "장")}이 남았어요. ${when} 찍혔어요.`);
     if (!ph.value.complete) lines.push(S_TRUNCATED);
+    // 128 — 본 장면이 없는 날, 문서류로 거른 장만 있었다면 그 사실만 쓴다(FR-009·009a). 읽지 못한
+    // 내용을 짐작하게 두지 않는다(원칙 II·V). 묘사가 남은 날에는 쓰지 않는다 — 흐릿한 한 줄이
+    // 지어내기 압력이 된다(005). 신호 줄이라 되뱉기 판정 대상이 아니다(FR-010).
+    if (kind === "unread" && vision !== undefined && vision.unreadable > 0) {
+      lines.push(
+        `글자가 적힌 사진이 ${koCount(vision.unreadable, "장")} 있었지만 내용은 읽지 못했어요.`,
+      );
+    }
   } else if (ph.kind === "unknown") {
     lines.push(PHOTOS_UNSEEN);
   } else {

@@ -342,7 +342,10 @@ async function readPhotos(
 
     // 073 — 사진이 후보로 주어졌으나 캡션 결과가 0장이면 정상 시각 완료로 다루지 않고
     // 실패로 반환한다. 「사진은 쌓였는데 못 봤다」는 unread 거짓 일기가 저장되는 것을 막는다(원칙 II·V).
-    if (selected.length > 0 && result.captions.length === 0) {
+    //
+    // 128 — 단, 문서류로 거른 장이 있으면 실패가 아니다: 「글자가 적힌 사진을 읽지 못했다」가 관측된
+    // 사실이고, 프롬프트가 그것을 고정 한 줄로 쓴다(FR-008). 거른 장이 0일 때만 종전대로 실패다.
+    if (selected.length > 0 && result.captions.length === 0 && result.unreadable === 0) {
       return { kind: "failed", reason: "전량 캡션 실패 (0장 생성)" };
     }
 

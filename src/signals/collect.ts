@@ -62,7 +62,15 @@ function usablePhotos(facts: PhotoFacts[], endMs: number): Photo[] {
       // 023 — `folderName`을 이월한다. `PhotoFacts`가 안 채웠으면 `undefined`로
       // 넘어가며 그것이 "분류 불가"다(select.ts가 판정). 004의 판정은 이 필드를
       // 읽지 않으므로 여기서 옮기는 것만으로 충분하다.
-      .map((f) => ({ id: f.id, takenAt: new Date(f.takenAtMs), folderName: f.folderName }))
+      .map((f) => ({
+        id: f.id,
+        takenAt: new Date(f.takenAtMs),
+        folderName: f.folderName,
+        // 128 — 이름·크기. 없으면 키 자체를 만들지 않는다.
+        ...(f.filename !== undefined ? { filename: f.filename } : {}),
+        ...(f.width !== undefined ? { width: f.width } : {}),
+        ...(f.height !== undefined ? { height: f.height } : {}),
+      }))
       .sort((a, b) => a.takenAt.getTime() - b.takenAt.getTime())
   );
 }

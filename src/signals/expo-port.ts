@@ -159,7 +159,14 @@ export function expoPhotoPort(): PhotoPort {
       // 자리(사진 선별을 실제로 하는 on-device.ts, 상한 초과인 하루)만
       // `folderNamesFor()`를 부른다 — 장수만 세는 004 경로는 `getUri()`를
       // 치르지 않는다.
-      return metadata.map((asset) => ({ id: asset.id, takenAtMs: asset.creationTime }));
+      // 128 — 이름·크기는 이 메타데이터에 이미 있다. `null`(모름)은 싣지 않는다.
+      return metadata.map((asset) => ({
+        id: asset.id,
+        takenAtMs: asset.creationTime,
+        ...(asset.filename != null ? { filename: asset.filename } : {}),
+        ...(asset.width != null ? { width: asset.width } : {}),
+        ...(asset.height != null ? { height: asset.height } : {}),
+      }));
     },
 
     /**

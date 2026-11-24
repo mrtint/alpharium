@@ -164,6 +164,7 @@ const twoCaptions = () => ({
   captions: [caption(12, "A woman looking at a menu."), caption(18, "A busy street.")],
   considered: 2,
   available: 2,
+  unreadable: 0,
 });
 
 /* ═══════════════════ E1 — 머리 (061 지시서 §1) ═══════════════════ */
@@ -334,7 +335,7 @@ describe("E9 — 꼬리는 날의 갈래 넷", () => {
       noSceneTail(WHY.unread, MINE.unread),
     );
     // 캡션을 하나도 못 읽은 vision이 와도 같다
-    const unreadVision = { captions: [], considered: 3, available: 5 };
+    const unreadVision = { captions: [], considered: 3, available: 5, unreadable: 0 };
     const p = buildPrompt(req(TRUNCATED, "quiet"), unreadVision);
     expect(lastLine(p)).toBe(noSceneTail(WHY.unread, MINE.unread));
     // 「일부만 보았다」는 「사진 속을 보지 못했다」와 어긋나므로 싣지 않는다 (research R3)
@@ -463,6 +464,7 @@ describe("V5 — 원본 케이스의 기록·꼬리", () => {
       captions: [caption(19, "A desk with a laptop and a cup.")],
       considered: 1,
       available: 1,
+      unreadable: 0,
     };
     expect(record(buildPrompt(req(s, "quiet"), vision))).toEqual([
       SIG_HEAD,
@@ -496,6 +498,7 @@ describe("V5 — 원본 케이스의 기록·꼬리", () => {
       ],
       considered: 3,
       available: 3,
+      unreadable: 0,
     };
     expect(
       record(
@@ -628,7 +631,12 @@ describe("E10 — titleQuestion", () => {
 
 describe("E5 — instructionLines 한국어 분기 (원본 행과 같은 순서)", () => {
   it("본 장면 있는 날: 머리 넷 → 한계 → 제목 질문 → 언어 줄 → 꼬리 (077 — 꼬리도 담는다, FR-009)", () => {
-    const vision = { captions: [caption(12, "A menu.")], considered: 1, available: 3 };
+    const vision = {
+      captions: [caption(12, "A menu.")],
+      considered: 1,
+      available: 3,
+      unreadable: 0,
+    };
     expect(instructionLines(req(TRUNCATED, "quiet", OPEN), vision)).toEqual([
       ...HEAD_RULES,
       S_DAY_OPEN,
@@ -796,5 +804,45 @@ describe("위반 주입 — 방어가 실제로 잡는가", () => {
 
   it("권한 없는 날이 0장 꼬리를 받으면 E9 ④가 잡는다", () => {
     expect(buildPrompt(req(UNSEEN, "quiet"))).toContain(WHY.unseen);
+  });
+});
+
+/* ═══════════════════ 128 — 문서류만 있던 날의 고정 한 줄 (P2·FR-009·009a·010) ═══════════════════ */
+
+describe("128 — 글자가 적힌 사진만 있던 날", () => {
+  const LINE = (n: string) => `글자가 적힌 사진이 ${n} 있었지만 내용은 읽지 못했어요.`;
+  const lastLine = (p: string) => p.split("\n").at(-1);
+  const docsOnly = (unreadable: number): PhotoVision => ({
+    captions: [],
+    considered: unreadable,
+    available: 5,
+    unreadable,
+  });
+
+  it("본 장면 없음 + 거른 장 4 → 사진 문장 바로 뒤에 고정 줄, 꼬리는 본 장면 없는 날 틀", () => {
+    const p = buildPrompt(req(TRUNCATED, "quiet"), docsOnly(4));
+    const lines = p.split("\n");
+    const at = lines.findIndex((l) => l.includes(LINE("네 장")));
+    expect(at).toBeGreaterThan(0);
+    // 사진 문장(과 그에 딸린 잘림 줄) 뒤, 자리 문장 앞
+    const photoAt = lines.findIndex((l) => /^사진은 .*장이 남았어요/.test(l));
+    expect(photoAt).toBeGreaterThanOrEqual(0);
+    expect(at).toBeGreaterThan(photoAt);
+    expect(at - photoAt).toBeLessThanOrEqual(2);
+    expect(lastLine(p)).toBe(noSceneTail(WHY.unread, MINE.unread));
+  });
+
+  it("거른 장이 0이면 없다", () => {
+    expect(buildPrompt(req(TRUNCATED, "quiet"), docsOnly(0))).not.toContain("글자가 적힌 사진");
+  });
+
+  it("묘사가 남은 날(본 장면 있음)에는 없다", () => {
+    const mixed = { ...twoCaptions(), unreadable: 2 };
+    expect(buildPrompt(req(TRUNCATED, "quiet"), mixed)).not.toContain("글자가 적힌 사진");
+  });
+
+  it("신호 줄이지 지시 줄이 아니다 — 본문이 옮겨도 되뱉기 대상이 아니다", () => {
+    const lines = instructionLines(req(TRUNCATED, "quiet"), docsOnly(4));
+    expect(lines.join("\n")).not.toContain("글자가 적힌 사진");
   });
 });

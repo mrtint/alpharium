@@ -107,3 +107,25 @@ describe("getUri는 기다림 한도 안에서만 부른다", () => {
     expect(CODE).not.toMatch(/await\s+asset\.getUri\(\)/);
   });
 });
+
+/**
+ * 128 — `photosBetween()`이 메타데이터의 filename·width·height를 싣는다(방안 1의 재료).
+ * `exeForMetadata()`가 이미 주는 값이다 — 새 네이티브·장당 호출이 없다. `null`은 싣지 않는다(원칙 V).
+ */
+describe("128 — photosBetween이 이름·크기를 싣는다", () => {
+  const SOURCE = readFileSync(join(__dirname, "../../src/signals/expo-port.ts"), "utf8");
+  const CODE = SOURCE.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const body = CODE.match(/async photosBetween\([^)]*\)[^{]*\{([\s\S]*?)\n {4}\}/)?.[1] ?? "";
+
+  it.each(["filename", "width", "height"])("%s를 asset에서 읽는다", (field) => {
+    expect(body).toMatch(new RegExp(`asset\\.${field}`));
+  });
+
+  it("null을 걸러 싣는다 — null 그대로 넘기지 않는다", () => {
+    expect(body).toMatch(/!= null|!== null/);
+  });
+
+  it("장마다 비동기 호출을 더하지 않는다", () => {
+    expect(body).not.toMatch(/getMediaSubtypes|getFilename|getWidth|getHeight|getInfo/);
+  });
+});
