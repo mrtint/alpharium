@@ -45,13 +45,13 @@ describe("로스터 — 캐릭터와 모델 자산의 매핑", () => {
     const asset = assetFor("quiet");
     expect(asset.key).toBe("a1");
     expect(asset.url).toBe(
-      "https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf",
+      "https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/pocketlog-diary/v1.0.0/pocketlog-diary-v1.0.0.gguf",
     );
     expect(asset.fallbackUrl).toBe(
-      "https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/main/kanana-v3-dpo-iq4_nl_im.gguf",
+      "https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/model-v1.0.0/pocketlog-diary-v1.0.0.gguf",
     );
     expect(asset.expectedBytes).toBe(1_241_435_520);
-    expect(asset.md5).toBe("dfc35a88fb1f5215f708ea5a348121b8");
+    expect(asset.md5).toBe("0de25a2d5cf36d7e6b8ba1da968436ff");
   });
 
   // R2 — 크기를 모르면 공간 판정도 완료 판정도 불가능하다

@@ -139,6 +139,15 @@ export function readinessOf(input: ReadinessInput): ModelReadiness {
     return { kind: "unusable", reason: REASON.corrupted };
   }
 
+  // 6c. 검증할 때 본 지문이 기준과 다르다 — 옛 버전이다 (130).
+  //
+  // 새 모델이 옛 모델과 바이트 수가 같으면 크기로는 갈리지 않는다. 그때 통과한 기록은
+  // "옛 기준으로 온전했다"는 뜻일 뿐이라, 로스터의 지문이 바뀌면 다시 받아야 한다.
+  // 기록값끼리만 견주며 파일 지문을 다시 계산하지 않는다. 기준이 비었으면 견주지 않는다.
+  if (input.expectedMd5 !== "" && verdict.verifiedMd5 !== input.expectedMd5) {
+    return { kind: "unusable", reason: REASON.staleVerdict };
+  }
+
   // 7. 전부 통과.
   return { kind: "ready" };
 }

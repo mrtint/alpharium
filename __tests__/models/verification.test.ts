@@ -8,8 +8,8 @@
  * 사실상 판정되지 않는다.
  */
 
-import { verifyDownloaded } from "../../src/models/verification";
-import type { ModelFilePort } from "../../src/models/port";
+import { settleExistingFile, verifyDownloaded } from "../../src/models/verification";
+import type { MetadataPort, ModelFilePort } from "../../src/models/port";
 
 /** 파일 대역. 크기와 지문을 따로 정할 수 있어 "크기는 같은데 내용이 다른" 경우를 만든다. */
 function filePort(bytes: number | null, hash: string | null): ModelFilePort {
@@ -108,5 +108,79 @@ describe("내용 검증", () => {
     expect(verdict).not.toHaveProperty("verifiedAt");
     expect(verdict).not.toHaveProperty("elapsed");
     expect(verdict).not.toHaveProperty("duration");
+  });
+});
+
+// 130 — 옛 모델과 새 모델의 바이트 수가 같다. 기록의 지문으로 옛 버전을 가려 다시 받는다.
+describe("이미 있는 파일 정리 — 같은 크기·다른 지문", () => {
+  function metadataPort(
+    initial: object,
+  ): MetadataPort & { contents: () => { verdicts: unknown[] } } {
+    let raw: string | null = JSON.stringify(initial);
+    return {
+      async read() {
+        return raw;
+      },
+      async writeAtomically(c: string) {
+        raw = c;
+      },
+      contents: () => JSON.parse(raw ?? "null"),
+    };
+  }
+
+  it("옛 지문으로 통과한 기록이면 지문을 다시 계산하지 않고 파일·기록을 지운 뒤 받으러 간다", async () => {
+    const removed: string[] = [];
+    let hashed = 0;
+    const files: ModelFilePort = {
+      async facts() {
+        return { exists: true, bytes: 1000 };
+      },
+      async contentHash() {
+        hashed++;
+        return "old";
+      },
+      async remove(key) {
+        removed.push(key);
+      },
+      async bytesUsed() {
+        return 1000;
+      },
+    };
+    const metadata = metadataPort({
+      verdicts: [{ assetKey: "a1", verifiedMd5: "old", verifiedBytes: 1000, passed: true }],
+      paused: [],
+      segmented: [],
+    });
+
+    const result = await settleExistingFile(
+      { files, metadata },
+      { assetKey: "a1", expectedBytes: 1000, expectedMd5: "new" },
+    );
+
+    expect(result).toBe("download");
+    expect(removed).toEqual(["a1"]);
+    expect(hashed).toBe(0);
+    expect(metadata.contents().verdicts).toEqual([]);
+  });
+
+  it("기록의 지문이 기준과 같으면 그대로 준비됨이다", async () => {
+    const removed: string[] = [];
+    const files: ModelFilePort = {
+      ...filePort(1000, "new"),
+      async remove(key) {
+        removed.push(key);
+      },
+    };
+    const metadata = metadataPort({
+      verdicts: [{ assetKey: "a1", verifiedMd5: "new", verifiedBytes: 1000, passed: true }],
+      paused: [],
+      segmented: [],
+    });
+    const result = await settleExistingFile(
+      { files, metadata },
+      { assetKey: "a1", expectedBytes: 1000, expectedMd5: "new" },
+    );
+    expect(result).toBe("ready");
+    expect(removed).toEqual([]);
   });
 });

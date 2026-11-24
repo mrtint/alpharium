@@ -123,6 +123,22 @@ export async function settleExistingFile(
     return "download";
   }
 
+  // 130 — 옛 기준 지문으로 통과한 기록이면 옛 버전 파일이다. 지문을 다시 계산하지 않고
+  // (1.2GB를 읽어 봐야 옛 지문이 나올 뿐이다) 파일과 기록을 지운 뒤 다시 받는다.
+  const recorded = verdictFor(state, target.assetKey);
+  if (
+    recorded !== null &&
+    recorded.assetKey === target.assetKey &&
+    recorded.passed &&
+    recorded.verifiedBytes === file.bytes &&
+    target.expectedMd5 !== "" &&
+    recorded.verifiedMd5 !== target.expectedMd5
+  ) {
+    await ports.files.remove(target.assetKey);
+    await mutateState(ports.metadata, (fresh) => withoutAsset(fresh, target.assetKey));
+    return "download";
+  }
+
   // 지문 계산이 던져도 받으러 간다 — 깨진 파일이 있는 기기가 재시도마다 같은 자리에서 막히면 안 된다.
   const verdict = await verifyDownloaded(ports.files, target).catch(() => null);
   if (verdict?.passed) {

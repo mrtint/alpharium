@@ -1,0 +1,22 @@
+# 130 — 온디바이스 일기 모델을 `pocketlog-diary-v1.0.0`으로 갱신
+
+**출처**: `docs/roadmap/README.md` 같은 이름의 과제(소유자 결정 2026-11-24 — 자산 키·파일 이름 변경 대신 판정에 MD5 비교).
+**트랙**: 경량(새 데이터 모델·외부 연동 없음, 변경 파일 4개 — `roster.ts`·`readiness.ts`·`verification.ts`·`AGENTS.md`, 수용 기준 3개).
+
+## 수용 기준
+
+1. `ASSETS.quiet`가 새 주소(R2 · Hugging Face 태그 `model-v1.0.0` 고정)·`expectedBytes 1_241_435_520`·`md5 0de25a2d5cf36d7e6b8ba1da968436ff`를 가리킨다(`roster.test.ts`).
+2. `readinessOf`는 검증 기록의 `verifiedMd5`가 기준 `md5`와 다르면 `unusable`(옛 버전)이다. 기준 `md5`가 비면 견주지 않는다(`readiness.test.ts`).
+3. `settleExistingFile`은 옛 지문으로 통과한 기록(같은 자산·같은 크기)을 만나면 파일 지문을 다시 계산하지 않고 파일과 기록을 지운 뒤 `download`를 낸다(`verification.test.ts`).
+
+## 결정
+
+| 결정 | 근거 | 뒤집으면 바뀌는 것 |
+| --- | --- | --- |
+| 옛 버전 판정 때 지문을 다시 계산하지 않고 곧바로 지운다 | 기록이 통과·같은 크기·옛 지문이면 다시 읽어도 옛 지문이 나온다. 1.24GB 해시를 아낀다 | 해시를 한 번 더 하면 기록이 틀린 드문 경우(파일이 이미 새 것인데 기록만 옛 것)를 살린다 |
+| 까닭 문구는 기존 `staleVerdict`(「예전에 받은 것이라 다시 받아야 한다」)를 쓴다 | 뜻이 같고 모델 정보를 담지 않는다(FR-004) | 새 문구면 카탈로그·테스트 추가 |
+
+## 위반 주입
+
+- `readiness.ts`의 비교를 `if (false)`로 바꾸면 모델 테스트 2건 실패(판정·정리 둘 다).
+- `verification.ts`의 지름길을 끄면 1건 실패(지문 재계산 0회 단언).

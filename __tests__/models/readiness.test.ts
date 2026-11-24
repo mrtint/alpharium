@@ -168,6 +168,24 @@ describe("준비 상태 판정", () => {
     expect(state.kind).toBe("unusable");
   });
 
+  // 130 — 같은 크기의 새 모델로 바뀌면 옛 기록의 지문이 기준과 어긋난다
+  it("검증 기록의 지문이 기준과 다르면 '쓸 수 있음'이 아니다(옛 버전)", () => {
+    const state = readinessOf({
+      ...READY,
+      verdict: { ...READY.verdict!, verifiedMd5: "old" },
+    });
+    expect(state.kind).toBe("unusable");
+  });
+
+  it("기준 지문이 비어 있으면 기록의 지문과 견주지 않는다", () => {
+    const state = readinessOf({
+      ...READY,
+      expectedMd5: "",
+      verdict: { ...READY.verdict!, verifiedMd5: "anything" },
+    });
+    expect(state.kind).toBe("ready");
+  });
+
   // D15 — 오류 메시지가 원칙 III의 누출 경로다
   it("까닭에 모델 정보가 담기지 않는다", () => {
     const states = [
