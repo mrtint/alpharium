@@ -128,7 +128,6 @@ export async function settleExistingFile(
   const recorded = verdictFor(state, target.assetKey);
   if (
     recorded !== null &&
-    recorded.assetKey === target.assetKey &&
     recorded.passed &&
     recorded.verifiedBytes === file.bytes &&
     target.expectedMd5 !== "" &&
