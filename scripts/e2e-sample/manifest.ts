@@ -191,7 +191,7 @@ export const SITUATIONS: Situation[] = [
   },
   {
     name: "clutter",
-    description: "카메라 3장 + 스크린샷 2장 + 다운로드 1장 — 잡사진은 좌표 없음, 장소 2곳",
+    description: "카메라 3장 + 스크린샷 2장 + 다운로드 1장 — 잡사진은 좌표 없음, 재료는 카메라 3장(129), 장소 2곳",
     slots: [
       s("09:30", "Camera", "street", "work"),
       s("11:45", "Camera", "document", "work"),
@@ -232,7 +232,7 @@ export const SITUATIONS: Situation[] = [
   },
   {
     name: "screenshots-only",
-    description: "스크린샷만 세 장 — 좌표 없음, 사진 3장·장소 0곳",
+    description: "스크린샷만 세 장 — 129부터 사진 없는 날(재료 0장)·장소 0곳",
     slots: [
       s("21:00", "Screenshots", "document", null),
       s("21:05", "Screenshots", "document", null),

@@ -31,16 +31,10 @@ import type { VisionEngine } from "./vision-port";
  * 표본이 작다. 바깥에서 기준을 읽거나 바꿀 수 없도록 export하지 않는다(FR-005).
  *
  * 수만 센다 — 거른 묘사의 글·이유는 어디에도 남기지 않는다(원칙 IV).
+ *
+ * 129 — 128의 읽기 전 판정(이름 `Screenshot*`·세로/가로 ≥ 2)은 수집 단계(`signals/camera-only.ts`)로 옮겼다.
+ * 화면 캡처는 여기 오기 전에 그 날의 사진에서 빠지고, `unreadable`은 읽은 뒤 판정만 센다.
  * ─────────────────────────────────────────────────────────────────────────────────────── */
-
-/**
- * 읽기 전 — 화면 캡처로 볼 세로/가로 비율의 하한. 폰 화면은 19.5:9·20:9(≈2.17~2.22),
- * 카메라는 4:3·16:9(≤1.78). 가로로 긴 파노라마는 세로가 짧아 걸리지 않는다. 사람이 정한 값.
- */
-const SCREEN_ASPECT_MIN = 2;
-
-/** 읽기 전 — 이 접두로 시작하는 파일 이름은 화면 캡처다(대소문자 무시). 사람이 정한 값 */
-const SCREENSHOT_NAME_PREFIX = "screenshot";
 
 /**
  * 읽은 뒤 — 이 낱말을 품은 묘사는 문서로 본다(낱말 경계, 복수형 포함, 대소문자 무시).
@@ -51,19 +45,6 @@ const DOCUMENT_WORDS = /\b(receipt|invoice|document|transaction)s?\b/i;
 
 /** 읽은 뒤 — 꾸밈 기호(`*`·`#`)와 공백을 벗긴 묘사가 이것으로 시작하면 문답 꼴이다. 사람이 정한 값 */
 const QUESTION_MARKER = /^question:/i;
-
-/** 묘사 전에 알아본 화면 캡처인가. 이름·크기를 모르면 그 값으로는 판정하지 않는다(원칙 V) */
-function looksLikeScreenCapture(photo: Photo): boolean {
-  if (
-    photo.filename !== undefined &&
-    photo.filename.toLowerCase().startsWith(SCREENSHOT_NAME_PREFIX)
-  ) {
-    return true;
-  }
-  const { width, height } = photo;
-  if (width === undefined || height === undefined || width <= 0 || height <= 0) return false;
-  return height / width >= SCREEN_ASPECT_MIN;
-}
 
 /** 묘사가 문서를 말하는가 — 문답 꼴이거나 문서 낱말을 품는다 */
 function describesDocument(text: string): boolean {
@@ -141,12 +122,6 @@ export async function captionAll(
 
     // 015 — 사진 전환 신호. 취소 검사 직후, 경로 해석 이전.
     onPhotoStart?.();
-
-    // 128 D2 — 화면 캡처는 경로를 풀지도, 줄이지도, 묘사하지도 않는다. 사본이 생기지 않는다.
-    if (looksLikeScreenCapture(photo)) {
-      unreadable += 1;
-      continue;
-    }
 
     // 경로를 얻지 못하면 이 장은 읽지 못한 것이다. **나머지는 계속 읽는다**(E4).
     let path: string | null;

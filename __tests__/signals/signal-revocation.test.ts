@@ -52,14 +52,14 @@ function fakePort(overrides: PortOverrides = {}): PhotoPort {
         )),
     locationOf: overrides.locationOf ?? (async () => ({ kind: "absent" as const })),
     filePathOf: async () => null,
-    folderNamesFor: async () => new Map(),
   };
 }
 
+// 129 — 출처는 카메라 사진(iOS 꼴, 종류 없음)
 const threePhotos: PhotoFacts[] = [
-  { id: "a", takenAtMs: at("2026-08-27T09:00:00") },
-  { id: "b", takenAtMs: at("2026-08-27T13:00:00") },
-  { id: "c", takenAtMs: at("2026-08-27T18:00:00") },
+  { id: "a", takenAtMs: at("2026-08-27T09:00:00"), mediaSubtypes: [] },
+  { id: "b", takenAtMs: at("2026-08-27T13:00:00"), mediaSubtypes: [] },
+  { id: "c", takenAtMs: at("2026-08-27T18:00:00"), mediaSubtypes: [] },
 ];
 
 describe("SR1 — granted가 아닌 모든 권한 상태 → unknown, never none", () => {

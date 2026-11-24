@@ -154,7 +154,7 @@ async function main(): Promise<never> {
       const name = `${day}-${String(index).padStart(3, "0")}.jpg`;
       const localPath = join(workDir, name);
       // 023 — `folder`가 있으면 `SEED_FOLDER/<folder>/` 아래로 간다. 023의
-      // `folderNameOf()`가 그 폴더 이름을 뽑아 스크린샷·다운로드로 분류한다.
+      // 129 — `camera-only.ts`가 `Camera`가 아닌 하위 폴더(스크린샷·다운로드)를 재료에서 뺀다.
       const devicePath = seedPathFor(name, photo.folder);
       writeFileSync(localPath, buffer);
 

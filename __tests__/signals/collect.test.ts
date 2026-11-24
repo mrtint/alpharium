@@ -59,17 +59,20 @@ function fakePort(overrides: PortOverrides = {}): { port: PhotoPort; counters: C
     photosBetween:
       overrides.photosBetween ??
       (async (fromMs, toMs) =>
-        (overrides.photos ?? []).filter(
-          (p) => p.takenAtMs === null || (p.takenAtMs >= fromMs && p.takenAtMs < toMs),
-        )),
+        (overrides.photos ?? [])
+          .filter((p) => p.takenAtMs === null || (p.takenAtMs >= fromMs && p.takenAtMs < toMs))
+          // 129 — 출처를 적지 않은 대역 사진은 카메라 사진(iOS 꼴, 종류 없음)으로 둔다 — 004 판정 표가 그대로 돈다.
+          .map((p) =>
+            p.localPath === undefined && p.mediaSubtypes === undefined
+              ? { ...p, mediaSubtypes: [] }
+              : p,
+          )),
     locationOf:
       overrides.locationOf ??
       (async (id) => overrides.locations?.[id] ?? { kind: "absent" as const }),
     // 011이 넓힌 계약. **004의 신호 수집은 이것을 부르지 않는다** — 부르면 사진을
     // 세기만 하는 경로가 파일 경로를 들고 다니게 된다.
     filePathOf: async () => null,
-    // 023이 넓힌 계약. 004의 신호 수집은 이것도 부르지 않는다(같은 이유).
-    folderNamesFor: async () => new Map(),
   };
 
   return { port, counters };
@@ -233,8 +236,8 @@ describe("C6·C7 — 하루에 넣을 수 없는 사진은 버린다", () => {
     // 기기 시계가 어긋났던 흔적. 어느 하루를 물어도 그 하루에 속하지 않는다.
     const { port } = fakePort({
       photosBetween: async () => [
-        { id: "future", takenAtMs: at("2027-01-01T10:00:00") },
-        { id: "ok", takenAtMs: at("2026-08-12T10:00:00") },
+        { id: "future", takenAtMs: at("2027-01-01T10:00:00"), mediaSubtypes: [] },
+        { id: "ok", takenAtMs: at("2026-08-12T10:00:00"), mediaSubtypes: [] },
       ],
     });
 
@@ -361,48 +364,90 @@ describe("C4 — 사진 목록이 찍힌 시각 순이다 (FR-004)", () => {
 });
 
 /**
- * 023 — `PhotoFacts.folderName`을 `Photo`로 이월한다 (SC-009).
- *
- * 계약: specs/023-photo-selection-algorithm/data-model.md §2
- *
- * 004의 판정은 이 필드를 읽지 않는다 — 위 모든 describe가 `folderName` 없이도
- * 그대로 통과하는 것이 SC-009다. 여기서는 있으면 옮겨지는 것만 확인한다.
+ * 129 — 카메라로 찍은 사진만 하루의 사진이다 (contracts/camera-only.md CC1~CC3).
  */
-describe("023 — folderName 이월 (SC-009)", () => {
-  it("PhotoFacts.folderName이 있으면 Photo에 그대로 실린다", async () => {
+describe("129 — 카메라 사진만 담는다", () => {
+  const cam = (id: string, hh: string) => ({
+    id,
+    takenAtMs: at(`2026-08-12T${hh}:00:00`),
+    localPath: `/storage/emulated/0/DCIM/Camera/${id}.jpg`,
+  });
+  const elsewhere = (id: string, hh: string, folder: string) => ({
+    id,
+    takenAtMs: at(`2026-08-12T${hh}:00:00`),
+    localPath: `/storage/emulated/0/${folder}/${id}.jpg`,
+  });
+  const seeded = {
+    id: "seed",
+    takenAtMs: at("2026-08-12T15:00:00"),
+    localPath: "/storage/emulated/0/Pictures/PocketlogSeed/s.jpg",
+  };
+
+  it("섞인 날은 카메라 사진만 남는다 (US1)", async () => {
     const { port } = fakePort({
       photos: [
-        { id: "cam", takenAtMs: at("2026-08-12T08:00:00"), folderName: "Camera" },
-        { id: "shot", takenAtMs: at("2026-08-12T12:00:00"), folderName: "Screenshots" },
-        { id: "unknown-folder", takenAtMs: at("2026-08-12T19:00:00") },
+        cam("a", "08"),
+        elsewhere("shot", "09", "DCIM/Screenshots"),
+        elsewhere("dl", "10", "Download"),
+        elsewhere("qs", "11", "Download/Quick Share"),
+        elsewhere("kakao", "12", "Pictures/KakaoTalk"),
+        { id: "ios-shot", takenAtMs: at("2026-08-12T13:00:00"), mediaSubtypes: ["screenshot"] },
+        cam("b", "14"),
       ],
     });
-
     const signals = await collectDaySignals(port, DAY);
-
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {
-      expect(signals.photos.value.photos.map((p) => [p.id, p.folderName])).toEqual([
-        ["cam", "Camera"],
-        ["shot", "Screenshots"],
-        ["unknown-folder", undefined],
-      ]);
+      expect(signals.photos.value.photos.map((p) => p.id)).toEqual(["a", "b"]);
     }
   });
 
-  it("folderName이 하나도 없어도 004 판정은 known 그대로다", async () => {
+  it("화면 캡처뿐인 날은 none이다 — unknown이 아니다 (US2)", async () => {
     const { port } = fakePort({
-      photos: [
-        { id: "a", takenAtMs: at("2026-08-12T09:00:00") },
-        { id: "b", takenAtMs: at("2026-08-12T10:00:00") },
-      ],
+      photos: [elsewhere("shot", "09", "DCIM/Screenshots"), elsewhere("dl", "10", "Download")],
     });
-
     const signals = await collectDaySignals(port, DAY);
+    expect(signals.photos).toEqual({ kind: "none" });
+  });
 
-    expect(signals.photos.kind).toBe("known");
+  it("출처를 모르는 사진은 뺀다 (FR-008)", async () => {
+    const { port } = fakePort({
+      photosBetween: async () => [{ id: "x", takenAtMs: at("2026-08-12T09:00:00") }],
+    });
+    const signals = await collectDaySignals(port, DAY);
+    expect(signals.photos).toEqual({ kind: "none" });
+  });
+
+  it("장소는 카메라 사진의 좌표만 묻는다 (CC3)", async () => {
+    const asked: string[] = [];
+    const { port } = fakePort({
+      photos: [cam("a", "08"), elsewhere("dl", "10", "Download")],
+      locationOf: async (id) => {
+        asked.push(id);
+        return { kind: "absent" };
+      },
+    });
+    await collectDaySignals(port, DAY);
+    expect(asked).toEqual(["a"]);
+  });
+
+  it("시딩 폴더는 allowSeed일 때만 담고, 기본은 빼는 쪽이다 (CC1, US3)", async () => {
+    const { port } = fakePort({ photos: [seeded] });
+    expect((await collectDaySignals(port, DAY)).photos).toEqual({ kind: "none" });
+    expect((await collectDaySignals(port, DAY, { allowSeed: false })).photos).toEqual({
+      kind: "none",
+    });
+    const dev = await collectDaySignals(port, DAY, { allowSeed: true });
+    expect(dev.photos.kind).toBe("known");
+  });
+
+  it("하루 신호의 사진에 경로·종류를 싣지 않는다 (011 경계)", async () => {
+    const { port } = fakePort({ photos: [cam("a", "08")] });
+    const signals = await collectDaySignals(port, DAY);
     if (signals.photos.kind === "known") {
-      expect(signals.photos.value.photos.every((p) => p.folderName === undefined)).toBe(true);
+      const photo = signals.photos.value.photos[0] as Record<string, unknown>;
+      expect(photo).not.toHaveProperty("localPath");
+      expect(photo).not.toHaveProperty("mediaSubtypes");
     }
   });
 });
@@ -650,9 +695,9 @@ describe("128 — 이름·크기 이월", () => {
         {
           id: "shot",
           takenAtMs: at("2026-08-12T08:00:00"),
-          filename: "Screenshot_1.jpg",
-          width: 1440,
-          height: 3120,
+          filename: "IMG_1.jpg",
+          width: 4000,
+          height: 3000,
         },
         { id: "bare", takenAtMs: at("2026-08-12T09:00:00") },
       ],
@@ -661,7 +706,7 @@ describe("128 — 이름·크기 이월", () => {
     expect(signals.photos.kind).toBe("known");
     if (signals.photos.kind === "known") {
       const [shot, bare] = signals.photos.value.photos;
-      expect([shot.filename, shot.width, shot.height]).toEqual(["Screenshot_1.jpg", 1440, 3120]);
+      expect([shot.filename, shot.width, shot.height]).toEqual(["IMG_1.jpg", 4000, 3000]);
       expect("filename" in bare || "width" in bare || "height" in bare).toBe(false);
     }
   });

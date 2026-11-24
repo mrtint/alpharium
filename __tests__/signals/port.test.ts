@@ -31,13 +31,16 @@ function stubPort(overrides: Partial<PhotoPort> = {}): PhotoPort {
     locationOf: async () => ({ kind: "absent" }),
     // 011이 넓힌 계약. 대역은 경로를 모른다 — 캡션을 돌리지 않는 스위트다
     filePathOf: async () => null,
-    // 023이 넓힌 계약. 같은 이유로 대역은 폴더를 모른다
-    folderNamesFor: async () => new Map(),
     ...overrides,
   };
 }
 
-const photo = (id: string, iso: string): PhotoFacts => ({ id, takenAtMs: at(iso) });
+// 129 — 출처는 카메라 사진(iOS 꼴, 종류 없음)으로 둔다
+const photo = (id: string, iso: string): PhotoFacts => ({
+  id,
+  takenAtMs: at(iso),
+  mediaSubtypes: [],
+});
 const found = (latitude: number, longitude: number): LocationOutcome => ({
   kind: "found",
   latitude,

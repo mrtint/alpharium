@@ -75,8 +75,8 @@ const FLOWS = [
   // 완주하는가**를 본다(SEED_DAY로 심은 날짜를 넘긴다 — 선행: `npm run seed:day --
   // many-camera <날짜>`).
   // ⚠️ **핵심 검증은 여기 없다** — 상한 값 실측(T031, `adb logcat`의 캡션·토큰),
-  // 시간 분포가 하루에 걸치는가(T036, 캡션된 `takenAt` 읽기), 잡사진 필터링
-  // (D1, `mixed-clutter`로 Screenshots·Download 제외 확인)은 사람이 logcat과
+  // 시간 분포가 하루에 걸치는가(T036, 캡션된 `takenAt` 읽기), 카메라 사진만 재료인가
+  // (129, `mixed-clutter`로 Screenshots·Download 제외 확인)은 사람이 logcat과
   // 저장된 일기를 읽어 판단한다. quickstart.md D1~D4를 손으로 확인한다.
   // **건너뛴 것은 통과가 아니다**(원칙 V).
   ".maestro/photo-selection-over-limit.yml",

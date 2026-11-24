@@ -485,7 +485,7 @@ export function checkVisionFile(fileName: string, contents: string): Violation[]
  * ─────────────────────────────────────────────────────────────────────────
  */
 const PORT_CLASSIFIES_PHOTO =
-  /\bNON_CAMERA_FOLDERS\b|\bfrom\s+["'][^"']*vision\/(?:select|classify)["']|\b(?:isScreenshot|isNonCamera|classifyPhoto)\b/;
+  /\bNON_CAMERA_FOLDERS\b|\bfrom\s+["'][^"']*(?:vision\/(?:select|classify)|camera-only)["']|\b(?:isScreenshot|isNonCamera|classifyPhoto|isCameraPhoto)\b/;
 
 /**
  * 소스 파일 하나가 사진 통로인지 보고, 맞으면 위 규칙을 적용한다.
@@ -505,7 +505,7 @@ export function checkPhotoPortFile(fileName: string, contents: string): Violatio
       violations.push({
         file: `${normalized}:${index + 1}`,
         key: code.trim(),
-        rule: "기기 통로가 잡사진을 판정한다 — 폴더 이름 추출까지만, 대조는 select.ts (023, spec Clarification)",
+        rule: "기기 통로가 사진 출처를 판정한다 — 사실을 싣기까지만, 판정은 signals/camera-only.ts (023·129)",
       });
     }
   }
@@ -1245,4 +1245,60 @@ export function formatViolations(violations: Violation[]): string {
   }
 
   return lines.join("\n");
+}
+
+/**
+ * 시딩 사진 인정의 자리 (129 SP1~SP3, 원칙 V).
+ *
+ * 시딩 폴더(`Pictures/PocketlogSeed`)는 판정에 성공한 개발 환경에서만 카메라 사진이다. 배포 빌드에 새면 시딩 폴더에
+ * 사진을 둔 사용자의 재료가 바뀐다. 이름을 아는 자리와 인정 여부를 구하는 자리를 소스로 좁힌다(106 `checkFastCycleFile` 선례).
+ *
+ *  - **SP1** `src/` 안에서 문자열 `PocketlogSeed`(대소문자 무시)는 `src/signals/camera-only.ts`에만
+ *  - **SP2** `allowsSeedPhotos(` 호출은 `src/app/wiring.ts`에서만(정의 파일 제외)
+ *  - **SP3** `camera-only.ts`는 `process.env`를 읽지 않고 `config/environment`를 import하지 않는다 — 환경은 인자다
+ *  - **SP4** `src/`에서 `allowSeed: true`를 값으로 적지 않는다 — 인정 여부는 `allowsSeedPhotos(resolution)`로만 정한다
+ */
+const SEED_PHOTO_FILE = "src/signals/camera-only.ts";
+const SEED_PHOTO_CALLER = "src/app/wiring.ts";
+
+export function checkSeedPhotoFile(fileName: string, contents: string): Violation[] {
+  const normalized = fileName.split("\\").join("/");
+  if (!normalized.startsWith("src/")) return [];
+  const code = contents.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const at = (key: string) => ({ file: normalized, key });
+  const violations: Violation[] = [];
+
+  if (normalized !== SEED_PHOTO_FILE && /pocketlogseed/i.test(code)) {
+    violations.push({
+      ...at("PocketlogSeed"),
+      rule: "시딩 폴더 이름을 camera-only.ts 밖에서 안다 — 시딩 인정은 판정 자리 하나에만 (129 SP1)",
+    });
+  }
+
+  if (
+    normalized !== SEED_PHOTO_FILE &&
+    normalized !== SEED_PHOTO_CALLER &&
+    /(?<!function\s)\ballowsSeedPhotos\s*\(/.test(code)
+  ) {
+    violations.push({
+      ...at("allowsSeedPhotos"),
+      rule: "시딩 인정 여부를 조립부(wiring.ts) 밖에서 구한다 (129 SP2)",
+    });
+  }
+
+  if (/\ballowSeed\s*:\s*true\b/.test(code)) {
+    violations.push({
+      ...at("allowSeed: true"),
+      rule: "시딩 인정을 값으로 박아 넣는다 — allowsSeedPhotos(resolution)로만 정한다 (129 SP4)",
+    });
+  }
+
+  if (normalized === SEED_PHOTO_FILE && (/process\.env/.test(code) || /config\/environment["']/.test(code))) {
+    violations.push({
+      ...at("environment"),
+      rule: "camera-only.ts가 환경을 직접 읽는다 — 환경 판정 결과는 인자로 받는다 (129 SP3)",
+    });
+  }
+
+  return violations;
 }

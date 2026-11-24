@@ -1,4 +1,4 @@
-import { folderNameOf } from "../../src/signals/expo-port";
+import { isCameraPhoto } from "../../src/signals/camera-only";
 import { SEED_FOLDER, seedPathFor } from "../../scripts/seed/device";
 
 /**
@@ -6,7 +6,7 @@ import { SEED_FOLDER, seedPathFor } from "../../scripts/seed/device";
  *
  * 계약: specs/023-photo-selection-algorithm/tasks.md T054
  *
- * `folderNameOf()`(읽는 쪽)의 대칭. `device.ts`의 나머지는 adb 경계라
+ * 129 — 읽는 쪽(`isCameraPhoto`)과의 대칭. `device.ts`의 나머지는 adb 경계라
  * 실기기에서 확인하지만(010), 이 순수 함수는 여기서 잠근다.
  */
 describe("seedPathFor", () => {
@@ -26,13 +26,18 @@ describe("seedPathFor", () => {
     }
   });
 
-  it("folderNameOf와 왕복한다 — seedPathFor가 만든 경로에서 folder를 되뽑는다", () => {
-    // 023의 분류가 실기기에서 이 경로를 볼 때 `folderNameOf()`가 그 폴더
-    // 이름을 뽑아 잡사진으로 갈라내야 한다.
-    expect(folderNameOf(`file://${seedPathFor("s.jpg", "Screenshots")}`)).toBe("Screenshots");
-    expect(folderNameOf(`file://${seedPathFor("d.jpg", "Download")}`)).toBe("Download");
-    // folder 미지정이면 마지막 폴더는 "PocketlogSeed" — 잡사진 목록에 없어
-    // 카메라 원본으로 분류된다(의도된 동작).
-    expect(folderNameOf(`file://${seedPathFor("c.jpg")}`)).toBe("PocketlogSeed");
+  it("camera-only 판정과 왕복한다 — 개발 환경에서 Camera·바로 아래만 카메라 사진 (129)", () => {
+    const facts = (path: string) => ({
+      id: "1",
+      takenAtMs: 1,
+      localPath: path.replace(/^\/sdcard/, "/storage/emulated/0"),
+    });
+    const dev = { allowSeed: true };
+    expect(isCameraPhoto(facts(seedPathFor("c.jpg")), dev)).toBe(true);
+    expect(isCameraPhoto(facts(seedPathFor("c.jpg", "Camera")), dev)).toBe(true);
+    expect(isCameraPhoto(facts(seedPathFor("s.jpg", "Screenshots")), dev)).toBe(false);
+    expect(isCameraPhoto(facts(seedPathFor("d.jpg", "Download")), dev)).toBe(false);
+    // 배포 판정이면 시딩은 하나도 아니다
+    expect(isCameraPhoto(facts(seedPathFor("c.jpg")), { allowSeed: false })).toBe(false);
   });
 });

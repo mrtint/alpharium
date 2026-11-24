@@ -9,6 +9,7 @@ import {
   checkSeedFile,
   checkSimulationFile,
   checkFastCycleFile,
+  checkSeedPhotoFile,
   checkSourceFile,
   checkVisionFile,
   formatViolations,
@@ -589,7 +590,7 @@ describe("checkPhotoPortFile", () => {
     const violations = checkPhotoPortFile("src/signals/expo-port.ts", line);
 
     expect(violations).toHaveLength(1);
-    expect(violations[0].rule).toContain("폴더 이름 추출까지만");
+    expect(violations[0].rule).toContain("판정은 signals/camera-only.ts");
   });
 
   it("폴더 이름을 뽑는 정상적인 코드는 잡지 않는다", () => {
@@ -1016,5 +1017,76 @@ describe("checkFastCycleFile — 빠른 주기의 읽기·지우기 위치 (106 
         '// import { loadFastCycle } from "../schedule/fast-cycle-store";\n/* resetFastCycleIfDue( */',
       ),
     ).toEqual([]);
+  });
+});
+
+describe("checkSeedPhotoFile — 시딩 사진 인정의 자리 (129 SP1~SP3)", () => {
+  it("SP1 시딩 폴더 이름은 camera-only.ts에만", () => {
+    expect(
+      checkSeedPhotoFile("src/signals/camera-only.ts", 'const S = ["pictures", "pocketlogseed"];'),
+    ).toEqual([]);
+    expect(
+      checkSeedPhotoFile("src/signals/collect.ts", 'if (p.includes("PocketlogSeed")) {}'),
+    ).toHaveLength(1);
+    // 주석·scripts/는 대상이 아니다
+    expect(checkSeedPhotoFile("src/signals/collect.ts", "// PocketlogSeed 설명")).toEqual([]);
+    expect(
+      checkSeedPhotoFile("scripts/seed/device.ts", 'const F = "/sdcard/Pictures/PocketlogSeed";'),
+    ).toEqual([]);
+  });
+
+  it("SP2 allowsSeedPhotos( 호출은 wiring.ts에서만", () => {
+    expect(
+      checkSeedPhotoFile("src/app/wiring.ts", "const a = allowsSeedPhotos(resolution);"),
+    ).toEqual([]);
+    expect(
+      checkSeedPhotoFile("src/signals/camera-only.ts", "export function allowsSeedPhotos(r) {}"),
+    ).toEqual([]);
+    expect(
+      checkSeedPhotoFile("src/schedule/task.ts", "const a = allowsSeedPhotos(resolution);"),
+    ).toHaveLength(1);
+  });
+
+  it("SP3 camera-only.ts는 환경을 직접 읽지 않는다", () => {
+    expect(
+      checkSeedPhotoFile("src/signals/camera-only.ts", "const e = process.env.X;"),
+    ).toHaveLength(1);
+    expect(
+      checkSeedPhotoFile(
+        "src/signals/camera-only.ts",
+        'import { currentEnvironment } from "../config/environment";',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("SP4 allowSeed: true를 값으로 적지 않는다", () => {
+    expect(
+      checkSeedPhotoFile("src/app/wiring.ts", "collectDaySignals(port, day, { allowSeed: true });"),
+    ).toHaveLength(1);
+    expect(
+      checkSeedPhotoFile("src/app/wiring.ts", "collectDaySignals(port, day, { allowSeed });"),
+    ).toEqual([]);
+  });
+
+  it("실제 저장소 소스는 위반이 없다", () => {
+    for (const f of [
+      "src/signals/camera-only.ts",
+      "src/app/wiring.ts",
+      "src/signals/collect.ts",
+      "src/signals/expo-port.ts",
+    ]) {
+      expect(checkSeedPhotoFile(f, readFileSync(join(__dirname, "../..", f), "utf8"))).toEqual([]);
+    }
+  });
+});
+
+describe("checkPhotoPortFile — 129: 기기 통로는 카메라 판정을 import하지 않는다", () => {
+  it("camera-only import·isCameraPhoto를 잡는다", () => {
+    expect(
+      checkPhotoPortFile(
+        "src/signals/expo-port.ts",
+        'import { isCameraPhoto } from "./camera-only";',
+      ).length,
+    ).toBeGreaterThan(0);
   });
 });
