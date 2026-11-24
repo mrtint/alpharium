@@ -146,6 +146,28 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 
 **위험**: 이 앱의 약속(배터리·권한)에 가장 크게 닿는 과제다. 백그라운드 쓰기와 같은 OS 제한(삼성 얼림·iOS 깨움 비보장)을 받아 며칠 단위 실측이 든다 — 개발 빌드 검증이 끝나기 전에는 릴리스 빌드로 가지 않는다(작업 습관). 위치 이력은 이 앱이 지금 다루는 어떤 데이터보다 민감해 소유자 판단이 필요하다.
 
+### 온디바이스 일기 모델을 `pocketlog-diary-v1.0.0`(v4.3e 정본, EXP-018)으로 갱신
+
+**배경**: `terrarium` 릴리스 `model-v1.0.0`의 새 일기 모델이 사진 5~8장 과밀 날의 압축 서사와 전 품질 게이트(33종·Phase3·Dense-15 100%)를 통과했다. 이를 앱의 `quiet` 캐릭터 모듈로 바꾸고, Hugging Face 폴백 주소를 움직이는 `resolve/main` 대신 태그 고정 주소(`resolve/model-v1.0.0/...`)로 바꾼다.
+
+**수정 대상**: `src/models/roster.ts`(`ASSETS.quiet`), `__tests__/models/roster.test.ts`(주소·바이트·MD5 하드코딩 검증값 동기화).
+
+**반영값(`ASSETS.quiet`)**:
+
+- `url`: `https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/pocketlog-diary/v1.0.0/pocketlog-diary-v1.0.0.gguf`
+- `fallbackUrl`: `https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/model-v1.0.0/pocketlog-diary-v1.0.0.gguf`
+- `expectedBytes`: `1_241_435_520`
+- `md5`: `0de25a2d5cf36d7e6b8ba1da968436ff`
+
+**완료 조건**:
+
+- `roster.test.ts`를 포함한 모델 로더 단위 테스트 전체 통과.
+- 기존 설치 기기에서 크기·MD5 변경을 감지해 모델을 자동 교체(`settleExistingFile`)하고 새 파일의 무결성 검증까지 실기기로 확인.
+
+**후속**: 앱 전환이 끝나면 `terrarium` R2 버킷의 옛 `models/kanana-v3-dpo/`를 지운다.
+
+**위험**: 지금 `ASSETS.quiet.expectedBytes`도 `1_241_435_520`이라 **새 파일과 바이트 수가 같다** — 크기로는 옛 파일을 가르지 못하고, 기기 파일 이름이 바뀌지 않으면 MD5 검증만이 교체를 일으킨다. `settleExistingFile`이 같은 크기·다른 MD5 파일을 실제로 지우고 다시 받는지 착수 때 먼저 확인한다(안 되면 파일 이름 변경 등 교체 경로가 필요하다). 이 문서의 「캐릭터 페르소나」 서술(모델 파일 이름)도 함께 고친다.
+
 ## 완료 이력
 
 과제별 상세 기록(배경·실측·결정)은 각 `specs/NNN-*/`와 이 파일의 git 히스토리
