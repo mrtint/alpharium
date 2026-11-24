@@ -62,15 +62,18 @@ export type { Character };
 const ASSETS: Readonly<Record<Character, ModelAsset>> = {
   quiet: {
     key: "a1",
-    // 122 — 일기 특화 kanana-v3-dpo(IQ4_NL imatrix). 주 경로 Cloudflare R2(r2.dev 개발 주소 —
+    // 130 — terrarium model-v1.0.0 정본(v4.3e, EXP-018) `pocketlog-diary-v1.0.0`. 옛 kanana-v3-dpo와
+    // 바이트 수가 같아 크기로는 갈리지 않는다 — 판정이 검증 기록의 지문을 이 md5와 견준다.
+    // 예비 경로는 움직이는 main 대신 태그 고정 주소다.
+    // (122 — 일기 특화 kanana-v3-dpo(IQ4_NL imatrix)에서 시작.) 주 경로 Cloudflare R2(r2.dev 개발 주소 —
     // 트래픽 제한이 있어 상용 전 커스텀 도메인은 소유자가 정한다), 예비 경로 Hugging Face.
     // 실측(2026-11-21, curl): R2 200 · Content-Length 1241435520 · Range 206.
     // 크기·지문은 옆 저장소 terrarium EXP-013~015에서 확정한 값이다.
-    url: "https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/kanana-v3-dpo/kanana-v3-dpo-iq4_nl_im.gguf",
+    url: "https://pub-9ba5686e50794962939808ea062b7deb.r2.dev/models/pocketlog-diary/v1.0.0/pocketlog-diary-v1.0.0.gguf",
     fallbackUrl:
-      "https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/main/kanana-v3-dpo-iq4_nl_im.gguf",
+      "https://huggingface.co/mrtint0729/kanana-1.5-2.1b-diary-dpo-gguf/resolve/model-v1.0.0/pocketlog-diary-v1.0.0.gguf",
     expectedBytes: 1_241_435_520,
-    md5: "dfc35a88fb1f5215f708ea5a348121b8",
+    md5: "0de25a2d5cf36d7e6b8ba1da968436ff",
   },
   // 037(헌법 1.6.0): a2(exaone)·a3(hyperclovax)·a4(qwen3)·a5(gemma3)가
   // 로스터를 나갔다. 자동 생성에 부적합이 실측으로 확정됐다 —
