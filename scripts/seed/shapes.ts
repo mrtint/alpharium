@@ -27,7 +27,7 @@ export type PlannedPhoto = {
   /**
    * 023 — 이 사진을 어느 하위 폴더에 심을지. 없으면 `SEED_FOLDER` 바로 아래
    * (기존 동작). `"Screenshots"`·`"Download"`면 `SEED_FOLDER/<그 이름>/` 아래로
-   * 가고, 023의 `folderNameOf()`가 그 이름을 뽑아 잡사진으로 분류한다.
+   * 가고, 129의 `camera-only.ts`가 `Camera`가 아닌 하위 폴더를 재료에서 뺀다.
    * `"Camera"`는 명시적으로 카메라 원본임을 나타낸다(생략과 결과는 같다).
    */
   folder?: "Camera" | "Screenshots" | "Download";
@@ -255,11 +255,11 @@ const SHAPES: DayShape[] = [
   // ───────────────────── 023 Phase 8 — burst 조합으로 만든 모양 ─────────────────────
   {
     name: "mixed-clutter",
-    description: "카메라 6장 + 스크린샷 3장 + 다운로드 1장 — 잡사진 필터링을 보는 하루",
+    description: "카메라 6장 + 스크린샷 3장 + 다운로드 1장 — 재료가 카메라 6장만인지 보는 하루(129)",
     /**
-     * 023의 잡사진 필터링(D1)을 실기기에서 본다. 카메라 원본은 하루에 흩어지고
-     * (near-a), 스크린샷·다운로드는 좌표 없이 섞인다. `folderNameOf()`가 각
-     * 폴더 이름을 뽑아 스크린샷·다운로드를 캡션 대상에서 뺀다.
+     * 129 — 카메라 원본은 하루에 흩어지고(near-a), 스크린샷·다운로드는 좌표 없이 섞인다.
+     * 수집(`signals/camera-only.ts`)이 `PocketlogSeed/Screenshots`·`Download`를 빼 재료가 카메라 6장이 된다
+     * (개발 환경에서만 시딩 사진이 인정된다).
      */
     build: (day) =>
       composeDay(day, [
@@ -270,10 +270,9 @@ const SHAPES: DayShape[] = [
   },
   {
     name: "screenshots-only",
-    description: "스크린샷만 5장 — 전부 잡사진일 때 되돌리는지 보는 하루",
+    description: "스크린샷만 5장 — 사진 없는 날로 보이는지 보는 하루(129)",
     /**
-     * 023의 되돌림(D1). 카메라 원본이 0장이면 필터가 아무것도 안 걸러내고
-     * 원본(스크린샷들)으로 선별한다 — "사진 없음"이 아니다.
+     * 129 — 023의 되돌림을 뒤집었다. 화면 캡처뿐인 날은 사진 없는 날이다(재료 0장).
      */
     build: (day) =>
       composeDay(day, [

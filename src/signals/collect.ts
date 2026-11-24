@@ -21,6 +21,7 @@
  */
 
 import { dayBounds, type DayDate } from "../config/day-boundary";
+import { isCameraPhoto } from "./camera-only";
 import { isUsableCoordinate, tracePlaces, type TimedCoordinate } from "./places";
 import type { LocationOutcome, PermissionState, PhotoFacts, PhotoPort } from "./port";
 import type { DaySignals, Photo, PhotoObservation, PhotoPlaces, SignalValue } from "./types";
@@ -54,18 +55,17 @@ function permissionReason(what: string, state: PermissionState): string {
  * **찍힌 시각이 없으면 버린다**(FR-003) — 어느 하루에도 넣을 수 없고, 임의의 날에
  * 배정하면 거짓이 된다. **미래 시각도 버린다**(Edge Cases) — 기기 시계가 어긋났던 흔적이다.
  */
-function usablePhotos(facts: PhotoFacts[], endMs: number): Photo[] {
+function usablePhotos(facts: PhotoFacts[], endMs: number, allowSeed: boolean): Photo[] {
   return (
     facts
       .filter((f): f is PhotoFacts & { takenAtMs: number } => f.takenAtMs !== null)
       .filter((f) => f.takenAtMs < endMs)
-      // 023 — `folderName`을 이월한다. `PhotoFacts`가 안 채웠으면 `undefined`로
-      // 넘어가며 그것이 "분류 불가"다(select.ts가 판정). 004의 판정은 이 필드를
-      // 읽지 않으므로 여기서 옮기는 것만으로 충분하다.
+      // 129 — 카메라로 찍은 사진만 하루의 사진이다. 판정은 camera-only.ts 한 곳(FR-001).
+      .filter((f) => isCameraPhoto(f, { allowSeed }))
+      // 출처 사실(localPath·mediaSubtypes)은 판정에만 쓰고 옮기지 않는다(011 경계).
       .map((f) => ({
         id: f.id,
         takenAt: new Date(f.takenAtMs),
-        folderName: f.folderName,
         // 128 — 이름·크기. 없으면 키 자체를 만들지 않는다.
         ...(f.filename !== undefined ? { filename: f.filename } : {}),
         ...(f.width !== undefined ? { width: f.width } : {}),
@@ -78,7 +78,7 @@ function usablePhotos(facts: PhotoFacts[], endMs: number): Photo[] {
 /**
  * 그 하루의 사진을 판정한다.
  *
- * 순서가 계약이다(contracts/collection.md 「photos」): 권한 → 조회 실패 → 0장 → known.
+ * 순서가 계약이다(contracts/collection.md 「photos」): 권한 → 조회 실패 → 시각·카메라 거르기(129) → 0장 → known.
  *
  * **012 — 상한이 없다**(FR-014). 조회에 성공하면 그 구간의 사진 전부가 담기므로
  * `complete`는 언제나 `true`다 — 잘림 판정 자체가 사라졌다(FR-015). 조회가 실패하면
@@ -87,6 +87,7 @@ function usablePhotos(facts: PhotoFacts[], endMs: number): Photo[] {
 async function collectPhotos(
   port: PhotoPort,
   day: DayDate,
+  allowSeed: boolean,
 ): Promise<SignalValue<PhotoObservation>> {
   let permission: PermissionState;
   try {
@@ -110,9 +111,9 @@ async function collectPhotos(
     return { kind: "unknown", reason: `사진을 조회하지 못했다: ${messageOf(error)}` };
   }
 
-  const usable = usablePhotos(facts, endMs);
+  const usable = usablePhotos(facts, endMs, allowSeed);
 
-  // 3. 권한이 있는데 없었던 것은 **관측된 사실**이다(FR-009).
+  // 3. 권한이 있는데 없었던 것은 **관측된 사실**이다(FR-009). 129 — 카메라 사진이 0장이면(화면 캡처뿐인 날) 여기다.
   if (usable.length === 0) {
     return { kind: "none" };
   }
@@ -216,8 +217,13 @@ async function collectPlaces(
  * **"지금"을 받지 않는다** — 어느 하루를 물을지는 `day`가 정한다. 하루가 닫혔는지는
  * `isDayClosed()`가 따로 답하며 그것은 파이프라인의 몫이다(002 FR-018a).
  */
-export async function collectDaySignals(port: PhotoPort, day: DayDate): Promise<DaySignals> {
-  const photos = await collectPhotos(port, day);
+export async function collectDaySignals(
+  port: PhotoPort,
+  day: DayDate,
+  // 129 CC1 — 시딩 사진 인정 여부. 기본은 인정하지 않는 쪽이다. 조립부가 `allowsSeedPhotos(resolution)`로 구한다.
+  options: { allowSeed?: boolean } = {},
+): Promise<DaySignals> {
+  const photos = await collectPhotos(port, day, options.allowSeed ?? false);
   // **`photos`를 먼저 정하고 그다음 좌표를 묻는다.** 좌표 단계가 통째로 실패해도
   // `photos`는 이미 손에 있다 — 그것이 FR-013a가 구현에서 성립하는 방식이다.
   const places = await collectPlaces(port, photos);

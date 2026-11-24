@@ -33,9 +33,10 @@ import { expoFileSystemPort, fileStore, type DiaryStore } from "../diary/store";
 import type { Character, CustomNames, VisionSetting } from "../diary/types";
 import { selectBackend, selectLocation } from "../inference/select";
 import type { InferenceLocation, SelectionFailure } from "../inference/types";
+import { allowsSeedPhotos } from "../signals/camera-only";
 import { collectDaySignals } from "../signals/collect";
 import { expoPhotoPort } from "../signals/expo-port";
-import type { PermissionState } from "../signals/port";
+import type { PermissionState, PhotoPort } from "../signals/port";
 import { expoPlaceIndexPort } from "../signals/place-index-port";
 import { placeNamer, type PlaceName } from "../signals/place-names";
 import type { Coordinate } from "../signals/places";
@@ -208,9 +209,18 @@ function deviceCustomNames(): Promise<CustomNames> {
   return loadCustomNames(expoCharacterNamesPort());
 }
 
-/** 그 하루의 실제 신호. 004의 수집을 그대로 쓴다 */
-function deviceSignals(day: DayDate): Promise<DaySignals> {
-  return collectDaySignals(expoPhotoPort(), day);
+/**
+ * 그 하루의 실제 신호. 004의 수집을 그대로 쓴다.
+ *
+ * 129 — 시딩 사진 인정 여부를 조립부가 정해 넘긴다(`allowsSeedPhotos(resolution)` — 판정에 성공한 개발 환경만).
+ * `allowsSeedPhotos(`를 부르는 자리는 저장소에서 여기 하나다(헌법 검사 `checkSeedPhotoFile` SP2).
+ */
+export function deviceSignalsFor(
+  resolution: EnvironmentResolution,
+  port: () => PhotoPort = expoPhotoPort,
+): (day: DayDate) => Promise<DaySignals> {
+  const allowSeed = allowsSeedPhotos(resolution);
+  return (day) => collectDaySignals(port(), day, { allowSeed });
 }
 
 /**
@@ -267,7 +277,7 @@ export function createAppPipeline(
 ): AppPipelineResult {
   // 048 — 신호를 읽는 통로는 여기서 **한 번** 정한다. 백엔드(018 captionDay)·파이프라인·
   // 신호 미리보기(previewDay)가 같은 함수를 쓴다 — 미리보기가 새 수집 경로가 되지 않는다(PV4).
-  const loadSignals = deps.loadSignals ?? deviceSignals;
+  const loadSignals = deps.loadSignals ?? deviceSignalsFor(resolution);
 
   // 020 L5 — 이 파이프라인을 조립하는 쪽. owner를 여기서 한 번 정한다 — `PipelineInput`은
   // 화면·태스크가 공유하는 데이터라 owner 개념이 안 어울린다.

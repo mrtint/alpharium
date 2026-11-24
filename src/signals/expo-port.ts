@@ -56,29 +56,68 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * 023 — 파일 경로/URI에서 상위 폴더 이름 하나를 뽑는다.
- *
- * **문자열 처리만 한다.** 그 이름이 스크린샷·다운로드 폴더인지 대조하는 것은
- * `src/vision/select.ts`의 몫이다 — 여기서 `NON_CAMERA_FOLDERS`를 알면 분류가
- * 기기 계층으로 샌 것이다(spec Clarification, 헌법 검사 `checkPhotoPortFile`).
- *
- * - `file:///storage/emulated/0/DCIM/Camera/IMG_1.jpg` → `"Camera"`
- * - `content://media/external/images/media/123` → `undefined` (폴더 구간 없음)
- * - `""` / `null` / `undefined` / 슬래시 없는 문자열 → `undefined`
- *
- * 풀 수 없으면 `undefined`이며 그것이 "분류 불가"다(023 FR-004).
- *
- * **export하지만 이 파일의 순수 헬퍼다** — 계약 테스트(`expo-port.test.ts`)가
- * 문자열 파싱을 직접 검사한다. `getUri()` 호출부는 기기에서만 확인한다(004).
- */
-export function folderNameOf(pathOrUri: string | null | undefined): string | undefined {
-  if (typeof pathOrUri !== "string" || pathOrUri === "") return undefined;
-  if (pathOrUri.startsWith("content://")) return undefined;
+/** 129 — 한 번에 받는 사진 수. 사람이 정한 값(하루 사진 수 상한은 없다 — 페이지를 끝까지 넘긴다, 012) */
+const PAGE_SIZE = 500;
 
-  const path = pathOrUri.startsWith("file://") ? pathOrUri.slice("file://".length) : pathOrUri;
-  const parts = path.split("/").filter(Boolean);
-  return parts.length >= 2 ? parts[parts.length - 2] : undefined;
+/** 레거시 `getAssetsAsync`가 주는 사진 하나에서 쓰는 필드 */
+type LegacyAsset = {
+  id: string;
+  filename?: string | null;
+  uri?: string | null;
+  width?: number | null;
+  height?: number | null;
+  creationTime?: number | null;
+  mediaSubtypes?: readonly string[] | null;
+};
+
+/**
+ * 129 — 레거시 목록 조회의 사진 하나를 사실로 옮긴다. **판정하지 않는다**(카메라 판정은 `camera-only.ts`).
+ *
+ * - 안드로이드는 `uri`가 `file://` + 파일 경로(MediaStore `_data`)다 → `localPath`.
+ * - iOS는 `uri`가 `ph://`라 폴더 뜻이 없다 → 싣지 않고 `mediaSubtypes`를 싣는다.
+ * - 크기 0·`null`은 모르는 것이다 → 싣지 않는다(원칙 V).
+ *
+ * export하지만 이 파일의 순수 헬퍼다 — 계약 테스트가 직접 검사한다.
+ */
+/**
+ * 129 — 레거시 id를 새 API(`new Asset(id)`·`exeForMetadata`)가 쓰는 id 꼴로 옮긴다.
+ *
+ * **둘이 다르다**(설치본 직접 확인): 레거시는 안드로이드 MediaStore `_ID`(`"123"`), iOS 맨 `localIdentifier`를 주고,
+ * 새 API는 안드로이드 `content://media/external/images/media/123`(`AssetMapper.kt` → `extractAssetContentUri`, 이미지),
+ * iOS `ph://<localIdentifier>`(`AssetMapper.swift`)를 쓴다. 옮기지 않으면 `locationOf`·`filePathOf`가 조용히 실패하고
+ * 저장된 일기의 사진 id(캐러셀·`vision-cache`)와도 어긋난다.
+ *
+ * ⚠️ Android 10(API 29)의 새 API는 `external_primary` 볼륨 URI를 쓴다 — 이 앱 대상 기기(Android 14+)에서는 `external`이다.
+ */
+export function newApiIdOf(legacyId: string, legacyUri: string): string {
+  if (legacyUri.startsWith("ph://") || legacyId.startsWith("ph://")) {
+    return legacyId.startsWith("ph://") ? legacyId : `ph://${legacyId}`;
+  }
+  if (/^\d+$/.test(legacyId)) return `${ANDROID_IMAGES_CONTENT_URI}/${legacyId}`;
+  return legacyId;
+}
+
+/** 새 API가 안드로이드 이미지에 쓰는 기준 URI(`MediaStore.Images.Media.EXTERNAL_CONTENT_URI`) */
+const ANDROID_IMAGES_CONTENT_URI = "content://media/external/images/media";
+
+export function factsOfLegacyAsset(asset: LegacyAsset): PhotoFacts {
+  const uri = typeof asset.uri === "string" ? asset.uri : "";
+  // 레거시 안드로이드는 `_data`가 NULL이면 `"file://null"`을 만든다 — 모르는 것이다(원칙 V)
+  const rawPath = uri.startsWith("file://") ? uri.slice("file://".length) : undefined;
+  const localPath = rawPath === "null" ? undefined : rawPath;
+  const takenAtMs =
+    typeof asset.creationTime === "number" && asset.creationTime > 0 ? asset.creationTime : null;
+  return {
+    id: newApiIdOf(asset.id, uri),
+    takenAtMs,
+    ...(localPath !== undefined && localPath !== "" ? { localPath } : {}),
+    ...(Array.isArray(asset.mediaSubtypes) ? { mediaSubtypes: asset.mediaSubtypes } : {}),
+    ...(typeof asset.filename === "string" && asset.filename !== ""
+      ? { filename: asset.filename }
+      : {}),
+    ...(typeof asset.width === "number" && asset.width > 0 ? { width: asset.width } : {}),
+    ...(typeof asset.height === "number" && asset.height > 0 ? { height: asset.height } : {}),
+  };
 }
 
 /** 실제 `expo-media-library`를 쓰는 통로 */
@@ -136,63 +175,40 @@ export function expoPhotoPort(): PhotoPort {
     /**
      * 그 구간의 사진 메타데이터.
      *
-     * **`exeForMetadata()`를 쓰고 `exe()`를 쓰지 않는다**(research.md §1). 전자가 돌려주는
-     * `AssetMetadata`는 "파일 경로를 풀거나 파일을 열지 않고" 얻어지며(타입 주석 명시),
-     * **픽셀에 닿을 문 자체가 없다.** 그것이 FR-005를 계약이 아니라 구조로 보장한다.
+     * **129 — 레거시 `getAssetsAsync`를 쓴다.** 새 API의 `exeForMetadata()`는 출처(안드로이드 파일 경로,
+     * iOS 종류)를 주지 않는다. 레거시 조회는 한 커서에서 안드로이드 `_data` 경로와 iOS `mediaSubtypes`를
+     * 함께 싣는다 — **사진마다 `getUri()`를 부르지 않는다**(SC-004, 2026-11-09 멈춤 호출). `resolveWithFullInfo`는
+     * 끈 채다(켜면 EXIF를 연다).
      *
-     * **012 — `.limit()`을 호출하지 않는다**(FR-014). 그 구간의 사진 전부를 돌려준다 —
-     * 상한 자체가 없다.
+     * 경계는 배타라(`>`·`<`) 시작을 1ms 당긴다. **012 — 상한이 없다**: 페이지를 끝까지 넘긴다.
      */
     async photosBetween(fromMs: number, toMs: number): Promise<PhotoFacts[]> {
-      const lib = await import("expo-media-library");
-      const { AssetField, MediaType, Query } = lib;
-
-      const metadata = await new Query()
-        .gte(AssetField.CREATION_TIME, fromMs)
-        .lt(AssetField.CREATION_TIME, toMs)
-        .eq(AssetField.MEDIA_TYPE, MediaType.IMAGE)
-        .orderBy(AssetField.CREATION_TIME)
-        .exeForMetadata();
-
-      // 023 — 폴더 이름을 여기서 채우지 않는다. `filePathOf()`의 경계를 잇는다
-      // (그 주석: "PhotoFacts에 담지 않고 함수로 둔다"). 폴더 이름이 필요한
-      // 자리(사진 선별을 실제로 하는 on-device.ts, 상한 초과인 하루)만
-      // `folderNamesFor()`를 부른다 — 장수만 세는 004 경로는 `getUri()`를
-      // 치르지 않는다.
-      // 128 — 이름·크기는 이 메타데이터에 이미 있다. `null`(모름)은 싣지 않는다.
-      return metadata.map((asset) => ({
-        id: asset.id,
-        takenAtMs: asset.creationTime,
-        ...(asset.filename != null ? { filename: asset.filename } : {}),
-        ...(asset.width != null ? { width: asset.width } : {}),
-        ...(asset.height != null ? { height: asset.height } : {}),
-      }));
-    },
-
-    /**
-     * 023 — 여러 사진의 상위 폴더 이름. `filePathOf()`가 이미 하는
-     * `getUri()`를 재사용하되 여러 장을 병렬로 처리한다.
-     *
-     * **던지지 않는다** — 한 장이 실패하면 그 id는 맵에 `undefined`이고
-     * 나머지는 채운다(004 FR-005a).
-     */
-    async folderNamesFor(photoIds: readonly string[]): Promise<Map<string, string | undefined>> {
-      const lib = await import("expo-media-library");
-      const entries = await Promise.all(
-        photoIds.map(async (id): Promise<[string, string | undefined]> => {
-          try {
-            const asset = new lib.Asset(id);
-            // 2026-11-09 — 콜백이 오지 않는 경우가 있어 한도 안에서만 기다린다(uri-deadline.ts)
-            const uri = await readUriWithin(() => asset.getUri());
-            // 073 — await 완료 시점까지 JS 참조를 유지해 Hermes GC 조기 수거 방지
-            if (asset.id === "") return [id, undefined];
-            return [id, folderNameOf(uri)];
-          } catch {
-            return [id, undefined];
+      const legacy = await import("expo-media-library/legacy");
+      const facts: PhotoFacts[] = [];
+      const seen = new Set<string>();
+      let after: string | undefined;
+      for (;;) {
+        const page = await legacy.getAssetsAsync({
+          first: PAGE_SIZE,
+          ...(after !== undefined ? { after } : {}),
+          mediaType: legacy.MediaType.photo,
+          createdAfter: fromMs - 1,
+          createdBefore: toMs,
+          sortBy: [[legacy.SortBy.creationTime, true]],
+          resolveWithFullInfo: false,
+        });
+        // 안드로이드 레거시 커서는 offset이라 조회 중 보관함이 바뀌면 같은 사진이 두 페이지에 올 수 있다 — id로 거른다
+        for (const asset of page.assets) {
+          const f = factsOfLegacyAsset(asset);
+          if (!seen.has(f.id)) {
+            seen.add(f.id);
+            facts.push(f);
           }
-        }),
-      );
-      return new Map(entries);
+        }
+        if (!page.hasNextPage || page.assets.length === 0) break;
+        after = page.endCursor;
+      }
+      return facts;
     },
 
     /**

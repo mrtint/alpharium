@@ -704,51 +704,17 @@ describe("128 D3 — 읽은 뒤: 문서 묘사는 재료에서 빠진다", () =>
   });
 });
 
-describe("128 D2 — 읽기 전: 화면 캡처는 묘사하지 않는다", () => {
-  const shot = (id: string, extra: Partial<Photo>): Photo => ({ ...photo(id, 9), ...extra });
-
-  it.each<[string, Partial<Photo>]>([
-    ["Screenshot_ 이름", { filename: "Screenshot_20261119_165537.jpg" }],
-    ["소문자 screenshot 이름", { filename: "screenshot-1.png" }],
-    ["세로 2.17", { width: 1440, height: 3120 }],
-    ["세로 정확히 2", { width: 1000, height: 2000 }],
-  ])("%s → 경로·리사이즈·묘사를 부르지 않고 unreadable 1", async (_, extra) => {
-    const resolved: string[] = [];
-    const resized: string[] = [];
+describe("129 — 읽기 전 판정은 수집으로 옮겼다", () => {
+  it("세로로 긴 사진도 캡션 단계에서는 거르지 않는다 — 수집이 이미 뺐다", async () => {
     const engine = engineSaying({});
     const vision = await captionAll(
       engine,
-      [shot("s", extra)],
+      [{ ...photo("s", 9), width: 1440, height: 3120 }],
       1,
-      async (p) => {
-        resolved.push(p.id);
-        return `/photo/${p.id}.jpg`;
-      },
-      undefined,
-      async (src) => {
-        resized.push(src);
-        return { ok: true, path: src };
-      },
+      resolve,
     );
-    expect(resolved).toEqual([]);
-    expect(resized).toEqual([]);
-    expect(engine.asked).toEqual([]);
-    expect(vision?.unreadable).toBe(1);
-    expect(vision?.captions).toHaveLength(0);
-  });
-
-  it.each<[string, Partial<Photo>]>([
-    ["가로 파노라마", { width: 4000, height: 1000 }],
-    ["카메라 16:9 세로", { width: 2252, height: 4000 }],
-    ["크기 모름", {}],
-    ["가로 0", { width: 0, height: 3000 }],
-    ["이름이 Screenshot을 품기만", { filename: "MyScreenshot.jpg" }],
-  ])("%s → 종전대로 읽는다", async (_, extra) => {
-    const engine = engineSaying({});
-    const vision = await captionAll(engine, [shot("s", extra)], 1, resolve);
     expect(engine.asked).toEqual(["s"]);
     expect(vision?.unreadable).toBe(0);
-    expect(vision?.captions).toHaveLength(1);
   });
 });
 

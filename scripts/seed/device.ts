@@ -29,9 +29,9 @@ export const SEED_FOLDER = "/sdcard/Pictures/PocketlogSeed";
 /**
  * 023 — 하위 폴더 이름을 붙인 심을 자리.
  *
- * `folder`가 있으면 `SEED_FOLDER/<folder>/` 아래로 간다. 023의
- * `folderNameOf()`가 "마지막 `/` 앞 세그먼트"를 뽑으므로 그 사진의 폴더
- * 이름이 `folder`가 되어 스크린샷·다운로드로 분류된다.
+ * `folder`가 있으면 `SEED_FOLDER/<folder>/` 아래로 간다. 129의 `camera-only.ts`는 개발 환경에서
+ * `SEED_FOLDER` 바로 아래와 `Camera`만 카메라 사진으로 보므로 `Screenshots`·`Download`는 재료에서 빠진다
+ * (실제 기기의 스크린샷·다운로드 폴더를 흉내 낸다).
  *
  * **`SEED_FOLDER` 밖으로 나가지 않는다** — `queryFolder()`의 `%PocketlogSeed%`
  * LIKE와 `removeSeedFolder()`의 `rm -rf SEED_FOLDER`가 하위 폴더까지 그대로

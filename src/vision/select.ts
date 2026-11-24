@@ -2,20 +2,17 @@
  * 읽을 사진을 고른다.
  *
  * 계약: specs/011-photo-vision-summary/contracts/selection.md
- *       specs/023-photo-selection-algorithm/contracts/classification.md
+ *       specs/023-photo-selection-algorithm/contracts/classification.md (129에서 걷음 — 판정은 signals/camera-only.ts)
  *       specs/023-photo-selection-algorithm/contracts/time-distribution.md
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **023이 011의 인덱스 균등 선별을 두 단계로 바꿨다.**
+ * **023이 011의 인덱스 균등 선별을 시간 분포 배분으로 바꿨다**(`distributeByTime`) — 하루를 고정 시간 칸으로
+ * 나누고, 사진이 있는 칸마다 최소 1장 + 남은 예산을 칸별 사진 수에 비례(최대 잔여법) 배분한다. 011은 "몇 번째
+ * 사진"을 균등하게 골랐고, 사진이 한 시간대에 몰리면 고른 것도 몰렸다("아침 카페만 본 채 하루를 쓴다").
  *
- *  1. **분류**(`classifyPhotos`) — 파일 경로의 상위 폴더 이름으로 "카메라 원본 /
- *     잡사진(스크린샷·다운로드·메신저) / 분류 불가"를 가르고, 잡사진을 뺀다.
- *     전부 빠지면 원본으로 되돌린다(스크린샷뿐인 하루도 그것을 봐야 정직하다).
- *  2. **시간 분포 배분**(`distributeByTime`) — 하루를 고정 시간 칸으로 나누고,
- *     사진이 있는 칸마다 최소 1장 + 남은 예산을 칸별 사진 수에 비례(최대
- *     잔여법) 배분한다. 011은 "몇 번째 사진"을 균등하게 골랐고, 사진이 한
- *     시간대에 몰리면 고른 것도 몰렸다("아침 카페만 본 채 하루를 쓴다").
- *     이것은 **시각**을 보고 하루에 걸쳐 훑되 뭉친 데는 더 본다.
+ * **129 — 023의 폴더 분류(`NON_CAMERA_FOLDERS`·되돌림)를 걷었다.** 화면 캡처·다운로드·메신저 사진은 수집
+ * (`signals/collect.ts` + `signals/camera-only.ts`)이 처음부터 빼므로 여기 오는 사진은 전부 카메라 사진이다.
+ * 「스크린샷뿐인 하루는 원본으로 되돌린다」는 소유자 결정으로 뒤집혔다 — 그 날은 사진 없는 날이다.
  * ─────────────────────────────────────────────────────────────────────────────
  *
  * **순수 함수다.** 기기를 모르고, 시각을 읽지 않고(`Date.now()`/`new Date()`
@@ -23,8 +20,8 @@
  * 때 **다른 사진을 보게 되어** 「신호가 같은데 출력이 다르다」가 된다
  * (006 FR-037a가 경계한 상태).
  *
- * **인자는 사진 목록 하나뿐이다**(011 S1, 023 FR-016). 상한·칸 개수·폴더
- * 목록을 밖에서 정할 수 없다 — 전부 파일 로컬 상수이며 export하지 않는다.
+ * **인자는 사진 목록 하나뿐이다**(011 S1, 023 FR-016). 상한·칸 개수를
+ * 밖에서 정할 수 없다 — 전부 파일 로컬 상수이며 export하지 않는다.
  */
 
 import type { Photo } from "../signals/types";
@@ -83,49 +80,6 @@ const VISION_PHOTO_LIMIT = 8;
 const BUCKET_COUNT = 6;
 
 /**
- * 잡사진(카메라로 찍지 않은 사진)이 저장되는 폴더 이름.
- *
- * **사람이 못 박은 상수**(023 FR-002, 012의 `USER_VISIBLE_SIGNAL_AXES`,
- * 021의 `PERMISSION_REQUIREMENTS` 선례). 코드가 경로·사진 수·분포를 보고 이
- * 목록을 만들거나 조정하지 않는다(원칙 V). 새 앱의 새 저장 폴더가 나오면
- * 사람이 여기 추가한다.
- *
- * **대소문자까지 정확히 일치**로 대조한다 — 안드로이드 표준 폴더 이름은
- * 고정이며, 느슨하게(부분 일치·정규식) 잡으면 사용자 폴더를 오분류한다
- * (contracts/classification.md C1).
- *
- * ⚠️ **quickstart D1 실측 후 확정한다** — 안드로이드 버전·제조사에 따라
- * 경로가 다를 수 있어, 실기기에서 `filePathOf()`가 실제로 돌려주는 문자열을
- * 보고 이 목록과 `folderNameOf()`의 파싱을 확정한다(011·013에서 URI 계약이
- * 반복 함정이었다).
- *
- * **export 하지 않는다**(023 FR-016, spec Clarification — 분류 판정은 이
- * 파일에만 있어야 하며 `expo-port.ts`가 이것을 참조하면 분류가 기기 계층으로
- * 샌 것이다).
- */
-const NON_CAMERA_FOLDERS: readonly string[] = [
-  "Screenshots", // Pictures/Screenshots, DCIM/Screenshots
-  "Download", // 브라우저·앱 다운로드
-  "KakaoTalk", // Pictures/KakaoTalk
-  "WhatsApp Images", // Pictures/WhatsApp Images (또는 .../WhatsApp/Media/...)
-  "Telegram", // Pictures/Telegram
-];
-
-/**
- * 사진 한 장의 분류. 이 파일 안에서만 쓴다.
- *
- * - `"camera"` — 폴더 이름이 잡사진 목록에 없다(카메라 폴더 포함, 목록 밖
- *   이름 포함 — 023 FR-003).
- * - `"non-camera"` — 폴더 이름이 잡사진 목록에 정확히 매칭.
- * - `"unclassifiable"` — `folderName`이 `undefined`(경로를 못 얻음).
- *
- * 선별에서 `"camera"`와 `"unclassifiable"`은 남고 `"non-camera"`만 빠진다.
- * 값이 셋인 것은 진단에서 "잡사진 아님"과 "모름"을 구분하기 위해서다
- * (원칙 V의 none/unknown 계열).
- */
-type PhotoClass = "camera" | "non-camera" | "unclassifiable";
-
-/**
  * 그날 사진 수가 캡션 상한에 닿았는가 — 사진 보기 갈래(많음/보통) 판정
  * (016, spec Clarifications).
  *
@@ -135,40 +89,6 @@ type PhotoClass = "camera" | "non-camera" | "unclassifiable";
  */
 export function reachedVisionLimit(availableCount: number): boolean {
   return availableCount >= VISION_PHOTO_LIMIT;
-}
-
-/**
- * 사진 한 장을 분류한다 (contracts/classification.md C1).
- *
- * 폴더 이름 하나로만 판정한다 — EXIF·픽셀·파일 크기를 보지 않는다(원칙 IV).
- */
-function classOf(photo: Photo): PhotoClass {
-  if (photo.folderName === undefined) return "unclassifiable";
-  return NON_CAMERA_FOLDERS.includes(photo.folderName) ? "non-camera" : "camera";
-}
-
-/**
- * 각 사진을 분류하고, 선별에 넘길 목록을 만든다
- * (contracts/classification.md C1~C4, 023 FR-001·FR-003·FR-004·FR-005·FR-006).
- *
- * **되돌림은 이 함수 안에서 매번 재계산된다** — 저장·타이머·`useEffect`
- * 없이(009 선례). `"non-camera"`를 뺀 목록이 비면 필터링 전 원본으로 되돌린다
- * (스크린샷뿐인 하루도 그것을 봐야 정직하다, 023 User Story 1 Scenario 2).
- *
- * @returns `kept` — 선별에 넘길 목록. `classes` — 진단·테스트용(어느 사진이
- *   왜 걸러졌나). 선별 결과에는 `classes`가 실리지 않는다.
- */
-function classifyPhotos(photos: readonly Photo[]): {
-  kept: Photo[];
-  classes: Map<string, PhotoClass>;
-} {
-  const classes = new Map<string, PhotoClass>();
-  for (const photo of photos) classes.set(photo.id, classOf(photo));
-
-  const kept = photos.filter((p) => classes.get(p.id) !== "non-camera");
-
-  // C3·FR-004a — 카메라 원본이 0장이면(또는 전부 잡사진이면) 원본으로 되돌린다.
-  return { kept: kept.length === 0 ? [...photos] : kept, classes };
 }
 
 /**
@@ -300,16 +220,12 @@ function distributeByTime(photos: readonly Photo[], budget: number): Photo[] {
  * 두 곳에 생기고, 부르는 쪽마다 다른 범위를 쓸 수 있다 — 009가 `selectableDays`
  * 에서 같은 함정을 겪었다.
  *
- * @param photos 찍힌 시각 순으로 정렬된 목록 (004가 이미 정렬해 준다).
- *   `folderName`은 023이 더한 선택적 필드 — 없으면 "분류 불가"로 다뤄 남긴다.
+ * @param photos 찍힌 시각 순으로 정렬된 목록 (004가 이미 정렬해 준다). 129부터 카메라 사진뿐이다.
  * @returns 최대 `VISION_PHOTO_LIMIT`장. 찍힌 시각 순.
  */
 export function selectForVision(photos: readonly Photo[]): Photo[] {
-  // R1 — 상한 이하면 전부. 분류도 분포도 하지 않는다 — 어차피 전부 캡션하므로
-  // 잡사진을 걸러도 대상이 안 줄고, `folderName` 없는 기기에서 불필요한 일을
-  // 피한다(contracts/classification.md C5).
+  // R1 — 상한 이하면 전부.
   if (photos.length <= VISION_PHOTO_LIMIT) return [...photos];
 
-  const { kept } = classifyPhotos(photos);
-  return distributeByTime(kept, VISION_PHOTO_LIMIT);
+  return distributeByTime(photos, VISION_PHOTO_LIMIT);
 }

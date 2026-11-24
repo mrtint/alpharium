@@ -12,9 +12,8 @@ import type { Photo } from "../../src/signals/types";
  *       specs/023-photo-selection-algorithm/contracts/time-distribution.md
  *
  * ─────────────────────────────────────────────────────────────────────────────
- * **023이 011의 인덱스 균등 선별을 두 단계로 바꿨다**: (1) 파일 경로 폴더
- * 이름으로 잡사진(스크린샷·다운로드·메신저)을 걸러내고, (2) 남은 것을 찍힌
- * 시각 분포로 배분한다("아침만 본 채 하루를 쓴다"를 막는다).
+ * **023이 011의 인덱스 균등 선별을 찍힌 시각 분포 배분으로 바꿨다**("아침만 본 채 하루를 쓴다"를 막는다).
+ * 129 — 023의 잡사진 폴더 분류는 수집 단계(`signals/camera-only.ts`)로 옮겼다.
  *
  * **004는 「그날 사진이 몇 장인가」를 세고 이 기능은 「하루가 어떠했는가」를 그린다.**
  * ─────────────────────────────────────────────────────────────────────────────
@@ -26,18 +25,6 @@ const SOURCE_PATH = join(__dirname, "../../src/vision/select.ts");
 const at = (hour: number, min = 0, id = `p${hour}-${min}`): Photo => ({
   id,
   takenAt: new Date(2026, 7, 20, hour, min, 0),
-  folderName: "Camera",
-});
-
-/** 폴더를 지정한 사진. */
-const inFolder = (
-  folderName: string | undefined,
-  hour: number,
-  id = `${folderName}-${hour}`,
-): Photo => ({
-  id,
-  takenAt: new Date(2026, 7, 20, hour, 0, 0),
-  folderName,
 });
 
 /**
@@ -56,7 +43,6 @@ const spread = (n: number): Photo[] =>
     return {
       id: `p${i}`,
       takenAt: new Date(2026, 7, 20, Math.floor(totalMin / 60), totalMin % 60, 0),
-      folderName: "Camera" as const,
     };
   });
 
@@ -67,86 +53,24 @@ const idsOf = (photos: Photo[]): string[] => photos.map((p) => p.id);
 // 잡사진 필터링 (US1, contracts/classification.md)
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe("US1. 잡사진 필터링 (contracts/classification.md)", () => {
-  it("R1 — 상한 이하(8장 이하)면 분류하지 않고 전부 (C5)", () => {
-    // Camera 3 + Screenshots 2 = 5장. 상한(8) 이하라 스크린샷도 그대로 온다.
-    const photos = [
-      inFolder("Camera", 8),
-      inFolder("Camera", 12),
-      inFolder("Camera", 18),
-      inFolder("Screenshots", 10),
-      inFolder("Screenshots", 20),
-    ];
-    expect(selectForVision(photos)).toEqual(photos);
-  });
-
-  it("C1·C2 — 카메라 원본이 1장 이상이면 잡사진을 걸러낸다", () => {
-    // Camera 6 + Screenshots 4 = 10장(상한 초과) → 스크린샷 제거, Camera 6장만.
-    const photos = [
-      inFolder("Camera", 5, "c1"),
-      inFolder("Camera", 8, "c2"),
-      inFolder("Screenshots", 9, "s1"),
-      inFolder("Camera", 11, "c3"),
-      inFolder("Screenshots", 13, "s2"),
-      inFolder("Camera", 15, "c4"),
-      inFolder("Screenshots", 17, "s3"),
-      inFolder("Camera", 19, "c5"),
-      inFolder("Screenshots", 21, "s4"),
-      inFolder("Camera", 23, "c6"),
-    ];
+/**
+ * 129 — 폴더 분류는 수집(`signals/camera-only.ts`)으로 옮겼다. 선별은 받은 목록을 거르지 않는다.
+ */
+describe("129. 선별은 사진을 거르지 않는다", () => {
+  it("상한 초과여도 시간 분포로만 고른다 — 원본 밖의 사진이 나오지 않는다", () => {
+    const photos = spread(12);
     const got = selectForVision(photos);
-
-    expect(got.every((p) => p.folderName === "Camera")).toBe(true);
-    // 6장 Camera 전부 서로 다른 칸이라 되돌림 없이 그대로 남는다(nonEmpty=6 < 8).
-    expect(idsOf(got).sort()).toEqual(["c1", "c2", "c3", "c4", "c5", "c6"]);
-  });
-
-  // 하루(00:00~24:00)에 고르게 흩뿌린 n장 — folderName만 바꿔 쓴다.
-  // spread()와 같은 자정 기준 분포지만 folderName을 인자로 받는다.
-  const spreadIn = (folderName: string | undefined, n: number): Photo[] =>
-    Array.from({ length: n }, (_, i) => {
-      const totalMin = Math.floor((i * 1439) / Math.max(1, n - 1));
-      return {
-        id: `${folderName ?? "u"}${i}`,
-        takenAt: new Date(2026, 7, 20, Math.floor(totalMin / 60), totalMin % 60, 0),
-        folderName,
-      };
-    });
-
-  it("C3 — 전부 잡사진이면 원본으로 되돌린다 (스크린샷만 12장)", () => {
-    const got = selectForVision(spreadIn("Screenshots", 12));
-
     expect(got.length).toBe(8);
-    expect(got.every((p) => p.folderName === "Screenshots")).toBe(true);
+    expect(got.every((p) => photos.includes(p))).toBe(true);
   });
 
-  it("C2 — 분류 불가(folderName undefined)는 남는다 (12장 전부 undefined)", () => {
-    const got = selectForVision(spreadIn(undefined, 12));
-
-    expect(got.length).toBe(8);
-    // 전부 unclassifiable → 되돌림과 무관하게 kept에 남고, 시간 분포로 8장.
-    expect(got.every((p) => p.folderName === undefined)).toBe(true);
-  });
-
-  it("C2 — 목록 밖 폴더 이름은 카메라 원본으로 본다 (OpenCamera 12장)", () => {
-    const got = selectForVision(spreadIn("OpenCamera", 12));
-
-    expect(got.length).toBe(8);
-    expect(got.every((p) => p.folderName === "OpenCamera")).toBe(true);
-  });
-
-  it("C4 — 같은 입력 2회 → 같은 사진이 걸러지고 같은 사진이 선택된다", () => {
-    const photos = [
-      ...Array.from({ length: 4 }, (_, i) => inFolder("Camera", i * 5 + 6, `c${i}`)),
-      ...Array.from({ length: 4 }, (_, i) => inFolder("Screenshots", i * 5 + 7, `s${i}`)),
-    ];
-    expect(idsOf(selectForVision(photos))).toEqual(idsOf(selectForVision(photos)));
+  it("select.ts에 폴더 분류가 남아 있지 않다", () => {
+    const code = readFileSync(SOURCE_PATH, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/\/\/.*$/gm, "");
+    expect(code).not.toMatch(/NON_CAMERA_FOLDERS|folderName|classifyPhotos/);
   });
 });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 시간 분포 배분 (US2, contracts/time-distribution.md)
-// ─────────────────────────────────────────────────────────────────────────────
 
 describe("US2. 시간 분포 배분 (contracts/time-distribution.md)", () => {
   it("D2 — 상한 이하면 분포 계산 없이 전부 (011 R1 유지)", () => {
@@ -243,16 +167,16 @@ describe("US2. 시간 분포 배분 (contracts/time-distribution.md)", () => {
   it("D1 — 시간 칸 경계가 자정 기준이다 (BUCKET_COUNT=6, 4시간 간격, 049)", () => {
     // 6장 ≤ 상한(8)이면 D2로 전부 반환되므로 상한 초과로 만들어 칸 경계 효과를 본다.
     const boundary: Photo[] = [
-      { id: "start", takenAt: new Date(2026, 7, 20, 0, 0, 0), folderName: "Camera" },
-      { id: "start2", takenAt: new Date(2026, 7, 20, 1, 0, 0), folderName: "Camera" },
-      { id: "m1", takenAt: new Date(2026, 7, 20, 7, 59, 0), folderName: "Camera" },
-      { id: "m2", takenAt: new Date(2026, 7, 20, 9, 0, 0), folderName: "Camera" },
-      { id: "mid1", takenAt: new Date(2026, 7, 20, 12, 0, 0), folderName: "Camera" },
-      { id: "mid2", takenAt: new Date(2026, 7, 20, 14, 0, 0), folderName: "Camera" },
-      { id: "ev1", takenAt: new Date(2026, 7, 20, 17, 0, 0), folderName: "Camera" },
-      { id: "ev2", takenAt: new Date(2026, 7, 20, 20, 0, 0), folderName: "Camera" },
-      { id: "lateA", takenAt: new Date(2026, 7, 20, 22, 0, 0), folderName: "Camera" },
-      { id: "lateB", takenAt: new Date(2026, 7, 20, 23, 59, 0), folderName: "Camera" },
+      { id: "start", takenAt: new Date(2026, 7, 20, 0, 0, 0) },
+      { id: "start2", takenAt: new Date(2026, 7, 20, 1, 0, 0) },
+      { id: "m1", takenAt: new Date(2026, 7, 20, 7, 59, 0) },
+      { id: "m2", takenAt: new Date(2026, 7, 20, 9, 0, 0) },
+      { id: "mid1", takenAt: new Date(2026, 7, 20, 12, 0, 0) },
+      { id: "mid2", takenAt: new Date(2026, 7, 20, 14, 0, 0) },
+      { id: "ev1", takenAt: new Date(2026, 7, 20, 17, 0, 0) },
+      { id: "ev2", takenAt: new Date(2026, 7, 20, 20, 0, 0) },
+      { id: "lateA", takenAt: new Date(2026, 7, 20, 22, 0, 0) },
+      { id: "lateB", takenAt: new Date(2026, 7, 20, 23, 59, 0) },
     ];
     const got = selectForVision(boundary);
 
@@ -355,7 +279,7 @@ describe("S1. 상한·상수가 한 자리에만 있다 (011 S1, 023 FR-016)", (
     // `distributeByTime(photos, budget)`이 budget을 인자로 받고, `selectForVision`이
     // `VISION_PHOTO_LIMIT`을 넘긴다. 상한이 바뀌면 같은 규칙에 새 상한만 들어간다.
     expect(CODE).toMatch(/function distributeByTime\([^)]*budget[^)]*\)/);
-    expect(CODE).toMatch(/distributeByTime\(kept, VISION_PHOTO_LIMIT\)/);
+    expect(CODE).toMatch(/distributeByTime\(photos, VISION_PHOTO_LIMIT\)/);
     // "밀집 가산" 전용 상수가 없다(FR-020).
     expect(CODE).not.toMatch(/(?:BONUS|DENSITY|CROWD)_[A-Z]+\s*=/);
   });

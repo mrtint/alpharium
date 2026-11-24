@@ -45,13 +45,6 @@ export type Photo = {
   id: string;
   /** 찍힌 시각. 이 값으로 어느 하루에 속하는지 정해진다 */
   takenAt: Date;
-  /**
-   * 023 — `PhotoFacts.folderName`을 그대로 이월한 값. 상위 폴더 이름
-   * (예: "Camera", "Screenshots"). 풀 수 없으면 `undefined`("분류 불가").
-   * `src/vision/select.ts`가 사진 선별 시 분류에 쓴다 — 다른 계층은
-   * 읽지 않으면 그대로 동작한다.
-   */
-  folderName?: string;
   /** 128 — `PhotoFacts`의 파일 이름·가로·세로를 이월한 값. 모르면 없다 */
   filename?: string;
   width?: number;
