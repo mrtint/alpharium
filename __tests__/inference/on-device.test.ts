@@ -695,6 +695,7 @@ describe("018 — generate(request, onStage, seen)", () => {
     captions: [{ photoId: "x", takenAt: new Date(2026, 7, 20, 9, 0, 0), text: "미리 읽은 사진" }],
     considered: 1,
     available: 1,
+    unreadable: 0,
   };
 
   it("seen이 주어지면 readPhotos()(vision engine.load)를 다시 부르지 않는다", async () => {
@@ -1250,6 +1251,7 @@ describe("061 — 제목 두 번째 호출 (TA2)", () => {
       captions: [{ photoId: "p", takenAt: new Date(2026, 7, 20, 22, 0, 0), text: "A cat." }],
       considered: 1,
       available: 1,
+      unreadable: 0,
     };
     const photos: DaySignals = {
       ...request.signals,
@@ -1367,12 +1369,103 @@ describe("073 — VLM 캡션 전량 실패 시 vision-failed 거부 가드", () 
     expect(result).toEqual({ kind: "vision-failed", reason: "failed" });
   });
 
+  /**
+   * 128 P1·T014 — 실제 `captionAll`을 묶은 조립: 문서 묘사만 나오는 날은 실패가 아니라 쓰고,
+   * 프롬프트에 고정 한 줄이 들어간다. 섞인 날은 거른 장이 일기 사진에 들어가지 않는다(FR-007).
+   */
+  function docEngine(docIds: string[]): VisionEngine {
+    return {
+      async load(): Promise<VisionLoadResult> {
+        return { ok: true };
+      },
+      async caption(path: string): Promise<VisionRunResult> {
+        const id = (path.split("/").pop() ?? "").replace(".jpg", "");
+        return {
+          text: docIds.includes(id)
+            ? "**Question:** What is the total amount?\n\n**Answer:** 1,000 won."
+            : `The image shows a park ${id}.`,
+        };
+      },
+      async stop() {},
+      async unload() {},
+    };
+  }
+
+  function recordingLlm(prompts: string[]): GenerationEngine {
+    return {
+      ask: async () => ({ text: "하루", ending: { kind: "eos" as const } }),
+      async load() {
+        return { ok: true, warm: true };
+      },
+      async prewarm() {},
+      async run(prompt: string) {
+        prompts.push(prompt);
+        return {
+          text: "오늘은 주인의 주머니 속에서 조용히 지냈어요.",
+          ending: { kind: "eos" as const },
+        };
+      },
+      async stop() {},
+      async unload() {},
+    };
+  }
+
+  const docSupport = (docIds: string[], cleaned: string[]): VisionSupport => ({
+    engine: docEngine(docIds),
+    resolvePath: async (p) => `/photo/${p.id}.jpg`,
+    resize: async (sourcePath) => ({ ok: true, path: sourcePath.replace("/photo/", "/resized/") }),
+    cleanupResized: async (path) => {
+      cleaned.push(path);
+    },
+  });
+
+  it("128 — 문서 묘사뿐인 날은 vision-failed가 아니고, 프롬프트에 고정 한 줄이 들어간다", async () => {
+    const prompts: string[] = [];
+    const cleaned: string[] = [];
+    const backend = createOnDeviceBackend(
+      async () => [],
+      recordingLlm(prompts),
+      60_000,
+      docSupport(["a", "b"], cleaned),
+    );
+    const result = await backend.generate(
+      requestWith(signalsWithPhotos([photo("a", 10), photo("b", 14)])),
+    );
+
+    expect("kind" in result).toBe(false);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain("글자가 적힌 사진이 두 장 있었지만 내용은 읽지 못했어요.");
+    expect(prompts[0]).not.toMatch(/Question|1,000/);
+    expect(cleaned.sort()).toEqual(["/resized/a.jpg", "/resized/b.jpg"]);
+  });
+
+  it("128 — 섞인 날은 거른 장이 일기 사진에 들어가지 않고 고정 줄도 없다 (FR-007)", async () => {
+    const prompts: string[] = [];
+    const backend = createOnDeviceBackend(
+      async () => [],
+      recordingLlm(prompts),
+      60_000,
+      docSupport(["b"], []),
+    );
+    const result = await backend.generate(
+      requestWith(signalsWithPhotos([photo("a", 10), photo("b", 14)])),
+    );
+
+    expect("kind" in result).toBe(false);
+    if (!("kind" in result)) {
+      expect((result.usedPhotos ?? []).map((p) => p.photoId)).toEqual(["a"]);
+    }
+    expect(prompts[0]).not.toContain("글자가 적힌 사진");
+  });
+
   it("readPhotos 구현부에 073 캡션 0장 방어 가드가 있다", () => {
     const code = readFileSync(join(__dirname, "../../src/inference/on-device.ts"), "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
       .replace(/\/\/.*$/gm, "");
 
-    expect(code).toMatch(/selected\.length\s*>\s*0\s*&&\s*result\.captions\.length\s*===\s*0/);
+    expect(code).toMatch(
+      /selected\.length\s*>\s*0\s*&&\s*result\.captions\.length\s*===\s*0\s*&&\s*result\.unreadable\s*===\s*0/,
+    );
   });
 });
 

@@ -622,3 +622,172 @@ describe("015 — onPhotoStart (SC-006)", () => {
     expect(vision?.captions).toHaveLength(5);
   });
 });
+
+/* ═══════════════════ 128 — 문서류 판정 (contracts/detection.md) ═══════════════════ */
+
+/** 장마다 정해진 묘사를 돌려주는 엔진. 표본에서 옮긴 꼴(내용 없이). */
+function engineSaying(texts: Record<string, string>): VisionEngine & { asked: string[] } {
+  const asked: string[] = [];
+  return {
+    asked,
+    async load() {
+      return { ok: true };
+    },
+    async caption(path: string) {
+      const id = (path.split("/").pop() ?? path).replace(".jpg", "");
+      asked.push(id);
+      return { text: texts[id] ?? `The image shows ${id}.` };
+    },
+    async stop() {},
+    async unload() {},
+  };
+}
+
+const copyResize: ResizeExecutor = async (sourcePath) => ({
+  ok: true,
+  path: sourcePath.replace("/photo/", "/resized/"),
+});
+
+describe("128 D3 — 읽은 뒤: 문서 묘사는 재료에서 빠진다", () => {
+  it.each<[string, string]>([
+    ["문답 꼴", "**Question:** What is the total amount?\n\n**Answer:** 1,000 won."],
+    ["앞 공백·# 꼴", "  ## Question: What is this?\nAnswer: a form."],
+    ["소문자 문답", "question: what? answer: that."],
+    ["receipt", "A paper Receipt on a table."],
+    ["invoices", "Two invoices lying flat."],
+    ["document", "A DOCUMENT with a stamp."],
+    ["transaction", "A record of a transaction."],
+  ])("%s → 빠지고 unreadable 1, 사본을 지운다", async (_, text) => {
+    const cleaned: string[] = [];
+    const vision = await captionAll(
+      engineSaying({ b: text }),
+      FIVE.slice(0, 2),
+      2,
+      resolve,
+      undefined,
+      copyResize,
+      async (p) => {
+        cleaned.push(p);
+      },
+    );
+    expect(vision?.captions.map((c) => c.photoId)).toEqual(["a"]);
+    expect(vision?.unreadable).toBe(1);
+    expect(vision?.considered).toBe(2);
+    expect(cleaned).toEqual(["/resized/b.jpg"]);
+  });
+
+  it.each<[string, string]>([
+    [
+      "table(호텔방 묘사 — 실측 오탐 후보)",
+      "The image shows a hotel room with a bed, a table with a vase.",
+    ],
+    ["text", "A sign with text on a wall."],
+    ["paper", "A paper crane on a desk."],
+    ["낱말 일부(documentary)", "A documentary poster."],
+    ["문답이 중간에", "A board that says Question: why?"],
+  ])("%s → 남는다", async (_, text) => {
+    const vision = await captionAll(engineSaying({ a: text }), FIVE.slice(0, 1), 1, resolve);
+    expect(vision?.captions).toHaveLength(1);
+    expect(vision?.unreadable).toBe(0);
+  });
+
+  it("빈 묘사는 실패한 장이지 거른 장이 아니다 (D4)", async () => {
+    const vision = await captionAll(engineSaying({ a: "" }), FIVE.slice(0, 1), 1, resolve);
+    expect(vision?.captions).toHaveLength(0);
+    expect(vision?.unreadable).toBe(0);
+  });
+
+  it("그만두면 종전대로 null (D5)", async () => {
+    const cancel = { cancelled: true };
+    const vision = await captionAll(engineSaying({}), FIVE, 5, resolve, cancel);
+    expect(vision).toBeNull();
+  });
+});
+
+describe("128 D2 — 읽기 전: 화면 캡처는 묘사하지 않는다", () => {
+  const shot = (id: string, extra: Partial<Photo>): Photo => ({ ...photo(id, 9), ...extra });
+
+  it.each<[string, Partial<Photo>]>([
+    ["Screenshot_ 이름", { filename: "Screenshot_20261119_165537.jpg" }],
+    ["소문자 screenshot 이름", { filename: "screenshot-1.png" }],
+    ["세로 2.17", { width: 1440, height: 3120 }],
+    ["세로 정확히 2", { width: 1000, height: 2000 }],
+  ])("%s → 경로·리사이즈·묘사를 부르지 않고 unreadable 1", async (_, extra) => {
+    const resolved: string[] = [];
+    const resized: string[] = [];
+    const engine = engineSaying({});
+    const vision = await captionAll(
+      engine,
+      [shot("s", extra)],
+      1,
+      async (p) => {
+        resolved.push(p.id);
+        return `/photo/${p.id}.jpg`;
+      },
+      undefined,
+      async (src) => {
+        resized.push(src);
+        return { ok: true, path: src };
+      },
+    );
+    expect(resolved).toEqual([]);
+    expect(resized).toEqual([]);
+    expect(engine.asked).toEqual([]);
+    expect(vision?.unreadable).toBe(1);
+    expect(vision?.captions).toHaveLength(0);
+  });
+
+  it.each<[string, Partial<Photo>]>([
+    ["가로 파노라마", { width: 4000, height: 1000 }],
+    ["카메라 16:9 세로", { width: 2252, height: 4000 }],
+    ["크기 모름", {}],
+    ["가로 0", { width: 0, height: 3000 }],
+    ["이름이 Screenshot을 품기만", { filename: "MyScreenshot.jpg" }],
+  ])("%s → 종전대로 읽는다", async (_, extra) => {
+    const engine = engineSaying({});
+    const vision = await captionAll(engine, [shot("s", extra)], 1, resolve);
+    expect(engine.asked).toEqual(["s"]);
+    expect(vision?.unreadable).toBe(0);
+    expect(vision?.captions).toHaveLength(1);
+  });
+});
+
+describe("128 D1 — 판정은 caption.ts 한 곳, 기준은 바깥에서 못 본다", () => {
+  const { readFileSync, readdirSync, statSync } = require("node:fs") as typeof import("node:fs");
+  const { join } = require("node:path") as typeof import("node:path");
+  const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const RAW = readFileSync(join(__dirname, "../../src/vision/caption.ts"), "utf8");
+  const CODE = strip(RAW);
+
+  it("판정 낱말이 caption.ts 코드에 있다", () => {
+    for (const w of ["receipt", "invoice", "document", "transaction"]) expect(CODE).toContain(w);
+  });
+
+  it("판정 기준을 export하지 않는다", () => {
+    expect(CODE).not.toMatch(/export\s+(const|function)\s+\w*(DOCUMENT|SCREEN|Document|Screen)/);
+    // 값 export는 captionAll 하나뿐이다(나머지는 타입)
+    expect(CODE.match(/^export (?!type |async function captionAll)/gm)).toBeNull();
+  });
+
+  it("「사람이 정한 값」이라고 적혀 있다", () => {
+    expect(RAW).toMatch(/사람이 정한 값/);
+  });
+
+  it("src/ 다른 곳에 판정 낱말 정규식이 없다", () => {
+    const files: string[] = [];
+    const walk = (d: string) => {
+      for (const n of readdirSync(d)) {
+        const p = join(d, n);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.tsx?$/.test(n)) files.push(p);
+      }
+    };
+    walk(join(__dirname, "../../src"));
+    const others = files.filter(
+      (f) =>
+        !f.endsWith(join("vision", "caption.ts")) &&
+        /invoice|transaction/i.test(strip(readFileSync(f, "utf8"))),
+    );
+    expect(others).toEqual([]);
+  });
+});

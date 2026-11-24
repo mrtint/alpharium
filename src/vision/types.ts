@@ -96,6 +96,14 @@ export type PhotoVision = {
    * 한계가 겹치며 프롬프트가 **둘 다** 말해야 한다.
    */
   available: number;
+  /**
+   * 128 — 문서류(화면 캡처·영수증·서류)로 판정해 재료에서 뺀 장의 수.
+   *
+   * 판정은 `src/vision/caption.ts` 한 곳에서만 한다. **수만 싣는다** — 거른 묘사의 글·이유·점수는
+   * 어디에도 남지 않는다(원칙 IV). 빈 묘사(실패한 장)는 여기에 세지 않는다.
+   * 불변식: `captions.length + unreadable ≤ considered`.
+   */
+  unreadable: number;
 };
 
 /**

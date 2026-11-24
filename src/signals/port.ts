@@ -61,6 +61,14 @@ export type PhotoFacts = {
    * 취급(남긴다)을 받는다.
    */
   folderName?: string;
+  /**
+   * 128 — 파일 이름·가로·세로(픽셀). `exeForMetadata()`가 이미 주는 값이라 픽셀에 닿지 않는다.
+   * 화면 캡처를 묘사 전에 알아보는 재료다(판정은 `src/vision/caption.ts`). **모르면 없다** —
+   * 안드로이드 미디어 저장소가 크기를 기록하지 않으면 `null`이고, 그때는 싣지 않는다(원칙 V).
+   */
+  filename?: string;
+  width?: number;
+  height?: number;
 };
 
 /**

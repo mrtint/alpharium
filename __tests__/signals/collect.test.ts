@@ -642,3 +642,27 @@ describe("C16 — SignalValue의 갈래 수가 002와 같다 (SC-006b)", () => {
     );
   });
 });
+
+describe("128 — 이름·크기 이월", () => {
+  it("PhotoFacts의 filename·width·height가 Photo에 실리고 없으면 없다", async () => {
+    const { port } = fakePort({
+      photos: [
+        {
+          id: "shot",
+          takenAtMs: at("2026-08-12T08:00:00"),
+          filename: "Screenshot_1.jpg",
+          width: 1440,
+          height: 3120,
+        },
+        { id: "bare", takenAtMs: at("2026-08-12T09:00:00") },
+      ],
+    });
+    const signals = await collectDaySignals(port, DAY);
+    expect(signals.photos.kind).toBe("known");
+    if (signals.photos.kind === "known") {
+      const [shot, bare] = signals.photos.value.photos;
+      expect([shot.filename, shot.width, shot.height]).toEqual(["Screenshot_1.jpg", 1440, 3120]);
+      expect("filename" in bare || "width" in bare || "height" in bare).toBe(false);
+    }
+  });
+});

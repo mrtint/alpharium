@@ -175,6 +175,7 @@ describe("A-2d 본 장면 있는 날의 꼬리 (077 TN5b)", () => {
     captions: [{ photoId: "p1", takenAt: new Date(`${DAY}T13:00:00`), text: "A desk." }],
     considered: 1,
     available: 1,
+    unreadable: 0,
   };
   const request: DiaryRequest = {
     signals,
