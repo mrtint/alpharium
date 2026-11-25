@@ -53,7 +53,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { AppState, ScrollView, StyleSheet, View } from "react-native";
 
 import { AppText } from "./components/Text";
 import { Button } from "./components/Button";
@@ -83,9 +83,6 @@ export type OnboardingPorts = {
     requestPermission(): Promise<"granted" | "denied">;
     getPermission(): Promise<"granted" | "denied" | "undetermined" | "blocked">;
   };
-  battery: {
-    openSettingsList(): Promise<void>;
-  };
   osSettings: OsSettingsPort;
   /** 029 — 필수 에셋(공용 사진 모델 + 기본 캐릭터) 다운로드 통로 (FR-015). */
   essentialAssets: EssentialAssetsPort;
@@ -97,8 +94,6 @@ export type OnboardingPorts = {
  * 보여줬지만, 지금은 설명 카드 자체가 없다(FR-007a) — 배경만 유지한 채
  * 같은 지연 뒤 요청 함수를 호출한다. 화면 계층 상수 — 순수 판정 파일에
  * 두지 않는다.
- *
- * `battery-exception` 스텝에는 적용하지 않는다(040 research.md #2).
  */
 export const ONBOARDING_STEP_AUTO_ADVANCE_MS = 1500;
 
@@ -108,7 +103,7 @@ export type OnboardingScreenProps = {
   /** 이미 로드된 플래그 — `App.tsx`가 읽어 넘긴다. */
   flag: OnboardingFlag;
   ports: OnboardingPorts;
-  /** 모든 단계를 마치거나 건너뛰고 [시작하기]를 누르면. batteryNoticeShown 최종값 포함. */
+  /** 모든 단계를 마치거나 건너뛰고 [시작하기]를 누르면. 131 — 처음 끝내면 autoWriteSetupPending이 true. */
   onComplete: (flag: OnboardingFlag) => void;
   /**
    * ★ 040 — 권한 스텝이 전부 결정됐다(`current === null`, FR-004). 필수 에셋
@@ -143,8 +138,6 @@ export function OnboardingScreen({
 }: OnboardingScreenProps) {
   const [states, setStates] = useState<Partial<Record<PermissionKey, PermissionState>>>({});
   const [skipped, setSkipped] = useState<PermissionKey[]>([]);
-  const [batteryNoticeShown, setBatteryNoticeShown] = useState(flag.batteryNoticeShown);
-  const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
   const alive = useRef(true);
 
@@ -209,7 +202,6 @@ export function OnboardingScreen({
     platform,
     requirements,
     states,
-    batteryNoticeShown,
     skippedThisSession: skipped,
   });
   const current = nextStep(steps);
@@ -239,15 +231,13 @@ export function OnboardingScreen({
 
   /**
    * ★ 043 — 요청 결과가 허용(`granted`/`limited`)이 아니면 자동으로
-   * `skip(key)`를 호출한다(FR-008). 사진·알림 단계(121 — 위치는 걷었다)에만 적용 —
-   * `battery-exception`은 결과를 조회할 API가 없어 이 판정 대상이 아니다
-   * (그 분기는 별도로 처리, 아래 switch에서 조기 반환).
+   * `skip(key)`를 호출한다(FR-008). 사진·알림 단계(121 — 위치는 걷었다)에만 적용한다. 배터리 예외는
+   * 131부터 첫 실행 단계가 아니다(자동 쓰기 설정 창).
    */
   const allow = useCallback(
     async (step: OnboardingStep) => {
       if (busyRef.current) return;
       busyRef.current = true;
-      if (alive.current) setBusy(true);
       try {
         let result: PermissionState | undefined;
         switch (step.requirement.key) {
@@ -261,10 +251,7 @@ export function OnboardingScreen({
             break;
           }
           case "battery-exception":
-            // 065 — 예외를 직접 요청하지 않고 설정 목록을 연다(Play 정책, battery-exception-port.ts).
-            await ports.battery.openSettingsList();
-            if (alive.current) setBatteryNoticeShown(true);
-            await refresh();
+            // 131 — 단계 계획(`planOnboardingSteps`)이 이 단계를 내지 않는다.
             return;
         }
         if (result !== "granted" && result !== "limited" && alive.current) {
@@ -273,7 +260,6 @@ export function OnboardingScreen({
         await refresh();
       } finally {
         busyRef.current = false;
-        if (alive.current) setBusy(false);
       }
     },
     [ports, refresh, skip],
@@ -282,9 +268,7 @@ export function OnboardingScreen({
   /*
    * ★ 040 — 스텝 진입 후 고정 지연으로 시스템 권한 요청을 자동 호출한다
    * (FR-001, research.md #1). ★ 043 — 이 지연 동안 화면에 그리는 것은
-   * Modernist 배경뿐이다(설명 카드 없음, FR-007a). `battery-exception`은
-   * 제외한다(040 research.md #2) — 조회 API가 없어 사용자가 설정에서
-   * 돌아왔는지 자동으로 알 수 없다.
+   * Modernist 배경뿐이다(설명 카드 없음, FR-007a).
    *
    * `current?.requirement.key`뿐 아니라 **`current?.status`도 deps에 넣는다**
    * (043 실기기 대비 계약 테스트에서 발견 — 초기 렌더 시 `states`가 아직
@@ -298,7 +282,6 @@ export function OnboardingScreen({
    */
   useEffect(() => {
     if (current === null) return;
-    if (current.requirement.key === "battery-exception") return;
     if (current.status === "blocked") return;
 
     const step = current;
@@ -310,16 +293,9 @@ export function OnboardingScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allow, current?.requirement.key, current?.status]);
 
-  const openSettings = useCallback(
-    async (step: OnboardingStep) => {
-      if (step.requirement.key === "battery-exception") {
-        await ports.battery.openSettingsList();
-      } else {
-        await ports.osSettings.openAppSettings();
-      }
-    },
-    [ports],
-  );
+  const openSettings = useCallback(async () => {
+    await ports.osSettings.openAppSettings();
+  }, [ports]);
 
   const finish = useCallback(() => {
     // 035 — `welcomeShown`은 이 화면이 정하지 않는다. 온보딩을 끝냈다고 해서 연출을
@@ -327,11 +303,20 @@ export function OnboardingScreen({
     // 045 — `downloadConsented`도 같은 이유로 이 화면이 정하지 않는다.
     onComplete({
       completed: true,
-      batteryNoticeShown,
+      batteryNoticeShown: flag.batteryNoticeShown,
       welcomeShown: flag.welcomeShown,
       downloadConsented: flag.downloadConsented,
+      // 131 — 처음 끝내는 때(새 설치)만 자동 쓰기 설정 창을 대기시킨다. 이미 끝낸 적이 있으면 들어온 값 그대로.
+      autoWriteSetupPending: flag.completed ? flag.autoWriteSetupPending : true,
     });
-  }, [onComplete, batteryNoticeShown, flag.welcomeShown, flag.downloadConsented]);
+  }, [
+    onComplete,
+    flag.batteryNoticeShown,
+    flag.completed,
+    flag.autoWriteSetupPending,
+    flag.welcomeShown,
+    flag.downloadConsented,
+  ]);
 
   const total = steps.length;
   const doneCount = steps.filter(
@@ -344,13 +329,8 @@ export function OnboardingScreen({
   const T = text().onboarding;
 
   // ★ 065 — 사진·알림 단계는 OS 권한 창이 자동으로 뜨는 동안 스플래시 그림만 둔다. 창 뒤에 비치는
-  // 제목·설명은 흐려서 읽히지 않았다(소유자 실기기 확인). `blocked`(설정 열기 안내)와 배터리 단계는 글이 필요해 그대로다.
-  if (
-    !showAssetsStep &&
-    current !== null &&
-    current.requirement.key !== "battery-exception" &&
-    current.status !== "blocked"
-  ) {
+  // 제목·설명은 흐려서 읽히지 않았다(소유자 실기기 확인). `blocked`(설정 열기 안내)는 글이 필요해 그대로다.
+  if (!showAssetsStep && current !== null && current.status !== "blocked") {
     return (
       <View style={styles.splashBackdrop} testID="onboarding-screen">
         <View style={styles.splashBackdrop} testID={`onboarding-step-${current.requirement.key}`}>
@@ -420,37 +400,6 @@ export function OnboardingScreen({
             </Button>
           </View>
         </View>
-      ) : current.requirement.key === "battery-exception" ? (
-        // FR-007c — 배터리 최적화 예외는 기존 021 화면 구조(안내 문구 +
-        // [설정 열기]/[건너뛰기])를 그대로 유지한다. 시각 스타일만 토큰 자동 상속.
-        <View style={styles.section} testID={`onboarding-step-${current.requirement.key}`}>
-          <AppText variant="caption" style={{ opacity: 0.5 }}>
-            {Math.min(doneCount + 1, total)} / {total}
-          </AppText>
-          <AppText variant="body">{current.requirement.rationale}</AppText>
-          <AppText variant="caption">{current.requirement.ifDenied}</AppText>
-
-          <View style={{ alignSelf: "flex-start" }}>
-            {current.status === "blocked" ? (
-              <Button onPress={() => void openSettings(current)} testID="onboarding-open-settings">
-                {T.openSettings}
-              </Button>
-            ) : (
-              <Button disabled={busy} onPress={() => void allow(current)} testID="onboarding-allow">
-                {T.allow}
-              </Button>
-            )}
-          </View>
-
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => skip(current.requirement.key)}
-            style={styles.secondary}
-            testID="onboarding-skip"
-          >
-            <AppText variant="caption">{T.skip}</AppText>
-          </Pressable>
-        </View>
       ) : (
         // ★ 043 FR-007a·FR-009 — 사진·알림 단계(121 — 위치는 걷었다)는 설명 카드·버튼 없이
         // 스플래시와 같은 Modernist 배경만 유지한다. OS 다이얼로그가 이
@@ -465,10 +414,7 @@ export function OnboardingScreen({
             <View style={styles.section}>
               <AppText variant="body">{current.requirement.ifDenied}</AppText>
               <View style={{ alignSelf: "flex-start" }}>
-                <Button
-                  onPress={() => void openSettings(current)}
-                  testID="onboarding-open-settings"
-                >
+                <Button onPress={() => void openSettings()} testID="onboarding-open-settings">
                   {T.openSettings}
                 </Button>
               </View>
@@ -492,7 +438,6 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: 8, backgroundColor: COLORS.accent },
   section: { gap: 10, marginTop: 8 },
-  secondary: { paddingVertical: 8, paddingHorizontal: 4, alignSelf: "flex-start" },
   // ★ 043 — 사진·알림 단계의 배경 컨테이너. 설명 카드가 없으므로
   // blocked일 때만 안내+버튼이 뜬다(FR-008a), 그 외엔 빈 배경(FR-009).
   permissionBackground: { flex: 1, minHeight: 200, justifyContent: "center" },

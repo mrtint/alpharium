@@ -76,6 +76,19 @@ export const home = {
     yes: "써 보기",
     later: "나중에",
   },
+  /** 자동 쓰기 설정 창 (131, 안내 규칙 D2·D5) — 제목·행·조건 줄은 규칙 문서 0-1 표와 D5 원문(소유자) */
+  autoWriteSetup: {
+    title: "매일 일기를 써 드릴까요?",
+    rowAuto: "자동으로 쓰기",
+    rowHour: "쓰는 시각",
+    rowBattery: "배터리 제한 풀기",
+    conditionIos: "이 시간에 충전중이라면 자동으로 작성해요",
+    conditionAndroid: "이 시간에 배터리 제한을 풀거나 충전중이라면 자동으로 작성해요",
+    allowed: "허용됨",
+    denied: "허용 안 함",
+    confirm: "켜기",
+    later: "나중에",
+  },
   /** 쓸 재료 (053, 보드 `1d` ④·`2l`·`2m`·`2e`·`2f`). `confirmTitleUnseen`·`madeUpDay`는 사람이 정한 문장 */
   material: {
     photos: "사진",

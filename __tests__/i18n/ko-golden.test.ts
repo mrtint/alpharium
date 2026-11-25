@@ -66,6 +66,13 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 131 — 자동 쓰기 설정 창(`home.autoWriteSetup`, 안내 규칙 D2·D5). 「자동으로 쓰기」·「허용됨」·「허용 안 함」·「나중에」는 골든에 이미 있다
+  "매일 일기를 써 드릴까요?",
+  "쓰는 시각",
+  "배터리 제한 풀기",
+  "이 시간에 충전중이라면 자동으로 작성해요",
+  "이 시간에 배터리 제한을 풀거나 충전중이라면 자동으로 작성해요",
+  "켜기",
   // 125 — 쓴 날 지면의 「하루 동선」(`home.dayRoute`, 보드 밖 초안). 「오전」·「오후」는 골든에 이미 있다
   "하루 동선",
   "사진이 찍힌 자리를 시간순으로 이은 거예요",
@@ -232,8 +239,9 @@ const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
   },
   // 098 — 화면 문구를 사실대로(UX-13·15·16·20·21). 옛 값은 골든 json에 그대로 있다
   {
-    spec: "098",
-    literal: { from: "잠들기 전에 도착해요", to: "열면 바로 그날 일기를 써요" },
+    // 131 — 「열면 바로 그날 일기를 써요」(098)를 다시 바꿨다: 첫 실행 시점엔 자동 쓰기가 꺼져 있어 조건 없는 「써요」가 반대로 읽힌다(안내 규칙 K4·D3)
+    spec: "098→131",
+    literal: { from: "잠들기 전에 도착해요", to: "매일 일기를 써 드릴 수 있어요" },
   },
   {
     spec: "098",
@@ -354,7 +362,8 @@ const CHANGED_AFTER_GOLDEN: readonly GoldenChange[] = [
       [
         "permission(notifications).rationale",
         "정한 시간대에 일기가 다 쓰이면 알려 드리기 위해 씁니다.",
-        "쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.",
+        // 131 — 「자동으로 쓰기」 조건을 품는다(K4). 085의 값은 「쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.」
+        "자동으로 쓰기를 켜 두면 쓸 차례와 다 쓴 일기를 알려 드립니다.",
       ],
       [
         "permission(notifications).ifDenied",

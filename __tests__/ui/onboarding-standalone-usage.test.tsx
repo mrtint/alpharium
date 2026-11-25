@@ -30,9 +30,6 @@ function makePorts() {
       requestPermission: async () => "granted" as const,
       getPermission: async () => "undetermined" as const,
     },
-    battery: {
-      openSettingsList: async () => {},
-    },
     location: {
       status: async () => "undetermined" as PermissionState,
       request: async () => "granted" as PermissionState,
@@ -63,6 +60,7 @@ const BASE_PROPS = {
     batteryNoticeShown: false,
     welcomeShown: false,
     downloadConsented: false,
+    autoWriteSetupPending: false,
   },
 };
 

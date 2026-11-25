@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, fireEvent, waitFor } from "@testing-library/react-native";
+import { act, cleanup, render, waitFor } from "@testing-library/react-native";
 
 import { OnboardingScreen, ONBOARDING_STEP_AUTO_ADVANCE_MS } from "../../src/ui/OnboardingScreen";
 import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
@@ -19,7 +19,7 @@ import type { PermissionState } from "../../src/signals/port";
  *
  * **043 갱신**: 사진·위치·알림 단계에는 더 이상 `onboarding-skip` 버튼이
  * 없으므로(FR-008), 그 단계들은 fake timer로 자동 호출을 진행시켜 통과시키고
- * 배터리 단계에서만 기존처럼 `onboarding-skip`을 누른다.
+ * 131 — 배터리 단계는 첫 실행에서 뺐다.
  */
 
 jest.setTimeout(30000);
@@ -62,9 +62,6 @@ function makePorts(overrides?: {
       },
       getPermission: async () => notifState.value,
     },
-    battery: {
-      openSettingsList: async () => {},
-    },
     location: {
       status: async () => locState.value,
       request: async () => {
@@ -98,6 +95,7 @@ const BASE_PROPS = {
     batteryNoticeShown: false,
     welcomeShown: false,
     downloadConsented: false,
+    autoWriteSetupPending: false,
   },
 };
 
@@ -110,7 +108,7 @@ describe("040 — onAllStepsDecided (FR-004, 043 자동 진행으로 갱신)", (
     });
   });
 
-  it("사진·위치·알림 자동 통과 + 배터리 건너뛰기로 에셋 미준비여도 onAllStepsDecided가 불린다", async () => {
+  it("사진·알림 자동 통과로 에셋 미준비여도 onAllStepsDecided가 불린다", async () => {
     jest.useFakeTimers();
     const onAllStepsDecided = jest.fn();
     const ports = makePorts({
@@ -146,13 +144,7 @@ describe("040 — onAllStepsDecided (FR-004, 043 자동 진행으로 갱신)", (
       });
     }
 
-    // 배터리 단계는 여전히 건너뛰기 버튼으로(FR-007c).
-    await waitFor(
-      () => expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-      { timeout: 4000 },
-    );
-    fireEvent.press(screen.getByTestId("onboarding-skip"));
-
+    // 131 — 배터리 단계는 첫 실행에 없다(자동 쓰기 설정 창). 사진·알림이 끝나면 곧바로 결정된다.
     await waitFor(() => expect(onAllStepsDecided).toHaveBeenCalledTimes(1), { timeout: 4000 });
     expect(onAllStepsDecided).toHaveBeenCalledTimes(1);
 

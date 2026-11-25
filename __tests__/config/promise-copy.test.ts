@@ -37,7 +37,9 @@ describe("ST4 — 배터리 행", () => {
 describe("ST5 — 온보딩 알림·배터리 안내", () => {
   it("넷이 승인 문구다", () => {
     const by = Object.fromEntries(PERMISSION_REQUIREMENTS.map((r) => [r.key, r]));
-    expect(by.notifications!.rationale).toBe("쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.");
+    expect(by.notifications!.rationale).toBe(
+      "자동으로 쓰기를 켜 두면 쓸 차례와 다 쓴 일기를 알려 드립니다.",
+    );
     expect(by.notifications!.ifDenied).toBe("쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.");
     expect(by["battery-exception"]!.rationale).toBe(
       "휴대폰이 절전에 들어가도 열지 않아도 먼저 써 둘 수 있게 허용을 요청합니다.",

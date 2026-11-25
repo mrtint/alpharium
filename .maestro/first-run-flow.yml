@@ -66,15 +66,9 @@ appId: com.a810labs.pocketlog
       - tapOn:
           id: "onboarding-skip"
 
-# ★ F3 — 배터리 예외 스텝만 남았다면 [설정 열기]/[건너뛰기]로 처리한다
-#   (자동 타이머가 없는 유일한 스텝, research.md #2).
-- runFlow:
-    when:
-      visible:
-        id: "onboarding-step-battery-exception"
-    commands:
-      - assertVisible:
-          id: "onboarding-open-settings"
+# ★ F3 — 131부터 배터리 예외 단계가 첫 실행에 없다(자동 쓰기 설정 창의 한 행).
+- assertNotVisible:
+    id: "onboarding-step-battery-exception"
 
 # 에셋 다운로드 단계 UI(021 원본)는 040 배선에서 이제 도달하지 않는다 —
 # 권한 결정 직후 곧바로 작명 화면으로 넘어간다(FR-004). 혹시 남아 있다면
