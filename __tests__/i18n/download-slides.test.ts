@@ -10,7 +10,7 @@ describe("098 CP1 — 슬라이드 3", () => {
   const slide = download.slides[2]!;
 
   it("제목·본문이 확정 문장이다", () => {
-    expect(slide.title).toBe("열면 바로 그날 일기를 써요");
+    expect(slide.title).toBe("매일 일기를 써 드릴 수 있어요");
     expect(slide.body).toBe("자동으로 쓰기를 켜 두면 쓸 차례에 알림이 오고, 먼저 써 두기도 해요.");
   });
 

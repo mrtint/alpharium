@@ -69,30 +69,23 @@ export function planOnboardingSteps(input: {
   platform: "android" | "ios";
   requirements: readonly PermissionRequirement[];
   states: Partial<Record<PermissionKey, PermissionState>>;
-  batteryNoticeShown: boolean;
   skippedThisSession: readonly PermissionKey[];
 }): OnboardingStep[] {
   const skipped = new Set(input.skippedThisSession);
 
-  return input.requirements
-    .filter((req) => req.platforms.includes(input.platform))
-    .slice()
-    .sort((a, b) => a.order - b.order)
-    .map((requirement) => {
-      if (requirement.key === "battery-exception") {
-        if (input.batteryNoticeShown) {
-          return { requirement, status: "satisfied" as const };
-        }
-        if (skipped.has("battery-exception")) {
-          return { requirement, status: "skipped-eligible" as const };
-        }
-        return { requirement, status: "actionable" as const };
-      }
-      return {
+  return (
+    input.requirements
+      // 131(U1) — 배터리 예외는 첫 실행 단계에서 뺐다. 자동 쓰기 설정 창의 한 행이 묻는다.
+      // 목록(`requirements.ts`)에는 남는다 — 설정 화면 권한 꼬리표가 같은 목록을 쓴다.
+      .filter((req) => req.key !== "battery-exception")
+      .filter((req) => req.platforms.includes(input.platform))
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map((requirement) => ({
         requirement,
         status: statusOf(input.states[requirement.key], skipped.has(requirement.key)),
-      };
-    });
+      }))
+  );
 }
 
 /**

@@ -56,6 +56,7 @@ describe("F4 — 시드 (FR-010a)", () => {
       batteryNoticeShown: true,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
   });
 
@@ -88,6 +89,7 @@ describe("F4 — 시드 (FR-010a)", () => {
       batteryNoticeShown: false,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
     expect(port.autoDiaryReads).toBe(0);
   });
@@ -101,6 +103,7 @@ describe("F3 — loadOnboardingFlag 부분 손상 관대", () => {
       batteryNoticeShown: true,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
   });
 
@@ -123,6 +126,7 @@ describe("F3 — saveOnboardingFlag", () => {
       batteryNoticeShown: true,
       welcomeShown: true,
       downloadConsented: true,
+      autoWriteSetupPending: true,
       // @ts-expect-error — 여분 필드는 버려져야 한다
       extra: 1,
     });
@@ -131,6 +135,7 @@ describe("F3 — saveOnboardingFlag", () => {
       batteryNoticeShown: true,
       welcomeShown: true,
       downloadConsented: true,
+      autoWriteSetupPending: true,
     });
   });
 
@@ -141,12 +146,14 @@ describe("F3 — saveOnboardingFlag", () => {
       batteryNoticeShown: false,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
     expect(await loadOnboardingFlag(port)).toEqual({
       completed: true,
       batteryNoticeShown: false,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
   });
 });
@@ -203,6 +210,7 @@ describe("W8 — welcomeShown이 없는 옛 파일은 「아직 안 봤다」", 
       batteryNoticeShown: true,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
   });
 
@@ -218,6 +226,7 @@ describe("W8 — welcomeShown이 없는 옛 파일은 「아직 안 봤다」", 
       batteryNoticeShown: true,
       welcomeShown: false,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
   });
 
@@ -228,6 +237,7 @@ describe("W8 — welcomeShown이 없는 옛 파일은 「아직 안 봤다」", 
       batteryNoticeShown: false,
       welcomeShown: true,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
     expect((await loadOnboardingFlag(port)).welcomeShown).toBe(true);
   });
@@ -246,14 +256,20 @@ describe("W7 — 진행 중 상태를 담지 않는다 (FR-009)", () => {
     );
   });
 
-  it("필드가 정확히 넷이다 (045에서 downloadConsented가 더해졌다)", () => {
+  it("필드가 정확히 다섯이다 (131에서 autoWriteSetupPending이 더해졌다)", () => {
     const declaration = FLAG_CODE.slice(
       FLAG_CODE.indexOf("export type OnboardingFlag"),
       FLAG_CODE.indexOf("export const DEFAULT_ONBOARDING_FLAG"),
     );
     const fields = [...declaration.matchAll(/^\s*(\w+):\s*boolean;/gm)].map((m) => m[1]);
     expect(new Set(fields)).toEqual(
-      new Set(["completed", "batteryNoticeShown", "welcomeShown", "downloadConsented"]),
+      new Set([
+        "completed",
+        "batteryNoticeShown",
+        "welcomeShown",
+        "downloadConsented",
+        "autoWriteSetupPending",
+      ]),
     );
   });
 });
@@ -278,6 +294,7 @@ describe("W10 — welcomeShown은 되돌아가지 않는다", () => {
       batteryNoticeShown: true,
       welcomeShown: true,
       downloadConsented: false,
+      autoWriteSetupPending: false,
     });
     const reloaded = await loadOnboardingFlag(port);
 
@@ -308,6 +325,7 @@ describe("C5 — downloadConsented는 한 번 true가 되면 되돌아가지 않
         batteryNoticeShown: true,
         welcomeShown: true,
         downloadConsented: true,
+        autoWriteSetupPending: false,
       }),
       null,
     );
@@ -329,6 +347,7 @@ describe("C5 — downloadConsented는 한 번 true가 되면 되돌아가지 않
       batteryNoticeShown: false,
       welcomeShown: false,
       downloadConsented: true,
+      autoWriteSetupPending: false,
     });
     expect((await loadOnboardingFlag(port)).downloadConsented).toBe(true);
   });
@@ -340,6 +359,7 @@ describe("C5 — downloadConsented는 한 번 true가 되면 되돌아가지 않
       batteryNoticeShown: false,
       welcomeShown: false,
       downloadConsented: true,
+      autoWriteSetupPending: false,
     });
     const reloaded = await loadOnboardingFlag(port);
     await saveOnboardingFlag(port, { ...reloaded, welcomeShown: true });
@@ -348,5 +368,39 @@ describe("C5 — downloadConsented는 한 번 true가 되면 되돌아가지 않
 
   it("기본값은 「아직 동의 안 함」이다", () => {
     expect(DEFAULT_ONBOARDING_FLAG.downloadConsented).toBe(false);
+  });
+});
+
+describe("131 — autoWriteSetupPending(설정 창 대기)", () => {
+  it("키가 없는 옛 파일은 false다 — 기존 사용자에게 창이 뜨지 않는다", async () => {
+    const port = memoryPort(
+      JSON.stringify({
+        completed: true,
+        batteryNoticeShown: true,
+        welcomeShown: true,
+        downloadConsented: true,
+      }),
+      null,
+    );
+    expect((await loadOnboardingFlag(port)).autoWriteSetupPending).toBe(false);
+  });
+
+  it("기본값은 false다", () => {
+    expect(DEFAULT_ONBOARDING_FLAG.autoWriteSetupPending).toBe(false);
+  });
+
+  it("boolean이 아니면 false다", async () => {
+    const port = memoryPort(JSON.stringify({ autoWriteSetupPending: "yes" }), null);
+    expect((await loadOnboardingFlag(port)).autoWriteSetupPending).toBe(false);
+  });
+
+  it("저장된 true는 왕복에서 보존된다", async () => {
+    const port = memoryPort(null, null);
+    await saveOnboardingFlag(port, {
+      ...DEFAULT_ONBOARDING_FLAG,
+      completed: true,
+      autoWriteSetupPending: true,
+    });
+    expect((await loadOnboardingFlag(port)).autoWriteSetupPending).toBe(true);
   });
 });

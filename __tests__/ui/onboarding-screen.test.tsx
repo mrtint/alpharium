@@ -77,11 +77,6 @@ function makePorts(overrides?: {
         },
         getPermission: async () => notifState.value,
       },
-      battery: {
-        openSettingsList: async () => {
-          calls.push("openBatterySettings");
-        },
-      },
       osSettings: {
         openAppSettings: async () => {
           calls.push("openAppSettings");
@@ -112,6 +107,7 @@ const BASE_PROPS = {
     batteryNoticeShown: false,
     welcomeShown: false,
     downloadConsented: false,
+    autoWriteSetupPending: false,
   },
 };
 
@@ -179,37 +175,15 @@ describe("043 — 사진·위치·알림 단계에 설명 카드·버튼이 없�
     expect(screen.queryByTestId("onboarding-skip")).toBeNull();
   });
 
-  it("배터리 예외 단계(actionable)에는 여전히 onboarding-skip·allow 버튼이 있다 (FR-007c)", async () => {
+  it("131 — 사진·알림을 정하면 배터리 단계 없이 [시작하기]가 뜬다(자동 쓰기 설정 창으로 옮겼다)", async () => {
     const { ports } = makePorts({
       photo: "granted",
       notification: "granted",
     });
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
 
-    await waitFor(() =>
-      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-    );
-    // 배터리 예외는 조회 API가 없어 항상 actionable로 시작한다(blocked
-    // 판정 없음) — [허용] 버튼이 뜬다. [설정 열기]는 별도 액션(FR-007c의
-    // openSettingsList 경로)이며 이 상태에서는 렌더되지 않는다.
-    expect(screen.getByTestId("onboarding-skip")).toBeTruthy();
-    expect(screen.getByTestId("onboarding-allow")).toBeTruthy();
-  });
-
-  it("065 — 배터리 단계의 [허용]은 예외를 직접 요청하지 않고 설정 목록을 연다(Play 정책)", async () => {
-    const { ports, calls } = makePorts({
-      photo: "granted",
-      notification: "granted",
-    });
-    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-    );
-    await fireEvent.press(screen.getByTestId("onboarding-allow"));
-
-    await waitFor(() => expect(calls).toContain("openBatterySettings"));
-    expect("requestException" in ports.battery).toBe(false);
+    await waitFor(() => expect(screen.getByTestId("onboarding-start")).toBeTruthy());
+    expect(screen.queryByTestId("onboarding-step-battery-exception")).toBeNull();
   });
 });
 
@@ -261,7 +235,7 @@ describe("★ 043 CRITICAL — 거부(denied) 시 자동 건너뛰기 (FR-008 �
     await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
   });
 
-  it("알림 요청이 거부돼도 자동으로 배터리 단계로 전환된다", async () => {
+  it("알림 요청이 거부돼도 자동으로 넘어간다 — 131부터 배터리 단계 없이 [시작하기]", async () => {
     jest.useFakeTimers();
     const { ports } = makePorts({
       photo: "granted",
@@ -272,9 +246,7 @@ describe("★ 043 CRITICAL — 거부(denied) 시 자동 건너뛰기 (FR-008 �
     await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
     await advance();
 
-    await waitFor(() =>
-      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-    );
+    await waitFor(() => expect(screen.getByTestId("onboarding-start")).toBeTruthy());
   });
 
   it("blocked(다시 묻지 않음)면 자동 전환하지 않고 [설정 열기]가 뜬다 (FR-008a)", async () => {
@@ -302,31 +274,6 @@ describe("★ 043 CRITICAL — 거부(denied) 시 자동 건너뛰기 (FR-008 �
   });
 });
 
-describe("배터리 예외 스텝은 자동 타이머가 없다 (research.md #2, FR-007c)", () => {
-  afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
-  });
-
-  it("지연이 지나도 배터리 설정 목록이 자동으로 열리지 않는다", async () => {
-    jest.useFakeTimers();
-    const { ports, calls } = makePorts({
-      photo: "granted",
-      notification: "granted",
-    });
-    await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={() => {}} />);
-
-    await waitFor(() =>
-      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-    );
-
-    await advance(ONBOARDING_STEP_AUTO_ADVANCE_MS * 3);
-
-    expect(calls).not.toContain("openBatterySettings");
-    expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy();
-  });
-});
-
 describe("[시작하기] (FR-011·SC-003)", () => {
   afterEach(() => {
     jest.clearAllTimers();
@@ -339,22 +286,20 @@ describe("[시작하기] (FR-011·SC-003)", () => {
     const { ports } = makePorts();
     await render(<OnboardingScreen {...BASE_PROPS} ports={ports} onComplete={onComplete} />);
 
-    // 사진 → 알림 자동 통과, 배터리는 버튼으로(121 — 위치 단계 없음).
+    // 사진 → 알림 자동 통과(121 — 위치 단계 없음, 131 — 배터리 단계 없음).
     await advance();
     await waitFor(() => expect(screen.getByTestId("onboarding-step-notifications")).toBeTruthy());
     await advance();
-    await waitFor(() =>
-      expect(screen.getByTestId("onboarding-step-battery-exception")).toBeTruthy(),
-    );
-
-    await fireEvent.press(screen.getByTestId("onboarding-skip"));
 
     await waitFor(() => expect(screen.getByTestId("onboarding-start")).toBeTruthy(), {
       timeout: 4000,
     });
     await fireEvent.press(screen.getByTestId("onboarding-start"));
 
-    expect(onComplete).toHaveBeenCalledWith(expect.objectContaining({ completed: true }));
+    // 131 — 처음 끝내면 자동 쓰기 설정 창을 대기시킨다(BASE_PROPS의 flag는 completed: false)
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({ completed: true, autoWriteSetupPending: true }),
+    );
   });
 });
 
@@ -375,6 +320,7 @@ describe("S1 — 플랫폼 필터 (FR-003)", () => {
           batteryNoticeShown: true,
           welcomeShown: false,
           downloadConsented: false,
+          autoWriteSetupPending: false,
         }}
         ports={ports}
         onComplete={() => {}}
@@ -432,6 +378,7 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8, 043 무변경 회�
           batteryNoticeShown: true,
           welcomeShown: false,
           downloadConsented: false,
+          autoWriteSetupPending: false,
         }}
         ports={ports}
         onComplete={() => {}}
@@ -456,6 +403,7 @@ describe("029 — 필수 에셋 다운로드 단계 (SR1~SR8, 043 무변경 회�
           batteryNoticeShown: true,
           welcomeShown: false,
           downloadConsented: false,
+          autoWriteSetupPending: false,
         }}
         ports={ports}
         onComplete={() => {}}

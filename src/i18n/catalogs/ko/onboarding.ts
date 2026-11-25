@@ -20,7 +20,7 @@ export const onboarding = {
       ifDenied: "사진을 볼 수 없어서 일기는 사진 없이 써요.",
     },
     notifications: {
-      rationale: "쓸 차례와 다 쓴 일기를 알려 드리기 위해 씁니다.",
+      rationale: "자동으로 쓰기를 켜 두면 쓸 차례와 다 쓴 일기를 알려 드립니다.",
       ifDenied: "쓸 차례도, 다 쓴 일기도 알려 드리지 못해요.",
     },
     "battery-exception": {

@@ -11,7 +11,6 @@ import { PERMISSION_REQUIREMENTS } from "../../src/onboarding/requirements";
 const base = {
   requirements: PERMISSION_REQUIREMENTS,
   states: {},
-  batteryNoticeShown: false,
   skippedThisSession: [],
 } as const;
 
@@ -27,10 +26,10 @@ describe("068 C4 — battery-exception은 안드로이드 전용", () => {
     expect(keys).toEqual(["photos", "notifications"]);
   });
 
-  it("안드로이드 단계 목록에는 마지막으로 있다", () => {
+  it("131 — 안드로이드 단계 목록에도 없다(자동 쓰기 설정 창의 한 행으로 옮겼다)", () => {
     const keys = planOnboardingSteps({ ...base, platform: "android" }).map(
       (s) => s.requirement.key,
     );
-    expect(keys[keys.length - 1]).toBe("battery-exception");
+    expect(keys).not.toContain("battery-exception");
   });
 });

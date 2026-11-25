@@ -61,37 +61,25 @@ appId: com.a810labs.pocketlog
 - assertNotVisible:
     text: ".*(kanana|exaone|hyperclovax|qwen|gemma|GGUF|Q4_|Q8_).*"
 # 배터리 단계가 아니라면 [허용] 버튼이 없어야 한다(사진·위치·알림은 다이얼로그로만 허용, FR-007a·FR-009).
-- runFlow:
-    when:
-      notVisible:
-        id: "onboarding-step-battery-exception"
-    commands:
-      - assertNotVisible:
-          id: "onboarding-allow"
+- assertNotVisible:
+    id: "onboarding-allow"
 
 # ★ 031 — **"사진에 담긴 위치"(photo-location) 단계가 온보딩에 없다.**
 #   `ACCESS_MEDIA_LOCATION`은 조회·요청 API가 없어 판정 불가능한 단계였고,
 #   사진 granted 상태에서 온보딩이 이 단계를 무한 반복했다(One UI 8.5 실기기).
-#   권한 단계는 이제 4개(사진·위치·알림·배터리 예외)다.
+#   권한 단계는 이제 둘(사진·알림)이다(121 위치, 131 배터리 예외를 걷었다).
 - assertNotVisible:
     id: "onboarding-step-photo-location"
 
 # 사진·위치·알림이 이미 부여된 기기라면 자동으로 배터리 예외 단계까지
 # 진행된다(OS 다이얼로그가 안 뜨므로 이 흐름이 직접 관여할 필요 없음).
-# ★ M3 — **배터리 예외 단계에는 여전히 [건너뛰기]/[허용]이 있다**(FR-007c).
+# ★ M3 — 131부터 배터리 예외 단계가 첫 실행에 없다(자동 쓰기 설정 창의 한 행).
 - extendedWaitUntil:
     visible:
-      id: "onboarding-step-battery-exception|onboarding-step-assets|onboarding-start"
+      id: "onboarding-step-assets|onboarding-start|welcome-name-input"
     timeout: 15000
-- runFlow:
-    when:
-      visible:
-        id: "onboarding-step-battery-exception"
-    commands:
-      - assertVisible:
-          id: "onboarding-skip"
-      - tapOn:
-          id: "onboarding-skip"
+- assertNotVisible:
+    id: "onboarding-step-battery-exception"
 
 # ★ M4 — **권한 뒤에 "필수 에셋 다운로드" 단계가 온다**(029 FR-015·016·017).
 #   권한을 전부 건너뛰었어도, 필수 에셋(공용 사진 모델 + 기본 캐릭터)이 준비돼

@@ -57,6 +57,14 @@ export type OnboardingFlag = {
    * (`welcomeShown`이 035에서 추가됐을 때와 같은 패턴).
    */
   downloadConsented: boolean;
+  /**
+   * 자동 쓰기 설정 창을 아직 묻지 않았다 (131, 안내 규칙 G4).
+   *
+   * 온보딩이 `completed: false → true`로 처음 저장될 때만 `true`가 되고, 창의
+   * 「켜기」/「나중에」에서 `false`가 된다 — 다시 `true`가 되지 않는다. 키가 없는
+   * 옛 파일은 `false`라 이미 첫 실행을 마친 사용자에게는 창이 뜨지 않는다(소유자, 새 설치만).
+   */
+  autoWriteSetupPending: boolean;
 };
 
 /** 파일 없음·손상 시의 값. */
@@ -65,6 +73,7 @@ export const DEFAULT_ONBOARDING_FLAG: OnboardingFlag = {
   batteryNoticeShown: false,
   welcomeShown: false,
   downloadConsented: false,
+  autoWriteSetupPending: false,
 };
 
 /** 옛 `auto-diary.json`에서 배터리 안내 제시 여부를 시드한다 (FR-010a). */
@@ -85,6 +94,7 @@ function seedFromAutoDiary(raw: string | null): OnboardingFlag {
         batteryNoticeShown: true,
         welcomeShown: false,
         downloadConsented: false,
+        autoWriteSetupPending: false,
       };
     }
   } catch {
@@ -123,6 +133,9 @@ export async function loadOnboardingFlag(port: OnboardingFlagPort): Promise<Onbo
       welcomeShown: typeof obj.welcomeShown === "boolean" ? obj.welcomeShown : false,
       // 045 — 키가 없는 옛 파일은 「다운로드 동의를 아직 안 했다」다.
       downloadConsented: typeof obj.downloadConsented === "boolean" ? obj.downloadConsented : false,
+      // 131 — 키가 없는 옛 파일은 「묻지 않는다」다(기존 사용자).
+      autoWriteSetupPending:
+        typeof obj.autoWriteSetupPending === "boolean" ? obj.autoWriteSetupPending : false,
     };
   } catch {
     return { ...DEFAULT_ONBOARDING_FLAG };
@@ -132,7 +145,7 @@ export async function loadOnboardingFlag(port: OnboardingFlagPort): Promise<Onbo
 /**
  * 온보딩 플래그를 담는다 (F3).
  *
- * **네 필드만 직렬화한다** — 여분 필드는 버린다.
+ * **다섯 필드만 직렬화한다** — 여분 필드는 버린다.
  */
 export async function saveOnboardingFlag(
   port: OnboardingFlagPort,
@@ -144,6 +157,7 @@ export async function saveOnboardingFlag(
       batteryNoticeShown: flag.batteryNoticeShown,
       welcomeShown: flag.welcomeShown,
       downloadConsented: flag.downloadConsented,
+      autoWriteSetupPending: flag.autoWriteSetupPending,
     }),
   );
 }

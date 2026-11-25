@@ -159,3 +159,4 @@ export const ROUTE_TEXT = lazyText((c) => c.home.dayRoute);
 
 /** 111 — 첫 일기 확인 문구 (규칙 문서 0-1) */
 export const FIRST_DIARY_TEXT = lazyText((c) => c.home.firstDiary);
+export const AUTO_WRITE_SETUP_TEXT = lazyText((c) => c.home.autoWriteSetup);

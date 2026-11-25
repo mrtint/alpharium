@@ -123,6 +123,8 @@ import { clearPhotoCopies } from "./src/app/wipe-port";
 import { FastCycleConfirmDialog } from "./src/ui/FastCycleConfirmDialog";
 import { WipeConfirmDialog } from "./src/ui/WipeConfirmDialog";
 import { FirstDiaryConfirmDialog } from "./src/ui/MaterialDialogs";
+import { AutoWriteSetupDialog } from "./src/ui/AutoWriteSetupDialog";
+import { useAutoWriteSetup } from "./src/app/use-auto-write-setup";
 import { FONT_LICENSE_TEXT, POLICY_LINKS_TEXT, SETTINGS_TEXT } from "./src/ui/settings-text";
 import { StackLayer } from "./src/ui/StackLayer";
 import { AppText } from "./src/ui/components/Text";
@@ -623,7 +625,6 @@ function AppFrame() {
     () => ({
       photo: expoPhotoPort(),
       notification: expoNotificationPort(),
-      battery: expoBatteryExceptionPort(),
       osSettings: expoOsSettingsPort(),
       // 029 — 필수 에셋 다운로드 통로 (FR-015). `src/app/`에 있어 로스터 접근 허용.
       essentialAssets: expoEssentialAssetsPort(),
@@ -934,7 +935,8 @@ function AppFrame() {
     setForceOnboarding(false);
     setOnboardingFlag((prev) => {
       if (prev === null || prev.completed === true) return prev;
-      const next = { ...prev, completed: true };
+      // 131 — 처음 끝내는 이 순간(새 설치)에만 자동 쓰기 설정 창을 대기시킨다. 이미 끝낸 설치는 위에서 돌아간다.
+      const next = { ...prev, completed: true, autoWriteSetupPending: true };
       void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
       return next;
     });
@@ -1545,6 +1547,48 @@ function AppFrame() {
     setRoute("settings");
   }, [developer, simulationClear, fastCycleDisable]);
 
+  /* ─────────────────── 131 — 자동 쓰기 설정 창 (안내 규칙 G4) ─────────────────── */
+  // 새 설치의 첫 실행이 끝난 뒤 한 번. 대기 비트(`autoWriteSetupPending`)는 권한 단계를 처음 끝낼 때 선다(`onAllPermissionStepsDecided`).
+  const setupNotificationPort = useMemo(() => expoNotificationPort(), []);
+  const setupBatteryPort = useMemo(() => expoBatteryExceptionPort(), []);
+  const clearAutoWriteSetupPending = useCallback(async () => {
+    setOnboardingFlag((prev) => {
+      if (prev === null || !prev.autoWriteSetupPending) return prev;
+      const next = { ...prev, autoWriteSetupPending: false };
+      void saveOnboardingFlag(onboardingFlagPort, next).catch(() => {});
+      return next;
+    });
+  }, [onboardingFlagPort]);
+  const setupEffectDeps = useMemo(
+    () => ({ settingsPort, backgroundPort, notificationPort: setupNotificationPort }),
+    [settingsPort, backgroundPort, setupNotificationPort],
+  );
+  const autoWriteSetup = useAutoWriteSetup({
+    platform: appPlatform(Platform.OS),
+    homeReady: firstRunStage === "done" && !readingFirstMaterial,
+    flagLoaded: onboardingFlag !== null,
+    pending: onboardingFlag?.autoWriteSetupPending === true,
+    firstDiaryEntered: firstDiary.entered.current,
+    firstDiaryDone: firstDiary.step === "done",
+    // 다른 확인 질문이 떠 있거나 설정·개발자 겹이 홈을 덮은 동안은 띄우지 않는다(R8)
+    otherDialogOpen:
+      homeCovered ||
+      firstDiary.step === "asking" ||
+      fastCycle.pendingEnable !== null ||
+      redownloadDialog !== null,
+    liveWrites,
+    batteryPort: setupBatteryPort,
+    settings: settingsValues?.autoDiary ?? null,
+    effects: {
+      applyTargetHour: (current, hour) => applyTargetHour(current, hour, setupEffectDeps),
+      applyToggleOn: (current) => applyToggleOn(current, setupEffectDeps),
+      applyToggleOff: (current) => applyToggleOff(current, setupEffectDeps),
+    },
+    clearPending: clearAutoWriteSetupPending,
+    onSettingsChange: onAutoDiaryChange,
+  });
+  const [setupClock] = useState(() => readDeviceClock(new Date()));
+
   // 플래그·에셋 상태를 아직 읽지 못했으면 아무것도 그리지 않는다(짧다).
   if (onboardingFlag === null || essentialsReady === null) {
     return <SafeAreaView style={styles.container} edges={["top", "bottom", "left", "right"]} />;
@@ -1864,6 +1908,31 @@ function AppFrame() {
         {/* 111 — 재료가 있는 첫 실행에서 첫 일기를 쓸지 묻는다. 뒤로 가기는 「나중에」와 같다 */}
         {firstDiary.step === "asking" && (
           <FirstDiaryConfirmDialog onConfirm={firstDiary.confirm} onLater={firstDiary.later} />
+        )}
+        {/* 131 — 자동 쓰기 설정 창. 시각을 고르는 동안은 시각 대화상자만 보인다 */}
+        {autoWriteSetup.visible && !autoWriteSetup.pickingHour && (
+          <AutoWriteSetupDialog
+            batteryTag={autoWriteSetup.batteryTag}
+            enabled={autoWriteSetup.enabled}
+            onConfirm={autoWriteSetup.confirm}
+            onLater={autoWriteSetup.later}
+            onOpenBattery={autoWriteSetup.openBattery}
+            onPickHour={autoWriteSetup.openHourPicker}
+            onToggle={autoWriteSetup.setEnabled}
+            platform={appPlatform(Platform.OS)}
+            targetHourText={formatTargetHour(autoWriteSetup.targetHour, setupClock.format)}
+          />
+        )}
+        {autoWriteSetup.visible && autoWriteSetup.pickingHour && (
+          <TargetHourDialog
+            format={setupClock.format}
+            hour={autoWriteSetup.targetHour}
+            onClose={autoWriteSetup.closeHourPicker}
+            onSelect={autoWriteSetup.selectHour}
+            open
+            platform={appPlatform(Platform.OS)}
+            timeZoneLine={timeZoneLine(setupClock.timeZoneId, setupClock.offsetMinutes)}
+          />
         )}
         {/* 106 — 빠른 주기 켜기 확인(오늘 일기가 있을 때). 개발 환경에서만 상태가 선다 */}
         {fastCycle.pendingEnable !== null && (
