@@ -33,8 +33,8 @@ TDD: 테스트를 먼저 쓴다(헌법 「개발 방식」).
 
 - [X] T008 위반 주입 6건(quickstart 3번) — 각 테스트 실패 확인 후 되돌림, 결과를 `specs/132-guidance-lock-g6/quickstart.md` 「기록」에
 - [X] T009 규칙 문서 정리 — 0-4 G6 행, 5장 K1·K3·K4·K8·K9·K11 행을 걷고 잠근 테스트 파일로 연결, 1-3 R6의 「짝이 비어 있는 것」·4-1의 K11 해당 ⛔ 행 갱신 in `docs/user-guidance-rules.md`
-- [ ] T010 `npm test`(문구 골든 `ko-golden.test.ts` 변경 없이 통과 — SC-003)·`npm run lint` 통과
-- [ ] T011 실기기 확인(iPhone 14 쓰는 중 안내 줄, SM-S901N 무변화) → quickstart 「기록」
+- [X] T010 `npm test`(문구 골든 `ko-golden.test.ts` 변경 없이 통과 — SC-003)·`npm run lint` 통과
+- [X] T011 실기기 확인(iPhone 14 쓰는 중 안내 줄, SM-S901N 무변화) → quickstart 「기록」
 
 ## Dependencies
 
