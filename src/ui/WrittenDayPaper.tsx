@@ -203,7 +203,8 @@ export function WrittenDayPaper({
                 </AppText>
               ))}
               {/* 125 — 문단 뒤 본문 끝. 하단 바가 비키는 아래 여백(104)은 이 칸 아래에 그대로 남는다 */}
-              {route !== undefined && <DayRouteSection route={route} />}
+              {/* 133 — 날짜 키: 다른 날이면 목록이 다시 접힌다. route는 렌더마다 새 객체일 수 있어 그 정체성에 기대지 않는다 */}
+              {route !== undefined && <DayRouteSection key={paper.entry.date} route={route} />}
             </View>,
           )}
         </>

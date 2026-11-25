@@ -76,6 +76,7 @@ const diagramOf = (names: string[]): DayRoute => ({
   items: names.map((label, i) => ({
     n: i + 1,
     period: "morning" as const,
+    photos: 1,
     label,
     x: 0.2 + i * 0.3,
     y: 0.5,
@@ -134,7 +135,7 @@ describe("DF2·US1 — 쓴 날 + 저장된 자리 2곳 이상이면 읽어 도�
     expect(routeDay).toHaveBeenCalledTimes(1);
     expect(routeDay.mock.calls[0]![0]).toBe(SUN);
     expect(routeDay.mock.calls[0]![1]).toEqual(SAVED_SUN);
-    expect(screen.getByText("1 · 오전 · 읽은-가")).toBeTruthy();
+    expect(screen.getByText(/^읽은-가( |$)/)).toBeTruthy();
   });
 
   it("안 쓴 날(오늘)에는 부르지 않고 칸이 없다", async () => {
@@ -167,7 +168,7 @@ describe("DF2·US1 — 쓴 날 + 저장된 자리 2곳 이상이면 읽어 도�
     await renderHome(store, routeDay);
     await selectDay(SUN);
 
-    expect(await screen.findByText(/^1 · .* · 집 근처$/)).toBeTruthy();
+    expect(await screen.findByText(/^집 근처( |$)/)).toBeTruthy();
     expect(routeDay).toHaveBeenCalledTimes(1);
     expect(routeDay.mock.calls[0]![1]).toHaveLength(1);
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
@@ -192,7 +193,7 @@ describe("DF2·US1 — 쓴 날 + 저장된 자리 2곳 이상이면 읽어 도�
     await renderHome(store, undefined);
     await selectDay(SUN);
 
-    expect(await screen.findByText(/^1 · .* · 일요일-가$/)).toBeTruthy();
+    expect(await screen.findByText(/^일요일-가( |$)/)).toBeTruthy();
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
   });
 });
@@ -208,7 +209,7 @@ describe("DF4 — 읽는 동안 지면은 막히지 않고 저장된 목록이 �
 
     // 본문과 저장된 이름이 이미 보이고 지면이 막히지 않았다
     expect(await screen.findByTestId("written-body")).toHaveTextContent(/첫 문단이다\./);
-    expect(await screen.findByText(/^1 · .* · 일요일-가$/)).toBeTruthy();
+    expect(await screen.findByText(/^일요일-가( |$)/)).toBeTruthy();
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
 
     await userEvent.press(await screen.findByTestId(`day-${SAT}`)); // 지면이 반응한다
@@ -228,7 +229,7 @@ describe("DF5 — routeDay가 던져도 저장된 목록으로 남는다", () =>
     await renderHome(store, routeDay);
     await selectDay(SUN);
 
-    expect(await screen.findByText(/^1 · .* · 일요일-가$/)).toBeTruthy();
+    expect(await screen.findByText(/^일요일-가( |$)/)).toBeTruthy();
     expect(screen.getByTestId("written-body")).toHaveTextContent(/첫 문단이다\./);
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
   });
@@ -240,7 +241,7 @@ describe("DF5 — routeDay가 던져도 저장된 목록으로 남는다", () =>
     await renderHome(store, routeDay);
     await selectDay(SUN);
 
-    expect(await screen.findByText(/^1 · .* · 일요일-가$/)).toBeTruthy();
+    expect(await screen.findByText(/^일요일-가( |$)/)).toBeTruthy();
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
   });
 });
@@ -324,7 +325,7 @@ describe("DF3·FR-015 — 늦은 결과는 버리고 캐시가 없다", () => {
     expect(routeDay.mock.calls.filter(([day]) => day === SUN)).toHaveLength(1);
 
     await userEvent.press(await screen.findByTestId(`day-${SAT}`));
-    await screen.findByText(/^1 · .* · 토요일-가$|읽은-가/);
+    await screen.findByText(/^토요일-가( |$)|읽은-가/);
     await selectDay(SUN);
     await screen.findByTestId("day-route-diagram");
     expect(routeDay.mock.calls.filter(([day]) => day === SUN)).toHaveLength(2);
@@ -364,7 +365,7 @@ describe("FR-015 — 다시 써서 같은 날의 일기가 바뀌면 옛 도식�
     // 새 일기를 다시 읽는 중이다(대기) — 옛 일기의 읽은 결과가 새 일기 위에 남아 있으면 안 된다
     expect(screen.queryByText(/옛-읽음/)).toBeNull();
     expect(screen.queryByTestId("day-route-diagram")).toBeNull();
-    expect(await screen.findByText(/^1 · .* · 새-가$/)).toBeTruthy();
+    expect(await screen.findByText(/^새-가( |$)/)).toBeTruthy();
 
     // 읽기가 끝나면 새 일기의 도식이 된다
     await act(async () => {

@@ -129,6 +129,13 @@ export const home = {
     lineNoName: (n: number, period: string): string => `${n} · ${period}`,
     /** 상한 밖의 자리 수 */
     more: (n: number): string => `외 ${n}곳`,
+    /** 133 — 접힌 목록 한 줄: 대표 자리 이름(번호·때 없음)과 나머지 수. 끝에 「펼치기」가 붙는다 */
+    summary: (lead: string, n: number): string => `${lead} 외 ${n}곳`,
+    /** 133 — 이름 있는 자리가 없어 대표가 없을 때의 접힌 한 줄 */
+    count: (n: number): string => `${n}곳`,
+    /** 133 — 줄 끝에 붙는 강조 글자 */
+    expand: "펼치기",
+    collapse: "접기",
     /** 도식 하나의 화면 낭독 — 점·선은 낭독에서 숨기고 범례가 번호 순서대로 읽힌다 */
     diagramA11y: (n: number): string => `사진이 찍힌 자리 ${n}곳을 시간순으로 이은 도식`,
   },
