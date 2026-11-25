@@ -71,6 +71,8 @@ export type RouteItem = {
   period: DayPeriod;
   /** 저장된 이름. `null`이면 이름을 모르는 곳이다 — 화면이 이름 칸을 비운다(126 FR-015) */
   label: string | null;
+  /** 그 자리의 사진 수 — 저장된 `photoCount`(133, 접힌 목록의 대표 자리를 고른다) */
+  photos: number;
   x?: number;
   y?: number;
 };
@@ -85,6 +87,21 @@ export type DayRoute = {
   /** 도식 뒤에 까는 지도(126). `diagram`일 때만 있고, 지도를 못 읽었거나 그릴 것이 없으면 없다(125 모양 그대로) */
   map?: RouteMap;
 };
+
+/**
+ * 접힌 목록의 대표 자리와 숨는 자리 수. 대표는 **이름 있는 자리** 중 사진이 가장 많은 곳(같으면 번호가 작은 곳)이다 —
+ * 이름만 보이므로 이름 없는 자리는 대표가 되지 못한다. 숨는 수는 상한(12곳) 밖까지 센다.
+ */
+export function legendSummary(route: DayRoute): { lead: string | null; hidden: number } {
+  let best: RouteItem | undefined;
+  for (const it of route.items) {
+    if (it.label !== null && (best === undefined || it.photos > best.photos)) best = it;
+  }
+  const total = route.items.length + route.more;
+  return best === undefined
+    ? { lead: null, hidden: total }
+    : { lead: best.label, hidden: total - 1 };
+}
 
 type Point = { latitude: number; longitude: number };
 
@@ -108,6 +125,7 @@ export function buildDayRoute(
     n: i + 1,
     period: dayPeriodOf(new Date(place.firstSeenAt)),
     label: place.label,
+    photos: place.photoCount,
   }));
   const list: DayRoute = { items: listItems, more, diagram: false };
 

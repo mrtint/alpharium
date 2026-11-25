@@ -42,8 +42,8 @@ const PAPER: PaperState = { kind: "readable", entry: ENTRY, madeUp: false };
 
 const ROUTE: DayRoute = {
   items: [
-    { n: 1, period: "morning", label: "시청", x: 0.2, y: 0.8 },
-    { n: 2, period: "afternoon", label: "잠실", x: 0.8, y: 0.2 },
+    { n: 1, period: "morning", label: "시청", photos: 1, x: 0.2, y: 0.8 },
+    { n: 2, period: "afternoon", label: "잠실", photos: 1, x: 0.8, y: 0.2 },
   ],
   more: 0,
   diagram: true,

@@ -59,7 +59,7 @@ describe("DM1 — 자리 1곳도 읽었고 일치하면 도식(점 하나, 프�
   it("diagram true·x=y=0.5 (126이 125 DR2를 대체한다)", () => {
     const route = buildDayRoute([visit(37.5, 127, 21)], [place("집 근처", 21)]);
     expect(route).toEqual({
-      items: [{ n: 1, period: "night", label: "집 근처", x: 0.5, y: 0.5 }],
+      items: [{ n: 1, period: "night", label: "집 근처", photos: 1, x: 0.5, y: 0.5 }],
       more: 0,
       diagram: true,
     });
@@ -68,7 +68,7 @@ describe("DM1 — 자리 1곳도 읽었고 일치하면 도식(점 하나, 프�
   it("읽지 못했으면(visits null) 한 줄 목록이다 — 모르는 것을 도식으로 채우지 않는다", () => {
     const route = buildDayRoute(null, [place("집 근처", 21)]);
     expect(route).toEqual({
-      items: [{ n: 1, period: "night", label: "집 근처" }],
+      items: [{ n: 1, period: "night", label: "집 근처", photos: 1 }],
       more: 0,
       diagram: false,
     });
@@ -301,9 +301,9 @@ describe("DR7 — 가로세로 비율을 지킨다(위도 보정), 북쪽이 위
 });
 
 describe("DR8 — 반환 모양에 좌표가 없다", () => {
-  it("항목 키는 n·period·label·x·y뿐이고 직렬화에 위도·경도가 없다", () => {
+  it("항목 키는 n·period·label·photos·x·y뿐이고 직렬화에 위도·경도가 없다", () => {
     const route = buildDayRoute(SEOUL, SEOUL_SAVED)!;
-    const allowed = new Set(["n", "period", "label", "x", "y"]);
+    const allowed = new Set(["n", "period", "label", "photos", "x", "y"]);
     for (const item of route.items) {
       for (const key of Object.keys(item)) expect(allowed.has(key)).toBe(true);
     }

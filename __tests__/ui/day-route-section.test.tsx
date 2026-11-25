@@ -23,6 +23,7 @@ const item = (n: number, x: number, y: number, label: string | null = `자리${n
   n,
   period: n === 1 ? "morning" : n === 2 ? "afternoon" : "evening",
   label,
+  photos: 1,
   x,
   y,
 });
@@ -43,6 +44,10 @@ const maybeId = (testID: string) => screen.queryByTestId(testID, HIDDEN);
 
 const flat = (testID: string) =>
   StyleSheet.flatten(byId(testID).props.style) as Record<string, unknown>;
+
+async function expand() {
+  await fireEvent.press(screen.getByTestId("day-route-toggle"));
+}
 
 async function renderMeasured(route: DayRoute) {
   await render(<DayRouteSection route={route} />);
@@ -122,14 +127,18 @@ describe("DU7 — 폭을 채우고 높이는 폭에 비례한다", () => {
 describe("DU3 — 범례 목록", () => {
   it("「번호 · 때 · 이름」 순서이고 이름을 모르는 자리는 이름 칸을 비운다(지어내지 않는다, 126 FR-015)", async () => {
     await renderMeasured(THREE);
+    await expand();
     expect(screen.getByText("1 · 오전 · 시청")).toBeTruthy();
     expect(screen.getByText("2 · 오후 · 잠실")).toBeTruthy();
-    expect(screen.getByText("3 · 저녁")).toBeTruthy();
+    expect(screen.getByTestId("day-route-legend-3")).toHaveTextContent("3 · 저녁", {
+      exact: true,
+    }); // 「접기」는 이 줄에 붙지 않는다
     expect(screen.queryByText(/이름을 모르는 곳/)).toBeNull();
   });
 
   it("범례 줄은 줄바꿈된다 — 글꼴을 키워도 잘리지 않는다(말줄임 없음)", async () => {
     await renderMeasured(THREE);
+    await expand();
     for (const line of ["1 · 오전 · 시청", "2 · 오후 · 잠실"]) {
       expect(screen.getByText(line).props.numberOfLines).toBeUndefined();
     }
@@ -137,10 +146,14 @@ describe("DU3 — 범례 목록", () => {
 
   it("more가 있으면 「외 N곳」 한 줄, 없으면 줄이 없다", async () => {
     await renderMeasured({ ...THREE, more: 2 });
-    expect(screen.getByText("외 2곳")).toBeTruthy();
+    await expand();
+    expect(screen.getByTestId("day-route-more")).toHaveTextContent("외 2곳", {
+      exact: true,
+    }); // 「접기」는 이 줄에 붙지 않는다
     await screen.unmount();
     await renderMeasured(THREE);
-    expect(screen.queryByText(/^외 /)).toBeNull();
+    await expand();
+    expect(screen.queryByText(/^외 \d+곳$/)).toBeNull();
   });
 });
 
@@ -261,8 +274,8 @@ describe("DU8 — 같은 자리로 돌아와 겹친 점은 한 점에 번호를 
 describe("diagram false — 범례 목록만(US2)", () => {
   const LIST: DayRoute = {
     items: [
-      { n: 1, period: "morning", label: "시청" },
-      { n: 2, period: "night", label: null },
+      { n: 1, period: "morning", label: "시청", photos: 1 },
+      { n: 2, period: "night", label: null, photos: 1 },
     ],
     more: 0,
     diagram: false,
@@ -275,18 +288,22 @@ describe("diagram false — 범례 목록만(US2)", () => {
     expect(maybeId("day-route-line-1")).toBeNull();
     expect(screen.queryByText("사진이 찍힌 자리를 시간순으로 이은 거예요")).toBeNull();
     expect(screen.getByText("하루 동선")).toBeTruthy();
+    await expand();
     expect(screen.getByText("1 · 오전 · 시청")).toBeTruthy();
-    expect(screen.getByText("2 · 밤")).toBeTruthy();
+    expect(screen.getByTestId("day-route-legend-2")).toHaveTextContent("2 · 밤", {
+      exact: true,
+    }); // 「접기」는 이 줄에 붙지 않는다
     expect(screen.queryByText(/이름을 모르는 곳/)).toBeNull();
   });
 
-  it("자리 1곳은 한 줄만이다", async () => {
+  it("자리 1곳은 한 줄만이다 — 133부터 이름만, 펼칠 것이 없어 버튼도 없다", async () => {
     await renderMeasured({
-      items: [{ n: 1, period: "evening", label: "집 근처" }],
+      items: [{ n: 1, period: "evening", label: "집 근처", photos: 1 }],
       more: 0,
       diagram: false,
     });
-    expect(screen.getByText("1 · 저녁 · 집 근처")).toBeTruthy();
+    expect(screen.getByText("집 근처")).toBeTruthy();
+    expect(screen.queryByTestId("day-route-toggle")).toBeNull();
     expect(maybeId("day-route-diagram")).toBeNull();
   });
 });
@@ -391,6 +408,128 @@ describe("126 DM11 — 점 옆 이름 라벨", () => {
     expect(byId("day-route-label-1")).toBeTruthy();
     expect(maybeId("day-route-label-2")).toBeNull();
     // 범례에는 이름이 그대로 있다
+    await expand();
     expect(screen.getByText(/^2 · .* · 이름이 상자 폭보다/)).toBeTruthy();
+  });
+});
+
+describe("133 — 범례 목록 접기", () => {
+  const withPhotos = (
+    photos: number[],
+    labels: (string | null)[] = photos.map((_, i) => `자리${i + 1}`),
+  ) =>
+    photos.map((p, i) => ({
+      ...item(i + 1, (i % 4) * 0.3 + 0.05, Math.floor(i / 4) * 0.3 + 0.1, labels[i]!),
+      photos: p,
+    }));
+
+  it("기본 접힘: 사진이 가장 많은 자리 이름만(번호·때 없이)과 「외 N곳 펼치기」", async () => {
+    await renderMeasured({
+      items: withPhotos([1, 5, 2, 1], ["성수역", "서울숲", null, "뚝섬"]),
+      more: 0,
+      diagram: true,
+    });
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("서울숲 외 3곳 펼치기", {
+      exact: true,
+    });
+    // 강조색은 「펼치기」 글자에만
+    expect(StyleSheet.flatten(screen.getByText("펼치기").props.style).color).toBe(COLORS.danger);
+    expect(StyleSheet.flatten(screen.getByTestId("day-route-lead").props.style).color).not.toBe(
+      COLORS.danger,
+    );
+    expect(screen.queryByText("1 · 오전 · 성수역")).toBeNull();
+  });
+
+  it("펼치면 전체 목록과 「접기」, 접으면 대표 한 줄로 돌아온다", async () => {
+    await renderMeasured({ items: withPhotos([1, 5, 2]), more: 0, diagram: true });
+    await expand();
+    expect(screen.getByText("1 · 오전 · 자리1")).toBeTruthy();
+    expect(screen.getByTestId("day-route-legend-3")).toHaveTextContent("3 · 저녁 · 자리3", {
+      exact: true,
+    }); // 「접기」는 이 줄에 붙지 않는다
+    expect(screen.queryByTestId("day-route-lead")).toBeNull();
+    const toggle = screen.getByTestId("day-route-toggle");
+    expect(toggle.props.accessibilityRole).toBe("button");
+    expect(screen.getByText("접기")).toBeTruthy();
+    await expand();
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("자리2 외 2곳 펼치기", {
+      exact: true,
+    });
+    expect(screen.queryByText("1 · 오전 · 자리1")).toBeNull();
+  });
+
+  it("동률이면 번호가 작은 자리, 이름 없는 자리는 대표가 되지 않는다", async () => {
+    await renderMeasured({
+      items: withPhotos([9, 3, 3], [null, "잠실", "시청"]),
+      more: 0,
+      diagram: false,
+    });
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("잠실 외 2곳 펼치기", {
+      exact: true,
+    });
+  });
+
+  it("이름 있는 자리가 없으면 대표 이름 없이 「N곳 펼치기」", async () => {
+    await renderMeasured({ items: withPhotos([2, 1], [null, null]), more: 0, diagram: false });
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("2곳 펼치기", { exact: true });
+  });
+
+  it("이름 있는 1곳뿐이면 그 이름 한 줄이고 버튼이 없다", async () => {
+    await renderMeasured({ items: withPhotos([3], ["성수역"]), more: 0, diagram: false });
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("성수역", { exact: true });
+    expect(screen.queryByTestId("day-route-toggle")).toBeNull();
+  });
+
+  it("12곳을 넘으면 N은 상한 밖까지 센다 — 펼치면 끝에 「외 N곳」과 「접기」", async () => {
+    await renderMeasured({
+      items: withPhotos([1, 1, 1, 1, 7, 1, 1, 1, 1, 1, 1, 1]),
+      more: 3,
+      diagram: false,
+    });
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("자리5 외 14곳 펼치기", {
+      exact: true,
+    });
+    await expand();
+    expect(screen.getByText("12 · 저녁 · 자리12")).toBeTruthy();
+    // 「접기」는 마지막 줄(「외 3곳」) 다음에 따로 한 줄이다
+    expect(screen.getByTestId("day-route-more")).toHaveTextContent("외 3곳", { exact: true });
+    expect(screen.getByTestId("day-route-toggle")).toHaveTextContent("접기", { exact: true });
+  });
+
+  it("같은 날을 새 route 객체로 다시 그려도 펼침이 유지된다(부모는 렌더마다 새로 만들 수 있다)", async () => {
+    const a: DayRoute = { items: withPhotos([1, 2]), more: 0, diagram: false };
+    await renderMeasured(a);
+    await expand();
+    await screen.rerender(<DayRouteSection route={{ ...a, items: [...a.items] }} />);
+    expect(screen.queryByTestId("day-route-lead")).toBeNull();
+    expect(screen.getByText("접기")).toBeTruthy();
+  });
+
+  it("다른 날(key가 바뀌면) 다시 접힌다", async () => {
+    const a: DayRoute = { items: withPhotos([1, 2]), more: 0, diagram: false };
+    const b: DayRoute = { items: withPhotos([4, 1]), more: 0, diagram: false };
+    await render(<DayRouteSection key="2026-11-15" route={a} />);
+    await expand();
+    expect(screen.queryByTestId("day-route-lead")).toBeNull();
+    await screen.rerender(<DayRouteSection key="2026-11-16" route={b} />);
+    expect(screen.getByTestId("day-route-lead")).toHaveTextContent("자리1 외 1곳 펼치기", {
+      exact: true,
+    });
+  });
+
+  it("버튼은 펼침 상태를 낭독에 알린다", async () => {
+    await renderMeasured({ items: withPhotos([1, 2]), more: 0, diagram: false });
+    expect(screen.getByTestId("day-route-toggle").props.accessibilityState).toEqual({
+      expanded: false,
+    });
+    await expand();
+    expect(screen.getByTestId("day-route-toggle").props.accessibilityState).toEqual({
+      expanded: true,
+    });
+  });
+
+  it("지도·도식은 접힘과 상관없이 모든 점을 그린다", async () => {
+    await renderMeasured({ items: withPhotos([1, 5, 2]), more: 0, diagram: true });
+    for (const n of [1, 2, 3]) expect(byId(`day-route-dot-${n}`)).toBeTruthy();
   });
 });

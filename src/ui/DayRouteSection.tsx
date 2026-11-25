@@ -24,9 +24,15 @@
  */
 
 import { useState } from "react";
-import { useWindowDimensions, View, type TextStyle, type ViewStyle } from "react-native";
+import { Pressable, useWindowDimensions, View, type TextStyle, type ViewStyle } from "react-native";
 
-import { ROUTE_ASPECT, type DayRoute, type RouteItem, type RouteMap } from "../app/day-route";
+import {
+  legendSummary,
+  ROUTE_ASPECT,
+  type DayRoute,
+  type RouteItem,
+  type RouteMap,
+} from "../app/day-route";
 import { AppText } from "./components/Text";
 import { ROUTE_TEXT } from "./home-text";
 import { labelPlacement, LABEL_STYLE, type LabelMarker } from "./label-placement";
@@ -59,20 +65,96 @@ export function DayRouteSection({ route }: DayRouteSectionProps) {
           {ROUTE_TEXT.note}
         </AppText>
       )}
-      <View style={LEGEND} testID="day-route-legend">
-        {route.items.map((item) => (
-          <AppText key={item.n} testID={`day-route-legend-${item.n}`}>
-            {item.label === null
+      <Legend route={route} />
+    </View>
+  );
+}
+
+/**
+ * 133 — 범례 목록은 기본 접힘이다(소유자, 2026-11-26). 접히면 대표 자리의 **이름만**(번호·때 없음) 한 줄과 「외 N곳 펼치기」,
+ * 펼치면 125·126 목록 그대로와 「접기」. 펼침은 저장하지 않고 다른 날의 동선이 오면 접힌다.
+ */
+function Legend({ route }: { route: DayRoute }) {
+  // 다른 날이면 접힌다 — 부르는 쪽(`WrittenDayPaper`)이 날짜를 `key`로 준다. route 객체는 렌더마다 새로 만들어질 수 있어
+  // 그 정체성으로 되돌리지 않는다(같은 날 다시 그려도 펼침이 유지돼야 한다)
+  const [expanded, setExpanded] = useState(false);
+  const toggle = () => setExpanded((v) => !v);
+  const { lead, hidden } = legendSummary(route);
+
+  // 줄 목록
+  const lines: { key: string; text: string; caption?: boolean }[] = expanded
+    ? [
+        ...route.items.map((item) => ({
+          key: `day-route-legend-${item.n}`,
+          text:
+            item.label === null
               ? ROUTE_TEXT.lineNoName(item.n, ROUTE_TEXT.period[item.period])
-              : ROUTE_TEXT.line(item.n, ROUTE_TEXT.period[item.period], item.label)}
-          </AppText>
-        ))}
-        {route.more > 0 && (
-          <AppText testID="day-route-more" variant="caption">
-            {ROUTE_TEXT.more(route.more)}
-          </AppText>
-        )}
-      </View>
+              : ROUTE_TEXT.line(item.n, ROUTE_TEXT.period[item.period], item.label),
+        })),
+        ...(route.more > 0
+          ? [{ key: "day-route-more", text: ROUTE_TEXT.more(route.more), caption: true }]
+          : []),
+      ]
+    : [
+        {
+          key: "day-route-lead",
+          text:
+            lead === null
+              ? ROUTE_TEXT.count(hidden)
+              : hidden > 0
+                ? ROUTE_TEXT.summary(lead, hidden)
+                : lead,
+        },
+      ];
+  // 접힌 줄에는 「펼치기」가 줄 끝에 붙고, 펼친 목록의 「접기」는 마지막 줄 다음에 따로 한 줄이다(소유자, 2026-11-26)
+  const action = hidden === 0 || expanded ? null : ROUTE_TEXT.expand;
+
+  return (
+    <View style={LEGEND} testID="day-route-legend">
+      {lines.map((line, i) => {
+        const variant = line.caption ? "caption" : "body";
+        if (action === null || i !== lines.length - 1) {
+          return (
+            <AppText key={line.key} testID={line.key} variant={variant}>
+              {line.text}
+            </AppText>
+          );
+        }
+        const label = `${line.text} ${action}`;
+        return (
+          // 줄 전체를 누른다 — 누르는 자리가 강조 글자보다 넓다. 색은 버튼 글자에만
+          <Pressable
+            accessibilityLabel={label}
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            key={line.key}
+            hitSlop={TOGGLE_HIT}
+            onPress={toggle}
+            style={TOGGLE_LINE}
+            testID="day-route-toggle"
+          >
+            <AppText testID={line.key} variant={variant}>
+              {line.text}{" "}
+              <AppText style={TOGGLE_TEXT} variant={variant}>
+                {action}
+              </AppText>
+            </AppText>
+          </Pressable>
+        );
+      })}
+      {expanded && hidden > 0 && (
+        <Pressable
+          accessibilityLabel={ROUTE_TEXT.collapse}
+          accessibilityRole="button"
+          accessibilityState={{ expanded }}
+          hitSlop={TOGGLE_HIT}
+          onPress={toggle}
+          style={TOGGLE_LINE}
+          testID="day-route-toggle"
+        >
+          <AppText style={TOGGLE_TEXT}>{ROUTE_TEXT.collapse}</AppText>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -234,6 +316,15 @@ const DOT_NUMBER: TextStyle = {
 };
 
 const LEGEND: ViewStyle = { gap: 6 };
+
+/** 133 — 펼치기·접기가 붙은 줄. 밝은 지면 위 작은 강조 글자는 `danger`(088·089) */
+const TOGGLE_LINE: ViewStyle = { alignSelf: "flex-start" };
+
+/** 줄 간격은 다른 줄과 같게 두고 누르는 자리만 위아래로 넓힌다(줄 높이 약 24 + 10·10) */
+const TOGGLE_HIT = { top: 10, bottom: 10, left: 8, right: 8 } as const;
+
+/** 펼치기·접기 글자만 강조한다 */
+const TOGGLE_TEXT: TextStyle = { color: COLORS.danger, fontWeight: "600" };
 
 /** 점 옆 이름 라벨 — 지도 바탕색의 평평한 판(반경·그림자 없음)에 글자. 판 치수는 `LABEL_STYLE`(사람이 정한 값)이다 */
 const LABEL: ViewStyle = {
