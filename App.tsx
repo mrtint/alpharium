@@ -88,7 +88,7 @@ import { PlaceNameDialog } from "./src/ui/PlaceNameDialog";
 import { formatTargetHour, timeZoneLine } from "./src/app/target-hour";
 import { readDeviceClock } from "./src/app/device-clock";
 import { batteryRowHint } from "./src/app/battery-row";
-import { writingLeaveNote } from "./src/app/leave-note";
+import { continuedAvailableFor, writingLeaveNote } from "./src/app/leave-note";
 import { appPlatform } from "./src/app/platform";
 import { createContinuedWrite } from "./src/app/continued-write";
 import { notifyContinuedSaved, type ContinuedSavedDeps } from "./src/app/continued-saved";
@@ -2471,7 +2471,10 @@ function DiarySection({
 
   return (
     <DiaryHomeScreen
-      writingLeaveNote={writingLeaveNote(appPlatform(Platform.OS))}
+      writingLeaveNote={writingLeaveNote(
+        appPlatform(Platform.OS),
+        continuedAvailableFor(appPlatform(Platform.OS), Platform.Version),
+      )}
       resolution={environment}
       pipeline={wiring.ok ? wiring.pipeline : undefined}
       store={store}

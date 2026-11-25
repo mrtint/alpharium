@@ -8,4 +8,15 @@
 
 ## 기록
 
-(구현 후 채움)
+### 위반 주입 (2026-11-25, 치환 적용을 먼저 단언)
+
+| 주입 | 잡은 테스트 | 결과 |
+| --- | --- | --- |
+| `home.autoWriteSetup.conditionIos`에 「항상」 | GL1 | 1 failed / 55 |
+| `settingsPlatform`에 새 키 `fooIos` | GL2 | 1 failed / 56 |
+| 슬라이드 3 본문에서 「자동으로 쓰기를 켜 두면」 제거 | GL3 | 1 failed / 55 |
+| `writingLeaveNote`가 iOS면 늘 반환 | LN1 | 1 failed / 10 |
+| 띠 `hidden`에서 토스트 조건 제거 | HB1 | 1 failed / 3 |
+| 쓰는 중 분기에 `{bandNode}` 추가 | HB2 | 1 failed / 3 |
+
+모두 되돌렸다.
