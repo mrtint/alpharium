@@ -31,15 +31,15 @@ describe("093 — 시각 대화상자 미리보기", () => {
 
 describe("093 — 쓰는 중 화면 안내 줄", () => {
   it("iOS만 나가도 계속 쓴다는 한 줄을 갖는다", () => {
-    expect(writingLeaveNote("ios")).toBe("앱을 나가도 계속 써요.");
+    expect(writingLeaveNote("ios", true)).toBe("앱을 나가도 계속 써요.");
   });
 
   it("안드로이드는 줄이 없다 — 앞을 벗어나면 멈추는 사실은 이 과제 밖이다", () => {
-    expect(writingLeaveNote("android")).toBeUndefined();
+    expect(writingLeaveNote("android", true)).toBeUndefined();
   });
 
   it("숫자(분·퍼센트)와 시간 약속을 넣지 않는다 (045 FR-006, 원칙 IV)", () => {
-    expect(writingLeaveNote("ios")).not.toMatch(/\d|분|퍼센트|%/);
+    expect(writingLeaveNote("ios", true)).not.toMatch(/\d|분|퍼센트|%/);
     expect(previewSentence(22, "h12", "ios").replace(/오후 10시/, "")).not.toMatch(/\d|분 /);
   });
 });
