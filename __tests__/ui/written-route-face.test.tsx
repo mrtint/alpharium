@@ -263,32 +263,42 @@ describe("135 첫 진입 애니메이션 (소유자 결정 2026-11-26)", () => {
     });
   };
 
-  it("★ 장소 시간순으로 점이 나오고 그 자리 사진이 쌓인 뒤 다음 장소로 — 끝나면 더미가 사라진다", async () => {
+  it("★ 장소 시간순으로: 도착 → 카드에 사진 1·2·3장 → 빨간 점이 다음 장소로 이동 → 도착, 끝나면 카드가 사라진다", async () => {
     await render(<WrittenDayPaper paper={paper(LINKED)} route={MAP_ROUTE} />);
     await fireEvent.press(screen.getByTestId("show-route-map"));
-    expect(screen.getByTestId("route-intro")).toBeTruthy();
     expect(screen.getByTestId("route-marker-1")).toBeTruthy();
     expect(screen.queryByTestId("route-marker-2")).toBeNull();
-    expect(screen.queryAllByTestId(/^route-intro-photo-1-/)).toHaveLength(0);
+    expect(screen.queryByTestId("route-intro-card")).toBeNull();
 
     await act(async () => {
       jest.advanceTimersByTime(INTRO.dotMs + 1);
     });
-    expect(screen.getAllByTestId(/^route-intro-photo-1-/)).toHaveLength(1);
+    // 번호를 눌렀을 때와 같은 카드 모양에 사진 1장
+    expect(screen.getAllByTestId(/^route-intro-photo-/)).toHaveLength(1);
+    expect(
+      within(screen.getByTestId("route-intro-polaroid")).getByText("1 · 오전 · 서울숲"),
+    ).toBeTruthy();
 
     await act(async () => {
       jest.advanceTimersByTime(INTRO.photoMs * 2);
     });
-    // 1번 자리는 사진 4장이지만 더미는 3장까지
-    expect(screen.getAllByTestId(/^route-intro-photo-1-/)).toHaveLength(3);
-    expect(screen.queryByTestId("route-marker-2")).toBeNull();
+    // 1번 자리는 사진 4장이지만 3단까지
+    expect(screen.getAllByTestId(/^route-intro-photo-/)).toHaveLength(3);
+    expect(screen.queryByTestId("route-intro-traveler")).toBeNull();
 
     await act(async () => {
       jest.advanceTimersByTime(INTRO.gapMs + 1);
     });
+    // 떠난다 — 카드는 사라지고 빨간 점이 이동한다. 다음 장소의 점은 아직 없다
+    expect(screen.getByTestId("route-intro-traveler")).toBeTruthy();
+    expect(screen.queryByTestId("route-intro-card")).toBeNull();
+    expect(screen.queryByTestId("route-marker-2")).toBeNull();
+
+    await act(async () => {
+      jest.advanceTimersByTime(INTRO.moveMs + 1);
+    });
     expect(screen.getByTestId("route-marker-2")).toBeTruthy();
-    // 앞 장소의 더미는 남아 있다
-    expect(screen.getAllByTestId(/^route-intro-photo-1-/)).toHaveLength(3);
+    expect(screen.queryByTestId("route-intro-traveler")).toBeNull();
 
     await runAll();
     expect(screen.queryByTestId("route-intro")).toBeNull();
@@ -341,6 +351,7 @@ describe("135 첫 진입 애니메이션 (소유자 결정 2026-11-26)", () => {
       jest.advanceTimersByTime(INTRO.dotMs * 3);
     });
     expect(screen.queryAllByTestId(/^route-intro-photo-/)).toHaveLength(0);
+    expect(screen.queryByTestId("route-intro-card")).toBeNull();
   });
 
   it("자리 번호가 순번과 달라도 첫 장면은 첫 자리만 그린다(코드 리뷰)", async () => {

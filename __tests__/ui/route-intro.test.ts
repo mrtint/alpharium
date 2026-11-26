@@ -1,39 +1,48 @@
 /**
  * 135 — 지도 면 첫 진입 애니메이션의 시간표 (소유자 결정 2026-11-26).
+ *
+ * 장소마다: 도착(점) → 그 자리 카드의 사진이 1·2·3장으로 쌓임 → 빨간 점이 경로를 따라 다음 장소로 이동 → 도착 …
  */
 import { INTRO, introTimeline } from "../../src/ui/route-intro";
 
 describe("135 introTimeline", () => {
-  it("장소마다 점이 먼저 나오고 사진이 한 장씩 쌓인 뒤 다음 장소로 간다", () => {
+  it("도착 → 사진 쌓기 → 다음 장소로 이동 → 도착 순이다", () => {
     const { frames } = introTimeline([2, 0, 1]);
-    expect(frames.map((f) => [f.step, f.shown])).toEqual([
-      [1, 0],
-      [1, 1],
-      [1, 2],
-      [2, 0],
-      [3, 0],
-      [3, 1],
+    expect(frames.map((f) => [f.phase, f.step, f.shown])).toEqual([
+      ["stay", 1, 0],
+      ["stay", 1, 1],
+      ["stay", 1, 2],
+      ["move", 1, 0],
+      ["stay", 2, 0],
+      ["move", 2, 0],
+      ["stay", 3, 0],
+      ["stay", 3, 1],
     ]);
-    // 시각은 늘어나기만 한다
     for (let i = 1; i < frames.length; i += 1) {
       expect(frames[i]!.at).toBeGreaterThan(frames[i - 1]!.at);
     }
     expect(frames[0]!.at).toBe(0);
   });
 
-  it("한 장소의 사진은 최대 3장까지만 센다", () => {
+  it("이동 장면 다음 도착까지가 이동 시간이다(줄이지 않을 때)", () => {
+    const { frames } = introTimeline([0, 0]);
+    expect(frames[2]!.at - frames[1]!.at).toBe(INTRO.moveMs);
+    expect(introTimeline([0, 0]).moveMs).toBe(INTRO.moveMs);
+  });
+
+  it("한 장소의 사진은 최대 3장까지만 쌓는다", () => {
     const { frames } = introTimeline([7]);
     expect(frames.map((f) => f.shown)).toEqual([0, 1, 2, 3]);
   });
 
-  it("전체 길이는 상한을 넘지 않는다(장소가 많으면 줄인다)", () => {
+  it("전체 길이는 상한을 넘지 않는다(장소가 많으면 모든 간격을 줄인다)", () => {
     const many = introTimeline(Array.from({ length: 12 }, () => 3));
-    expect(many.fadeAt + INTRO.fadeMs).toBeLessThanOrEqual(INTRO.maxMs);
-    const few = introTimeline([1]);
-    expect(few.fadeAt).toBeLessThan(many.fadeAt);
+    expect(many.doneAt).toBeLessThanOrEqual(INTRO.maxMs);
+    expect(many.moveMs).toBeLessThan(INTRO.moveMs);
+    expect(introTimeline([1]).fadeAt).toBeLessThan(many.fadeAt);
   });
 
-  it("마지막 장면 뒤 잠깐 머물고 사진 더미가 사라진다", () => {
+  it("마지막 장면 뒤 잠깐 머물고 카드가 사라진다", () => {
     const t = introTimeline([1, 1]);
     expect(t.fadeAt).toBeGreaterThan(t.frames[t.frames.length - 1]!.at);
     expect(t.doneAt).toBe(t.fadeAt + INTRO.fadeMs);

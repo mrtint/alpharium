@@ -25,9 +25,9 @@ import {
   type ViewStyle,
 } from "react-native";
 import Animated, {
-  Keyframe,
   useAnimatedStyle,
   useSharedValue,
+  withSequence,
   withTiming,
   ZoomIn,
 } from "react-native-reanimated";
@@ -41,8 +41,8 @@ import { ROUTE_TEXT } from "./home-text";
 import type { CarouselPhoto } from "./PhotoCarousel";
 import { INTRO, introTimeline, type IntroFrame } from "./route-intro";
 import { PhotoViewer } from "./PhotoViewer";
-import { markersFor, markerWidth, RouteCanvas, type Marker } from "./RouteCanvas";
-import { COLORS, WRITTEN_DAY } from "./theme/tokens";
+import { markersFor, markerWidth, ROUTE_DIAGRAM, RouteCanvas, type Marker } from "./RouteCanvas";
+import { COLORS, MAP_COLORS, WRITTEN_DAY } from "./theme/tokens";
 
 /** 카드 치수 — 사람이 정한 값(research R6). 사진 칸은 4:3 */
 export const ROUTE_CARD = { width: 132, height: 116, pad: 5, photoHeight: 78, stack: 3 } as const;
@@ -87,7 +87,7 @@ export function RouteFace({
   const [introRunning, setIntroOn] = useState(() => intro === true && reduceMotion !== true);
   // 동작 줄이기 값이 마운트 뒤에 도착해도 곧바로 멈춘다(코드 리뷰 — 사진 0장인 날은 면이 바로 마운트된다). 꺼지면 아래 효과의 정리가 타이머를 모두 지운다
   const introOn = introRunning && reduceMotion !== true;
-  const [frame, setFrame] = useState<IntroFrame>({ at: 0, step: 1, shown: 0 });
+  const [frame, setFrame] = useState<IntroFrame>({ at: 0, phase: "stay", step: 1, shown: 0 });
   const [fading, setFading] = useState(false);
   const placePhotos = useMemo(
     () =>
@@ -98,12 +98,14 @@ export function RouteFace({
     [route.items, photos],
   );
   const counts = placePhotos.map((p) => p.length).join(",");
+  const timeline = useMemo(
+    () => introTimeline(counts === "" ? [] : counts.split(",").map(Number)),
+    [counts],
+  );
   useEffect(() => {
     if (!introOn) return;
     onIntroStart?.();
-    const { frames, fadeAt, doneAt } = introTimeline(
-      counts === "" ? [] : counts.split(",").map(Number),
-    );
+    const { frames, fadeAt, doneAt } = timeline;
     const timers = [
       ...frames.slice(1).map((f) => setTimeout(() => setFrame(f), f.at)),
       setTimeout(() => setFading(true), fadeAt),
@@ -117,6 +119,66 @@ export function RouteFace({
   const visibleUpTo = introOn ? route.items[frame.step - 1]?.n : undefined;
 
   const markers = markersFor(route.items, boxW, boxH, visibleUpTo);
+
+  // 135 — 카메라: 애니메이션 동안 지도를 키워 지금 장소를 면 가운데에 두고, 빨간 점이 경로를 따라 다음 장소로 갈 때 함께 미끄러진다
+  // (소유자 결정 2026-11-26). 지도 상자는 면 가운데에 있으므로 상자 중심을 기준으로 「t = −s·(p − 중심)」만큼 옮기면 p가 가운데에 온다.
+  const allMarkers = useMemo(() => markersFor(route.items, boxW, boxH), [route.items, boxW, boxH]);
+  const pointOf = (step: number) => {
+    const n = route.items[step - 1]?.n;
+    const m = allMarkers.find((mk) => n !== undefined && mk.numbers.includes(n));
+    return m === undefined ? { x: boxW / 2, y: boxH / 2 } : { x: m.cx, y: m.cy };
+  };
+  const camS = useSharedValue(1);
+  const camX = useSharedValue(0);
+  const camY = useSharedValue(0);
+  const travX = useSharedValue(0);
+  const travY = useSharedValue(0);
+  useEffect(() => {
+    if (!introOn) {
+      camS.value = 1;
+      camX.value = 0;
+      camY.value = 0;
+      return;
+    }
+    const aim = (p: { x: number; y: number }, duration: number) => {
+      const x = -INTRO_ZOOM * (p.x - boxW / 2);
+      const y = -INTRO_ZOOM * (p.y - boxH / 2);
+      camX.value = duration === 0 ? x : withTiming(x, { duration });
+      camY.value = duration === 0 ? y : withTiming(y, { duration });
+    };
+    if (fading) {
+      camS.value = withTiming(1, { duration: INTRO.fadeMs });
+      camX.value = withTiming(0, { duration: INTRO.fadeMs });
+      camY.value = withTiming(0, { duration: INTRO.fadeMs });
+      return;
+    }
+    camS.value = INTRO_ZOOM;
+    if (frame.phase === "move") {
+      const from = pointOf(frame.step);
+      const to = pointOf(frame.step + 1);
+      // 시작 자리로 곧바로 옮긴 뒤 이동한다 — 값을 두 번 대입하면 앞의 것이 버려져 지난 자리에서 출발했다(시뮬레이터 확인)
+      travX.value = withSequence(
+        withTiming(from.x, { duration: 0 }),
+        withTiming(to.x, { duration: timeline.moveMs }),
+      );
+      travY.value = withSequence(
+        withTiming(from.y, { duration: 0 }),
+        withTiming(to.y, { duration: timeline.moveMs }),
+      );
+      aim(to, timeline.moveMs);
+    } else {
+      aim(pointOf(frame.step), frame.at === 0 ? 0 : 120);
+    }
+    // 장면이 바뀔 때만 — 점 위치는 같은 장면 안에서 바뀌지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [introOn, frame, fading]);
+  const camera = useAnimatedStyle(() => ({
+    transform: [{ translateX: camX.value }, { translateY: camY.value }, { scale: camS.value }],
+  }));
+  const traveler = useAnimatedStyle(() => ({
+    left: travX.value - ROUTE_DIAGRAM.dot / 2,
+    top: travY.value - ROUTE_DIAGRAM.dot / 2,
+  }));
   // 같은 점(첫 번호)이 다시 눌리면 닫는다. 애니메이션 중에는 누름이 「건너뛰기」다
   const onPressMarker = (m: Marker) => {
     if (introOn) {
@@ -129,14 +191,21 @@ export function RouteFace({
     picked === null ? null : (markers.find((m) => m.numbers[0] === picked.numbers[0]) ?? null);
 
   return (
-    <View style={[FACE, { width, height }]} testID="route-face">
+    <View
+      // 애니메이션 동안 확대한 지도의 가장자리 밖은 지도 바탕색으로 이어 보이게 한다
+      style={[FACE, { width, height }, introOn && { backgroundColor: MAP_COLORS.mapLand }]}
+      testID="route-face"
+    >
       <Pressable
         accessible={false}
         onPress={() => (introOn ? setIntroOn(false) : setPicked(null))}
         style={FILL}
         testID="route-face-backdrop"
       />
-      <View style={{ position: "absolute", left: offsetX, top: offsetY }}>
+      <Animated.View
+        style={[{ position: "absolute", left: offsetX, top: offsetY }, camera]}
+        testID={introOn ? "route-intro" : undefined}
+      >
         <RouteCanvas
           height={boxH}
           items={route.items}
@@ -146,14 +215,11 @@ export function RouteFace({
           visibleUpTo={visibleUpTo}
           width={boxW}
         />
-        {introOn && (
-          <IntroStacks
-            box={{ width: boxW, height: boxH }}
-            fading={fading}
-            frame={frame}
-            markers={markers}
-            numbers={route.items.map((it) => it.n)}
-            placePhotos={placePhotos}
+        {introOn && frame.phase === "move" && (
+          <Animated.View
+            pointerEvents="none"
+            style={[TRAVELER, traveler]}
+            testID="route-intro-traveler"
           />
         )}
         {!introOn && current !== null && (
@@ -165,7 +231,23 @@ export function RouteFace({
             route={route}
           />
         )}
-      </View>
+      </Animated.View>
+      {introOn && frame.phase === "stay" && frame.shown > 0 && (
+        // 지금 장소는 면 가운데에 있다 — 카드를 면 기준으로 그 옆에 둔다(확대한 지도 안에 넣으면 카드도 커진다)
+        <IntroCard
+          box={{ width, height }}
+          fading={fading}
+          marker={{
+            numbers: [route.items[frame.step - 1]!.n],
+            cx: width / 2,
+            cy: height / 2,
+            halfW: (ROUTE_DIAGRAM.dot * INTRO_ZOOM) / 2,
+          }}
+          photos={placePhotos[frame.step - 1] ?? []}
+          route={route}
+          shown={frame.shown}
+        />
+      )}
       {onShowPhotos !== undefined && <FaceButton kind="photos" onPress={onShowPhotos} />}
       {viewer !== null && (
         <PhotoViewer
@@ -179,21 +261,23 @@ export function RouteFace({
   );
 }
 
-/** 135 — 애니메이션 동안의 사진 더미. 지난 장소는 다 쌓였고 지금 장소는 `frame.shown`장까지 */
-function IntroStacks({
-  frame,
-  markers,
-  placePhotos,
-  numbers,
+/**
+ * 135 — 애니메이션 동안의 카드. 번호를 눌렀을 때와 같은 폴라로이드 모양이고, 사진이 1·2·3장으로 겹쳐 쌓인다(소유자 결정 2026-11-26).
+ * 누를 수 없고 「+N」·낭독 알림이 없다(지나가는 장면이다).
+ */
+function IntroCard({
+  marker,
   box,
+  route,
+  photos,
+  shown,
   fading,
 }: {
-  frame: IntroFrame;
-  markers: readonly Marker[];
-  placePhotos: readonly (readonly (CarouselPhoto & RoutePhoto)[])[];
-  /** 단계(목록 순번)마다의 자리 번호 */
-  numbers: readonly number[];
+  marker: { numbers: number[]; cx: number; cy: number; halfW: number };
   box: { width: number; height: number };
+  route: DayRoute;
+  photos: readonly (CarouselPhoto & RoutePhoto)[];
+  shown: number;
   fading: boolean;
 }) {
   const opacity = useSharedValue(1);
@@ -201,41 +285,45 @@ function IntroStacks({
     if (fading) opacity.value = withTiming(0, { duration: INTRO.fadeMs });
   }, [fading, opacity]);
   const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  const at = cardPlacement(marker, ROUTE_CARD, box);
+  const list = photos.slice(0, shown);
   return (
-    <Animated.View pointerEvents="none" style={[FILL, fade]} testID="route-intro">
-      {placePhotos.slice(0, frame.step).map((list, i) => {
-        const n = numbers[i]!;
-        const count = i + 1 < frame.step ? list.length : Math.min(frame.shown, list.length);
-        const marker = markers.find((m) => m.numbers.includes(n));
-        if (count === 0 || marker === undefined) return null;
-        const at = cardPlacement(
-          { cx: marker.cx, cy: marker.cy, halfW: markerWidth(marker) / 2 },
-          INTRO_STACK,
-          box,
-        );
-        return (
-          <View key={n} style={[STACK, { left: at.left, top: at.top }]}>
-            {list.slice(0, count).map((p, k) => (
-              <Animated.View
-                entering={SNAP}
-                key={p.photoId}
-                style={[STACK_PHOTO, { transform: [{ rotate: `${TILT[k % TILT.length]}deg` }] }]}
-                testID={`route-intro-photo-${n}-${k}`}
-              >
-                <Image
-                  resizeMode="cover"
-                  source={{ uri: `file://${p.resizedPath}` }}
-                  style={STACK_IMAGE}
-                />
-                {/* 찰칵 — 한 장이 놓일 때 짧게 하얗게 번쩍인다 */}
-                <Animated.View entering={FLASH} style={[FILL, FLASH_FACE]} />
-              </Animated.View>
-            ))}
-          </View>
-        );
-      })}
+    <Animated.View
+      pointerEvents="none"
+      style={[CARD, { left: at.left, top: at.top }, fade]}
+      testID="route-intro-polaroid"
+    >
+      <View style={CARD_PHOTO} testID="route-intro-card">
+        {list
+          .map((p, i) => (
+            <Animated.Image
+              entering={SNAP}
+              key={p.photoId}
+              resizeMode="cover"
+              source={{ uri: `file://${p.resizedPath}` }}
+              style={[STACKED, { left: i * 3, top: (ROUTE_CARD.stack - 1 - i) * 3 }]}
+              testID={`route-intro-photo-${i}`}
+            />
+          ))
+          .reverse()}
+      </View>
+      <AppText numberOfLines={1} style={CARD_LINE}>
+        {cardLine(route, marker.numbers)}
+      </AppText>
     </Animated.View>
   );
+}
+
+/** 카드 아래 한 줄 — 「번호 · 때 · 이름」(이름 없으면 「번호 · 때」). 합친 점의 때는 첫 번호, 이름은 이름 있는 첫 자리의 것 */
+function cardLine(route: DayRoute, numberList: readonly number[]): string {
+  const numbers = numberList.join("·");
+  const first = route.items.find((it) => it.n === numberList[0]);
+  const label =
+    route.items.find((it) => numberList.includes(it.n) && it.label !== null)?.label ?? null;
+  const period = first === undefined ? "" : ROUTE_TEXT.period[first.period];
+  return label === null
+    ? ROUTE_TEXT.lineNoName(numbers, period)
+    : ROUTE_TEXT.line(numbers, period, label);
 }
 
 function Card({
@@ -258,14 +346,7 @@ function Card({
   );
   const card = routeCardFor(photos, marker.numbers);
   const numbers = marker.numbers.join("·");
-  const first = route.items.find((it) => it.n === marker.numbers[0]);
-  const label =
-    route.items.find((it) => marker.numbers.includes(it.n) && it.label !== null)?.label ?? null;
-  const period = first === undefined ? "" : ROUTE_TEXT.period[first.period];
-  const line =
-    label === null
-      ? ROUTE_TEXT.lineNoName(numbers, period)
-      : ROUTE_TEXT.line(numbers, period, label);
+  const line = cardLine(route, marker.numbers);
   const place: ViewStyle = { left: at.left, top: at.top };
   // 카드가 열리거나 옮겨가면 낭독기에 알린다 — 점을 누른 사람이 카드가 생긴 줄 알도록(코드 리뷰)
   const announcement =
@@ -329,33 +410,17 @@ function Card({
 
 /* ═══════════════════════════════ 치수 (보드 밖 초안 — 사람이 정한 값) ═══════════════════════════════ */
 
-/** 135 — 애니메이션 사진 더미(작은 폴라로이드) 치수와 기울기 — 사람이 정한 값 */
-const INTRO_STACK = { width: 62, height: 54 } as const;
-const TILT = [-6, 4, -2] as const;
+/** 135 — 애니메이션 동안 지도 확대 배율과 카드 사진이 놓이는 움직임 — 사람이 정한 값 */
+const INTRO_ZOOM = 1.6;
 const SNAP = ZoomIn.duration(220);
-const FLASH = new Keyframe({ 0: { opacity: 0.9 }, 100: { opacity: 0 } }).duration(260);
 
-const STACK: ViewStyle = {
+/** 135 — 다음 장소로 가는 빨간 점(시작점과 같은 강조색, 번호 없음) */
+const TRAVELER: ViewStyle = {
   position: "absolute",
-  width: INTRO_STACK.width,
-  height: INTRO_STACK.height,
+  width: ROUTE_DIAGRAM.dot,
+  height: ROUTE_DIAGRAM.dot,
+  backgroundColor: COLORS.accent,
 };
-
-const STACK_PHOTO: ViewStyle = {
-  position: "absolute",
-  left: 4,
-  top: 4,
-  width: INTRO_STACK.width - 8,
-  height: INTRO_STACK.height - 8,
-  padding: 3,
-  backgroundColor: COLORS.bg,
-  borderWidth: 1,
-  borderColor: COLORS.text,
-};
-
-const STACK_IMAGE = { flex: 1, backgroundColor: COLORS.surface } as const;
-
-const FLASH_FACE: ViewStyle = { backgroundColor: COLORS.bg };
 
 const FACE: ViewStyle = { backgroundColor: COLORS.surface, overflow: "hidden" };
 
