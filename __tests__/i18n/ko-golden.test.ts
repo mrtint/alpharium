@@ -66,6 +66,14 @@ const WRITE = process.env.GOLDEN_WRITE === "1";
 
 /** 골든 뒤에 더한 문구 — 새 진단 언어 줄(FR-011b), 064 상태 흉내(`catalogs/ko/simulation.ts`), 067 사진 확대 화면(`catalogs/ko/photo-viewer.ts`), 068 iOS 배터리 행(`catalogs/ko/settings-platform.ts`), 074 모바일 데이터 동의·대기 화면(`catalogs/ko/consent-gate.ts`) */
 const ADDED_AFTER_GOLDEN: readonly string[] = [
+  // 135 — 쓴 날 지도 면·폴라로이드 카드(`home.dayRoute`)
+  "${}번 자리 사진 ${}장 크게 보기",
+  "${}번 자리, ${}",
+  "${}번 자리, ${}, ${}",
+  "다닌 길 보기",
+  "사진 보기",
+  "이 일기에는 자리별 사진이 남아 있지 않아요",
+  "이곳에서 남은 사진이 없어요",
   // 131 — 자동 쓰기 설정 창(`home.autoWriteSetup`, 안내 규칙 D2·D5). 「자동으로 쓰기」·「허용됨」·「허용 안 함」·「나중에」는 골든에 이미 있다
   "매일 일기를 써 드릴까요?",
   "쓰는 시각",

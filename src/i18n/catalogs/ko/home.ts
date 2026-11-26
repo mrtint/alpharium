@@ -124,9 +124,10 @@ export const home = {
     note: "사진이 찍힌 자리를 시간순으로 이은 거예요",
     period: { morning: "오전", afternoon: "오후", evening: "저녁", night: "밤" },
     /** 범례 한 줄 — 「1 · 오전 · 서울숲」 */
-    line: (n: number, period: string, label: string): string => `${n} · ${period} · ${label}`,
+    line: (n: number | string, period: string, label: string): string =>
+      `${n} · ${period} · ${label}`,
     /** 이름을 모르는 자리의 범례 줄 — 이름 칸을 비운다(126 FR-015). 지어낸 이름을 넣지 않는다 */
-    lineNoName: (n: number, period: string): string => `${n} · ${period}`,
+    lineNoName: (n: number | string, period: string): string => `${n} · ${period}`,
     /** 상한 밖의 자리 수 */
     more: (n: number): string => `외 ${n}곳`,
     /** 133 — 접힌 목록 한 줄: 대표 자리 이름(번호·때 없음)과 나머지 수. 끝에 「펼치기」가 붙는다 */
@@ -138,6 +139,21 @@ export const home = {
     collapse: "접기",
     /** 도식 하나의 화면 낭독 — 점·선은 낭독에서 숨기고 범례가 번호 순서대로 읽힌다 */
     diagramA11y: (n: number): string => `사진이 찍힌 자리 ${n}곳을 시간순으로 이은 도식`,
+    /** 135 — 캐러셀 사진 위 지도 아이콘·지도 면의 갤러리 아이콘 낭독 */
+    showMapA11y: "다닌 길 보기",
+    showPhotosA11y: "사진 보기",
+    /** 135 — 지도 점 낭독. 합친 점은 번호를 「1·4」로 잇는다. 이름이 없으면 이름 칸을 뺀다 */
+    markerA11y: (numbers: string, period: string, label: string | null): string =>
+      label === null ? `${numbers}번 자리, ${period}` : `${numbers}번 자리, ${label}, ${period}`,
+    /** 135 — 폴라로이드 카드 낭독(누르면 크게 본다) */
+    cardA11y: (numbers: string, count: number): string =>
+      `${numbers}번 자리 사진 ${count}장 크게 보기`,
+    /** 135 — 카드에 다 못 싣은 사진 수 */
+    cardMore: (n: number): string => `+${n}`,
+    /** 135 — 그 자리에 남은 사진이 없다(하루 최대 8장만 남는다) */
+    cardEmpty: "이곳에서 남은 사진이 없어요",
+    /** 135 — 자리별 사진 연결이 저장되기 전(135 이전)에 쓴 일기. 시각으로 짐작해 붙이지 않는다(원칙 V) */
+    cardUnlinked: "이 일기에는 자리별 사진이 남아 있지 않아요",
   },
 
   /**

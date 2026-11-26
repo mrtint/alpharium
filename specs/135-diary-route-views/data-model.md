@@ -13,11 +13,11 @@
 
 ## PlaceVisit (신호, 변경 — 저장 안 함)
 
-- `photoIds: string[]` — 그 자리에 묶인 좌표 있는 사진 식별자, 시각순. `photoIds.length === photoCount`.
+- `photoIds: string[]` — 그 자리에 묶인 좌표 있는 사진 식별자, 시각순. 수집 경로에서는 `photoIds.length === photoCount`.
 
 ## TimedCoordinate (신호, 변경)
 
-- `photoId: string` 추가.
+- `photoId?: string` 추가 — 수집(`collect.ts`)은 언제나 싣는다. 선택인 까닭은 자리 묶기 시험의 좌표만 있는 입력을 그대로 두기 위해서다(식별자 없는 점은 `photoIds`에서 빠진다).
 
 ## RouteCard (화면 상태, 저장 안 함)
 

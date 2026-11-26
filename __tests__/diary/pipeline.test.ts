@@ -900,7 +900,8 @@ describe("017 — 사진 보존 판정 (contracts/photo-preservation.md P4)", ()
 
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.entry.photos).toEqual(usedPhotos);
+      // 135 — 자리 신호가 없으면 모든 사진의 placeIndex는 null이다(키는 있다, data-model DM1)
+      expect(result.entry.photos).toEqual(usedPhotos.map((p) => ({ ...p, placeIndex: null })));
     }
   });
 
@@ -1036,6 +1037,7 @@ describe("121 — 기기 안 장소 이름 (contracts/diary-places.md DP1~DP5)",
       firstSeenAt: T(8),
       lastSeenAt: T(9),
       photoCount: 2,
+      photoIds: ["p1", "p2"],
       source: "photo-exif" as const,
     },
     {
@@ -1043,6 +1045,7 @@ describe("121 — 기기 안 장소 이름 (contracts/diary-places.md DP1~DP5)",
       firstSeenAt: T(13),
       lastSeenAt: T(13),
       photoCount: 1,
+      photoIds: ["p3"],
       source: "photo-exif" as const,
     },
   ];
@@ -1122,6 +1125,33 @@ describe("121 — 기기 안 장소 이름 (contracts/diary-places.md DP1~DP5)",
     expect(box.request?.places).toBeUndefined();
     // DP5 — 「끔」이어도 자리는 남고 이름 칸이 null이다.
     expect(result.ok && result.entry.places?.map((p) => p.label)).toEqual([null, null]);
+  });
+
+  it("135 DM1·DM2 — 저장 일기의 사진마다 속한 자리 순번(없으면 null)을 둔다", async () => {
+    const photo = (photoId: string) => ({
+      photoId,
+      takenAt: T(9),
+      resizedPath: `/resized/${photoId}.jpg`,
+      ownsResizedPath: true,
+    });
+    const backend: InferenceBackend = {
+      location: "on-device",
+      async isAvailable() {
+        return { kind: "loaded" };
+      },
+      async generate() {
+        return { text: "오늘 하루.", usedPhotos: [photo("p2"), photo("p3"), photo("x")] };
+      },
+    };
+    const pipeline = createPipeline({
+      backend,
+      store: memoryStore(),
+      loadSignals: async () => signalsWithPlaces(),
+      placeNamesEnabled: false,
+    });
+
+    const result = await pipeline.run(inputFor());
+    expect(result.ok && result.entry.photos?.map((p) => p.placeIndex)).toEqual([0, 1, null]);
   });
 
   it("자리가 없으면(none) 켜져 있어도 찾지 않고 entry.places도 없다", async () => {

@@ -1,7 +1,12 @@
 /**
  * 121 — 자리 목록 → 프롬프트 장소 항목·저장 자리 (data-model PromptPlace·SavedPlace, spec FR-005·FR-007).
  */
-import { buildPromptPlaces, dayPeriodOf, savedPlacesOf } from "../../src/diary/place-lines";
+import {
+  buildPromptPlaces,
+  dayPeriodOf,
+  placeIndexOf,
+  savedPlacesOf,
+} from "../../src/diary/place-lines";
 import type { PlaceName } from "../../src/signals/place-names";
 import type { PlaceVisit } from "../../src/signals/types";
 
@@ -12,6 +17,7 @@ function visit(hour: number, photoCount = 1): PlaceVisit {
     firstSeenAt: first,
     lastSeenAt: new Date(2026, 10, 21, hour, 30),
     photoCount,
+    photoIds: [],
     source: "photo-exif",
   };
 }
@@ -164,5 +170,21 @@ describe("savedPlacesOf", () => {
     ])) {
       expect("latE5" in p).toBe("lonE5" in p);
     }
+  });
+});
+
+describe("135 — placeIndexOf (data-model DM2)", () => {
+  const withIds = (hour: number, ids: string[]): PlaceVisit => ({
+    ...visit(hour, ids.length),
+    photoIds: ids,
+  });
+  it("묶인 자리의 0부터 순번을 낸다", () => {
+    const visits = [withIds(9, ["a", "b"]), withIds(13, ["c"])];
+    expect(placeIndexOf(visits, "a")).toBe(0);
+    expect(placeIndexOf(visits, "c")).toBe(1);
+  });
+  it("어느 자리에도 없으면 null이다", () => {
+    expect(placeIndexOf([withIds(9, ["a"])], "z")).toBeNull();
+    expect(placeIndexOf([], "a")).toBeNull();
   });
 });

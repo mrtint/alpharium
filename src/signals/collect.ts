@@ -179,6 +179,7 @@ async function collectPlaces(
           latitude: outcome.latitude,
           longitude: outcome.longitude,
           takenAtMs: photo.takenAt.getTime(),
+          photoId: photo.id,
         });
       }
     } else if (outcome.kind === "failed") {

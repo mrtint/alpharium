@@ -41,6 +41,7 @@ import {
 
 import { indexAtProgress, isTap, type Point } from "../app/photo-viewer";
 import { AppText } from "./components/Text";
+import { FaceButton } from "./FaceButton";
 import { PHOTO_VIEWER_TEXT, WRITTEN_DAY_TEXT } from "./home-text";
 import { PhotoViewer } from "./PhotoViewer";
 import { useReduceMotion } from "./reduce-motion";
@@ -53,12 +54,14 @@ export type PhotoCarouselProps = {
   photos?: readonly CarouselPhoto[];
   /** 슬라이드 폭 = 스트립 폭. 부르는 쪽이 `onLayout`으로 잰다(창 폭을 가정하지 않는다) */
   width: number;
+  /** 135 — 있으면 사진 위 우측 하단에 지도 아이콘(누르면 지도 면). 동선을 그릴 수 있는 날에만 부르는 쪽이 준다(WR2) */
+  onShowMap?: () => void;
 };
 
 /** 051 — 순번 규칙은 확대 화면과 함께 쓰려고 `src/app/photo-viewer.ts`로 옮겼다(067) */
 export { indexAtProgress };
 
-export function PhotoCarousel({ photos, width }: PhotoCarouselProps) {
+export function PhotoCarousel({ photos, width, onShowMap }: PhotoCarouselProps) {
   const [index, setIndex] = useState(0);
   // 열린 확대 화면이 시작한 장 — 닫혀 있으면 null (data-model §2)
   const [viewerStart, setViewerStart] = useState<number | null>(null);
@@ -92,6 +95,7 @@ export function PhotoCarousel({ photos, width }: PhotoCarouselProps) {
     return (
       <View testID="photo-carousel-single">
         <PhotoFace onOpen={openViewer} photo={photos[0]} slide={0} width={width} />
+        {onShowMap !== undefined && <FaceButton kind="map" onPress={onShowMap} />}
         {viewer}
       </View>
     );
@@ -113,6 +117,7 @@ export function PhotoCarousel({ photos, width }: PhotoCarouselProps) {
         <View accessibilityLabel={position} style={BADGE} testID="photo-carousel-badge">
           <AppText style={BADGE_TEXT}>{position}</AppText>
         </View>
+        {onShowMap !== undefined && <FaceButton kind="map" onPress={onShowMap} />}
       </View>
       <View style={INDICATOR} testID="photo-carousel-indicator">
         {photos.map((p, i) => (

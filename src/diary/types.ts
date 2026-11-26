@@ -179,7 +179,17 @@ export type DiaryEntry = {
    * 작아 리사이즈를 건너뛴 경우) — 051 캐러셀 표시에는 쓰지만 058 「일기 모두
    * 지우기」·저장 실패 정리 어느 쪽도 그 경로를 지우지 않는다(FR-006).
    */
-  photos?: { photoId: string; takenAt: Date; resizedPath: string; ownsResizedPath: boolean }[];
+  photos?: {
+    photoId: string;
+    takenAt: Date;
+    resizedPath: string;
+    ownsResizedPath: boolean;
+    /**
+     * 135 — 이 사진이 속한 자리의 순번(`places`의 0부터). `null`이면 좌표가 없어 어느 자리에도 들지 않았다.
+     * **키가 없으면 135 이전에 쓴 일기다** — 화면은 자리별 사진을 짐작해 붙이지 않는다(원칙 V).
+     */
+    placeIndex?: number | null;
+  }[];
   /**
    * 소요 시간 (017, 헌법 1.2.0).
    *

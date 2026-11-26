@@ -113,3 +113,12 @@ export function savedPlacesOf(
     };
   });
 }
+
+/**
+ * 135 — 사진 하나가 속한 자리의 순번(0부터, `savedPlacesOf`가 만드는 `entry.places`와 같은 순서). 어느 자리에도 묶이지 않았으면
+ * (좌표가 없던 사진) `null`이다 — 시각으로 짐작하지 않는다(원칙 V).
+ */
+export function placeIndexOf(visits: readonly PlaceVisit[], photoId: string): number | null {
+  const i = visits.findIndex((v) => v.photoIds.includes(photoId));
+  return i === -1 ? null : i;
+}

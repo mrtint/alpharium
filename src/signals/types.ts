@@ -92,6 +92,11 @@ export type PlaceVisit = {
   lastSeenAt: Date;
   /** 그 자리에 묶인 좌표 있는 사진 수(≥1) */
   photoCount: number;
+  /**
+   * 135 — 그 자리에 묶인 사진 식별자, 시각순. 수집이 언제나 싣으므로 실제로는 `photoCount`와 길이가 같다(식별자 없이 들어온 점은 빠진다).
+   * 일기를 쓸 때 `entry.photos[].placeIndex`를 정하는 데만 쓰고 저장하지 않는다.
+   */
+  photoIds: string[];
   source: "photo-exif";
 };
 
