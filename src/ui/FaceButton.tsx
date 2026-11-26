@@ -1,26 +1,27 @@
 /**
  * 135 — 쓴 날 사진 자리의 면 전환 단추(사진 ↔ 지도). 사진·지도 위 우측 하단에 같은 모양·같은 자리로 놓인다
- * (소유자 결정 2026-11-26 — 캐러셀 순번 배지처럼 그림 위에 얹는다, specs/135-diary-route-views/contracts/written-route.md WR2·WR3).
+ * (specs/135-diary-route-views/contracts/written-route.md WR2·WR3).
  *
- * 아이콘 글꼴·라이브러리를 들이지 않고 평평한 사각형으로 그린다(Modernist — 반경·그림자 없음, `design/DESIGN.md`).
- * 지도는 세로 판 셋(접은 지도), 사진은 겹친 사각형 둘이다. 보이는 단추는 32, 누를 자리는 `hitSlop`으로 44 이상이다.
- * 치수는 **사람이 정한 값이다**(원칙 V).
+ * **모양은 소유자가 골랐다(2026-11-26, A1)** — 검은 판에 기호 + 글자. 사진 면에서는 핀 기호 + 「지도」, 지도 면에서는 액자 기호 +
+ * 「사진」. 배지(1 / 5)와 같은 평평한 판이고 반경·그림자가 없다. 기호는 아이콘 글꼴·라이브러리 없이 `View`로 그린다(핀의 둥근 머리만
+ * 반경을 쓴다 — 면이 아니라 기호다). 누를 자리는 높이 30에 `hitSlop`으로 44 이상. 치수는 **사람이 정한 값이다**(원칙 V).
  */
 
-import { Pressable, View, type ViewStyle } from "react-native";
+import { Pressable, View, type TextStyle, type ViewStyle } from "react-native";
 
+import { AppText } from "./components/Text";
 import { ROUTE_TEXT } from "./home-text";
 import { COLORS, WRITTEN_DAY } from "./theme/tokens";
 
-/** 보이는 단추 한 변 */
-export const FACE_BUTTON_SIZE = 32;
-const HIT = (44 - FACE_BUTTON_SIZE) / 2;
+/** 보이는 단추 높이 */
+export const FACE_BUTTON_HEIGHT = 30;
+const HIT = { top: 7, bottom: 7, left: 6, right: 6 } as const;
 
 export function FaceButton({
   kind,
   onPress,
 }: {
-  /** 누르면 보일 면 — `map`이면 지도 아이콘(사진 위), `photos`면 사진 아이콘(지도 위) */
+  /** 누르면 보일 면 — `map`이면 핀 + 「지도」(사진 위), `photos`면 액자 + 「사진」(지도 위) */
   kind: "map" | "photos";
   onPress: () => void;
 }) {
@@ -34,44 +35,104 @@ export function FaceButton({
       style={BUTTON}
       testID={isMap ? "show-route-map" : "show-photos"}
     >
-      {isMap ? (
-        <View style={MAP_ICON}>
-          <View style={[PANEL, { height: 14, marginTop: 2 }]} />
-          <View style={[PANEL, { height: 14 }]} />
-          <View style={[PANEL, { height: 14, marginTop: 2 }]} />
-        </View>
-      ) : (
-        <View style={PHOTO_ICON}>
-          <View style={[FRAME, { left: 0, top: 4 }]} />
-          <View style={[FRAME, { left: 4, top: 0, backgroundColor: COLORS.text }]} />
-        </View>
-      )}
+      {isMap ? <PinIcon /> : <PhotoIcon />}
+      <AppText allowFontScaling={false} style={LABEL}>
+        {isMap ? ROUTE_TEXT.showMapLabel : ROUTE_TEXT.showPhotosLabel}
+      </AppText>
     </Pressable>
   );
 }
+
+/** 핀 — 한 모서리만 뾰족한 둥근 판을 45° 돌린 물방울 + 가운데 구멍 */
+function PinIcon() {
+  return (
+    <View style={ICON_BOX} testID="face-icon-pin">
+      <View style={PIN_HEAD}>
+        <View style={PIN_HOLE} />
+      </View>
+    </View>
+  );
+}
+
+/** 액자 — 테두리 사각형 + 안의 해(점)와 산(기운 판) */
+function PhotoIcon() {
+  return (
+    <View style={ICON_BOX} testID="face-icon-photo">
+      <View style={FRAME}>
+        <View style={SUN} />
+        <View style={HILL} />
+      </View>
+    </View>
+  );
+}
+
+const INK = COLORS.bg;
 
 const BUTTON: ViewStyle = {
   position: "absolute",
   right: WRITTEN_DAY.badge.inset,
   bottom: WRITTEN_DAY.badge.inset,
-  width: FACE_BUTTON_SIZE,
-  height: FACE_BUTTON_SIZE,
-  backgroundColor: COLORS.bg,
+  height: FACE_BUTTON_HEIGHT,
+  paddingHorizontal: 10,
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+  backgroundColor: COLORS.text,
+};
+
+const LABEL: TextStyle = { fontSize: 12, fontWeight: "700", lineHeight: 16, color: INK };
+
+const ICON_BOX: ViewStyle = {
+  width: 14,
+  height: 14,
   alignItems: "center",
   justifyContent: "center",
 };
 
-const MAP_ICON: ViewStyle = { flexDirection: "row", gap: 2, height: 18, alignItems: "flex-start" };
+const PIN_HEAD: ViewStyle = {
+  width: 10,
+  height: 10,
+  marginTop: -2,
+  borderTopLeftRadius: 5,
+  borderTopRightRadius: 5,
+  borderBottomLeftRadius: 5,
+  borderBottomRightRadius: 0,
+  backgroundColor: INK,
+  transform: [{ rotate: "45deg" }],
+  alignItems: "center",
+  justifyContent: "center",
+};
 
-const PANEL: ViewStyle = { width: 5, backgroundColor: COLORS.text };
-
-const PHOTO_ICON: ViewStyle = { width: 18, height: 18 };
+const PIN_HOLE: ViewStyle = {
+  width: 3.5,
+  height: 3.5,
+  borderRadius: 1.75,
+  backgroundColor: COLORS.text,
+};
 
 const FRAME: ViewStyle = {
-  position: "absolute",
   width: 14,
-  height: 14,
-  borderWidth: 2,
-  borderColor: COLORS.text,
-  backgroundColor: COLORS.bg,
+  height: 11,
+  borderWidth: 1.6,
+  borderColor: INK,
+  overflow: "hidden",
+};
+
+const SUN: ViewStyle = {
+  position: "absolute",
+  left: 2,
+  top: 1.5,
+  width: 3,
+  height: 3,
+  backgroundColor: INK,
+};
+
+const HILL: ViewStyle = {
+  position: "absolute",
+  left: 2,
+  bottom: -4,
+  width: 9,
+  height: 9,
+  backgroundColor: INK,
+  transform: [{ rotate: "45deg" }],
 };

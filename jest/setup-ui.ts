@@ -87,6 +87,11 @@ jest.mock("react-native-reanimated", () => {
     // 준다(`.duration()`·`.delay()`·`.reduceMotion()`이 자기 자신). 움직임은 실기기에서 본다(C9).
     FadeIn: mockLayoutAnimationStub(),
     FadeOut: mockLayoutAnimationStub(),
+    // 135 — 지도 면 첫 진입 애니메이션(사진이 찰칵 놓임·번쩍임)
+    ZoomIn: mockLayoutAnimationStub(),
+    Keyframe: function Keyframe() {
+      return mockLayoutAnimationStub();
+    },
     ReduceMotion: { System: "system", Always: "always", Never: "never" },
     Easing: {
       linear: (t: number) => t,

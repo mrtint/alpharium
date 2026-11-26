@@ -135,9 +135,20 @@ export function WrittenDayPaper({
     face: "photos",
   });
   // 같은 날 안에서 동선이 다시 계산돼 지도 면이 없어지면(늦게 온 결과 등) 사진 면으로 돌아간다 — 숨은 캐러셀만 남는 빈 칸을 막는다(코드 리뷰)
+  // 다른 날에 들렀다 돌아와도 사진 면이다 — 날이 바뀐 렌더에서 곧바로 되돌린다(WR6)
+  if (faceState.date !== date) setFaceState({ date, face: "photos" });
   const face: Face = hasMap && faceState.date === date ? faceState.face : "photos";
   const showFace = (next: Face) => setFaceState({ date, face: next });
   const reduceMotion = useReduceMotion() === true;
+  // 135 — 지도 면 첫 진입 애니메이션은 날마다 한 번(같은 날 다시 와도 보이지 않는다, 소유자 결정 2026-11-26)
+  // 날이 바뀌면 그 자리에서 「안 보임」으로 되돌린다(렌더 중 파생 상태 갱신 — 다른 날에 들렀다 돌아오면 다시 한 번 보인다)
+  const [introState, setIntroState] = useState<{ date: string | undefined; shown: boolean }>({
+    date,
+    shown: false,
+  });
+  if (introState.date !== date) setIntroState({ date, shown: false });
+  const intro = !(introState.date === date && introState.shown);
+  const markIntro = () => setIntroState({ date, shown: true });
 
   return (
     <ScrollView
@@ -207,6 +218,8 @@ export function WrittenDayPaper({
               {hasMap && face === "map" && (
                 <FadeTo from={0} interactive reduceMotion={reduceMotion} style={FACE_OVER} to={1}>
                   <RouteFace
+                    intro={intro}
+                    onIntroStart={markIntro}
                     onShowPhotos={() => showFace("photos")}
                     photos={paper.entry.photos}
                     reduceMotion={reduceMotion}
@@ -221,7 +234,9 @@ export function WrittenDayPaper({
           {width > 0 && !hasPhotos && hasMap && (
             <View style={CAROUSEL_FRAME}>
               <RouteFace
+                intro={intro}
                 key={paper.entry.date}
+                onIntroStart={markIntro}
                 photos={paper.entry.photos}
                 reduceMotion={reduceMotion}
                 route={route}

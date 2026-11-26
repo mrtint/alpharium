@@ -50,11 +50,18 @@ export type RouteCanvasProps = {
   selected?: readonly number[];
   /** 135 — 있으면 점이 버튼이다 */
   onPressMarker?: (marker: Marker) => void;
+  /** 135 — 첫 진입 애니메이션 동안 이 번호까지의 자리만 그린다(점·선·라벨). 없으면 전부 */
+  visibleUpTo?: number;
 };
 
 /** 그림 안의 점 중심들 — 지도 면이 카드 자리를 고를 때도 쓴다 */
-export function markersFor(items: readonly RouteItem[], width: number, height: number): Marker[] {
-  const centers = items.flatMap((item) =>
+export function markersFor(
+  items: readonly RouteItem[],
+  width: number,
+  height: number,
+  visibleUpTo?: number,
+): Marker[] {
+  const centers = shown(items, visibleUpTo).flatMap((item) =>
     item.x === undefined || item.y === undefined
       ? []
       : [{ n: item.n, cx: item.x * width, cy: item.y * height }],
@@ -74,9 +81,10 @@ export function RouteCanvas({
   height,
   selected,
   onPressMarker,
+  visibleUpTo,
 }: RouteCanvasProps) {
   const { dot, lineWidth } = ROUTE_DIAGRAM;
-  const centers = items.flatMap((item) =>
+  const centers = shown(items, visibleUpTo).flatMap((item) =>
     item.x === undefined || item.y === undefined
       ? []
       : [{ n: item.n, cx: item.x * width, cy: item.y * height }],
@@ -191,6 +199,11 @@ export function RouteCanvas({
       {interactive && dots}
     </View>
   );
+}
+
+/** 자리 번호는 시간순으로 늘어난다(`buildDayRoute`) — 그래서 「이 번호까지」가 「이 순번까지」와 같다 */
+function shown(items: readonly RouteItem[], visibleUpTo: number | undefined): readonly RouteItem[] {
+  return visibleUpTo === undefined ? items : items.filter((it) => it.n <= visibleUpTo);
 }
 
 function labelOf(items: readonly RouteItem[], m: Marker): string | null {

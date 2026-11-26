@@ -142,6 +142,9 @@ export const home = {
     /** 135 — 캐러셀 사진 위 지도 아이콘·지도 면의 갤러리 아이콘 낭독 */
     showMapA11y: "다닌 길 보기",
     showPhotosA11y: "사진 보기",
+    /** 135 — 단추에 보이는 글자(기호 옆) */
+    showMapLabel: "지도",
+    showPhotosLabel: "사진",
     /** 135 — 지도 점 낭독. 합친 점은 번호를 「1·4」로 잇는다. 이름이 없으면 이름 칸을 뺀다 */
     markerA11y: (numbers: string, period: string, label: string | null): string =>
       label === null ? `${numbers}번 자리, ${period}` : `${numbers}번 자리, ${label}, ${period}`,
