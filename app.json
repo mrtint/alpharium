@@ -10,7 +10,7 @@
       "supportsTablet": false,
       "appleTeamId": "PGNGG84B39",
       "bundleIdentifier": "com.a810labs.pocketlog",
-      "buildNumber": "19",
+      "buildNumber": "20",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMotionUsageDescription": "앱은 움직임 정보를 쓰지 않습니다."
@@ -26,7 +26,7 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "versionCode": 19,
+      "versionCode": 20,
       "predictiveBackGestureEnabled": false,
       "package": "com.a810labs.pocketlog",
       "permissions": [
