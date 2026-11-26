@@ -27,6 +27,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
+  Pressable,
   ScrollView,
   useWindowDimensions,
   View,
@@ -136,9 +137,18 @@ export function WrittenDayPaper({
   });
   // 같은 날 안에서 동선이 다시 계산돼 지도 면이 없어지면(늦게 온 결과 등) 사진 면으로 돌아간다 — 숨은 캐러셀만 남는 빈 칸을 막는다(코드 리뷰)
   // 다른 날에 들렀다 돌아와도 사진 면이다 — 날이 바뀐 렌더에서 곧바로 되돌린다(WR6)
-  if (faceState.date !== date) setFaceState({ date, face: "photos" });
+  // 136 — 지도 창(카드)이 열려 있는가와 「창 밖을 눌러 닫기」 신호. 창이 열려 있으면 지면의 나머지를 덮는 판을 둔다
+  const [cardOpen, setCardOpen] = useState(false);
+  const [dismissKey, setDismissKey] = useState(0);
+  if (faceState.date !== date) {
+    setFaceState({ date, face: "photos" });
+    setCardOpen(false);
+  }
   const face: Face = hasMap && faceState.date === date ? faceState.face : "photos";
-  const showFace = (next: Face) => setFaceState({ date, face: next });
+  const showFace = (next: Face) => {
+    setFaceState({ date, face: next });
+    setCardOpen(false);
+  };
   const reduceMotion = useReduceMotion() === true;
   // 135 — 지도 면 첫 진입 애니메이션은 날마다 한 번(같은 날 다시 와도 보이지 않는다, 소유자 결정 2026-11-26)
   // 날이 바뀌면 그 자리에서 「안 보임」으로 되돌린다(렌더 중 파생 상태 갱신 — 다른 날에 들렀다 돌아오면 다시 한 번 보인다)
@@ -200,7 +210,7 @@ export function WrittenDayPaper({
       {paper.kind === "readable" && (
         <>
           {width > 0 && hasPhotos && (
-            <View style={CAROUSEL_FRAME}>
+            <View style={[CAROUSEL_FRAME, cardOpen && ABOVE_DISMISS]}>
               {/* 135 — 캐러셀은 지도 면 아래에서도 마운트를 유지해 돌아오면 보던 장이다(WR3) */}
               <FadeTo
                 interactive={face === "photos"}
@@ -218,7 +228,9 @@ export function WrittenDayPaper({
               {hasMap && face === "map" && (
                 <FadeTo from={0} interactive reduceMotion={reduceMotion} style={FACE_OVER} to={1}>
                   <RouteFace
+                    dismissKey={dismissKey}
                     intro={intro}
+                    onCardOpenChange={setCardOpen}
                     onIntroStart={markIntro}
                     onShowPhotos={() => showFace("photos")}
                     photos={paper.entry.photos}
@@ -232,10 +244,12 @@ export function WrittenDayPaper({
           )}
           {/* 135 — 사진이 0장이고 지도는 그릴 수 있으면 지도 면만, 사진 아이콘 없이(WR4) */}
           {width > 0 && !hasPhotos && hasMap && (
-            <View style={CAROUSEL_FRAME}>
+            <View style={[CAROUSEL_FRAME, cardOpen && ABOVE_DISMISS]}>
               <RouteFace
+                dismissKey={dismissKey}
                 intro={intro}
                 key={paper.entry.date}
+                onCardOpenChange={setCardOpen}
                 onIntroStart={markIntro}
                 photos={paper.entry.photos}
                 reduceMotion={reduceMotion}
@@ -273,6 +287,21 @@ export function WrittenDayPaper({
                 <DayRouteSection key={paper.entry.date} route={route} />
               )}
             </View>,
+          )}
+          {/*
+            136 — 지도 창(카드)이 열려 있으면 지면의 나머지(글·여백)를 덮는 투명한 판. 누르면 창이 닫힌다(소유자, 2026-11-27).
+            지도 칸은 판보다 위(zIndex)라 점·카드·지도 위 빈 곳(아래 판)은 그대로 받는다.
+          */}
+          {cardOpen && hasMap && (
+            <Pressable
+              accessible={false}
+              onPress={() => {
+                setCardOpen(false);
+                setDismissKey((k) => k + 1);
+              }}
+              style={DISMISS_LAYER}
+              testID="route-card-dismiss"
+            />
           )}
         </>
       )}
@@ -368,6 +397,17 @@ function FadeTo({
     </Animated.View>
   );
 }
+
+/** 136 — 창 밖을 덮는 판과 그 위에 놓이는 지도 칸 */
+const DISMISS_LAYER: ViewStyle = {
+  position: "absolute",
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  zIndex: 1,
+};
+const ABOVE_DISMISS: ViewStyle = { zIndex: 2 };
 
 const CAROUSEL_FRAME: ViewStyle = {
   paddingTop: carouselPadding.top,

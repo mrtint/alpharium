@@ -149,7 +149,8 @@ export function RouteCanvas({
   });
 
   return (
-    <View style={{ width, height }}>
+    // 136 — 그림 자체는 누름을 받지 않고 점만 받는다. 지도 위 빈 곳 누름이 지도 면의 아래 판(창 닫기)에 닿게 한다
+    <View pointerEvents="box-none" style={{ width, height }} testID="route-canvas">
       {map !== undefined && <RouteMapLayer map={map} />}
       <View
         accessibilityElementsHidden

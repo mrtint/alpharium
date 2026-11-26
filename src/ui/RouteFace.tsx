@@ -61,6 +61,10 @@ export type RouteFaceProps = {
    */
   intro?: boolean;
   onIntroStart?: () => void;
+  /** 136 — 창(카드)이 열리고 닫힐 때 알린다. 부르는 쪽이 창 밖(글 등)을 덮는 판을 둔다 */
+  onCardOpenChange?: (open: boolean) => void;
+  /** 136 — 바뀌면 창을 닫는다(부르는 쪽의 덮는 판을 눌렀다) */
+  dismissKey?: number;
 };
 
 export function RouteFace({
@@ -71,6 +75,8 @@ export function RouteFace({
   reduceMotion,
   intro,
   onIntroStart,
+  onCardOpenChange,
+  dismissKey = 0,
 }: RouteFaceProps) {
   const height = WRITTEN_DAY.photoHeight;
   // 투영 비율을 지키며 면 안에 맞춘 지도 상자
@@ -79,7 +85,18 @@ export function RouteFace({
   const offsetX = (width - boxW) / 2;
   const offsetY = (height - boxH) / 2;
 
-  const [picked, setPicked] = useState<Marker | null>(null);
+  const [picked, setPickedState] = useState<Marker | null>(null);
+  // 창이 열리고 닫히는 곳은 모두 이것을 거친다 — 부르는 쪽의 덮는 판이 창 상태를 따라간다(136)
+  const setPicked = (next: Marker | null) => {
+    setPickedState(next);
+    onCardOpenChange?.(next !== null);
+  };
+  // 부르는 쪽이 창 밖을 눌러 닫으라고 했다 — 렌더 중에 곧바로 닫는다(부르는 쪽은 이미 닫힘으로 알고 있다)
+  const [seenDismiss, setSeenDismiss] = useState(dismissKey);
+  if (seenDismiss !== dismissKey) {
+    setSeenDismiss(dismissKey);
+    setPickedState(null);
+  }
   const [viewer, setViewer] = useState<readonly CarouselPhoto[] | null>(null);
 
   // 135 — 첫 진입 애니메이션. 장소마다 그 자리 사진 수(카드와 같은 규칙 — 옛 일기·사진 없는 자리는 0)로 시간표를 만든다
@@ -190,7 +207,7 @@ export function RouteFace({
       setIntroOn(false);
       return;
     }
-    setPicked((cur) => (cur !== null && cur.numbers[0] === m.numbers[0] ? null : m));
+    setPicked(picked !== null && picked.numbers[0] === m.numbers[0] ? null : m);
   };
   const current =
     picked === null ? null : (markers.find((m) => m.numbers[0] === picked.numbers[0]) ?? null);
@@ -212,8 +229,10 @@ export function RouteFace({
         testID="route-face-backdrop"
       />
       <Animated.View
+        // 136 — 지도 상자는 누름을 받지 않는다(점·카드만) — 빈 곳 누름이 아래 판(`route-face-backdrop`)에 닿는다
+        pointerEvents="box-none"
         style={[{ position: "absolute", left: offsetX, top: offsetY }, camera]}
-        testID={introOn ? "route-intro" : undefined}
+        testID={introOn ? "route-intro" : "route-camera"}
       >
         <RouteCanvas
           height={boxH}
