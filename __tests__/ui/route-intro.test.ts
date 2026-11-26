@@ -3,7 +3,7 @@
  *
  * 장소마다: 도착(점) → 그 자리 카드의 사진이 1·2·3장으로 쌓임 → 빨간 점이 경로를 따라 다음 장소로 이동 → 도착 …
  */
-import { INTRO, introTimeline } from "../../src/ui/route-intro";
+import { cameraFor, INTRO, introTimeline } from "../../src/ui/route-intro";
 
 describe("135 introTimeline", () => {
   it("도착 → 사진 쌓기 → 다음 장소로 이동 → 도착 순이다", () => {
@@ -42,9 +42,19 @@ describe("135 introTimeline", () => {
     expect(introTimeline([1]).fadeAt).toBeLessThan(many.fadeAt);
   });
 
-  it("마지막 장면 뒤 잠깐 머물고 카드가 사라진다", () => {
+  it("마지막 장면 뒤 잠깐 머물고 카드가 사라진 뒤에 지도가 원래 크기로 돌아간다(코드 리뷰 — 카드가 장소에서 떨어지지 않게)", () => {
     const t = introTimeline([1, 1]);
     expect(t.fadeAt).toBeGreaterThan(t.frames[t.frames.length - 1]!.at);
-    expect(t.doneAt).toBe(t.fadeAt + INTRO.fadeMs);
+    expect(t.returnAt).toBe(t.fadeAt + INTRO.fadeMs);
+    expect(t.doneAt).toBe(t.returnAt + INTRO.fadeMs);
+  });
+
+  it("cameraFor — 상자 중심 기준으로 확대한 뒤 p가 면 가운데에 오는 이동량", () => {
+    const box = { width: 300, height: 186 };
+    expect(cameraFor({ x: 150, y: 93 }, box, 1.6)).toEqual({ x: 0, y: 0 });
+    const c = cameraFor({ x: 50, y: 40 }, box, 1.6);
+    // 화면 = 중심 + t + s·(p − 중심) 이 중심이 된다
+    expect(150 + c.x + 1.6 * (50 - 150)).toBeCloseTo(150);
+    expect(93 + c.y + 1.6 * (40 - 93)).toBeCloseTo(93);
   });
 });

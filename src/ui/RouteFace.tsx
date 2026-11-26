@@ -27,7 +27,6 @@ import {
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
-  withSequence,
   withTiming,
   ZoomIn,
 } from "react-native-reanimated";
@@ -39,7 +38,7 @@ import { AppText } from "./components/Text";
 import { FaceButton } from "./FaceButton";
 import { ROUTE_TEXT } from "./home-text";
 import type { CarouselPhoto } from "./PhotoCarousel";
-import { INTRO, introTimeline, type IntroFrame } from "./route-intro";
+import { cameraFor, INTRO, introTimeline, type IntroFrame } from "./route-intro";
 import { PhotoViewer } from "./PhotoViewer";
 import { markersFor, markerWidth, ROUTE_DIAGRAM, RouteCanvas, type Marker } from "./RouteCanvas";
 import { COLORS, MAP_COLORS, WRITTEN_DAY } from "./theme/tokens";
@@ -89,6 +88,7 @@ export function RouteFace({
   const introOn = introRunning && reduceMotion !== true;
   const [frame, setFrame] = useState<IntroFrame>({ at: 0, phase: "stay", step: 1, shown: 0 });
   const [fading, setFading] = useState(false);
+  const [returning, setReturning] = useState(false);
   const placePhotos = useMemo(
     () =>
       route.items.map((it) => {
@@ -105,10 +105,11 @@ export function RouteFace({
   useEffect(() => {
     if (!introOn) return;
     onIntroStart?.();
-    const { frames, fadeAt, doneAt } = timeline;
+    const { frames, fadeAt, returnAt, doneAt } = timeline;
     const timers = [
       ...frames.slice(1).map((f) => setTimeout(() => setFrame(f), f.at)),
       setTimeout(() => setFading(true), fadeAt),
+      setTimeout(() => setReturning(true), returnAt),
       setTimeout(() => setIntroOn(false), doneAt),
     ];
     return () => timers.forEach(clearTimeout);
@@ -128,6 +129,12 @@ export function RouteFace({
     const m = allMarkers.find((mk) => n !== undefined && mk.numbers.includes(n));
     return m === undefined ? { x: boxW / 2, y: boxH / 2 } : { x: m.cx, y: m.cy };
   };
+  /** 지금 장소 점의 반폭 — 합친 점(「1·4」)이면 그만큼 넓다(코드 리뷰) */
+  const introHalfW = (step: number) => {
+    const n = route.items[step - 1]?.n;
+    const m = allMarkers.find((mk) => n !== undefined && mk.numbers.includes(n));
+    return (m === undefined ? ROUTE_DIAGRAM.dot : markerWidth(m)) / 2;
+  };
   const camS = useSharedValue(1);
   const camX = useSharedValue(0);
   const camY = useSharedValue(0);
@@ -140,38 +147,36 @@ export function RouteFace({
       camY.value = 0;
       return;
     }
+    const box = { width: boxW, height: boxH };
     const aim = (p: { x: number; y: number }, duration: number) => {
-      const x = -INTRO_ZOOM * (p.x - boxW / 2);
-      const y = -INTRO_ZOOM * (p.y - boxH / 2);
+      const { x, y } = cameraFor(p, box, INTRO_ZOOM);
       camX.value = duration === 0 ? x : withTiming(x, { duration });
       camY.value = duration === 0 ? y : withTiming(y, { duration });
     };
-    if (fading) {
+    if (returning) {
+      // 카드가 다 사라진 뒤에 지도를 원래 크기로 되돌린다
       camS.value = withTiming(1, { duration: INTRO.fadeMs });
       camX.value = withTiming(0, { duration: INTRO.fadeMs });
       camY.value = withTiming(0, { duration: INTRO.fadeMs });
       return;
     }
+    if (fading) return;
     camS.value = INTRO_ZOOM;
     if (frame.phase === "move") {
-      const from = pointOf(frame.step);
       const to = pointOf(frame.step + 1);
-      // 시작 자리로 곧바로 옮긴 뒤 이동한다 — 값을 두 번 대입하면 앞의 것이 버려져 지난 자리에서 출발했다(시뮬레이터 확인)
-      travX.value = withSequence(
-        withTiming(from.x, { duration: 0 }),
-        withTiming(to.x, { duration: timeline.moveMs }),
-      );
-      travY.value = withSequence(
-        withTiming(from.y, { duration: 0 }),
-        withTiming(to.y, { duration: timeline.moveMs }),
-      );
+      // 출발점은 머무는 장면에서 미리 놓아 두었다 — 마운트 첫 프레임에 엉뚱한 자리(0,0)에 번쩍이지 않게(코드 리뷰)
+      travX.value = withTiming(to.x, { duration: timeline.moveMs });
+      travY.value = withTiming(to.y, { duration: timeline.moveMs });
       aim(to, timeline.moveMs);
     } else {
-      aim(pointOf(frame.step), frame.at === 0 ? 0 : 120);
+      const here = pointOf(frame.step);
+      travX.value = here.x;
+      travY.value = here.y;
+      aim(here, frame.at === 0 ? 0 : 120);
     }
-    // 장면이 바뀔 때만 — 점 위치는 같은 장면 안에서 바뀌지 않는다
+    // 장면·상자 크기가 바뀔 때 다시 조준한다(`pointOf`는 상자 크기와 자리 목록에서 나온다)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [introOn, frame, fading]);
+  }, [introOn, frame, fading, returning, boxW, boxH, timeline.moveMs]);
   const camera = useAnimatedStyle(() => ({
     transform: [{ translateX: camX.value }, { translateY: camY.value }, { scale: camS.value }],
   }));
@@ -193,7 +198,11 @@ export function RouteFace({
   return (
     <View
       // 애니메이션 동안 확대한 지도의 가장자리 밖은 지도 바탕색으로 이어 보이게 한다
-      style={[FACE, { width, height }, introOn && { backgroundColor: MAP_COLORS.mapLand }]}
+      style={[
+        FACE,
+        { width, height },
+        introOn && route.map !== undefined && { backgroundColor: MAP_COLORS.mapLand },
+      ]}
       testID="route-face"
     >
       <Pressable
@@ -241,7 +250,7 @@ export function RouteFace({
             numbers: [route.items[frame.step - 1]!.n],
             cx: width / 2,
             cy: height / 2,
-            halfW: (ROUTE_DIAGRAM.dot * INTRO_ZOOM) / 2,
+            halfW: introHalfW(frame.step) * INTRO_ZOOM,
           }}
           photos={placePhotos[frame.step - 1] ?? []}
           route={route}
