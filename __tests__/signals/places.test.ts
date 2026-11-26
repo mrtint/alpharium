@@ -192,6 +192,7 @@ describe("121 TV1~TV3 — 자리 목록(visits)", () => {
         firstSeenAt: new Date(at("2026-08-12T09:00:00")),
         lastSeenAt: new Date(at("2026-08-12T10:30:00")),
         photoCount: 2,
+        photoIds: [],
         source: "photo-exif",
       },
       {
@@ -199,6 +200,7 @@ describe("121 TV1~TV3 — 자리 목록(visits)", () => {
         firstSeenAt: new Date(at("2026-08-12T13:00:00")),
         lastSeenAt: new Date(at("2026-08-12T15:00:00")),
         photoCount: 2,
+        photoIds: [],
         source: "photo-exif",
       },
     ]);
@@ -215,5 +217,22 @@ describe("121 TV1~TV3 — 자리 목록(visits)", () => {
 
   it("TV3 — 좌표가 없으면 빈 목록", () => {
     expect(tracePlaces([]).visits).toEqual([]);
+  });
+});
+
+describe("135 — 자리마다 묶인 사진 식별자 (data-model PlaceVisit.photoIds)", () => {
+  it("자리마다 묶인 사진의 식별자를 시각순으로 낸다", () => {
+    const trace = tracePlaces([
+      { ...northOf(500), takenAtMs: at("2026-08-12T12:00:00"), photoId: "c" },
+      { ...BASE, takenAtMs: at("2026-08-12T09:00:00"), photoId: "a" },
+      { ...BASE, takenAtMs: at("2026-08-12T10:00:00"), photoId: "b" },
+    ]);
+    expect(trace.visits.map((v) => v.photoIds)).toEqual([["a", "b"], ["c"]]);
+    expect(trace.visits.map((v) => v.photoCount)).toEqual([2, 1]);
+  });
+
+  it("식별자 없이 들어온 점은 목록에 넣지 않는다(사진 수는 센다)", () => {
+    const trace = tracePlaces([{ ...BASE, takenAtMs: at("2026-08-12T09:00:00") }]);
+    expect(trace.visits[0]!.photoIds).toEqual([]);
   });
 });

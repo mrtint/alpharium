@@ -128,3 +128,25 @@ describe("121 US4 — 자리 목록 저장 왕복", () => {
     expect(back.places).toBeUndefined();
   });
 });
+
+describe("135 — 사진의 자리 순번 저장 왕복 (data-model DM1·DM3)", () => {
+  const photo = (photoId: string, placeIndex?: number | null) => ({
+    photoId,
+    takenAt: T(9),
+    resizedPath: `/r/${photoId}.jpg`,
+    ownsResizedPath: true,
+    ...(placeIndex !== undefined ? { placeIndex } : {}),
+  });
+
+  it("숫자와 null이 그대로 돌아온다", () => {
+    const back = deserializeEntry(
+      serializeEntry(entry({ photos: [photo("a", 0), photo("b", null)] })),
+    );
+    expect(back.photos?.map((p) => p.placeIndex)).toEqual([0, null]);
+  });
+
+  it("옛 일기(키 없음)는 키 없이 돌아온다", () => {
+    const back = deserializeEntry(serializeEntry(entry({ photos: [photo("a")] })));
+    expect(back.photos?.[0] !== undefined && "placeIndex" in back.photos[0]).toBe(false);
+  });
+});

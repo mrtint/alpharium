@@ -272,6 +272,7 @@ describe("125 createAppPipeline — routeDay", () => {
     firstSeenAt: new Date(2026, 10, 16, hour, 0),
     lastSeenAt: new Date(2026, 10, 16, hour, 30),
     photoCount: 1,
+    photoIds: [],
     source: "photo-exif",
   });
   const VISITS = [

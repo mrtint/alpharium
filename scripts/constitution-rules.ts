@@ -631,7 +631,7 @@ export function checkSimulationFile(fileName: string, contents: string): Violati
  *  - **MP1** `src/ui/`가 `src/map/`을 import한다 — 화면은 지도 파일·위경도를 모른다. `RouteMap` 타입은 `src/app/day-route.ts`가 다시 내보낸다.
  *  - **MP2** `src/map/`이 `src/app/`·`src/ui/`를 import한다 — 순수 폴더가 위로 올라간다(상세 정도 값은 `options`로 받는다).
  *  - **MP3** `src/map/`의 `map-port.ts` 밖이 `react-native`·`expo-*`를 import한다 — 기기에 닿는 건 포트 하나다.
- *  - **MP4** 지도 코드(`src/map/`·`src/app/day-route.ts`·`day-map.ts`·`src/ui/DayRouteSection.tsx`·`RouteMapLayer.tsx`)에 외부 요청(`fetch(`·
+ *  - **MP4** 지도 코드(`src/map/`·`src/app/day-route.ts`·`day-map.ts`·`src/ui/DayRouteSection.tsx`·`RouteMapLayer.tsx`·`RouteCanvas.tsx`·`RouteFace.tsx`)에 외부 요청(`fetch(`·
  *    `XMLHttpRequest`)·지도 라이브러리(`react-native-maps`·`maplibre`·`mapbox`)가 있다 — 지도는 앱에 든 파일에서만 온다.
  */
 const MAP_FILES = new Set([
@@ -639,6 +639,9 @@ const MAP_FILES = new Set([
   "src/app/day-map.ts",
   "src/ui/DayRouteSection.tsx",
   "src/ui/RouteMapLayer.tsx",
+  // 135 — 그리기를 옮긴 곳과 지도 면
+  "src/ui/RouteCanvas.tsx",
+  "src/ui/RouteFace.tsx",
 ]);
 const MAP_PORT_FILE = "src/map/map-port.ts";
 

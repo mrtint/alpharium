@@ -25,7 +25,7 @@
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ScrollView,
   useWindowDimensions,
@@ -33,6 +33,7 @@ import {
   type TextStyle,
   type ViewStyle,
 } from "react-native";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 
 import type { DayRoute } from "../app/day-route";
 import { reachedEnd, type PaperState } from "../app/written-day";
@@ -42,6 +43,8 @@ import type { SwipeDirection } from "../app/state";
 import { DayRouteSection } from "./DayRouteSection";
 import { DaySwipe } from "./DaySwipe";
 import { PhotoCarousel } from "./PhotoCarousel";
+import { useReduceMotion } from "./reduce-motion";
+import { RouteFace } from "./RouteFace";
 import { COLORS, WRITTEN_DAY, TYPE } from "./theme/tokens";
 
 export type WrittenDayPaperProps = {
@@ -122,6 +125,30 @@ export function WrittenDayPaper({
     onReachEndChange?.(atEnd);
   };
   const hasPhotos = paper.kind === "readable" && (paper.entry.photos?.length ?? 0) > 0;
+  // 135 — 지도 면이 있는 날(WR1). 그 날은 아래 「하루 동선」 칸을 그리지 않는다(WR5)
+  const hasMap =
+    paper.kind === "readable" && route !== undefined && route.diagram && route.items.length > 0;
+  // 135 — 고른 면. 날짜와 함께 두어 다른 날이 오면 첫 프레임부터 사진 면이다(WR6 — effect로 되돌리면 한 프레임 지도가 샌다)
+  const date = paper.kind === "readable" ? paper.entry.date : undefined;
+  const [faceState, setFaceState] = useState<{ date: string | undefined; face: Face }>({
+    date,
+    face: "photos",
+  });
+  // 같은 날 안에서 동선이 다시 계산돼 지도 면이 없어지면(늦게 온 결과 등) 사진 면으로 돌아간다 — 숨은 캐러셀만 남는 빈 칸을 막는다(코드 리뷰)
+  // 다른 날에 들렀다 돌아와도 사진 면이다 — 날이 바뀐 렌더에서 곧바로 되돌린다(WR6)
+  if (faceState.date !== date) setFaceState({ date, face: "photos" });
+  const face: Face = hasMap && faceState.date === date ? faceState.face : "photos";
+  const showFace = (next: Face) => setFaceState({ date, face: next });
+  const reduceMotion = useReduceMotion() === true;
+  // 135 — 지도 면 첫 진입 애니메이션은 날마다 한 번(같은 날 다시 와도 보이지 않는다, 소유자 결정 2026-11-26)
+  // 날이 바뀌면 그 자리에서 「안 보임」으로 되돌린다(렌더 중 파생 상태 갱신 — 다른 날에 들렀다 돌아오면 다시 한 번 보인다)
+  const [introState, setIntroState] = useState<{ date: string | undefined; shown: boolean }>({
+    date,
+    shown: false,
+  });
+  if (introState.date !== date) setIntroState({ date, shown: false });
+  const intro = !(introState.date === date && introState.shown);
+  const markIntro = () => setIntroState({ date, shown: true });
 
   return (
     <ScrollView
@@ -174,10 +201,45 @@ export function WrittenDayPaper({
         <>
           {width > 0 && hasPhotos && (
             <View style={CAROUSEL_FRAME}>
-              {/* 날이 바뀌면 새로 마운트해 1장부터 시작한다(CAR10) */}
-              <PhotoCarousel
+              {/* 135 — 캐러셀은 지도 면 아래에서도 마운트를 유지해 돌아오면 보던 장이다(WR3) */}
+              <FadeTo
+                interactive={face === "photos"}
+                reduceMotion={reduceMotion}
+                to={face === "photos" ? 1 : 0}
+              >
+                {/* 날이 바뀌면 새로 마운트해 1장부터 시작한다(CAR10) */}
+                <PhotoCarousel
+                  key={paper.entry.date}
+                  onShowMap={hasMap ? () => showFace("map") : undefined}
+                  photos={paper.entry.photos}
+                  width={width - carouselPadding.horizontal * 2}
+                />
+              </FadeTo>
+              {hasMap && face === "map" && (
+                <FadeTo from={0} interactive reduceMotion={reduceMotion} style={FACE_OVER} to={1}>
+                  <RouteFace
+                    intro={intro}
+                    onIntroStart={markIntro}
+                    onShowPhotos={() => showFace("photos")}
+                    photos={paper.entry.photos}
+                    reduceMotion={reduceMotion}
+                    route={route}
+                    width={width - carouselPadding.horizontal * 2}
+                  />
+                </FadeTo>
+              )}
+            </View>
+          )}
+          {/* 135 — 사진이 0장이고 지도는 그릴 수 있으면 지도 면만, 사진 아이콘 없이(WR4) */}
+          {width > 0 && !hasPhotos && hasMap && (
+            <View style={CAROUSEL_FRAME}>
+              <RouteFace
+                intro={intro}
                 key={paper.entry.date}
+                onIntroStart={markIntro}
                 photos={paper.entry.photos}
+                reduceMotion={reduceMotion}
+                route={route}
                 width={width - carouselPadding.horizontal * 2}
               />
             </View>
@@ -185,7 +247,10 @@ export function WrittenDayPaper({
           {/* 사진이 없으면 본문이 지면 맨 위 20부터다(보드 `2k`), 있으면 인디케이터 아래 16 */}
           {swipeable(
             <View
-              style={[BODY, { paddingTop: hasPhotos ? body.paddingTop : body.paddingTopAlone }]}
+              style={[
+                BODY,
+                { paddingTop: hasPhotos || hasMap ? body.paddingTop : body.paddingTopAlone },
+              ]}
               testID="written-body"
             >
               {/*
@@ -204,7 +269,9 @@ export function WrittenDayPaper({
               ))}
               {/* 125 — 문단 뒤 본문 끝. 하단 바가 비키는 아래 여백(104)은 이 칸 아래에 그대로 남는다 */}
               {/* 133 — 날짜 키: 다른 날이면 목록이 다시 접힌다. route는 렌더마다 새 객체일 수 있어 그 정체성에 기대지 않는다 */}
-              {route !== undefined && <DayRouteSection key={paper.entry.date} route={route} />}
+              {route !== undefined && !hasMap && (
+                <DayRouteSection key={paper.entry.date} route={route} />
+              )}
             </View>,
           )}
         </>
@@ -252,6 +319,55 @@ const PAPER: ViewStyle = {
 
 /** 114 — 밀기 영역은 캐러셀 아래 남은 높이를 채운다 */
 const SWIPE_FILL: ViewStyle = { flexGrow: 1 };
+
+/** 135 — 사진 면·지도 면 */
+type Face = "photos" | "map";
+
+/** 135 — 두 면을 바꾸는 크로스페이드 길이(ms). 사람이 정한 값 */
+const FACE_FADE_MS = 200;
+
+/** 135 — 지도 면은 캐러셀 사진 칸 바로 위에 겹친다(캐러셀 칸 안쪽 여백만큼 비킨다) */
+const FACE_OVER: ViewStyle = {
+  position: "absolute",
+  top: carouselPadding.top,
+  left: carouselPadding.horizontal,
+};
+
+/**
+ * 135 — 투명도를 `to`로 옮기는 겹(마운트 때는 `from`부터). `FadeLayer`(049)와 달리 누름을 받는다 — 면 안의 단추·점을 눌러야 한다.
+ * `interactive`가 거짓이면 누름을 받지 않고 낭독에서도 숨는다(보이지 않는 면). 동작 줄이기면 곧바로 바뀐다(127).
+ */
+function FadeTo({
+  to,
+  from = to,
+  interactive,
+  reduceMotion,
+  style,
+  children,
+}: {
+  to: number;
+  from?: number;
+  interactive: boolean;
+  reduceMotion: boolean;
+  style?: ViewStyle;
+  children: ReactNode;
+}) {
+  const opacity = useSharedValue(from);
+  useEffect(() => {
+    opacity.value = reduceMotion ? to : withTiming(to, { duration: FACE_FADE_MS });
+  }, [to, reduceMotion, opacity]);
+  const fade = useAnimatedStyle(() => ({ opacity: opacity.value }));
+  return (
+    <Animated.View
+      accessibilityElementsHidden={!interactive}
+      importantForAccessibility={interactive ? "auto" : "no-hide-descendants"}
+      pointerEvents={interactive ? "auto" : "none"}
+      style={[style, fade]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 const CAROUSEL_FRAME: ViewStyle = {
   paddingTop: carouselPadding.top,

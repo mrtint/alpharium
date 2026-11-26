@@ -40,13 +40,14 @@ const ENTRY: DiaryEntry = {
 
 const PAPER: PaperState = { kind: "readable", entry: ENTRY, madeUp: false };
 
+/** 135 — 도식이 있는 날은 칸 대신 사진 자리의 지도 면이 된다(WR5). 아래 칸을 보는 이 파일은 목록만 있는 동선을 쓴다 */
 const ROUTE: DayRoute = {
   items: [
-    { n: 1, period: "morning", label: "시청", photos: 1, x: 0.2, y: 0.8 },
-    { n: 2, period: "afternoon", label: "잠실", photos: 1, x: 0.8, y: 0.2 },
+    { n: 1, period: "morning", label: "시청", photos: 1 },
+    { n: 2, period: "afternoon", label: "잠실", photos: 1 },
   ],
   more: 0,
-  diagram: true,
+  diagram: false,
 };
 
 describe("DF1 — 칸은 본문 뒤, 지면 맨 끝이다", () => {

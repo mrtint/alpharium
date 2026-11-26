@@ -34,7 +34,10 @@ export const SAME_PLACE_METERS = 100;
 const EARTH_RADIUS_METERS = 6_371_000;
 
 export type Coordinate = { latitude: number; longitude: number };
-export type TimedCoordinate = Coordinate & { takenAtMs: number };
+/**
+ * 시각이 붙은 좌표. 135 — `photoId`는 그 좌표가 나온 사진이다(수집은 언제나 싣는다). 자리마다 묶인 사진을 일기 사진과 잇는 데 쓴다.
+ */
+export type TimedCoordinate = Coordinate & { takenAtMs: number; photoId?: string };
 
 /**
  * 실제 좌표인지 본다(FR-013d).
@@ -97,12 +100,14 @@ export function tracePlaces(points: TimedCoordinate[]): PlaceTrace & { visits: P
     if (previous !== undefined && distanceMeters(previous.coordinate, point) <= SAME_PLACE_METERS) {
       previous.lastSeenAt = new Date(point.takenAtMs);
       previous.photoCount += 1;
+      if (point.photoId !== undefined) previous.photoIds.push(point.photoId);
     } else {
       visits.push({
         coordinate: { latitude: point.latitude, longitude: point.longitude },
         firstSeenAt: new Date(point.takenAtMs),
         lastSeenAt: new Date(point.takenAtMs),
         photoCount: 1,
+        photoIds: point.photoId === undefined ? [] : [point.photoId],
         source: "photo-exif",
       });
     }

@@ -8,7 +8,7 @@
  * 파이프라인이 거기까지 도달한다는 것 자체가 검증 대상이다.
  */
 
-import { buildPromptPlaces, savedPlacesOf } from "./place-lines";
+import { buildPromptPlaces, placeIndexOf, savedPlacesOf } from "./place-lines";
 import type { PlaceName } from "../signals/place-names";
 import type { Coordinate } from "../signals/places";
 import { isDayWritable, type DayDate } from "../config/day-boundary";
@@ -426,7 +426,15 @@ async function runStages(
     ...(input.authorName !== undefined ? { authorName: input.authorName } : {}),
     signalsUsed: withoutVisits(signals),
     createdAt: input.now,
-    ...(generated.usedPhotos !== undefined ? { photos: generated.usedPhotos } : {}),
+    // 135 — 사진마다 속한 자리 순번을 함께 남긴다(data-model DM1·DM2). 어느 자리에도 들지 않으면 null — 135 이전 일기의 「키 없음」과 가른다
+    ...(generated.usedPhotos !== undefined
+      ? {
+          photos: generated.usedPhotos.map((p) => ({
+            ...p,
+            placeIndex: placeIndexOf(visits, p.photoId),
+          })),
+        }
+      : {}),
     ...(generated.timing !== undefined ? { timing: generated.timing } : {}),
     ...(savedPlaces !== undefined ? { places: savedPlaces } : {}),
   };
