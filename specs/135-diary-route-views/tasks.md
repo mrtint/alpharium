@@ -49,8 +49,8 @@
 
 - [X] T022 위반 주입: (a) `routeCardFor`가 시각으로 짐작하도록 바꾸면 `unlinked` 테스트가 잡는지 (b) WR5 숨김을 빼면 테스트가 잡는지 확인 후 되돌림
 - [X] T023 `npm test`·`npm run lint`(tsc·헌법 검사·prettier) 통과
-- [ ] T024 iOS 시뮬레이터에서 모양 확인(quickstart), 실기기 iPhone 14·SM-S901N dev 빌드에서 동작·저장된 `placeIndex` 확인, 결과를 `quickstart.md` 「기록」에
-- [ ] T025 AGENTS.md 「홈(Modernist)」 항목에 135 요약(지도 면·폴라로이드·`placeIndex`)을 고쳐 넣고 125·126의 「쓴 날 지면 맨 아래」 서술을 지도 면 날 기준으로 고친다; 로드맵 과제 본문의 「하단 바 버튼」 결정을 뒤집힌 것으로 고친다 — `AGENTS.md`, `docs/roadmap/README.md`
+- [ ] T024 iOS 시뮬레이터에서 모양 확인(quickstart), 실기기 iPhone 14·SM-S901N dev 빌드에서 동작·저장된 `placeIndex` 확인, 결과를 `quickstart.md` 「기록」에 — 시뮬레이터(모양·동작·저장값)는 2026-11-26 확인, 실기기 동작은 남음
+- [X] T025 AGENTS.md 「홈(Modernist)」 항목에 135 요약(지도 면·폴라로이드·`placeIndex`)을 고쳐 넣고 125·126의 「쓴 날 지면 맨 아래」 서술을 지도 면 날 기준으로 고친다; 로드맵 과제 본문의 「하단 바 버튼」 결정을 뒤집힌 것으로 고친다 — `AGENTS.md`, `docs/roadmap/README.md`
 
 ## Dependencies
 
