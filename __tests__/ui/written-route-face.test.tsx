@@ -254,9 +254,54 @@ describe("135 코드 리뷰 회귀", () => {
   });
 });
 
+describe("136 — 창이 열린 뒤 창 밖을 누르면 닫힌다(소유자, 2026-11-27)", () => {
+  it("★ 지도 그림은 누름을 가로채지 않는다 — 지도 위 빈 곳 누름이 아래 판에 닿는다", async () => {
+    await render(<WrittenDayPaper paper={paper(LINKED)} route={MAP_ROUTE} />);
+    await showMap();
+    expect(screen.getByTestId("route-canvas").props.pointerEvents).toBe("box-none");
+    expect(screen.getByTestId("route-camera").props.pointerEvents).toBe("box-none");
+  });
+
+  it("★ 창이 열려 있으면 지면의 나머지(글 등)를 덮는 판이 생기고, 누르면 창이 닫힌다", async () => {
+    await render(<WrittenDayPaper paper={paper(LINKED)} route={MAP_ROUTE} />);
+    await showMap();
+    expect(screen.queryByTestId("route-card-dismiss")).toBeNull();
+    await fireEvent.press(screen.getByTestId("route-marker-1"));
+    expect(screen.getByTestId("route-card")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("route-card-dismiss"));
+    expect(screen.queryByTestId("route-card")).toBeNull();
+    expect(screen.queryByTestId("route-card-dismiss")).toBeNull();
+  });
+
+  it("같은 점·다른 점·지도 빈 곳 누름 뒤에도 덮는 판이 창 상태를 따라간다", async () => {
+    await render(<WrittenDayPaper paper={paper(LINKED)} route={MAP_ROUTE} />);
+    await showMap();
+    await fireEvent.press(screen.getByTestId("route-marker-1"));
+    await fireEvent.press(screen.getByTestId("route-marker-2"));
+    expect(screen.getByTestId("route-card-dismiss")).toBeTruthy();
+    await fireEvent.press(screen.getByTestId("route-marker-2"));
+    expect(screen.queryByTestId("route-card-dismiss")).toBeNull();
+    await fireEvent.press(screen.getByTestId("route-marker-1"));
+    await fireEvent.press(screen.getByTestId("route-face-backdrop"));
+    expect(screen.queryByTestId("route-card-dismiss")).toBeNull();
+  });
+
+  it("사진 면으로 돌아가면 덮는 판이 남지 않는다", async () => {
+    await render(<WrittenDayPaper paper={paper(LINKED)} route={MAP_ROUTE} />);
+    await showMap();
+    await fireEvent.press(screen.getByTestId("route-marker-1"));
+    await fireEvent.press(screen.getByTestId("show-photos"));
+    expect(screen.queryByTestId("route-card-dismiss")).toBeNull();
+  });
+});
+
 describe("135 첫 진입 애니메이션 (소유자 결정 2026-11-26)", () => {
   beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => {
+    jest.useRealTimers();
+    // 동작 줄이기 시험의 접근성 스파이가 뒤 묶음으로 새지 않게
+    jest.restoreAllMocks();
+  });
   const runAll = async () => {
     await act(async () => {
       jest.runAllTimers();
