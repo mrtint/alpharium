@@ -104,7 +104,7 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 3. **사진 4장**: `VISION_PHOTO_LIMIT` 8 → 4. 같이 움직이는 것: 「사진이 더 있을 수 있어요」 판정(`availableCount >= VISION_PHOTO_LIMIT`), 023 선별 테스트, 쓴 날 캐러셀·`entry.photos`·`vision-cache/` 사본 수(하루 최대 8 → 4 — 099 백업 한도 위험이 줄어든다), 135 자리별 사진 카드, 092 박동 무게(사진 단계가 짧아진다).
 4. **프롬프트**: `prompt.ts`에 3줄 머리·분량 3구간·경량 신호 줄을 넣는다. 문안 정본이 `my-ollama` `hand-prompt/v5`(077)에서 terrarium `v5.3`으로 바뀐다 — AGENTS.md·주석의 정본 표기를 고친다.
 5. **1턴 제목**: `on-device.ts`의 제목 호출과 `titleQuestion()`을 걷고, `extractTitle()`이 `제목:` 접두를 떼게 한다(`MAX_TITLE_LENGTH` 40은 그대로, 접두가 없거나 길이를 넘으면 제목 없이 본문만 — 지어내지 않는다). 함께 걷을 것: `ProgressStage` `title`과 `monologue.title`(100), 123 `kvWarm`·제목 미리 읽기 건너뛰기, `withTitle`. `engine.ask`를 쓰는 곳이 남는지 센다.
-6. **런타임**: `flash_attn`을 넣을지 SM-S901N·iPhone 14에서 다시 잰다 — 123은 「이득 없음」으로 넣지 않았다. terrarium 수치는 데스크톱이라 기기 근거가 아니다.
+6. **런타임**: 이 과제에서는 `flash_attn`을 건드리지 않는다. 재측정은 「추론 런타임 파라미터를 실측값으로 맞춘다 (Android·iOS)」 과제가 `q8_0` KV 캐시와 묶어 맡는다([추론 런타임 프로파일링](../inference-runtime-profiling.md)).
 7. **문서**: AGENTS.md 「온디바이스 일기 생성」「캐릭터 페르소나」「VLM 캡션」「제목 구간」「iPhone 이어 하기」의 8장·2턴·영어 캡션 서술을 고친다. 소스 계약 문구 골든과 진단 프롬프트 미리보기(`prompt-preview`)를 맞춘다.
 
 **헌법·계약 점검 포인트**:
@@ -123,6 +123,26 @@ OS가 BGTask로 앱을 깨우는 것도 보았고, 강제로 호출한 백그라
 **완료 조건**: 두 실기기(SM-S901N·iPhone 14) dev 빌드에서 v1을 받아 둔 기기가 v2로 바뀌고(지움 → 받기 → 지문 통과), 사진 0~~1·2·3~~4장인 날과 사진 없는 날을 실제로 써서 제목이 1턴에서 붙고, 4갈래 판정·되뱉기 계약 테스트가 새 머리로 통과하고, 소유자가 일기를 읽고 받아들였다. 이어 하기(iOS) 회차 한 번에서 사진 단계·글 단계가 만료 없이 끝난다.
 
 **위험**: terrarium의 실사 VLM 결과가 자체 기준에 못 미쳤다 — 기기에서 읽은 일기가 v1보다 못하면 되돌릴 수 있어야 한다(로스터·프롬프트를 함께 되돌리는 한 커밋). 한국어 캡션은 영어보다 토큰이 많아 캡션 한 장 시간이 늘 수 있다 — 112의 앱 밖 멈춤 판정(32~39초)에 다시 닿는지 iPhone 14에서 본다. 문서 판정의 한국어 낱말은 「계산서」처럼 식당 사진 묘사에도 나올 수 있다(128에서 `table`을 뺀 선례) — 표본으로 오탐을 본다. 2턴 제목을 걷으면 100·123의 실측·코드가 같이 사라지니 AGENTS.md에서 지우는 서술을 빠뜨리지 않는다.
+
+### 추론 런타임 파라미터를 실측값으로 맞춘다 (Android·iOS)
+
+**배경**: 추론 파라미터의 실측 정리는 [추론 런타임 프로파일링](../inference-runtime-profiling.md)에 있다. Galaxy S22(`SM-S901N`)에서 `IQ4_NL` 4스레드·`use_mmap: false`는 피크 메모리를 2 GiB 아래로(2,578 → 1,590 MiB) 내리고 OpenCL GPU 오프로드는 CPU보다 3~9배 느려 쓸 수 없다고 나왔다. 그런데 `llama-port.ts`의 `n_ctx`·`n_gpu_layers` 주석은 아직 짐작으로 적혀 있고, `flash_attn_type`은 「이득 없음」이라며 꺼 둔 상태라 실측과 어긋난다. `flash_attn`은 실험에서 `pp512`가 1.9배 빨랐으나 기존 기록과 충돌하므로 기기에서 다시 재야 정한다. iPhone 14의 Metal·`BGTask` 수치는 아직 없다.
+
+**할 일**:
+
+1. `src/inference/llama-port.ts`의 짐작 주석(`n_ctx`, `n_gpu_layers`)을 실측 근거로 고친다.
+2. 플랫폼별 `contextParams()`에 `n_gpu_layers`·`n_threads`·`use_mmap`·`flash_attn_type`·`cache_type_k/v`를 실측 기준으로 반영하고 단위 테스트를 더한다. Android 포그라운드는 `n_gpu_layers: 0`, `n_threads: 4`, `use_mmap: false`를 후보로 두고, `flash_attn_type`과 `cache_type_k/v`(`q8_0`은 `flash_attn`이 필요하다)는 아래 기기 측정 뒤에 정한다. Android 백그라운드는 `assembly.ts`의 스레드 정책을 유지한다.
+3. Android 실기기(SM-S901N)에서 변경 전·후 피크 메모리(2 GiB 미만)와 일기 한 편의 생성 시간·수락률을 비교한다. `flash_attn`은 코드의 `undefined`(라이브러리 기본 `auto`), 명시 `on`, 명시 `off`를 구분해 같은 방식으로 재고, llama.cpp 로그에 실제 켜진 상태를 남긴다. `kv: q8_0`은 `flash_attn`이 켜져 있어야 하므로 두 값을 한 묶음으로 잰다. 「경합·스왑 오염」이 섞인 조건(기존 E2E `f16` 참고치 같은 것)은 비교 근거로 쓰지 않는다.
+4. 미측정 상태인 iPhone 14 실기기에서 Metal(`n_gpu_layers: 99`) 포그라운드와 `BGTask` 백그라운드의 `phys_footprint`·Jetsam 안정성을 잰 뒤 iOS 파라미터를 확정한다.
+
+**완료 조건**: Android 파라미터가 실측 근거와 함께 코드·테스트에 들어가고, `flash_attn` 채택 여부가 로그와 함께 기록됐다. iOS 파라미터는 실측이 끝난 것만 확정하고 나머지는 `[미측정]`으로 남긴다.
+
+**위험**:
+
+- Android `use_mmap: false` 전환은 콜드 로드 시간을 조금 늘릴 수 있다. 4 GB RAM 이하 저사양 단말에서는 LMK 위험이 있어 `cache_type_k/v: 'q8_0'` 폴백 기준을 먼저 정해야 한다. 이 기기는 RAM 7.4 GB라 저사양 동작은 보지 못했다.
+- iPhone 14(6 GB RAM)에서 `n_gpu_layers: 99`와 `use_mmap: false`를 함께 쓰면 Jetsam 종료가 날 수 있다. iOS 포그라운드에서 `use_mmap`을 유지할지 실측 없이 정하지 않는다.
+- 실험의 E2E 수치는 하네스 값이고 1회 측정이다. 앱 경로에서 다시 재기 전에는 시간 목표로 삼지 않는다.
+- 일기 모델 v2 과제의 런타임 항목(`flash_attn` 재측정)과 내용이 겹친다. 어느 과제가 맡을지 소유자가 정한다.
 
 ## 완료 이력
 
