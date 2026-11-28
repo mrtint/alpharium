@@ -1,0 +1,9 @@
+{
+  "name": "pocketlog-ipad-window",
+  "version": "1.0.0",
+  "private": true,
+  "description": "iPad 창 모드에서 창 조절 점이 앱을 덮지 않게 하고 가로에서 바로 서게 하는 로컬 Expo 모듈 (139)",
+  "license": "UNLICENSED",
+  "author": "a810labs",
+  "homepage": "https://github.com/mrtint/alpharium"
+}
