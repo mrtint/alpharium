@@ -3,6 +3,8 @@
  *
  * 한도는 두 콘솔의 값이다(짐작 — 제출 시점에 콘솔 도움말과 대조해 `device-check.md`에 적는다, S9).
  * 모델 식별자 금지는 헌법 원칙 III이 앱 화면에서 금하는 것과 같은 목록을 스토어 글에도 적용한 것이다.
+ * 2026-11-28: 121 뒤 거짓이 된 「좌표를 지도 서비스에 보낸다」류의 주장과 App Store 키워드의 바이트 한도·
+ * 앱 이름 중복을 잠근다(Apple 「Platform version information」 도움말).
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -43,6 +45,14 @@ const MODEL_IDENTIFIER = new RegExp(
 );
 
 const read = (file: ListingFile) => readFileSync(join(DIR, file), "utf8");
+/** 121에서 걷은 동작 — 좌표는 휴대폰 밖으로 나가지 않고 장소 이름은 앱에 든 지도 자료에서 찾는다 */
+const STALE_PLACE_CLAIM =
+  /지도\s?서비스|지오코(딩|더)|좌표[^.\n]{0,30}(보낼|보내요|보냅니다|전송해|전송합)/;
+/** App Store 키워드 — 도움말은 「up to 100 bytes」(제품 페이지 문서는 100 characters). 더 좁은 쪽을 지킨다 */
+const KEYWORD_BYTE_LIMIT = 100;
+const APP_NAME = "포켓로그";
+const bytes = (text: string) => Buffer.byteLength(text.replace(/\n$/, ""), "utf8");
+
 /** 끝 개행만 뺀 글자 수(유니코드 코드 포인트) */
 const length = (text: string) => [...text.replace(/\n$/, "")].length;
 
@@ -57,6 +67,20 @@ describe("102 스토어 설명문", () => {
   it("S2: 글자 수 한도 — 제목 30·부제 30·짧은 설명 80·긴 설명 4000·키워드 100", () => {
     for (const file of FILES) {
       expect({ file, ok: length(read(file)) <= LIMITS[file] }).toEqual({ file, ok: true });
+    }
+  });
+
+  it("App Store 키워드는 UTF-8 100바이트 안이고 앱 이름을 되풀이하지 않는다", () => {
+    expect(bytes(read("keywords.txt"))).toBeLessThanOrEqual(KEYWORD_BYTE_LIMIT);
+    expect(read("keywords.txt")).not.toContain(APP_NAME);
+  });
+
+  it("좌표를 지도 서비스에 보낸다는 낡은 주장이 없다(121)", () => {
+    for (const file of FILES) {
+      expect({ file, hit: STALE_PLACE_CLAIM.exec(read(file))?.[0] ?? null }).toEqual({
+        file,
+        hit: null,
+      });
     }
   });
 
@@ -98,6 +122,30 @@ describe("102 스토어 설명문 — 위반 주입 (S8)", () => {
     const long = "가".repeat(31);
     expect(length(long)).toBeGreaterThan(LIMITS["title.txt"]);
     expect(length("가".repeat(30) + "\n")).toBeLessThanOrEqual(LIMITS["title.txt"]);
+  });
+
+  it("글자 한도 안이어도 100바이트를 넘는 키워드는 바이트 검사가 잡는다", () => {
+    const long = "가".repeat(34); // 34자 · 102바이트
+    expect(length(long)).toBeLessThanOrEqual(LIMITS["keywords.txt"]);
+    expect(bytes(long)).toBeGreaterThan(KEYWORD_BYTE_LIMIT);
+    expect(bytes("가".repeat(33) + "a\n")).toBe(KEYWORD_BYTE_LIMIT);
+  });
+
+  it("낡은 장소 문장은 잡고 지금 문장은 통과시킨다", () => {
+    for (const bad of [
+      "장소 이름을 얻으려고 사진의 좌표 하나를 휴대폰의 지도 서비스에 보낼 수 있어요.",
+      "사진의 좌표를 서버로 보냅니다.",
+      "좌표 하나를 전송해 이름을 찾아요.",
+      "기기의 지오코딩을 써요.",
+    ]) {
+      expect({ bad, hit: STALE_PLACE_CLAIM.test(bad) }).toEqual({ bad, hit: true });
+    }
+    for (const ok of [
+      "장소 이름은 앱에 함께 든 지도 자료에서 찾아서, 사진의 좌표를 휴대폰 밖으로 보내지 않아요.",
+      "좌표를 휴대폰 밖으로 보내지 않습니다.",
+    ]) {
+      expect({ ok, hit: STALE_PLACE_CLAIM.test(ok) }).toEqual({ ok, hit: false });
+    }
   });
 
   it("모델 이름·파라미터 수·양자화 표기는 식별자 검사가 잡는다", () => {
